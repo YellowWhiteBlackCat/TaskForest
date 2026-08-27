@@ -8,7 +8,10 @@ description = "Portable safe-I/O provider implementations shared by TaskForest n
 publish = false
 
 [dependencies]
-battery = "0.7"
+# Maintained continuation of the archived svartalf/rust-battery 0.7 crate.
+# Upstream hard-pinned nix ^0.19 (RUSTSEC-2021-0119 getgrouplist OOB write)
+# and can never move; the fork dropped the vulnerable nix edge entirely.
+starship-battery = "0.11"
 taskmanager-core = { path = "../taskmanager-core" }
 taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-platform-provider = { path = "../taskmanager-platform-provider" }

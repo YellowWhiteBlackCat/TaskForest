@@ -3,11 +3,11 @@ use super::*;
 #[test]
 fn battery_status_labels_cover_every_state() {
     for (state, expected) in [
-        (battery::State::Charging, "Charging"),
-        (battery::State::Discharging, "Discharging"),
-        (battery::State::Full, "Full"),
-        (battery::State::Empty, "Empty"),
-        (battery::State::Unknown, "Unknown"),
+        (starship_battery::State::Charging, "Charging"),
+        (starship_battery::State::Discharging, "Discharging"),
+        (starship_battery::State::Full, "Full"),
+        (starship_battery::State::Empty, "Empty"),
+        (starship_battery::State::Unknown, "Unknown"),
     ] {
         assert_eq!(status_label(state), expected);
     }

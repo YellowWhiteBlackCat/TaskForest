@@ -386,7 +386,10 @@ version = "0.2.2"
 package = "gpui_sum_tree"
 
 [dependencies.taffy]
-version = "=0.9.0"
+# 0.9.x resolves grid 0.18 (CVE-2026-42199: integer overflow in
+# Grid::expand_rows reachable from safe API; fixed from grid 1.0, which the
+# taffy >=0.10 line depends on). Keep in sync on every upstream gpui bump.
+version = "=0.10.1"
 
 [dependencies.thiserror]
 version = "2.0.12"

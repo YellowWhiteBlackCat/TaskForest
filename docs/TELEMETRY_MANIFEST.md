@@ -9,7 +9,7 @@
 
 1. **三平台对等契约 (Uniform Contract)**：所有平台适配器均实现统一的 `taskmanager-platform-contract` 与 `taskmanager-platform-provider` 特征集，产出 toolkit-neutral 的 Core DTO 模型。
 2. **安全分级路径 (Safety Hierarchy)**：
-   - 首选 **(A) 社区成熟且已审计的 Safe Rust 库**（如 `sysinfo`、`raw-cpuid`、`battery`、`smbioslib`、`notify-rust`、`windows-registry`、`windows-service`）；
+   - 首选 **(A) 社区成熟且已审计的 Safe Rust 库**（如 `sysinfo`、`raw-cpuid`、`starship-battery`、`smbioslib`、`notify-rust`、`windows-registry`、`windows-service`）；
    - 必备极小原生 ABI 走 **(B) 独立最小审计边界 crate**（Linux 的 `perf-ioctl`、`afpacket`、`fd-bridge`；Windows 的 `taskmanager-windows-api`；严格做到 `#![deny(unsafe_op_in_unsafe_fn)]` 与 `// SAFETY:` 逐块注释，零 handle/pointer 穿透）；
    - 固定的辅助兼容工具走 **(C) 有界受限 Shell-out**（仅限 `smartctl`、`explorer /select` 等，固定参数、硬超时、stdout/stderr 单流与两流合计均为 4 MiB 上限并保证 kill/wait/reader 回收，**禁止作为遥测核心路径**，Windows 生产与测试严格禁用 PowerShell/CMD 解释器进行遥测）；
    - 无合格 Safe 来源或涉及不可控全局框架的指标，如实返回 **`Unsupported` / `Unavailable`**。
@@ -153,7 +153,7 @@ swap 读出（`/proc/swaps` used 口径）、压缩深度（orig→compr + 守�
 |---|---|---|---|---|
 | **登录用户与会话清单** | • `systemd-logind` D-Bus / `utmpx` | • `taskmanager-windows-api::enumerate_sessions()` (`WTSEnumerateSessionsW` + `WTSQuerySessionInformationW`) | • `utmpx` (`getutxent`) / `who` | **User** (Windows 走 ADR-031 RAII 内存释放) |
 | **注销会话 (Logoff Session)** | • `logind` `TerminateSession` | • `taskmanager-windows-api::logoff_session(session_id)` (`WTSLogoffSession`) | • `pkill -u <user>` | **User / Admin** (ADR-031 边界保护) |
-| **电池与电源供应状态、健康与续航估计** | • `/sys/class/power_supply/*`：`energy_full`/`energy_full_design`（无 energy 节点时以 charge × voltage 明确降级）、`time_to_empty_now`/`time_to_full_now`，status gate 只在 Discharging/Charging 时接受对应估计<br>• `battery` crate 作为 portable 路径 | • `battery` crate (`GetSystemPowerStatus`) 的 energy-full/design 与 native time estimates；未报告的值为 typed `Unsupported` | • `battery` crate (`IOPMPowerSource`) 的 energy-full/design 与 native time estimates；未报告的值为 typed `Unsupported` | **User** (Safe Rust；health = full/design 的纯比例，估计缺失/状态不适用绝不显示零或错误的另一侧) |
+| **电池与电源供应状态、健康与续航估计** | • `/sys/class/power_supply/*`：`energy_full`/`energy_full_design`（无 energy 节点时以 charge × voltage 明确降级）、`time_to_empty_now`/`time_to_full_now`，status gate 只在 Discharging/Charging 时接受对应估计<br>• `starship-battery` crate 作为 portable 路径 | • `starship-battery` crate (`GetSystemPowerStatus`) 的 energy-full/design 与 native time estimates；未报告的值为 typed `Unsupported` | • `starship-battery` crate (`IOPMPowerSource`) 的 energy-full/design 与 native time estimates；未报告的值为 typed `Unsupported` | **User** (Safe Rust；health = full/design 的纯比例，估计缺失/状态不适用绝不显示零或错误的另一侧) |
 | **桌面深浅色与高对比度外观** | • XDG Desktop Portal `org.freedesktop.portal.Settings` (D-Bus) | • `windows-registry` 查询 `Personalize\\AppsUseLightTheme` 与 `Accessibility\\HighContrastOn` | • `defaults read -g AppleInterfaceStyle` | **User** (Safe Rust) |
 | **桌面 Toast 告警通知 (`alerts.notify`)** | • `notify-rust` (通过 freedesktop D-Bus 接口通知系统通知中心) | • `notify-rust` (调用 Windows 原生 WinRT Toast 通知) | • `notify-rust` (`NSUserNotification` / `osascript`) | **User** (Safe Rust) |
 | **资源管理器文件定位 (`shell.resource.reveal`)** | • D-Bus `org.freedesktop.FileManager1.ShowItems`<br>• 降级为 `xdg-open` | • exact creation token 校验后 `explorer.exe /select,<path>`（路径只是 payload，不是身份） | • typed `Unsupported`，直至可先验证 exact process identity | **User** (target identity + 参数校验；拒绝必须先于桌面副作用) |
