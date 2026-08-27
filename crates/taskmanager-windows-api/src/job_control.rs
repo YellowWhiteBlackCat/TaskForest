@@ -255,8 +255,10 @@ fn apply_limits_to_job(
     .map_err(set_information_failure)?;
 
     if let Some(percent) = limits.cpu_rate_percent {
-        let mut rate = JOBOBJECT_CPU_RATE_CONTROL_INFORMATION::default();
-        rate.ControlFlags = JOB_OBJECT_CPU_RATE_CONTROL_ENABLE;
+        let mut rate = JOBOBJECT_CPU_RATE_CONTROL_INFORMATION {
+            ControlFlags: JOB_OBJECT_CPU_RATE_CONTROL_ENABLE,
+            ..Default::default()
+        };
         let rate_size = u32::try_from(size_of::<JOBOBJECT_CPU_RATE_CONTROL_INFORMATION>())
             .map_err(|_| WindowsApiError::ResourceLimit)?;
         // SAFETY: writing the rate variant of the documented union; the

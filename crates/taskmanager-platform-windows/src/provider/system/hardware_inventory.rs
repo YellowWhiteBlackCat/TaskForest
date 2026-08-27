@@ -201,12 +201,12 @@ fn package_count_facts_for_target() -> (Option<u64>, SourceStatus) {
             // An entry that cannot be opened or carries no usable
             // DisplayName is not an installed app; skipping it mirrors how
             // the Settings app ignores broken ARP rows.
-            if let Ok(entry) = key.open(&name) {
-                if let Ok(display_name) = entry.get_string("DisplayName") {
-                    if !display_name.trim().is_empty() {
-                        count += 1;
-                    }
-                }
+            if let Ok(display_name) = key
+                .open(&name)
+                .and_then(|entry| entry.get_string("DisplayName"))
+                && !display_name.trim().is_empty()
+            {
+                count += 1;
             }
         }
         HiveScan::Counted(count)

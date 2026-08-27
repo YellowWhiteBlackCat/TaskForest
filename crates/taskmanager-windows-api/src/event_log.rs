@@ -555,10 +555,10 @@ fn render_event_xml(
             )
         }
     };
-    if let Err(error) = sizing {
-        if error.code() != ERROR_INSUFFICIENT_BUFFER.to_hresult() {
-            return Err(map_event_log_error(error));
-        }
+    if let Err(error) = sizing
+        && error.code() != ERROR_INSUFFICIENT_BUFFER.to_hresult()
+    {
+        return Err(map_event_log_error(error));
     }
     if used == 0 {
         return Ok(String::new());

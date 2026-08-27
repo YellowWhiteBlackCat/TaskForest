@@ -380,6 +380,9 @@ fn join_reader(
         .map_err(Into::into)
 }
 
-#[cfg(test)]
+// Every fixture in this module drives unix process semantics (fork/signal
+// side effects); mounting it on Windows compiled an unused `super::*` import
+// and zero tests under -D warnings.
+#[cfg(all(test, unix))]
 #[path = "../tests/headless/command.rs"]
 mod tests;

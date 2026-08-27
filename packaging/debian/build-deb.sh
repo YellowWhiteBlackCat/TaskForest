@@ -25,6 +25,12 @@ version=$2
 output=$3
 deb_arch=${4:-amd64}
 
+# Debian sorts a plain revision above the no-revision upstream version, so a
+# Cargo prerelease like 0.1.0-rc.1 becomes 0.1.0~rc.1 — below the final
+# release, matching the rpm conversion in build-rpm.sh. The replacement is
+# quoted: an unquoted bare '~' inside ${//} expands to $HOME.
+deb_version=${version//'-'/'~'}
+
 case "$deb_arch" in
     amd64|arm64) ;;
     *) echo "build-deb: unsupported Debian architecture '$deb_arch'" >&2; exit 1 ;;
@@ -45,7 +51,7 @@ chmod 755 "$work" "$work/usr"
 installed_size=$(du -sk --exclude=DEBIAN "$work/usr" | cut -f1)
 mkdir -p "$work/DEBIAN"
 chmod 755 "$work/DEBIAN"
-sed -e "s/__VERSION__/$version/" \
+sed -e "s/__VERSION__/$deb_version/" \
     -e "s/__ARCH__/$deb_arch/" \
     -e "s/__INSTALLED_SIZE__/$installed_size/" \
     "$script_dir/control" >"$work/DEBIAN/control"

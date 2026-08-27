@@ -30,6 +30,10 @@ pub use taskmanager_application::i18n;
 pub use taskmanager_core::core;
 pub use taskmanager_core::core::*;
 
-#[cfg(test)]
+// Mounted for the Linux-only /proc fixture tests that src/*.rs modules pull
+// in through `#[path]` (see cli_process_gpu.rs). The cfg mirrors the one
+// consumer: mounting it on Windows/macOS leaves the scratch helper unused
+// under -D warnings because no lib-side caller compiles there.
+#[cfg(all(test, target_os = "linux"))]
 #[path = "../tests/common/test_support.rs"]
 pub(crate) mod test_support;

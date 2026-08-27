@@ -111,10 +111,39 @@ fn memory_pressure_rate_is_signed_for_freed_memory() {
 }
 
 #[test]
-fn container_provider_refreshes_healthy_wsl_rollup() {
+fn live_container_provider_refreshes_a_typed_wsl_rollup() {
     let mut provider = WinContainerRollupProvider::new();
-    let rollup = provider.refresh(1_000).expect("healthy wsl rollup");
-    assert_eq!(rollup.state.status, DeviceStatus::Healthy);
+    let rollup = provider
+        .refresh(1_000)
+        .expect("the rollup reports itself as typed state, never an error");
+    // WSL presence, running sets, and sample completeness vary per host, so
+    // Healthy and Stale are both honest native outcomes. The contract is the
+    // distribution-scoped summary set itself: unique wsl-prefixed identities,
+    // a wsl:// locator per distro, and no guessed runtime family.
+    assert!(
+        matches!(
+            rollup.state.status,
+            DeviceStatus::Healthy | DeviceStatus::Stale
+        ),
+        "a native WSL rollup resolves to Healthy or Stale, got {:?}",
+        rollup.state.status,
+    );
+    let mut seen = std::collections::HashSet::new();
+    for container in &rollup.containers {
+        assert!(!container.name.trim().is_empty());
+        assert_eq!(container.id, format!("wsl:{}", container.name));
+        assert_eq!(container.cgroup_path, format!("wsl://{}", container.name));
+        assert!(
+            matches!(
+                container.runtime,
+                Some(
+                    taskmanager_core::IsolationKind::Wsl | taskmanager_core::IsolationKind::Docker
+                )
+            ),
+            "a WSL distro stays in the wsl/docker runtime family"
+        );
+        assert!(seen.insert(container.id.clone()), "ids stay unique");
+    }
 }
 
 #[test]

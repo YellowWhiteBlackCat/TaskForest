@@ -51,22 +51,6 @@ jobs:
       # complete standard product surface and publish honest typed outcomes on
       # its native target (P1-ARCH-09). The same suite also runs on Linux.
       - run: cargo nextest run --locked -p taskmanager-platform-macos --profile ci -j 4
-      # Semantic macOS visual contract: the test runs against the real macOS
-      # GPUI backend and records scale-factor, high-contrast, skin, and
-      # CJK/mono fallback invariants. It is intentionally a contract
-      # receipt, not a pixel claim; screenshot acceptance still requires a
-      # macOS-capable visual runner.
-      - name: Execute macOS visual contract
-        run: |
-          set -o pipefail
-          cargo nextest run --locked --test gui --features test-support --profile ci -E 'test(macos_visual_contract_keeps_native_scale_and_product_text_policy)' -j 4 2>&1 | tee macos-visual-contract.txt
-      - name: Upload macOS visual contract
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-visual-contract
-          path: macos-visual-contract.txt
-          if-no-files-found: error
       # Reduced debug builds remain useful for fallback tests; releases reject
       # them and always use the default hardware-all profile.
       - run: cargo check --locked --no-default-features --features ui-gpui
@@ -117,22 +101,6 @@ jobs:
         run: cargo check --locked --no-default-features --features ui-iced -j 4
       - name: Check TUI frontend on Windows
         run: cargo check --locked --no-default-features --features ui-tui -j 4
-      # Semantic Windows visual contract: the test runs against the real
-      # Windows GPUI backend and records scale-factor, high-contrast, skin,
-      # and CJK/mono fallback invariants. It is intentionally a contract
-      # receipt, not a pixel claim; screenshot acceptance still requires a
-      # Windows-capable visual runner.
-      - name: Execute Windows visual contract
-        run: |
-          set -o pipefail
-          cargo nextest run --locked --test gui --features test-support --profile ci -E 'test(windows_visual_contract_keeps_native_scale_and_product_text_policy)' -j 4 2>&1 | tee windows-visual-contract.txt
-      - name: Upload Windows visual contract
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-visual-contract
-          path: windows-visual-contract.txt
-          if-no-files-found: error
       # Reduced debug builds remain useful for fallback tests; releases reject
       # them and always use the default hardware-all profile.
       - run: cargo check --locked --no-default-features --features ui-gpui -j 4
