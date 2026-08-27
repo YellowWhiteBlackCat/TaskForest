@@ -32,6 +32,9 @@ PRIVATE_PATH_PATTERN = re.compile(
 ALLOWED_EMAILS = {
     "noreply@yellowwhiteblackcat.github.io",
     "noreply@anthropic.com",
+    # GitHub's generic committer identity for squash/web-flow merges: it
+    # carries no personal data, unlike the per-account noreply suffix.
+    "noreply@github.com",
     # Public upstream package metadata retained in patch provenance.
     "nathan@zed.dev",
     "creepy-skeleton@yandex.ru",
