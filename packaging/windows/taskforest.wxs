@@ -69,6 +69,6 @@
          user pick INSTALLFOLDER instead of always landing in Program Files;
          the RTF for the license dialog is bound by build-msi.sh. -->
     <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <UIRef Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UIRef Id="WixUI_InstallDir" />
   </Package>
 </Wix>
