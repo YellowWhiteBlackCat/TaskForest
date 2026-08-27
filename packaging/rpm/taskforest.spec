@@ -61,3 +61,4 @@ tar -xf %{SOURCE0} -C %{buildroot}
 /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.setup.policy
 %dir /usr/share/licenses/taskforest
 /usr/share/licenses/taskforest/LICENSE
+/usr/share/licenses/taskforest/THIRD-PARTY-NOTICES.txt
