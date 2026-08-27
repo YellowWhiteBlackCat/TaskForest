@@ -11,7 +11,7 @@ fn frozen(pid: u32) -> FrozenProcessIdentity {
 fn live_frozen(pid: u32) -> FrozenProcessIdentity {
     let token = taskmanager_windows_api::process_creation_time_100ns(pid)
         .expect("current process creation time");
-    FrozenProcessIdentity::from_authoritative_parts(pid, "test", token, 1)
+    FrozenProcessIdentity::from_authoritative_parts(pid, "test", 1, token)
         .expect("valid live identity")
 }
 

@@ -179,7 +179,7 @@ fn read_cached_edid(monitor_instance: &str) -> Option<Vec<u8>> {
         return None;
     }
     let length = usize::try_from(byte_size).ok()?;
-    if length < 128 || length > MAX_EDID_BYTES {
+    if !(128..=MAX_EDID_BYTES).contains(&length) {
         return None;
     }
     let mut bytes = vec![0_u8; length];

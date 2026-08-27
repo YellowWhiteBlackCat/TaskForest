@@ -168,8 +168,17 @@ fn full_nonterminal_observation_coalesces_without_blocking_control() {
         Ok(RequestId::new(3).expect("fixture id"))
     );
 
-    let _ = observation_rx.recv_timeout(Duration::from_millis(100));
+    // The enqueue path is non-blocking, so joining before the drain proves
+    // the full queue alone cannot stall the lane; draining afterwards pins
+    // which event was retained regardless of scheduling order.
     assert!(!observation_thread.join().expect("observation publisher"));
+    assert_eq!(
+        observation_rx
+            .recv_timeout(Duration::from_millis(100))
+            .map(|event| event.request_id),
+        Ok(RequestId::new(1).expect("fixture id")),
+        "the queued observation stays delivered while the overflow coalesces"
+    );
     control_thread.join().expect("control publisher");
 }
 

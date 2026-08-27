@@ -262,6 +262,8 @@ fn batch_event_count(batch: &PlatformEventBatch) -> usize {
         + batch.sensor_events.len()
         + batch.power_supply_events.len()
         + batch.smart_events.len()
+        + batch.gpu_engine_rows_events.len()
+        + batch.npu_inventory_events.len()
         + batch.failures.len()
 }
 
@@ -524,10 +526,8 @@ fn observation_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         );
     }
 
-    // containers.rollup rides the SNAPSHOT lane (not the failure lane): Windows
-    // has no cgroup-v2, so the provider returns a typed-unavailable rollup
-    // whose DeviceState is Unsupported. The snapshot must reach the batch so
-    // the page shows the honest "containers.unsupported" reason — never the
+    // containers.rollup rides the SNAPSHOT lane (not the failure lane): the
+    // Windows provider publishes its live WSL rollup as typed state, never the
     // doubly-dishonest empty-healthy "no containers detected" default.
     let containers_rollup = drains
         .batches
@@ -541,7 +541,7 @@ fn observation_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
     assert!(
         matches!(
             containers_rollup.state.status,
-            DeviceStatus::Healthy | DeviceStatus::Unsupported
+            DeviceStatus::Healthy | DeviceStatus::Stale
         ),
         "Windows containers rollup must carry a typed DeviceState"
     );
@@ -593,7 +593,10 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
             SessionControlRequest {
                 request_id: request_ids.begin(),
                 session_id: SessionId::new("contract.fixture.session"),
-                action: SessionControlAction::Lock,
+                // Disconnect uses a deliberately malformed fixture identity,
+                // so the provider returns a typed identity failure without
+                // locking or logging off a real CI session.
+                action: SessionControlAction::Disconnect,
             },
             1,
         ),
@@ -891,10 +894,10 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         })
         .collect();
     assert_eq!(session_outcomes.len(), 1);
-    // Session control is implemented through the WTS native boundary; Lock has
-    // no per-session API. On Linux CI it degrades to a typed non-Unsupported failure embedded
-    // in the correlated outcome — host-independent: it must be an error and must
-    // NOT be Unsupported (the capability is no longer pending).
+    // Session control is implemented through the WTS native boundary. The
+    // malformed Disconnect fixture above must produce a typed identity failure
+    // without touching a real session; the correlated result is therefore an
+    // error and must NOT be Unsupported (the capability is implemented).
     assert!(
         session_outcomes[0].result.is_err(),
         "session control outcome must embed a typed failure"

@@ -5,19 +5,13 @@ fn gpu_and_npu_adapter_enumeration() {
     let result = enumerate_gpu_adapters();
     #[cfg(windows)]
     {
-        if let Ok(inventory) = result {
-            for adapter in &inventory.adapters {
-                eprintln!("LIVE GPU/NPU ADAPTER: {adapter:?}");
-                assert!(!adapter.name.is_empty());
-            }
-            let has_intel_arc = inventory
-                .adapters
-                .iter()
-                .any(|a| a.name.contains("Intel(R) Arc"));
-            let has_npu = inventory.adapters.iter().any(|a| a.is_npu);
-            eprintln!("Has Intel Arc: {has_intel_arc}, Has NPU: {has_npu}");
-            assert!(has_intel_arc);
-            assert!(has_npu);
+        let inventory = result.expect("DXGI adapter enumeration should be queryable");
+        assert!(inventory.adapters.len() <= MAX_GPU_ADAPTERS as usize);
+        for adapter in &inventory.adapters {
+            // The runner may expose a physical GPU, a virtual adapter, or
+            // only the Microsoft Basic Render Driver. Hardware vendor and NPU
+            // presence are runtime capabilities, not test preconditions.
+            assert!(!adapter.name.trim().is_empty());
         }
     }
     #[cfg(not(windows))]
