@@ -39,7 +39,7 @@ esac
 
 case "$msi_arch" in
     x64|arm64) ;;
-    *) echo "build-msi: MSI_ARCH must be x64 or arm64" >&2; exit 1 ;;
+    *) echo "build-msi: MSI_ARCH must be x64 or arm64, got '$msi_arch'" >&2; exit 1 ;;
 esac
 
 # Third-party notices ship inside the MSI next to the license: the release
@@ -47,7 +47,7 @@ esac
 # must ride with the installer. Generated from the Cargo.lock graph at build
 # time; the staged file is never hand-edited.
 py=$(command -v python3 || command -v python || true)
-[[ -n "$py" ]] || { echo "build-msi: python3 required for THIRD-PARTY-NOTICES.txt" >&2; exit 1; }
+[[ -n "$py" ]] || { echo "build-msi: python3 or python required for THIRD-PARTY-NOTICES.txt" >&2; exit 1; }
 "$py" "$repo/scripts/gen_third_party_notices.py" "$stage/THIRD-PARTY-NOTICES.txt"
 
 wix build -acceptEula wix7 -arch "$msi_arch" \
