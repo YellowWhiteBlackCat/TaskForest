@@ -47,7 +47,7 @@ This document does not copy host counts, audit dates or receipt status.
 
 | Group | Files and responsibility | Owner / removal authority |
 |---|---|---|
-| Package base | `/usr/bin/taskmanager` compatibility entry, the `taskforest-g` GPUI binary, the TaskForestG `.desktop` entry, AppStream metadata, SVG icon, setup payload, setup polkit policy | Root package transaction — the same staged tree ships as the Arch package, the `.deb`, and the `.rpm` (layout authority: `packaging/arch/PKGBUILD`); remove with `pacman -Rns taskforest-git` / `dpkg -r taskforest` / `rpm -e taskforest`, never ad hoc `rm` |
+| Package base | `/usr/bin/taskmanager` compatibility entry, the `taskforest-g` GPUI binary, the TaskForestG `.desktop` entry, AppStream metadata, SVG icon, setup payload, setup polkit policy, and the generated third-party notices under `/usr/share/licenses/taskforest/` | Root package transaction — the same staged tree ships as the Arch package, the `.deb`, and the `.rpm` (layout authority: `packaging/arch/PKGBUILD`); remove with `pacman -Rns taskforest-git` / `dpkg -r taskforest` / `rpm -e taskforest`, never ad hoc `rm` |
 | Optional RAPL setup | `/etc/udev/rules.d/99-taskmanager.rules` | Root, but only through `taskmanager-setup-helper install/revert`; exact content and atomic rollback |
 | GPU PMU optional capability | `taskmanager-privilege-helper` plus `com.taskforest.perf-helper.policy` | Package transaction or [`scripts/manage-polkit-install.sh`](../scripts/manage-polkit-install.sh) `perf` transaction |
 | Per-process network optional capability | `taskmanager-net-launcher` plus `com.taskforest.net-launcher.policy` | Package transaction or the same manager's `net` transaction |

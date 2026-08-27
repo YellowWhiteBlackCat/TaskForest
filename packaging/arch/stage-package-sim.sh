@@ -16,7 +16,8 @@
 #
 # Prerequisites: the release binaries from build() must already exist under
 # target/release (the GPUI shape artifact plus the setup, privilege, network,
-# and process-control helpers; the package surface is GPUI-only).
+# and process-control helpers; the package surface is GPUI-only) and python3
+# for the notices generation.
 #
 # Usage: packaging/arch/stage-package-sim.sh [staging-dir]
 # (default: a self-cleaning directory under the repo's gitignored .tmp/)
@@ -45,6 +46,10 @@ trap 'if (( cleanup )); then rm -rf "$pkgdir"; fi' EXIT
 pkgname=taskforest-git
 pkgdir="$pkgdir"
 export pkgname pkgdir
+
+# The notices file is generated the same way PKGBUILD build() does, so the
+# replay below stages the exact file a real package would ship.
+python3 scripts/gen_third_party_notices.py target/release/THIRD-PARTY-NOTICES.txt
 
 # --- 1. run every install line of package() verbatim ------------------------
 # The PKGBUILD is reviewed repo content (makepkg sources it wholesale), so

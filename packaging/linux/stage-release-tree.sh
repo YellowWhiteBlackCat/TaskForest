@@ -16,7 +16,8 @@
 # Prerequisites: release binaries must exist under target/release —
 # taskforest-g, taskmanager-setup-helper,
 # taskmanager-privilege-helper, taskmanager-net-launcher, and
-# taskmanager-process-control-helper (the PKGBUILD build() set).
+# taskmanager-process-control-helper (the PKGBUILD build() set) — plus
+# python3, which regenerates the third-party notices file.
 #
 # Usage: packaging/linux/stage-release-tree.sh OUTPUT_DIR
 set -euo pipefail
@@ -33,6 +34,11 @@ fi
 pkgdir=$1
 mkdir -p "$pkgdir"
 pkgdir=$(cd "$pkgdir" && pwd)
+
+# The third-party notices file is a build artifact of the dependency closure:
+# regenerate it beside the release binaries (the same step PKGBUILD build()
+# runs) so the replayed install lines below never depend on a stale copy.
+python3 scripts/gen_third_party_notices.py target/release/THIRD-PARTY-NOTICES.txt
 
 # makepkg's package() environment: the lines below reference exactly these.
 pkgname=taskforest-git
