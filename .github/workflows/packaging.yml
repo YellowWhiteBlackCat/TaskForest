@@ -230,11 +230,16 @@ jobs:
       # optional extension; without it `wix build -ext WixToolset.UI.wixext`
       # fails with WIX0144 (seen on the rc.2 tag run 33060554020). Keep the
       # tool and extension on the same exact version so a future WiX release
-      # cannot silently change the release installer.
+      # cannot silently change the release installer. WiX v7 additionally
+      # gates EVERY command behind the OSMF EULA acknowledgement (WIX7015,
+      # seen on rehearsal run 33065976879); `eula accept` writes the per-user
+      # sentinel so build/decompile keep working even with their own
+      # -acceptEula flags removed later.
       - name: Install WiX
         shell: bash
         run: |
           dotnet tool install --global wix --version 7.0.0
+          wix eula accept wix7
           wix extension add --global WixToolset.UI.wixext/7.0.0
           wix extension list --global
       # MSI ProductVersion is numeric x.y.z: strip any prerelease suffix; the
