@@ -50,6 +50,8 @@ CI 在构建后使用 Windows Installer 管理提取验证 MSI 数据库和关�
 - 默认要求 tag 版本与根 `Cargo.toml` 完全一致；
 - `Cargo.lock` 必须提交且 `cargo metadata --locked` 通过；
 - prerelease tag 自动创建 GitHub prerelease；
+- DEB/RPM 的版本字段禁止预发布连字符：`0.1.0-rc.1` 落盘为 `0.1.0~rc.1`
+  （~ 排序低于正式版，保证 rc 可被 `0.1.0` 升级覆盖）；
 - MSI ProductVersion 只使用数字段 `X.Y.Z`；
 - 每个平台输出独立 SHA-256 清单。
 
