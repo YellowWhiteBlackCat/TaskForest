@@ -2,7 +2,22 @@ use super::*;
 
 #[cfg(windows)]
 fn current_system_drive() -> String {
-    std::env::var("SystemDrive").expect("Windows must expose the SystemDrive environment variable")
+    // The system drive is where the OS lives, but a sanitized environment may
+    // drop either variable: prefer SystemDrive, then derive the drive letter
+    // from SystemRoot (the Windows directory), then fall back to the
+    // historical default instead of failing the contract on env layout.
+    if let Ok(drive) = std::env::var("SystemDrive")
+        && !drive.is_empty()
+    {
+        return drive;
+    }
+    if let Ok(root) = std::env::var("SystemRoot")
+        && root.len() >= 2
+        && root.as_bytes()[1] == b':'
+    {
+        return root[..2].to_owned();
+    }
+    String::from("C:")
 }
 
 #[test]
