@@ -58,6 +58,7 @@ def run_cargo_metadata() -> dict:
         cwd=REPO_ROOT,
         capture_output=True,
         text=True,
+        encoding="utf-8",
         timeout=METADATA_TIMEOUT_S,
     )
     if proc.returncode != 0:
