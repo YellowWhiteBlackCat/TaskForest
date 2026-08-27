@@ -3,11 +3,11 @@ use super::*;
 #[test]
 fn battery_status_labels_cover_every_state() {
     for (state, expected) in [
-        (battery::State::Charging, "Charging"),
-        (battery::State::Discharging, "Discharging"),
-        (battery::State::Full, "Full"),
-        (battery::State::Empty, "Empty"),
-        (battery::State::Unknown, "Unknown"),
+        (starship_battery::State::Charging, "Charging"),
+        (starship_battery::State::Discharging, "Discharging"),
+        (starship_battery::State::Full, "Full"),
+        (starship_battery::State::Empty, "Empty"),
+        (starship_battery::State::Unknown, "Unknown"),
     ] {
         assert_eq!(status_label(state), expected);
     }
@@ -79,7 +79,7 @@ fn estimate_observations_map_none_to_unsupported_and_never_zero() {
 fn battery_snapshot_has_coherent_discovery_authority() {
     let snapshot =
         collect_battery_snapshot("fixture", ProviderId::borrowed("fixture.power.battery"), 1)
-            .expect("battery crate returns a typed snapshot");
+            .expect("starship-battery returns a typed snapshot");
     taskmanager_platform_conformance::assert_device_discovery_consistent(&snapshot)
         .expect("portable battery discovery must be coherent");
 }

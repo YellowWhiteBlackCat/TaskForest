@@ -19,7 +19,7 @@
 4. **Windows native-first 红线（ADR-018/031）**:
    - Windows 生产代码、测试和开发辅助代码禁止 PowerShell 或其它命令解释器承担遥测。
    - 先选成熟 safe crate（当前包括 `sysinfo`、`nvml-wrapper`、`windows-registry`、
-     `windows-service`、`battery`、`open`）；只有没有成熟封装且 ABI 足够小、值得审计时，
+     `windows-service`、`starship-battery`、`open`）；只有没有成熟封装且 ABI 足够小、值得审计时，
      才能新增独立 boundary crate。
    - native wrapper 必须只暴露 typed 值/错误，内部拥有句柄和编码缓冲；OS 返回的长度须先
      做符号、上界、整数转换检查；分配/枚举/等待/输出必须有上限；每块 `unsafe` 都有

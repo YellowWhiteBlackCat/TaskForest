@@ -14,7 +14,8 @@
     x.y.z) upgrade in place for the final release.
   - Unsigned until an Authenticode secret exists; SmartScreen will warn.
 -->
-<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package Name="TaskForest"
            Manufacturer="TaskForest contributors"
            Version="$(var.ProductVersion)"
@@ -68,7 +69,6 @@
          install. WixUI_InstallDir is the minimal standard set that lets the
          user pick INSTALLFOLDER instead of always landing in Program Files;
          the RTF for the license dialog is bound by build-msi.sh. -->
-    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
-    <UIRef Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
   </Package>
 </Wix>

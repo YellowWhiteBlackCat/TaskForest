@@ -16,9 +16,9 @@ consumer proves portability.
 
 Current shared implementations are the bounded directory scanner, the
 fixed-argument child-process lifecycle, battery snapshot assembly through the
-safe cross-platform `battery` crate, and the pure EDID base-block parser that
-native display inventories map into their own display models. Platform
-adapters still provide their provider IDs and stable identity namespaces.
+safe cross-platform `starship_battery` crate, and the pure EDID base-block
+parser that native display inventories map into their own display models.
+Platform adapters still provide their provider IDs and stable identity namespaces.
 
 Portable battery collection assembles `BatteryScalarObservations` first and
 applies that group once to `BatteryInfo`; it never writes schema-v1 scalar

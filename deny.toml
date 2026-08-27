@@ -33,10 +33,6 @@ ignore = [
     # are not used by TaskForest, which never drives git2 directly.
     "RUSTSEC-2026-0183",
     "RUSTSEC-2026-0184",
-    # nix 0.19.1 is a target-specific transitive (not in the default build
-    # tree). The vulnerable nix::unistd::getgrouplist is never called by
-    # TaskForest; the crate is held at 0.19.x by a transitive that hasn't moved.
-    "RUSTSEC-2021-0119",
     # Iced 0.14.0 fixes cryoglyph at 0.1.0, which in turn fixes lru at 0.16.x;
     # no compatible cryoglyph release is available yet. The application does
     # not expose that cache, install panicking Drop keys, or use catch_unwind

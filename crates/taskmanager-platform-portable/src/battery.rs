@@ -1,5 +1,7 @@
-//! Shared battery snapshot assembly through the safe cross-platform `battery`
-//! crate. Native adapters supply only their identity namespace and provider ID.
+//! Shared battery snapshot assembly through the safe cross-platform
+//! `starship_battery` crate (the maintained continuation of the archived
+//! `battery` 0.7 crate). Native adapters supply only their identity namespace
+//! and provider ID.
 
 use std::collections::HashSet;
 
@@ -14,7 +16,8 @@ pub fn collect_battery_snapshot(
     provider: ProviderId,
     observed_at_ms: u64,
 ) -> Result<DeviceSourceSnapshot<PowerSupplySnapshot>, ProviderFailure> {
-    let manager = battery::Manager::new().map_err(|_| ProviderFailure::TemporarilyUnavailable)?;
+    let manager =
+        starship_battery::Manager::new().map_err(|_| ProviderFailure::TemporarilyUnavailable)?;
     let mut batteries = Vec::new();
     let mut discovered = Vec::new();
     let mut identities = HashSet::<String>::new();
@@ -55,11 +58,13 @@ pub fn collect_battery_snapshot(
         let id = format!("{identity_namespace}:battery:{identity}");
         let capacity_pct = battery
             .state_of_charge()
-            .get::<battery::units::ratio::percent>();
+            .get::<starship_battery::units::ratio::percent>();
         let voltage_v = battery
             .voltage()
-            .get::<battery::units::electric_potential::volt>();
-        let power_w = battery.energy_rate().get::<battery::units::power::watt>();
+            .get::<starship_battery::units::electric_potential::volt>();
+        let power_w = battery
+            .energy_rate()
+            .get::<starship_battery::units::power::watt>();
         // Degradation facts in Wh; a non-finite quantity is the crate's
         // "driver did not report it" signal, not a measurement. The crate's
         // quantities are f32 — widened losslessly to the shared f64 fact
@@ -67,22 +72,22 @@ pub fn collect_battery_snapshot(
         let energy_full_wh = f64::from(
             battery
                 .energy_full()
-                .get::<battery::units::energy::watt_hour>(),
+                .get::<starship_battery::units::energy::watt_hour>(),
         );
         let energy_full_design_wh = f64::from(
             battery
                 .energy_full_design()
-                .get::<battery::units::energy::watt_hour>(),
+                .get::<starship_battery::units::energy::watt_hour>(),
         );
         // Runtime estimates: the crate reports `None` whenever the native
         // source has no estimate (including its own Charging/Discharging
         // gating), so `None` maps to typed unavailability — never zero.
         let time_to_full_secs = battery
             .time_to_full()
-            .map(|estimate| f64::from(estimate.get::<battery::units::time::second>()));
+            .map(|estimate| f64::from(estimate.get::<starship_battery::units::time::second>()));
         let time_to_empty_secs = battery
             .time_to_empty()
-            .map(|estimate| f64::from(estimate.get::<battery::units::time::second>()));
+            .map(|estimate| f64::from(estimate.get::<starship_battery::units::time::second>()));
 
         let mut row = BatteryInfo::new(id.clone(), DeviceState::healthy(observed_at_ms));
         row.kind = PowerSupplyKind::Battery;
@@ -148,12 +153,12 @@ pub fn collect_battery_snapshot(
     ))
 }
 
-fn status_label(state: battery::State) -> &'static str {
+fn status_label(state: starship_battery::State) -> &'static str {
     match state {
-        battery::State::Charging => "Charging",
-        battery::State::Discharging => "Discharging",
-        battery::State::Full => "Full",
-        battery::State::Empty => "Empty",
+        starship_battery::State::Charging => "Charging",
+        starship_battery::State::Discharging => "Discharging",
+        starship_battery::State::Full => "Full",
+        starship_battery::State::Empty => "Empty",
         _ => "Unknown",
     }
 }
@@ -183,9 +188,9 @@ fn finite_nonnegative_observation(value: f32, observed_at_ms: u64) -> ScalarObse
     }
 }
 
-/// Wh quantity from the `battery` crate (non-`Option`, so a non-finite or
-/// negative value is the driver's "not reported" signal) widened to the
-/// shared µWh fact axis.
+/// Wh quantity from the `starship_battery` crate (non-`Option`, so a
+/// non-finite or negative value is the driver's "not reported" signal)
+/// widened to the shared µWh fact axis.
 fn watt_hours_observation(value_wh: f64, observed_at_ms: u64) -> ScalarObservation<f64> {
     let microwatt_hours = value_wh * 1_000_000.0;
     if microwatt_hours.is_finite() && microwatt_hours >= 0.0 {
