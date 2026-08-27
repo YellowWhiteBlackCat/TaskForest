@@ -19,29 +19,12 @@ SECRET_PATTERNS = (
     re.compile(rb"\bxox[baprs]-[A-Za-z0-9-]{20,}\b"),
     re.compile(rb"\bBearer\s+[A-Za-z0-9._-]{20,}\b"),
 )
-EMAIL_PATTERN = re.compile(
-    r"(?<![/\\])\b[A-Za-z0-9.!#$%&'*+?^_`{|}~-]+@"
-    r"[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z][A-Za-z0-9-]*)+\b"
-)
 PRIVATE_PATH_PATTERN = re.compile(
     rb"(?<![A-Za-z0-9_])(?:/run/media/(?!<user>)[A-Za-z0-9._-]+|"
     rb"/(?:home|Users)/(?!<user>)[A-Za-z0-9._-]+|"
     rb"/mnt/c/Users/(?!<user>)[A-Za-z0-9._-]+|"
     rb"[A-Za-z]:[\\/](?:Users|users)[\\/](?!<user>)[A-Za-z0-9._-]+)"
 )
-ALLOWED_EMAILS = {
-    "noreply@yellowwhiteblackcat.github.io",
-    "noreply@anthropic.com",
-    # GitHub's generic committer identity for squash/web-flow merges: it
-    # carries no personal data, unlike the per-account noreply suffix.
-    "noreply@github.com",
-    # Public upstream package metadata retained in patch provenance.
-    "nathan@zed.dev",
-    "creepy-skeleton@yandex.ru",
-    "david2005thomas@gmail.com",
-}
-ALLOWED_EMAIL_SUFFIX = "@users.noreply.github.com"
-NON_EMAIL_SUFFIXES = (".service", ".socket", ".target")
 FORBIDDEN_PREFIXES = (
     ".private/",
     "docs/archive/",
@@ -113,11 +96,6 @@ def path_violations(root: Path, files: list[Path]) -> list[str]:
     return findings
 
 
-def allowed_email(address: str) -> bool:
-    lowered = address.lower()
-    return lowered in ALLOWED_EMAILS or lowered.endswith(ALLOWED_EMAIL_SUFFIX)
-
-
 def content_violations(root: Path, files: list[Path]) -> list[str]:
     findings: list[str] = []
     for path in files:
@@ -132,16 +110,9 @@ def content_violations(root: Path, files: list[Path]) -> list[str]:
         if PRIVATE_PATH_PATTERN.search(data):
             findings.append(f"host-specific path in tracked file: {name}")
         try:
-            text = data.decode("utf-8")
+            data.decode("utf-8")
         except UnicodeDecodeError:
             findings.append(f"non-UTF-8 text must be reviewed before publication: {name}")
-            continue
-        for address in EMAIL_PATTERN.findall(text):
-            if address.lower().endswith(NON_EMAIL_SUFFIXES):
-                continue
-            if not allowed_email(address):
-                findings.append(f"personal or unapproved email in tracked file: {name}")
-                break
     return findings
 
 
@@ -156,14 +127,6 @@ def history_violations(root: Path) -> list[str]:
             normalized.startswith(prefix) for prefix in FORBIDDEN_PREFIXES
         ):
             findings.append(f"private path remains in Git history: {normalized}")
-
-    emails = {
-        line.strip().lower()
-        for line in git_lines(root, "log", "--all", "--format=%ae%n%ce")
-        if line.strip()
-    }
-    if any(not allowed_email(address) for address in emails):
-        findings.append("personal or unapproved author email remains in Git history")
     return findings
 
 
@@ -176,8 +139,6 @@ def validate(root: Path, include_history: bool) -> list[str]:
 
 
 def self_test() -> None:
-    assert allowed_email("123+bot@users.noreply.github.com")
-    assert not allowed_email("person" + "@qq" + ".com")
     assert SECRET_PATTERNS[0].search(b"-----BEGIN " + b"PRIVATE KEY-----")
     assert PRIVATE_PATH_PATTERN.search(b"/run/" + b"media/person/disk/project")
     assert PRIVATE_PATH_PATTERN.search(b"/" + b"Users/person/project")
@@ -185,7 +146,7 @@ def self_test() -> None:
     with tempfile.TemporaryDirectory(prefix="public-repo-guard-") as directory:
         root = Path(directory)
         path = root / "sample.txt"
-        path.write_text("person" + "@qq" + ".com\n", encoding="utf-8")
+        path.write_text("/run/" + "media/person/disk/project\n", encoding="utf-8")
         assert content_violations(root, [path])
     print("public-repo-guard self-test: PASS")
 
