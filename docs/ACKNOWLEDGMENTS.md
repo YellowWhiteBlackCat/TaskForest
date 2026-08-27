@@ -37,7 +37,7 @@
 |---|---|---|
 | sysinfo | MIT | 跨平台系统事实 |
 | nvml-wrapper | Apache-2.0 OR MIT | NVIDIA NVML 封装 |
-| starship-battery | Apache-2.0 OR MIT | 电池状态（archived `battery` 0.7 的维护续作） |
+| starship-battery | ISC | 电池状态（archived `battery` 0.7 的维护续作） |
 | smbios-lib | MIT | SMBIOS/DMI 解析 |
 | raw-cpuid | MIT | CPU 拓扑与指令集 |
 | nix | MIT | Unix API 安全封装 |

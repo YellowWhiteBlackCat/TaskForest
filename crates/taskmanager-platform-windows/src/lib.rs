@@ -6,7 +6,7 @@
 //! Known Folder, exact-process control, WTS, processor topology/cache and NIC
 //! metadata). `sysinfo` supplies CPU/memory/process/network/disk,
 //! `raw-cpuid` supplies advertised CPU frequency facts, `nvml-wrapper` supplies NVIDIA GPU,
-//! `windows-registry` supplies startup/theme facts, `battery` supplies power,
+//! `windows-registry` supplies startup/theme facts, `starship-battery` supplies power,
 //! and `open` supplies URL opening.
 //!
 //! Windows APIs without an accepted safe wrapper are NOT called. The

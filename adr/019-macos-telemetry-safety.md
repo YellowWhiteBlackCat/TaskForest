@@ -29,7 +29,7 @@ macOS 适配器**只用发布在 crates.io 的 Safe 封装库 + 有界 `std::pro
 | 来源 | 职责 | 说明 |
 |---|---|---|
 | `sysinfo` 0.39（同版本复用） | CPU 占用/每核/频率/brand、内存、进程清单/CPU/内存/磁盘 IO 总量/信号控制、网络计数/MAC、磁盘容量/只读、**温度（SMC 事件，Intel+ARM）**、users | 比 Windows 面更全：`kill_with(Signal)` 提供 POSIX 信号控制 |
-| `battery` 0.7（同版本复用） | 电池容量%/状态/电压/功率 | core-foundation 后端 |
+| `starship-battery` 0.11.1（同版本复用） | 电池容量%/状态/电压/功率 | core-foundation 后端 |
 | `open` 5（同版本复用） | URL 打开 | 平台 shell |
 | `plist` 1.10 | LaunchAgents/Daemons 解析与回写、diskutil 输出解析 | 纯 Rust |
 | `serde_json` | system_profiler / smartctl JSON | 已在工作区 |
@@ -52,7 +52,7 @@ macOS 适配器**只用发布在 crates.io 的 Safe 封装库 + 有界 `std::pro
 | startup | **plist 解析 LaunchAgents/Daemons + Disabled 键回写控制** | /System/... 只读目录 → control_policy Unsupported |
 | **启动证据** | **`sysctl -n kern.boottime`（启动证据 + 开机墙钟时间戳）** | 分阶段启动耗时无等价物 → 不提供（不伪造 0ms） |
 | sessions | **who 会话清单 + id -u** | 会话控制（锁屏/断开）→ Unsupported |
-| power | battery crate | 循环次数 crate 不给 → Unavailable |
+| power | starship-battery | 循环次数 crate 不给 → Unavailable |
 | filesystem health | sysinfo 只读标志 | 错误计数/完整性 → 缺失 |
 | appearance | **defaults read AppleInterfaceStyle / AppleIncreaseContrast** | — |
 | hardware | sysinfo + **system_profiler SPHardwareDataType -json**（型号/芯片） | 固件版本无 Safe 访问器 → typed Unavailable 片段 |

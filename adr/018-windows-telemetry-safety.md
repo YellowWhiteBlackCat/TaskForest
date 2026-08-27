@@ -41,7 +41,7 @@ provider 注册 typed `Unsupported` 结果，缺口在本 ADR 的清单中如实
 | `notify-rust` | 4.18 | Windows 桌面 Toast 告警通知（`alerts.notify`） | safe 包装，内部通过 WinRT Toast / Shell API 发送 |
 | `nvml-wrapper` | 0.12（与 platform-linux 同版本） | NVIDIA GPU：利用率/温度/功耗/显存/频率/风扇/驱动版本；每进程显存 | 动态加载 `libnvidia-ml.dll` |
 | `windows-registry` | 0.6（微软官方） | 启动项 Run 键、桌面深浅色、高对比标志 | `Reg*` 系列 |
-| `battery` | 0.7 | 电池容量%/充电状态/电压/功率/循环次数 | winapi 电池查询 |
+| `starship-battery` | 0.11.1 | 电池容量%/充电状态/电压/功率/循环次数 | Windows safe API 封装 |
 | `atomicwrites` | 0.4.4 | ConfigStore primary/backup 有界原子替换 | safe API；Windows 内部使用 `MoveFileExW` replace/write-through，应用层不接触 FFI |
 | `open` | 5 | URL 打开 | 平台 shell |
 | `std::process::Command`（兼容工具） | — | `smartctl`、`explorer /select` 与用户显式的 `cmd /C` 命令启动；**不得用于遥测** | 固定 executable + argv、3–5 s 有界等待；输出有 4 MiB 上限 |
@@ -68,7 +68,7 @@ provider 注册 typed `Unsupported` 结果，缺口在本 ADR 的清单中如实
 | startup control | 只修改已存在、已识别的 `StartupApproved\Run` status byte；不删 Run 值/文件 | 缺 approval blob、RunOnce、StartupFolder → Unsupported；权限/身份失败 typed |
 | config/path | ConfigStore bounded atomic replace + backup recovery + generation ordering；Windows Known Folder native path | primary/backup 都损坏才回到 default；Known Folder 不可用时使用绝对 temp fallback，不使用 CWD 相对路径 |
 | local time | **时区规则（`GetDynamicTimeZoneInformation` + `GetTimeZoneInformationForYear` 有界年窗 → 纯函数合成 TZif v2 → 复用 core `LocalTimeRules::from_tzif` 解析器，零 core 改动；经 platform-native cfg 分支接入 app-host）** | 合成不可表示（无报告瞬时的固定偏移变更、瞬时冲突）或解析器拒绝 → typed `ProviderFault`，**绝不回退 UTC 假装本地时区** |
-| power | 电池容量%/状态/电压/功率（battery crate）+ 压力速率派生 | 循环次数等字段缺失时 Unavailable |
+| power | 电池容量%/状态/电压/功率（starship-battery）+ 压力速率派生 | 循环次数等字段缺失时 Unavailable |
 | filesystem health | 挂载点/fs 类型/只读标志（sysinfo） | 错误计数/完整性状态 → Unsupported |
 | SMART/自检 | 观测 + 控制均走有界 `smartctl` shell-out（`-a` 解析自检日志段 / `-t <kind>`），ATA/NVMe 同路径 | smartmontools 缺席 → MissingDependency；实盘读数 on-box-unverified |
 | sensors | ACPI 热区（WMI/COM `MSAcpi_ThermalZoneTemperature` 等，含 LHM/OHM 命名空间）+ sysinfo Components 兜底；validated/去重/排序 | OEM firmware 无热区或兜底来源身份不明 → discovery typed `Partial(Unsupported)`，不伪造为空设备 |

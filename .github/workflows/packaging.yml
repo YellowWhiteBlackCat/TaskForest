@@ -228,12 +228,15 @@ jobs:
           install -m644 LICENSE msi-stage/
       # WiX v4+ ships the standard dialog sets (WixUI_InstallDir et al.) as an
       # optional extension; without it `wix build -ext WixToolset.UI.wixext`
-      # fails with WIX0144 (seen on the rc.2 tag run 33060554020).
+      # fails with WIX0144 (seen on the rc.2 tag run 33060554020). Keep the
+      # tool and extension on the same exact version so a future WiX release
+      # cannot silently change the release installer.
       - name: Install WiX
         shell: bash
         run: |
-          dotnet tool install --global wix
-          wix extension add -g WixToolset.UI.wixext
+          dotnet tool install --global wix --version 7.0.0
+          wix extension add --global WixToolset.UI.wixext/7.0.0
+          wix extension list --global
       # MSI ProductVersion is numeric x.y.z: strip any prerelease suffix; the
       # package architecture is explicit so arm64 cannot receive an x64 MSI.
       - name: Resolve numeric MSI version

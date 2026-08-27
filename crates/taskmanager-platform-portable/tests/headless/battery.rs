@@ -79,7 +79,7 @@ fn estimate_observations_map_none_to_unsupported_and_never_zero() {
 fn battery_snapshot_has_coherent_discovery_authority() {
     let snapshot =
         collect_battery_snapshot("fixture", ProviderId::borrowed("fixture.power.battery"), 1)
-            .expect("battery crate returns a typed snapshot");
+            .expect("starship-battery returns a typed snapshot");
     taskmanager_platform_conformance::assert_device_discovery_consistent(&snapshot)
         .expect("portable battery discovery must be coherent");
 }

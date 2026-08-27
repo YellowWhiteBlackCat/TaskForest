@@ -6,7 +6,7 @@
 //! capability set through `taskmanager-platform-runtime`.
 //!
 //! Most domains are implemented through safe wrapper crates (sysinfo for
-//! CPU/memory/process/storage/network, plus `battery`, `open`, `plist`) and
+//! CPU/memory/process/storage/network, plus `starship-battery`, `open`, `plist`) and
 //! bounded `std::process::Command` shell-outs to macOS system tools
 //! (`launchctl`/`smartctl`/`system_profiler`/`networksetup`/`renice`/`ps`) —
 //! the same safe route-C pattern the Linux adapter uses for `systemctl`, with
