@@ -10,7 +10,8 @@ publish = false
 [dependencies]
 # Maintained continuation of the archived svartalf/rust-battery 0.7 crate.
 # Upstream hard-pinned nix ^0.19 (RUSTSEC-2021-0119 getgrouplist OOB write)
-# and can never move; the fork dropped the vulnerable nix edge entirely.
+# and can never move; the fork's Linux path uses no nix at all and its
+# *BSD targets ride the patched nix ~0.31 line instead.
 starship-battery = "0.11"
 taskmanager-core = { path = "../taskmanager-core" }
 taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
