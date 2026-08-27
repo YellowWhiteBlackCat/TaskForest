@@ -21,22 +21,37 @@ pub struct WinCpuTelemetryProvider {
     system: sysinfo::System,
     advertised_max_mhz: Option<u64>,
     topology: Option<taskmanager_windows_api::WindowsProcessorTopology>,
+    /// Instant of the baseline sysinfo sample taken at construction. Usage is
+    /// a delta between two samples at least MINIMUM_CPU_UPDATE_INTERVAL apart;
+    /// before that window the first reading is meaningless (it reads as a full
+    /// load on every core) and must surface as typed unavailable, never as a
+    /// fabricated 100%.
+    primed_at: Option<std::time::Instant>,
 }
 
 impl WinCpuTelemetryProvider {
     pub fn new() -> Self {
         let (_, advertised_max_mhz) = super::cpu_info::advertised_frequencies_mhz();
         let topology = taskmanager_windows_api::processor_topology().ok();
+        let mut system = sysinfo::System::new();
+        system.refresh_cpu_all();
         Self {
-            system: sysinfo::System::new(),
+            system,
             advertised_max_mhz,
             topology,
+            primed_at: Some(std::time::Instant::now()),
         }
     }
 }
 
 impl CpuTelemetryProvider for WinCpuTelemetryProvider {
     fn refresh(&mut self, observed_at_ms: u64) -> Result<CpuTelemetryObservation, ProviderFailure> {
+        // Usage needs a delta over at least one minimum interval since the
+        // baseline sample; refreshing now still advances sysinfo's internal
+        // baseline for the next cadence tick.
+        let usage_ready = self
+            .primed_at
+            .is_some_and(|primed| primed.elapsed() >= sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
         self.system.refresh_cpu_all();
         let cpus = self.system.cpus();
         if cpus.is_empty() {
@@ -110,6 +125,7 @@ impl CpuTelemetryProvider for WinCpuTelemetryProvider {
             &per_core_freq,
             self.advertised_max_mhz,
             observed_at_ms,
+            usage_ready,
         );
         let thermal_zones = taskmanager_windows_api::query_acpi_thermal_zones().ok();
         let mut thermal_temp = thermal_zones.as_ref().and_then(|zones| {
@@ -175,6 +191,7 @@ impl CpuScalarObservationFactory {
         per_core_freq: &[Option<u64>],
         advertised_max_mhz: Option<u64>,
         observed_at_ms: u64,
+        usage_ready: bool,
     ) -> taskmanager_core::CpuScalarObservations {
         let global = core_usages.iter().sum::<f32>() / core_usages.len().max(1) as f32;
         let live_freqs: Vec<u64> = per_core_freq.iter().copied().flatten().collect();
@@ -218,12 +235,19 @@ impl CpuScalarObservationFactory {
                 FailureKind::Unsupported,
             )
         };
+        let global_usage_pct = if usage_ready {
+            ScalarObservation::available(global, observed_at_ms)
+        } else {
+            ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable)
+        };
+        let core_usage_group = if usage_ready {
+            ScalarObservationGroup::available(core_usages.clone(), observed_at_ms)
+        } else {
+            ScalarObservationGroup::unavailable(FailureKind::TemporarilyUnavailable)
+        };
         taskmanager_core::CpuScalarObservations {
-            global_usage_pct: ScalarObservation::available(global, observed_at_ms),
-            core_usage_group: ScalarObservationGroup::available(
-                core_usages.clone(),
-                observed_at_ms,
-            ),
+            global_usage_pct,
+            core_usage_group,
             frequency_mhz: match max_freq {
                 Some(mhz) => ScalarObservation::available(mhz, observed_at_ms),
                 None => ScalarObservation::unavailable(FailureKind::Unsupported),

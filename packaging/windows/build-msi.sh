@@ -39,13 +39,23 @@ esac
 
 case "$msi_arch" in
     x64|arm64) ;;
-    *) echo "build-msi: MSI_ARCH must be x64 or arm64, got '$msi_arch'" >&2; exit 1 ;;
+    *) echo "build-msi: MSI_ARCH must be x64 or arm64" >&2; exit 1 ;;
 esac
+
+# Third-party notices ship inside the MSI next to the license: the release
+# exe embeds OFL fonts and links the dependency closure, so their full terms
+# must ride with the installer. Generated from the Cargo.lock graph at build
+# time; the staged file is never hand-edited.
+py=$(command -v python3 || command -v python || true)
+[[ -n "$py" ]] || { echo "build-msi: python3 required for THIRD-PARTY-NOTICES.txt" >&2; exit 1; }
+"$py" "$repo/scripts/gen_third_party_notices.py" "$stage/THIRD-PARTY-NOTICES.txt"
 
 wix build -acceptEula wix7 -arch "$msi_arch" \
     -d "StageDir=$(cygpath -w "$stage" 2>/dev/null || printf '%s' "$stage")" \
     -d "IconPath=$icon_path" \
     -d "ProductVersion=$version" \
+    -bindvariable "WixUILicenseRtf=$(cygpath -w "$script_dir/license.rtf" 2>/dev/null || printf '%s' "$script_dir/license.rtf")" \
+    -ext WixToolset.UI.wixext \
     -o "$output" \
     "$script_dir/taskforest.wxs"
 
