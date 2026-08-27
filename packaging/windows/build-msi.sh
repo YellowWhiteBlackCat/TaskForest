@@ -55,7 +55,7 @@ wix build -acceptEula wix7 -arch "$msi_arch" \
     -d "IconPath=$icon_path" \
     -d "ProductVersion=$version" \
     -bindvariable "WixUILicenseRtf=$(cygpath -w "$script_dir/license.rtf" 2>/dev/null || printf '%s' "$script_dir/license.rtf")" \
-    -ext WixToolset.UI.wixext \
+    -ext WixToolset.UI.wixext/7.0.0 \
     -o "$output" \
     "$script_dir/taskforest.wxs"
 
