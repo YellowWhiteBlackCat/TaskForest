@@ -25,7 +25,8 @@ output=$3
 
 # RPM's Version field forbids dashes; a Cargo prerelease like 0.1.0-rc.1
 # becomes 0.1.0~rc.1 so the final 0.1.0 release sorts above it (rpmvercmp).
-rpm_version=${version//-/~}
+# The replacement is quoted: an unquoted bare '~' inside ${//} expands to $HOME.
+rpm_version=${version//'-'/'~'}
 
 [[ -d "$staged/usr" ]] || { echo "build-rpm: $staged does not contain a staged usr/ tree" >&2; exit 1; }
 command -v rpmbuild >/dev/null || { echo "build-rpm: rpmbuild not installed (apt-get install rpm)" >&2; exit 1; }
