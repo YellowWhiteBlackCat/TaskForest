@@ -289,7 +289,9 @@ jobs:
           rm -f cert.pfx
       - name: Emit sha256 checksums
         shell: bash
-        run: sha256sum "TaskForest-${{ steps.version.outputs.version }}-${{ matrix.arch }}.msi" > checksums-sha256-windows-${{ matrix.arch }}.txt
+        # MSYS sha256sum marks output as binary mode (`hash *name`); normalize
+        # to GNU text format so every platform's manifest has one shape.
+        run: sha256sum "TaskForest-${{ steps.version.outputs.version }}-${{ matrix.arch }}.msi" | sed 's/ \*/  /' > checksums-sha256-windows-${{ matrix.arch }}.txt
       - uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}-artifacts
@@ -334,7 +336,7 @@ jobs:
             local expected actual
             test -s "$manifest"
             expected=$(printf '%s\n' "$@" | sort)
-            actual=$(awk '{print $2}' "$manifest" | sed 's#^\./##' | sort)
+            actual=$(awk '{print $2}' "$manifest" | sed -e 's#^\./##' -e 's#^\*##' | sort)
             if [[ "$actual" != "$expected" ]]; then
               echo "checksum manifest '$manifest' does not cover exactly its artifact set" >&2
               printf 'expected:\n%s\nactual:\n%s\n' "$expected" "$actual" >&2
