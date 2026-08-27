@@ -8,8 +8,8 @@ url='https://github.com/YellowWhiteBlackCat/TaskForest'
 license=('Apache-2.0')
 # gpui 0.2.2's blade backend dlopens libvulkan at runtime (no ELF NEEDED entry,
 # verified via ldd), so the app is non-functional without the loader even though
-# it is not a hard link — hence vulkan-loader in depends, not optdepends.
-depends=('fontconfig' 'freetype2' 'libxkbcommon' 'wayland' 'vulkan-loader')
+# it is not a hard link — hence vulkan-icd-loader in depends, not optdepends.
+depends=('fontconfig' 'freetype2' 'libxkbcommon' 'wayland' 'vulkan-icd-loader')
 optdepends=('smartmontools: ATA/SATA/NVMe S.M.A.R.T. attributes and self-tests'
             'nvme-cli: extra NVMe endurance/power-on-hours data'
             'xfsprogs: XFS filesystem integrity checks'

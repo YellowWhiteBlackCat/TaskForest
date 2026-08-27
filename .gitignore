@@ -53,3 +53,12 @@ docs/screenshots/*
 
 # Host-specific installation observations are local receipts.
 docs/system-install-host-receipt.tsv
+
+# makepkg working state under packaging/arch (never publish build artifacts)
+packaging/arch/src/
+packaging/arch/pkg/
+packaging/arch/*.pkg.tar.*
+packaging/arch/bin/src/
+packaging/arch/bin/pkg/
+packaging/arch/bin/*.pkg.tar.*
+packaging/arch/bin/*.deb
