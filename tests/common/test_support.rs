@@ -1,6 +1,6 @@
-//! Shared test-only scratch support for root-package unit tests wired through
-//! `src/*.rs` `#[path]` modules: a unique per-process root under the
-//! repository `.tmp/` (never the system temp dir).
+//! Shared test-only scratch support for the root package's integration test
+//! binaries (mounted from `tests/logic.rs`): a unique per-process root under
+//! the repository `.tmp/` (never the system temp dir).
 
 pub(crate) fn repo_temp_dir() -> std::path::PathBuf {
     static DIR: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();

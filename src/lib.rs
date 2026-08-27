@@ -29,7 +29,3 @@ pub use taskmanager_application::i18n;
 
 pub use taskmanager_core::core;
 pub use taskmanager_core::core::*;
-
-#[cfg(test)]
-#[path = "../tests/common/test_support.rs"]
-pub(crate) mod test_support;
