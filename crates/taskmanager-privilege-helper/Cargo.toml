@@ -1,0 +1,29 @@
+[package]
+name = "taskmanager-privilege-helper"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+authors = ["TaskForest"]
+license = "Apache-2.0"
+description = "Privileged helper binary: reads the Intel iGPU perf PMU and emits a typed JSON envelope (TaskForest permission-model Boundary 2, ADR-023)."
+publish = false
+
+# This is one feature-specific privileged piece of TaskForest (ADR-023, docs/PERMISSION_MODEL.md
+# Boundary 2). It performs exactly ONE operation: a system-wide Intel i915/xe GPU
+# per-engine utilization read via the audited perf_event_open boundary crate
+# (taskmanager-perf-ioctl, ADR-022 — the workspace's sole unsafe trust root, used
+# here only through its safe API). It emits ONE JSON object to stdout then exits.
+# There are NO flags and NO file access beyond /sys discovery plus the perf
+# counter read itself, keeping the privileged attack surface minimal. Missing or
+# permission-denied data is reported as a typed ERROR envelope — NEVER a
+# fabricated or zeroed busy_pct.
+
+[dependencies]
+# The audited perf_event_open boundary crate. Its public API (GpuEngineCounter:
+# open_enabled / read_counter) is the ONLY way this helper touches the perf
+# syscall — it never writes its own unsafe. This is a permitted second consumer
+# of the trust root alongside taskmanager-platform-linux (see the dependency
+# firewall test, which allowlists both).
+taskmanager-perf-ioctl = { path = "../taskmanager-perf-ioctl" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

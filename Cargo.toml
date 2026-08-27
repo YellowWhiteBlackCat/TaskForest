@@ -1,0 +1,176 @@
+[workspace]
+exclude = [
+    "crates/taskmanager-afpacket/fuzz",
+]
+members = [".", "crates/*"]
+resolver = "2"
+
+[package]
+name = "taskmanager"
+version = "0.1.0"
+edition = "2024"
+authors = ["TaskForest contributors"]
+description = "TaskForest — an eye-friendly native system monitor with GPUI, Iced, Ratatui, and Bevy frontends"
+readme = "README.md"
+license = "Apache-2.0"
+repository = "https://github.com/YellowWhiteBlackCat/TaskForest"
+homepage = "https://github.com/YellowWhiteBlackCat/TaskForest"
+keywords = ["task-manager", "system-monitor", "gpui", "wayland"]
+categories = ["gui", "os::linux-apis"]
+rust-version = "1.97.1"
+build = "build.rs"
+
+[dependencies]
+# UI-owned background controllers; Linux telemetry dependencies live in
+# taskmanager-platform-linux.
+crossbeam-channel = "0.5"
+taskmanager-core = { path = "crates/taskmanager-core" }
+taskmanager-application = { path = "crates/taskmanager-application" }
+taskmanager-app-host = { path = "crates/taskmanager-app-host" }
+# Per-feature privilege-escalation seam (ADR-023): the CLI `--gpu-engines`
+# surface drives the polkit/pkexec helper crossing from this composition edge.
+# The crate is pure safe Rust with zero dependencies, so the dependency
+# firewall stays intact; only this one new inward edge is declared.
+taskmanager-escalation = { path = "crates/taskmanager-escalation" }
+taskmanager-telemetry-store = { path = "crates/taskmanager-telemetry-store" }
+taskmanager-ui-contract = { path = "crates/taskmanager-ui-contract" }
+# ADR-020 single source: the frontends read shared formatting from the
+# renderer-independent shell presentation layer.
+taskmanager-shell = { path = "crates/taskmanager-shell" }
+taskmanager-assets = { path = "crates/taskmanager-assets" }
+
+# Serialization & Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Local-time presentation for process start times; the frontend never reads
+# platform timezone files directly (Linux telemetry I/O stays in the adapter).
+chrono = "0.4"
+
+# ── UI frontends (exactly ONE enabled; enforced by build.rs, ADR-029) ────────
+# Each frontend is a feature-gated product shape: `cargo build` produces the
+# GPUI desktop binary, `--no-default-features --features ui-tui` the terminal
+# frontend, `--no-default-features --features ui-iced` the iced desktop
+# frontend. The UI-neutral CLI modes (`--json`, `--suggest-thresholds`,
+# `--gpu-engines`) behave identically in every shape.
+
+# GPUI frontend: the complete desktop product lives in its own peer crate.
+# The root package retains only this optional dispatch edge.
+taskmanager-gpui = { path = "crates/taskmanager-gpui", optional = true }
+# GPUI integration tests are root-package targets, so their direct toolkit
+# handles live on the same optional composition edge. Keeping them as
+# unconditional dev-dependencies would make `ui-tui`/`ui-iced` dev closures
+# resolve GPUI even though those targets are cfg-disabled.
+# The gpui platform features are additive per-target (Cargo feature unification
+# merges them across every edge of the resolved graph): the Windows edge must
+# carry `windows-manifest` (embeds gpui's DPI-awareness manifest via build.rs —
+# the only functional gpui feature on Windows), and the macOS edge carries
+# `macos-blade` (Metal).
+#
+# Strict Wayland product policy: production edges are `wayland`-ONLY. gpui's
+# upstream `test-support` feature forces the `x11` backend (and its
+# `-lxkbcommon-x11` link), so it is NOT a production feature here — it is
+# pulled only when the root `test-support` feature is enabled for the headless
+# GPUI interaction matrix (see [features] below).
+gpui = { version = "0.2.2", default-features = false, features = ["wayland"], optional = true }
+taskmanager-ui = { path = "crates/taskmanager-ui", optional = true }
+
+# TUI frontend (ratatui) and iced frontend (iced 0.14): both consume the
+# neutral shell/theme layers with default features — zero gpui.
+taskmanager-tui = { path = "crates/taskmanager-tui", optional = true }
+taskmanager-iced = { path = "crates/taskmanager-iced", optional = true }
+
+# NOTE: keep every optional frontend declaration above the per-target tables —
+# a `[target.'cfg(...)'.dependencies]` header silently absorbs all following
+# bare key/value lines into that target-gated table.
+
+[target.'cfg(target_os = "windows")'.dependencies]
+gpui = { version = "0.2.2", default-features = false, features = ["wayland", "windows-manifest"], optional = true }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+gpui = { version = "0.2.2", default-features = false, features = ["wayland", "macos-blade"], optional = true }
+
+[build-dependencies]
+# Embeds packaging/windows/taskmanager.ico as the exe main-icon resource (id 1),
+# which gpui 0.2.2 reads back via LoadImageW(MAKEINTRESOURCE(1)) for its window
+# class icon; the same resource is what Explorer shows for the .exe file icon.
+# build.rs invokes it only for a Windows target and the GPUI shape; keeping the
+# build dependency host-available also lets an LLVM-RC Windows cross-build
+# embed the same mandatory resource instead of silently producing an iconless
+# executable.
+embed-resource = "3"
+
+[features]
+# Product builds always use `hardware-all`. The vendor-named feature remains an
+# internal compatibility/development switch for isolated fallback tests; it is
+# not a user-facing distribution variant.
+default = ["hardware-all", "ui-gpui"]
+# Headless GPUI interaction tests need gpui's upstream `test-support` feature
+# (VisualTestContext/TestAppContext), which upstream hard-wires to `x11` as
+# well as `wayland`. It stays a DEV/test-only feature: production binaries
+# never enable it, so the shipped product links no X11 system libraries.
+test-support = ["gpui?/test-support", "taskmanager-gpui?/test-support"]
+hardware-all = ["taskmanager-app-host/hardware-all"]
+nvidia = ["taskmanager-app-host/nvidia"]
+
+# Exactly one `ui-*` feature must be enabled (enforced by build.rs, ADR-029):
+# ui-gpui (default) = the GPUI desktop frontend; ui-tui = the ratatui
+# frontend; ui-iced = the iced frontend. Each shape shares the same core,
+# application, shell and theme layers and the same UI-neutral CLI.
+ui-gpui = [
+    "dep:taskmanager-gpui",
+    "dep:gpui",
+    "dep:taskmanager-ui",
+]
+ui-tui = ["dep:taskmanager-tui"]
+ui-iced = ["dep:taskmanager-iced"]
+
+[dev-dependencies]
+# Integration tests construct the platform runtime through the composition
+# edge (ADR-009 reverse dependency firewall) instead of naming an OS crate,
+# so `--test gui` compiles and runs on every supported platform. The shared
+# conformance assertions keep the live-smoke contract host-neutral.
+taskmanager-platform-native = { path = "crates/taskmanager-platform-native" }
+taskmanager-platform-conformance = { path = "crates/taskmanager-platform-conformance" }
+taskmanager-test-support = { path = "crates/taskmanager-test-support" }
+
+[target.'cfg(target_os = "linux")'.dev-dependencies]
+taskmanager-platform-linux = { path = "crates/taskmanager-platform-linux", default-features = false, features = ["test-support"] }
+
+[[bin]]
+name = "taskmanager"
+path = "src/main.rs"
+
+[lib]
+name = "taskmanager"
+path = "src/lib.rs"
+
+[patch.crates-io]
+proc-macro-error2 = { path = "./patches/proc-macro-error2" }
+# Vendored gpui 0.2.2 patch (strict Wayland): upstream declares the
+# Linux `xkbcommon` dependency with `features = ["wayland", "x11"]`
+# unconditionally, so every binary links `-lxkbcommon-x11` even in a
+# wayland-only build. The patch moves `xkbcommon/x11` behind gpui's own `x11`
+# feature (enabled only by the dev-only `test-support`), so production links
+# zero X11 system libraries.
+gpui = { path = "./patches/gpui" }
+
+# Release profile for the shipping artifacts (tag-triggered release.yml +
+# packaging/arch/PKGBUILD). The previous absence of an explicit profile meant
+# Cargo's defaults: opt-level 3, full debuginfo, no LTO — the GPUI binary
+# shipped at ~64 MB unstripped. These settings cut it to ~15 MB and improve
+# runtime perf without changing panic semantics:
+#   - lto/codegen-units: cross-crate inlining for size + speed (thin LTO keeps
+#     the build tractable; "fat" doubles build time for marginal further gain).
+#   - strip = "debuginfo": drops the bulk of the binary (the .debug section)
+#     but KEEPS the symbol table so `RUST_BACKTRACE=1` crash reports stay
+#     human-readable. "symbols" would shrink further but erase backtraces.
+#   - panic stays unwinding (the default): the business crates recover lock
+#     poison via `.into_inner()` (CLAUDE.md rule 4); panic = "abort" would
+#     silently change that contract.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "debuginfo"

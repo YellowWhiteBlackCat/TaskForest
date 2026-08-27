@@ -1,0 +1,64 @@
+[package]
+name = "taskmanager-gpui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "GPUI desktop frontend for the TaskForest native system monitor"
+publish = false
+
+# This crate owns the GPUI product surface and toolkit event loop.  The shared
+# app-host owns native composition; the root package only selects the product
+# shape and dispatches the binary.
+
+[dependencies]
+gpui = { version = "0.2.2", default-features = false, features = ["wayland"] }
+crossbeam-channel = "0.5"
+chrono = "0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-app-host = { path = "../taskmanager-app-host" }
+taskmanager-assets = { path = "../taskmanager-assets" }
+taskmanager-icons = { path = "../taskmanager-icons" }
+taskmanager-theme = { path = "../taskmanager-theme", features = ["gpui"] }
+taskmanager-ui = { path = "../taskmanager-ui" }
+taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+taskmanager-shell = { path = "../taskmanager-shell" }
+taskmanager-telemetry-store = { path = "../taskmanager-telemetry-store" }
+
+[features]
+test-support = ["taskmanager-app-host/test-support"]
+
+[target.'cfg(target_os = "linux")'.dependencies]
+taskmanager-accessibility-linux = { path = "../taskmanager-accessibility-linux" }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+gpui = { version = "0.2.2", default-features = false, features = ["wayland", "macos-blade"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+gpui = { version = "0.2.2", default-features = false, features = ["wayland", "windows-manifest"] }
+# Windows evidence mode (`--capture-window`): `windows-capture` is a mature
+# safe Windows.Graphics.Capture wrapper (it also encodes PNGs internally, so no
+# separate png edge is needed); `raw-window-handle` and `sha2` are already in
+# the dependency graph. All are Windows-only direct edges of this crate,
+# reached only by the capture module behind `#[cfg(windows)]` — no new audited
+# boundary crate. (gpui's optional `screen-capture` feature routes through
+# `zed-scap` 0.0.8-zed, which does not compile against either published
+# `windows-capture`; the capture module therefore uses windows-capture directly
+# — recorded in the Windows ledger.)
+windows-capture = "1.5.0"
+raw-window-handle = "0.6"
+sha2 = "0.10"
+
+[dev-dependencies]
+gpui = { version = "0.2.2", default-features = false, features = ["wayland", "test-support"] }
+taskmanager-app-host = { path = "../taskmanager-app-host", features = ["test-support"] }
+taskmanager-test-support = { path = "../taskmanager-test-support" }
+
+[lib]
+name = "taskmanager_gpui"
+path = "src/lib.rs"

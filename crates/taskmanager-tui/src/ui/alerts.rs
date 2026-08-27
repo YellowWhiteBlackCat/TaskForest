@@ -1,0 +1,289 @@
+//! Threshold-suggestions overlay rendered on top of the live TUI frame.
+//!
+//! Surfaces the shared [`AlertEngine::suggest_threshold`] heuristic that the
+//! `--suggest-thresholds` CLI already exposes, but driven from the TUI's own
+//! rolling window (see [`crate::history::LiveGraphHistory`]) so the proposal
+//! becomes principled once enough telemetry accrues.
+//!
+//! Honesty contract (mirrored verbatim from `src/cli.rs`): an `Insufficient`
+//! verdict is rendered as its typed marker — `too_few_samples (N/20)` or
+//! `unsupported_metric` — and NEVER as a fabricated number. A `Suggested`
+//! verdict shows the threshold, its clear-band hysteresis, the derivation
+//! basis, the confidence band, and the sample count, so a user can see "why
+//! this number?" instead of a bare value. The window starts empty, so early on
+//! every numeric metric honestly renders as insufficient.
+
+use ratatui::Frame;
+use ratatui::layout::{Alignment, Constraint, Layout, Rect};
+use ratatui::style::{Color, Modifier, Style};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use taskmanager_application::ManagedAlertRule;
+use taskmanager_application::alerts::{
+    AlertMetric, AlertSeverity, InsufficientReason, SUGGESTION_MIN_SAMPLES, SuggestedThreshold,
+    SuggestionBasis, SuggestionConfidence,
+};
+use taskmanager_application::i18n::t;
+use taskmanager_ui_contract::IconId;
+
+use crate::TuiTheme;
+
+/// Render the threshold-suggestions overlay centred over `area`. Does nothing
+/// if the terminal is too small for a readable box. The overlay is driven by
+/// [`crate::TuiApp::history`]; it never reads the point-in-time snapshot directly, so
+/// a stale latest snapshot cannot leak a fabricated threshold into the view.
+pub fn render_suggestions_overlay(
+    frame: &mut Frame<'_>,
+    app: &crate::TuiApp,
+    theme: TuiTheme,
+    area: Rect,
+) {
+    let popup = centered(area, 74, 22);
+    frame.render_widget(Clear, popup);
+    let block = Block::new()
+        .borders(Borders::ALL)
+        .border_style(Style::new().fg(theme.accent))
+        .style(Style::new().bg(theme.overlay_bg))
+        .title(format!(
+            " {} {} ",
+            crate::icon_glyph(IconId::Settings),
+            t("alerts.threshold_suggestions")
+        ));
+    let inner = block.inner(popup);
+    frame.render_widget(block, popup);
+
+    let [body, footer] = Layout::vertical([Constraint::Min(8), Constraint::Length(2)]).areas(inner);
+
+    let mut lines: Vec<Line<'static>> = Vec::with_capacity(AlertMetric::ALL.len() + 2);
+    lines.push(Line::from(vec![
+        Span::styled(t("alerts.floor_hint"), Style::new().fg(theme.dim)),
+        Span::raw(" "),
+        Span::styled(
+            t("alerts.samples_required").replacen("{}", &SUGGESTION_MIN_SAMPLES.to_string(), 1),
+            Style::new().fg(theme.dim).add_modifier(Modifier::BOLD),
+        ),
+    ]));
+    lines.push(Line::from(""));
+
+    let history = app.alert_suggestions.clone();
+    for metric in AlertMetric::ALL {
+        lines.push(metric_line(metric, history.suggest(metric), theme));
+    }
+
+    frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }), body);
+
+    frame.render_widget(
+        Paragraph::new(vec![
+            Line::from(""),
+            Line::from(vec![
+                Span::styled(" T / Esc ", Style::new().fg(Color::Black).bg(theme.accent)),
+                Span::styled(
+                    format!("  {}   ", t("chrome.close")),
+                    Style::new().fg(theme.dim),
+                ),
+                Span::styled(t("alerts.live_hint"), Style::new().fg(theme.dim)),
+            ]),
+        ])
+        .alignment(Alignment::Center),
+        footer,
+    );
+}
+
+/// Build one overlay row: the metric label (left) and the honest verdict
+/// (right). A `Suggested` verdict shows its value + clear band + basis +
+/// confidence + sample count; an `Insufficient` verdict shows its typed marker
+/// and never a fabricated number. `pub(crate)` so the health page renders the
+/// same rows as the suggestions overlay.
+pub(crate) fn metric_line(
+    row: AlertMetric,
+    suggestion: SuggestedThreshold,
+    theme: TuiTheme,
+) -> Line<'static> {
+    let label = Span::styled(
+        format!("{:<18}", metric_label(row)),
+        Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
+    );
+    match suggestion {
+        SuggestedThreshold::Suggested {
+            threshold,
+            hysteresis,
+            basis,
+            sample_count,
+            confidence,
+            ..
+        } => {
+            let value_color = match row {
+                AlertMetric::DiskTemperatureC => warn_for_temperature(threshold, theme),
+                _ => warn_for_percentage(threshold, theme),
+            };
+            Line::from(vec![
+                label,
+                Span::raw(" "),
+                Span::styled(
+                    format!("{}{}", format_threshold(threshold), metric_unit(row)),
+                    Style::new().fg(value_color).add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!("  ±{} clear", format_threshold(hysteresis)),
+                    Style::new().fg(theme.dim),
+                ),
+                Span::raw("  "),
+                Span::styled(
+                    format!(
+                        "{} · {} · n={}",
+                        basis_label(basis),
+                        confidence_label(confidence),
+                        sample_count
+                    ),
+                    Style::new().fg(theme.dim),
+                ),
+            ])
+        }
+        SuggestedThreshold::Insufficient {
+            sample_count,
+            required,
+            reason,
+        } => {
+            let (marker, color) = insufficient_marker(reason, sample_count, required, theme);
+            Line::from(vec![
+                label,
+                Span::raw(" "),
+                Span::styled(marker, Style::new().fg(color)),
+            ])
+        }
+    }
+}
+
+pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
+    match metric {
+        AlertMetric::CpuUsagePercent => t("alerts.metric_cpu"),
+        AlertMetric::MemoryUsagePercent => t("alerts.metric_memory"),
+        AlertMetric::DiskTemperatureC => t("alerts.metric_disk_temperature"),
+        AlertMetric::SmartPercentUsed => t("alerts.metric_smart_used"),
+        AlertMetric::SmartCriticalWarning => t("alerts.metric_smart_critical"),
+    }
+}
+
+/// Unit suffix appended to a suggested threshold value. The binary
+/// SMART-warning metric never reaches the suggested branch, so it carries no
+/// unit.
+pub(crate) fn metric_unit(metric: AlertMetric) -> &'static str {
+    match metric {
+        AlertMetric::CpuUsagePercent
+        | AlertMetric::MemoryUsagePercent
+        | AlertMetric::SmartPercentUsed => "%",
+        AlertMetric::DiskTemperatureC => "°C",
+        AlertMetric::SmartCriticalWarning => "",
+    }
+}
+
+/// Compact read-only projection of one canonical managed rule for the Health
+/// surface. Disabled rules remain present and are labelled instead of being
+/// mistaken for deletion.
+pub(crate) fn managed_rule_line(managed: &ManagedAlertRule, theme: TuiTheme) -> Line<'static> {
+    let severity = match managed.rule.severity {
+        AlertSeverity::Info => theme.accent,
+        AlertSeverity::Warning => theme.warn,
+        AlertSeverity::Critical => theme.danger,
+    };
+    let state = if managed.enabled {
+        t("common.enabled")
+    } else {
+        t("common.disabled")
+    };
+    let state_color = if managed.enabled {
+        theme.good
+    } else {
+        theme.dim
+    };
+    Line::from(vec![
+        Span::styled(
+            format!("{:<18}", metric_label(managed.rule.metric)),
+            Style::new().fg(severity).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(
+                " {:.1}{} · {}",
+                managed.rule.threshold,
+                metric_unit(managed.rule.metric),
+                state
+            ),
+            Style::new().fg(state_color),
+        ),
+    ])
+}
+
+/// Format a finite metric value with one decimal place. Every threshold the
+/// engine returns is finite (it clamps to a sane range), so this never renders
+/// `NaN`/`inf`.
+fn format_threshold(value: f32) -> String {
+    format!("{value:.1}")
+}
+
+/// Honest marker for an `Insufficient` verdict, mirroring the CLI's
+/// `insufficient_reason_str` snake-case spelling so the two surfaces agree.
+fn insufficient_marker(
+    reason: InsufficientReason,
+    sample_count: usize,
+    required: usize,
+    theme: TuiTheme,
+) -> (String, Color) {
+    match reason {
+        InsufficientReason::TooFewSamples => (
+            format!("insufficient · too_few_samples ({sample_count}/{required})"),
+            theme.warn,
+        ),
+        InsufficientReason::UnsupportedMetric => (
+            "insufficient · unsupported_metric".to_string(),
+            theme.danger,
+        ),
+    }
+}
+
+fn warn_for_percentage(value: f32, theme: TuiTheme) -> Color {
+    if value >= 90.0 {
+        theme.danger
+    } else if value >= 75.0 {
+        theme.warn
+    } else {
+        theme.good
+    }
+}
+
+fn warn_for_temperature(value: f32, theme: TuiTheme) -> Color {
+    if value >= 70.0 {
+        theme.danger
+    } else if value >= 55.0 {
+        theme.warn
+    } else {
+        theme.good
+    }
+}
+
+fn basis_label(basis: SuggestionBasis) -> &'static str {
+    match basis {
+        SuggestionBasis::MeanPlusStddevFloorP95 => "mean+3σ∧p95",
+    }
+}
+
+fn confidence_label(confidence: SuggestionConfidence) -> &'static str {
+    match confidence {
+        SuggestionConfidence::Low => "low",
+        SuggestionConfidence::High => "high",
+    }
+}
+
+fn centered(area: Rect, width: u16, height: u16) -> Rect {
+    let width = width.min(area.width.saturating_sub(4));
+    let height = height.min(area.height.saturating_sub(2));
+    Rect {
+        x: area.x + area.width.saturating_sub(width) / 2,
+        y: area.y + area.height.saturating_sub(height) / 2,
+        height,
+        width,
+    }
+}
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/alerts_tests.rs"]
+mod tests;

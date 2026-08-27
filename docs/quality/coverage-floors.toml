@@ -1,0 +1,15 @@
+# Per-crate line-coverage floors; bootstrapped by
+# scripts/quality/per_crate_coverage_gate.py --baseline --write.
+# Floors only move up; tolerance baked in at seed time is 1.0%.
+#
+# taskmanager-perf-ioctl 68.4 was seeded 2026-08-13 under the embedded-tests
+# accounting; after 8e58011e moved tests out of src/ the unprivileged ceiling
+# is 50.0 (success paths need CAP_PERFMON). Pending privileged receipt +
+# owner decision; procedure recorded (NOT yet run) in docs/QUALITY_GATES.md §3.
+[floors]
+taskmanager-afpacket = 68.9
+taskmanager-application = 76.7
+taskmanager-core = 85.0
+taskmanager-fd-bridge = 96.6
+taskmanager-perf-ioctl = 68.4
+taskmanager-platform-linux = 80.3

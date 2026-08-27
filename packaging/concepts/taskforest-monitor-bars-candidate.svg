@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="TaskForest monitor bars candidate">
+  <defs>
+    <linearGradient id="forest" x1="18" y1="10" x2="112" y2="120" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#185c52"/>
+      <stop offset="1" stop-color="#0d4944"/>
+    </linearGradient>
+    <linearGradient id="frame" x1="22" y1="26" x2="102" y2="104" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#effbdc"/>
+      <stop offset="1" stop-color="#d8efc8"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="120" height="120" rx="25" fill="url(#forest)"/>
+  <rect x="16" y="23" width="96" height="70" rx="11" fill="url(#frame)"/>
+  <rect x="21" y="28" width="86" height="60" rx="5" fill="#f8fbf5"/>
+  <path d="M57 92h14v7h13a3.5 3.5 0 0 1 0 7H44a3.5 3.5 0 0 1 0-7h13z" fill="url(#frame)"/>
+  <g fill="#306f4e">
+    <rect x="29" y="59" width="11" height="17" rx="2"/>
+    <rect x="44" y="45" width="11" height="31" rx="2"/>
+    <rect x="73" y="45" width="11" height="31" rx="2"/>
+    <rect x="88" y="59" width="11" height="17" rx="2"/>
+  </g>
+  <path d="M59 36a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v38a2 2 0 0 1-2 2h-.5v7a1.5 1.5 0 0 1-1.5 1.5h-2A1.5 1.5 0 0 1 61.5 83v-7H61a2 2 0 0 1-2-2z" fill="#75c69a"/>
+</svg>

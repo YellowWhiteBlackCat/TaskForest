@@ -1,0 +1,17 @@
+[package]
+name = "taskmanager-core"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Platform-neutral domain models, policies, and shared services for TaskForest"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive", "rc"] }
+serde_json = "1.0"
+
+[dev-dependencies]
+# Integration-harness fixtures (tests/headless). Deliberately NOT reachable
+# from the lib unit-test mounts: consuming test-support there would link two
+# core instances (E0308); shared fixtures require the standalone harness.
+taskmanager-test-support = { path = "../taskmanager-test-support" }

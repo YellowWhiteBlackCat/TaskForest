@@ -1,0 +1,15 @@
+[package]
+name = "taskmanager-platform-provider"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Platform-neutral native provider SPI for TaskForest capability adapters"
+
+[dependencies]
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+
+[lib]
+name = "taskmanager_platform_provider"
+path = "src/lib.rs"

@@ -1,0 +1,88 @@
+[package]
+name = "taskmanager-platform-linux"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Worker-backed Linux application-port adapters for TaskForest"
+
+[features]
+# Intel/AMD DRM, hwmon, block, NIC, and generic Linux backends have no optional
+# dependency and are always compiled. `hardware-all` lists every backend that
+# does require an optional dependency; extend this registry whenever one is
+# added so the standard artifact never becomes a vendor SKU.
+default = ["hardware-all"]
+hardware-all = ["nvidia"]
+nvidia = ["dep:nvml-wrapper"]
+# Exposes parsers, managers, and low-level collector helpers only to integration
+# tests. Product consumers use LinuxPlatformRuntime and provider composition.
+test-support = []
+
+[dependencies]
+bitflags = "2.13"
+crossbeam-channel = "0.5"
+nix = { version = "0.31", features = ["process", "signal", "user", "resource", "net", "fs", "feature", "poll"] }
+nvml-wrapper = { version = "0.12", optional = true }
+# Pure-Rust StatusNotifierItem tray (ADR-0NN). `blocking` + `async-io`:
+# ksni requires exactly one executor feature; `async-io` matches the repo's
+# existing zbus default (async-io + blocking-api) and keeps tokio out of the
+# tree entirely — avoiding the zbus#526 mixed-executor panic hazard documented
+# in the ksni README. No GTK, no libappindicator, no extra executor thread.
+ksni = { version = "0.3", default-features = false, features = ["blocking", "async-io"] }
+rustix = { version = "1", features = ["process", "thread"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sysinfo = "0.39"
+zbus = { version = "5.19", features = ["blocking-api"] }
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-core = { path = "../taskmanager-core" }
+# Per-feature escalation seam (ADR-023): consulted at the Intel PMU denial point
+# to type a perf_event_open EACCES as RequiresEscalation(IntelPmu) rather than a
+# bare PermissionDenied. Pure safe-Rust leaf, no transitive capability grant.
+taskmanager-escalation = { path = "../taskmanager-escalation" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskmanager-platform-portable = { path = "../taskmanager-platform-portable" }
+taskmanager-platform-provider = { path = "../taskmanager-platform-provider" }
+taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
+tracing = "0.1"
+
+# ADR-024: the second audited `unsafe` boundary crate — the AF_PACKET socket
+# seam for per-process network byte accounting. Only its safe `FiveTuple` parser
+# type is consumed here (the attribution join); the capture loop that owns a
+# `PacketSource` is wired later. Pure safe surface up; no RawFd/raw-pointer seam.
+# ADR-022: the perf_event_open boundary crate behind the Intel PMU engine rows.
+# Both kernel surfaces exist only on Linux; the edges are target-gated so this
+# adapter keeps compiling (contract tests on the second OS) on every target.
+# NOTE: target tables absorb every bare line that follows — keep this last in
+# the dependency layout.
+[target.'cfg(target_os = "linux")'.dependencies]
+taskmanager-afpacket = { path = "../taskmanager-afpacket" }
+taskmanager-perf-ioctl = { path = "../taskmanager-perf-ioctl" }
+wayland-backend = { version = "0.3", features = ["dlopen"] }
+wayland-client = { version = "0.31", features = ["dlopen"] }
+wayland-scanner = "0.31"
+
+[target.'cfg(any(target_arch = "x86", target_arch = "x86_64"))'.dependencies]
+# Safe CPUID reader for advertised processor base/max frequency. The adapter
+# uses only typed accessors; unsupported leaves remain unavailable.
+raw-cpuid = "11.6"
+
+[dev-dependencies]
+proptest = "1.11.0"
+taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }
+taskmanager-test-support = { path = "../taskmanager-test-support" }
+
+# Zero-dependency throughput benches (std::time only, no criterion): trend
+# inputs consumed by scripts/quality/bench-gate.sh, not assertions. The hot
+# parsers are re-exported behind `test-support`, which the root crate enables
+# for integration tests, so workspace `--all-targets` test runs DO build this
+# target; every canonical nextest invocation therefore carries
+# `-E 'not binary(throughput)'` (harness=false output is not libtest-shaped).
+[[bench]]
+name = "throughput"
+harness = false
+required-features = ["test-support"]
+
+[lib]
+name = "taskmanager_platform_linux"
+path = "src/lib.rs"

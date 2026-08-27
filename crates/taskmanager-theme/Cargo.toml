@@ -1,0 +1,30 @@
+[package]
+name = "taskmanager-theme"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Toolkit-neutral theme tokens, skin/mode/high-contrast/fonts axes for TaskForest (ADR-017, ADR-026)"
+readme = "README.md"
+publish = false
+
+# Toolkit-NEUTRAL by default (ADR-026): the design data modules never name a
+# toolkit type. The gpui bindings live in ONE cfg'd module (src/gpui.rs)
+# behind the optional `gpui` feature — Rust's orphan rule requires the
+# `From<Color> for gpui::Rgba` conversions to live in the crate that owns
+# `Color`, so the toolkit-dependent code is quarantined here instead of in a
+# separate adapter crate. Non-gpui frontends (TUI and iced) depend on
+# this crate with default features off and see no toolkit dependency.
+
+[dependencies]
+gpui = { version = "0.2.2", default-features = false, optional = true }
+
+[features]
+gpui = ["dep:gpui"]
+
+[dev-dependencies]
+gpui = { version = "0.2.2", default-features = false, features = ["test-support"] }
+
+[lib]
+name = "taskmanager_theme"
+path = "src/lib.rs"

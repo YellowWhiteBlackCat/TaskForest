@@ -1,0 +1,36 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {
+    "version": [7, 4],
+    "exit_status": 0
+  },
+  "device": {
+    "name": "/dev/sda",
+    "type": "sat",
+    "protocol": "ATA"
+  },
+  "smart_status": {
+    "passed": true
+  },
+  "temperature": {
+    "current": 31
+  },
+  "power_on_time": {
+    "hours": 12876
+  },
+  "ata_smart_attributes": {
+    "revision": 16,
+    "table": [
+      {
+        "id": 9,
+        "name": "Power_On_Hours",
+        "raw": { "value": 12876, "string": "12876" }
+      },
+      {
+        "id": 194,
+        "name": "Temperature_Celsius",
+        "raw": { "value": 31, "string": "31 (Min/Max 18/48)" }
+      }
+    ]
+  }
+}

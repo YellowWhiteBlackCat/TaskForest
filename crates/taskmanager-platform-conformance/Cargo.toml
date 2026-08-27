@@ -1,0 +1,16 @@
+[package]
+name = "taskmanager-platform-conformance"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Host-neutral conformance scenarios shared by TaskForest platform adapters"
+
+[dependencies]
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+
+[lib]
+name = "taskmanager_platform_conformance"
+path = "src/lib.rs"

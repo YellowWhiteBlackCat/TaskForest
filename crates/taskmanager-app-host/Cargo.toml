@@ -1,0 +1,31 @@
+[package]
+name = "taskmanager-app-host"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Toolkit-neutral native application composition for TaskForest"
+publish = false
+
+# This crate is the one shared composition seam for the three UI shapes.  It
+# owns native target selection, user paths, and platform-client construction;
+# it deliberately has no GPUI, Iced, or Ratatui dependency.
+
+[dependencies]
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-history-store = { path = "../taskmanager-history-store" }
+taskmanager-platform-native = { path = "../taskmanager-platform-native", default-features = false }
+taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
+crossbeam-channel = "0.5"
+ctrlc = { version = "3.5", features = ["termination"] }
+
+[features]
+default = []
+test-support = []
+hardware-all = ["taskmanager-platform-native/hardware-all"]
+nvidia = ["taskmanager-platform-native/nvidia"]
+
+[lib]
+name = "taskmanager_app_host"
+path = "src/lib.rs"

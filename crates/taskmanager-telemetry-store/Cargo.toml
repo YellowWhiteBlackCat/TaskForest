@@ -1,0 +1,18 @@
+[package]
+name = "taskmanager-telemetry-store"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Platform-neutral bounded telemetry history read model for TaskForest"
+
+[dependencies]
+ringbuf = "0.5"
+taskmanager-core = { path = "../taskmanager-core" }
+
+[dev-dependencies]
+taskmanager-test-support = { path = "../taskmanager-test-support" }
+
+[lib]
+name = "taskmanager_telemetry_store"
+path = "src/lib.rs"

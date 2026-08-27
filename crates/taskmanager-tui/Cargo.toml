@@ -1,0 +1,26 @@
+[package]
+name = "taskmanager-tui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Ratatui terminal frontend for the TaskForest native system monitor"
+publish = false
+
+[dependencies]
+ratatui = { version = "0.30.2", default-features = false, features = ["crossterm", "layout-cache", "macros", "underline-color", "unstable-rendered-line-info"] }
+# The neutral theme crate, taken with DEFAULT features — toolkit-free — so
+# this frontend proves the neutral build (ADR-026).
+taskmanager-theme = { path = "../taskmanager-theme" }
+taskmanager-shell = { path = "../taskmanager-shell" }
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-app-host = { path = "../taskmanager-app-host" }
+taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+taskmanager-assets = { path = "../taskmanager-assets" }
+
+[dev-dependencies]
+taskmanager-test-support = { path = "../taskmanager-test-support" }
+
+[lib]
+name = "taskmanager_tui"
+path = "src/lib.rs"

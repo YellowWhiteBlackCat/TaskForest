@@ -1,0 +1,14 @@
+# sccache is intentionally opt-in, not a default Cargo wrapper.
+#
+# sccache 0.17 bootstraps its local server through a Unix startup socket under
+# TMPDIR. This repository's agent lease uses a deep NVMe scratch path for
+# TMPDIR; that path can exceed Linux SUN_LEN before rustc even starts. A
+# default wrapper would therefore make basic commands such as `cargo clean`
+# fail before Cargo can do any work. Use `RUSTC_WRAPPER=sccache` only when the
+# caller has supplied a short, socket-safe TMPDIR; normal Cargo commands use
+# plain rustc and remain reliable under the repository lease.
+#
+# The dev workstation's E-core pinning (rustc on CPU 4-11) is deliberately
+# NOT configured here: the machine's user-level ~/.cargo/config.toml applies
+# it to every Rust project on that machine, so CI and other machines keep
+# plain rustc. See the "Compile affinity" section of AGENTS.md.

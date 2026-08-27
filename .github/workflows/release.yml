@@ -1,0 +1,113 @@
+# Tag-triggered release — a thin wrapper over packaging.yml.
+#
+# A release must trace 1:1 to an immutable git tag, never a mutable branch
+# tip. This workflow only runs the prechecks and delegates every artifact
+# build to the reusable packaging workflow (publish=true). The dispatch entry
+# exists to re-run/complete a release for an ALREADY-EXISTING tag (e.g.
+# re-attaching assets after a partial failure) — it resolves the tag through
+# `resolve-tag` below, never through github.ref_name (which is the dispatch
+# branch on that path). A failed run can also simply be re-run from the
+# Actions UI: the original tag event is preserved.
+#
+# Platform gates:
+#   Linux   always releases (blocking).
+#   Windows always releases and is blocking; the MSI is part of the artifact
+#           contract for every published tag.
+#   macOS   deferred — no packaging job exists yet.
+#
+# This workflow is the ONLY place the release token gains contents:write;
+# the package job passes that permission and only the two optional signing
+# secrets required by the Windows job.
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to release (checked out and attached to)
+        type: string
+        required: true
+      allow_version_mismatch:
+        description: Skip the tag == Cargo.toml version equality (emergency only)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  precheck:
+    name: Release prechecks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.resolve-tag.outputs.tag }}
+      prerelease: ${{ steps.resolve-tag.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          # On dispatch, github.ref_name is the BRANCH — the explicit input
+          # tag is the only correct source. On tag push they coincide.
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+      - name: Public repository and history guard
+        run: |
+          python3 scripts/quality/public_repo_guard.py
+          python3 scripts/quality/public_repo_guard.py --history
+      - name: Resolve the releasing tag
+        id: resolve-tag
+        run: |
+          echo "tag=${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}" >>"$GITHUB_OUTPUT"
+          # A semver prerelease suffix (v0.1.0-rc.1) publishes as a GitHub
+          # prerelease; softprops does not infer this from the tag itself.
+          echo "prerelease=${{ contains(github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name, '-') }}" >>"$GITHUB_OUTPUT"
+      - name: Verify tag shape and version equality
+        env:
+          ALLOW_MISMATCH: ${{ inputs.allow_version_mismatch || false }}
+        run: |
+          tag="${{ steps.resolve-tag.outputs.tag }}"
+          version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)
+          if [[ ! "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "tag '$tag' is not semver (vX.Y.Z[-pre])" >&2; exit 1
+          fi
+          bare="${tag#v}"
+          if [[ "$ALLOW_MISMATCH" != "true" && "$bare" != "$version" ]]; then
+            echo "tag '$tag' does not match Cargo.toml version '$version'" >&2
+            echo "bump Cargo.toml (and Cargo.lock) or set allow_version_mismatch" >&2; exit 1
+          fi
+      # `cargo metadata --locked` fails the moment the committed Cargo.lock
+      # does not satisfy the manifest, proving the tag builds reproducibly.
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - run: cargo metadata --locked --format-version 1 >/dev/null
+      # Every host-installed path must stay allowlisted before a release
+      # ships new package layouts (same guard as the CI blocking gate).
+      - run: timeout 30s python3 scripts/quality/system_install_manifest_guard.py --self-test
+      - run: timeout 30s python3 scripts/quality/system_install_manifest_guard.py
+
+  packaging:
+    name: Build & publish artifacts
+    needs: precheck
+    permissions:
+      contents: write
+    uses: ./.github/workflows/packaging.yml
+    with:
+      publish: true
+      linux: true
+      windows: true
+      # `ref` pins every packaging checkout to the tag even on the dispatch
+      # path; `release_tag` names the GitHub Release the assets attach to.
+      # `version` intentionally stays empty: the packaging jobs read the
+      # Cargo.toml version, which precheck just proved equals the tag.
+      ref: ${{ needs.precheck.outputs.tag }}
+      release_tag: ${{ needs.precheck.outputs.tag }}
+      prerelease: ${{ needs.precheck.outputs.prerelease == 'true' }}
+    secrets:
+      WINDOWS_CERT_B64: ${{ secrets.WINDOWS_CERT_B64 }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}

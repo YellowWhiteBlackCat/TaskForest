@@ -1,0 +1,16 @@
+# Repository-wide nextest contract (single source of truth for test
+# parallelism). Every profile inherits from `default` (nextest >= 0.9.115),
+# so the per-binary thread ceiling applies to bare `cargo nextest run` and
+# every `--profile` variant without repeating the key anywhere else.
+#
+#   - test-threads = 4: per-test-binary thread ceiling. Process concurrency
+#     (`-j 4`) is CLI-only in nextest, so every invocation in scripts and CI
+#     passes `-j 4`; together the whole run stays at <= 4 binaries x 4 threads.
+#   - AGENTS.md documents this contract; do not scatter thread flags in
+#     individual scripts unless they match the values below.
+[profile.default]
+test-threads = 4
+
+[profile.ci]
+# Report every failure in one run instead of stopping at the first failing test.
+fail-fast = false

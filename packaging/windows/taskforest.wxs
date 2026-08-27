@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TaskForest Windows installer (WiX v4+ schema, built by `wix build`).
+
+  Per-machine install of the GPUI frontend into Program Files, with one Start
+  Menu shortcut. History persistence is owned by the running frontend session.
+  Design notes:
+
+  - No service or autostart registration is installed by this MSI.
+  - No privileged helpers ship here: the pkexec/polkit escalation seams are
+    Linux-native; Windows escalation stays the typed Unsupported surface until
+    the UAC chain lands.
+  - AllowSameVersionUpgrades lets an rc build (numeric version collared to
+    x.y.z) upgrade in place for the final release.
+  - Unsigned until an Authenticode secret exists; SmartScreen will warn.
+-->
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <Package Name="TaskForest"
+           Manufacturer="TaskForest contributors"
+           Version="$(var.ProductVersion)"
+           UpgradeCode="2C676326-A218-46D4-A591-39FB02798F3A"
+           Scope="perMachine"
+           Compressed="yes"
+           Language="1033"
+           Codepage="65001">
+    <SummaryInformation Description="Eye-friendly native system monitor built with GPUI" />
+    <MajorUpgrade AllowSameVersionUpgrades="yes"
+                  DowngradeErrorMessage="A newer version of TaskForest is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+    <Icon Id="TaskForest.ico" SourceFile="$(var.IconPath)" />
+    <Property Id="ARPPRODUCTICON" Value="TaskForest.ico" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="TaskForest">
+        <Component Id="TaskForestGExecutable" Guid="64F61D3A-68C5-46CB-B8E0-3BAB0639CAFE">
+          <File Id="TaskForestGExe" Source="$(var.StageDir)/taskforest-g.exe" KeyPath="yes" />
+        </Component>
+        <Component Id="LicenseNotice" Guid="691EEA03-C18E-46DC-9A5B-26FC9813C76C">
+          <File Id="LicenseFile" Source="$(var.StageDir)/LICENSE" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ShortcutFolder" Name="TaskForest">
+        <Component Id="StartMenuShortcut" Guid="67C87331-4F2F-4846-8681-7D86C731BA54">
+          <Shortcut Id="TaskForestGShortcut"
+                    Name="TaskForestG"
+                    Description="Eye-friendly native system monitor (GPUI)"
+                    Target="[INSTALLFOLDER]taskforest-g.exe"
+                    Icon="TaskForest.ico"
+                    WorkingDirectory="INSTALLFOLDER" />
+          <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
+          <RegistryValue Root="HKLM"
+                         Key="Software\TaskForest"
+                         Name="StartMenuShortcut"
+                         Type="integer"
+                         Value="1"
+                         KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+  </Package>
+</Wix>

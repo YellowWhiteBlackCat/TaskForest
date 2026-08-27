@@ -1,0 +1,56 @@
+[package]
+name = "taskmanager-platform-macos"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "macOS application-port adapter composition for TaskForest"
+
+# Safety policy (2026-08-02, ADR-019): every provider is implemented ONLY
+# through safe, published wrapper crates (sysinfo / open / plist)
+# and bounded `std::process::Command` shell-outs to macOS system tools
+# (launchctl / smartctl / defaults / system_profiler / who / log / renice) —
+# the same pattern the Linux adapter uses for systemctl. No hand-written FFI
+# module is allowed (#![forbid(unsafe_code)]).
+[features]
+# The standard artifact contract: every provider registered here is part of
+# the default build; hardware backends are runtime-selected, never a
+# user-picked product SKU.
+default = ["hardware-all"]
+hardware-all = []
+# Dev/test-only seam gate (mirrors taskmanager-platform-linux): never enabled
+# in product builds; exists so test-only helpers can use
+# `#[cfg(any(test, feature = "test-support"))]` without unexpected-cfg warnings.
+test-support = []
+
+[dependencies]
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskmanager-platform-portable = { path = "../taskmanager-platform-portable" }
+taskmanager-platform-provider = { path = "../taskmanager-platform-provider" }
+taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
+# Shared spec -> muda menu bridge (also used by the Windows adapter).
+taskmanager-tray-muda = { path = "../taskmanager-tray-muda" }
+
+# Safe cross-platform telemetry (CPU/memory/process/network/disk/components
+# behind safe APIs). Reused version with platform-linux/platform-windows.
+sysinfo = "0.39"
+# Safe URL/open integration (uses the platform shell).
+open = "5"
+# Safe plist parsing/serialization (LaunchAgents/LaunchDaemons + diskutil).
+plist = "1.10"
+# JSON parsing for `system_profiler -json` / `smartctl -j` output.
+serde_json = "1.0"
+
+# Safe native macOS tray icon + context menu (NSStatusItem behind a safe
+# public API; ADR-0NN). Target-gated so non-macOS builds never pull AppKit.
+[target.'cfg(target_os = "macos")'.dependencies]
+tray-icon = "0.24"
+
+[dev-dependencies]
+taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }
+
+[lib]
+name = "taskmanager_platform_macos"
+path = "src/lib.rs"

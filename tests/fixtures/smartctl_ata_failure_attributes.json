@@ -1,0 +1,83 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {
+    "version": [7, 4],
+    "exit_status": 8
+  },
+  "device": {
+    "name": "/dev/sdc",
+    "type": "sat",
+    "protocol": "ATA"
+  },
+  "smart_status": {
+    "passed": false
+  },
+  "temperature": {
+    "current": 45
+  },
+  "power_on_time": {
+    "hours": 30015
+  },
+  "ata_smart_attributes": {
+    "revision": 16,
+    "table": [
+      {
+        "id": 5,
+        "name": "Reallocated_Sector_Ct",
+        "value": 83,
+        "worst": 83,
+        "thresh": 10,
+        "raw": { "value": 10, "string": "10" },
+        "when_failed": "now",
+        "failed": true
+      },
+      {
+        "id": 9,
+        "name": "Power_On_Hours",
+        "value": 1,
+        "worst": 1,
+        "thresh": 0,
+        "raw": { "value": 30015, "string": "30015" },
+        "when_failed": "-"
+      },
+      {
+        "id": 194,
+        "name": "Temperature_Celsius",
+        "value": 45,
+        "worst": 45,
+        "thresh": 0,
+        "raw": { "value": 45, "string": "45 (Min/Max 25/52)" },
+        "when_failed": "-"
+      },
+      {
+        "id": 197,
+        "name": "Current_Pending_Sector",
+        "value": 100,
+        "worst": 99,
+        "thresh": 0,
+        "raw": { "value": 4, "string": "4" },
+        "when_failed": "-",
+        "failing_now": false
+      },
+      {
+        "id": 198,
+        "name": "Offline_Uncorrectable",
+        "value": 100,
+        "worst": 99,
+        "thresh": 0,
+        "raw": { "value": 7, "string": "7" },
+        "when_failed": "now",
+        "failing_now": true
+      },
+      {
+        "id": 199,
+        "name": "UDMA_CRC_Error_Count",
+        "value": 200,
+        "worst": 200,
+        "thresh": 0,
+        "raw": { "value": 2, "string": "2" },
+        "when_failed": "now"
+      }
+    ]
+  }
+}

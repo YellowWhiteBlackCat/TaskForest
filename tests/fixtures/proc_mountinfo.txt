@@ -1,0 +1,3 @@
+36 25 259:2 / / rw,relatime shared:1 - ext4 /dev/nvme0n1p2 rw,errors=remount-ro
+40 36 0:30 / /sys/fs/cgroup ro,nosuid,nodev,noexec,relatime - cgroup2 cgroup rw
+41 36 8:1 / /media/My\040Disk rw,relatime - ext4 /dev/sda1 rw

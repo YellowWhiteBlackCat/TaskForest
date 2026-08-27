@@ -1,0 +1,29 @@
+[package]
+name = "taskmanager-escalation"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Per-feature privilege-escalation seam for TaskForest — the honest unprivileged default gate"
+publish = false
+
+# Foundation of the per-feature escalation framework (ADR-023, permission-model
+# Boundary 2 operationalized). Pure safe Rust: the seam types + UnprivilegedGate
+# (reports RequiresEscalation for every escalation-column feature), plus the
+# polkit/pkexec invocation for the privileged helpers. The main app never holds
+# privilege; the helper performs only the privileged op and returns safe typed
+# data (or, for the AF_PACKET launcher, an OwnedFd via SCM_RIGHTS).
+#
+# The net-launcher invocation receives the privileged fd via the audited
+# SCM_RIGHTS boundary crate (taskmanager-fd-bridge, ADR-025) — reached only
+# through its safe recv_fd API. No other workspace dep.
+
+# The SCM_RIGHTS recv side is Linux-only (it lives behind the linux-gated
+# PkexecNetLauncher impl in src/polkit.rs). Gate the dep so escalation still
+# compiles on macOS/Windows — those never invoke the net launcher (ADR-025).
+[target.'cfg(target_os = "linux")'.dependencies]
+taskmanager-fd-bridge = { path = "../taskmanager-fd-bridge" }
+
+[lib]
+name = "taskmanager_escalation"
+path = "src/lib.rs"

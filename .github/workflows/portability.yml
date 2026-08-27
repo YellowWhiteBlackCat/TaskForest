@@ -1,0 +1,138 @@
+# Native portability CI.
+#
+# Windows is a blocking peer of the Linux CI on every pull request and main
+# push. macOS remains an advisory signal on manual dispatch and the monthly
+# schedule; its job is intentionally skipped on routine pull requests.
+name: Portability
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 4 1 * *" # monthly, 1st at 04:00 UTC
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Keep this env identical to ci.yml's and packaging.yml's: rust-cache keys
+# hash all CARGO*/RUST* variables, so aligned envs let the Windows job here
+# share one cache with the Windows packaging job (same job id), turning the
+# monthly guard into a cache warmer for releases instead of a cold start.
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  macos:
+    name: macOS (build + lib tests)
+    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    runs-on: macos-latest
+    timeout-minutes: 120
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
+      # Build the GUI bin natively on macOS — Cargo.toml's target-conditional
+      # gpui dep pulls in `macos-blade` (Metal) additively on this target.
+      - run: cargo build --locked
+      # Lib unit tests cross-check the cfg(target_os) gating + pure parsers.
+      - run: cargo nextest run --locked --lib --profile ci -j 4
+      # Second-OS adapter contract proof: the macOS adapter must compose the
+      # complete standard product surface and publish honest typed outcomes on
+      # its native target (P1-ARCH-09). The same suite also runs on Linux.
+      - run: cargo nextest run --locked -p taskmanager-platform-macos --profile ci -j 4
+      # Semantic macOS visual contract: the test runs against the real macOS
+      # GPUI backend and records scale-factor, high-contrast, skin, and
+      # CJK/mono fallback invariants. It is intentionally a contract
+      # receipt, not a pixel claim; screenshot acceptance still requires a
+      # macOS-capable visual runner.
+      - name: Execute macOS visual contract
+        run: |
+          set -o pipefail
+          cargo nextest run --locked --test gui --features test-support --profile ci -E 'test(macos_visual_contract_keeps_native_scale_and_product_text_policy)' -j 4 2>&1 | tee macos-visual-contract.txt
+      - name: Upload macOS visual contract
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-visual-contract
+          path: macos-visual-contract.txt
+          if-no-files-found: error
+      # Reduced debug builds remain useful for fallback tests; releases reject
+      # them and always use the default hardware-all profile.
+      - run: cargo check --locked --no-default-features --features ui-gpui
+
+  windows:
+    name: Windows (native safety receipt)
+    runs-on: windows-latest
+    timeout-minutes: 120
+    # Windows native boundaries are now a required safety receipt, not an
+    # advisory cross-target compile. Product telemetry still contains typed
+    # unsupported domains, but every implemented native seam must execute here.
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
+      # Build the GUI bin natively on Windows (MSVC) — Cargo.toml's
+      # target-conditional gpui dep pulls in `windows-manifest` additively here.
+      - run: cargo build --locked -j 4
+      # Run the boundary and adapter's complete native test surface, including
+      # the Known Folder, exact-process, WTS, registry and config receipts.
+      - name: Execute native boundary receipt
+        run: |
+          set -o pipefail
+          cargo nextest run --locked -p taskmanager-windows-api -p taskmanager-platform-windows --all-targets --profile ci -j 4 2>&1 | tee windows-native-receipt.txt
+      - name: Upload native boundary receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-native-receipt
+          path: windows-native-receipt.txt
+          if-no-files-found: error
+      # The workspace lib suite also exercises the shared atomic ConfigStore
+      # and its language/font round-trip contract on this real Windows host.
+      # The Linux and macOS adapters are excluded: platform-linux's nix/Unix
+      # call sites and platform-macos's sysinfo uid handling are single-platform
+      # artifacts (the Windows product links platform-windows instead); their
+      # boundary-crate edges are target-gated since 2026-08-18.
+      - run: cargo nextest run --locked --workspace --lib --exclude taskmanager-platform-linux --exclude taskmanager-platform-macos --profile ci -j 4
+      # Every product shape is a Windows product surface. The default build
+      # selects GPUI, so compile the Iced and TUI compositions explicitly;
+      # otherwise a Windows-only dependency or cfg regression can remain
+      # invisible while the required native GPUI job stays green.
+      - name: Check Iced frontend on Windows
+        run: cargo check --locked --no-default-features --features ui-iced -j 4
+      - name: Check TUI frontend on Windows
+        run: cargo check --locked --no-default-features --features ui-tui -j 4
+      # Semantic Windows visual contract: the test runs against the real
+      # Windows GPUI backend and records scale-factor, high-contrast, skin,
+      # and CJK/mono fallback invariants. It is intentionally a contract
+      # receipt, not a pixel claim; screenshot acceptance still requires a
+      # Windows-capable visual runner.
+      - name: Execute Windows visual contract
+        run: |
+          set -o pipefail
+          cargo nextest run --locked --test gui --features test-support --profile ci -E 'test(windows_visual_contract_keeps_native_scale_and_product_text_policy)' -j 4 2>&1 | tee windows-visual-contract.txt
+      - name: Upload Windows visual contract
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-visual-contract
+          path: windows-visual-contract.txt
+          if-no-files-found: error
+      # Reduced debug builds remain useful for fallback tests; releases reject
+      # them and always use the default hardware-all profile.
+      - run: cargo check --locked --no-default-features --features ui-gpui -j 4

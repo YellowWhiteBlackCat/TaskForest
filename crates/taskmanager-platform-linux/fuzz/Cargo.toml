@@ -1,0 +1,37 @@
+[package]
+name = "taskmanager-platform-linux-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+# The pure parsers re-exported for fuzzing live behind `test-support`; the
+# vendor backends stay off so the sanitizer build skips nvml-wrapper.
+taskmanager-platform-linux = { path = "..", default-features = false, features = ["test-support"] }
+
+[[bin]]
+name = "proc_parsers"
+path = "fuzz_targets/proc_parsers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "system_parsers"
+path = "fuzz_targets/system_parsers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "mm_stat"
+path = "fuzz_targets/mm_stat.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

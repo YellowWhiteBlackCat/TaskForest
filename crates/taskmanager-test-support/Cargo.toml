@@ -1,0 +1,15 @@
+[package]
+name = "taskmanager-test-support"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Dev-only typed behavior-fixture builders for TaskForest tests"
+
+[dependencies]
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-core = { path = "../taskmanager-core" }
+
+[lib]
+name = "taskmanager_test_support"
+path = "src/lib.rs"

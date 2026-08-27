@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=TaskForestG
+Name[zh_CN]=任务森林 G
+GenericName=System Monitor (GPUI)
+GenericName[zh_CN]=系统监视器（GPUI）
+Comment=Eye-friendly native system monitor powered by GPUI
+Comment[zh_CN]=基于 GPUI 的护眼原生系统监视器
+Exec=taskforest-g
+Icon=taskforest-taskboard
+Terminal=false
+Categories=System;Monitor;
+Keywords=system;monitor;task;process;performance;gpui;
+Keywords[zh_CN]=系统;监视器;任务;进程;性能;GPUI;
+StartupNotify=true
+StartupWMClass=io.github.YellowWhiteBlackCat.TaskForestG

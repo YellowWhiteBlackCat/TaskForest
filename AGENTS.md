@@ -1,0 +1,60 @@
+# Repository Strategic Charter
+
+TaskForest is a Rust 2024 system monitor for Linux, Windows, and macOS. This file
+defines repository-wide engineering boundaries; implementation detail belongs to
+the lower document layers.
+
+## Public documentation contract
+
+- `README.md` is the product introduction: identity, capabilities, status, usage,
+  platforms, releases, and license.
+- `AGENTS.md` defines the global mission, boundaries, invariants, and document route.
+- `docs/` contains concise current-state charters; every living document is ≤200 lines.
+- `crates/*/README.md` owns crate responsibilities, contracts, dependencies, and checks.
+- `adr/` records current irreversible decisions.
+- History, plans, scores, TODOs, dated receipts, host snapshots, and real captures are
+  private material. They belong only in ignored `.private/` storage and must never be
+  committed to the public repository.
+
+## Mission and architecture
+
+- Linux, Windows, and macOS share one typed product contract. GPUI, Iced, TUI, and
+  Bevy consume the same application projections; GPUI is the current release surface.
+- Preserve the one-way flow: frontend → application → core/shell → platform runtime →
+  app-host/native composition → OS.
+- `core` owns typed facts and pure rules; `application` owns commands, reducers, and
+  ports; platform crates own I/O; frontends render projections; composition selects
+  adapters.
+- One fact has one authority. A lower layer may expand an upper layer, never redefine it.
+
+## Non-negotiable invariants
+
+- Business crates are safe Rust. `unsafe` exists only in the four audited boundary
+  crates and crosses their APIs only as typed, owned values.
+- The application is unprivileged by default. Escalation is per feature, OS-native,
+  typed, and observable; unavailable data is never fabricated as zero or success.
+- Frontends never read OS sources directly. Blocking collection stays off the UI thread;
+  rendering and keyboard paths consume the same cached projection.
+- Use the owned theme/component layer, toolkit-neutral contracts, typed layout tokens,
+  and the `foo.rs` + `foo/` module shape; do not add `foo/mod.rs`.
+- Windows telemetry, tests, and helpers never use PowerShell or another command interpreter.
+- Production code is panic-free by gate. Tests prove behavior and side effects, not source
+  text, vacuous assertions, or host-specific values.
+- Public-repository checks reject private paths, live captures, personal email addresses,
+  credentials, and host-specific absolute paths.
+
+## Authority route
+
+- Start at [docs/README.md](docs/README.md), then read the relevant current charter.
+- Read [docs/ARCH.md](docs/ARCH.md), [docs/STATE_OWNERSHIP.md](docs/STATE_OWNERSHIP.md),
+  [docs/STANDARDS.md](docs/STANDARDS.md), and [docs/QUALITY_GATES.md](docs/QUALITY_GATES.md).
+- Read [docs/PERMISSION_MODEL.md](docs/PERMISSION_MODEL.md), the affected crate README,
+  and any relevant [ADR](adr/) before changing trust or platform boundaries.
+
+## Working protocol
+
+- Preserve unrelated work. Cargo uses `.tmp/`, the shared `target/`, and at most four jobs;
+  use nextest except for doctests.
+- Routine work may proceed on `main` until the owner rescinds mainline mode.
+- Before completion, run the quick gate and report pass/fail/skip with relevant evidence.
+- Keep commits focused. Never publish `.private/`, generated host receipts, or live captures.

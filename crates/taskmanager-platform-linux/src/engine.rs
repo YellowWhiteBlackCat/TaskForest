@@ -1,0 +1,15 @@
+pub mod collector;
+pub(crate) mod desktop_appearance;
+pub mod hardware;
+#[cfg(feature = "nvidia")]
+pub(crate) mod nvml;
+pub mod power;
+pub mod process;
+pub mod runtime_evidence;
+pub mod sensors;
+pub mod services;
+pub mod session;
+pub mod smart;
+pub mod startup;
+pub mod storage_health;
+pub(crate) mod storage_target;

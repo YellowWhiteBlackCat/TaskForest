@@ -1,0 +1,32 @@
+[
+  {
+    "pid_one_comm": "systemd\n",
+    "openrc_runtime_active": false,
+    "openrc_binary_installed": true,
+    "expected": "systemd"
+  },
+  {
+    "pid_one_comm": "openrc-init\n",
+    "openrc_runtime_active": false,
+    "openrc_binary_installed": true,
+    "expected": "openrc"
+  },
+  {
+    "pid_one_comm": "busybox\n",
+    "openrc_runtime_active": true,
+    "openrc_binary_installed": true,
+    "expected": "openrc"
+  },
+  {
+    "pid_one_comm": "runit\n",
+    "openrc_runtime_active": false,
+    "openrc_binary_installed": true,
+    "expected": "unsupported"
+  },
+  {
+    "pid_one_comm": null,
+    "openrc_runtime_active": false,
+    "openrc_binary_installed": false,
+    "expected": "unsupported"
+  }
+]

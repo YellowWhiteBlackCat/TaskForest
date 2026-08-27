@@ -1,0 +1,149 @@
+# Continuous integration for the Linux-first taskmanager crate.
+#
+# Quota budget: GitHub free-runner minutes are finite, so CI carries only the
+# cheap, deterministic essentials. Everything expensive or environment-bound
+# moved local — `scripts/quality/local-gates.sh` reproduces the full former
+# gate set on this machine (see docs/QUALITY_GATES.md):
+#
+#   local standard tier: clippy, workspace nextest, doctests, rustdoc, the
+#       ui-tui/ui-iced shape matrix, the nvidia fallback matrix, cargo deny,
+#       the release build, and (--with-gui) the GPUI interaction matrix.
+#   local extended tier: llvm-cov with the configured workspace floors plus
+#       per-crate floors, mutation testing of the core/application diff,
+#       Miri on the three audited unsafe crates, fuzz-target build/runs,
+#       release-bloat and bench trends.
+#
+# Removed from the PR path to save quota:
+#   - coverage job      -> local extended (same llvm-cov invocation)
+#   - ui-shapes matrix  -> local standard (shape-tui / shape-iced stages)
+#   - gpui interaction  -> local standard --with-gui (needs a live session)
+#   - macOS / Windows   -> .github/workflows/portability.yml (dispatch +
+#       monthly cron; they remain non-blocking guards, never release gates)
+#
+# Architecture context (unchanged):
+# - `taskmanager-core` owns platform-neutral contracts and shared services.
+# - `taskmanager-application` owns toolkit-neutral commands, reducers, and ports.
+# - `taskmanager-platform-linux` exclusively owns `/proc`, `/sys`, command, control,
+#   hardware, process, service, startup, session, SMART, sensor, and storage providers.
+# - GPUI and Ratatui consume the shared contracts and compose the Linux adapter at
+#   their runtime edge. Architecture tests block provider code from returning to core.
+#
+# Linux is the blocking product gate.
+name: CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  CARGO_INCREMENTAL: 0
+
+# Burst dedupe: when several commits land on one ref back-to-back, only the
+# newest verdict matters — superseded in-flight runs cancel instead of
+# burning full Linux-gate minutes. Each PR groups by its own ref. Releases
+# deliberately keep their own NON-cancelling concurrency (a tag publish must
+# never abort mid-flight; see release.yml).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# The manual workflow only needs to read repository contents. Keep the default
+# token from gaining write access when the release gate is eventually enabled.
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    name: Linux (essential gate)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v7
+      # The public repository must not carry host receipts, screenshots,
+      # private publication material, credentials, or personal addresses.
+      - name: Public repository guard
+        run: python3 scripts/quality/public_repo_guard.py
+      - name: Public documentation guard
+        run: |
+          python3 scripts/quality/doc_governance_guard.py --self-test
+          python3 scripts/quality/doc_governance_guard.py
+      # A cold release build of the gpui workspace plus the all-targets test
+      # binaries overflows the ubuntu-latest runner's free disk. Reclaim ~10GB
+      # of pre-installed SDKs this Rust CI never uses before any compilation.
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup /usr/local/share/boost
+          sudo apt-get clean
+          df -h /
+      # gpui links against xkbcommon on Linux; the runner image ships the
+      # runtime lib but not always the -dev link flags, so install it
+      # explicitly (idempotent if already present).
+      - name: Install Linux GUI system deps
+        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev
+      - uses: dtolnay/rust-toolchain@1.97.1
+        with:
+          components: rustfmt, clippy
+      - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
+      # Dependency gate: block PRs that introduce a CVE, an unapproved license,
+      # or a duplicate crate before spending time on a full build. Policy lives
+      # in deny.toml. Run early because it needs no compilation.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+      # Reject non-progressing Python loops, unmanaged subprocesses, global
+      # process killing, and background shell jobs without cleanup ownership.
+      # These two runs are the CI twin of the same scripts in local-gates quick.
+      - run: timeout 30s python3 scripts/quality/automation_safety_guard.py
+      - run: timeout 30s python3 scripts/quality/automation_safety_guard.py --self-test
+      # Every host-installed path must be present in the audited manifest, and
+      # the only direct root install manager must pass an isolated rollback smoke
+      # after the release helper binaries have been built below.
+      - run: timeout 30s python3 scripts/quality/system_install_manifest_guard.py --self-test
+      - run: timeout 30s python3 scripts/quality/system_install_manifest_guard.py
+      # Block oversized source/test files after the repository-wide split pass.
+      - run: python3 scripts/quality/rust_line_guard.py --mode enforce
+      # Every crate root and substantial source module must carry a //! purpose
+      # header so rustdoc and contributors always see what a module owns.
+      - run: python3 scripts/quality/module_doc_guard.py --mode enforce
+      # The per-crate coverage gate parses the same lcov the extended tier
+      # produces; CI only proves the gate itself is correct via its self-test.
+      - run: timeout 30s python3 scripts/quality/per_crate_coverage_gate.py --self-test
+      - run: cargo fmt --all -- --check
+      # `test-support` is DEV-only: gpui's upstream test-support hard-wires
+      # X11, so it is enabled for test targets but never for the release build
+      # below (strict Wayland product policy).
+      - run: cargo clippy --locked --workspace --all-targets --features test-support -- -D warnings
+      # Product artifacts are OS variants, never hardware-vendor variants.
+      # The package smoke also needs the four standalone helper binaries, so
+      # name every release binary explicitly instead of relying on the root
+      # package's default-member build.
+      - run: >-
+          cargo build --locked --release -j 4
+          -p taskmanager
+          -p taskmanager-setup-helper
+          -p taskmanager-privilege-helper
+          -p taskmanager-net-launcher
+          -p taskmanager-process-control-helper
+      - run: timeout --kill-after=10s 30s scripts/test-system-install-manager.sh
+      # The release build above just produced the full package binary set;
+      # validate the packaging layout in the SAME gate so PKGBUILD layout
+      # drift fails the PR instead of surfacing at the first rehearsal.
+      # stage-package-sim replays every package() install line and checks
+      # the manifest whitelist, modes, and polkit exec.path resolution.
+      - run: install -m755 target/release/taskmanager target/release/taskforest-g
+      - run: timeout 120s packaging/arch/stage-package-sim.sh
+      - run: cargo nextest run --locked --workspace --all-targets --features test-support --profile ci -j 4 -E 'not binary(throughput)'
+      # nextest does not execute doctests on stable Rust.
+      - run: cargo test --locked --doc --workspace
+      # Rustdoc must stay warning-free: broken intra-doc links, unresolved
+      # symbol references, public docs linking to private items, and unclosed
+      # HTML tags in doc comments are all CI failures.
+      - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps
+      # Isolate the vendor backend only as a development/fallback matrix. The
+      # standard tests above already include it through default hardware-all.
+      # ADR-029 still requires an explicit UI shape when defaults are disabled.
+      - run: cargo nextest run --locked --workspace --lib --no-default-features --features hardware-all,nvidia,ui-gpui --profile ci -j 4

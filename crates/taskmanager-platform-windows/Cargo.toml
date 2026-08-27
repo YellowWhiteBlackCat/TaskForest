@@ -1,0 +1,68 @@
+[package]
+name = "taskmanager-platform-windows"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Windows application-port adapter composition for TaskForest"
+
+# Safety policy (2026-08-02): every provider is implemented ONLY through
+# safe, published wrapper crates (sysinfo / nvml-wrapper / windows-service /
+# windows-registry / open). Windows APIs without a safe wrapper are
+# NOT called — the corresponding provider registers a typed Unsupported
+# outcome and the gap is recorded in docs/ADRs. No hand-written FFI module is
+# allowed in this crate (#![forbid(unsafe_code)]).
+[features]
+# The standard artifact contract: every provider registered here is part of
+# the default build; hardware backends (NVML) are runtime-selected, never a
+# user-picked product SKU.
+default = ["hardware-all"]
+hardware-all = []
+
+[dependencies]
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-escalation = { path = "../taskmanager-escalation" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskmanager-platform-portable = { path = "../taskmanager-platform-portable" }
+taskmanager-platform-provider = { path = "../taskmanager-platform-provider" }
+taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
+taskmanager-tray-muda = { path = "../taskmanager-tray-muda" }
+taskmanager-windows-api = { path = "../taskmanager-windows-api" }
+
+# Safe cross-platform telemetry: CPU/memory/process/network/disk (Windows
+# backend reads GetSystemTimes / SystemProcessInformation / GetIfTable2 /
+# GetDiskFreeSpaceEx behind a safe API). Reused version with platform-linux.
+sysinfo = "0.39"
+# Safe CPUID reader for static processor base/max frequency facts. The crate
+# owns the architecture-specific intrinsic boundary; this adapter only uses
+# its typed iterator/accessors.
+raw-cpuid = "11.6"
+# Safe NVIDIA telemetry: dynamically loads libnvidia-ml.dll (same crate the
+# Linux adapter uses for NVML; safe public API).
+nvml-wrapper = "0.12"
+# Safe URL/open integration (uses the platform shell).
+open = "5"
+[target.'cfg(windows)'.dependencies]
+# Safe Windows service manager (SCM) wrapper: inventory + start/stop/restart.
+# Enable/disable uses the minimal taskmanager-windows-api start-mode seam so
+# existing binary paths and launch arguments are never reconstructed.
+windows-service = "0.8"
+# Safe registry wrapper (Microsoft's own crate): startup Run keys + theme.
+# Windows-only crate; empty elsewhere.
+windows-registry = "0.6"
+# Safe pure-Rust SMBIOS table parser (DMTF standard tables for BIOS/Motherboard/Memory DIMMs).
+smbios-lib = "0.9"
+# Safe native Windows desktop notification (Toast) wrapper.
+notify-rust = "4.18"
+# Safe native Windows tray icon + context menu (Shell_NotifyIcon + Win32
+# menu behind a safe public API; ADR-0NN). Windows-only, so the GTK/Linux
+# surface of these crates never enters the Linux CI dependency tree.
+tray-icon = "0.24"
+
+[dev-dependencies]
+taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }
+
+[lib]
+name = "taskmanager_platform_windows"
+path = "src/lib.rs"

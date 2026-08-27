@@ -1,0 +1,2 @@
+0::/user.slice/app.scope
+5:cpu,cpuacct:/legacy.slice/app

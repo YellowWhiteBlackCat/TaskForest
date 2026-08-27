@@ -1,0 +1,111 @@
+# Maintainer: TaskForest contributors
+pkgname=taskforest-git
+pkgver=0.1.0.r0.g0000000
+pkgrel=1
+pkgdesc='Eye-friendly native system monitor built with GPUI'
+arch=('x86_64' 'aarch64')
+url='https://github.com/YellowWhiteBlackCat/TaskForest'
+license=('Apache-2.0')
+# gpui 0.2.2's blade backend dlopens libvulkan at runtime (no ELF NEEDED entry,
+# verified via ldd), so the app is non-functional without the loader even though
+# it is not a hard link — hence vulkan-loader in depends, not optdepends.
+depends=('fontconfig' 'freetype2' 'libxkbcommon' 'wayland' 'vulkan-loader')
+optdepends=('smartmontools: ATA/SATA/NVMe S.M.A.R.T. attributes and self-tests'
+            'nvme-cli: extra NVMe endurance/power-on-hours data'
+            'xfsprogs: XFS filesystem integrity checks'
+            'iw: WiFi SSID display'
+            'nvidia-utils: NVIDIA GPU utilization via dynamically loaded NVML'
+            'vulkan-intel: Vulkan ICD for Intel integrated graphics'
+            'vulkan-radeon: Vulkan ICD for AMD graphics')
+makedepends=('cargo' 'clang' 'git')
+checkdepends=('cargo-nextest')
+provides=('taskforest')
+conflicts=('taskforest')
+source=("$pkgname::git+$url.git")
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$pkgname"
+  printf '0.1.0.r%s.g%s' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+prepare() {
+  cd "$pkgname"
+  cargo fetch --locked --target "$CARCH-unknown-linux-gnu"
+}
+
+build() {
+  cd "$pkgname"
+  # GPUI-only release surface (owner decision 2026-08-24): the Iced frontend
+  # stays a supported product surface but is not distributed in packages yet.
+  # Binaries: the GPUI app, the fixed setup helper, and the three per-feature
+  # privileged helpers the manifest
+  # authorizes for package install (ADR-023 Boundary 2).
+  # taskmanager-process-control-helper ships in-package (owner decision
+  # 2026-08-14); the standalone conflict-safe installer
+  # (scripts/manage-polkit-install.sh) remains for non-package hosts.
+  cargo build --frozen --release \
+    -p taskmanager \
+    -p taskmanager-setup-helper \
+    -p taskmanager-privilege-helper \
+    -p taskmanager-net-launcher \
+    -p taskmanager-process-control-helper
+  # The root package enforces one UI feature per build; the default feature
+  # set is exactly the GPUI shape, so copy it to its distribution name.
+  install -m755 target/release/taskmanager target/release/taskforest-g
+}
+
+check() {
+  cd "$pkgname"
+  cargo nextest run --frozen --workspace --all-targets
+  cargo test --frozen --doc --workspace
+}
+
+package() {
+  cd "$pkgname"
+  # After changing this list, re-run the no-sudo staging simulation:
+  #   packaging/arch/stage-package-sim.sh
+  # (stages every install line below and verifies the manifest whitelist,
+  # modes, and polkit exec.path resolution — Receipt 14 mechanized).
+  # This install set is the LAYOUT AUTHORITY for every Linux package format:
+  # the deb and rpm builders replay these exact lines through
+  # packaging/linux/stage-release-tree.sh, so Arch, deb, and rpm installs
+  # stay byte-for-byte identical by construction.
+  install -Dm755 target/release/taskforest-g "$pkgdir/usr/bin/taskmanager"
+  install -Dm755 target/release/taskforest-g "$pkgdir/usr/bin/taskforest-g"
+  install -Dm755 target/release/taskmanager-setup-helper \
+    "$pkgdir/usr/libexec/taskmanager-setup-helper"
+  # Per-feature privileged helpers + their polkit actions (ADR-023 Boundary 2).
+  # Both the helper binaries and the .policy.in sources carry the absolute
+  # exec.path baked in (no @bindir@ substitution needed); install drops the .in
+  # suffix to the canonical action filename. Paths match the manifest rows
+  # POLKIT-PERF-HELPER/POLICY and POLKIT-NET-HELPER/POLICY exactly so the
+  # system_install_manifest_guard stays green.
+  install -Dm755 target/release/taskmanager-privilege-helper \
+    "$pkgdir/usr/libexec/taskmanager-privilege-helper"
+  install -Dm644 polkit/com.taskforest.perf-helper.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/com.taskforest.perf-helper.policy"
+  install -Dm755 target/release/taskmanager-net-launcher \
+    "$pkgdir/usr/libexec/taskmanager-net-launcher"
+  install -Dm644 polkit/com.taskforest.net-launcher.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/com.taskforest.net-launcher.policy"
+  # Process-control helper lands under /usr/lib (matching the exec.path its
+  # policy annotates); rows POLKIT-PROCESS-HELPER/POLICY in the manifest.
+  install -Dm755 target/release/taskmanager-process-control-helper \
+    "$pkgdir/usr/lib/taskforest-process-control-helper"
+  install -Dm644 polkit/com.taskforest.process-control.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/com.taskforest.process-control.policy"
+  install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForestG.desktop \
+    "$pkgdir/usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestG.desktop"
+  install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForestG.metainfo.xml \
+    "$pkgdir/usr/share/metainfo/io.github.YellowWhiteBlackCat.TaskForestG.metainfo.xml"
+  install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg \
+    "$pkgdir/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg"
+  # First Run owns activation of this optional rule through the fixed helper;
+  # ship the audited asset for View/Copy without enabling it at install time.
+  install -Dm644 packaging/linux/99-taskmanager.rules \
+    "$pkgdir/usr/share/taskmanager/setup/99-taskmanager.rules"
+  install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.setup.policy \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.setup.policy"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/taskforest/LICENSE"
+}

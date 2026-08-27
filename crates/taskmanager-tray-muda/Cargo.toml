@@ -1,0 +1,24 @@
+[package]
+name = "taskmanager-tray-muda"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Shared muda/tray-icon bridge for the Windows and macOS tray adapters"
+publish = false
+
+# Single source for the neutral TrayMenuSpec -> muda menu mapping shared by
+# the Windows and macOS adapters (ADR-0NN). The repository rule forbids
+# copying a private helper into a second crate; this crate is that one
+# implementation. tray-icon is target-gated so Linux CI never pulls GTK.
+
+[dependencies]
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+
+[target.'cfg(any(target_os = "windows", target_os = "macos"))'.dependencies]
+tray-icon = "0.24"
+
+[lib]
+name = "taskmanager_tray_muda"
+path = "src/lib.rs"

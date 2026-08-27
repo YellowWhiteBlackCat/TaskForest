@@ -1,0 +1,12 @@
+{
+  "nvme_self_test_log": {
+    "current_self_test_operation": { "string": "Completed without error" },
+    "current_self_test_completion_percent": 100,
+    "table": [
+      {
+        "type": { "string": "Extended self-test" },
+        "status": { "string": "Completed without error" }
+      }
+    ]
+  }
+}

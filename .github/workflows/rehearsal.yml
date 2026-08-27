@@ -1,0 +1,41 @@
+# Manual packaging rehearsal — a thin wrapper over packaging.yml.
+#
+# The first real run of a release pipeline must never be the production
+# moment. This workflow dispatches the exact same packaging jobs with
+# publish=false: artifacts land as workflow artifacts (3-day retention) for
+# pull-back inspection — inspect the deb/rpm metadata and install the MSI on a
+# Windows host — without creating a GitHub Release.
+#
+# Per the trigger matrix, this is the only sanctioned way to spend packaging
+# minutes outside a tag: each run is an explicit, per-platform human choice.
+name: Rehearsal
+
+on:
+  workflow_dispatch:
+    inputs:
+      linux:
+        description: Rehearse the Linux DEB/RPM jobs
+        type: boolean
+        default: true
+      windows:
+        description: Rehearse the Windows MSI job
+        type: boolean
+        default: true
+
+# Read-only token floor: `permissions: {}` would leave GITHUB_TOKEN with no
+# scope at all, which cannot even check out a private repository. Rehearsal
+# never writes (publish=false), so contents:read is the exact minimum.
+permissions:
+  contents: read
+
+jobs:
+  packaging:
+    name: Rehearse artifact build
+    uses: ./.github/workflows/packaging.yml
+    with:
+      publish: false
+      linux: ${{ inputs.linux }}
+      windows: ${{ inputs.windows }}
+    secrets:
+      WINDOWS_CERT_B64: ${{ secrets.WINDOWS_CERT_B64 }}
+      WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}

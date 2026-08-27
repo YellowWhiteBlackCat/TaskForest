@@ -1,0 +1,32 @@
+[package]
+name = "taskmanager-net-launcher"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+authors = ["TaskForest"]
+license = "Apache-2.0"
+description = "Privileged launcher binary: opens an AF_PACKET socket (CAP_NET_RAW) and passes the fd to the unprivileged app via SCM_RIGHTS (TaskForest permission-model Boundary 2, ADR-023/024/025)."
+publish = false
+
+# The SECOND privileged piece of TaskForest (ADR-023, docs/PERMISSION_MODEL.md
+# Boundary 2), mirroring taskmanager-privilege-helper. Invoked through the
+# OS-native escalation prompt (polkit + pkexec on Linux), it performs exactly
+# ONE privileged operation: open an AF_PACKET raw socket bound to one interface
+# (CAP_NET_RAW), then hand the fd to the unprivileged app over a Unix domain
+# socket via SCM_RIGHTS and exit. The app then runs the capture loop on the
+# inherited fd WITHOUT ever holding CAP_NET_RAW. There are no flags beyond the
+# socket path + interface index, and no file access beyond the socket open —
+# minimal privileged attack surface. A denial or open failure emits a typed
+# ERROR envelope on stdout + a non-zero exit; it NEVER passes a bad fd.
+
+[dependencies]
+# The audited AF_PACKET boundary crate (ADR-024) — the launcher uses ONLY its
+# safe open_packet_fd to obtain the passable OwnedFd. The audited SCM_RIGHTS
+# boundary crate (ADR-025) — send_fd is the ONLY way the launcher transfers the
+# fd. Both reached solely through their safe APIs; this binary writes no unsafe.
+taskmanager-afpacket = { path = "../taskmanager-afpacket" }
+taskmanager-fd-bridge = { path = "../taskmanager-fd-bridge" }
+
+[[bin]]
+name = "taskmanager-net-launcher"
+path = "src/main.rs"

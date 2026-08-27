@@ -1,0 +1,30 @@
+{
+  "json_format_version": [1, 0],
+  "smartctl": {
+    "version": [7, 4],
+    "exit_status": 8
+  },
+  "device": {
+    "name": "/dev/sdb",
+    "type": "sat",
+    "protocol": "ATA"
+  },
+  "smart_status": {
+    "passed": false
+  },
+  "ata_smart_attributes": {
+    "revision": 16,
+    "table": [
+      {
+        "id": 9,
+        "name": "Power_On_Hours",
+        "raw": { "value": 54321, "string": "54321" }
+      },
+      {
+        "id": 190,
+        "name": "Airflow_Temperature_Cel",
+        "raw": { "value": 47, "string": "47 (Min/Max 22/51)" }
+      }
+    ]
+  }
+}

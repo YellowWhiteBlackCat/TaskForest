@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  TaskForestG.app bundle descriptor.
+
+  Mechanism (verified from gpui 0.2.2 source): gpui's macOS backend calls
+  NSApplication::setActivationPolicy(Regular) in did_finish_launching
+  (src/platform/mac/platform.rs:1390), which gives the process a Dock tile
+  and menu bar. gpui NEVER calls setApplicationIconImage, so the Dock /
+  Launchpad icon is supplied entirely by LaunchServices: at launch time it
+  reads CFBundleIconFile from this plist and resolves it against
+  Contents/Resources/<value>.icns. No gpui code change is required; the icon
+  appears whenever the app is launched *as a bundle* (Finder / `open` /
+  Launchpad). A bare `taskforest-g` binary run from a shell gets no bundle icon.
+-->
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+
+    <key>CFBundleDisplayName</key>
+    <string>TaskForestG</string>
+
+    <key>CFBundleExecutable</key>
+    <string>taskforest-g</string>
+
+    <key>CFBundleIconFile</key>
+    <string>icon</string>
+
+    <key>CFBundleIdentifier</key>
+    <string>io.github.YellowWhiteBlackCat.TaskForestG</string>
+
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+
+    <key>CFBundleName</key>
+    <string>TaskForestG</string>
+
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+
+    <key>CFBundleShortVersionString</key>
+    <string>0.1.0</string>
+
+    <key>CFBundleVersion</key>
+    <string>1</string>
+
+    <!-- gpui's Metal (blade) backend needs a recent macOS; treat as a floor
+         to confirm on real hardware. -->
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.utilities</string>
+
+    <!-- gpui renders with Metal; enable HiDPI backing. -->
+    <key>NSHighResolutionCapable</key>
+    <true/>
+
+    <!-- Stay on the integrated GPU on dual-GPU Macs instead of forcing the
+         discrete GPU awake. -->
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+</dict>
+</plist>

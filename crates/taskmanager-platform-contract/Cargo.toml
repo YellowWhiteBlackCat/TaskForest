@@ -1,0 +1,14 @@
+[package]
+name = "taskmanager-platform-contract"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Platform-neutral capability, request, event, and port contracts for TaskForest"
+
+[dependencies]
+taskmanager-core = { path = "../taskmanager-core" }
+
+[lib]
+name = "taskmanager_platform_contract"
+path = "src/lib.rs"

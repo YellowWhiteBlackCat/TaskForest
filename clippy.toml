@@ -1,0 +1,5 @@
+# Workspace-wide structural ratchets. These are deliberately global rather
+# than per-file allowlists: new code cannot exceed the largest audited legacy
+# function while named-system refactors continue lowering the ceiling.
+cognitive-complexity-threshold = 48
+too-many-lines-threshold = 650

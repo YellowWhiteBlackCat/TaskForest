@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=TaskForestI
+Name[zh_CN]=任务森林 I
+GenericName=System Monitor (Iced)
+GenericName[zh_CN]=系统监视器（Iced）
+Comment=Eye-friendly native system monitor powered by Iced
+Comment[zh_CN]=基于 Iced 的护眼原生系统监视器
+Exec=taskforest-i
+Icon=taskforest-taskboard
+Terminal=false
+Categories=System;Monitor;
+Keywords=system;monitor;task;process;performance;iced;
+Keywords[zh_CN]=系统;监视器;任务;进程;性能;Iced;
+StartupNotify=true
+StartupWMClass=io.github.YellowWhiteBlackCat.TaskForestI

@@ -1,0 +1,24 @@
+[package]
+name = "taskmanager-platform-portable"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Portable safe-I/O provider implementations shared by TaskForest native adapters"
+publish = false
+
+[dependencies]
+battery = "0.7"
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskmanager-platform-provider = { path = "../taskmanager-platform-provider" }
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31", features = ["fs", "process", "signal"] }
+
+[dev-dependencies]
+taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }
+
+[lib]
+name = "taskmanager_platform_portable"
+path = "src/lib.rs"

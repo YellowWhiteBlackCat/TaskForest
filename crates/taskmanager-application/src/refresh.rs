@@ -1,0 +1,46 @@
+//! Typed refresh requests and data delivered back to a frontend.
+
+use crate::model::{ServiceDeps, ServiceLogSnapshot, ServiceLogStreamSnapshot};
+use crate::{FailureKind, RequestId, ServiceControlOutcome, ServiceId};
+
+/// A typed asynchronous service result. Keeping these in the shared update
+/// stream lets every frontend consume the same provider-neutral lifecycle.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ServiceUpdate {
+    Action(ServiceControlOutcome),
+    Dependencies {
+        request_id: RequestId,
+        service_id: ServiceId,
+        deps: ServiceDeps,
+    },
+    DependenciesUnavailable {
+        request_id: RequestId,
+        service_id: ServiceId,
+        error: FailureKind,
+    },
+    Logs(ServiceLogSnapshot),
+    LogStream {
+        request_id: RequestId,
+        observed_at_ms: u64,
+        snapshot: ServiceLogStreamSnapshot,
+    },
+}
+
+/// A refresh scope understood by application and platform adapters.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum RefreshRequest {
+    All,
+    Telemetry,
+    HardwareInventory,
+    Processes,
+    PlatformLists,
+    Services,
+    Startup,
+    Sessions,
+    Health,
+    /// Targeted power/battery refresh (capacity, charge rate, state per battery).
+    /// Distinct from [`Health`](Self::Health) so a frontend can poll battery on
+    /// its own cadence without re-fetching sensors/SMART.
+    Power,
+    Containers,
+}

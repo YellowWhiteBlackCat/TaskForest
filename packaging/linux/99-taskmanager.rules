@@ -1,0 +1,27 @@
+# TaskManager — optional install-time privilege widening (no runtime sudo).
+#
+# The app itself never carries setcap/setuid and never prompts on its own
+# unless the user enables a per-feature escalation (polkit helpers, ADR-023).
+# These udev rules use the same mechanism Mission Center's setup script does:
+# the udev daemon (running as root) widens the mode ONCE at device appearance,
+# so every later unprivileged launch reads the data without privileges.
+#
+# Install (systemd systems):
+#   sudo install -Dm644 99-taskmanager.rules /etc/udev/rules.d/99-taskmanager.rules
+#   sudo udevadm control --reload-rules && sudo udevadm trigger
+#
+# What each rule opens and why:
+#   * intel-rapl energy_uj — CPU package power draw (RAPL). The kernel ships it
+#     0400 root; without this rule the app reports typed PermissionDenied for
+#     CPU power on Intel hosts (never a fabricated 0 W).
+#
+# NOT included by design:
+#   * /dev/nvme* / /dev/sd* (SMART) — device-node access is a distribution
+#     policy (usually 0660 root:disk); add your user to the `disk` group or
+#     write your own rule. SMART stays a typed PermissionDenied otherwise.
+#   * perf_event (Intel per-engine %) — the app escalates per-feature via its
+#     polkit helper instead of a blanket capability grant.
+#   * AF_PACKET (per-process network) — the app escalates per-feature via its
+#     polkit net-launcher; a setcap on a dedicated helper binary is a future
+#     design option, never on the main binary.
+SUBSYSTEM=="powercap", KERNEL=="intel-rapl*", RUN+="/usr/bin/chmod a+r /sys/%p/energy_uj"

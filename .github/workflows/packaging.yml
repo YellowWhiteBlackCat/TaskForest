@@ -1,0 +1,332 @@
+# Reusable artifact builder — the ONLY place release artifacts are produced.
+#
+# Never triggered directly (zero cost at rest): release.yml (v* tag push) and
+# rehearsal.yml (manual, non-publishing rehearsal) are thin wrappers that call
+# this workflow. One expensive action, one trigger source — a wrapper can never
+# spend packaging minutes by accident.
+#
+# Surface matrix:
+#   Linux   native amd64 + arm64: DEB and RPM.
+#   Windows native x64 + arm64: MSI.
+#   macOS   deferred until its signing and notarization contract is ready.
+#
+# Linux arm64 uses the public GitHub-hosted ARM runner so the binaries and
+# package metadata are produced natively. Windows arm64 likewise uses the
+# native Windows ARM runner; no emulation or mislabeled x64 payload is allowed.
+# Every Linux package format replays the PKGBUILD layout authority through
+# packaging/linux/stage-release-tree.sh, so Arch/deb/rpm installs identical
+# trees by construction. Only the GPUI frontend shape is packaged.
+#
+# Token policy is owned by the CALLER: this workflow declares no `permissions`
+# block, because a called workflow can only restrict the caller's GITHUB_TOKEN.
+# release.yml grants contents:write on its calling job; rehearsal.yml grants
+# contents:read and never reaches the publish job because publish=false.
+
+# Windows is part of the release artifact contract. Rehearsal may still opt out
+# for a deliberately Linux-only local check, but a published release always
+# waits for both native MSI jobs and all Linux architecture jobs.
+name: Packaging
+
+on:
+  workflow_call:
+    inputs:
+      publish:
+        description: Attach artifacts to the GitHub Release for the triggering tag
+        type: boolean
+        default: false
+      linux:
+        description: Build the Linux artifact set
+        type: boolean
+        default: true
+      windows:
+        description: Build the Windows MSI set
+        type: boolean
+        default: true
+      version:
+        description: Package version (defaults to the Cargo.toml version)
+        type: string
+        default: ""
+      ref:
+        description: Git ref to build (defaults to the event's checkout ref)
+        type: string
+        default: ""
+      release_tag:
+        description: Tag the GitHub Release attaches to when publishing (defaults to the event ref)
+        type: string
+        default: ""
+      prerelease:
+        description: Mark the published GitHub Release as a prerelease
+        type: boolean
+        default: false
+    secrets:
+      WINDOWS_CERT_B64:
+        description: Optional base64-encoded Authenticode PFX certificate
+        required: false
+      WINDOWS_CERT_PASSWORD:
+        description: Optional password for WINDOWS_CERT_B64
+        required: false
+
+# These env vars MUST stay identical to ci.yml's workflow env (and
+# portability.yml's): rust-cache derives its key partly from a hash of all
+# CARGO*/RUST* environment variables, so any difference splits the cache and
+# the release jobs cold-build the dependencies CI just compiled on the same
+# commit. RUSTFLAGS also keeps release artifacts warning-clean exactly like
+# the blocking gate.
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: -D warnings
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  linux:
+    name: Build Linux ${{ matrix.arch }} packages
+    runs-on: ${{ matrix.runner }}
+    if: inputs.linux
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-24.04
+            deb_arch: amd64
+            rpm_arch: x86_64
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+            deb_arch: arm64
+            rpm_arch: aarch64
+    env:
+      DEB_ARCH: ${{ matrix.deb_arch }}
+      RPM_ARCH: ${{ matrix.rpm_arch }}
+    steps:
+      # An empty `ref` input falls back to the event's natural ref (tag push
+      # → the tag commit; rehearsal → the dispatch branch head).
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup /usr/local/share/boost
+          sudo apt-get clean
+          df -h /
+      - name: Install build and packaging deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev rpm file
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: Swatinem/rust-cache@v2
+      # Native runner builds: the host target is the package target, so a
+      # successful arm64 job cannot accidentally contain an x86_64 binary.
+      - name: Build release binaries
+        run: |
+          cargo build --locked --release -j 4 \
+            -p taskmanager \
+            -p taskmanager-setup-helper \
+            -p taskmanager-privilege-helper \
+            -p taskmanager-net-launcher \
+            -p taskmanager-process-control-helper
+          install -m755 target/release/taskmanager target/release/taskforest-g
+      - name: Resolve package version
+        id: version
+        run: |
+          version="${{ inputs.version }}"
+          if [[ -z "$version" ]]; then
+            version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)
+          fi
+          echo "version=$version" >>"$GITHUB_OUTPUT"
+      - name: Stage the release tree (PKGBUILD layout authority)
+        run: packaging/linux/stage-release-tree.sh staging
+      - name: Build DEB
+        run: |
+          packaging/debian/build-deb.sh staging \
+            "${{ steps.version.outputs.version }}" \
+            "taskforest_${{ steps.version.outputs.version }}_${DEB_ARCH}.deb" \
+            "$DEB_ARCH"
+      - name: Build RPM
+        run: |
+          packaging/rpm/build-rpm.sh staging \
+            "${{ steps.version.outputs.version }}" \
+            "taskforest-${{ steps.version.outputs.version }}-1.${RPM_ARCH}.rpm"
+      - name: Validate DEB package
+        run: |
+          set -euo pipefail
+          deb=$(find . -maxdepth 1 -type f -name "taskforest_*_${DEB_ARCH}.deb" -print -quit)
+          test -n "$deb"
+          test "$(dpkg-deb --field "$deb" Architecture)" = "$DEB_ARCH"
+          dpkg-deb --info "$deb"
+          dpkg-deb --contents "$deb" > "deb-contents-${DEB_ARCH}.txt"
+          test -s "deb-contents-${DEB_ARCH}.txt"
+      - name: Validate RPM package
+        run: |
+          set -euo pipefail
+          rpm_file=$(find . -maxdepth 1 -type f -name "taskforest-*.*.${RPM_ARCH}.rpm" -print -quit)
+          test -n "$rpm_file"
+          test "$(rpm -qp --queryformat '%{ARCH}\n' "$rpm_file")" = "$RPM_ARCH"
+          rpm -qp --info "$rpm_file"
+          rpm -qp --list "$rpm_file" > "rpm-contents-${RPM_ARCH}.txt"
+          rpm -qp --requires "$rpm_file" > "rpm-requires-${RPM_ARCH}.txt"
+          test -s "rpm-contents-${RPM_ARCH}.txt"
+      - name: Emit sha256 checksums
+        run: |
+          set -euo pipefail
+          files=(
+            "$(find . -maxdepth 1 -type f -name "taskforest_*_${DEB_ARCH}.deb" -print -quit)"
+            "$(find . -maxdepth 1 -type f -name "taskforest-*.*.${RPM_ARCH}.rpm" -print -quit)"
+          )
+          for file in "${files[@]}"; do test -n "$file" && test -f "$file"; done
+          sha256sum "${files[@]}" > "checksums-sha256-linux-${{ matrix.arch }}.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-${{ matrix.arch }}-artifacts
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: ${{ inputs.publish && 90 || 3 }}
+          path: |
+            taskforest_*_${{ matrix.deb_arch }}.deb
+            taskforest-*.*.${{ matrix.rpm_arch }}.rpm
+            checksums-sha256-linux-${{ matrix.arch }}.txt
+
+  windows:
+    name: Build Windows ${{ matrix.arch }} MSI
+    runs-on: ${{ matrix.runner }}
+    if: inputs.windows
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: x64
+            runner: windows-latest
+            rust_target: x86_64-pc-windows-msvc
+            msi_arch: x64
+          - arch: arm64
+            runner: windows-11-vs2026-arm
+            rust_target: aarch64-pc-windows-msvc
+            msi_arch: arm64
+    env:
+      WINDOWS_CERT_B64: ${{ secrets.WINDOWS_CERT_B64 }}
+      RUST_TARGET: ${{ matrix.rust_target }}
+      MSI_ARCH: ${{ matrix.msi_arch }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.ref }}
+      - uses: dtolnay/rust-toolchain@1.97.1
+      - name: Install Rust target
+        shell: bash
+        run: rustup target add "$RUST_TARGET"
+      - uses: Swatinem/rust-cache@v2
+      # GPUI shape only — the release surface deliberately skips the Iced
+      # build. The Windows edge embeds the exe icon on the native MSVC toolchain.
+      - name: Build release exe
+        shell: bash
+        run: |
+          cargo build --locked --release --target "$RUST_TARGET" -j 4 \
+            -p taskmanager
+          mkdir -p msi-stage
+          install -m755 "target/$RUST_TARGET/release/taskmanager.exe" msi-stage/taskforest-g.exe
+          install -m644 LICENSE msi-stage/
+      - name: Install WiX
+        shell: bash
+        run: dotnet tool install --global wix
+      # MSI ProductVersion is numeric x.y.z: strip any prerelease suffix; the
+      # package architecture is explicit so arm64 cannot receive an x64 MSI.
+      - name: Resolve numeric MSI version
+        id: version
+        shell: bash
+        run: |
+          version="${{ inputs.version }}"
+          if [[ -z "$version" ]]; then
+            version=$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n1)
+          fi
+          numeric=$(printf '%s' "$version" | sed 's/-[^-]*$//')
+          echo "version=$numeric" >>"$GITHUB_OUTPUT"
+      - name: Build MSI
+        shell: bash
+        run: |
+          packaging/windows/build-msi.sh msi-stage \
+            "${{ steps.version.outputs.version }}" \
+            "$MSI_ARCH" \
+            "TaskForest-${{ steps.version.outputs.version }}-${{ matrix.arch }}.msi"
+      - name: Validate MSI database and payload references
+        shell: bash
+        run: |
+          set -euo pipefail
+          msi=$(find . -maxdepth 1 -type f -name "TaskForest-*-${{ matrix.arch }}.msi" -print -quit)
+          test -n "$msi"
+          test -s "$msi"
+          rm -rf msi-decompile
+          mkdir -p msi-decompile
+          wix msi decompile -acceptEula wix7 \
+            -o msi-decompile/taskforest.wxs "$msi"
+          test -s msi-decompile/taskforest.wxs
+          grep -Eiq 'taskforest-g\.exe' msi-decompile/taskforest.wxs
+          grep -Eiq 'license' msi-decompile/taskforest.wxs
+      # Sign ONLY when an Authenticode PFX cert secret exists; until then the
+      # MSI ships unsigned (SmartScreen will warn) per the owner decision.
+      - name: signtool (when WINDOWS_CERT_B64 secret present)
+        if: env.WINDOWS_CERT_B64 != ''
+        shell: bash
+        run: |
+          echo "${{ secrets.WINDOWS_CERT_B64 }}" | base64 -d > cert.pfx
+          signtool sign /fd sha256 /td sha256 \
+            /tr https://time.certum.pl \
+            /f cert.pfx /p "${{ secrets.WINDOWS_CERT_PASSWORD }}" \
+            "TaskForest-${{ steps.version.outputs.version }}-${{ matrix.arch }}.msi"
+          rm -f cert.pfx
+      - name: Emit sha256 checksums
+        shell: bash
+        run: sha256sum "TaskForest-${{ steps.version.outputs.version }}-${{ matrix.arch }}.msi" > checksums-sha256-windows-${{ matrix.arch }}.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-${{ matrix.arch }}-artifacts
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: ${{ inputs.publish && 90 || 3 }}
+          path: |
+            TaskForest-*-${{ matrix.arch }}.msi
+            checksums-sha256-windows-${{ matrix.arch }}.txt
+
+  publish:
+    name: Publish release artifacts
+    if: inputs.publish
+    needs: [linux, windows]
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Download all validated artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: '*-artifacts'
+          path: release-artifacts
+          merge-multiple: true
+      - name: Verify release artifact matrix
+        working-directory: release-artifacts
+        run: |
+          set -euo pipefail
+          test -n "$(find . -maxdepth 1 -type f -name 'taskforest_*_amd64.deb' -print -quit)"
+          test -n "$(find . -maxdepth 1 -type f -name 'taskforest_*_arm64.deb' -print -quit)"
+          test -n "$(find . -maxdepth 1 -type f -name 'taskforest-*.*.x86_64.rpm' -print -quit)"
+          test -n "$(find . -maxdepth 1 -type f -name 'taskforest-*.*.aarch64.rpm' -print -quit)"
+          test -n "$(find . -maxdepth 1 -type f -name 'TaskForest-*-x64.msi' -print -quit)"
+          test -n "$(find . -maxdepth 1 -type f -name 'TaskForest-*-arm64.msi' -print -quit)"
+          for checksum in checksums-sha256-linux-x64.txt \
+                         checksums-sha256-linux-arm64.txt \
+                         checksums-sha256-windows-x64.txt \
+                         checksums-sha256-windows-arm64.txt; do
+            test -s "$checksum"
+          done
+      - name: Attach validated artifacts to the GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ inputs.release_tag }}
+          prerelease: ${{ inputs.prerelease }}
+          generate_release_notes: true
+          files: |
+            release-artifacts/taskforest_*_amd64.deb
+            release-artifacts/taskforest_*_arm64.deb
+            release-artifacts/taskforest-*.*.x86_64.rpm
+            release-artifacts/taskforest-*.*.aarch64.rpm
+            release-artifacts/TaskForest-*-x64.msi
+            release-artifacts/TaskForest-*-arm64.msi
+            release-artifacts/checksums-sha256-*.txt

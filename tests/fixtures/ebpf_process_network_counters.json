@@ -1,0 +1,53 @@
+{
+  "abi_version": 3,
+  "map_generation": 7,
+  "coverage": {
+    "attribution": "task_context_tracing",
+    "hooks": [
+      { "capability": "process_attribution", "availability": "attached" },
+      { "capability": "tcp_ipv4_ingress", "availability": "attached" },
+      { "capability": "tcp_ipv4_egress", "availability": "attached" },
+      { "capability": "tcp_ipv6_ingress", "availability": "attached" },
+      { "capability": "tcp_ipv6_egress", "availability": "attached" },
+      { "capability": "udp_ipv4_ingress", "availability": "attached" },
+      { "capability": "udp_ipv4_egress", "availability": "attached" },
+      { "capability": "udp_ipv6_ingress", "availability": "attached" },
+      { "capability": "udp_ipv6_egress", "availability": "attached" },
+      { "capability": "unix_ingress", "availability": "attached" },
+      { "capability": "unix_egress", "availability": "attached" },
+      { "capability": "sendfile_egress", "availability": "attached" },
+      { "capability": "splice_ingress", "availability": "attached" },
+      { "capability": "splice_egress", "availability": "attached" },
+      {
+        "capability": "process_exit_cleanup",
+        "availability": "attached"
+      }
+    ]
+  },
+  "entries": [
+    {
+      "observer_key": {
+        "tgid": 4242,
+        "binding_generation": 11
+      },
+      "identity": {
+        "pid": 4242,
+        "start_token": 9876543
+      },
+      "rx_bytes": 1048576,
+      "tx_bytes": 524288
+    },
+    {
+      "observer_key": {
+        "tgid": 4242,
+        "binding_generation": 12
+      },
+      "identity": {
+        "pid": 4242,
+        "start_token": 9877000
+      },
+      "rx_bytes": 2048,
+      "tx_bytes": 4096
+    }
+  ]
+}

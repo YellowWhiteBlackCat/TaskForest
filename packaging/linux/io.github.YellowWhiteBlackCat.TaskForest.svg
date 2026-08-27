@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="TaskForest task dashboard and growing tree">
+  <defs>
+    <linearGradient id="forest" x1="20" y1="8" x2="110" y2="122" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#247553"/>
+      <stop offset="1" stop-color="#064c3a"/>
+    </linearGradient>
+    <linearGradient id="leaf" x1="45" y1="14" x2="86" y2="62" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#b9e56f"/>
+      <stop offset=".52" stop-color="#55b94f"/>
+      <stop offset="1" stop-color="#147544"/>
+    </linearGradient>
+  </defs>
+
+  <!-- The tile is opaque; only the pixels outside its rounded outline are transparent. -->
+  <rect x="4" y="4" width="120" height="120" rx="24" fill="url(#forest)"/>
+
+  <!-- One opaque task dashboard: tasks on the left, live utilization on the right. -->
+  <rect x="17" y="34" width="94" height="72" rx="11" fill="#f8fbf5"/>
+  <path d="M65 34h35a11 11 0 0 1 11 11v50a11 11 0 0 1-11 11H65z" fill="#0d6048"/>
+  <path d="M18 47h45" fill="none" stroke="#d8e2d8" stroke-width="3"/>
+  <g>
+    <circle cx="26" cy="41" r="2.5" fill="#2c8057"/>
+    <circle cx="34" cy="41" r="2.5" fill="#75c69a"/>
+    <circle cx="42" cy="41" r="2.5" fill="#a7d96b"/>
+  </g>
+  <path d="M25 62h10l3-10 5 19 5-14 5 6h6" fill="none" stroke="#0b6348" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+  <g fill="#11734d">
+    <circle cx="26" cy="80" r="2.5"/>
+    <circle cx="26" cy="90" r="2.5"/>
+    <circle cx="26" cy="100" r="2.5"/>
+  </g>
+  <g fill="#cfd8cf">
+    <rect x="33" y="77.5" width="23" height="5" rx="2.5"/>
+    <rect x="33" y="87.5" width="25" height="5" rx="2.5"/>
+    <rect x="33" y="97.5" width="20" height="5" rx="2.5"/>
+  </g>
+  <g fill="#91cf58">
+    <rect x="74" y="80" width="8" height="18" rx="2"/>
+    <rect x="87" y="68" width="8" height="30" rx="2"/>
+    <rect x="100" y="53" width="8" height="45" rx="2"/>
+  </g>
+
+  <!-- The growing tree is the central hierarchy and the visual divider. -->
+  <g fill="none" stroke="#0a5942" stroke-linecap="round" stroke-linejoin="round" stroke-width="8">
+    <path d="M64 108V28M64 51 50 38M64 64 45 48M64 51 78 38M64 69 84 50M64 88c0 9-4 15-11 20M64 88c0 9 4 15 11 20"/>
+  </g>
+  <g fill="none" stroke="#f0f8e8" stroke-linecap="round" stroke-linejoin="round" stroke-width="4">
+    <path d="M64 108V28M64 51 50 38M64 64 45 48M64 51 78 38M64 69 84 50M64 88c0 9-4 15-11 20M64 88c0 9 4 15 11 20"/>
+  </g>
+  <g fill="url(#leaf)" stroke="#0b6847" stroke-linejoin="round" stroke-width="2">
+    <path d="M64 13c8 4 13 9 16 15-4 6-9 10-16 13-7-3-12-7-16-13 3-6 8-11 16-15z"/>
+    <path d="M59 44c-12-1-20-6-23-15 9-5 19-1 25 9z"/>
+    <path d="M69 44c12-1 20-6 23-15-9-5-19-1-25 9z"/>
+    <path d="M59 61c-11-1-18-7-20-17 10-3 19 2 23 12z"/>
+    <path d="M69 64c11-2 18-8 20-18-10-2-19 3-23 13z"/>
+  </g>
+</svg>

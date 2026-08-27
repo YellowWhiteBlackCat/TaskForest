@@ -1,0 +1,98 @@
+# cargo-deny configuration.
+#
+# Gates every PR (via .github/workflows/ci.yml -> cargo deny check) for known
+# vulnerabilities (advisories), unapproved licenses (licenses), and duplicated
+# crates (bans). A Dependabot bump that introduces a CVE, a license we do not
+# ship under, or a duplicate dependency will fail CI before merge.
+#
+# Docs: https://embarkstudios.github.io/cargo-deny/
+
+# advisories: block known CVEs / unsound / yanked crates against the resolved
+# graph. The RustSec advisory DB is fetched at check time.
+[advisories]
+db-urls = ["https://github.com/rustsec/advisory-db"]
+# cargo-deny >=0.16 (PR #611): `vulnerability` is now ALWAYS denied (key
+# removed) and `notice` was removed entirely. The remaining fields keep their
+# enums: `unmaintained`/`unsound` are scopes (where to check), `yanked` a
+# severity. A vulnerability or yanked/unsound crate is a hard release gate.
+# Unmaintained crates are only an error when reached from a workspace member;
+# transitive unmaintained deps that nothing actually calls stay out of scope.
+unmaintained = "workspace"
+# Unsound crates can trigger UB; never ship one. Scope "all" flags unsoundness
+# anywhere in the graph (the finding is always an error within scope).
+unsound = "all"
+# A yanked crate means the publisher retracted the release; never ship one.
+yanked = "deny"
+# Per-advisory opt-outs. Each is a TRANSITIVE dependency TaskForest cannot bump
+# directly (pinned by gpui 0.2.2 or a target-specific resolver) AND whose
+# vulnerable/unsound code path TaskForest never calls. Revisit on each gpui bump.
+ignore = [
+    # git2 0.20.4 is pulled transitively via gpui_util -> gpui 0.2.2; the fix is
+    # git2 >=0.21, unreachable without a gpui update. The unsound paths
+    # (Remote::list() null deref; Signature from a buffer-created BlameHunk)
+    # are not used by TaskForest, which never drives git2 directly.
+    "RUSTSEC-2026-0183",
+    "RUSTSEC-2026-0184",
+    # nix 0.19.1 is a target-specific transitive (not in the default build
+    # tree). The vulnerable nix::unistd::getgrouplist is never called by
+    # TaskForest; the crate is held at 0.19.x by a transitive that hasn't moved.
+    "RUSTSEC-2021-0119",
+    # Iced 0.14.0 fixes cryoglyph at 0.1.0, which in turn fixes lru at 0.16.x;
+    # no compatible cryoglyph release is available yet. The application does
+    # not expose that cache, install panicking Drop keys, or use catch_unwind
+    # around it; cryoglyph only evicts its own GPU glyph values. The separate
+    # Ratatui lru edge is kept on the fixed 0.18.2 release in Cargo.lock.
+    # RUSTSEC-2026-0253 is currently lru 0.16.4 via cryoglyph 0.1.0 from
+    # Iced 0.14.0. No compatible cryoglyph release exposes lru >=0.18.2 yet;
+    # the TaskForest application does not construct cryoglyph caches, provide
+    # panicking Drop keys, or use catch_unwind around that transitive cache.
+    # Re-evaluate and remove this exception when Iced/cryoglyph moves to the
+    # fixed lru line.
+    "RUSTSEC-2026-0253",
+    # glib 0.18 (via gtk 0.18 -> libappindicator, the Linux tray stack) has an
+    # unsound Iterator impl for VariantStrIter. A fix requires the gtk 0.20
+    # generation, unreachable without a major tray-stack bump. The vulnerable
+    # iterator is never driven by this workspace: the tray path only passes
+    # owned menu models, never a VariantStrIter.
+    "RUSTSEC-2024-0429",
+]
+
+# licenses: reject any license expression not explicitly approved below. The
+# allow-list starts permissive (OSI-approved, royalty-free) and is tightened as
+# the workspace grows.
+[licenses]
+allow = [
+    "MIT",
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "ISC",
+    "Zlib",
+    "Unicode-DFS-2016",
+    "CC0-1.0",
+    "BSL-1.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "MPL-2.0",
+    "Unicode-3.0",
+    "NCSA",
+    # ksni (Linux tray icon): public-domain-equivalent permissive license.
+    "Unlicense",
+]
+# cargo-deny >=0.16 (PR #611): `unlicensed` and `copyleft` severities were
+# removed — a crate whose license is not in `allow` (including unparseable or
+# copyleft expressions) is now a hard deny. Keep the allow list permissive and
+# add concrete licenses as the workspace grows.
+# Crates whose license expression cargo-deny cannot parse with high confidence
+# are flagged rather than silently accepted.
+confidence-threshold = 0.8
+# Ignore workspace members themselves when evaluating licenses; only gate deps.
+private = { ignore = true }
+
+# bans: surface duplicate crate versions and wildcard deps. Denying duplicates
+# outright is too strict for a workspace this size (transitive duplicates are
+# common and usually benign), so duplicates report at `warn` without failing
+# the gate.
+[bans]
+multiple-versions = "warn"
+wildcards = "warn"
+highlight = "all"

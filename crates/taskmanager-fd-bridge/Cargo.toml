@@ -1,0 +1,30 @@
+[package]
+name = "taskmanager-fd-bridge"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Audited SCM_RIGHTS fd-passing boundary crate — the third unsafe trust root for TaskForest (AF_PACKET launcher → unprivileged app)"
+
+# The THIRD crate in the workspace permitted to contain `unsafe` (ADR-022 +
+# ADR-024 + ADR-025). It is the audited OS ABI seam for passing a file
+# descriptor between processes over a Unix domain socket via SCM_RIGHTS — the
+# mechanism the CAP_NET_RAW launcher uses to hand an AF_PACKET socket fd to the
+# unprivileged app. Every unsafe block carries a SAFETY: comment, no RawFd/raw
+# pointer crosses the public API (OwnedFd in, OwnedFd out), and the workspace
+# architecture test enforces the contract on every change. Mirrors
+# taskmanager-perf-ioctl / taskmanager-afpacket discipline exactly.
+
+[dependencies]
+libc = "0.2"
+
+[features]
+# Exposes the pure cmsg-walk seam (`find_scm_rights_in_control`) for the
+# standalone fuzz workspace (fuzz/scm_rights_walk), mirroring
+# taskmanager-platform-linux's `test-support` parser exports. Product
+# consumers never enable it.
+test-support = []
+
+[lib]
+name = "taskmanager_fd_bridge"
+path = "src/lib.rs"

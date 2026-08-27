@@ -1,0 +1,12 @@
+[package]
+name = "taskmanager-setup-helper"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Fixed Linux first-run setup helper for TaskForest's optional RAPL udev rule"
+publish = false
+
+[[bin]]
+name = "taskmanager-setup-helper"
+path = "src/main.rs"

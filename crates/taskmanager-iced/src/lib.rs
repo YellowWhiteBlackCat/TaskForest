@@ -1,0 +1,55 @@
+//! Iced frontend for TaskForest (ADR-027/028).
+//!
+//! The third frontend architecture slice, peer to the GPUI desktop shell and
+//! the ratatui TUI: the renderer-independent state machine lives in
+//! `taskmanager-shell`, the
+//! design tokens come from the neutral `taskmanager-theme` (taken with
+//! default features — no gpui), and this crate maps them onto iced 0.14.
+//!
+//! Modules:
+//!
+//! - [`theme`] — the neutral skin registry mapped onto iced colors.
+//! - [`keys`] — iced keyboard events normalized into the shared shell
+//!   key vocabulary.
+//! - [`focus`] — the real Iced `operation::Focusable` adapter for modal
+//!   controls.
+//! - [`a11y`] — a bounded semantic snapshot projection; no native bridge is
+//!   claimed until an Iced accessibility adapter is linked and evidenced.
+//! - [`app`] — the iced [`IcedApp`] state: platform data flow, refresh
+//!   scheduling, and the `Message` loop.
+//! - `perf_history` — the frontend-local bounded per-process ring for the
+//!   details overlay's Performance tab; the system-wide headline chart reads
+//!   the shared shell `LiveGraphHistory` series (G-02, ADR-028).
+//! - `perf_chart` — a minimal iced `Canvas` line/area chart for the
+//!   Performance page (iced ships no chart widget).
+//! - `app_history_chart` — a one-series `Canvas` sparkline for the
+//!   App-history page rows (reuses the Performance chart's point projection).
+//! - [`ui`] — the iced view layer (pages, gauges, process table).
+
+#![forbid(unsafe_code)]
+
+pub mod a11y;
+pub mod app;
+pub(crate) mod app_history_chart;
+pub(crate) mod capture;
+pub mod export;
+pub mod focus;
+pub(crate) mod font_catalog;
+pub mod i18n;
+pub(crate) mod icons;
+pub mod keys;
+pub(crate) mod perf_chart;
+pub(crate) mod perf_history;
+pub mod run;
+pub mod saved_views;
+pub mod theme;
+pub(crate) mod tray;
+pub(crate) mod trend_strip;
+pub mod ui;
+
+pub use app::{IcedApp, Message};
+
+#[cfg(test)]
+#[path = "../tests/common/test_support.rs"]
+mod test_support;
+pub use run::run;

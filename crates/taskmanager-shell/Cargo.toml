@@ -1,0 +1,29 @@
+[package]
+name = "taskmanager-shell"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Frontend-shared shell state machine for TaskForest renderer frontends (ADR-027)"
+readme = "README.md"
+publish = false
+
+# The renderer-INDEPENDENT frontend state machine (ADR-027): page routing,
+# selection, search, process sort, platform-batch application and the shared
+# command router. The TUI, the iced frontend and (at its own composition
+# rhythm) the GPUI frontend all run this state machine and render it with
+# their own toolkit. Toolkit-neutral: no gpui/ratatui/iced dependency, and
+# the theme crate is intentionally NOT a dependency (colors are a per-frontend
+# mapping concern).
+
+[dependencies]
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-telemetry-store = { path = "../taskmanager-telemetry-store" }
+taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+
+[dev-dependencies]
+taskmanager-test-support = { path = "../taskmanager-test-support" }
+
+[lib]
+name = "taskmanager_shell"
+path = "src/lib.rs"

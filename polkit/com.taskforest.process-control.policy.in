@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TaskForest per-feature escalation policy (ADR-023). This action authorizes
+  one identity-checked foreign-process control operation per helper invocation;
+  it does not run the main TaskForest application as root.
+
+  Install paths:
+    this file   -> /usr/share/polkit-1/actions/com.taskforest.process-control.policy
+    helper bin -> /usr/lib/taskforest-process-control-helper
+
+  The annotated path MUST match the path passed to pkexec exactly.
+-->
+<policyconfig>
+  <action id="com.taskforest.process-control">
+    <description>Control a selected foreign process from TaskForest</description>
+    <message>TaskForest needs authorization to apply the confirmed process action to a process owned by another user. The selected PID and start identity are checked again before the operation.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>auth_admin_keep</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/taskforest-process-control-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

@@ -1,0 +1,19 @@
+[package]
+name = "taskmanager-perf-ioctl"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Audited perf_event_open boundary crate — the first of three unsafe trust roots for TaskForest (perf-ioctl/afpacket/fd-bridge)"
+
+# The only crate in the workspace permitted to contain `unsafe`. It is the
+# audited OS/driver ABI seam (ADR-022): every unsafe block carries a SAFETY
+# comment, no RawFd/raw pointer crosses the public API, and the workspace
+# architecture test enforces the contract on every change.
+
+[dependencies]
+libc = "0.2"
+
+[lib]
+name = "taskmanager_perf_ioctl"
+path = "src/lib.rs"

@@ -1,0 +1,12 @@
+[package]
+name = "taskmanager-assets"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Toolkit-neutral branding, icon, font, and UI assets for TaskForest"
+readme = "README.md"
+publish = false
+
+[dev-dependencies]
+usvg = "0.48.1"

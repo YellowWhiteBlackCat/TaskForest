@@ -1,0 +1,36 @@
+[package]
+name = "taskmanager-process-control-helper"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Privileged helper: one identity-checked Linux process-control operation per polkit invocation"
+publish = false
+
+# A dedicated helper keeps CAP_KILL/CAP_SYS_NICE authority out of the main
+# TaskForest process. It accepts only one fixed operation and re-checks the
+# provider-native /proc start token immediately before the syscall.
+
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31", features = ["process", "signal"] }
+rustix = { version = "1", features = ["process", "thread"] }
+
+# Race-free signal targets: the audited pidfd seam (ADR-025 boundary crate).
+# pidfd_open pins the exact process instance BEFORE the start-token read, so a
+# recycled pid can never inherit the user's signal intent. The edge stays
+# Linux-gated like every other fd-bridge consumer (the crate is empty
+# elsewhere), and the helper touches only its safe typed API — this crate
+# itself remains `#![forbid(unsafe_code)]`.
+[target.'cfg(target_os = "linux")'.dependencies]
+taskmanager-fd-bridge = { path = "../taskmanager-fd-bridge" }
+
+[target.'cfg(windows)'.dependencies]
+taskmanager-windows-api = { path = "../taskmanager-windows-api" }
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+[[bin]]
+name = "taskmanager-process-control-helper"
+path = "src/main.rs"

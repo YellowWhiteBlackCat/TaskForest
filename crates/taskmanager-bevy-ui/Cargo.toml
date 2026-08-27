@@ -1,0 +1,131 @@
+[package]
+name = "taskmanager-bevy-ui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Bevy UI fourth frontend skeleton for the TaskForest native system monitor (M0)"
+readme = "README.md"
+publish = false
+
+# Fourth frontend (docs/BEVY_UI_FRONTEND.md): renders the shared neutral
+# projections with Bevy 0.19 `bevy_ui` (observer + required-components idioms),
+# peer to the GPUI/Iced/TUI frontends. Dependency whitelist is charter law:
+# application/app-host/shell/theme/ui-contract/assets + locked bevy only — no
+# core, no platform-runtime, no platform crates (they stay behind app-host).
+
+[dependencies]
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-app-host = { path = "../taskmanager-app-host" }
+taskmanager-shell = { path = "../taskmanager-shell" }
+taskmanager-theme = { path = "../taskmanager-theme" }
+taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+# Bundled font bytes (ADR-026 fonts policy): the placeholder window registers
+# the same embedded faces the other frontends use; zero toolkit types cross.
+taskmanager-assets = { path = "../taskmanager-assets" }
+
+# Base `bevy` declaration with an EMPTY feature set. The per-target tables
+# below own the real feature closure; this entry exists because bevy's derive
+# macros (Event/Component/Resource) resolve `::bevy::…` paths by scanning this
+# crate's plain `[dependencies]` table, and a target-table-only declaration
+# leaves them unresolved. The workspace root uses the identical
+# base-plus-target-tables split for gpui's platform-specific features; the
+# feature union across the tables is exactly the per-target closure below.
+bevy = { version = "=0.19.1", default-features = false }
+
+# Bevy is locked to the exact patch release and must stay in one workspace
+# resolution with platform-runtime's bevy_app/bevy_ecs 0.19. Upgrades require
+# the normal architecture and release review.
+#
+# Feature closure (minimal for a bevy_ui windowed desktop shell):
+# - bevy_ui: the toolkit layer itself (its layout plugin; pulls bevy_text and
+#   bevy_sprite; nothing 3D).
+# - bevy_scene: the `bsn!` (Bevy Scene Notation) macro and the `Scene`/
+#   `CommandsSceneExt` spawn seam it resolves through (`bevy::scene::bsn`).
+#   Charter law (docs/BEVY_UI_FRONTEND.md): static structure composes
+#   declaratively with `bsn!`; this feature is the minimal closure for that
+#   idiom. It adds no new external crates — bevy_scene rides the bevy_asset
+#   graph already in this closure — and does NOT pull the broader `scene`
+#   facade feature (which would add bevy_world_serialization for `.scn`/ron
+#   scene assets this frontend never loads).
+# - bevy_ui_widgets: the official unstyled widget package — the second half
+#   of the charter's two-piece UI base (button/menu/scrollarea/scrollbar/
+#   slider/checkbox/radio/list/text_input/popover semantics; styling stays
+#   ours via theme tokens, Feathers is not adopted). Bevy 0.19 gates the
+#   crate behind this facade feature; enabling it also wires
+#   `UiWidgetsPlugins` into `DefaultPlugins` and pulls `bevy_input_focus`.
+# - ui_picking: the official picking/message infrastructure required by the
+#   Bevy 0.19 widget observers (pointer release/IME queues); `DefaultPlugins`
+#   owns the corresponding runtime plugins, not this frontend composition.
+# - bevy_ui_render: the UiRenderPlugin draw pass. bevy 0.19 splits ui layout
+#   from ui rendering, so `bevy_ui` alone lays nodes out without ever painting
+#   them; a windowed skeleton must close over the ui render node too.
+# - bevy_core_pipeline: the render-graph phase host the ui render node plugs
+#   into, plus the camera clear pass a UI camera needs.
+# - bevy_render: the render graph a bevy_ui surface needs (bevy_ui depends on
+#   it; declared explicitly because we talk to its window-clear color).
+# - bevy_asset: AssetPlugin, i.e. the `Assets<Font>`/`Assets<Image>` stores
+#   the placeholder text pipeline reads. The bevy_asset subcrate is already in
+#   the dependency graph via bevy_text; only this feature adds the plugin to
+#   DefaultPlugins, whose membership is feature-gated, not dependency-gated.
+# - bevy_winit: the window/event-loop host; no raw winit use of our own.
+# - bevy_text: font shaping through cosmic-text; required for any text node
+#   and enabled so the feature choice is explicit, not transitive luck.
+# - wayland (Linux only): winit backend selection. Charter law
+#   (docs/BEVY_UI_FRONTEND.md): the Bevy frontend is Wayland-only on Linux;
+#   the `x11` feature stays off and X11 sessions are carried by the existing
+#   three frontends. No X11 compatibility layer is introduced.
+# - default-features off: no audio, no gilrs, no scene/pbr/gltf animation, no
+#   state/log/reflect-auto-register app defaults, no
+#   dynamic linking, no dev-tools. `multi_threaded` stays off for the M0
+#   skeleton: without it PipelinedRenderingPlugin is simply absent and the
+#   render pass runs inline on the app thread, which the drain seam cannot
+#   observe.
+[target.'cfg(target_os = "linux")'.dependencies]
+bevy = { version = "=0.19.1", default-features = false, features = [
+    "bevy_ui",
+    "bevy_ui_widgets",
+    "bevy_scene",
+    "bevy_ui_render",
+    "bevy_core_pipeline",
+    "bevy_render",
+    "bevy_asset",
+    "bevy_winit",
+    "bevy_text",
+    "ui_picking",
+    "wayland",
+] }
+
+# Non-Linux targets keep the same UI closure minus the windowing backend
+# toggles that only exist on Linux builds of winit.
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+bevy = { version = "=0.19.1", default-features = false, features = [
+    "bevy_ui",
+    "bevy_ui_widgets",
+    "bevy_scene",
+    "bevy_ui_render",
+    "bevy_core_pipeline",
+    "bevy_render",
+    "bevy_asset",
+    "bevy_winit",
+    "bevy_text",
+    "ui_picking",
+] }
+
+[dev-dependencies]
+# Headless seam tests inject fake event ports through the application
+# re-exports; the app-host test-support feature marks the dev-only edge (the
+# same opt-in GPUI's test matrix uses).
+taskmanager-app-host = { path = "../taskmanager-app-host", features = [
+    "test-support",
+] }
+
+[lib]
+name = "taskmanager_bevy_ui"
+path = "src/lib.rs"
+
+# Artifact naming follows scripts/build-frontend-binaries.sh's frontend
+# pattern (taskforest-g / taskforest-i): the Bevy shape is taskforest-b.
+[[bin]]
+name = "taskforest-b"
+path = "src/main.rs"

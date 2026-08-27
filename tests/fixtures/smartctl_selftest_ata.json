@@ -1,0 +1,21 @@
+{
+  "ata_smart_data": {
+    "self_test": {
+      "status": {
+        "string": "Self-test routine in progress... 90% of test remaining",
+        "remaining_percent": 90
+      }
+    }
+  },
+  "ata_smart_self_test_log": {
+    "standard": {
+      "table": [
+        {
+          "type": { "string": "Short offline" },
+          "status": { "string": "Completed without error" },
+          "lifetime_hours": 12876
+        }
+      ]
+    }
+  }
+}

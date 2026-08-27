@@ -1,0 +1,92 @@
+[package]
+name = "taskmanager-iced"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Iced desktop frontend for the TaskForest native system monitor (ADR-027/028)"
+readme = "README.md"
+publish = false
+
+# Iced is the third frontend slice (ADR-028; shared shell in ADR-027), peer to the GPUI desktop shell and
+# the ratatui TUI: it runs the shared `taskmanager-shell` state machine and
+# the neutral `taskmanager-theme` design tokens (taken with DEFAULT features —
+# no gpui) and renders them with iced 0.14. The native platform runtime is
+# injected through the toolkit-neutral `taskmanager-app-host`, exactly like
+# the other frontends.
+
+[dependencies]
+# The real focusable modal adapter uses iced's public custom-widget/operation
+# edge; this feature is iced-only and does not expose toolkit types to shell or
+# the neutral theme contract.
+#
+# Version truth: the umbrella `iced` crate has exactly one 0.14.x release,
+# 0.14.0 — there is no umbrella 0.14.1/0.14.2 on crates.io. Patch releases
+# exist only for sub-crates and resolve automatically through the lock
+# (e.g. `iced_widget` 0.14.2). Keep the requirement at "0.14.0"; do not cite
+# an umbrella "0.14.2" in docs or ADRs.
+#
+# Strict Wayland (product policy, mirrors GPUI's `wayland`-only gpui edge):
+# iced 0.14's DEFAULT features enable BOTH winit backends (`x11` + `wayland`),
+# and the x11 backend links `-lxkbcommon-x11`. We keep the full default
+# renderer/theme set minus `x11`, so no X11 system library is needed and the
+# binary never falls back to the legacy X11 path.
+iced = { version = "0.14.0", default-features = false, features = [
+    "advanced",
+    "canvas",
+    "lazy",
+    "svg",
+    "wgpu",
+    "tiny-skia",
+    "crisp",
+    "web-colors",
+    "thread-pool",
+    "linux-theme-detection",
+    "wayland",
+] }
+fontdb = { version = "0.23", default-features = true }
+futures-timer = "3.0.4"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# naga 27.0.3 (iced's wgpu chain) upstream bug: its error formatting falls
+# back to a String writer when its `termcolor` feature is off, which does not
+# compile once codespan-reporting's `termcolor` feature is unified on by
+# gpui's naga 25 (the workspace builds both chains). Pinning the feature here
+# selects naga's correct NoColor path. See the naga source
+# (src/error.rs DiagnosticBuffer cfg_if).
+naga = { version = "=27.0.3", default-features = false, features = ["termcolor"] }
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-app-host = { path = "../taskmanager-app-host" }
+taskmanager-shell = { path = "../taskmanager-shell" }
+taskmanager-icons = { path = "../taskmanager-icons", default-features = false }
+taskmanager-theme = { path = "../taskmanager-theme" }
+taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+# The bundled font bytes (ADR-026 fonts policy): the composition edge (run.rs)
+# registers Roboto Mono + MiSans VF into iced's font database, the same
+# single source GPUI embeds — zero toolkit, pure leaf crate.
+taskmanager-assets = { path = "../taskmanager-assets" }
+# The Iced event loop consumes the bundled fonts; native composition remains in
+# the toolkit-neutral app host.
+
+# ADR-029: no binary target — the single `taskmanager` binary compiles this
+# frontend in under the `ui-iced` feature.
+
+# Keep Iced's Windows renderer on the same `windows` 0.58 family as its
+# wgpu-hal 27 DX12 path.  gpu-allocator 0.27 accepts 0.53..=0.58, so Cargo
+# otherwise reuses the unrelated 0.57 instance retained by GPUI's optional
+# screen-capture dependency; that produces incompatible D3D12 types inside
+# wgpu-hal.  This is a resolver constraint only: platform behavior remains
+# behind Iced/wgpu's safe public APIs and this crate does not call Windows APIs.
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58.0", default-features = false, features = [
+    "Win32_Graphics_Direct3D12",
+    "Win32_Graphics_Dxgi_Common",
+] }
+
+[dev-dependencies]
+taskmanager-test-support = { path = "../taskmanager-test-support" }
+
+[lib]
+name = "taskmanager_iced"
+path = "src/lib.rs"

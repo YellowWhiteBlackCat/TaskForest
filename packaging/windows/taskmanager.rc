@@ -1,0 +1,18 @@
+// TaskForest Windows resource script.
+//
+// Embeds the app icon as the executable's PRIMARY icon at resource id 1.
+// gpui 0.2.2's Windows backend (platform/windows/platform.rs `load_icon`) calls
+// LoadImageW(exe_module, MAKEINTRESOURCE(1), IMAGE_ICON, ...) and installs the
+// result as the window-class `hIcon` — i.e. the taskbar / alt-tab / titlebar
+// icon. Windows Explorer independently shows the LOWEST-id icon for the .exe
+// file itself. So a single resource at id 1 satisfies both gpui's window icon
+// and the Explorer file icon.
+//
+// This is a different resource TYPE (RT_ICON = 1 / RT_GROUP_ICON = 14) from
+// gpui's `windows-manifest` feature (RT_MANIFEST = 24, also at id 1) — resource
+// ids are namespaced per-type, so the two id-1 resources coexist without a
+// duplicate-resource link error.
+//
+// The ICON path is relative to this .rc file's directory, so taskmanager.ico
+// sits next to it under packaging/windows/.
+1 ICON "taskmanager.ico"

@@ -1,0 +1,238 @@
+//! Containers page: per-container aggregated CPU + memory rollup.
+//!
+//! Mirrors the Processes/Services page structure (a header row + data rows in a
+//! card surface) but is self-contained — it does not touch the shared process
+//! table column code (owned elsewhere). The rollup data comes from
+//! [`crate::core::ContainerRollup`]; the page only renders it.
+//!
+//! Honesty contract: an empty list is an explicit, localized "no containers
+//! detected" state (never a blank panel), and a typed-unavailable source
+//! (cgroup-v1 host, EACCES on the unified mount) renders the typed reason
+//! rather than masquerading as an empty system. A CPU% that is still a
+//! first-sample gap renders an em dash, not a fabricated `0.0%`.
+
+use gpui::{Div, ParentElement, Styled, div, px};
+
+use crate::core::{
+    ContainerRollup, ContainerSummary, DeviceStatus, IsolationKind, ScalarAvailability,
+};
+
+use crate::gpui_app::elements;
+use crate::gpui_app::formatting;
+use crate::gpui_app::theme::{Color, Theme, tokens};
+use crate::i18n;
+use taskmanager_application::container_row_window;
+use taskmanager_ui::data::row::DataRow;
+use taskmanager_ui::primitives::state_panel::StatePanel;
+use taskmanager_ui_contract::IconId;
+
+/// Render the Containers page body (no outer padding — the caller wraps it).
+/// The rollup's typed [`DeviceStatus`] drives which branch is taken so a
+/// failed source and a genuinely empty host never share copy.
+pub fn render_containers(t: &Theme, rollup: &ContainerRollup) -> Div {
+    let body = match rollup.state.status {
+        DeviceStatus::Unsupported => typed_message(t, i18n::t("containers.unsupported"), None),
+        DeviceStatus::PermissionDenied => {
+            typed_message(t, i18n::t("containers.permission_denied"), None)
+        }
+        DeviceStatus::Stale => typed_message(t, i18n::t("containers.unavailable"), None),
+        // Healthy covers both a populated list and a genuinely container-free host.
+        DeviceStatus::Healthy | DeviceStatus::MissingTool => {
+            if rollup.containers.is_empty() {
+                typed_message(
+                    t,
+                    i18n::t("containers.no_containers"),
+                    Some(i18n::t("containers.empty_hint")),
+                )
+            } else {
+                container_list(t, &rollup.containers)
+            }
+        }
+    };
+    div()
+        .flex_1()
+        .min_h(px(0.0))
+        .flex()
+        .flex_col()
+        .gap(tokens::SPACE_6)
+        .child(header_row(t))
+        .child(body)
+}
+
+fn header_row(t: &Theme) -> Div {
+    row_skeleton(
+        t,
+        i18n::t("containers.name"),
+        i18n::t("containers.runtime"),
+        i18n::t("containers.cpu"),
+        i18n::t("containers.memory"),
+        i18n::t("containers.processes"),
+        true,
+    )
+}
+
+fn container_list(t: &Theme, containers: &[ContainerSummary]) -> Div {
+    let (shown, hidden) = container_row_window(containers.len());
+    let mut list = div().flex().flex_col();
+    for container in &containers[..shown] {
+        list = list.child(row_for(t, container));
+    }
+    if hidden > 0 {
+        list = list.child(elements::more_rows_hint(t, hidden));
+    }
+    list
+}
+
+/// Pre-folded display strings for one container row (ARCH.md §4.0 data
+/// layer): the telemetry→display fold happens once here; the `row_for` /
+/// `row_skeleton` render helpers only lay out and paint. No theme or gpui
+/// types.
+pub struct ContainerRowVm {
+    /// Container name (grow column).
+    pub name: String,
+    /// Friendly runtime label (`runtime_label`) or the shared dash.
+    pub runtime: String,
+    /// `x.y%` or the shared dash — a first-sample gap never renders `0.0%`.
+    pub cpu: String,
+    /// Decimal memory string or the shared dash.
+    pub memory: String,
+    /// Member-process count or the shared dash.
+    pub processes: String,
+}
+
+/// Fold one [`ContainerSummary`] into its row display strings, mirroring the
+/// exact formatter/dash conventions the inline render path used.
+pub fn container_row_vm(container: &ContainerSummary) -> ContainerRowVm {
+    // One shared dash spelling for uncollected cells (first-sample CPU rate,
+    // vanished cgroup memory) — never a fabricated `0.0%` / `0 MB`, and the
+    // memory cell no longer borrows the CPU-specific pending key.
+    let cpu = match container.cpu_percentage.availability() {
+        ScalarAvailability::Available | ScalarAvailability::Partial(_) => container
+            .cpu_percentage
+            .current_value()
+            .map(|value| format!("{value:.1}%"))
+            .unwrap_or_else(formatting::missing_value),
+        // First-sample gap, vanished cgroup, or a read failure: never `0.0%`.
+        _ => formatting::missing_value(),
+    };
+    ContainerRowVm {
+        name: container.name.clone(),
+        runtime: container
+            .runtime
+            .as_ref()
+            .map(runtime_label)
+            .unwrap_or_else(formatting::missing_value),
+        cpu,
+        memory: container
+            .memory_bytes
+            .current_value()
+            .map(|bytes| formatting::format_decimal_memory(*bytes))
+            .unwrap_or_else(formatting::missing_value),
+        processes: if container.member_pids.is_empty() {
+            formatting::missing_value()
+        } else {
+            container.member_pids.len().to_string()
+        },
+    }
+}
+
+fn row_for(t: &Theme, container: &ContainerSummary) -> Div {
+    let vm = container_row_vm(container);
+    row_skeleton(
+        t,
+        &vm.name,
+        &vm.runtime,
+        &vm.cpu,
+        &vm.memory,
+        &vm.processes,
+        false,
+    )
+}
+
+/// One five-column row. The header variant dims the text and bolds it; data
+/// rows use the card surface so the list reads as a table without depending on
+/// the shared (process-owned) table primitive.
+fn row_skeleton(
+    t: &Theme,
+    name: &str,
+    runtime: &str,
+    cpu: &str,
+    memory: &str,
+    processes: &str,
+    is_header: bool,
+) -> Div {
+    let bg = if is_header {
+        t.sidebar_bg
+    } else {
+        t.sidebar_card_bg
+    };
+    let fg = if is_header { t.fg_dim } else { t.fg };
+    let weight = if is_header {
+        tokens::FONT_WEIGHT_BOLD
+    } else {
+        tokens::FONT_WEIGHT_NORMAL
+    };
+    let cell = |label: &str, grow: bool| {
+        let mut cell = div()
+            .text_size(tokens::FONT_12)
+            .text_color(fg)
+            .font_weight(weight.into())
+            .min_w(px(0.0));
+        if grow {
+            cell = cell.flex_1();
+        }
+        cell.child(label.to_string())
+    };
+    DataRow::new(t.palette())
+        .background(bg)
+        .radius(tokens::control_radius(t))
+        .child(cell(name, true))
+        .child(fixed_cell(runtime, 96.0, fg, weight))
+        .child(fixed_cell(cpu, 80.0, fg, weight))
+        .child(fixed_cell(memory, 96.0, fg, weight))
+        .child(fixed_cell(processes, 84.0, fg, weight))
+        .render()
+}
+
+fn fixed_cell(label: &str, width: f32, fg: Color, weight: taskmanager_theme::Weight) -> Div {
+    div()
+        .w(px(width))
+        .min_w(px(0.0))
+        .text_size(tokens::FONT_12)
+        .text_color(fg)
+        .font_weight(weight.into())
+        .child(label.to_string())
+}
+
+/// Centered typed empty/unavailable message with an optional secondary hint.
+/// Mirrors [`crate::gpui_app::list_view::unavailable_state`] but localized for
+/// the containers domain.
+fn typed_message(t: &Theme, primary: &str, secondary: Option<&str>) -> Div {
+    let mut panel =
+        StatePanel::new(IconId::Applications, primary.to_owned(), t.palette()).tone(t.warning);
+    if let Some(hint) = secondary {
+        panel = panel.detail(hint.to_owned());
+    }
+    panel.render()
+}
+
+/// Friendly runtime label for the runtime column. Kept short so the fixed
+/// 96 px column does not truncate the common cases.
+fn runtime_label(kind: &IsolationKind) -> String {
+    match kind {
+        IsolationKind::Docker => "Docker",
+        IsolationKind::Podman => "Podman",
+        IsolationKind::Kubernetes => "Kubernetes",
+        IsolationKind::Lxc => "LXC",
+        IsolationKind::SystemdNspawn => "nspawn",
+        IsolationKind::Flatpak => "Flatpak",
+        IsolationKind::Snap => "Snap",
+        IsolationKind::Wsl => "WSL",
+        IsolationKind::OtherContainer => "Container",
+    }
+    .to_string()
+}
+
+#[cfg(test)]
+#[path = "../../tests/gui/gpui_gpui_app_containers_view_tests.rs"]
+mod tests;

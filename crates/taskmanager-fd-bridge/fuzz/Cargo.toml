@@ -1,0 +1,23 @@
+[package]
+name = "taskmanager-fd-bridge-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+# The pure cmsg-walk seam is re-exported behind `test-support` (the same
+# exposure pattern the platform-linux fuzz crate uses for its parsers).
+taskmanager-fd-bridge = { path = "..", features = ["test-support"] }
+
+[[bin]]
+name = "scm_rights_walk"
+path = "fuzz_targets/scm_rights_walk.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

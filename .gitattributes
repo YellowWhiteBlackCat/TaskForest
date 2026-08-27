@@ -1,0 +1,13 @@
+# Deterministic line endings across platforms: every text file checks out as
+# LF on every OS (Windows developers run `core.autocrlf=true` by default,
+# which would otherwise silently rewrite working copies to CRLF and desync the
+# SHA-256 source-provenance manifests and the Python/Bash gates). Binary
+# assets are pinned explicitly so `text=auto` never guesses about them.
+* text=auto eol=lf
+*.png binary
+*.ttf binary
+*.otf binary
+*.ico binary
+*.exe binary
+*.zip binary
+*.gz binary

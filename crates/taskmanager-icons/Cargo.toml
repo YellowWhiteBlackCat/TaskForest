@@ -1,0 +1,25 @@
+[package]
+name = "taskmanager-icons"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Toolkit-neutral semantic icon registry with a GPUI SVG adapter (ADR-017)"
+readme = "README.md"
+publish = false
+
+[dependencies]
+# The registry/path half is toolkit-neutral. GPUI is an optional adapter so
+# Iced can consume the same semantic path and embedded asset without pulling
+# GPUI types into its frontend crate.
+gpui = { version = "0.2.2", default-features = false, optional = true }
+taskmanager-assets = { path = "../taskmanager-assets" }
+taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+
+[features]
+default = ["gpui"]
+gpui = ["dep:gpui"]
+
+[lib]
+name = "taskmanager_icons"
+path = "src/lib.rs"

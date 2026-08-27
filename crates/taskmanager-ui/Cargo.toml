@@ -1,0 +1,36 @@
+[package]
+name = "taskmanager-ui"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Owned GPUI component layer: primitives, inputs, and overlays (ADR-017)"
+readme = "README.md"
+publish = false
+
+[features]
+default = []
+test-support = []
+
+[dependencies]
+# gpui + theme + icons + ui-contract only (ADR-017 §1 dependency direction): no
+# gpui-component, no taskmanager-core/application. Colors come exclusively from
+# taskmanager-theme's Palette; icons from taskmanager-icons; focus/overlay
+# contracts from taskmanager-ui-contract. The theme's `gpui` feature (ADR-026)
+# supplies the From<Color>→Rgba/Hsla/Fill and token conversions this library
+# relies on.
+gpui = { version = "0.2.2", default-features = false }
+taskmanager-theme = { path = "../taskmanager-theme", features = ["gpui"] }
+taskmanager-icons = { path = "../taskmanager-icons" }
+taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+
+[dev-dependencies]
+gpui = { version = "0.2.2", default-features = false, features = ["test-support"] }
+
+[lib]
+name = "taskmanager_ui"
+path = "src/lib.rs"
+
+[[test]]
+name = "selectable-text"
+path = "tests/gui/selectable_text.rs"

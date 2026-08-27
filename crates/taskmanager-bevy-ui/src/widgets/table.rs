@@ -1,0 +1,215 @@
+#![allow(dead_code)]
+// ^ The pure core + render adapters are consumed by the M1 page bodies and
+// the headless tests; in-product call sites land with M1 (process table)
+// and M2 (curves). Tracked, not accidental: docs/BEVY_UI_FRONTEND.md ladder.
+
+//! Process/info table: pure projection core + minimal bsn! render adapter.
+//!
+//! **Pure core** (no bevy types): the column vocabulary comes verbatim from
+//! the ui-contract single source ([`PROCESS_COLUMNS`]) so the bevy table can
+//! never drift from the GPUI/Iced/TUI column semantics; the sort projection
+//! input is the contract's stable column token; and the virtual-scroll
+//! window is a plain clamping function over (total, viewport, scroll).
+//!
+//! **Render adapter**: one header scene and one row scene. Row *material*
+//! (which rows exist, their cell text) stays owned by the page + shell —
+//! this layer only renders what it is handed, bounded by the window math.
+
+use bevy::ecs::hierarchy::Children;
+use bevy::scene::{Scene, bsn};
+use bevy::ui::prelude::{AlignItems, FlexDirection, Node, Val, percent, px};
+use bevy::ui::widget::Text;
+use taskmanager_ui_contract::{PROCESS_COLUMNS, ProcessColumnSpec};
+
+use crate::palette::space_8;
+use crate::window::{Role, TextRole};
+
+/// The process-table column vocabulary, straight from the ui-contract single
+/// source. Page agents consume this — never a local column copy.
+pub(crate) fn process_columns() -> &'static [ProcessColumnSpec] {
+    PROCESS_COLUMNS
+}
+
+/// Active sort as a table-projection input: the ui-contract column token
+/// plus direction. Pages translate their shell sort slot (`SortCol`,
+/// `InfoSortCol`, …) into this neutral shape at the boundary.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct SortProjection {
+    /// Stable column token (`ProcessColumnSpec::id`).
+    pub column: &'static str,
+    /// `true` when the sort is reversed (descending).
+    pub descending: bool,
+}
+
+/// Hideable-column projection: drop hidden columns, keep contract order, and
+/// keep the identity column (`Name`, `hideable == false`) always visible — a
+/// caller cannot accidentally render an anonymous table.
+pub(crate) fn visible_columns(hidden: &[&str]) -> Vec<&'static ProcessColumnSpec> {
+    PROCESS_COLUMNS
+        .iter()
+        .filter(|spec| spec.hideable && !hidden.contains(&spec.id) || !spec.hideable)
+        .collect()
+}
+
+/// How many rows of `row_height_px` fit in `viewport_height_px`. A
+/// non-positive row height renders nothing (never a divide-by-zero panic,
+/// never a fabricated giant viewport). The `as` cast is a saturating f32→usize
+/// cast on an already-floored positive value.
+pub(crate) fn rows_in_viewport(viewport_height_px: f32, row_height_px: f32) -> usize {
+    if row_height_px <= 0.0 || viewport_height_px <= 0.0 {
+        return 0;
+    }
+    (viewport_height_px / row_height_px).floor() as usize
+}
+
+/// Half-open visible row range `[first, last)` over a row space of `total`
+/// rows with `viewport_rows` capacity at scroll offset `scroll_top` (the
+/// index of the first row the caller asked to show).
+///
+/// Clamping contract: an empty table or zero-capacity viewport yields an
+/// empty window; a scroll offset past the end pins to the last full page
+/// (never an empty tail window, never an out-of-bounds range).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct RowWindow {
+    pub(crate) first: usize,
+    pub(crate) last: usize,
+}
+
+impl RowWindow {
+    /// Number of visible rows (always `<= viewport_rows` and `<= total`).
+    pub(crate) fn len(self) -> usize {
+        self.last - self.first
+    }
+
+    pub(crate) fn is_empty(self) -> bool {
+        self.last == self.first
+    }
+}
+
+/// Compute the visible [`RowWindow`]. Pure; the M1 virtual scroller feeds it
+/// `total` from the shell projection and `scroll_top` from its scroll state.
+pub(crate) fn row_window(total: usize, viewport_rows: usize, scroll_top: usize) -> RowWindow {
+    if total == 0 || viewport_rows == 0 {
+        return RowWindow::default();
+    }
+    let visible = viewport_rows.min(total);
+    let max_top = total - visible;
+    let first = scroll_top.min(max_top);
+    RowWindow {
+        first,
+        last: first + visible,
+    }
+}
+
+/// One header cell text: the column token plus a direction marker when the
+/// sort is active on it. Pure — pages and tests agree on this spelling.
+pub(crate) fn header_label(column: &ProcessColumnSpec, sort: Option<SortProjection>) -> String {
+    match sort {
+        Some(active) if active.column == column.id => {
+            let arrow = if active.descending { '▼' } else { '▲' };
+            format!("{} {arrow}", column.id)
+        }
+        _ => column.id.to_owned(),
+    }
+}
+
+/// Render adapter: the header row. One text cell per column, widths from the
+/// contract's default-width tokens; numeric columns right-align.
+pub(crate) fn header_scene(
+    columns: &[&ProcessColumnSpec],
+    sort: Option<SortProjection>,
+) -> impl Scene + use<> {
+    let labels: Vec<String> = columns
+        .iter()
+        .map(|column| header_label(column, sort))
+        .collect();
+    let widths: Vec<f32> = columns.iter().map(|column| column.default_width).collect();
+    let numeric: Vec<bool> = columns.iter().map(|column| column.numeric).collect();
+    let cells = header_cells(&labels, &widths, &numeric);
+    bsn! {
+        Node {
+            width: percent(100),
+            height: Val::Auto,
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(space_8()),
+        }
+        Children [
+            { cells }
+        ]
+    }
+}
+
+fn header_cells(labels: &[String], widths: &[f32], numeric: &[bool]) -> Vec<impl Scene + use<>> {
+    labels
+        .iter()
+        .zip(widths.iter().copied())
+        .zip(numeric.iter().copied())
+        .map(|((label, width), numeric_column)| {
+            let label = label.clone();
+            let align = if numeric_column {
+                AlignItems::FlexEnd
+            } else {
+                AlignItems::FlexStart
+            };
+            bsn! {
+                Node {
+                    width: px(width),
+                    align_items: align,
+                }
+                Children [
+                    ( Text(label) TextRole(Role::Caption) ),
+                ]
+            }
+        })
+        .collect()
+}
+
+/// Render adapter: one body row from pre-formatted cell strings. Cells pair
+/// with the same column slice the header used; row height/spacing come from
+/// the palette via the page (the row node here stays unstyled chrome).
+pub(crate) fn row_scene(cells: &[String], columns: &[&ProcessColumnSpec]) -> impl Scene + use<> {
+    let owned: Vec<String> = cells.to_vec();
+    let widths: Vec<f32> = columns.iter().map(|column| column.default_width).collect();
+    let numeric: Vec<bool> = columns.iter().map(|column| column.numeric).collect();
+    let cells = row_cells(&owned, &widths, &numeric);
+    bsn! {
+        Node {
+            width: percent(100),
+            height: Val::Auto,
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(space_8()),
+        }
+        Children [
+            { cells }
+        ]
+    }
+}
+
+fn row_cells(cells: &[String], widths: &[f32], numeric: &[bool]) -> Vec<impl Scene + use<>> {
+    cells
+        .iter()
+        .zip(widths.iter().copied())
+        .zip(numeric.iter().copied())
+        .map(|((cell, width), numeric_column)| {
+            let cell = cell.clone();
+            let align = if numeric_column {
+                AlignItems::FlexEnd
+            } else {
+                AlignItems::FlexStart
+            };
+            bsn! {
+                Node {
+                    width: px(width),
+                    align_items: align,
+                }
+                Children [
+                    ( Text(cell) TextRole(Role::Body) ),
+                ]
+            }
+        })
+        .collect()
+}
+
+#[cfg(test)]
+#[path = "../../tests/headless/table.rs"]
+mod tests;

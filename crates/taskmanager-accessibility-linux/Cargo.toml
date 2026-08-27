@@ -1,0 +1,29 @@
+[package]
+name = "taskmanager-accessibility-linux"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Linux AT-SPI accessibility bridge for TaskForest (accesskit_unix adapter over the semantic contract)"
+
+[dependencies]
+taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+# Core accesskit types (Node/Role/TreeUpdate) are pure Rust and used by the
+# snapshot mapper on every target so the mapping is unit-testable off-Linux.
+accesskit = "0.24.1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# The Unix adapter owns the D-Bus/AT-SPI conversation. Default `async-io`
+# feature (no tokio) matches gpui's own executor; enabling both async-io and
+# tokio is a compile_error in accesskit_unix, so we leave defaults alone.
+accesskit_unix = "0.22.1"
+
+[dev-dependencies]
+# accesskit's own structural validator: a pure-Rust oracle for TreeUpdate
+# well-formedness (connectivity, root presence, focus validity). Used by the
+# mapping tests on every target.
+accesskit_consumer = "0.38"
+
+[lib]
+name = "taskmanager_accessibility_linux"
+path = "src/lib.rs"

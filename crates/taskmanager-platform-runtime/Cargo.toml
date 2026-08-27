@@ -1,0 +1,18 @@
+[package]
+name = "taskmanager-platform-runtime"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "OS-neutral bounded capability runtime for TaskForest native adapters"
+
+[dependencies]
+bevy_app = { version = "0.19", default-features = false, features = ["std"] }
+bevy_ecs = { version = "0.19", default-features = false, features = ["std", "multi_threaded"] }
+crossbeam-channel = "0.5"
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-core = { path = "../taskmanager-core" }
+
+[lib]
+name = "taskmanager_platform_runtime"
+path = "src/lib.rs"

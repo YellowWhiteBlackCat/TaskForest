@@ -1,0 +1,22 @@
+Package: taskforest
+Version: __VERSION__
+Section: admin
+Priority: optional
+Architecture: __ARCH__
+Depends: fontconfig, libfreetype6, libxkbcommon0, libwayland-client0, libvulkan1
+Recommends: polkitd
+Suggests: smartmontools, nvme-cli, xfsprogs, iw, mesa-vulkan-drivers, nvidia-vulkan-icd
+Maintainer: TaskForest contributors <noreply@yellowwhiteblackcat.github.io>
+Installed-Size: __INSTALLED_SIZE__
+Homepage: https://github.com/YellowWhiteBlackCat/TaskForest
+Description: Eye-friendly native system monitor built with GPUI
+ TaskForest renders live CPU, memory, GPU, network, storage, and per-process
+ telemetry through one Wayland-native GPUI frontend. This package installs the
+ GPUI application and the per-feature polkit-gated helpers (ADR-023): nothing
+ runs privileged until an OS-native prompt authorizes it. History is persisted
+ by the active frontend session.
+ .
+ Wayland session required (X11 is not supported). Vulkan loader and a Vulkan
+ ICD for your GPU are needed for rendering; the suggested packages cover the
+ common cases.
+License: Apache-2.0
