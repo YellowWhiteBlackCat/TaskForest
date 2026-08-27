@@ -29,11 +29,15 @@ pub enum HistoryWriterClaimStatus {
 pub(super) struct RootLockOwnership {
     path: PathBuf,
     token: String,
-    _file: File,
+    _file: Option<File>,
 }
 
 impl Drop for RootLockOwnership {
     fn drop(&mut self) {
+        // Close the handle before unlinking: Windows refuses to delete a
+        // file that is still open, which would strand this owner's claim on
+        // disk and fail every later generation closed.
+        self._file = None;
         let Ok(current) = bounded_io::read_file(&self.path, MAX_LOCK_CLAIM_BYTES) else {
             return;
         };
@@ -76,7 +80,7 @@ pub(super) fn acquire_root_lock(
             Ok(RootLockOwnership {
                 path,
                 token,
-                _file: file,
+                _file: Some(file),
             })
         }
         Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
@@ -137,7 +141,7 @@ fn acquire_existing_claim(
     Ok(RootLockOwnership {
         path,
         token,
-        _file: file,
+        _file: Some(file),
     })
 }
 
