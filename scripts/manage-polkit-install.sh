@@ -268,11 +268,18 @@ install_one() {
     fi
     temp="$(mktemp "$parent/.taskforest-polkit.XXXXXX")"
     TEMP_PATHS+=("$temp")
+    # MSYS coreutils `install` silently truncates an EXISTING destination to
+    # zero bytes and still exits 0 (observed on Git Bash 2026-08-27); the
+    # copy must target a brand-new inode on every platform.
+    rm -f -- "$temp"
     if [[ "$STAGING" == "1" ]]; then
         install -m "$mode" "$source" "$temp"
     else
         install -o 0 -g 0 -m "$mode" "$source" "$temp"
     fi
+    # Fail closed: a zero-byte privileged helper must never be published,
+    # whatever the copy primitive did.
+    [[ -s "$temp" ]] || die "helper copy produced no content: $temp"
     # Same-directory hard-link publication refuses a race winner instead of
     # replacing it, and the EXIT trap removes the staging inode on failure.
     ln -- "$temp" "$destination" \

@@ -8,6 +8,15 @@
 
 #![forbid(unsafe_code)]
 #![allow(linker_messages)]
+// The product GUI shapes (ui-gpui, ui-iced) must not allocate a console when
+// launched from the Start Menu: a console-subsystem PE makes Windows open a
+// terminal window beside the app window. The TUI shape keeps the console
+// subsystem — it runs inside one. Piped/redirected stdout in the GUI shapes
+// still works; only interactive terminal echo for them is given up.
+#![cfg_attr(
+    all(target_os = "windows", any(feature = "ui-gpui", feature = "ui-iced")),
+    windows_subsystem = "windows"
+)]
 
 use std::io;
 

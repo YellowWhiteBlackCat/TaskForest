@@ -17,11 +17,10 @@
 | [GPUI](https://github.com/zed-industries/zed)（Zed Industries） | Apache-2.0 | GPU 加速桌面主前端，发行包唯一形态（本地补丁见下节） |
 | [Iced](https://github.com/iced-rs/iced) | MIT | 响应式桌面前端，受支持但暂不进发行包 |
 | [Ratatui](https://github.com/ratatui/ratatui) | MIT | 终端前端 |
-| bevy_app / bevy_ecs | Apache-2.0 OR MIT | Bevy 应用骨架与 ECS，GPUI 前端与平台运行时复用 |
+| bevy / bevy_app / bevy_ecs | Apache-2.0 OR MIT | Bevy 门面与应用骨架/ECS：独立 Bevy 前端及平台运行时复用 |
 | naga | MIT OR Apache-2.0 | 着色器翻译；iced 渲染链的 feature pin |
-| usvg | Apache-2.0 OR MIT | 自有 SVG 图标解析 |
 | fontdb | MIT | 系统字体枚举 |
-| raw-window-handle | Apache-2.0 OR MIT | 窗口句柄抽象 |
+| raw-window-handle | MIT OR Apache-2.0 OR Zlib | 窗口句柄抽象 |
 
 ## 本地补丁依赖
 
@@ -80,6 +79,7 @@
 | 依赖 | 许可证 | 用途 |
 |---|---|---|
 | embed-resource | MIT | Windows 资源嵌入（build 依赖） |
+| usvg | Apache-2.0 OR MIT | 图标资产测试中的 SVG 解析（dev 依赖，不进发行二进制） |
 | proptest | Apache-2.0 OR MIT | 属性测试（dev 依赖） |
 
 ## 捆绑字体
@@ -96,4 +96,7 @@
 
 - 本表列出全部**直接**依赖的名字与许可证；版本不在此复制，以仓库锁文件为唯一版本权威。
 - 传递依赖闭包同样以锁文件为准；发布门禁中的依赖审计负责复核许可证集合。
+- 二进制发行包（MSI、deb、rpm）随包携带打包期生成的
+  `THIRD-PARTY-NOTICES.txt`（[scripts/gen_third_party_notices.py](../scripts/gen_third_party_notices.py)）：
+  内含非开发依赖闭包中每个第三方 crate 的许可证全文与捆绑字体的 OFL 条款；本表不复制这些全文。
 - 第三方名称与商标归各自所有者；本文署名不构成赞助或背书。

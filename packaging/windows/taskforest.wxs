@@ -38,6 +38,9 @@
         <Component Id="LicenseNotice" Guid="691EEA03-C18E-46DC-9A5B-26FC9813C76C">
           <File Id="LicenseFile" Source="$(var.StageDir)/LICENSE" />
         </Component>
+        <Component Id="ThirdPartyNotices" Guid="1BB818B1-4A90-4020-9DC9-0A6A43E0AB78">
+          <File Id="ThirdPartyNoticesFile" Source="$(var.StageDir)/THIRD-PARTY-NOTICES.txt" />
+        </Component>
       </Directory>
     </StandardDirectory>
 
@@ -60,5 +63,12 @@
         </Component>
       </Directory>
     </StandardDirectory>
+
+    <!-- Install-time UI: welcome → license → install-directory choice →
+         install. WixUI_InstallDir is the minimal standard set that lets the
+         user pick INSTALLFOLDER instead of always landing in Program Files;
+         the RTF for the license dialog is bound by build-msi.sh. -->
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UIRef Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
   </Package>
 </Wix>

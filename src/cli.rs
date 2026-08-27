@@ -322,6 +322,14 @@ struct Collected {
     npu_inventory: Option<NpuInventorySnapshot>,
 }
 
+/// One-shot snapshots wait this long before their first (and only) refresh:
+/// rate facts — CPU usage, disk and network throughput — are deltas between
+/// two samples at least one minimum CPU update interval apart, and the
+/// platform providers take their baseline when the runtime spawns. The wait
+/// lets the single refresh observe a real delta instead of an honestly
+/// unavailable rate family.
+const RATE_SAMPLING_WARMUP: Duration = Duration::from_millis(250);
+
 /// Drive one bounded collection cycle against an already-spawned client and
 /// return the snapshot, process list, and any container rollup.
 ///
@@ -335,6 +343,7 @@ fn collect_one_snapshot(
     client: &mut PlatformClient,
     timeout: Duration,
 ) -> Result<Collected, SnapshotCliError> {
+    std::thread::sleep(RATE_SAMPLING_WARMUP);
     let submitted_at_ms = wall_clock_ms();
     // Three independent refresh axes publishing on separate lanes. Either of
     // the first two may complete first; containers are best-effort.

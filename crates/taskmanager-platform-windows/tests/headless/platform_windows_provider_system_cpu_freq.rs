@@ -13,6 +13,7 @@ fn cpu_factory_picks_group_availability_by_live_slot_coverage() {
         &[Some(2400_u64), Some(2500), Some(2600), Some(2700)],
         Some(5_000),
         1_000,
+        true,
     );
     assert_eq!(
         full.per_core_frequency_group.availability(),
@@ -33,6 +34,7 @@ fn cpu_factory_picks_group_availability_by_live_slot_coverage() {
         &[Some(2400_u64), None, Some(2600), Some(2700)],
         None,
         1_000,
+        true,
     );
     assert!(matches!(
         partial.per_core_frequency_group.availability(),
@@ -42,7 +44,8 @@ fn cpu_factory_picks_group_availability_by_live_slot_coverage() {
 
     // No native live-frequency source -> Unavailable, max-freq scalar also
     // Unavailable.
-    let none = CpuScalarObservationFactory::build(usages, &[None, None, None, None], None, 1_000);
+    let none =
+        CpuScalarObservationFactory::build(usages, &[None, None, None, None], None, 1_000, true);
     assert_eq!(
         none.per_core_frequency_group.availability(),
         taskmanager_core::ScalarAvailability::Unavailable(FailureKind::Unsupported)
@@ -53,7 +56,28 @@ fn cpu_factory_picks_group_availability_by_live_slot_coverage() {
 #[test]
 fn live_win_cpu_provider_refresh() {
     let mut provider = WinCpuTelemetryProvider::new();
-    let result = provider.refresh(1000);
+    // The first refresh sits inside sysinfo's minimum sampling window after
+    // the construction-time baseline, so usage must surface as typed
+    // unavailable — never the fabricated full-load reading — while the
+    // instant facts (frequency, topology) stay available.
+    let early = provider
+        .refresh(1_000)
+        .expect("refresh inside the priming window still reports typed state");
+    let early_metrics = early.current_value().expect("metrics should be present");
+    assert!(
+        matches!(
+            early_metrics
+                .scalar_observations()
+                .global_usage_pct
+                .availability(),
+            taskmanager_core::ScalarAvailability::Unavailable(FailureKind::TemporarilyUnavailable)
+        ),
+        "usage before the second sample is honestly unavailable"
+    );
+    assert!(early_metrics.current_frequency_mhz().is_some());
+
+    std::thread::sleep(sysinfo::MINIMUM_CPU_UPDATE_INTERVAL);
+    let result = provider.refresh(2_000);
     assert!(result.is_ok());
     let obs = result.unwrap();
     let metrics = obs.current_value().expect("metrics should be present");
@@ -71,6 +95,13 @@ fn live_win_cpu_provider_refresh() {
     eprintln!("  PER CORE FREQS: {per_core_freqs:?}");
     assert!(metrics.current_frequency_mhz().is_some());
     assert!(metrics.current_core_usage_len() > 0);
+    assert_eq!(
+        metrics
+            .scalar_observations()
+            .global_usage_pct
+            .availability(),
+        taskmanager_core::ScalarAvailability::Available
+    );
     // The power overlay is a Windows-only native source: off-Windows the
     // energy preference must be an honest None, never a fabricated default.
     #[cfg(not(windows))]

@@ -17,7 +17,7 @@ optdepends=('smartmontools: ATA/SATA/NVMe S.M.A.R.T. attributes and self-tests'
             'nvidia-utils: NVIDIA GPU utilization via dynamically loaded NVML'
             'vulkan-intel: Vulkan ICD for Intel integrated graphics'
             'vulkan-radeon: Vulkan ICD for AMD graphics')
-makedepends=('cargo' 'clang' 'git')
+makedepends=('cargo' 'clang' 'git' 'python')
 checkdepends=('cargo-nextest')
 provides=('taskforest')
 conflicts=('taskforest')
@@ -53,6 +53,10 @@ build() {
   # The root package enforces one UI feature per build; the default feature
   # set is exactly the GPUI shape, so copy it to its distribution name.
   install -m755 target/release/taskmanager target/release/taskforest-g
+  # Third-party notices: generated from the Cargo.lock dependency closure so
+  # the package carries every shipped dependency's license terms (the OFL
+  # fonts are embedded in the binary). Mirrored by the deb/rpm staging path.
+  python3 scripts/gen_third_party_notices.py target/release/THIRD-PARTY-NOTICES.txt
 }
 
 check() {
@@ -108,4 +112,6 @@ package() {
   install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.setup.policy \
     "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.setup.policy"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/taskforest/LICENSE"
+  install -Dm644 target/release/THIRD-PARTY-NOTICES.txt \
+    "$pkgdir/usr/share/licenses/taskforest/THIRD-PARTY-NOTICES.txt"
 }
