@@ -79,7 +79,7 @@ pub fn priority_tier(action: ProcessMenuAction) -> Option<PriorityTier> {
 
 /// Localized label for one menu action. The three priority tiers route
 /// through the shell's single tier→label fold
-/// (`presentation::priority_tier_label`, §4.0 同一律) so the menu names each
+/// (`presentation::priority_tier_label`, §8.1 同一律) so the menu names each
 /// tier the same way every frontend's menus, toasts, and confirmations do.
 pub fn action_label(action: ProcessMenuAction) -> &'static str {
     match action {

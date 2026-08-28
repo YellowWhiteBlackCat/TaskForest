@@ -6,7 +6,7 @@ use gpui::{Div, InteractiveElement, ParentElement, Styled, div, px};
 
 use crate::core::hardware::{CpuType, HardwareInfo};
 use crate::gpui_app::elements;
-use crate::gpui_app::graph::{GraphOpts, GraphSettings, compute_column_count, graph_element};
+use crate::gpui_app::graph::{GraphSettings, compute_column_count};
 use crate::gpui_app::theme::{Theme, tokens};
 
 use super::per_core::PerCoreSeries;
@@ -102,31 +102,16 @@ pub(super) fn render(
                     .get(core_index)
                     .cloned()
                     .unwrap_or_else(empty_samples);
-                let cell = elements::graph_card(
+                let cell = elements::mini_graph_cell(
                     theme,
-                    graph_element(
-                        ("tm-perf-core-graph", core_index),
-                        samples,
-                        color.into(),
-                        GraphOpts {
-                            max: 100.0,
-                            gradient_fill: true,
-                            ..GraphOpts::default()
-                        }
-                        .with_settings(graph_settings),
-                    ),
+                    ("tm-perf-core-graph", core_index),
+                    samples,
+                    color,
+                    stats.cores[core_index].label(),
+                    graph_settings,
                 )
                 .h_full()
-                .min_w(px(0.0))
-                .child(
-                    div()
-                        .absolute()
-                        .top(px(2.0))
-                        .left(px(5.0))
-                        .text_size(tokens::FONT_9)
-                        .text_color(theme.fg_dim)
-                        .child(stats.cores[core_index].label().to_owned()),
-                );
+                .min_w(px(0.0));
                 #[cfg(any(test, feature = "test-support"))]
                 let cell = cell.debug_selector(move || format!("tm-perf-core:{core_index}"));
                 row = row.child(cell);

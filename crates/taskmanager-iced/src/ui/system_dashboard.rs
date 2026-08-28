@@ -28,7 +28,7 @@ use super::components::{IcedElement, titled_card};
 use super::missing_value;
 
 // The summary fold lives in the data layer (`super::system_dashboard_model`)
-// per ARCH.md §4.0; re-exported here so the segment module and its mounted
+// per ARCH.md §8.1; re-exported here so the segment module and its mounted
 // tests read one import surface.
 pub(crate) use super::system_dashboard_model::{DashboardSummaryModel, summary_model};
 

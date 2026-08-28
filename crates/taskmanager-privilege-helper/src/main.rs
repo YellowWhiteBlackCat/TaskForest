@@ -5,8 +5,9 @@
 //! per ADR-023 and `docs/PERMISSION_MODEL.md` Boundary 2), it performs exactly
 //! ONE operation: a SYSTEM-WIDE Intel i915/xe GPU per-engine utilization read
 //! via the audited `perf_event_open` boundary crate ([ADR-022]
-//! `taskmanager-perf-ioctl` — the workspace's sole `unsafe` trust root, reached
-//! here ONLY through its safe API). It writes ONE JSON object to stdout and
+//! `taskmanager-perf-ioctl` — one of the workspace's four `unsafe` trust roots,
+//! reached here ONLY through its safe API). It writes ONE JSON object to stdout
+//! and
 //! exits. There are no flags and no file access beyond `/sys` discovery plus the
 //! perf counter read itself — minimal privileged attack surface.
 //!

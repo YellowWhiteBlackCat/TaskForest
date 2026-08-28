@@ -62,6 +62,9 @@ use wayland_protocols::xdg::decoration::zv1::client::{
 };
 use wayland_protocols::xdg::shell::client::{xdg_surface, xdg_toplevel, xdg_wm_base};
 use wayland_protocols_plasma::blur::client::{org_kde_kwin_blur, org_kde_kwin_blur_manager};
+use wayland_protocols_wlr::layer_shell::v1::client::{
+    zwlr_layer_shell_v1, zwlr_layer_surface_v1,
+};
 use xkbcommon::xkb::ffi::XKB_KEYMAP_FORMAT_TEXT_V1;
 use xkbcommon::xkb::{self, KEYMAP_COMPILE_NO_FLAGS, Keycode};
 
@@ -117,6 +120,7 @@ pub struct Globals {
     pub decoration_manager: Option<zxdg_decoration_manager_v1::ZxdgDecorationManagerV1>,
     pub blur_manager: Option<org_kde_kwin_blur_manager::OrgKdeKwinBlurManager>,
     pub text_input_manager: Option<zwp_text_input_manager_v3::ZwpTextInputManagerV3>,
+    pub layer_shell: Option<zwlr_layer_shell_v1::ZwlrLayerShellV1>,
     pub executor: ForegroundExecutor,
 }
 
@@ -154,6 +158,9 @@ impl Globals {
             decoration_manager: globals.bind(&qh, 1..=1, ()).ok(),
             blur_manager: globals.bind(&qh, 1..=1, ()).ok(),
             text_input_manager: globals.bind(&qh, 1..=1, ()).ok(),
+            // Version 4 is sufficient for the layer-shell requests used by
+            // this adapter, including on-demand keyboard interactivity.
+            layer_shell: globals.bind(&qh, 1..=4, ()).ok(),
             executor,
             qh,
         }
@@ -208,6 +215,9 @@ pub(crate) struct WaylandClientState {
     windows: HashMap<ObjectId, WaylandWindowStatePtr>,
     // Output to scale mapping
     outputs: HashMap<ObjectId, Output>,
+    // Keep the protocol handles alongside their descriptive output facts so
+    // an explicit neutral output selection can be passed to layer-shell.
+    output_handles: HashMap<ObjectId, wl_output::WlOutput>,
     in_progress_outputs: HashMap<ObjectId, InProgressOutput>,
     keyboard_layout: LinuxKeyboardLayout,
     keymap_state: Option<xkb::State>,
@@ -455,6 +465,8 @@ impl WaylandClient {
         let mut seat: Option<wl_seat::WlSeat> = None;
         #[allow(clippy::mutable_key_type)]
         let mut in_progress_outputs = HashMap::default();
+        #[allow(clippy::mutable_key_type)]
+        let mut output_handles = HashMap::default();
         globals.contents().with_list(|list| {
             for global in list {
                 match &global.interface[..] {
@@ -473,6 +485,7 @@ impl WaylandClient {
                             &qh,
                             (),
                         );
+                        output_handles.insert(output.id(), output.clone());
                         in_progress_outputs.insert(output.id(), InProgressOutput::default());
                     }
                     _ => {}
@@ -565,6 +578,7 @@ impl WaylandClient {
             ime_pre_edit: None,
             composing: false,
             outputs: HashMap::default(),
+            output_handles,
             in_progress_outputs,
             windows: HashMap::default(),
             common,
@@ -695,7 +709,22 @@ impl LinuxClient for WaylandClient {
     ) -> anyhow::Result<Box<dyn PlatformWindow>> {
         let mut state = self.0.borrow_mut();
 
-        let parent = state.keyboard_focused_window.as_ref().map(|w| w.toplevel());
+        let parent = state
+            .keyboard_focused_window
+            .as_ref()
+            .and_then(|w| w.toplevel());
+        let layer_output = match &params.presentation {
+            crate::WindowPresentation::LayerShell(options) => options
+                .output()
+                .and_then(|name| {
+                    state.outputs.iter().find_map(|(id, output)| {
+                        (output.name.as_deref() == Some(name))
+                            .then(|| state.output_handles.get(id).cloned())
+                            .flatten()
+                    })
+                }),
+            crate::WindowPresentation::Standalone => None,
+        };
 
         let (window, surface_id) = WaylandWindow::new(
             handle,
@@ -705,6 +734,7 @@ impl LinuxClient for WaylandClient {
             params,
             state.common.appearance,
             parent,
+            layer_output,
         )?;
         state.windows.insert(surface_id, window.0.clone());
 
@@ -919,6 +949,7 @@ impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for WaylandClientStat
                         (),
                     );
 
+                    state.output_handles.insert(output.id(), output.clone());
                     state
                         .in_progress_outputs
                         .insert(output.id(), InProgressOutput::default());
@@ -950,6 +981,7 @@ delegate_noop!(WaylandClientStatePtr: ignore zwp_text_input_manager_v3::ZwpTextI
 delegate_noop!(WaylandClientStatePtr: ignore org_kde_kwin_blur::OrgKdeKwinBlur);
 delegate_noop!(WaylandClientStatePtr: ignore wp_viewporter::WpViewporter);
 delegate_noop!(WaylandClientStatePtr: ignore wp_viewport::WpViewport);
+delegate_noop!(WaylandClientStatePtr: ignore zwlr_layer_shell_v1::ZwlrLayerShellV1);
 
 impl Dispatch<WlCallback, ObjectId> for WaylandClientStatePtr {
     fn event(
@@ -1082,6 +1114,28 @@ impl Dispatch<xdg_toplevel::XdgToplevel, ObjectId> for WaylandClientStatePtr {
 
         if should_close {
             // The close logic will be handled in drop_window()
+            window.close();
+        }
+    }
+}
+
+impl Dispatch<zwlr_layer_surface_v1::ZwlrLayerSurfaceV1, ObjectId> for WaylandClientStatePtr {
+    fn event(
+        this: &mut Self,
+        _: &zwlr_layer_surface_v1::ZwlrLayerSurfaceV1,
+        event: zwlr_layer_surface_v1::Event,
+        surface_id: &ObjectId,
+        _: &Connection,
+        _: &QueueHandle<Self>,
+    ) {
+        let client = this.get_client();
+        let mut state = client.borrow_mut();
+        let Some(window) = get_window(&mut state, surface_id) else {
+            return;
+        };
+
+        drop(state);
+        if window.handle_layer_surface_event(event) {
             window.close();
         }
     }

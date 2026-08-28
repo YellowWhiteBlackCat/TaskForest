@@ -122,7 +122,7 @@ fn query_disk_performance_windows(drive: &str) -> Result<WindowsDiskPerformance,
         )
     };
 
-    if success.is_err() || bytes_returned < size_of::<DiskPerformanceRaw>() as u32 {
+    if success.is_err() || bytes_returned != size_of::<DiskPerformanceRaw>() as u32 {
         return Err(WindowsApiError::QueryFailed);
     }
 
@@ -270,7 +270,15 @@ fn query_disk_device_info_windows(drive: &str) -> Result<WindowsDiskDeviceInfo, 
         )
     };
 
-    if success.is_err() || (bytes_returned as usize) < 32 {
+    let returned_bytes =
+        usize::try_from(bytes_returned).map_err(|_| WindowsApiError::ResourceLimit)?;
+    if success.is_err() {
+        return Err(WindowsApiError::QueryFailed);
+    }
+    if returned_bytes > out_buffer.len() {
+        return Err(WindowsApiError::ResourceLimit);
+    }
+    if returned_bytes < 32 {
         return Err(WindowsApiError::QueryFailed);
     }
 
@@ -296,10 +304,10 @@ fn query_disk_device_info_windows(drive: &str) -> Result<WindowsDiskDeviceInfo, 
 
     let extract_str = |offset: u32| -> Option<String> {
         let offset = offset as usize;
-        if offset == 0 || offset >= bytes_returned as usize {
+        if offset == 0 || offset >= returned_bytes {
             return None;
         }
-        let slice = &out_buffer[offset..bytes_returned as usize];
+        let slice = &out_buffer[offset..returned_bytes];
         let end = slice.iter().position(|&b| b == 0).unwrap_or(slice.len());
         let s = std::str::from_utf8(&slice[..end]).ok()?.trim().to_string();
         if s.is_empty() { None } else { Some(s) }
@@ -335,7 +343,7 @@ fn query_disk_device_info_windows(drive: &str) -> Result<WindowsDiskDeviceInfo, 
 
     let media_type = if bus_type == WindowsDiskBusType::Nvme {
         WindowsDiskMediaType::Ssd
-    } else if seek_ok.is_ok() && seek_bytes as usize >= size_of::<DEVICE_SEEK_PENALTY_DESCRIPTOR>()
+    } else if seek_ok.is_ok() && seek_bytes as usize == size_of::<DEVICE_SEEK_PENALTY_DESCRIPTOR>()
     {
         if seek_desc.IncursSeekPenalty {
             WindowsDiskMediaType::Hdd
@@ -501,7 +509,7 @@ fn query_disk_smart_info_windows(drive: &str) -> Result<WindowsDiskSmartInfo, Wi
     };
 
     let mut phys_guard = None;
-    if get_num_ok.is_ok() && dev_num_bytes as usize >= size_of::<StorageDeviceNumber>() {
+    if get_num_ok.is_ok() && dev_num_bytes as usize == size_of::<StorageDeviceNumber>() {
         let phys_path = format!("\\\\.\\PhysicalDrive{}", dev_num.device_number);
         let phys_wide: Vec<u16> = std::ffi::OsStr::new(&phys_path)
             .encode_wide()
@@ -565,7 +573,8 @@ fn query_disk_smart_info_windows(drive: &str) -> Result<WindowsDiskSmartInfo, Wi
                 )
             };
 
-            if ok.is_ok() && bytes_returned >= 512 {
+            let returned_bytes = usize::try_from(bytes_returned).unwrap_or(usize::MAX);
+            if ok.is_ok() && returned_bytes <= out_buffer.len() && returned_bytes >= 512 {
                 let data_offset = if bytes_returned >= 24 {
                     let offset = u32::from_le_bytes([
                         out_buffer[16],
@@ -573,9 +582,13 @@ fn query_disk_smart_info_windows(drive: &str) -> Result<WindowsDiskSmartInfo, Wi
                         out_buffer[18],
                         out_buffer[19],
                     ]) as usize;
-                    if offset > 0 && offset + 512 <= bytes_returned as usize {
+                    if offset > 0
+                        && offset
+                            .checked_add(512)
+                            .is_some_and(|end| end <= returned_bytes)
+                    {
                         offset
-                    } else if bytes_returned as usize >= 48 + 512 {
+                    } else if returned_bytes >= 48 + 512 {
                         48
                     } else {
                         40
@@ -584,8 +597,10 @@ fn query_disk_smart_info_windows(drive: &str) -> Result<WindowsDiskSmartInfo, Wi
                     continue;
                 };
 
-                if data_offset + 512 <= bytes_returned as usize {
-                    let log = &out_buffer[data_offset..data_offset + 512];
+                if let Some(data_end) = data_offset.checked_add(512)
+                    && data_end <= returned_bytes
+                {
+                    let log = &out_buffer[data_offset..data_end];
                     let critical_warning = log[0];
                     let kelvin = u16::from_le_bytes([log[1], log[2]]);
                     let temp_c = if (273..=450).contains(&kelvin) {
@@ -623,7 +638,7 @@ fn query_disk_smart_info_windows(drive: &str) -> Result<WindowsDiskSmartInfo, Wi
                 None,
             )
         };
-        if predict_ok.is_ok() {
+        if predict_ok.is_ok() && predict_bytes as usize == size_of::<StoragePredictFailure>() {
             return Ok(WindowsDiskSmartInfo {
                 temperature_c: None,
                 percentage_used: None,

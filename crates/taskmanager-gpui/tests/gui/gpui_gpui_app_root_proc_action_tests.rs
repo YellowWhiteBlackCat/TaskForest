@@ -101,7 +101,7 @@ fn menu_control_vocabulary_maps_to_neutral_requests() {
 
 /// Full menu dispatch through a recording platform client: the Suspend /
 /// Resume menu items must submit the NEUTRAL `ProcessControlRequest`
-/// variants (§4.0), never `SendSignal(Stop/Continue)`.
+/// variants (§8.1), never `SendSignal(Stop/Continue)`.
 #[gpui::test]
 async fn menu_suspend_resume_submit_the_neutral_request(cx: &mut gpui::TestAppContext) {
     let submitted = Arc::new(Mutex::new(Vec::new()));

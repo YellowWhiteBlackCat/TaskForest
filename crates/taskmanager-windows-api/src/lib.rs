@@ -1,10 +1,10 @@
 //! Small audited Windows API boundary with a safe, platform-neutral surface.
 //!
-//! The Windows adapter is deliberately kept `#![forbid(unsafe_code)]`.  Calls
-//! that have no suitable published safe wrapper live here instead, where the
-//! raw Win32 ABI is contained and reviewed. This includes bounded processor
-//! topology/cache and NIC metadata queries. No handle, pointer, or UTF-16
-//! buffer crosses this crate's public API.
+//! The Windows adapter is deliberately kept as an audited `unsafe` boundary.
+//! Calls that have no suitable published safe wrapper live here instead, where
+//! the raw Win32 ABI is contained and reviewed. This includes bounded
+//! processor topology/cache and NIC metadata queries. No handle, pointer, or
+//! UTF-16 buffer crosses this crate's public API.
 
 #![deny(unsafe_op_in_unsafe_fn)]
 // This boundary crate compiles on every host so Linux CI can run the

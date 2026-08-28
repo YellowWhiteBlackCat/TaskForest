@@ -23,7 +23,7 @@ use taskmanager_application::{
 pub enum ProcessControlKind {
     EndTask,
     Signal(ProcessSignal),
-    /// Neutral suspend/resume projection (§4.0 语义完备律): adapters may
+    /// Neutral suspend/resume projection (§8.1 语义完备律): adapters may
     /// implement the concept via stop/continue signals, but the user concept
     /// is its own vocabulary and never a POSIX signal in a frontend.
     Suspend,
@@ -128,7 +128,7 @@ impl SystemProjectionStore {
     ///
     /// The recorded kind is the SUBMISSION-time vocabulary, not the event's:
     /// adapters complete `Suspend`/`Resume` requests as `SignalCompleted`
-    /// with the platform's stop/continue signal (§4.0 映射穷尽律), and the
+    /// with the platform's stop/continue signal (§8.1 映射穷尽律), and the
     /// feedback must keep describing the concept the user invoked.
     pub(super) fn apply_process_control_completion(
         &mut self,

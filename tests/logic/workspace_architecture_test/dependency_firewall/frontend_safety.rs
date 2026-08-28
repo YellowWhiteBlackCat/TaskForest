@@ -231,6 +231,7 @@ fn default_build_is_strict_safe_rust_with_zero_unsafe() {
                 "unsafe {",
                 "unsafe impl",
                 "unsafe fn",
+                "unsafe extern",
                 "unsafe trait",
                 "allow(unsafe_code)",
             ] {
@@ -329,9 +330,18 @@ fn scan_safe_seam_violations(source: &str) -> Vec<String> {
     if stripped.contains("impl AsRawFd") {
         leaks.push("implements AsRawFd".to_owned());
     }
+    // Keep a small declaration window so a public signature split over lines
+    // cannot evade the seam check. We deliberately stop at the first opening
+    // brace/semicolon: the function body is private implementation detail,
+    // while aggregate fields and nested public items are checked when their
+    // own `pub` declaration starts.
+    let mut in_public_declaration = false;
     for line in stripped.lines() {
         let trimmed = line.trim_start();
-        if !(trimmed.starts_with("pub ") || trimmed.starts_with("pub(")) {
+        if trimmed.starts_with("pub ") || trimmed.starts_with("pub(") {
+            in_public_declaration = true;
+        }
+        if !in_public_declaration {
             continue;
         }
         // Substring tokens with no identifier ambiguity: the Unix RawFd family
@@ -360,6 +370,9 @@ fn scan_safe_seam_violations(source: &str) -> Vec<String> {
                     "public item leaks `{token}` across the safe seam: {line}"
                 ));
             }
+        }
+        if line.contains('{') || line.contains(';') {
+            in_public_declaration = false;
         }
     }
     leaks
@@ -395,13 +408,17 @@ fn audited_boundary_crate_carries_its_own_unsafe_contract() {
         if is_crate_root(path) && !source.contains("#![deny(unsafe_op_in_unsafe_fn)]") {
             missing_deny.push(path.display().to_string());
         }
-        // (b) every unsafe block/fn has a // SAFETY: comment on the same line
+        // (b) every unsafe block/fn/impl/extern has a // SAFETY: comment on the same line
         // or somewhere in the contiguous `//`-comment block immediately above
         // (a "small window" — a multi-line SAFETY justification is normal).
         let lines: Vec<&str> = source.lines().collect();
         for (idx, line) in lines.iter().enumerate() {
             let code = line.split_once("//").map_or(*line, |(code, _)| code);
-            if code.contains("unsafe {") || code.contains("unsafe fn") {
+            if code.contains("unsafe {")
+                || code.contains("unsafe fn")
+                || code.contains("unsafe impl")
+                || code.contains("unsafe extern")
+            {
                 let mut has_safety = line.contains("// SAFETY:");
                 let mut back = idx;
                 while !has_safety && back > 0 {
@@ -467,6 +484,9 @@ fn safe_seam_scan_is_os_neutral_and_catches_win32_handle_and_pcwstr_leaks() {
     // introduced; this is test-only governance.
     let synthetic_win32 = "\
 pub fn take_handle(h: HANDLE) {}
+pub fn multiline_handle(
+    h: HANDLE,
+) {}
 pub fn return_pcwstr() -> PCWSTR { std::ptr::null() }
 pub fn take_pcstr(s: PCSTR) {}
 pub fn take_pwstring(p: PWSTR) {}
@@ -497,6 +517,12 @@ pub const SOL_SOCKET_LEVEL: c_int = libc::SOL_SOCKET;
             "expected seam scan to catch the public-API leak of `{token}`, got: {leaks:?}"
         );
     }
+    assert!(
+        leaks
+            .iter()
+            .any(|line| line.contains("public item leaks `HANDLE`") && line.contains("h: HANDLE")),
+        "expected the multiline public signature to be checked, got: {leaks:?}"
+    );
 
     // (b) Win32 casts — every audited cast form is caught (the `as SOCKET`
     // here lives in a private body, so only the cast scan — not the public-API
@@ -551,7 +577,7 @@ fn body() { let _ = 1 as RawFd; }
 #[test]
 fn audited_perf_boundary_crate_is_depended_on_only_by_the_linux_adapter_and_helper() {
     // ADR-022 / ADR-023 reverse firewall: the audited perf boundary crate (the
-    // workspace's sole `unsafe` trust root) is a permitted dependency of exactly
+    // workspace's perf `unsafe` trust root) is a permitted dependency of exactly
     // TWO workspace crates — taskmanager-platform-linux (the unprivileged Linux
     // adapter, which probes the PMU and degrades typed when denied) and
     // taskmanager-privilege-helper (the privileged helper binary that performs

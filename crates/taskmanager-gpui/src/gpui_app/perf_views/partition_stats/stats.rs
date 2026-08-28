@@ -1,4 +1,4 @@
-//! Pure data-layer capacity fold for the per-partition panel (ARCH.md §4.0):
+//! Pure data-layer capacity fold for the per-partition panel (ARCH.md §8.1):
 //! the typed partition observation reads live here so the render module only
 //! paints the folded usage.
 

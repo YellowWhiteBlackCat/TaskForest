@@ -1,7 +1,8 @@
 //! Per-engine sampling — opens counters through the audited boundary crate's
 //! SAFE API, sleeps the sample window, reads the deltas, and computes the busy
 //! ratio. The `perf_event_open` syscall and its ioctls live ONLY in
-//! `taskmanager-perf-ioctl` (the workspace's sole `unsafe` trust root, ADR-022);
+//! `taskmanager-perf-ioctl` (one of the workspace's four `unsafe` trust roots,
+//! ADR-022);
 //! this module never writes `unsafe` and touches perf exclusively through
 //! [`GpuEngineCounter::open_enabled`] / [`GpuEngineCounter::read_counter`].
 //!

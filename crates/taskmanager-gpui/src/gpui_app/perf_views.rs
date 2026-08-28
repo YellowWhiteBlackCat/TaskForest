@@ -4,7 +4,7 @@
 
 use gpui::{
     AnyElement, Context, Div, ElementId, InteractiveElement, IntoElement, ParentElement,
-    ScrollHandle, StatefulInteractiveElement, Styled, div, px,
+    StatefulInteractiveElement, Styled, div,
 };
 use taskmanager_telemetry_store::TelemetryStore;
 
@@ -12,16 +12,14 @@ use crate::core::DirectoryUsageSnapshot;
 use crate::core::metrics::{NetworkAdapterType, SystemSnapshot};
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{DisplayUnits, GraphUnit, PerformanceSettings, UnitKind};
-use crate::gpui_app::graph::{
-    GraphHover, GraphOpts, graph_element_hover, graph_hover, latest_samples_rc,
-    latest_samples_rc_for_slide,
-};
+use crate::gpui_app::graph::GraphHover;
 use crate::gpui_app::history_samples::{
     f32_history_samples, network_rate_samples, network_rx_rate_samples, network_tx_rate_samples,
     storage_activity_samples, storage_rate_samples, storage_read_rate_samples,
     storage_temperature_samples, storage_write_rate_samples,
 };
 use crate::gpui_app::root::RootView;
+use crate::gpui_app::root::responsive::{PerformanceChartInventory, PerformancePageBudget};
 use crate::gpui_app::theme::Theme;
 use crate::i18n;
 use std::cell::RefCell;
@@ -46,11 +44,12 @@ mod smart_status;
 use crate::gpui_app::theme::tokens;
 use disk_stats::disk_stats;
 pub(crate) use dynamic::{BatteryViewProps, FanViewProps, render_battery, render_fan};
-use layout::{
-    MainColumnLayout, MainContent, MainGraphDualSeries, MainWithStatsProps,
-    SecondaryGraphCardProps, main_with_stats, secondary_graph_card, stats_panel,
-};
-pub(crate) use layout::{performance_split, performance_title_row};
+// The ONE page composition root and its chart specification are the crate's
+// public surface for Performance pages: cpu_view composes through the same
+// root as every device page, so no sibling module can hand-roll a parallel
+// page shell.
+pub(crate) use layout::{ChartSpec, DualLanes, HeadlineSurface, PerfPageProps, perf_page};
+use layout::{render_chart, stats_panel};
 use memory_composition::composition_block;
 use memory_stats::memory_page_stats;
 use network_stats::{network_link_speed_graph_max, network_stats, network_title};
@@ -74,11 +73,7 @@ mod tests;
 // the top-right pill thus reads in the graph's native unit (memory/GPU = %,
 // storage activity/GPU/memory = %, network = MB/s).
 pub(super) fn badge_pct(v: f32) -> String {
-    format!("{:.0}%", v)
-}
-
-fn format_pct(v: f32) -> String {
-    format!("{:.1}%", v)
+    format!("{v:.0}%")
 }
 fn badge_network_bytes_decimal(v: f32) -> String {
     DisplayUnits {
@@ -248,10 +243,10 @@ pub(crate) struct MemoryViewProps<'a> {
     pub(crate) snap: &'a SystemSnapshot,
     pub(crate) telemetry: &'a TelemetryStore,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) left_scroll: ScrollHandle,
-    pub(crate) stats_scroll: ScrollHandle,
+    pub(crate) stats_scroll: gpui::ScrollHandle,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
     pub(crate) memory_history: &'a mut MemoryHistoryCache,
+    pub(crate) budget: PerformancePageBudget,
 }
 
 pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
@@ -260,148 +255,62 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
         snap,
         telemetry,
         performance,
-        left_scroll,
         stats_scroll,
         hover_slot,
         memory_history,
+        budget,
     } = props;
     let units = performance.units;
-    let graph_settings = performance.graph;
     let m = &snap.memory;
     let memory_stats = memory_page_stats(m, units);
     let stats = memory_stats.rows;
 
-    // Left flex-col: title + composition bar, then the memory graph, then — when
-    // the host has swap — a second swap graph stacked beneath it. Both graph cards
-    // are flex_1 siblings so they split the column's remaining height evenly; the
-    // swap card carries a small "Swap" caption. Composition bar + stats panel are
-    // untouched.
-    //
-    // The full memory + swap projections are generation-keyed (see
-    // `MemoryHistoryCache`): a cache hit on a UI-only frame (hover, resize,
-    // overlay switch) reuses the last projection via `Rc` deref instead of
-    // re-cloning the correlated histories out of the telemetry store. The
-    // tail-limit keeps that same `Rc` when the window already fits (the rings
-    // are capped at the graph data-point bound), so a UI-only frame copies
-    // nothing; only a shrunken data-points setting pays a tail-slice.
+    // One fixed main viewport (the shared device-page contract): the memory
+    // headline and — when the host has swap and the chart-inventory budget
+    // permits — the swap headline are `flex_1` siblings that split the
+    // column's remaining height evenly. The full memory + swap projections
+    // are generation-keyed (see `MemoryHistoryCache`): a cache hit on a
+    // UI-only frame reuses the last projection via `Rc` deref, and the
+    // chart's tail-limit keeps the identity when the window already fits.
     let (mem_history, swap_history) = memory_history.refresh(telemetry);
-    let mem_samples = if graph_settings.sliding_graphs {
-        latest_samples_rc_for_slide(Rc::clone(mem_history), graph_settings.data_points)
-    } else {
-        latest_samples_rc(Rc::clone(mem_history), graph_settings.data_points)
-    };
-    let swap_samples = if graph_settings.sliding_graphs {
-        latest_samples_rc_for_slide(Rc::clone(swap_history), graph_settings.data_points)
-    } else {
-        latest_samples_rc(Rc::clone(swap_history), graph_settings.data_points)
-    };
-    let mut left = div()
-        .flex()
-        .flex_col()
-        .gap(tokens::SPACE_10)
-        .flex_1()
-        .min_w(px(0.0))
-        .child(performance_title_row(
-            theme,
-            i18n::t("common.memory").into(),
-            format!("{} {}", i18n::t("mem.total"), memory_stats.total_readout),
-        ))
-        .child(composition_block(theme, m, units))
-        .child(elements::graph_card_with_state(
-            theme,
-            graph_element_hover(
-                "mem-graph",
-                "mem-graph",
-                mem_samples.clone(),
-                theme.memory.into(),
-                GraphOpts {
-                    // Batch-8 aesthetics for the headline memory graph: vertical
-                    // gradient fill, emphasized 25/50/75/100% reference rules, and
-                    // a top-right current-value pill — additive over the MC
-                    // filled-area baseline.
-                    gradient_fill: true,
-                    ref_lines: true,
-                    value_badge: true,
-                    badge_fmt: Some(badge_pct),
-                    ..GraphOpts::default()
-                }
-                .with_settings(graph_settings),
-                Box::new(|v| format!("{:.0}%", v)),
-                hover_slot.clone(),
-            ),
-            &mem_samples,
-        ));
-    if let Some(summary) = graph_summary_row(theme, &mem_samples, &format_pct) {
-        left = left.child(summary);
-    }
-    // Swap-over-time graph — gated on swap presence so swap-less hosts keep the
-    // full-height memory graph. The correlated swap series is a percentage
-    // (0..=100), so
-    // GraphOpts::default() (max 100) scales correctly. Reuses theme.memory at a
-    // lower alpha so the swap series reads as distinct yet memory-adjacent.
-    if memory_stats.has_swap {
-        left = left.child(
-            div()
-                .flex()
-                .flex_col()
-                .gap(tokens::SPACE_6)
-                .flex_1()
-                .min_h(px(0.0))
-                .child(
-                    div()
-                        .text_size(tokens::FONT_13)
-                        .text_color(theme.fg_dim)
-                        .child(i18n::t("mem.swap")),
-                )
-                .child(elements::graph_card_with_state(
-                    theme,
-                    graph_element_hover(
-                        "swap-graph",
-                        "swap-graph",
-                        swap_samples.clone(),
-                        theme.memory.with_alpha(0.75).into(),
-                        GraphOpts {
-                            gradient_fill: true,
-                            ref_lines: true,
-                            value_badge: true,
-                            badge_fmt: Some(badge_pct),
-                            ..GraphOpts::default()
-                        }
-                        .with_settings(graph_settings),
-                        Box::new(|v| format!("{:.0}%", v)),
-                        hover_slot.clone(),
-                    ),
-                    &swap_samples,
-                )),
+    let mut charts = vec![ChartSpec::headline(
+        "mem-graph",
+        "mem-graph",
+        Rc::clone(mem_history),
+        theme.memory,
+        GraphUnit::Percent,
+    )];
+    // Swap-over-time graph — gated on swap presence (and the Full chart
+    // inventory) so swap-less or compact hosts keep the full-height memory
+    // graph. The correlated swap series is a percentage (0..=100) and reuses
+    // theme.memory at a lower alpha so it reads as distinct yet
+    // memory-adjacent.
+    if memory_stats.has_swap && budget.chart_inventory == PerformanceChartInventory::Full {
+        charts.push(
+            ChartSpec::headline(
+                "swap-graph",
+                "swap-graph",
+                Rc::clone(swap_history),
+                theme.memory.with_alpha(0.75),
+                GraphUnit::Percent,
+            )
+            .with_title(i18n::t("mem.swap")),
         );
-        if let Some(summary) = graph_summary_row(theme, &swap_samples, &format_pct) {
-            left = left.child(summary);
-        }
-    };
-
-    // Hover tooltip: page-level singleton (one slot, one cursor). Placed as a
-    // sibling of the graph cards — OUTSIDE their `overflow_hidden` container —
-    // so the deferred+anchored label follows the cursor without clipping.
-    if let Some((pos, text)) = graph_hover(hover_slot) {
-        left = left.child(elements::tooltip_overlay(theme, &text, pos));
     }
-
-    let left = div()
-        .flex()
-        .flex_col()
-        .flex_1()
-        .min_w(px(0.0))
-        .min_h(px(0.0))
-        .child(taskmanager_ui::layout::scroll_region_with_rail(
-            "perf-left-scroll",
-            "tm-perf-left-scroll",
-            "perf-left-scrollbar",
-            "tm-perf-left-scrollbar",
-            left_scroll,
-            theme.palette(),
-            left,
-        ));
-    layout::performance_split(theme, left, stats_panel(theme, stats), stats_scroll)
+    perf_page(PerfPageProps {
+        theme,
+        stats_scroll,
+        title: i18n::t("common.memory").into(),
+        subtitle: format!("{} {}", i18n::t("mem.total"), memory_stats.total_readout),
+        header_extra: Some(composition_block(theme, m, units).into_any_element()),
+        headline: HeadlineSurface::Charts(charts),
+        below: None,
+        stats: stats_panel(theme, stats),
+        stats_footer: None,
+        hover_slot,
+        graph_settings: performance.graph,
+        budget,
+    })
 }
 
 /// Stateless renderer props for the Disk page. The props boundary prevents
@@ -409,20 +318,19 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
 /// panel family (mirrors `CpuViewProps`).
 pub(crate) struct DiskViewProps<'a> {
     pub theme: &'a Theme,
-    pub left_scroll: ScrollHandle,
-    pub stats_scroll: ScrollHandle,
+    pub stats_scroll: gpui::ScrollHandle,
     pub snap: &'a SystemSnapshot,
     pub telemetry: &'a TelemetryStore,
     pub index: usize,
     pub performance: PerformanceSettings,
     pub directory_usage: Option<&'a DirectoryUsageSnapshot>,
     pub hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub budget: PerformancePageBudget,
 }
 
 pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) -> Div {
     let DiskViewProps {
         theme,
-        left_scroll,
         stats_scroll,
         snap,
         telemetry,
@@ -430,9 +338,9 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
         performance,
         directory_usage,
         hover_slot,
+        budget,
     } = props;
     let units = performance.units;
-    let graph_settings = performance.graph;
     let Some(d) = snap.disks.get(i) else {
         return div();
     };
@@ -453,26 +361,31 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
     let activity_samples =
         storage_activity_samples(&telemetry.system_history, &d.device_id, d.device_generation);
     // Active-time percentage window beneath the throughput pair (the battery
-    // power / fan temperature secondary-graph precedent): this disk's own
+    // power / fan temperature secondary-chart precedent): this disk's own
     // generation-scoped activity ring on the shared 0..100 percent scale. The
-    // card appears only when the ring holds samples — a cold window or a
-    // platform whose active-time source is honestly unavailable keeps the
-    // absence instead of a fabricated flat 0%.
-    let activity_graph = (!activity_samples.is_empty()).then(|| {
-        secondary_graph_card(SecondaryGraphCardProps {
-            theme,
-            id: ElementId::from("disk-activity-graph"),
-            slide_key: (ElementId::from("disk-activity-graph"), d.device_id.clone()).into(),
-            title: i18n::t("disk.active_time").to_string(),
-            samples: Rc::clone(&activity_samples),
-            color: theme.disk,
-            graph_opts: GraphOpts::default(),
-            graph_settings,
-            graph_unit: GraphUnit::Percent,
-            hover_slot,
-        })
-        .into_any_element()
-    });
+    // card appears only when the ring holds samples AND the chart-inventory
+    // budget keeps secondary charts — a cold window or a platform whose
+    // active-time source is honestly unavailable keeps the absence instead
+    // of a fabricated flat 0%.
+    let activity_graph = (!activity_samples.is_empty()
+        && budget.chart_inventory == PerformanceChartInventory::Full)
+        .then(|| {
+            render_chart(
+                theme,
+                ChartSpec::secondary(
+                    "disk-activity-graph",
+                    (ElementId::from("disk-activity-graph"), d.device_id.clone()),
+                    i18n::t("disk.active_time").to_string(),
+                    Rc::clone(&activity_samples),
+                    theme.disk,
+                    GraphUnit::Percent,
+                ),
+                performance.graph,
+                budget.vertical,
+                hover_slot,
+            )
+            .into_any_element()
+        });
     let stats = disk_stats(d, units, temperature_samples.as_ref());
     let has_smart = has_smart_fields(d); // ── SMART health button (opens a dedicated attributes dialog) ──
     let smart_footer: Option<AnyElement> = if smart_section_visible(d) {
@@ -503,9 +416,8 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
     } else {
         None
     };
-    main_with_stats(MainWithStatsProps {
+    perf_page(PerfPageProps {
         theme,
-        left_scroll,
         stats_scroll,
         title: if d.model.is_empty() {
             d.name.trim_start_matches("/dev/").to_string()
@@ -518,29 +430,26 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
             d.disk_type,
             d.fs_type
         ),
-        graph_id: (ElementId::from("tm-perf-main-graph"), d.device_id.clone()).into(),
-        graph_samples: samples,
-        graph_color: theme.disk,
-        graph_opts: GraphOpts {
-            // finite_series_peak already floors the shared dynamic scale at
-            // 1.0, so an all-gap window keeps a neutral axis.
-            max: observed_max,
-            ..GraphOpts::default()
-        },
-        graph_settings,
-        graph_unit: GraphUnit::DriveRate(units),
-        graph_dual: Some(MainGraphDualSeries {
-            primary_samples: read_samples,
-            primary_label: i18n::t("disk.read"),
-            secondary_samples: write_samples,
-            secondary_label: i18n::t("disk.write"),
-        }),
-        main_content: MainContent::AggregateGraph,
-        main_column: MainColumnLayout::Scrollable,
-        graph_controls: None,
-        stats,
-        stats_footer: smart_footer,
-        left_footer: Some(
+        header_extra: None,
+        headline: HeadlineSurface::Charts(vec![
+            ChartSpec::dual_headline(
+                // finite_series_peak already floors the shared dynamic scale at
+                // 1.0, so an all-gap window keeps a neutral axis.
+                "main-graph",
+                (ElementId::from("tm-perf-main-graph"), d.device_id.clone()),
+                DualLanes {
+                    aggregate: samples,
+                    primary: read_samples,
+                    primary_label: i18n::t("disk.read"),
+                    secondary: write_samples,
+                    secondary_label: i18n::t("disk.write"),
+                },
+                theme.disk,
+                GraphUnit::DriveRate(units),
+            )
+            .with_max(observed_max),
+        ]),
+        below: Some(
             div()
                 .flex()
                 .flex_col()
@@ -556,7 +465,11 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
                 ))
                 .into_any_element(),
         ),
+        stats: stats_panel(theme, stats),
+        stats_footer: smart_footer,
         hover_slot,
+        graph_settings: performance.graph,
+        budget,
     })
 }
 
@@ -567,9 +480,9 @@ pub(crate) struct NetworkViewProps<'a> {
     pub(crate) telemetry: &'a TelemetryStore,
     pub(crate) index: usize,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) left_scroll: ScrollHandle,
-    pub(crate) stats_scroll: ScrollHandle,
+    pub(crate) stats_scroll: gpui::ScrollHandle,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub(crate) budget: PerformancePageBudget,
 }
 
 pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
@@ -579,12 +492,11 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
         telemetry,
         index: i,
         performance,
-        left_scroll,
         stats_scroll,
         hover_slot,
+        budget,
     } = props;
     let units = performance.units;
-    let graph_settings = performance.graph;
     let Some(n) = snap.networks.get(i) else {
         return div();
     };
@@ -601,7 +513,7 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
     let samples =
         network_rate_samples(&telemetry.system_history, &n.device_id, n.device_generation);
     let observed_max = finite_series_peak(&rx_samples).max(finite_series_peak(&tx_samples));
-    let max = if graph_settings.network_dynamic_scaling {
+    let max = if performance.graph.network_dynamic_scaling {
         observed_max
     } else {
         network_link_speed_graph_max(n).unwrap_or(observed_max)
@@ -611,49 +523,55 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
     let is_wireless = n.adapter_type() == NetworkAdapterType::WiFi;
     let title = network_title(n, is_wireless);
     let stats = network_stats(n, is_wireless, units);
-    main_with_stats(MainWithStatsProps {
+    perf_page(PerfPageProps {
         theme,
-        left_scroll,
         stats_scroll,
         title,
         subtitle: n.ipv4_addr.as_deref().unwrap_or_default().to_owned(),
-        graph_id: (ElementId::from("tm-perf-main-graph"), n.device_id.clone()).into(),
-        graph_samples: samples,
-        graph_color: theme.network,
-        graph_opts: GraphOpts {
-            max,
-            ..GraphOpts::default()
-        },
-        graph_settings,
-        graph_unit: GraphUnit::NetworkRate(units),
-        graph_dual: Some(MainGraphDualSeries {
-            primary_samples: rx_samples,
-            primary_label: i18n::t("net.receive"),
-            secondary_samples: tx_samples,
-            secondary_label: i18n::t("net.send"),
-        }),
-        main_content: MainContent::AggregateGraph,
-        main_column: MainColumnLayout::Scrollable,
-        graph_controls: None,
-        stats,
+        header_extra: None,
+        headline: HeadlineSurface::Charts(vec![
+            ChartSpec::dual_headline(
+                "main-graph",
+                (ElementId::from("tm-perf-main-graph"), n.device_id.clone()),
+                DualLanes {
+                    aggregate: samples,
+                    primary: rx_samples,
+                    primary_label: i18n::t("net.receive"),
+                    secondary: tx_samples,
+                    secondary_label: i18n::t("net.send"),
+                },
+                theme.network,
+                GraphUnit::NetworkRate(units),
+            )
+            .with_max(max),
+        ]),
+        below: None,
+        stats: stats_panel(theme, stats),
         stats_footer: status_footer(theme, n.device_state.status),
-        left_footer: None,
         hover_slot,
+        graph_settings: performance.graph,
+        budget,
     })
 }
 
 // ---- shared helpers ----
 
-/// Greatest finite sample of a window, floored at 1.0 — the shared dynamic
-/// max of a two-series throughput graph. `f32::max` ignores the NaN gaps, so
-/// an all-gap (or empty) window floors to the neutral 1.0 scale instead of a
-/// degenerate zero.
-pub(super) fn finite_series_peak(samples: &[f32]) -> f32 {
+/// Greatest finite sample of a window, floored — the shared dynamic max of a
+/// throughput graph. `f32::max` ignores the NaN gaps, so an all-gap (or
+/// empty) window floors to the given neutral scale instead of a degenerate
+/// zero.
+pub(super) fn finite_series_peak_floored(floor: f32, samples: &[f32]) -> f32 {
     samples
         .iter()
         .copied()
         .filter(|value| value.is_finite())
-        .fold(1.0_f32, f32::max)
+        .fold(floor, f32::max)
+}
+
+/// `finite_series_peak_floored` at the throughput floor (1.0 MB/s) — the
+/// shared dynamic max of a two-series disk/network graph.
+pub(super) fn finite_series_peak(samples: &[f32]) -> f32 {
+    finite_series_peak_floored(1.0, samples)
 }
 
 pub(super) fn graph_summary_row(

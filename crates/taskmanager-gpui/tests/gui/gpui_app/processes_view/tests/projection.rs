@@ -146,7 +146,7 @@ mod canonical_category {
         SortCol, Toggle, VisibleRowsProps, category_expansion_key, category_tree_rows, visible_rows,
     };
     use crate::i18n::{self, Language};
-    use taskmanager_shell::ProcessStatusFilter;
+    use taskmanager_shell::{ProcessRowKey, ProcessStatusFilter};
 
     fn app_item(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
         let identity = ProcessApplicationIdentity::new("org.example.Editor", "Editor", None)
@@ -541,6 +541,144 @@ mod canonical_category {
         assert!((rows[1].cpu.unwrap() - 12.60).abs() < f32::EPSILON);
         assert_eq!(rows[0].mem, Some(541_000_000));
         assert_eq!(rows[1].mem, Some(541_000_000));
+        i18n::set_language(prior);
+    }
+
+    /// The bare Left/Right tree-navigation fold (iced parity) is pure, so the
+    /// whole matrix is pinned without a window: Left collapses an expanded
+    /// row, Right expands a collapsed one, Left on an already-collapsed row
+    /// climbs to the nearest visible selectable ancestor, and Right on an
+    /// expanded row (or Left with no selectable ancestor) is an honest no-op
+    /// — never a fall-through into column stepping.
+    #[test]
+    fn structural_arrow_matrix_matches_the_iced_contract() {
+        use crate::gpui_app::processes_view::rows::projection::{
+            StructuralArrow, structural_arrow_action,
+        };
+        let parent = Some(ProcessRowKey::Process(100));
+
+        assert_eq!(
+            structural_arrow_action(false, parent, false),
+            Some(StructuralArrow::Collapse),
+            "Left on an expanded row collapses its subtree"
+        );
+        assert_eq!(
+            structural_arrow_action(true, parent, true),
+            Some(StructuralArrow::Expand),
+            "Right on a collapsed row expands its subtree"
+        );
+        assert_eq!(
+            structural_arrow_action(true, parent, false),
+            Some(StructuralArrow::GotoParent(ProcessRowKey::Process(100))),
+            "Left on an already-collapsed row climbs to the parent"
+        );
+        assert_eq!(
+            structural_arrow_action(true, None, false),
+            None,
+            "Left with no selectable ancestor (category/aggregate boundary) is a no-op"
+        );
+        assert_eq!(
+            structural_arrow_action(false, parent, true),
+            None,
+            "Right on an already-expanded row is a no-op"
+        );
+    }
+
+    /// Every projected row carries its nearest VISIBLE selectable ancestor:
+    /// an app-root process row points at the aggregate above it, in-tree
+    /// children point at their real parent row, and structural rows (category
+    /// headers, app aggregates, category-tree roots) carry `None` so climbing
+    /// stops honestly at the boundary instead of fabricating a target.
+    #[test]
+    fn parent_key_pins_the_nearest_visible_selectable_ancestor() {
+        let prior = pinned_english();
+        let identity =
+            ProcessApplicationIdentity::new("org.example.MissionCenter", "Mission Center", None)
+                .expect("fixture identity must be non-empty");
+        let item = |pid: u32, name: &str, cpu: f32, mem: u64, parent_pid: Option<u32>| {
+            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                .pid(pid)
+                .parent_pid(parent_pid)
+                .name(name.to_owned())
+                .current_cpu_percentage(cpu)
+                .current_memory_bytes(mem)
+                .status("S".to_owned())
+                .application_identity_observation(ProcessMetadataObservation::available(
+                    identity.clone(),
+                    10,
+                ))
+                .build()
+        };
+        let background = |pid: u32, name: &str, parent_pid: Option<u32>| {
+            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                .pid(pid)
+                .parent_pid(parent_pid)
+                .name(name.to_owned())
+                .current_cpu_percentage(1.0)
+                .current_memory_bytes(100)
+                .status("S".to_owned())
+                .application_identity_observation(ProcessMetadataObservation::<
+                    ProcessApplicationIdentity,
+                >::absent(10))
+                .build()
+        };
+        let apps = [
+            item(100, "missioncenter", 10.0, 1_000, None),
+            item(101, "missioncenter-magpie", 2.0, 200, Some(100)),
+            item(102, "bwrap", 3.0, 300, Some(100)),
+            item(103, "glycin-svg", 4.0, 400, Some(102)),
+        ];
+        let backgrounds = [
+            background(200, "syslogd", None),
+            background(201, "cron", Some(200)),
+        ];
+        let refs: Vec<&ProcessItem> = apps.iter().chain(backgrounds.iter()).collect();
+        let rows = visible_rows(VisibleRowsProps {
+            processes: &refs,
+            query: "",
+            sort_col: SortCol::Pid,
+            sort_asc: true,
+            filter: ProcessStatusFilter::All,
+            collapsed: &HashSet::new(),
+            expanded_apps: &HashSet::from([
+                category_expansion_key(ProcessCategory::Application),
+                category_expansion_key(ProcessCategory::Background),
+                "app-tree:100".to_owned(),
+            ]),
+        });
+
+        // Applications: header, aggregate, then the fully expanded tree.
+        assert_eq!(rows[0].parent_key, None, "category header is structural");
+        assert_eq!(
+            rows[1].parent_key, None,
+            "the app aggregate's only parent is the structural header"
+        );
+        assert_eq!(
+            rows[2].parent_key,
+            Some(ProcessRowKey::Application(100)),
+            "the root process row climbs to the aggregate row above it"
+        );
+        assert_eq!(
+            rows[3].parent_key,
+            Some(ProcessRowKey::Process(100)),
+            "in-tree children climb to their real parent row"
+        );
+        assert_eq!(rows[4].parent_key, Some(ProcessRowKey::Process(100)));
+        assert_eq!(
+            rows[5].parent_key,
+            Some(ProcessRowKey::Process(102)),
+            "deeper rows climb one visible level at a time"
+        );
+        // Background keeps the direct tree: its root's parent is the
+        // structural header, so climbing stops there.
+        let bg_rows = &rows[6..];
+        assert_eq!(bg_rows[0].parent_key, None);
+        assert_eq!(bg_rows[1].parent_key, None);
+        assert_eq!(
+            bg_rows[2].parent_key,
+            Some(ProcessRowKey::Process(200)),
+            "a category-tree child climbs to its in-tree parent"
+        );
         i18n::set_language(prior);
     }
 }

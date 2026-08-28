@@ -110,6 +110,10 @@ const MAX_TASK_SCHEDULER_FOLDERS: usize = 16;
 #[cfg(windows)]
 const MAX_TASK_SCHEDULER_TASKS: usize = 256;
 
+/// Maximum trigger records inspected for one registered task.
+#[cfg(windows)]
+const MAX_TASK_SCHEDULER_TRIGGERS: i32 = 256;
+
 /// Append this folder's startup-relevant tasks, honoring the global bound.
 #[cfg(windows)]
 fn collect_folder_tasks(
@@ -122,7 +126,14 @@ fn collect_folder_tasks(
     let registered = unsafe { folder.GetTasks(0) }.map_err(com_failure)?;
     // SAFETY: valid collection.
     let count = unsafe { registered.Count() }.map_err(com_failure)?;
-    if count < 0 || *visited + count as usize > MAX_TASK_SCHEDULER_TASKS {
+    if count < 0 {
+        return Err(WindowsApiError::ResourceLimit);
+    }
+    let count_usize = usize::try_from(count).map_err(|_| WindowsApiError::ResourceLimit)?;
+    let total = visited
+        .checked_add(count_usize)
+        .ok_or(WindowsApiError::ResourceLimit)?;
+    if total > MAX_TASK_SCHEDULER_TASKS {
         return Err(WindowsApiError::ResourceLimit);
     }
     for index in 1..=count {
@@ -131,7 +142,9 @@ fn collect_folder_tasks(
         if let Some(task) = startup_relevant_task(&task)? {
             tasks.push(task);
         }
-        *visited += 1;
+        *visited = visited
+            .checked_add(1)
+            .ok_or(WindowsApiError::ResourceLimit)?;
     }
     Ok(())
 }
@@ -167,6 +180,9 @@ fn startup_relevant_task(
     };
     if trigger_count < 0 {
         return Err(WindowsApiError::QueryFailed);
+    }
+    if trigger_count > MAX_TASK_SCHEDULER_TRIGGERS {
+        return Err(WindowsApiError::ResourceLimit);
     }
     let mut has_logon_or_boot_trigger = false;
     for index in 1..=trigger_count {

@@ -73,8 +73,7 @@ pub fn query_event_log(
     limit: usize,
 ) -> Result<Vec<WindowsEventLogEntry>, WindowsApiError> {
     validate_query(query)?;
-    let limit = limit.min(MAX_EVENT_LOG_ENTRIES_PER_QUERY);
-    if limit == 0 {
+    if !(1..=MAX_EVENT_LOG_ENTRIES_PER_QUERY).contains(&limit) {
         return Err(WindowsApiError::InvalidInput);
     }
     #[cfg(windows)]
@@ -487,15 +486,21 @@ fn query_event_log_windows(
         if returned > batch.len() {
             return Err(WindowsApiError::ResourceLimit);
         }
-        for raw in batch[..returned].iter().copied() {
+
+        // Take ownership of the complete batch before any fallible rendering
+        // starts. If a later event fails, all already-returned handles still
+        // live in this vector and are closed by Drop during unwinding.
+        let events: Vec<EventHandleGuard> = batch[..returned]
+            .iter()
+            .copied()
+            .filter_map(|raw| {
+                EventHandleGuard::new(windows::Win32::System::EventLog::EVT_HANDLE(raw))
+            })
+            .collect();
+        for event in events {
             if collected.len() == limit {
                 break;
             }
-            let Some(event) =
-                EventHandleGuard::new(windows::Win32::System::EventLog::EVT_HANDLE(raw))
-            else {
-                continue;
-            };
             let xml = render_event_xml(event.0)?;
             let parsed = parse_event_xml(&xml);
             let message = if let Some(rendered) = parsed.rendering_message {
@@ -585,14 +590,17 @@ fn render_event_xml(
         }
     }
     .map_err(map_event_log_error)?;
-    let units = usize::try_from(used_after).map_err(|_| WindowsApiError::ResourceLimit)?;
-    if units > buffer.len() {
+    let used_bytes = usize::try_from(used_after).map_err(|_| WindowsApiError::ResourceLimit)?;
+    if used_bytes == 0 || used_bytes > bytes || !used_bytes.is_multiple_of(2) {
         return Err(WindowsApiError::ResourceLimit);
     }
+    let used_units = used_bytes / 2;
     let end = buffer
+        .get(..used_units)
+        .ok_or(WindowsApiError::ResourceLimit)?
         .iter()
         .position(|unit| *unit == 0)
-        .unwrap_or(buffer.len());
+        .unwrap_or(used_units);
     String::from_utf16(&buffer[..end]).map_err(|_| WindowsApiError::InvalidText)
 }
 
@@ -628,9 +636,10 @@ fn format_event_message(
             return None;
         }
     }
-    // `used` counts the terminating NUL.
-    let units = usize::try_from(used).ok()?.checked_sub(1)?;
-    if units == 0 || units > MAX_EVENT_MESSAGE_UNITS {
+    // `used` counts the terminating NUL, so retain that slot in the output
+    // buffer instead of under-allocating the second call.
+    let units = usize::try_from(used).ok()?;
+    if units == 0 || units > MAX_EVENT_MESSAGE_UNITS.saturating_add(1) {
         return None;
     }
     let mut buffer = vec![0_u16; units];
@@ -651,6 +660,10 @@ fn format_event_message(
         }
     }
     .ok()?;
+    let used_after = usize::try_from(used_after).ok()?;
+    if used_after == 0 || used_after > buffer.len() {
+        return None;
+    }
     let end = buffer
         .iter()
         .position(|unit| *unit == 0)

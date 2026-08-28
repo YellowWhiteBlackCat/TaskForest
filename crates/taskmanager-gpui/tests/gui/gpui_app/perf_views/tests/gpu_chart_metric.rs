@@ -1,7 +1,7 @@
-//! GPU headline chart-metric selection regressions (ADR-034 stage 2):
-//! the pill row, the shared projection, the availability gate, and the
-//! generation reset — all through the same shell contract the Iced and TUI
-//! frontends consume.
+//! GPU page chartable-family regressions: the page renders every measured
+//! family as its own graph (no selector row), and the shared
+//! `gpu_chart_metric_history` dispatch keeps one sampling track across view
+//! capacities — the same shell contract the Iced and TUI frontends consume.
 
 use super::*;
 
@@ -12,8 +12,9 @@ fn chart_metric_gpu(device_id: &str, utilization: f32, temperature_c: f32) -> Gp
     gpu.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(utilization, 1),
         temperature_c: ScalarObservation::available(temperature_c, 1),
-        // Power stays unobserved: the availability gate must keep its pill
-        // visible-but-inert and reject its selection.
+        // Power stays unobserved: the product contract is "hide what is not
+        // read", so the power family must render nothing at all — never a
+        // fabricated zero graph.
         ..GpuScalarObservations::default()
     });
     gpu
@@ -58,14 +59,11 @@ fn seed_chart_metric_gpu(view: &mut RootView, device_id: &str, frames: [(f32, f3
     }
 }
 
-/// The default projection renders the full vocabulary pill row — including
-/// the unobserved power family — selects Utilization, and the headline graph
-/// follows the selection through the shared `GpuChartMetric::value` fold.
-/// The activation path (mouse click and the Pill's keyboard Enter/Space,
-/// which route through the same `on_click`) accepts an observed family and
-/// silently rejects an unobserved one.
+/// The GPU page renders every family the device measures as its own graph —
+/// the utilization headline plus one card per additional available family —
+/// with no selector row and no chart for an unobserved family.
 #[gpui::test]
-async fn gpu_chart_metric_pills_default_gate_and_selection(cx: &mut TestAppContext) {
+async fn gpu_page_renders_every_measured_family_without_selector(cx: &mut TestAppContext) {
     use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
 
     let (win, view) = wrapped_root(cx);
@@ -81,56 +79,52 @@ async fn gpu_chart_metric_pills_default_gate_and_selection(cx: &mut TestAppConte
     draw(cx, win);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     assert!(
-        vcx.debug_bounds("tm-gpu-chart-metric-selector").is_some(),
-        "the GPU page must render the shared selector row"
+        vcx.debug_bounds("tm-gpu-chart-metric-selector").is_none(),
+        "the GPU page must not render a chart-metric selector row"
     );
     for metric in GpuChartMetric::ALL {
         let selector: &str =
             Box::leak(format!("tm-gpu-chart-metric-pill:{}", metric.id_stem()).into_boxed_str());
         assert!(
-            vcx.debug_bounds(selector).is_some(),
-            "every vocabulary family stays visible — including the unobserved ones ({selector})"
+            vcx.debug_bounds(selector).is_none(),
+            "no pill may remain for any family ({selector})"
         );
     }
-    drop(vcx);
+    let headline = vcx
+        .debug_bounds("tm-graph:main-graph")
+        .expect("the utilization headline graph must render");
+    assert!(
+        headline.size.width > px(100.0) && headline.size.height > px(100.0),
+        "the utilization headline must stay readable: {headline:?}"
+    );
+    let temperature = vcx
+        .debug_bounds("tm-perf-secondary-graph:gpu-temperature-graph")
+        .expect("the measured temperature family must render its own graph card");
+    assert!(
+        temperature.size.height >= px(100.0),
+        "the temperature graph card must stay readable: {temperature:?}"
+    );
+    assert!(
+        vcx.debug_bounds("tm-graph:gpu-temperature-graph").is_some(),
+        "the temperature card must paint a real chart canvas"
+    );
+    assert!(
+        vcx.debug_bounds("tm-perf-secondary-graph:gpu-power-graph")
+            .is_none(),
+        "an unobserved family must render nothing at all"
+    );
 
+    // The headline window reads the ONE shared dispatch (the same call
+    // `render_gpu` makes over this direct track's live-graph view), not a
+    // frontend-local fold.
     view.read_with(cx, |v, _| {
-        assert_eq!(
-            v.shell.gpu_chart_metric_selected(),
-            GpuChartMetric::Utilization
-        );
-    });
-
-    // An unobserved family is rejected with no state change.
-    view.update(cx, |v, cx| {
-        v.select_gpu_chart_metric(GpuChartMetric::Power, 0, cx);
-    });
-    view.read_with(cx, |v, _| {
-        assert_eq!(
-            v.shell.gpu_chart_metric_selected(),
-            GpuChartMetric::Utilization
-        );
-    });
-
-    // An observed family is selected and the headline window follows it.
-    view.update(cx, |v, cx| {
-        v.select_gpu_chart_metric(GpuChartMetric::Temperature, 0, cx);
-    });
-    view.read_with(cx, |v, _| {
-        assert_eq!(
-            v.shell.gpu_chart_metric_selected(),
-            GpuChartMetric::Temperature
-        );
-        // The headline window reads the ONE shared dispatch (the same call
-        // `render_gpu` makes over this direct track's live-graph view), not a
-        // frontend-local fold.
         let window = taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history(
             &v.live_graph_history,
             "gpu:chart:metric",
             1,
-            GpuChartMetric::Temperature,
+            GpuChartMetric::Utilization,
         );
-        assert_eq!(window, [61.0, 63.0]);
+        assert_eq!(window, [42.0, 55.0]);
         // The unobserved family's window stays explicit gaps, never a zero.
         let power = taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history(
             &v.live_graph_history,
@@ -143,15 +137,12 @@ async fn gpu_chart_metric_pills_default_gate_and_selection(cx: &mut TestAppConte
     draw(cx, win);
 }
 
-// ── Single-track sampling anchor (post ADR-034 stage-2 convergence) ─────────
+// ── Single-track sampling anchor ────────────────────────────────────────────
 //
-// GPU chart-metric sampling used to run on two tracks: the shell/store
-// dispatch the Iced and TUI shells read, and a frontend-local typed fold.
-// They agreed on values and NaN gaps but silently diverged on window
-// capacity and generation isolation, so the typed fold was sunk into the
-// store as ONE generation-scoped read and every frontend now consumes the
-// single `gpu_chart_metric_history` dispatch. This anchor keeps proving the
-// two consumption SHAPES — this direct track's full-retention view and the
+// GPU chart-metric sampling must run on ONE track: the shell/store dispatch
+// every frontend reads (`gpu_chart_metric_history` over a `LiveGraphHistory`
+// view), not a frontend-local fold. These anchors keep proving the two
+// consumption SHAPES — this direct track's full-retention view and the
 // composed track's capacity-narrowed view — sample the same window
 // semantics, so the tracks can never fork again.
 
@@ -207,7 +198,7 @@ fn seed_tracks_frames(
         ingestor
             .ingest_correlated_gpu(
                 CorrelatedTelemetryStamp::from_accepted_event(revision, observed_at_ms + 1)
-                    .expect("fixture revision is non-zero"),
+                    .expect("tracks fixture revision is non-zero"),
                 &crate::core::GpuTelemetryObservation::current(
                     vec![gpu.clone()],
                     observed_at_ms,
@@ -293,10 +284,9 @@ fn gpu_chart_metric_sampling_is_one_track_across_view_capacities() {
 }
 
 /// The capacity difference is exactly a tail of one and the same window, and
-/// the single track keeps the generation isolation the old local fold had:
-/// a row/ring generation mismatch (row advanced, ring not re-ingested) and
-/// an unbound `0` generation yield an honest empty window — never the
-/// previous device instance's samples.
+/// the single track keeps the generation isolation: a row/ring generation
+/// mismatch and an unbound `0` generation yield an honest empty window —
+/// never the previous device instance's samples.
 #[test]
 fn gpu_chart_metric_sampling_tails_one_window_and_scopes_generation() {
     use taskmanager_shell::presentation::gpu_chart_metric::{
@@ -328,9 +318,7 @@ fn gpu_chart_metric_sampling_tails_one_window_and_scopes_generation() {
         "the narrowed window is exactly the tail of the one retained window"
     );
 
-    // A row/ring generation mismatch breaks the window on the single track;
-    // the pre-convergence shell/store track leaked the previous generation's
-    // samples here.
+    // A row/ring generation mismatch breaks the window on the single track.
     assert!(
         gpu_chart_metric_history(&full, TRACKS_DEVICE_ID, 2, metric).is_empty(),
         "a generation mismatch must yield an honest empty window"
@@ -339,49 +327,4 @@ fn gpu_chart_metric_sampling_tails_one_window_and_scopes_generation() {
         gpu_chart_metric_history(&full, TRACKS_DEVICE_ID, 0, metric).is_empty(),
         "an unbound generation must not inherit any ring's samples"
     );
-}
-
-/// The per-tick fold: a stable generation keeps the user's selection; a
-/// generation advance (a confirmed hot-plug) resets it to the ADR default.
-#[gpui::test]
-async fn gpu_chart_metric_generation_change_resets_to_default(cx: &mut TestAppContext) {
-    use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
-
-    let (win, view) = wrapped_root(cx);
-    view.update(cx, |v, cx| {
-        v.mark_telemetry_frame_ready();
-        v.page = TopPage::Performance;
-        seed_chart_metric_gpu(v, "gpu:chart:gen", [(40.0, 60.0), (50.0, 62.0)]);
-        v.system_snapshot_mut_for_test().gpu = vec![chart_metric_gpu("gpu:chart:gen", 50.0, 62.0)];
-        v.selected = SelectedDevice::Gpu(0);
-        v.reconcile_gpu_chart_metric();
-        cx.notify();
-    });
-    view.update(cx, |v, cx| {
-        v.select_gpu_chart_metric(GpuChartMetric::Temperature, 0, cx);
-    });
-    view.update(cx, |v, _cx| {
-        v.reconcile_gpu_chart_metric();
-    });
-    view.read_with(cx, |v, _| {
-        assert_eq!(
-            v.shell.gpu_chart_metric_selected(),
-            GpuChartMetric::Temperature,
-            "a stable generation keeps the selection"
-        );
-    });
-
-    view.update(cx, |v, cx| {
-        v.system_snapshot_mut_for_test().gpu[0].device_generation = DeviceGeneration::new(2);
-        v.reconcile_gpu_chart_metric();
-        cx.notify();
-    });
-    view.read_with(cx, |v, _| {
-        assert_eq!(
-            v.shell.gpu_chart_metric_selected(),
-            GpuChartMetric::Utilization,
-            "a generation change resets the selection to the ADR default"
-        );
-    });
-    draw(cx, win);
 }

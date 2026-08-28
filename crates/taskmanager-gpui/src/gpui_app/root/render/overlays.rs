@@ -128,6 +128,7 @@ pub(super) fn compose_primary_dialogs(
                 gray_zero_values: presentation.gray_zero_values,
                 notify_enabled: view.projection().alert_center.policy().enabled,
                 history_persistence: view.history_runtime.enabled_next_start(),
+                first_run: &view.first_run,
                 notify_quiet_start: view
                     .projection()
                     .alert_center

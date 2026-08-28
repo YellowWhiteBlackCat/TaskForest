@@ -2,7 +2,8 @@
 # Nightly quality pass: the expensive checks that do NOT belong on every PR.
 #
 # Stages (each independently skippable, all bounded by `timeout`):
-#   1. Miri      — the three audited unsafe boundary crates (ADR-022/024/025).
+#   1. Miri      — the three Linux audited unsafe boundary crates
+#                  (ADR-022/024/025); the Windows root is compile/clippy-tested.
 #                  Caught a real CMSG-alignment UB in fd-bridge (2026-08-07).
 #   2. Fuzz      — libFuzzer over the five-tuple frame parser (untrusted wire
 #                  bytes); 2M runs are ~1s of corpus-guided coverage.

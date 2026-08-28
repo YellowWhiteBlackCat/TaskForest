@@ -1,8 +1,10 @@
 //! Audited `AF_PACKET` boundary crate — the workspace's second `unsafe` trust
 //! root (ADR-024), the safe-Rust seam for per-process network byte accounting.
 //!
-//! This is ONE of TWO places in the product tree allowed to contain `unsafe`
-//! (the other being `taskmanager-perf-ioctl`, ADR-022). It is the OS ABI seam
+//! This is ONE of FOUR places in the product tree allowed to contain `unsafe`
+//! (the others being `taskmanager-perf-ioctl`, ADR-022,
+//! `taskmanager-fd-bridge`, ADR-025, and `taskmanager-windows-api`, ADR-031).
+//! It is the OS ABI seam
 //! for an `AF_PACKET` `SOCK_RAW` socket — the only kernel interface that
 //! observes per-packet bytes for attribution to a process. eBPF (the prior
 //! approach) was removed by ADR-021 as too large a trust root; a single

@@ -1,4 +1,4 @@
-//! Neutral process-details row ViewModel (ARCH.md §4.0 data layer).
+//! Neutral process-details row ViewModel (ARCH.md §8.1 data layer).
 //!
 //! The single fold from a typed [`ProcessItem`] observation to the
 //! label/value rows every frontend's process-details panel and

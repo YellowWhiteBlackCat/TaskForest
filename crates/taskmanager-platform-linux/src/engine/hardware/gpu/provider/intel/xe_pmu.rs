@@ -7,7 +7,7 @@
 //! (`XE_PMU_EVENT_ENGINE_TOTAL_TICKS = 0x3`) counters per engine to form the
 //! ratio `active_delta / total_delta`. So this fallback opens TWO
 //! [`GpuEngineCounter`]s per engine via the audited boundary crate (the
-//! workspace's sole `unsafe` trust root — see ADR-022), reads them in lockstep
+//! one of the workspace's four `unsafe` trust roots — see ADR-022), reads them in lockstep
 //! each tick, and emits each pair as [`EngineBusySource::Ticks`]. The rate math
 //! itself (active-over-total, ignoring wall-elapsed) lives in the shared tracker
 //! in [`super::engines`].

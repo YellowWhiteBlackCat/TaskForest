@@ -1,6 +1,6 @@
 //! source-inspection: static-policy
 //!
-//! Long-term renderer/data dependency boundary (ARCH.md §4.0).
+//! Long-term renderer/data dependency boundary (ARCH.md §8.1).
 //!
 //! The folding-layer contract ("一次折叠，三端渲染") says render modules may
 //! not fold typed observations into display semantics themselves — that fold
@@ -169,7 +169,7 @@ fn render_modules_gain_no_new_inline_observation_folds() {
     assert!(
         offenders.is_empty(),
         "new inline observation fold in render module(s): {offenders:?} — move the \
-         read into the page's data-layer module (ARCH.md §4.0) and pass the folded \
+         read into the page's data-layer module (ARCH.md §8.1) and pass the folded \
          ViewModel down; renderer exceptions are not accepted."
     );
 }

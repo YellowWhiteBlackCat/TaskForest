@@ -39,7 +39,7 @@ fn process_menu_offers_the_batch_control_vocabulary() {
     assert!(labels[2].contains("Suspend"));
     assert!(labels[3].contains("Resume"));
     assert!(labels[4].contains("Force kill"));
-    // The three tier rows read the shared tier→label fold (§4.0 同一律):
+    // The three tier rows read the shared tier→label fold (§8.1 同一律):
     // High / Normal / Low, never a bare "Priority" row hiding the tier.
     assert_eq!(labels[5], "High");
     assert_eq!(labels[6], "Normal");

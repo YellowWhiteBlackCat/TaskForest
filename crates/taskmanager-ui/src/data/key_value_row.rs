@@ -116,9 +116,14 @@ impl KeyValueRow {
             // Stat/spec rows have no external label token. Let the label own
             // the elastic side and keep the short readout intrinsic; making
             // both children flex-grow leaves a narrow value at zero width in
-            // GPUI's first flex measurement, which then wraps every character.
+            // GPUI's first flex measurement, which then wraps every
+            // character. Shrinkable-with-full-max bounds an observation
+            // longer than the row (a serial number, a trend line) to the
+            // row itself — minus the column gap — so it truncates at its own
+            // end instead of pushing past the panel and clipping mid-string
+            // at the window edge.
             label = label.flex_1().truncate();
-            value = value.flex_shrink_0();
+            value = value.flex_shrink().max_w_full();
         }
         if self.value_align_right {
             // A value column is a single-line readout. Without the shared

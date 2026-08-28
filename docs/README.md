@@ -34,7 +34,7 @@ crates/*/README.md         crate 职责、契约和验证方式
 
 | 分类 | 文档 |
 |---|---|
-| 架构、分层和数据方向 | [ARCH.md](ARCH.md) |
+| 架构、分层和数据方向 | [ARCH.md](ARCH.md)、[HOST_ARCHITECTURE.md](HOST_ARCHITECTURE.md) |
 | 状态、生命周期和刷新时序 | [STATE_OWNERSHIP.md](STATE_OWNERSHIP.md) |
 | Rust、模块和测试标准 | [STANDARDS.md](STANDARDS.md)、[TEST_LAYOUT.md](TEST_LAYOUT.md) |
 | CI、测试和发布门禁 | [QUALITY_GATES.md](QUALITY_GATES.md) |

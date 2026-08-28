@@ -4,7 +4,7 @@
 //! a busy config for each engine visible in the same GT `engines/` sysfs tree
 //! walked by [`super::read_intel_gt_engines`]. The actual `perf_event_open`
 //! call lives in the audited boundary crate `taskmanager-perf-ioctl` (the
-//! workspace's sole `unsafe` trust root since eBPF — see ADR-022); nothing
+//! one of the workspace's four `unsafe` trust roots — see ADR-022); nothing
 //! here is `unsafe`, and this crate stays `#![forbid(unsafe_code)]`.
 //!
 //! i915 PMU busy config encoding (matches `intel_gpu_top` / kernel

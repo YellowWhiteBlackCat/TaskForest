@@ -157,7 +157,7 @@ fn containers_rollup(shell: &taskmanager_shell::ShellApp) -> Option<&ContainerRo
     shell.projection().containers.as_ref()
 }
 
-/// Pre-folded display strings for one container row (ARCH.md §4.0 data
+/// Pre-folded display strings for one container row (ARCH.md §8.1 data
 /// layer): the telemetry→display fold happens once here; the table helpers
 /// only lay out and paint. GPUI `ContainerRowVm` parity.
 #[derive(Clone, Debug, PartialEq)]

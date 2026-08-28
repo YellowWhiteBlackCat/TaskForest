@@ -93,7 +93,7 @@ pub fn optional_nice(value: Option<i32>) -> String {
     })
 }
 
-/// Locale label for a scheduling-priority tier — the SINGLE fold (§4.0 同一律)
+/// Locale label for a scheduling-priority tier — the SINGLE fold (§8.1 同一律)
 /// shared by every frontend's menus, toasts, and confirmations. The tier
 /// word, not a raw Unix nice number, is the honest cross-platform phrasing
 /// (each platform adapter maps the tier to its native primitive).

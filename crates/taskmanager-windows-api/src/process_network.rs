@@ -10,6 +10,8 @@ use crate::WindowsApiError;
 const MAX_TABLE_BYTES: usize = 16 * 1024 * 1024;
 /// Maximum entries parsed per table to prevent CPU exhaustion.
 const MAX_ENTRIES: usize = 65_536;
+/// Four protocol/address-family tables feed one bounded projection.
+const MAX_TOTAL_CONNECTIONS: usize = 4 * MAX_ENTRIES;
 
 /// Protocol transport for process socket.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -166,9 +168,16 @@ where
     P: Fn(&[u8], &mut Vec<WindowsProcessConnection>) -> Result<(), WindowsApiError>,
 {
     let mut size: u32 = 0;
-    let _ = call(None, &mut size);
+    let sizing_status = call(None, &mut size);
     if size == 0 {
-        return Ok(());
+        // A zero-sized table is a valid empty result only when the sizing
+        // query itself succeeded. Do not turn an API failure into a healthy
+        // empty projection.
+        return if sizing_status == 0 {
+            Ok(())
+        } else {
+            Err(WindowsApiError::QueryFailed)
+        };
     }
     let size_usize = usize::try_from(size).map_err(|_| WindowsApiError::ResourceLimit)?;
     if size_usize > MAX_TABLE_BYTES {
@@ -177,9 +186,35 @@ where
     let mut buffer = vec![0u8; size_usize];
     let status = call(Some(buffer.as_mut_ptr().cast()), &mut size);
     if status != 0 {
-        return Ok(());
+        return Err(WindowsApiError::QueryFailed);
     }
-    parser(&buffer, out)
+    let returned_bytes = usize::try_from(size).map_err(|_| WindowsApiError::ResourceLimit)?;
+    if returned_bytes == 0 || returned_bytes > buffer.len() {
+        return Err(WindowsApiError::ResourceLimit);
+    }
+    parser(&buffer[..returned_bytes], out)
+}
+
+#[cfg(windows)]
+fn ensure_connection_capacity(
+    out: &[WindowsProcessConnection],
+    additional: usize,
+) -> Result<(), WindowsApiError> {
+    if additional > MAX_TOTAL_CONNECTIONS.saturating_sub(out.len()) {
+        return Err(WindowsApiError::ResourceLimit);
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+fn table_bytes_for_entries(entries: usize, row_size: usize) -> Result<usize, WindowsApiError> {
+    4_usize
+        .checked_add(
+            entries
+                .checked_mul(row_size)
+                .ok_or(WindowsApiError::ResourceLimit)?,
+        )
+        .ok_or(WindowsApiError::ResourceLimit)
 }
 
 #[cfg(windows)]
@@ -188,13 +223,19 @@ fn parse_tcp4_table(
     out: &mut Vec<WindowsProcessConnection>,
 ) -> Result<(), WindowsApiError> {
     if buf.len() < 4 {
-        return Ok(());
+        return Err(WindowsApiError::QueryFailed);
     }
-    let num_entries = u32::from_ne_bytes(buf[0..4].try_into().unwrap_or([0; 4])) as usize;
-    let entries = num_entries.min(MAX_ENTRIES);
+    let num_entries = usize::try_from(u32::from_ne_bytes(buf[0..4].try_into().unwrap_or([0; 4])))
+        .map_err(|_| WindowsApiError::ResourceLimit)?;
+    if num_entries > MAX_ENTRIES {
+        return Err(WindowsApiError::ResourceLimit);
+    }
+    let entries = num_entries;
+    ensure_connection_capacity(out, entries)?;
     let row_size = 24; // dwState(4) + dwLocalAddr(4) + dwLocalPort(4) + dwRemoteAddr(4) + dwRemotePort(4) + dwOwningPid(4)
-    if buf.len() < 4 + entries * row_size {
-        return Ok(());
+    let required_bytes = table_bytes_for_entries(entries, row_size)?;
+    if buf.len() < required_bytes {
+        return Err(WindowsApiError::QueryFailed);
     }
     for i in 0..entries {
         let offset = 4 + i * row_size;
@@ -232,13 +273,19 @@ fn parse_tcp6_table(
     out: &mut Vec<WindowsProcessConnection>,
 ) -> Result<(), WindowsApiError> {
     if buf.len() < 4 {
-        return Ok(());
+        return Err(WindowsApiError::QueryFailed);
     }
-    let num_entries = u32::from_ne_bytes(buf[0..4].try_into().unwrap_or([0; 4])) as usize;
-    let entries = num_entries.min(MAX_ENTRIES);
+    let num_entries = usize::try_from(u32::from_ne_bytes(buf[0..4].try_into().unwrap_or([0; 4])))
+        .map_err(|_| WindowsApiError::ResourceLimit)?;
+    if num_entries > MAX_ENTRIES {
+        return Err(WindowsApiError::ResourceLimit);
+    }
+    let entries = num_entries;
+    ensure_connection_capacity(out, entries)?;
     let row_size = 56; // ucLocalAddr(16) + dwLocalScopeId(4) + dwLocalPort(4) + ucRemoteAddr(16) + dwRemoteScopeId(4) + dwRemotePort(4) + dwState(4) + dwOwningPid(4)
-    if buf.len() < 4 + entries * row_size {
-        return Ok(());
+    let required_bytes = table_bytes_for_entries(entries, row_size)?;
+    if buf.len() < required_bytes {
+        return Err(WindowsApiError::QueryFailed);
     }
     for i in 0..entries {
         let offset = 4 + i * row_size;
@@ -280,13 +327,19 @@ fn parse_udp4_table(
     out: &mut Vec<WindowsProcessConnection>,
 ) -> Result<(), WindowsApiError> {
     if buf.len() < 4 {
-        return Ok(());
+        return Err(WindowsApiError::QueryFailed);
     }
-    let num_entries = u32::from_ne_bytes(buf[0..4].try_into().unwrap_or([0; 4])) as usize;
-    let entries = num_entries.min(MAX_ENTRIES);
+    let num_entries = usize::try_from(u32::from_ne_bytes(buf[0..4].try_into().unwrap_or([0; 4])))
+        .map_err(|_| WindowsApiError::ResourceLimit)?;
+    if num_entries > MAX_ENTRIES {
+        return Err(WindowsApiError::ResourceLimit);
+    }
+    let entries = num_entries;
+    ensure_connection_capacity(out, entries)?;
     let row_size = 12; // dwLocalAddr(4) + dwLocalPort(4) + dwOwningPid(4)
-    if buf.len() < 4 + entries * row_size {
-        return Ok(());
+    let required_bytes = table_bytes_for_entries(entries, row_size)?;
+    if buf.len() < required_bytes {
+        return Err(WindowsApiError::QueryFailed);
     }
     for i in 0..entries {
         let offset = 4 + i * row_size;
@@ -312,13 +365,19 @@ fn parse_udp6_table(
     out: &mut Vec<WindowsProcessConnection>,
 ) -> Result<(), WindowsApiError> {
     if buf.len() < 4 {
-        return Ok(());
+        return Err(WindowsApiError::QueryFailed);
     }
-    let num_entries = u32::from_ne_bytes(buf[0..4].try_into().unwrap_or([0; 4])) as usize;
-    let entries = num_entries.min(MAX_ENTRIES);
+    let num_entries = usize::try_from(u32::from_ne_bytes(buf[0..4].try_into().unwrap_or([0; 4])))
+        .map_err(|_| WindowsApiError::ResourceLimit)?;
+    if num_entries > MAX_ENTRIES {
+        return Err(WindowsApiError::ResourceLimit);
+    }
+    let entries = num_entries;
+    ensure_connection_capacity(out, entries)?;
     let row_size = 28; // ucLocalAddr(16) + dwLocalScopeId(4) + dwLocalPort(4) + dwOwningPid(4)
-    if buf.len() < 4 + entries * row_size {
-        return Ok(());
+    let required_bytes = table_bytes_for_entries(entries, row_size)?;
+    if buf.len() < required_bytes {
+        return Err(WindowsApiError::QueryFailed);
     }
     for i in 0..entries {
         let offset = 4 + i * row_size;

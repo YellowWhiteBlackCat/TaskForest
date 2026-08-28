@@ -6,22 +6,21 @@
 
 use std::{cell::RefCell, rc::Rc};
 
-use gpui::{Div, ElementId, IntoElement, ParentElement, ScrollHandle, Styled, div, px};
+use gpui::{Div, ElementId, IntoElement, ParentElement, Styled, div, px};
 use taskmanager_telemetry_store::TelemetryStore;
 
 use super::device_status_i18n_key;
 use super::dynamic_stats::{battery_stats, fan_stats};
+use super::finite_series_peak_floored;
 use super::smart_status::status_footer;
+use super::{ChartSpec, HeadlineSurface, PerfPageProps, perf_page, render_chart, stats_panel};
 use crate::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use crate::gpui_app::formatting::{GraphUnit, PerformanceSettings};
-use crate::gpui_app::graph::{GraphHover, GraphOpts};
+use crate::gpui_app::graph::GraphHover;
 use crate::gpui_app::history_samples::{
     battery_capacity_samples, battery_power_samples, fan_rpm_samples, fan_temperature_samples,
 };
-use crate::gpui_app::perf_views::layout::{
-    MainColumnLayout, MainContent, MainWithStatsProps, SecondaryGraphCardProps, main_with_stats,
-    secondary_graph_card,
-};
+use crate::gpui_app::root::responsive::{PerformanceChartInventory, PerformancePageBudget};
 use crate::gpui_app::theme::{Theme, tokens};
 use crate::i18n;
 
@@ -32,9 +31,9 @@ pub(crate) struct BatteryViewProps<'a> {
     pub(crate) telemetry: &'a TelemetryStore,
     pub(crate) index: usize,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) left_scroll: ScrollHandle,
-    pub(crate) stats_scroll: ScrollHandle,
+    pub(crate) stats_scroll: gpui::ScrollHandle,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub(crate) budget: PerformancePageBudget,
 }
 
 pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
@@ -44,11 +43,10 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         telemetry,
         index,
         performance,
-        left_scroll,
         stats_scroll,
         hover_slot,
+        budget,
     } = props;
-    let graph_settings = performance.graph;
     let Some(battery) = power_supplies.batteries.get(index) else {
         return dynamic_device_empty(
             theme,
@@ -77,49 +75,48 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         battery.model_name.clone()
     };
     let stats = battery_stats(battery);
-    let left_footer = (!power_samples.is_empty()).then(|| {
-        let max = power_samples
-            .iter()
-            .copied()
-            .filter(|value| value.is_finite())
-            .fold(1.0_f32, f32::max);
-        secondary_graph_card(SecondaryGraphCardProps {
-            theme,
-            id: ElementId::from("battery-power-graph"),
-            slide_key: (ElementId::from("battery-power-graph"), battery.id.clone()).into(),
-            title: i18n::t("battery.power_graph").to_string(),
-            samples: Rc::clone(&power_samples),
-            color: theme.accent,
-            graph_opts: GraphOpts {
-                max,
-                ..GraphOpts::default()
-            },
-            graph_settings,
-            graph_unit: GraphUnit::Watts,
-            hover_slot,
-        })
-        .into_any_element()
-    });
-    main_with_stats(MainWithStatsProps {
+    // Optional power channel below the charge headline (the shared secondary
+    // tier): only when the typed channel holds samples and the chart
+    // inventory keeps secondary charts.
+    let power_graph = (!power_samples.is_empty()
+        && budget.chart_inventory == PerformanceChartInventory::Full)
+        .then(|| {
+            render_chart(
+                theme,
+                ChartSpec::secondary(
+                    "battery-power-graph",
+                    (ElementId::from("battery-power-graph"), battery.id.clone()),
+                    i18n::t("battery.power_graph").to_string(),
+                    Rc::clone(&power_samples),
+                    theme.accent,
+                    GraphUnit::Watts,
+                )
+                .with_max(finite_series_peak_floored(1.0, &power_samples)),
+                performance.graph,
+                budget.vertical,
+                hover_slot,
+            )
+            .into_any_element()
+        });
+    perf_page(PerfPageProps {
         theme,
-        left_scroll,
         stats_scroll,
         title,
         subtitle: i18n::t("battery.charge_graph").to_string(),
-        graph_id: (ElementId::from("tm-perf-main-graph"), battery.id.clone()).into(),
-        graph_samples: Rc::clone(&samples),
-        graph_color: theme.accent,
-        graph_opts: GraphOpts::default(),
-        graph_settings,
-        graph_unit: GraphUnit::Percent,
-        graph_dual: None,
-        main_content: MainContent::AggregateGraph,
-        main_column: MainColumnLayout::Scrollable,
-        graph_controls: None,
-        stats,
+        header_extra: None,
+        headline: HeadlineSurface::Charts(vec![ChartSpec::headline(
+            "main-graph",
+            (ElementId::from("tm-perf-main-graph"), battery.id.clone()),
+            Rc::clone(&samples),
+            theme.accent,
+            GraphUnit::Percent,
+        )]),
+        below: power_graph,
+        stats: stats_panel(theme, stats),
         stats_footer: status_footer(theme, battery.device_state.status),
-        left_footer,
         hover_slot,
+        graph_settings: performance.graph,
+        budget,
     })
 }
 
@@ -130,9 +127,9 @@ pub(crate) struct FanViewProps<'a> {
     pub(crate) telemetry: &'a TelemetryStore,
     pub(crate) index: usize,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) left_scroll: ScrollHandle,
-    pub(crate) stats_scroll: ScrollHandle,
+    pub(crate) stats_scroll: gpui::ScrollHandle,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub(crate) budget: PerformancePageBudget,
 }
 
 pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
@@ -142,11 +139,10 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
         telemetry,
         index,
         performance,
-        left_scroll,
         stats_scroll,
         hover_slot,
+        budget,
     } = props;
-    let graph_settings = performance.graph;
     let Some(fan) = sensors
         .readings
         .iter()
@@ -165,72 +161,67 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
         fan.id(),
         fan.device_generation(),
     );
-    let max = samples.iter().copied().fold(1000.0_f32, f32::max);
+    let max = finite_series_peak_floored(1000.0, &samples);
     let temperature_reading = sensors.readings.iter().find(|reading| {
         reading.device_id() == fan.device_id() && reading.quantity() == &SensorQuantity::Temperature
     });
-    let empty: std::rc::Rc<[f32]> = std::rc::Rc::from([]);
-    let temperature_samples = temperature_reading.map_or_else(
-        || empty.clone(),
-        |reading| {
-            fan_temperature_samples(
-                &telemetry.dynamic_history,
-                reading.id(),
-                reading.device_generation(),
-            )
-        },
-    );
-    let stats = fan_stats(sensors, fan);
-    let left_footer = (!temperature_samples.is_empty()).then(|| {
-        let max = temperature_samples
-            .iter()
-            .copied()
-            .filter(|value| value.is_finite())
-            .fold(100.0_f32, f32::max);
-        secondary_graph_card(SecondaryGraphCardProps {
-            theme,
-            id: ElementId::from("fan-temperature-graph"),
-            slide_key: (
-                ElementId::from("fan-temperature-graph"),
-                fan.id().to_owned(),
-            )
-                .into(),
-            title: i18n::t("fan.temperature_graph").to_string(),
-            samples: Rc::clone(&temperature_samples),
-            color: theme.cpu,
-            graph_opts: GraphOpts {
-                max,
-                ..GraphOpts::default()
-            },
-            graph_settings,
-            graph_unit: GraphUnit::Temperature,
-            hover_slot,
-        })
-        .into_any_element()
+    let temperature_samples = temperature_reading.map_or_else(Vec::new, |reading| {
+        fan_temperature_samples(
+            &telemetry.dynamic_history,
+            reading.id(),
+            reading.device_generation(),
+        )
+        .to_vec()
     });
-    main_with_stats(MainWithStatsProps {
+    let stats = fan_stats(sensors, fan);
+    // Optional temperature channel below the RPM headline (the shared
+    // secondary tier): only when the companion channel holds samples and the
+    // chart inventory keeps secondary charts.
+    let temperature_graph = (!temperature_samples.is_empty()
+        && budget.chart_inventory == PerformanceChartInventory::Full)
+        .then(|| {
+            render_chart(
+                theme,
+                ChartSpec::secondary(
+                    "fan-temperature-graph",
+                    (
+                        ElementId::from("fan-temperature-graph"),
+                        fan.id().to_owned(),
+                    ),
+                    i18n::t("fan.temperature_graph").to_string(),
+                    Rc::from(temperature_samples.as_slice()),
+                    theme.cpu,
+                    GraphUnit::Temperature,
+                )
+                .with_max(finite_series_peak_floored(100.0, &temperature_samples)),
+                performance.graph,
+                budget.vertical,
+                hover_slot,
+            )
+            .into_any_element()
+        });
+    perf_page(PerfPageProps {
         theme,
-        left_scroll,
         stats_scroll,
         title: format!("{} — {}", i18n::t("common.fan"), fan.label()),
         subtitle: i18n::t("fan.speed_graph").to_string(),
-        graph_id: (ElementId::from("tm-perf-main-graph"), fan.id().to_owned()).into(),
-        graph_samples: Rc::clone(&samples),
-        graph_color: theme.cpu,
-        graph_opts: GraphOpts {
-            max,
-            ..GraphOpts::default()
-        },
-        graph_settings,
-        graph_unit: GraphUnit::Rpm,
-        graph_dual: None,
-        main_content: MainContent::AggregateGraph,
-        main_column: MainColumnLayout::Scrollable,
-        graph_controls: None,
-        stats,
+        header_extra: None,
+        headline: HeadlineSurface::Charts(vec![
+            ChartSpec::headline(
+                "main-graph",
+                (ElementId::from("tm-perf-main-graph"), fan.id().to_owned()),
+                Rc::clone(&samples),
+                theme.cpu,
+                GraphUnit::Rpm,
+            )
+            .with_max(max),
+        ]),
+        below: temperature_graph,
+        stats: stats_panel(theme, stats),
         stats_footer: status_footer(theme, fan.state().status),
-        left_footer,
         hover_slot,
+        graph_settings: performance.graph,
+        budget,
     })
 }
 

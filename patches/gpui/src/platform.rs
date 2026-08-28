@@ -1131,8 +1131,204 @@ pub struct WindowOptions {
     /// Note that this may be ignored.
     pub window_decorations: Option<WindowDecorations>,
 
+    /// The protocol role used to present the window.
+    ///
+    /// `Standalone` uses the platform's normal desktop-window path. On
+    /// Wayland, `LayerShell` requests the optional `zwlr_layer_shell_v1`
+    /// role; other platforms keep their existing window host.
+    pub presentation: WindowPresentation,
+
     /// Tab group name, allows opening the window as a native tab on macOS 10.12+. Windows with the same tabbing identifier will be grouped together.
     pub tabbing_identifier: Option<String>,
+}
+
+/// Window presentation role understood by the platform composition layer.
+#[derive(Clone, Debug, Default)]
+pub enum WindowPresentation {
+    /// Use the normal desktop window role.
+    #[default]
+    Standalone,
+    /// Request a Wayland layer-shell surface.
+    LayerShell(LayerShellOptions),
+}
+
+impl WindowPresentation {
+    /// Borrow layer-shell settings when this presentation requests that role.
+    pub fn as_layer_shell(&self) -> Option<&LayerShellOptions> {
+        match self {
+            Self::Standalone => None,
+            Self::LayerShell(options) => Some(options),
+        }
+    }
+}
+
+/// Toolkit-local, protocol-free settings for a Wayland layer-shell surface.
+///
+/// The application host owns the authoritative neutral contract. This type is
+/// the GPUI adapter copy and deliberately contains no Wayland object or event
+/// queue, so the patched toolkit remains independent of TaskForest crates.
+#[derive(Clone, Debug)]
+pub struct LayerShellOptions {
+    namespace: String,
+    layer: LayerShellLayer,
+    anchor: u8,
+    size: (u32, u32),
+    margins: (i32, i32, i32, i32),
+    exclusive_zone: i32,
+    keyboard_interactivity: LayerShellKeyboardInteractivity,
+    output: Option<String>,
+    fallback: LayerShellFallback,
+}
+
+impl LayerShellOptions {
+    /// Construct a top-panel profile with a compositor-selected width.
+    pub fn new(namespace: impl Into<String>) -> Self {
+        Self {
+            namespace: namespace.into(),
+            layer: LayerShellLayer::Top,
+            // GPUI's adapter mask is TOP=1, RIGHT=2, BOTTOM=4, LEFT=8.
+            anchor: 1 | 2 | 8,
+            // A zero width is compositor-selected because the profile is
+            // anchored to both horizontal edges. The height is explicit: a
+            // zero height would require both vertical anchors by protocol.
+            size: (0, 32),
+            margins: (0, 0, 0, 0),
+            exclusive_zone: 0,
+            keyboard_interactivity: LayerShellKeyboardInteractivity::None,
+            output: None,
+            fallback: LayerShellFallback::NormalWindow,
+        }
+    }
+
+    /// Return the layer-shell namespace.
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    /// Return the requested z-order layer.
+    pub const fn layer(&self) -> LayerShellLayer {
+        self.layer
+    }
+
+    /// Return the toolkit-local anchor bit mask.
+    pub const fn anchor(&self) -> u8 {
+        self.anchor
+    }
+
+    /// Return the requested width and height.
+    pub const fn size(&self) -> (u32, u32) {
+        self.size
+    }
+
+    /// Return margins in top, right, bottom, left order.
+    pub const fn margins(&self) -> (i32, i32, i32, i32) {
+        self.margins
+    }
+
+    /// Return the requested exclusive zone.
+    pub const fn exclusive_zone(&self) -> i32 {
+        self.exclusive_zone
+    }
+
+    /// Return the requested keyboard-focus policy.
+    pub const fn keyboard_interactivity(&self) -> LayerShellKeyboardInteractivity {
+        self.keyboard_interactivity
+    }
+
+    /// Return the optional output name.
+    pub fn output(&self) -> Option<&str> {
+        self.output.as_deref()
+    }
+
+    /// Return the fallback behavior when the layer-shell role is unavailable.
+    pub const fn fallback(&self) -> LayerShellFallback {
+        self.fallback
+    }
+
+    /// Replace the requested z-order layer.
+    pub const fn with_layer(mut self, layer: LayerShellLayer) -> Self {
+        self.layer = layer;
+        self
+    }
+
+    /// Replace the toolkit-local anchor bit mask.
+    pub const fn with_anchor(mut self, anchor: u8) -> Self {
+        self.anchor = anchor;
+        self
+    }
+
+    /// Replace the requested width and height.
+    pub const fn with_size(mut self, width: u32, height: u32) -> Self {
+        self.size = (width, height);
+        self
+    }
+
+    /// Replace margins in top, right, bottom, left order.
+    pub const fn with_margins(mut self, margins: (i32, i32, i32, i32)) -> Self {
+        self.margins = margins;
+        self
+    }
+
+    /// Replace the exclusive zone.
+    pub const fn with_exclusive_zone(mut self, exclusive_zone: i32) -> Self {
+        self.exclusive_zone = exclusive_zone;
+        self
+    }
+
+    /// Replace the keyboard-focus policy.
+    pub const fn with_keyboard_interactivity(
+        mut self,
+        keyboard_interactivity: LayerShellKeyboardInteractivity,
+    ) -> Self {
+        self.keyboard_interactivity = keyboard_interactivity;
+        self
+    }
+
+    /// Replace the optional output name.
+    pub fn with_output(mut self, output: Option<String>) -> Self {
+        self.output = output;
+        self
+    }
+
+    /// Replace the fallback behavior.
+    pub const fn with_fallback(mut self, fallback: LayerShellFallback) -> Self {
+        self.fallback = fallback;
+        self
+    }
+}
+
+/// Z-order layer for a GPUI layer-shell request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LayerShellLayer {
+    /// Behind normal desktop surfaces.
+    Background,
+    /// Above background surfaces.
+    Bottom,
+    /// Above normal desktop surfaces.
+    Top,
+    /// Above top-layer surfaces.
+    Overlay,
+}
+
+/// Keyboard focus policy for a GPUI layer-shell request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum LayerShellKeyboardInteractivity {
+    /// Never receive keyboard focus.
+    None,
+    /// Request exclusive keyboard focus.
+    Exclusive,
+    /// Use compositor-managed normal focus semantics.
+    OnDemand,
+}
+
+/// Behavior when the compositor does not expose the layer-shell global.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum LayerShellFallback {
+    /// Reopen through the existing standalone host.
+    #[default]
+    NormalWindow,
+    /// Return the platform error to the caller.
+    Unavailable,
 }
 
 /// The variables that can be configured when creating a new window
@@ -1146,6 +1342,13 @@ pub struct WindowOptions {
 )]
 pub(crate) struct WindowParams {
     pub bounds: Bounds<Pixels>,
+
+    /// Presentation role selected by the frontend composition layer.
+    #[cfg_attr(
+        not(any(target_os = "linux", target_os = "freebsd")),
+        allow(dead_code)
+    )]
+    pub presentation: WindowPresentation,
 
     /// The titlebar configuration of the window
     #[cfg_attr(feature = "wayland", allow(dead_code))]
@@ -1239,6 +1442,7 @@ impl Default for WindowOptions {
             app_id: None,
             window_min_size: None,
             window_decorations: None,
+            presentation: WindowPresentation::Standalone,
             tabbing_identifier: None,
         }
     }

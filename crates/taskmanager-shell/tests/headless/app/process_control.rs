@@ -221,7 +221,7 @@ fn signal_completion_records_typed_signal_feedback() {
     );
 }
 
-/// §4.0 语义完备律: the fold records the SUBMISSION vocabulary. A neutral
+/// §8.1 语义完备律: the fold records the SUBMISSION vocabulary. A neutral
 /// `Suspend` request completes as `SignalCompleted(Stop)` at the adapter edge
 /// (Linux/macOS map the concept to SIGSTOP/SIGCONT), but the feedback must
 /// keep saying Suspend — a POSIX signal name is an adapter mapping detail,

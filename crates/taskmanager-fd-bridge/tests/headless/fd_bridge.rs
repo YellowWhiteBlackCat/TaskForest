@@ -497,6 +497,23 @@ fn find_scm_rights_rejects_header_only_cmsg() {
     assert_eq!(find_scm_rights(&buf, msg.msg_controllen), None);
 }
 
+#[test]
+fn find_scm_rights_rejects_a_partial_fd_payload() {
+    // A rights payload must contain whole c_int values. The parser must stop
+    // before CMSG_DATA is copied when the peer declares a partial word.
+    let mut buf = CmsgBuffer::<HANDOFF_CONTROL_LEN>::zeroed();
+    let mut msg = header_for(&mut buf);
+    // SAFETY: aligned CmsgBuffer, header fully written below.
+    unsafe {
+        let cmsg = libc::CMSG_FIRSTHDR(&msg);
+        (*cmsg).cmsg_level = libc::SOL_SOCKET;
+        (*cmsg).cmsg_type = libc::SCM_RIGHTS;
+        (*cmsg).cmsg_len = libc::CMSG_LEN(5) as usize;
+        msg.msg_controllen = (*cmsg).cmsg_len;
+    }
+    assert_eq!(find_scm_rights(&buf, msg.msg_controllen), None);
+}
+
 /// `CMSG_SPACE(size_of::<ucred>())` — the claimed controllen the header_for
 /// helpers lay out (largest payload the tests fill).
 const CMSG_SPACE_UCRED: usize =

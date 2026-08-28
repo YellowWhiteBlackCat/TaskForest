@@ -1,8 +1,6 @@
 //! Per-page body rendering for the root application shell (line split).
 
-use super::super::{
-    Hover, NavOrientation, RootView, SelectedDevice, SystemHealthCallbacks, TopPage,
-};
+use super::super::{Hover, RootView, SelectedDevice, SystemHealthCallbacks, TopPage};
 use super::init_search_entity;
 use crate::core::metrics::SystemSnapshot;
 use crate::gpui_app::app_history_view;
@@ -29,7 +27,7 @@ pub(crate) struct PageBodyFrame<'a> {
     pub telemetry: &'a TelemetryStore,
     pub hovered: Option<&'a Hover>,
     pub selected: SelectedDevice,
-    pub layout: responsive::PageLayoutBudget,
+    pub frame: responsive::FrameBudget,
     pub corner_radius_factor: f32,
     pub selected_pid: Option<u32>,
 }
@@ -49,27 +47,21 @@ impl RootView {
             telemetry,
             hovered,
             selected,
-            layout,
+            frame,
             corner_radius_factor,
             selected_pid: sel_pid,
         } = frame;
+        let layout = frame.page_layout();
         let performance = self.performance_settings();
-        let page_padding = layout.page_padding;
+        let page_padding = frame.content.page_padding;
         let presentation = self.presentation_snapshot();
         let devices = presentation.devices;
         let sidebar_preferences = &presentation.sidebar;
         let appearance = presentation.appearance;
-        let content_width = {
-            let rail_width = if matches!(self.nav_orientation, NavOrientation::Vertical) {
-                responsive::nav_rail_width(layout.navigation)
-            } else {
-                0.0
-            };
-            px(
-                (f32::from(window.viewport_size().width) - rail_width - page_padding * 2.0)
-                    .max(0.0),
-            )
-        };
+        // This width already excludes navigation and page padding. Every
+        // non-Performance page consumes the same root-owned slot instead of
+        // subtracting shell regions a second time.
+        let content_width = px(f32::from(frame.content.size.width));
         let source_retry_button = self
             .source_retry_button
             .get_or_insert_with(|| {
@@ -79,8 +71,11 @@ impl RootView {
         match self.page {
             TopPage::Performance => {
                 let hardware = self.hardware_rc().clone();
-                let performance_layout =
-                    responsive::PerformancePageBudget::from_page_layout(layout);
+                let performance_layout = responsive::PerformancePageBudget::from_frame(
+                    frame,
+                    self.sidebar_visible,
+                    f32::from(sidebar_preferences.width),
+                );
                 let main = if self.history_replay_visible() {
                     // Read-only history replay (roadmap #4): the persisted
                     // series replace the live graphs while the panel is open.
@@ -98,7 +93,7 @@ impl RootView {
                         SelectedDevice::Cpu => cpu_view::render_cpu(
                             cpu_view::CpuViewProps {
                                 theme: t,
-                                stats_scroll: self.performance_scroll.1.clone(),
+                                stats_scroll: self.performance_stats_scroll.clone(),
                                 snap,
                                 telemetry,
                                 hardware: &hardware,
@@ -114,23 +109,23 @@ impl RootView {
                                 snap,
                                 telemetry,
                                 performance,
-                                left_scroll: self.performance_scroll.0.clone(),
-                                stats_scroll: self.performance_scroll.1.clone(),
+                                stats_scroll: self.performance_stats_scroll.clone(),
                                 hover_slot: &self.graph_hover,
                                 memory_history: &mut self.memory_history,
+                                budget: performance_layout,
                             })
                         }
                         SelectedDevice::Disk(i) => perf_views::render_disk(
                             perf_views::DiskViewProps {
                                 theme: t,
-                                left_scroll: self.performance_scroll.0.clone(),
-                                stats_scroll: self.performance_scroll.1.clone(),
+                                stats_scroll: self.performance_stats_scroll.clone(),
                                 snap,
                                 telemetry,
                                 index: i,
                                 performance,
                                 directory_usage: self.directory_usage(),
                                 hover_slot: &self.graph_hover,
+                                budget: performance_layout,
                             },
                             cx,
                         ),
@@ -141,20 +136,13 @@ impl RootView {
                                 telemetry,
                                 index: i,
                                 performance,
-                                left_scroll: self.performance_scroll.0.clone(),
-                                stats_scroll: self.performance_scroll.1.clone(),
+                                stats_scroll: self.performance_stats_scroll.clone(),
                                 hover_slot: &self.graph_hover,
+                                budget: performance_layout,
                             })
                         }
                         SelectedDevice::Gpu(i) => {
                             let engine_device_id = self.gpu_engine_rows_device_id(i);
-                            // The shared chart-metric projection for the
-                            // viewed device (ADR-034): one selection, one
-                            // availability gate, rendered by the pill row and
-                            // the headline graph alike.
-                            let chart_metric = self.shell.gpu_chart_metric_projection(
-                                &taskmanager_shell::gpu_chart_metric_gate(snap.gpu.get(i)),
-                            );
                             perf_views::render_gpu(
                                 t,
                                 snap,
@@ -170,9 +158,8 @@ impl RootView {
                                         performance_layout.chart_inventory,
                                     ),
                                     performance,
-                                    left_scroll: self.performance_scroll.0.clone(),
-                                    stats_scroll: self.performance_scroll.1.clone(),
-                                    chart_metric,
+                                    stats_scroll: self.performance_stats_scroll.clone(),
+                                    budget: performance_layout,
                                 },
                                 cx,
                                 &self.graph_hover,
@@ -185,9 +172,9 @@ impl RootView {
                                 telemetry,
                                 index: i,
                                 performance,
-                                left_scroll: self.performance_scroll.0.clone(),
-                                stats_scroll: self.performance_scroll.1.clone(),
+                                stats_scroll: self.performance_stats_scroll.clone(),
                                 hover_slot: &self.graph_hover,
+                                budget: performance_layout,
                             })
                         }
                         SelectedDevice::Fan(i) => {
@@ -197,9 +184,9 @@ impl RootView {
                                 telemetry,
                                 index: i,
                                 performance,
-                                left_scroll: self.performance_scroll.0.clone(),
-                                stats_scroll: self.performance_scroll.1.clone(),
+                                stats_scroll: self.performance_stats_scroll.clone(),
                                 hover_slot: &self.graph_hover,
+                                budget: performance_layout,
                             })
                         }
                     }
@@ -280,25 +267,27 @@ impl RootView {
                     == responsive::DeviceNavigationPresentation::Strip
                 {
                     body = body.flex_col();
-                    if self.sidebar_visible {
-                        body = body.child(responsive::device_strip(
-                            responsive::DeviceStripProps {
-                                theme: t,
-                                snapshot: snap,
-                                power_supplies: self.power_supplies(),
-                                sensors: self.sensors(),
-                                selected,
-                                show_cpu: devices.cpu,
-                                show_memory: devices.memory,
-                                show_disks: devices.disks,
-                                network_visibility: self.network_visibility(),
-                                show_gpus: devices.gpus,
-                                sidebar_order: &sidebar_preferences.order,
-                                sidebar_device_overrides: &sidebar_preferences.device_overrides,
-                            },
-                            cx,
-                        ));
-                    }
+                    // When the persistent sidebar is hidden, the strip becomes
+                    // the accessible device switcher rather than disappearing
+                    // with it. The selected device must remain reachable at
+                    // every width.
+                    body = body.child(responsive::device_strip(
+                        responsive::DeviceStripProps {
+                            theme: t,
+                            snapshot: snap,
+                            power_supplies: self.power_supplies(),
+                            sensors: self.sensors(),
+                            selected,
+                            show_cpu: devices.cpu,
+                            show_memory: devices.memory,
+                            show_disks: devices.disks,
+                            network_visibility: self.network_visibility(),
+                            show_gpus: devices.gpus,
+                            sidebar_order: &sidebar_preferences.order,
+                            sidebar_device_overrides: &sidebar_preferences.device_overrides,
+                        },
+                        cx,
+                    ));
                 } else if self.sidebar_visible {
                     // Render-entry projection: the sidebar's CPU sparkline
                     // shares the generation-keyed headline cache instead of
@@ -311,7 +300,7 @@ impl RootView {
                         sidebar::SidebarProps {
                             theme: t,
                             scroll: &self.sidebar_scroll,
-                            width: sidebar_preferences.width,
+                            width: px(performance_layout.sidebar_width),
                             snap,
                             telemetry,
                             cpu_usage_samples: sidebar_cpu_usage,
@@ -435,7 +424,7 @@ impl RootView {
                 let entity = cx.entity();
                 let hardware = self.hardware_rc().clone();
                 let processes = self.processes_rc().clone();
-                let system_layout = responsive::SystemPageBudget::from_page_layout(layout);
+                let system_layout = responsive::SystemPageBudget::from_frame(frame);
                 let content: AnyElement = match self.dashboard.section {
                     SystemSection::Dashboard => {
                         dashboard::render_dashboard(dashboard::DashboardViewProps {

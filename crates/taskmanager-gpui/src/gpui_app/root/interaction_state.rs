@@ -29,7 +29,7 @@ pub enum Hover {
 /// `ProcessSignal` to send; `EndTask`/`Kill` create a shared confirmation intent,
 /// while `Suspend`/`Resume` submit the neutral `ProcessControlRequest`
 /// vocabulary in `apply_proc_action` (the adapters own the stop/continue
-/// signal mapping, ARCH §4.0);
+/// signal mapping, ARCH §8.1);
 /// `Properties` opens the process details dialog; `OpenLocation` / `SearchOnline`
 /// are the Win11-TM / MC parity non-signal actions (handled in `dispatch.rs`);
 /// `CopyName` / `CopyPid` / `CopyCmdline` back the Win11-TM "Copy" submenu and write

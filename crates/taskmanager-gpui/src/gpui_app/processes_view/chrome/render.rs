@@ -279,6 +279,7 @@ pub fn render_processes(
                             entity: &entity_for_rows,
                             pids: nav_pids.clone(),
                             row_keys: nav_rows.clone(),
+                            rows: rows_owned.clone(),
                             gray_zero_values,
                             density,
                             ui_size,

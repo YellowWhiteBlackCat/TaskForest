@@ -4469,6 +4469,7 @@ dependencies = [
  "wayland-cursor",
  "wayland-protocols 0.31.2",
  "wayland-protocols-plasma 0.2.0",
+ "wayland-protocols-wlr",
  "windows 0.61.3",
  "windows-core 0.61.2",
  "windows-numerics 0.2.0",
@@ -9884,7 +9885,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager"
-version = "0.1.0-rc.3"
+version = "0.1.0-rc.4"
 dependencies = [
  "chrono",
  "crossbeam-channel",

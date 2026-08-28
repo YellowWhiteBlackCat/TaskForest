@@ -5,6 +5,55 @@ use super::*;
 
 const MAX_PROCESS_MODULES: usize = 2048;
 
+#[cfg(windows)]
+const MAX_SID_SUB_AUTHORITIES: usize = 15;
+
+#[cfg(windows)]
+fn sid_pointer_is_within_buffer(
+    buffer: &[u64],
+    returned_bytes: usize,
+    sid: windows::Win32::Security::PSID,
+) -> bool {
+    use std::mem::{align_of, size_of, size_of_val};
+    use windows::Win32::Security::SID;
+
+    if sid.0.is_null() || returned_bytes > size_of_val(buffer) {
+        return false;
+    }
+    let start = buffer.as_ptr() as usize;
+    let Some(end) = start.checked_add(returned_bytes) else {
+        return false;
+    };
+    let address = sid.0 as usize;
+    let Some(header_end) = address.checked_add(2) else {
+        return false;
+    };
+    if address < start || header_end > end || !address.is_multiple_of(align_of::<SID>()) {
+        return false;
+    }
+
+    // SAFETY: The two-byte SID header was proven to be within the returned
+    // native buffer. Reading the byte fields does not require a wider slice.
+    let (revision, sub_authority_count) = unsafe {
+        let bytes = sid.0.cast::<u8>();
+        (*bytes, *bytes.add(1))
+    };
+    if revision != 1 || usize::from(sub_authority_count) > MAX_SID_SUB_AUTHORITIES {
+        return false;
+    }
+    let Some(sub_authority_bytes) = usize::from(sub_authority_count).checked_mul(size_of::<u32>())
+    else {
+        return false;
+    };
+    let sid_bytes = 8_usize.checked_add(sub_authority_bytes);
+    let Some(sid_bytes) = sid_bytes else {
+        return false;
+    };
+    address
+        .checked_add(sid_bytes)
+        .is_some_and(|sid_end| sid_end <= end)
+}
+
 /// Query process isolation, elevation and integrity level facts.
 #[must_use = "inspect the process isolation result"]
 pub fn process_isolation(pid: u32) -> Result<WindowsProcessIsolation, WindowsApiError> {
@@ -78,37 +127,47 @@ pub fn process_isolation(pid: u32) -> Result<WindowsProcessIsolation, WindowsApi
             )
         };
 
-        let mut integrity_buffer = [0u8; 128];
+        let mut integrity_buffer = [0_u64; 16];
         let mut integrity_level = None;
-        // SAFETY: `token` is valid and `integrity_buffer` is a writable byte slice.
+        let mut integrity_return_length = 0_u32;
+        // SAFETY: `token` is valid and `integrity_buffer` is an aligned,
+        // initialized writable byte buffer large enough for the query.
         let integrity_queried = unsafe {
             GetTokenInformation(
                 token,
                 TokenIntegrityLevel,
                 Some(integrity_buffer.as_mut_ptr().cast()),
-                u32::try_from(integrity_buffer.len()).unwrap_or(0),
-                &mut return_length,
+                u32::try_from(std::mem::size_of_val(&integrity_buffer)).unwrap_or(0),
+                &mut integrity_return_length,
             )
         };
 
-        if integrity_queried.is_ok() {
+        let integrity_bytes = usize::try_from(integrity_return_length).unwrap_or(usize::MAX);
+        if integrity_queried.is_ok()
+            && integrity_bytes >= size_of::<TOKEN_MANDATORY_LABEL>()
+            && integrity_bytes <= std::mem::size_of_val(&integrity_buffer)
+        {
             let label = integrity_buffer.as_ptr().cast::<TOKEN_MANDATORY_LABEL>();
-            // SAFETY: `integrity_buffer` was filled by GetTokenInformation with TOKEN_MANDATORY_LABEL
+            // SAFETY: the returned length proves the outer token structure is
+            // initialized and the u64 buffer provides its required alignment.
             let sid_ptr = unsafe { (*label).Label.Sid };
-            if !sid_ptr.0.is_null() {
+            if sid_pointer_is_within_buffer(&integrity_buffer, integrity_bytes, sid_ptr) {
                 use windows::Win32::Security::{GetSidSubAuthority, GetSidSubAuthorityCount};
-                // SAFETY: sid_ptr is non-null from TokenIntegrityLevel
+                // SAFETY: the SID header and complete variable-length SID were
+                // proven to be inside the initialized token buffer.
                 let count_ptr = unsafe { GetSidSubAuthorityCount(sid_ptr) };
                 if !count_ptr.is_null() {
-                    // SAFETY: count_ptr is verified non-null.
+                    // SAFETY: count_ptr belongs to the validated SID.
                     let count = unsafe { *count_ptr };
                     if count > 0 {
                         let sub_auth_ptr = {
-                            // SAFETY: sid_ptr is valid and index (count - 1) is in bounds.
+                            // SAFETY: the validated SID contains `count` DWORD
+                            // sub-authorities and this index is in range.
                             unsafe { GetSidSubAuthority(sid_ptr, (count - 1) as u32) }
                         };
                         if !sub_auth_ptr.is_null() {
-                            // SAFETY: sub_auth_ptr is verified non-null.
+                            // SAFETY: the Windows helper returned a pointer to
+                            // the validated SID's in-buffer sub-authority.
                             let rid = unsafe { *sub_auth_ptr };
                             integrity_level = Some(match rid {
                                 0..=0x0FFF => WindowsIntegrityLevel::Untrusted,
@@ -194,16 +253,15 @@ pub fn process_modules(pid: u32) -> Result<Vec<WindowsProcessModule>, WindowsApi
                 .unwrap_or(entry.szExePath.len());
             let file_path = String::from_utf16_lossy(&entry.szExePath[..path_len]);
 
+            if modules.len() == MAX_PROCESS_MODULES {
+                return Err(WindowsApiError::ResourceLimit);
+            }
             modules.push(WindowsProcessModule {
                 module_name,
                 file_path,
                 base_address: entry.modBaseAddr as usize,
                 module_size: entry.modBaseSize,
             });
-
-            if modules.len() >= MAX_PROCESS_MODULES {
-                break;
-            }
 
             entry.dwSize = size_of::<MODULEENTRY32W>() as u32;
             // SAFETY: `snapshot` is valid, `entry` is re-initialized with size.
@@ -386,11 +444,19 @@ fn enumerate_all_process_thread_counts_windows()
     };
 
     let mut map: HashMap<u32, u32> = HashMap::with_capacity(512);
+    let mut inspected = 0usize;
 
     // SAFETY: Snapshot handle is valid, entry is sized.
     let mut ok = unsafe { Thread32First(snapshot, &mut entry) }.is_ok();
     while ok {
-        *map.entry(entry.th32OwnerProcessID).or_insert(0) += 1;
+        inspected = inspected
+            .checked_add(1)
+            .ok_or(WindowsApiError::ResourceLimit)?;
+        if inspected > 1_000_000 {
+            return Err(WindowsApiError::ResourceLimit);
+        }
+        let count = map.entry(entry.th32OwnerProcessID).or_insert(0);
+        *count = count.checked_add(1).ok_or(WindowsApiError::ResourceLimit)?;
 
         entry.dwSize =
             u32::try_from(size_of::<THREADENTRY32>()).map_err(|_| WindowsApiError::QueryFailed)?;
@@ -442,28 +508,34 @@ fn query_process_user_windows(pid: u32) -> Result<String, WindowsApiError> {
     }
     let _token_guard = ProcessHandle(token);
 
-    let mut token_user_buf = [0u8; 128];
+    let mut token_user_buf = [0_u64; 16];
     let mut return_len = 0u32;
-    // SAFETY: GetTokenInformation with TokenUser.
+    // SAFETY: GetTokenInformation with TokenUser and an aligned writable
+    // buffer whose size is passed exactly.
     let info_ok = unsafe {
         GetTokenInformation(
             token,
             windows::Win32::Security::TokenUser,
             Some(token_user_buf.as_mut_ptr().cast()),
-            token_user_buf.len() as u32,
+            u32::try_from(std::mem::size_of_val(&token_user_buf)).unwrap_or(0),
             &mut return_len,
         )
     }
     .is_ok();
 
-    if !info_ok || return_len < size_of::<TOKEN_USER>() as u32 {
+    let token_user_bytes = usize::try_from(return_len).unwrap_or(usize::MAX);
+    if !info_ok
+        || token_user_bytes < size_of::<TOKEN_USER>()
+        || token_user_bytes > std::mem::size_of_val(&token_user_buf)
+    {
         return Err(WindowsApiError::QueryFailed);
     }
 
     let token_user = token_user_buf.as_ptr().cast::<TOKEN_USER>();
-    // SAFETY: token_user was populated by GetTokenInformation.
+    // SAFETY: the returned length proves the outer TOKEN_USER is initialized
+    // and token_user_buf is aligned for the repr(C) structure.
     let sid = unsafe { (*token_user).User.Sid };
-    if sid.0.is_null() {
+    if !sid_pointer_is_within_buffer(&token_user_buf, token_user_bytes, sid) {
         return Err(WindowsApiError::QueryFailed);
     }
 
@@ -491,7 +563,12 @@ fn query_process_user_windows(pid: u32) -> Result<String, WindowsApiError> {
         return Err(WindowsApiError::QueryFailed);
     }
 
-    let user_name = String::from_utf16_lossy(&name_buf[..name_len as usize]);
+    let name_len = usize::try_from(name_len).map_err(|_| WindowsApiError::QueryFailed)?;
+    let domain_len = usize::try_from(domain_len).map_err(|_| WindowsApiError::QueryFailed)?;
+    if name_len > name_buf.len() || domain_len > domain_buf.len() {
+        return Err(WindowsApiError::QueryFailed);
+    }
+    let user_name = String::from_utf16_lossy(&name_buf[..name_len]);
     Ok(user_name)
 }
 
@@ -805,6 +882,14 @@ fn query_process_environment_windows(
     if status.0 < 0 {
         return Err(WindowsApiError::QueryFailed);
     }
+    let returned_bytes =
+        usize::try_from(returned_bytes).map_err(|_| WindowsApiError::QueryFailed)?;
+    let minimum_returned = basic_information_peb_field()
+        .checked_add(POINTER_BYTES)
+        .ok_or(WindowsApiError::QueryFailed)?;
+    if returned_bytes < minimum_returned || returned_bytes > basic_information.len() {
+        return Err(WindowsApiError::QueryFailed);
+    }
     let peb_base = read_le_usize(&basic_information, basic_information_peb_field())?;
     if peb_base == 0 {
         // No PEB means no native environment source; an empty "healthy"
@@ -905,6 +990,9 @@ fn read_environment_block(
         if read == 0 {
             return Ok((block, false));
         }
+        if read > want || !read.is_multiple_of(2) {
+            return Err(WindowsApiError::QueryFailed);
+        }
         block.extend_from_slice(&chunk[..read]);
         address = address
             .checked_add(read)
@@ -946,7 +1034,10 @@ fn read_target_bytes(
     if ok.is_err() {
         return Err(WindowsApiError::QueryFailed);
     }
-    Ok(read.min(buffer.len()))
+    if read > buffer.len() {
+        return Err(WindowsApiError::QueryFailed);
+    }
+    Ok(read)
 }
 
 #[cfg(test)]

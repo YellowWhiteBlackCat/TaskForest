@@ -18,6 +18,7 @@ mod cells;
 mod formatting;
 mod groups;
 use cells::append_body_cells;
+use projection::{StructuralArrow, structural_arrow_action};
 pub(crate) mod projection;
 pub use projection::{
     ProcRowProps, ProjectionCache, RowCellText, Toggle, VisibleRow, VisibleRowsProps,
@@ -407,6 +408,7 @@ pub fn proc_row_with_layout(
         entity,
         pids,
         row_keys,
+        rows,
         gray_zero_values,
         density,
         ui_size,
@@ -436,16 +438,25 @@ pub fn proc_row_with_layout(
     let ent_toggle = entity.clone();
     let ent_key = entity.clone();
     // Keyboard-nav capture: the ordered PID list (ArrowUp/Down moves selection by
-    // index) + this row's tree/group affordance (ArrowLeft/Right collapses/expands).
-    // Each handler reads the LIVE `selected_pid` from RootView, so consecutive arrow
-    // presses keep advancing even though gpui focus stays on the originally-clicked row.
+    // index) + this row's tree/group affordance (bare ArrowLeft/Right run the
+    // iced-parity tree matrix: collapse / expand / climb to the parent; leaf
+    // rows and Alt/Shift keep the column-cursor stepping).
+    // Each handler reads the LIVE `selected_process_row` from RootView, so
+    // consecutive arrow presses keep advancing even though gpui focus stays on
+    // the originally-clicked row.
     let key_pids = pids;
     let click_pids = key_pids.clone();
     let nav_rows = row_keys;
+    // Full projection snapshot for the bare Left/Right structural resolver:
+    // the acted-on row is the LIVE selection (focus and selection diverge
+    // after Home/End/PageUp), so the handler needs to find it among all rows,
+    // not just this focused one. Owned `Rc` — the same per-row clone cost the
+    // `pids`/`nav_rows` captures already pay.
+    let all_rows = rows;
     let key_has_children = row.has_children;
     let key_collapsed = row.collapsed;
+    let key_parent_key = row.parent_key;
     let key_toggle = row.toggle.clone();
-    let structural_arrow = key_has_children;
     let double_click_toggle = row.toggle.clone();
     let double_click_enabled = row.has_children;
 
@@ -674,9 +685,11 @@ pub fn proc_row_with_layout(
                 }
                 "left" | "right" => {
                     let right = key == "right";
+                    // Alt/Shift reserves the keys for column navigation on
+                    // every row, structural or leaf.
                     let column_modifier =
                         ev.keystroke.modifiers.alt || ev.keystroke.modifiers.shift;
-                    if !structural_arrow || column_modifier {
+                    if column_modifier {
                         ent_key.update(cx, |v, cx| {
                             v.processes_state.column_cursor = process_column_step(
                                 v.processes_state.column_cursor,
@@ -686,17 +699,62 @@ pub fn proc_row_with_layout(
                             cx.notify();
                         });
                         cx.stop_propagation();
-                    } else if structural_arrow {
-                        // Tree/group expansion keeps bare Left/Right on
-                        // aggregate rows. Alt/Shift reserves the same keys for
-                        // column navigation.
-                        let want_collapse = !right;
-                        if want_collapse != key_collapsed {
-                            ent_key.update(cx, |v, cx| {
-                                set_expansion(v, &key_toggle, !want_collapse);
-                                cx.notify();
+                    } else {
+                        // Bare structural key. The acted-on row is the LIVE
+                        // selection — focus and selection diverge after the
+                        // root router moves it (Home/End/PageUp) — resolved
+                        // through the shared projection; with nothing
+                        // selected the focused row keeps the historical
+                        // behavior. The decision itself is the pure
+                        // `structural_arrow_action` fold (iced-parity tree
+                        // matrix), so the renderer only executes it.
+                        ent_key.update(cx, |v, cx| {
+                            let target = v.selected_process_row().and_then(|active| {
+                                all_rows.iter().find(|r| r.selection_key == Some(active))
                             });
-                        }
+                            let (has_children, collapsed, parent_key, toggle) = match target {
+                                Some(row) => {
+                                    (row.has_children, row.collapsed, row.parent_key, &row.toggle)
+                                }
+                                None => {
+                                    (key_has_children, key_collapsed, key_parent_key, &key_toggle)
+                                }
+                            };
+                            if !has_children {
+                                // Leaf rows keep the historical bare-key
+                                // meaning: step the header column cursor
+                                // without touching sort or selection.
+                                v.processes_state.column_cursor = process_column_step(
+                                    v.processes_state.column_cursor,
+                                    right,
+                                    &v.processes_state.hidden_cols,
+                                );
+                                cx.notify();
+                            } else {
+                                match structural_arrow_action(collapsed, parent_key, right) {
+                                    Some(StructuralArrow::Collapse) => {
+                                        set_expansion(v, toggle, false);
+                                        cx.notify();
+                                    }
+                                    Some(StructuralArrow::Expand) => {
+                                        set_expansion(v, toggle, true);
+                                        cx.notify();
+                                    }
+                                    Some(StructuralArrow::GotoParent(parent)) => {
+                                        // Bare key collapses the multi-select
+                                        // set onto the parent — the same rule
+                                        // the Up/Down mover applies.
+                                        v.move_process_row_selection(Some(parent), false);
+                                        cx.notify();
+                                    }
+                                    // Right on an expanded row / Left with no
+                                    // selectable ancestor: honest no-op, no
+                                    // repaint.
+                                    None => {}
+                                }
+                            }
+                        });
+                        cx.stop_propagation();
                     }
                 }
                 _ => {}

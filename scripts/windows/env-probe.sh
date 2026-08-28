@@ -79,7 +79,7 @@ MINGW* | MSYS* | CYGWIN*) printf 'OK    %s (Git Bash family)\n' "$kernel" ;;
 esac
 
 echo "== hard requirements =="
-require cargo "Rust toolchain (rust-toolchain.toml pins the channel)"
+require cargo "Rust toolchain (rust-toolchain.toml selects the channel)"
 require rustc "compiler front end"
 require git "worktree provenance"
 require sha256sum "evidence hashing"

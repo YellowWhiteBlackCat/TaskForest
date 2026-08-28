@@ -54,6 +54,8 @@ struct JobHandleGuard(HANDLE);
 // pointer into Rust memory; `CloseHandle` is documented as thread-safe, so
 // moving the guard to whatever thread drops the registry entry is sound.
 #[cfg(windows)]
+// SAFETY: a Win32 job handle is an owned kernel object reference; it contains
+// no Rust-memory pointer and may be moved to the dropping thread.
 unsafe impl Send for JobHandleGuard {}
 
 #[cfg(windows)]

@@ -151,6 +151,11 @@ pub struct RootView {
     /// Immutable native local-time rules injected at composition startup.
     /// Projection/render paths never discover host files or environment state.
     pub(crate) local_time_rules: taskmanager_application::LocalTimeRulesObservation,
+    /// The selected surface role is frontend composition state, not business
+    /// state. Standalone is the default so existing desktop launches retain
+    /// the complete application shell; the compact widget branch is only
+    /// reachable through the explicit layer-shell host selection.
+    pub(crate) surface_role: crate::window_presentation::GpuiSurfaceRole,
     pub nav_orientation: NavOrientation,
     /// Test-only override of the compositor-decoration branch that
     /// `gpui_app::root::render` reads each frame. `None` (the production
@@ -190,10 +195,10 @@ pub struct RootView {
     pub(crate) dialog_scroll: DialogScrollState,
     /// Per-window System-page scroll state (sectioned hardware cards).
     pub system_scroll: ScrollHandle,
-    /// Per-window Performance scroll state: `(primary content, statistics)`.
-    /// CPU details and device pages share the primary owner because only one
-    /// performance device is visible at a time.
-    pub performance_scroll: (ScrollHandle, ScrollHandle),
+    /// Per-window Performance statistics-rail scroll state. Every device page
+    /// composes through the one fixed-viewport page root, so the rail is the
+    /// only scrolling surface on the page.
+    pub performance_stats_scroll: ScrollHandle,
     /// Per-window App-history list scroll state. The history page can contain
     /// more application groups than fit below its fixed title/status chrome;
     /// keeping this handle on the RootView avoids a process-global scroll
@@ -540,6 +545,7 @@ impl RootView {
             telemetry_ingestor,
             TelemetryRefreshPolicy::default(),
             None,
+            crate::window_presentation::GpuiSurfaceRole::Standalone,
             cx,
         )
     }
@@ -555,12 +561,36 @@ impl RootView {
         platform: PlatformClient,
         cx: &mut Context<Self>,
     ) -> Self {
+        Self::new_with_platform_and_surface_role(
+            theme,
+            telemetry,
+            telemetry_ingestor,
+            telemetry_refresh_policy,
+            platform,
+            crate::window_presentation::GpuiSurfaceRole::Standalone,
+            cx,
+        )
+    }
+
+    /// Construct the interactive shell with an explicit frontend surface
+    /// role. Startup uses this only for the opt-in layer-shell widget; the
+    /// existing [`Self::new_with_platform`] API remains standalone.
+    pub(crate) fn new_with_platform_and_surface_role(
+        theme: Theme,
+        telemetry: Arc<TelemetryStore>,
+        telemetry_ingestor: CorrelatedSystemTelemetryIngestor,
+        telemetry_refresh_policy: TelemetryRefreshPolicy,
+        platform: PlatformClient,
+        surface_role: crate::window_presentation::GpuiSurfaceRole,
+        cx: &mut Context<Self>,
+    ) -> Self {
         Self::new_inner(
             theme,
             telemetry,
             telemetry_ingestor,
             telemetry_refresh_policy,
             Some(platform),
+            surface_role,
             cx,
         )
     }
@@ -571,6 +601,7 @@ impl RootView {
         telemetry_ingestor: CorrelatedSystemTelemetryIngestor,
         telemetry_refresh_policy: TelemetryRefreshPolicy,
         platform: Option<PlatformClient>,
+        surface_role: crate::window_presentation::GpuiSurfaceRole,
         cx: &mut Context<Self>,
     ) -> Self {
         let live_graph_history = taskmanager_shell::history::LiveGraphHistory::from_store(
@@ -597,6 +628,7 @@ impl RootView {
         Self {
             theme,
             local_time_rules: taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+            surface_role,
             presentation: presentation_preferences::PresentationPreferences::default(),
             nav_orientation: NavOrientation::Horizontal,
             decorations_override: None,
@@ -606,7 +638,7 @@ impl RootView {
             settings_switches: HashMap::new(),
             dialog_scroll: DialogScrollState::default(),
             system_scroll: ScrollHandle::new(),
-            performance_scroll: (ScrollHandle::new(), ScrollHandle::new()),
+            performance_stats_scroll: ScrollHandle::new(),
             app_history_scroll: UniformListScrollHandle::new(),
             sidebar_scroll: ScrollHandle::new(),
             processes_scroll: processes_view::ProcessesScrollState::default(),

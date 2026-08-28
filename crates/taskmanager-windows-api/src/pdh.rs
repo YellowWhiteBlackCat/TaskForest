@@ -2,6 +2,159 @@
 
 use crate::WindowsApiError;
 
+#[cfg(windows)]
+const MAX_PDH_BUFFER_BYTES: usize = 4 * 1024 * 1024;
+
+#[cfg(windows)]
+const MAX_PDH_ITEMS: usize = 65_536;
+
+#[cfg(windows)]
+const MAX_PDH_NAME_UTF16: usize = 512;
+
+#[cfg(windows)]
+const MAX_PROCESSOR_CORES: usize = 4096;
+
+#[cfg(windows)]
+struct PdhCounterItems {
+    // PDH writes both the item array and the pointed-to names into one byte
+    // buffer. A Vec<u64> gives the first item the alignment required by the
+    // repr(C) item type while still leaving PDH the byte-addressable storage
+    // it expects.
+    storage: Vec<u64>,
+    item_count: usize,
+    initialized_bytes: usize,
+}
+
+#[cfg(windows)]
+impl PdhCounterItems {
+    fn items(&self) -> &[windows::Win32::System::Performance::PDH_FMT_COUNTERVALUE_ITEM_W] {
+        // SAFETY: `query_pdh_counter_items` checks that the native item count
+        // fits inside `initialized_bytes`, which is within `storage`. The
+        // storage is u64-aligned, satisfying the repr(C) item alignment, and
+        // PDH initialized the returned item array before this view is made.
+        unsafe { std::slice::from_raw_parts(self.storage.as_ptr().cast(), self.item_count) }
+    }
+
+    fn decode_name(&self, pointer: windows::core::PWSTR, max_units: usize) -> Option<String> {
+        if pointer.0.is_null() || max_units == 0 {
+            return None;
+        }
+
+        let start = self.storage.as_ptr() as usize;
+        let end = start.checked_add(self.initialized_bytes)?;
+        let pointer_address = pointer.0 as usize;
+        let pointer_end = pointer_address.checked_add(std::mem::size_of::<u16>())?;
+        if pointer_address < start
+            || pointer_end > end
+            || !pointer_address.is_multiple_of(std::mem::align_of::<u16>())
+        {
+            return None;
+        }
+
+        let available_units = (end - pointer_address) / std::mem::size_of::<u16>();
+        let units = available_units.min(max_units);
+        // SAFETY: the address is aligned, points inside the native buffer, and
+        // `units` is bounded by the bytes returned by PDH.
+        let wide = unsafe { std::slice::from_raw_parts(pointer.0.cast_const(), units) };
+        let nul = wide.iter().position(|&unit| unit == 0)?;
+        String::from_utf16(&wide[..nul]).ok()
+    }
+}
+
+#[cfg(windows)]
+fn query_pdh_counter_items(
+    counter: windows::Win32::System::Performance::PDH_HCOUNTER,
+    format: windows::Win32::System::Performance::PDH_FMT,
+) -> Result<Option<PdhCounterItems>, WindowsApiError> {
+    use windows::Win32::System::Performance::{
+        PDH_FMT_COUNTERVALUE_ITEM_W, PdhGetFormattedCounterArrayW,
+    };
+
+    let mut required_bytes = 0_u32;
+    let mut required_items = 0_u32;
+    // SAFETY: The sizing call passes valid writable result pointers and a null
+    // item buffer, which is the PDH two-call contract.
+    let _ = unsafe {
+        PdhGetFormattedCounterArrayW(
+            counter,
+            format,
+            &mut required_bytes,
+            &mut required_items,
+            None,
+        )
+    };
+
+    let required_bytes =
+        usize::try_from(required_bytes).map_err(|_| WindowsApiError::ResourceLimit)?;
+    let required_items =
+        usize::try_from(required_items).map_err(|_| WindowsApiError::ResourceLimit)?;
+    if required_bytes == 0 || required_items == 0 {
+        return Ok(None);
+    }
+    if required_bytes > MAX_PDH_BUFFER_BYTES || required_items > MAX_PDH_ITEMS {
+        return Err(WindowsApiError::ResourceLimit);
+    }
+
+    let item_bytes = required_items
+        .checked_mul(std::mem::size_of::<PDH_FMT_COUNTERVALUE_ITEM_W>())
+        .ok_or(WindowsApiError::ResourceLimit)?;
+    if item_bytes > required_bytes {
+        return Err(WindowsApiError::QueryFailed);
+    }
+
+    let word_count = required_bytes
+        .checked_add(std::mem::size_of::<u64>() - 1)
+        .ok_or(WindowsApiError::ResourceLimit)?
+        / std::mem::size_of::<u64>();
+    let storage_bytes = word_count
+        .checked_mul(std::mem::size_of::<u64>())
+        .ok_or(WindowsApiError::ResourceLimit)?;
+    let storage_bytes_u32 =
+        u32::try_from(storage_bytes).map_err(|_| WindowsApiError::ResourceLimit)?;
+    let mut storage = vec![0_u64; word_count];
+    let item_pointer = storage.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
+    let mut buffer_bytes = storage_bytes_u32;
+    let mut item_count =
+        u32::try_from(required_items).map_err(|_| WindowsApiError::ResourceLimit)?;
+
+    // SAFETY: `storage` is non-empty, u64-aligned, and large enough for the
+    // native byte buffer. The pointers and counts remain valid for the call.
+    let status = unsafe {
+        PdhGetFormattedCounterArrayW(
+            counter,
+            format,
+            &mut buffer_bytes,
+            &mut item_count,
+            Some(item_pointer),
+        )
+    };
+    if status != 0 {
+        return Err(WindowsApiError::QueryFailed);
+    }
+
+    let initialized_bytes =
+        usize::try_from(buffer_bytes).map_err(|_| WindowsApiError::ResourceLimit)?;
+    let item_count = usize::try_from(item_count).map_err(|_| WindowsApiError::ResourceLimit)?;
+    if initialized_bytes > storage_bytes
+        || initialized_bytes > MAX_PDH_BUFFER_BYTES
+        || item_count > MAX_PDH_ITEMS
+    {
+        return Err(WindowsApiError::QueryFailed);
+    }
+    let item_bytes = item_count
+        .checked_mul(std::mem::size_of::<PDH_FMT_COUNTERVALUE_ITEM_W>())
+        .ok_or(WindowsApiError::ResourceLimit)?;
+    if item_bytes > initialized_bytes {
+        return Err(WindowsApiError::QueryFailed);
+    }
+
+    Ok(Some(PdhCounterItems {
+        storage,
+        item_count,
+        initialized_bytes,
+    }))
+}
+
 /// Breakdown per individual engine type (e.g. 3D, Copy, Video Decode, Compute, Neural).
 #[derive(Clone, Debug, PartialEq)]
 pub struct WindowsGpuEngineDetail {
@@ -143,8 +296,8 @@ fn query_gpu_adapter_memory_windows() -> Result<Vec<WindowsGpuAdapterMemorySampl
 {
     use std::collections::BTreeMap;
     use windows::Win32::System::Performance::{
-        PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_LARGE, PDH_HCOUNTER, PDH_HQUERY,
-        PdhAddEnglishCounterW, PdhCollectQueryData, PdhGetFormattedCounterArrayW, PdhOpenQueryW,
+        PDH_FMT_LARGE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW, PdhCollectQueryData,
+        PdhOpenQueryW,
     };
     use windows::core::w;
 
@@ -179,67 +332,33 @@ fn query_gpu_adapter_memory_windows() -> Result<Vec<WindowsGpuAdapterMemorySampl
         return Err(WindowsApiError::QueryFailed);
     }
 
-    let read_counter_map = |counter: PDH_HCOUNTER| -> BTreeMap<String, u64> {
-        let mut buffer_size: u32 = 0;
-        let mut item_count: u32 = 0;
-        // SAFETY: Passing None/null buffer to query required size.
-        let _ = unsafe {
-            PdhGetFormattedCounterArrayW(
-                counter,
-                PDH_FMT_LARGE,
-                &mut buffer_size,
-                &mut item_count,
-                None,
-            )
-        };
-        if buffer_size == 0 || item_count == 0 {
-            return BTreeMap::new();
-        }
-        let mut buffer = vec![0u8; buffer_size as usize];
-        let items_ptr = buffer.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
-        // SAFETY: buffer is sized to buffer_size.
-        let status = unsafe {
-            PdhGetFormattedCounterArrayW(
-                counter,
-                PDH_FMT_LARGE,
-                &mut buffer_size,
-                &mut item_count,
-                Some(items_ptr),
-            )
-        };
-        if status != 0 {
-            return BTreeMap::new();
-        }
-        // SAFETY: items_ptr points to initialized array of PDH_FMT_COUNTERVALUE_ITEM_W of length item_count.
-        let items = unsafe { std::slice::from_raw_parts(items_ptr, item_count as usize) };
-        let mut map = BTreeMap::new();
-        for item in items {
-            if item.szName.is_null() {
-                continue;
-            }
-            // SAFETY: item.szName is valid non-null pointer within PDH buffer.
-            let name = unsafe {
-                let mut len = 0;
-                while *item.szName.0.add(len) != 0 && len < 512 {
-                    len += 1;
-                }
-                let slice = std::slice::from_raw_parts(item.szName.0, len);
-                String::from_utf16_lossy(slice)
+    let read_counter_map =
+        |counter: PDH_HCOUNTER| -> Result<BTreeMap<String, u64>, WindowsApiError> {
+            let items_buffer = match query_pdh_counter_items(counter, PDH_FMT_LARGE) {
+                Ok(Some(items)) => items,
+                Ok(None) => return Ok(BTreeMap::new()),
+                Err(error) => return Err(error),
             };
-            if name == "_Total" {
-                continue;
+            let items = items_buffer.items();
+            let mut map = BTreeMap::new();
+            for item in items {
+                let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
+                    continue;
+                };
+                if name == "_Total" {
+                    continue;
+                }
+                // SAFETY: Anonymous union contains largeValue per PDH_FMT_LARGE.
+                let value = unsafe { item.FmtValue.Anonymous.largeValue };
+                if value >= 0 {
+                    map.insert(name, value as u64);
+                }
             }
-            // SAFETY: Anonymous union contains largeValue per PDH_FMT_LARGE.
-            let value = unsafe { item.FmtValue.Anonymous.largeValue };
-            if value >= 0 {
-                map.insert(name, value as u64);
-            }
-        }
-        map
-    };
+            Ok(map)
+        };
 
-    let dedicated = read_counter_map(dedicated_counter);
-    let shared = read_counter_map(shared_counter);
+    let dedicated = read_counter_map(dedicated_counter)?;
+    let shared = read_counter_map(shared_counter)?;
     let mut names: std::collections::BTreeSet<&String> =
         dedicated.keys().chain(shared.keys()).collect();
     let mut samples = Vec::with_capacity(names.len());
@@ -271,8 +390,8 @@ impl Drop for PdhQuery {
 fn query_gpu_engine_utilization_windows() -> Result<Vec<WindowsGpuEngineSample>, WindowsApiError> {
     use std::collections::HashMap;
     use windows::Win32::System::Performance::{
-        PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY,
-        PdhAddEnglishCounterW, PdhCollectQueryData, PdhGetFormattedCounterArrayW, PdhOpenQueryW,
+        PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW, PdhCollectQueryData,
+        PdhOpenQueryW,
     };
     use windows::core::w;
 
@@ -309,59 +428,15 @@ fn query_gpu_engine_utilization_windows() -> Result<Vec<WindowsGpuEngineSample>,
         return Err(WindowsApiError::QueryFailed);
     }
 
-    let mut buffer_size: u32 = 0;
-    let mut item_count: u32 = 0;
-    // First call to determine buffer size.
-    // SAFETY: Passing None/null buffer to query required size.
-    let _ = unsafe {
-        PdhGetFormattedCounterArrayW(
-            counter,
-            PDH_FMT_DOUBLE,
-            &mut buffer_size,
-            &mut item_count,
-            None,
-        )
-    };
-
-    if buffer_size == 0 || item_count == 0 {
+    let Some(items_buffer) = query_pdh_counter_items(counter, PDH_FMT_DOUBLE)? else {
         return Ok(Vec::new());
-    }
-
-    let mut buffer: Vec<u8> = vec![0; buffer_size as usize];
-    let items_ptr = buffer.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
-
-    // Second call to retrieve the counter items.
-    // SAFETY: buffer has length buffer_size and items_ptr is valid writable pointer.
-    let status = unsafe {
-        PdhGetFormattedCounterArrayW(
-            counter,
-            PDH_FMT_DOUBLE,
-            &mut buffer_size,
-            &mut item_count,
-            Some(items_ptr),
-        )
     };
-    if status != 0 {
-        return Err(WindowsApiError::QueryFailed);
-    }
-
-    // SAFETY: items_ptr points to initialized array of PDH_FMT_COUNTERVALUE_ITEM_W of length item_count.
-    let items_slice = unsafe { std::slice::from_raw_parts(items_ptr, item_count as usize) };
+    let items_slice = items_buffer.items();
     let mut luid_engines: HashMap<u64, HashMap<String, f32>> = HashMap::new();
 
     for item in items_slice {
-        if item.szName.is_null() {
+        let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
             continue;
-        }
-        // Decode null-terminated UTF-16 string
-        // SAFETY: item.szName is valid non-null pointer within PDH buffer.
-        let name = unsafe {
-            let mut len = 0;
-            while *item.szName.0.add(len) != 0 && len < 512 {
-                len += 1;
-            }
-            let slice = std::slice::from_raw_parts(item.szName.0, len);
-            String::from_utf16_lossy(slice)
         };
 
         // Name format: pid_1234_luid_0x00000000_0x0000ABCD_phys_0_eng_0_engtype_3D
@@ -415,8 +490,8 @@ fn query_gpu_engine_instances_windows()
 -> Result<Vec<WindowsGpuEngineInstanceSample>, WindowsApiError> {
     use std::collections::BTreeMap;
     use windows::Win32::System::Performance::{
-        PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY,
-        PdhAddEnglishCounterW, PdhCollectQueryData, PdhGetFormattedCounterArrayW, PdhOpenQueryW,
+        PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW, PdhCollectQueryData,
+        PdhOpenQueryW,
     };
     use windows::core::w;
 
@@ -449,54 +524,17 @@ fn query_gpu_engine_instances_windows()
         return Err(WindowsApiError::QueryFailed);
     }
 
-    let mut buffer_size: u32 = 0;
-    let mut item_count: u32 = 0;
-    // SAFETY: Passing None/null buffer to query required size.
-    let _ = unsafe {
-        PdhGetFormattedCounterArrayW(
-            counter,
-            PDH_FMT_DOUBLE,
-            &mut buffer_size,
-            &mut item_count,
-            None,
-        )
-    };
-    if buffer_size == 0 || item_count == 0 {
+    let Some(items_buffer) = query_pdh_counter_items(counter, PDH_FMT_DOUBLE)? else {
         return Ok(Vec::new());
-    }
-    let mut buffer: Vec<u8> = vec![0; buffer_size as usize];
-    let items_ptr = buffer.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
-    // SAFETY: buffer has length buffer_size and items_ptr is a valid writable pointer.
-    let status = unsafe {
-        PdhGetFormattedCounterArrayW(
-            counter,
-            PDH_FMT_DOUBLE,
-            &mut buffer_size,
-            &mut item_count,
-            Some(items_ptr),
-        )
     };
-    if status != 0 {
-        return Err(WindowsApiError::QueryFailed);
-    }
-    // SAFETY: items_ptr points to an initialized array of PDH_FMT_COUNTERVALUE_ITEM_W of length item_count.
-    let items_slice = unsafe { std::slice::from_raw_parts(items_ptr, item_count as usize) };
+    let items_slice = items_buffer.items();
 
     // Sibling engine instances of one type (phys_N/eng_M) share the typed
     // row Task Manager shows per process; sum them per (pid, LUID, type).
     let mut rows: BTreeMap<(u32, u64, String), f32> = BTreeMap::new();
     for item in items_slice {
-        if item.szName.is_null() {
+        let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
             continue;
-        }
-        // SAFETY: item.szName is a valid non-null pointer within the PDH buffer.
-        let name = unsafe {
-            let mut len = 0;
-            while *item.szName.0.add(len) != 0 && len < 512 {
-                len += 1;
-            }
-            let slice = std::slice::from_raw_parts(item.szName.0, len);
-            String::from_utf16_lossy(slice)
         };
         let (Some(pid), Some(luid)) = (
             parse_pid_from_instance_name(&name),
@@ -535,8 +573,8 @@ fn query_gpu_process_memory_windows() -> Result<Vec<WindowsGpuProcessMemorySampl
 {
     use std::collections::BTreeMap;
     use windows::Win32::System::Performance::{
-        PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_LARGE, PDH_HCOUNTER, PDH_HQUERY,
-        PdhAddEnglishCounterW, PdhCollectQueryData, PdhGetFormattedCounterArrayW, PdhOpenQueryW,
+        PDH_FMT_LARGE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW, PdhCollectQueryData,
+        PdhOpenQueryW,
     };
     use windows::core::w;
 
@@ -573,51 +611,14 @@ fn query_gpu_process_memory_windows() -> Result<Vec<WindowsGpuProcessMemorySampl
 
     let read_counter_map =
         |counter: PDH_HCOUNTER| -> Result<BTreeMap<(u32, u64), u64>, WindowsApiError> {
-            let mut buffer_size: u32 = 0;
-            let mut item_count: u32 = 0;
-            // SAFETY: Passing None/null buffer to query required size.
-            let _ = unsafe {
-                PdhGetFormattedCounterArrayW(
-                    counter,
-                    PDH_FMT_LARGE,
-                    &mut buffer_size,
-                    &mut item_count,
-                    None,
-                )
-            };
-            if buffer_size == 0 || item_count == 0 {
+            let Some(items_buffer) = query_pdh_counter_items(counter, PDH_FMT_LARGE)? else {
                 return Ok(BTreeMap::new());
-            }
-            let mut buffer = vec![0u8; buffer_size as usize];
-            let items_ptr = buffer.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
-            // SAFETY: buffer is sized to buffer_size.
-            let status = unsafe {
-                PdhGetFormattedCounterArrayW(
-                    counter,
-                    PDH_FMT_LARGE,
-                    &mut buffer_size,
-                    &mut item_count,
-                    Some(items_ptr),
-                )
             };
-            if status != 0 {
-                return Err(WindowsApiError::QueryFailed);
-            }
-            // SAFETY: items_ptr points to an initialized array of PDH_FMT_COUNTERVALUE_ITEM_W of length item_count.
-            let items = unsafe { std::slice::from_raw_parts(items_ptr, item_count as usize) };
+            let items = items_buffer.items();
             let mut map: BTreeMap<(u32, u64), u64> = BTreeMap::new();
             for item in items {
-                if item.szName.is_null() {
+                let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
                     continue;
-                }
-                // SAFETY: item.szName is a valid non-null pointer within the PDH buffer.
-                let name = unsafe {
-                    let mut len = 0;
-                    while *item.szName.0.add(len) != 0 && len < 512 {
-                        len += 1;
-                    }
-                    let slice = std::slice::from_raw_parts(item.szName.0, len);
-                    String::from_utf16_lossy(slice)
                 };
                 if name == "_Total" {
                     continue;
@@ -717,10 +718,19 @@ fn parse_processor_core_index(name: &str) -> Option<Option<usize>> {
         if core_str == "_Total" {
             Some(None)
         } else {
-            core_str.parse::<usize>().ok().map(Some)
+            core_str
+                .parse::<usize>()
+                .ok()
+                .filter(|index| *index < MAX_PROCESSOR_CORES)
+                .map(Some)
         }
     } else if parts.len() == 1 {
-        parts[0].trim().parse::<usize>().ok().map(Some)
+        parts[0]
+            .trim()
+            .parse::<usize>()
+            .ok()
+            .filter(|index| *index < MAX_PROCESSOR_CORES)
+            .map(Some)
     } else {
         None
     }
@@ -730,8 +740,8 @@ fn parse_processor_core_index(name: &str) -> Option<Option<usize>> {
 fn query_cpu_dynamic_frequencies_windows() -> Result<WindowsCpuFrequencySample, WindowsApiError> {
     use std::collections::BTreeMap;
     use windows::Win32::System::Performance::{
-        PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY,
-        PdhAddEnglishCounterW, PdhCollectQueryData, PdhGetFormattedCounterArrayW, PdhOpenQueryW,
+        PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW, PdhCollectQueryData,
+        PdhOpenQueryW,
     };
     use windows::core::w;
 
@@ -770,79 +780,45 @@ fn query_cpu_dynamic_frequencies_windows() -> Result<WindowsCpuFrequencySample, 
         return Err(WindowsApiError::QueryFailed);
     }
 
-    let read_counter_map = |counter: PDH_HCOUNTER| -> (Option<f64>, BTreeMap<usize, f64>) {
-        if counter.0.is_null() {
-            return (None, BTreeMap::new());
-        }
-        let mut buffer_size: u32 = 0;
-        let mut item_count: u32 = 0;
-        // SAFETY: query required buffer size.
-        let _ = unsafe {
-            PdhGetFormattedCounterArrayW(
-                counter,
-                PDH_FMT_DOUBLE,
-                &mut buffer_size,
-                &mut item_count,
-                None,
-            )
-        };
-        if buffer_size == 0 || item_count == 0 {
-            return (None, BTreeMap::new());
-        }
-        let mut buffer = vec![0u8; buffer_size as usize];
-        let items_ptr = buffer.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
-        // SAFETY: buffer is sized to buffer_size.
-        let status = unsafe {
-            PdhGetFormattedCounterArrayW(
-                counter,
-                PDH_FMT_DOUBLE,
-                &mut buffer_size,
-                &mut item_count,
-                Some(items_ptr),
-            )
-        };
-        if status != 0 {
-            return (None, BTreeMap::new());
-        }
-        // SAFETY: items_ptr points to initialized array of PDH_FMT_COUNTERVALUE_ITEM_W of length item_count.
-        let items = unsafe { std::slice::from_raw_parts(items_ptr, item_count as usize) };
-        let mut total_val = None;
-        let mut core_map = BTreeMap::new();
-        for item in items {
-            if item.szName.is_null() {
-                continue;
+    let read_counter_map =
+        |counter: PDH_HCOUNTER| -> Result<(Option<f64>, BTreeMap<usize, f64>), WindowsApiError> {
+            if counter.0.is_null() {
+                return Ok((None, BTreeMap::new()));
             }
-            // SAFETY: item.szName is valid non-null pointer within PDH buffer.
-            let name = unsafe {
-                let mut len = 0;
-                while *item.szName.0.add(len) != 0 && len < 256 {
-                    len += 1;
-                }
-                let slice = std::slice::from_raw_parts(item.szName.0, len);
-                String::from_utf16_lossy(slice)
+            let items_buffer = match query_pdh_counter_items(counter, PDH_FMT_DOUBLE) {
+                Ok(Some(items)) => items,
+                Ok(None) => return Ok((None, BTreeMap::new())),
+                Err(error) => return Err(error),
             };
-            // SAFETY: Anonymous union contains doubleValue per PDH_FMT_DOUBLE.
-            let val = unsafe { item.FmtValue.Anonymous.doubleValue };
-            if !val.is_finite() {
-                continue;
-            }
-            match parse_processor_core_index(&name) {
-                Some(None) => {
-                    if total_val.is_none() || name == "_Total" {
-                        total_val = Some(val);
+            let items = items_buffer.items();
+            let mut total_val = None;
+            let mut core_map = BTreeMap::new();
+            for item in items {
+                let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
+                    continue;
+                };
+                // SAFETY: Anonymous union contains doubleValue per PDH_FMT_DOUBLE.
+                let val = unsafe { item.FmtValue.Anonymous.doubleValue };
+                if !val.is_finite() {
+                    continue;
+                }
+                match parse_processor_core_index(&name) {
+                    Some(None) => {
+                        if total_val.is_none() || name == "_Total" {
+                            total_val = Some(val);
+                        }
                     }
+                    Some(Some(idx)) => {
+                        core_map.insert(idx, val);
+                    }
+                    None => {}
                 }
-                Some(Some(idx)) => {
-                    core_map.insert(idx, val);
-                }
-                None => {}
             }
-        }
-        (total_val, core_map)
-    };
+            Ok((total_val, core_map))
+        };
 
-    let (total_freq, freq_map) = read_counter_map(freq_counter);
-    let (total_perf, perf_map) = read_counter_map(perf_pct_counter);
+    let (total_freq, freq_map) = read_counter_map(freq_counter)?;
+    let (total_perf, perf_map) = read_counter_map(perf_pct_counter)?;
 
     // Per-core base from PROCESSOR_POWER_INFORMATION.MaxMhz (per-core-type
     // base: P 1900 / E 1500 / LP-E 1500). This is the multiplier Task Manager

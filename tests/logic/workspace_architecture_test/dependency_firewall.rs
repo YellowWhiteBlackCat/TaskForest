@@ -412,8 +412,8 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             ][..],
         ),
         // ADR-023: the privileged helper binary depends ONLY on the audited perf
-        // boundary crate (the workspace's sole unsafe trust root, reached through
-        // its safe API) — not on the whole Linux adapter — so the privileged
+        // boundary crate (one of the workspace's four unsafe trust roots, reached
+        // through its safe API) — not on the whole Linux adapter — so the privileged
         // attack surface stays minimal. serde/serde_json are non-workspace deps
         // and not tracked by this DAG assertion.
         (

@@ -28,7 +28,9 @@ use taskmanager_ui::primitives::motion::{hover_animation, hover_state_key};
 use taskmanager_ui::primitives::pill::PillState;
 use taskmanager_ui_contract::IconId;
 
-use crate::gpui_app::graph::{GraphSampleState, graph_sample_state};
+use crate::gpui_app::graph::{
+    GraphOpts, GraphSampleState, GraphSettings, graph_element, graph_sample_state,
+};
 use crate::gpui_app::icons;
 use crate::gpui_app::theme::tokens;
 use crate::gpui_app::theme::{Theme, WindowCorner, appear, fade_in};
@@ -411,7 +413,7 @@ pub fn card_shadow(t: &Theme) -> Vec<BoxShadow> {
 }
 
 /// The recurring graph-container wrapper used by every Performance graph card
-/// (perf_views.rs `render_memory` + `main_with_stats`, and cpu_view.rs per-core
+/// (the shared `render_chart` headline/secondary tiers, and cpu_view.rs per-core
 /// grid plus headline). Pure layout helper — a flex-filling, rounded, 1px-bordered
 /// card surfaced in the theme's elevated card fill (`Theme::card_surface`) that
 /// clips its graph to the rounded corners via `overflow_hidden`. Carries the
@@ -498,6 +500,46 @@ fn graph_card_with_explicit_state(
         );
     }
     graph_card(theme, host)
+}
+
+/// The mini variant of the graph-card family: one density chart cell for a
+/// grid surface (CPU per-core matrix, GPU engine inventory).
+///
+/// This is the ONE mini-cell assembly: gradient fill only (no reference
+/// rules, value pill, or hover surface — a density cell reads its value from
+/// the overlay label), the shared first-frame state overlay, and the single
+/// absolute top-left label style. Callers chain their grid sizing
+/// (`.h_full()` / `.size_full()`) and their test-support identity selector.
+pub(crate) fn mini_graph_cell(
+    theme: &Theme,
+    id: impl Into<ElementId>,
+    samples: Rc<[f32]>,
+    color: crate::gpui_app::theme::Color,
+    label: &str,
+    settings: GraphSettings,
+) -> Div {
+    let opts = GraphOpts {
+        gradient_fill: true,
+        ..GraphOpts::default()
+    }
+    .with_settings(settings);
+    // The element tail-limits its own window; the state classification reads
+    // the caller's full generation-scoped window.
+    graph_card_with_state(
+        theme,
+        graph_element(id, Rc::clone(&samples), color.into(), opts),
+        &samples,
+    )
+    .child(
+        div()
+            .absolute()
+            .top(px(4.0))
+            .left(px(6.0))
+            .text_size(tokens::FONT_10)
+            .font_weight(tokens::FONT_WEIGHT_BOLD.into())
+            .text_color(theme.fg_dim)
+            .child(label.to_owned()),
+    )
 }
 
 /// One entry of a graph legend: the series' stroke color and its localized

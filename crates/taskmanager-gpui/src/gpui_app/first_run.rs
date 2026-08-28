@@ -4,7 +4,10 @@
 //! never interprets or launches the displayed command strings; View/Run/Revert
 //!/Restart each submit their own typed action to the native provider.
 
-use gpui::{App, ClipboardItem, Context, Div, Entity, ParentElement, Styled, Window, div, px};
+use gpui::{
+    App, ClipboardItem, Context, Div, Entity, InteractiveElement, ParentElement, Styled, Window,
+    div, px,
+};
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{RootView, platform_submission_time_ms};
@@ -362,6 +365,50 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
     body.child(actions)
 }
 
+/// Render the non-modal entry point for optional setup.
+///
+/// Discovery is intentionally separate from presentation: startup may learn
+/// that the fixed setup asset exists, but that fact must not commandeer the
+/// user's current page. The Settings entry is the stable, explicit route back
+/// to the full first-run surface.
+pub(crate) fn render_settings_row(theme: &Theme, entity: Entity<RootView>) -> Div {
+    let open_entity = entity;
+    div()
+        .debug_selector(|| "first-run-settings-row".to_owned())
+        .flex()
+        .items_center()
+        .justify_between()
+        .gap(tokens::SPACE_12)
+        .child(
+            div()
+                .flex_1()
+                .min_w(px(0.0))
+                .flex()
+                .flex_col()
+                .gap(tokens::SPACE_4)
+                .child(
+                    div()
+                        .text_size(tokens::FONT_13)
+                        .text_color(theme.fg)
+                        .child(i18n::t("settings.additional_setup_detail")),
+                ),
+        )
+        .child(elements::pill(
+            theme,
+            "first-run-open-from-settings",
+            i18n::t("settings.additional_setup_open"),
+            false,
+            false,
+            move |_window: &mut Window, cx: &mut App| {
+                open_entity.update(cx, |view, cx| {
+                    view.show_first_run();
+                    cx.notify();
+                });
+            },
+            |_, _, _| {},
+        ))
+}
+
 fn submission_failure_kind(kind: SubmissionErrorKind) -> FailureKind {
     match kind {
         SubmissionErrorKind::UnsupportedCapability => FailureKind::Unsupported,
@@ -468,9 +515,10 @@ impl RootView {
                 } else {
                     FirstRunPhase::Hidden
                 };
-                if available {
-                    self.show_first_run();
-                } else {
+                // Observation is a background capability check. An optional
+                // setup must never become a startup modal; the Settings entry
+                // is the explicit discovery route.
+                if !available {
                     self.dismiss_window_surface(
                         crate::gpui_app::root::WindowSurfaceKind::FirstRun,
                         crate::gpui_app::root::WindowSurfaceDismissReason::Completed,

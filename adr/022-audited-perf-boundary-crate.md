@@ -17,8 +17,8 @@ The owner refined the safe-Rust principle rather than abandoning it:
 
 - **business crates stay `#![forbid(unsafe_code)]`** — the default build is
   still pure safe Rust for everything users and almost all telemetry touch; and
-- **OS/driver ABI work lives in ONE minimal, audited boundary crate** that
-  exposes ONLY safe APIs.
+- **each OS/driver ABI surface lives in a minimal, audited boundary crate**
+  that exposes ONLY safe APIs.
 
 The question was whether `perf_event_open` qualifies as a minimal trust root.
 It does: it is a single self-contained syscall plus two `ioctl` controls,
@@ -28,13 +28,13 @@ one trust root, and it stayed removed.
 
 ## Decision
 
-Introduce `crates/taskmanager-perf-ioctl` — the workspace's sole `unsafe`
-trust root — as the audited boundary for the Linux `perf_event_open(2)` syscall
-and its `PERF_EVENT_IOC_*` ioctl controls, used to read Intel i915 PMU
+Introduce `crates/taskmanager-perf-ioctl` — one of the workspace's four audited
+`unsafe` trust roots — as the boundary for the Linux `perf_event_open(2)`
+syscall and its `PERF_EVENT_IOC_*` ioctl controls, used to read Intel i915 PMU
 per-engine busy counters. The refined principle is encoded as a layered gate:
 
-- **Boundary crate** (`crates/taskmanager-perf-ioctl`): the only crate
-  permitted to contain `unsafe`. Its crate root carries
+- **Boundary crate** (`crates/taskmanager-perf-ioctl`): this crate is one of
+  the four permitted production `unsafe` roots. Its crate root carries
   `#![deny(unsafe_op_in_unsafe_fn)]` (NOT `forbid` — forbid would disallow the
   audited opt-out). It has exactly two `unsafe` sites:
   1. `perf_event_open` — the `libc::syscall(SYS_perf_event_open, …)` call and
@@ -54,11 +54,10 @@ per-engine busy counters. The refined principle is encoded as a layered gate:
 
 `tests/logic/workspace_architecture_test/dependency_firewall.rs` enforces:
 
-1. `default_build_is_strict_safe_rust_with_zero_unsafe` now skips an explicit
-   `UNSAFE_ALLOWLIST = &["crates/taskmanager-perf-ioctl/src"]` while still
-   forbidding `unsafe {/impl/fn/trait` + `allow(unsafe_code)` and requiring
-   `#![forbid/deny(unsafe_code)]` on every OTHER crate root — the incremental
-   gate holds for all other crates.
+1. `default_build_is_strict_safe_rust_with_zero_unsafe` skips the explicit four
+   root allowlist while still forbidding `unsafe {/impl/fn/trait` +
+   `allow(unsafe_code)` and requiring `#![forbid/deny(unsafe_code)]` on every
+   OTHER crate root — the incremental gate holds for all other crates.
 2. `audited_boundary_crate_carries_its_own_unsafe_contract` checks the
    boundary crate specifically: its root carries
    `#![deny(unsafe_op_in_unsafe_fn)]`; every `unsafe {` block and `unsafe fn`
@@ -66,11 +65,12 @@ per-engine busy counters. The refined principle is encoded as a layered gate:
    block immediately above; and no raw-pointer cast (`as *const`, `as *mut`,
    `as RawFd`), `impl AsRawFd`, or raw handle/pointer in a `pub` item crosses
    the seam.
-3. `audited_perf_boundary_crate_is_depended_on_only_by_the_linux_adapter`
-   enforces the reverse firewall: only `taskmanager-platform-linux` may depend
-   on the boundary crate, and the boundary crate has zero workspace deps.
-4. The dependency DAG test lists `taskmanager-perf-ioctl` as a permitted
-   dependency of `taskmanager-platform-linux` ONLY.
+3. `audited_perf_boundary_crate_is_depended_on_only_by_the_linux_adapter_and_helper`
+   enforces the reverse firewall: only the Linux adapter and the
+   feature-specific privilege helper may depend on this boundary crate, and the
+   boundary crate has zero workspace deps.
+4. The dependency DAG test lists `taskmanager-perf-ioctl` only at those two
+   sanctioned composition edges.
 
 ### cargo-geiger
 
@@ -78,16 +78,16 @@ CI runs `cargo geiger` as defense-in-depth (`.github/workflows/ci.yml`). The
 authoritative gate is the architecture test above (ripgrep-based, fast,
 deterministic, runs on every build via the nextest step); geiger is a
 cross-check of the dependency tree and is kept non-blocking because geiger
-releases lag the repository's pinned 1.97.1 toolchain. If geiger stabilises on
-the pinned toolchain it can be promoted to blocking; the architecture test
-holds the line regardless.
+releases can lag the repository's compatibility floor (1.97.1) and the current
+stable developer channel. If geiger stabilises across both toolchain lanes it
+can be promoted to blocking; the architecture test holds the line regardless.
 
 ## Consequences
 
 - **True positive:** Intel i915 per-engine busy utilization is reachable on
   mainline i915 (where the sysfs `busy` node is absent) via the PMU, while the
   product's "pure safe Rust for everything users touch" differentiator is
-  preserved and audited. The boundary crate is ~150 lines with exactly two
+  preserved and audited. This boundary crate is ~150 lines with exactly two
   `unsafe` sites — small enough to review in one read.
 - **Honest limit:** the `xe` driver's two-counter ticks path (engine-busy plus
   a total-ticks counter needing a `Delta`-wrapped config and its own PMU event
@@ -98,7 +98,7 @@ holds the line regardless.
   typed-empty / `FailureKind::PermissionDenied` and the rest of the GPU sample
   (frequency, RC6) is unaffected — the same honest-None convention as before.
 - **eBPF is not part of this boundary:** its object, loader and ABI are outside
-  the current production trust root; the single `perf_event_open` call remains
+  the current production trust roots; the single `perf_event_open` call remains
   independently audited.
 
 ## Alternatives considered

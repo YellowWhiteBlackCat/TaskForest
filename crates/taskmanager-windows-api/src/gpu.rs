@@ -353,7 +353,10 @@ fn query_driver_metadata(
                     Some(&mut buf_size),
                 )
             };
-            if res.is_ok() && buf_size > 0 {
+            if res.is_ok()
+                && buf_size > 0
+                && usize::try_from(buf_size).unwrap_or(usize::MAX) <= buf.len() * 2
+            {
                 let len = buf.iter().position(|&c| c == 0).unwrap_or(buf.len());
                 let s = String::from_utf16_lossy(&buf[..len]).trim().to_string();
                 if !s.is_empty() {
@@ -383,7 +386,11 @@ fn query_driver_metadata(
             if res.is_err() {
                 break;
             }
-            let sub_name = String::from_utf16_lossy(&name_buf[..name_len as usize]);
+            let name_len = usize::try_from(name_len).unwrap_or(usize::MAX);
+            if name_len > name_buf.len() {
+                break;
+            }
+            let sub_name = String::from_utf16_lossy(&name_buf[..name_len]);
             let mut dev_key = HKEY::default();
             let dev_subkey_hstring = HSTRING::from(format!(
                 "SYSTEM\\CurrentControlSet\\Control\\Class\\{}\\{}",

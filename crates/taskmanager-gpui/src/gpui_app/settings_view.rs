@@ -21,6 +21,7 @@ use crate::core::config::{
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
 };
 use crate::gpui_app::elements::pill;
+use crate::gpui_app::first_run::{self, FirstRunUiState};
 use crate::gpui_app::formatting::DisplayUnits;
 use crate::gpui_app::graph::GraphSettings;
 use crate::gpui_app::root::{Hover, RootView};
@@ -106,6 +107,7 @@ pub(crate) struct SettingsViewProps<'a> {
     pub gray_zero_values: bool,
     pub notify_enabled: bool,
     pub history_persistence: bool,
+    pub first_run: &'a FirstRunUiState,
     pub notify_quiet_start: u8,
     pub notify_quiet_end: u8,
     pub font_pref: FontPreference,
@@ -143,6 +145,7 @@ pub(crate) fn render_settings(
         gray_zero_values,
         notify_enabled,
         history_persistence,
+        first_run: first_run_state,
         notify_quiet_start,
         notify_quiet_end,
         font_pref,
@@ -156,6 +159,64 @@ pub(crate) fn render_settings(
         switches,
     } = props;
     let ent = cx.entity();
+
+    let mut system_sections = div().flex().flex_col().gap(tokens::SPACE_12).child(section(
+        t,
+        i18n::t("settings.devices"),
+        devices_row(
+            t,
+            ent.clone(),
+            DeviceVisibility {
+                cpu: show_cpu,
+                memory: show_memory,
+                disks: show_disks,
+                network: show_network,
+                network_wired: show_network_wired,
+                network_wireless: show_network_wireless,
+                network_vpn: show_network_vpn,
+                network_virtual: show_network_virtual,
+                network_other: show_network_other,
+                gpus: show_gpus,
+            },
+            switches,
+            cx,
+        ),
+    ));
+    if first_run_state.info.is_some() {
+        system_sections = system_sections.child(section(
+            t,
+            i18n::t("settings.additional_setup"),
+            first_run::render_settings_row(t, ent.clone()),
+        ));
+    }
+    system_sections = system_sections
+        .child(section(
+            t,
+            i18n::t("settings.performance"),
+            refresh_row(t, refresh_secs, slider_entity, cx),
+        ))
+        .child(section(
+            t,
+            i18n::t("settings.graph_settings"),
+            graph_options_group(
+                t,
+                ent.clone(),
+                graph_settings,
+                graph_points_slider,
+                switches,
+                cx,
+            ),
+        ))
+        .child(section(
+            t,
+            i18n::t("settings.apps"),
+            zero_values_row(t, ent.clone(), gray_zero_values, switches, cx),
+        ))
+        .child(section(
+            t,
+            i18n::t("settings.history_persistence"),
+            history_persistence_row(t, ent.clone(), history_persistence, switches, cx),
+        ));
 
     // NOTE: no outer chrome box / title row / Close button here — the wrapping
     // `dialog_overlay` (taskmanager_ui dialog) supplies them. This fn returns
@@ -235,63 +296,7 @@ pub(crate) fn render_settings(
                     text_rendering_row(t, ent.clone(), text_rendering, hovered, cx),
                 )),
         ))
-        .child(group(
-            t,
-            "settings.group_system",
-            div()
-                .flex()
-                .flex_col()
-                .gap(tokens::SPACE_12)
-                .child(section(
-                    t,
-                    i18n::t("settings.devices"),
-                    devices_row(
-                        t,
-                        ent.clone(),
-                        DeviceVisibility {
-                            cpu: show_cpu,
-                            memory: show_memory,
-                            disks: show_disks,
-                            network: show_network,
-                            network_wired: show_network_wired,
-                            network_wireless: show_network_wireless,
-                            network_vpn: show_network_vpn,
-                            network_virtual: show_network_virtual,
-                            network_other: show_network_other,
-                            gpus: show_gpus,
-                        },
-                        switches,
-                        cx,
-                    ),
-                ))
-                .child(section(
-                    t,
-                    i18n::t("settings.performance"),
-                    refresh_row(t, refresh_secs, slider_entity, cx),
-                ))
-                .child(section(
-                    t,
-                    i18n::t("settings.graph_settings"),
-                    graph_options_group(
-                        t,
-                        ent.clone(),
-                        graph_settings,
-                        graph_points_slider,
-                        switches,
-                        cx,
-                    ),
-                ))
-                .child(section(
-                    t,
-                    i18n::t("settings.apps"),
-                    zero_values_row(t, ent.clone(), gray_zero_values, switches, cx),
-                ))
-                .child(section(
-                    t,
-                    i18n::t("settings.history_persistence"),
-                    history_persistence_row(t, ent.clone(), history_persistence, switches, cx),
-                )),
-        ))
+        .child(group(t, "settings.group_system", system_sections))
         .child(group(
             t,
             "settings.group_notifications",

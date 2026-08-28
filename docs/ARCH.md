@@ -1,7 +1,8 @@
 # TaskForest 当前架构
 
-本文定义公开、当前的系统边界。实现细节归各 crate README，不在这里记录历史过程、
-完成比例或主机回执。
+本文定义公开、当前的系统边界。实现细节归各 crate README；窗口宿主与 standalone/
+layer-shell 并存合同见 [HOST_ARCHITECTURE.md](HOST_ARCHITECTURE.md)。这里不记录历史
+过程、完成比例或主机回执。
 
 ## 1. 系统目标
 
@@ -47,7 +48,7 @@ OS → platform adapter → runtime → application reducer → cached projectio
 | `taskmanager-shell` | 前端中立投影、缓存和交互词汇 | 直接采集、toolkit widget |
 | `taskmanager-platform-*` | 平台数据源和控制适配器 | 重定义领域语义、制造默认成功 |
 | `taskmanager-platform-runtime` | 调度、并发、背压和事件传递 | UI 生命周期所有权 |
-| `taskmanager-app-host` | 选择适配器并组合应用运行时 | 新建第二套事实模型 |
+| `taskmanager-app-host` | 选择适配器并组合应用运行时，发布工具包无关的 surface role 合同 | 新建第二套事实模型、持有 toolkit/native surface |
 | frontend crates | 渲染投影并提交命令 | OS I/O、阻塞采集、业务规则分叉 |
 | boundary/helper crates | 最小化原生或特权边界 | 把裸句柄、指针或未验证输入传入业务层 |
 
@@ -101,13 +102,44 @@ OS → platform adapter → runtime → application reducer → cached projectio
 业务 crate 使用 safe Rust。`unsafe` 仅存在于四个审计边界 crate，且只能向外返回拥有
 所有权、经过验证的 Rust 值。详见 [PERMISSION_MODEL.md](PERMISSION_MODEL.md)。
 
-## 8. 前端契约
+## 8. 前端契约：同异律
 
 前端共享页面和命令词汇、可用性与失败语义、主题与布局 token、无障碍语义、稳定行身份、
-危险操作确认，以及同一刷新代次的缓存投影。
+危险操作确认，以及同一刷新代次的缓存投影。跨前端的交互语义同样属于"同"，由以下定律
+约束：
 
-toolkit 特有的窗口、widget、scene 或事件类型必须停留在对应 frontend crate。共享层不添加
-GPUI、Iced、Ratatui 或 Bevy 类型。
+1. **语义完备律**：每个用户可理解概念（优先级、挂起/恢复、结束树、服务控制、启动项、
+   会话…）必须在 core 拥有中性 typed 枚举/结构体；平台原生概念（nice 值、Windows
+   priority class、POSIX 信号编号、SCM/systemd 动词）是 adapter 的映射输入，不允许直达
+   UI。守门：`tests/logic` 结构扫描 UI 壳层。
+2. **映射穷尽律**：每个平台 adapter 对每个中性语义恰好二选一——实现映射，或 typed
+   `Unsupported`。降维映射允许，但必须落在 adapter 内且覆盖枚举全域，不允许部分覆盖
+   静默丢弃。
+3. **同一律**：同一事实→显示的折叠全代码库只存在一份，归宿在 shell 折叠层；同一控制
+   语义的 label 折叠同理一份。
+4. **语义平价律**：同一投影、同一控制命令在三端三平台渲染与执行的语义必须相同——
+   标签、缺失性、行序、行为后果；像素与交互手势允许不同，语义不同即缺陷。守门：
+   `dual_track_policy_parity`、`renderer_fold_boundary`、`control_semantic_parity`。
+5. **折叠律**：渲染入口只回放数据层折叠（"一次折叠，三端渲染"），渲染模块不得重算
+   数据折叠。
+
+### 存异边界
+
+模型与投影永不携带 toolkit 类型、颜色、布局或平台原生词汇；刻意保留的表面差异——
+精度、密度、皮肤、布局预算的执行方式、执行与游标模型（如"选中即游标"与独立 visual
+cursor 可并存）、未进入共享命令表的局部按键——属于渲染层设计权。求同到语义为止，
+不到像素。每个"异"必须挂在至少一个"同"上，实现同一个共享语义；没有对应"同"的
+新行为不是"异"，是分叉，不得落地。
+
+### 防串扰律
+
+- 新交互语义先进共享层（application 命令表或 shell 交互词汇/投影），再写前端执行；
+  存量平台词汇或内联折叠在触碰时中性化、下沉（触碰迁移律）。
+- 声称跨前端 parity 的行为必须由行为测试钉住同一矩阵定义；无测试支撑的 parity 注释或
+  文档视为缺陷。
+- 修改共享语义必须三端同批落地，或显式登记未落端与原因。
+- toolkit 特有的窗口、widget、scene 或事件类型必须停留在对应 frontend crate。共享层
+  不添加 GPUI、Iced、Ratatui 或 Bevy 类型。
 
 ## 9. 安装与发布边界
 

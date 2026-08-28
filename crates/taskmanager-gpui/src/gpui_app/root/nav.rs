@@ -371,13 +371,18 @@ pub fn nav_strip_horizontal(
     cx: &mut Context<RootView>,
 ) -> Div {
     let tabs = div()
+        .id("tm-navigation-tabs-horizontal")
         .flex()
         .flex_row()
         .items_center()
         .gap(tokens::SPACE_4)
         .flex_1()
         .min_w(px(0.0))
-        .overflow_hidden()
+        // Labels are a semantic slot, not a reason to clip the last page. At
+        // narrow widths the root budget switches to icons; the scroll
+        // fallback still keeps the navigation complete for long locales and
+        // future pages.
+        .overflow_x_scroll()
         .child(tab(
             TabProps {
                 theme: t,
@@ -535,13 +540,16 @@ pub fn nav_strip_vertical(
     cx: &mut Context<RootView>,
 ) -> Div {
     let tabs = div()
+        .id("tm-navigation-tabs-vertical")
         .flex()
         .flex_col()
         .gap(tokens::SPACE_4)
         .flex_1()
         .min_h(px(0.0))
         .w_full()
-        .overflow_hidden()
+        // Vertical navigation is a real bounded rail. Let it scroll instead
+        // of allowing the lower pages to disappear when the window is short.
+        .overflow_y_scroll()
         .child(tab(
             TabProps {
                 theme: t,

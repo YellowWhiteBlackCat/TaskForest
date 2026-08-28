@@ -13,7 +13,7 @@ use crate::gpui_app::root::termination::ProcessTerminationAction;
 
 /// A single-target control intent extracted from a process-menu action.
 /// `Suspend`/`Resume` route through the neutral request vocabulary
-/// (ARCH §4.0 语义完备律): the POSIX stop/continue signals are adapter
+/// (ARCH §8.1 语义完备律): the POSIX stop/continue signals are adapter
 /// mapping details and must never be named by a UI tree
 /// (`tests/logic/control_vocabulary_boundary.rs`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

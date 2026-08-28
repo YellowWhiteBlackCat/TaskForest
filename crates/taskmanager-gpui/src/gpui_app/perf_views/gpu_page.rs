@@ -4,9 +4,10 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
+#[cfg(any(test, feature = "test-support"))]
+use gpui::InteractiveElement;
 use gpui::{
-    AnyElement, Context, Div, ElementId, InteractiveElement, IntoElement, ParentElement,
-    ScrollHandle, Styled, div, px,
+    AnyElement, Context, Div, ElementId, IntoElement, ParentElement, ScrollHandle, Styled, div, px,
 };
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryHistory;
 
@@ -15,18 +16,14 @@ use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{
     DisplayUnits, GraphUnit, PerformanceSettings, UnitKind, gpu_identity_text, missing_value,
 };
-use crate::gpui_app::graph::{
-    GraphHover, GraphOpts, GraphSettings, graph_element, latest_samples_rc,
-    latest_samples_rc_for_slide,
-};
+use crate::gpui_app::graph::{GraphHover, GraphSettings};
 use crate::gpui_app::history_samples::{gpu_engine_samples, gpu_engine_series_names};
 use crate::gpui_app::perf_views::gpu_engines_panel;
 use crate::gpui_app::perf_views::gpu_stats::{
     VramCompositionData, gpu_stats, vram_composition_data,
 };
-use crate::gpui_app::perf_views::graph_summary_row;
 use crate::gpui_app::perf_views::layout::{
-    MainColumnLayout, MainContent, MainWithStatsProps, main_with_stats,
+    ChartSpec, HeadlineSurface, PerfPageProps, perf_page, render_chart, stats_panel,
 };
 use crate::gpui_app::perf_views::smart_status::status_footer;
 use crate::gpui_app::root::RootView;
@@ -35,8 +32,7 @@ use crate::gpui_app::theme::{Theme, tokens};
 use crate::i18n;
 use taskmanager_shell::history::LiveGraphHistory;
 use taskmanager_shell::presentation::gpu_chart_metric::{
-    GpuChartMetric, GpuChartMetricChoiceState, GpuChartMetricProjection, GpuChartMetricUnit,
-    gpu_chart_metric_history,
+    GpuChartMetric, GpuChartMetricAvailability, GpuChartMetricUnit, gpu_chart_metric_history,
 };
 
 const VRAM_SUMMARY_LABEL_WIDTH: crate::gpui_app::theme::Length =
@@ -51,11 +47,8 @@ pub(crate) struct GpuRenderState<'a> {
     pub(crate) engine_device_id: taskmanager_application::DeviceId,
     pub(crate) chart_layout: GpuChartLayout,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) left_scroll: ScrollHandle,
     pub(crate) stats_scroll: ScrollHandle,
-    /// The shared chart-metric selector projection (ADR-034 stage 2): the
-    /// pill row and the headline graph consume exactly this projection.
-    pub(crate) chart_metric: GpuChartMetricProjection,
+    pub(crate) budget: crate::gpui_app::root::responsive::PerformancePageBudget,
 }
 
 /// The complete GPU chart inventory selected by responsive layout alone.
@@ -220,6 +213,8 @@ fn render_gpu_engine_grid(
     history: &CorrelatedSystemTelemetryHistory,
     metrics: &GpuMetrics,
     graph_settings: GraphSettings,
+    vertical: crate::gpui_app::root::responsive::PerformanceVerticalRunway,
+    hover_slot: &Rc<RefCell<Option<GraphHover>>>,
 ) -> Div {
     let mut engine_names = gpu_engine_series_names(history, metrics);
     if engine_names.is_empty() {
@@ -243,57 +238,31 @@ fn render_gpu_engine_grid(
         metrics.device_generation,
         &primary_name,
     );
-    let primary_samples = if graph_settings.sliding_graphs {
-        latest_samples_rc_for_slide(primary_samples, graph_settings.data_points)
-    } else {
-        latest_samples_rc(primary_samples, graph_settings.data_points)
-    };
-    let primary_summary = graph_summary_row(theme, &primary_samples, &|value| {
-        format!("{:.0}%", value.round())
-    });
-    let primary_card = elements::graph_card(
+    // The dominant engine wears the full headline contract — hover, first
+    // frame state, value pill, summary row — identified by a caption that
+    // carries the live per-engine readout.
+    let primary_card = render_chart(
         theme,
-        graph_element(
+        ChartSpec::headline(
             (
                 ElementId::from("tm-gpu-main-engine-graph"),
                 format!("{}:{primary_name}", metrics.device_id),
             ),
-            Rc::clone(&primary_samples),
-            theme.gpu.into(),
-            GraphOpts {
-                gradient_fill: true,
-                ref_lines: true,
-                value_badge: true,
-                badge_fmt: Some(crate::gpui_app::perf_views::badge_pct),
-                ..GraphOpts::default()
-            }
-            .with_settings(graph_settings),
-        ),
-    )
-    .flex_1()
-    .min_h(px(140.0))
-    .child(
-        div()
-            .absolute()
-            .top(px(6.0))
-            .left(px(8.0))
-            .flex()
-            .items_baseline()
-            .gap(tokens::SPACE_6)
-            .child(
-                div()
-                    .text_size(tokens::FONT_13)
-                    .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                    .text_color(theme.fg)
-                    .child(primary_name.clone()),
-            )
-            .child(
-                div()
-                    .text_size(tokens::FONT_14)
-                    .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                    .text_color(theme.fg_dim)
-                    .child(gpu_percentage_readout(primary_usage)),
+            (
+                ElementId::from("tm-gpu-main-engine-graph"),
+                format!("{}:{primary_name}", metrics.device_id),
             ),
+            primary_samples,
+            theme.gpu,
+            GraphUnit::Percent,
+        )
+        .with_title(format!(
+            "{primary_name}  {}",
+            gpu_percentage_readout(primary_usage)
+        )),
+        graph_settings,
+        vertical,
+        hover_slot,
     );
     #[cfg(any(test, feature = "test-support"))]
     let primary_card = {
@@ -308,13 +277,8 @@ fn render_gpu_engine_grid(
         .h_full()
         .min_h(px(0.0))
         .child(primary_card);
-    if let Some(summary) = primary_summary {
-        #[cfg(any(test, feature = "test-support"))]
-        let summary = summary.debug_selector(|| "tm-perf-gpu-primary-engine-summary".to_string());
-        container = container.child(summary);
-    }
 
-    // Remaining engines retain readable fixed-height cards below the primary.
+    // Remaining engines retain readable fixed-height cells below the primary.
     if !engine_names.is_empty() {
         let cnt = engine_names.len();
         let cols = if cnt <= 3 { cnt } else { 3 };
@@ -346,39 +310,19 @@ fn render_gpu_engine_grid(
                         metrics.device_generation,
                         name,
                     );
-                    let graph_samples = if graph_settings.sliding_graphs {
-                        latest_samples_rc_for_slide(samples, graph_settings.data_points)
-                    } else {
-                        latest_samples_rc(samples, graph_settings.data_points)
-                    };
                     let cell_label = format!("{name}  {}", gpu_percentage_readout(cur_usage));
-                    let cell = elements::graph_card(
+                    let cell = elements::mini_graph_cell(
                         theme,
-                        graph_element(
-                            (
-                                ElementId::from("tm-gpu-engine-graph"),
-                                format!("{}:{}", metrics.device_id, name),
-                            ),
-                            graph_samples,
-                            theme.gpu.into(),
-                            GraphOpts {
-                                gradient_fill: true,
-                                ..GraphOpts::default()
-                            }
-                            .with_settings(graph_settings),
+                        (
+                            ElementId::from("tm-gpu-engine-graph"),
+                            format!("{}:{}", metrics.device_id, name),
                         ),
+                        samples,
+                        theme.gpu,
+                        &cell_label,
+                        graph_settings,
                     )
-                    .size_full()
-                    .child(
-                        div()
-                            .absolute()
-                            .top(px(4.0))
-                            .left(px(6.0))
-                            .text_size(tokens::FONT_10)
-                            .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                            .text_color(theme.fg_dim)
-                            .child(cell_label),
-                    );
+                    .size_full();
                     #[cfg(any(test, feature = "test-support"))]
                     let cell = {
                         let debug_name = name.clone();
@@ -406,21 +350,25 @@ pub(crate) fn render_gpu(
     cx: &mut Context<RootView>,
     hover_slot: &Rc<RefCell<Option<GraphHover>>>,
 ) -> Div {
-    // The engine grid keeps reading the typed system history directly; only
-    // the headline chart-metric sampling had a diverging second fold, and it
-    // now rides the same shell dispatch the Iced/TUI shells consume.
+    // The engine grid keeps reading the typed system history directly; the
+    // chartable scalar families ride the same shell dispatch the Iced/TUI
+    // shells consume.
     let telemetry = live_graph.store();
     let graph_settings = gpu_state.performance.graph;
     let Some(g) = snap.gpu.get(i) else {
         return div();
     };
-    let selected = gpu_state.chart_metric.selected;
+    // The headline chart is the utilization family — no selector, no hidden
+    // families. Every chartable family the device actually reports renders
+    // as its own graph below the headline; a family the platform cannot
+    // measure renders nothing at all (never a fabricated zero).
     let samples = gpu_chart_metric_history(
         live_graph,
         &g.device_id,
         g.device_generation.get(),
-        selected,
+        GpuChartMetric::Utilization,
     );
+    let availability = GpuChartMetricAvailability::for_viewed_gpu(Some(g));
 
     // Hardware identity and driver identity are distinct facts. A resolved
     // product such as "Arc B390" leads; the generic adapter brand qualifies
@@ -429,15 +377,9 @@ pub(crate) fn render_gpu(
 
     let stats = gpu_stats(g, gpu_state.performance.units);
     let vram_data = vram_composition_data(g);
-    let graph_unit = match selected.unit() {
-        GpuChartMetricUnit::Percent => GraphUnit::Percent,
-        GpuChartMetricUnit::Watts => GraphUnit::Watts,
-        GpuChartMetricUnit::Celsius => GraphUnit::Temperature,
-        GpuChartMetricUnit::Megahertz => GraphUnit::Megahertz,
-    };
-    let graph_max = gpu_chart_metric_max(selected.unit(), &samples);
     // Stats footer: the device-status footer (when not Healthy) PLUS the
-    // per-engine GPU utilization card (when supported).
+    // VRAM composition card and the per-engine GPU utilization card (when
+    // supported).
     let mut footer_children: Vec<AnyElement> = Vec::new();
     if let Some(f) = status_footer(theme, g.device_state.status) {
         footer_children.push(f);
@@ -478,51 +420,134 @@ pub(crate) fn render_gpu(
         )
     };
     let engine_names = gpu_engine_series_names(&telemetry.system_history, g);
-    let main_content = if gpu_state
+    let headline = if gpu_state
         .chart_layout
         .shows_engine_inventory(engine_names.len())
     {
-        MainContent::EngineInventory(
-            render_gpu_engine_grid(theme, &telemetry.system_history, g, graph_settings)
-                .into_any_element(),
+        HeadlineSurface::Custom(
+            render_gpu_engine_grid(
+                theme,
+                &telemetry.system_history,
+                g,
+                graph_settings,
+                gpu_state.budget.vertical,
+                hover_slot,
+            )
+            .into_any_element(),
         )
     } else {
-        MainContent::AggregateGraph
+        HeadlineSurface::Charts(vec![ChartSpec::headline(
+            "main-graph",
+            (ElementId::from("tm-perf-main-graph"), g.device_id.clone()),
+            // The utilization family's generation-scoped window arrives as an
+            // owned Vec; moving it into `Rc` hands the buffer to the graph
+            // without a second copy.
+            Rc::from(samples),
+            theme.gpu,
+            GraphUnit::Percent,
+        )])
     };
-    let selector = render_gpu_chart_metric_selector(theme, i, &gpu_state.chart_metric, cx);
-    let main = main_with_stats(MainWithStatsProps {
+    let main = perf_page(PerfPageProps {
         theme,
-        left_scroll: gpu_state.left_scroll,
         stats_scroll: gpu_state.stats_scroll,
         title,
         subtitle,
-        graph_id: (ElementId::from("tm-perf-main-graph"), g.device_id.clone()).into(),
-        // The selected family's generation-scoped window arrives as an owned
-        // Vec; moving it into `Rc` hands the buffer to the graph without a
-        // second copy.
-        graph_samples: Rc::from(samples),
-        graph_color: theme.gpu,
-        graph_opts: GraphOpts {
-            max: graph_max,
-            ..GraphOpts::default()
-        },
-        graph_settings,
-        graph_unit,
-        graph_dual: None,
-        main_content,
-        stats,
+        header_extra: None,
+        headline,
+        below: render_gpu_metric_graphs(
+            theme,
+            live_graph,
+            g,
+            &availability,
+            graph_settings,
+            gpu_state.budget,
+            hover_slot,
+        ),
+        stats: stats_panel(theme, stats),
         stats_footer: footer,
-        main_column: MainColumnLayout::Viewport,
-        left_footer: None,
         hover_slot,
-        graph_controls: Some(selector.into_any_element()),
+        graph_settings,
+        budget: gpu_state.budget,
     });
     div().size_full().child(main)
 }
 
-/// The headline graph's y-ceiling for one family (ADR-034 stage 2):
-/// percent families keep the fixed 0–100 ladder, scalar families scale to
-/// their window's finite peak with a sane floor so a lone sample still reads.
+/// Every chartable family the viewed GPU reports, as its own secondary chart
+/// beneath the headline (no selector — the product contract is "show all
+/// measured content, hide what is not read"). Utilization is the headline's
+/// own family and never repeats here; a family absent from the device's
+/// latest typed point, whose window holds no finite sample, or when the
+/// chart-inventory budget keeps only the aggregate, renders nothing.
+fn render_gpu_metric_graphs(
+    theme: &Theme,
+    live_graph: &LiveGraphHistory,
+    gpu: &GpuMetrics,
+    availability: &GpuChartMetricAvailability,
+    graph_settings: GraphSettings,
+    budget: crate::gpui_app::root::responsive::PerformancePageBudget,
+    hover_slot: &Rc<RefCell<Option<GraphHover>>>,
+) -> Option<AnyElement> {
+    use crate::gpui_app::root::responsive::PerformanceChartInventory;
+    if budget.chart_inventory != PerformanceChartInventory::Full {
+        return None;
+    }
+    let mut cards: Vec<AnyElement> = Vec::new();
+    for metric in GpuChartMetric::ALL {
+        if metric == GpuChartMetric::Utilization || !availability.is_available(metric) {
+            continue;
+        }
+        let samples = gpu_chart_metric_history(
+            live_graph,
+            &gpu.device_id,
+            gpu.device_generation.get(),
+            metric,
+        );
+        if !samples.iter().any(|value| value.is_finite()) {
+            continue;
+        }
+        let unit = match metric.unit() {
+            GpuChartMetricUnit::Percent => crate::gpui_app::formatting::GraphUnit::Percent,
+            GpuChartMetricUnit::Watts => crate::gpui_app::formatting::GraphUnit::Watts,
+            GpuChartMetricUnit::Celsius => crate::gpui_app::formatting::GraphUnit::Temperature,
+            GpuChartMetricUnit::Megahertz => crate::gpui_app::formatting::GraphUnit::Megahertz,
+        };
+        let max = gpu_chart_metric_max(metric.unit(), &samples);
+        let stem = metric.id_stem();
+        cards.push(
+            render_chart(
+                theme,
+                ChartSpec::secondary(
+                    ElementId::Name(format!("gpu-{stem}-graph").into()),
+                    (
+                        ElementId::from("tm-perf-secondary-graph"),
+                        format!("{}:{stem}", gpu.device_id),
+                    ),
+                    i18n::t(metric.label_key()).to_string(),
+                    Rc::from(samples),
+                    theme.gpu,
+                    unit,
+                )
+                .with_max(max),
+                graph_settings,
+                budget.vertical,
+                hover_slot,
+            )
+            .into_any_element(),
+        );
+    }
+    (!cards.is_empty()).then(|| {
+        div()
+            .flex()
+            .flex_col()
+            .gap(tokens::SPACE_8)
+            .children(cards)
+            .into_any_element()
+    })
+}
+
+/// The headline graph's y-ceiling for one scalar family: percent families
+/// keep the fixed 0–100 ladder, scalar families scale to their window's
+/// finite peak with a sane floor so a lone sample still reads.
 fn gpu_chart_metric_max(unit: GpuChartMetricUnit, samples: &[f32]) -> f32 {
     match unit {
         GpuChartMetricUnit::Percent => 100.0,
@@ -541,87 +566,5 @@ fn gpu_chart_metric_max(unit: GpuChartMetricUnit, samples: &[f32]) -> f32 {
             .copied()
             .filter(|value| value.is_finite())
             .fold(100.0, f32::max),
-    }
-}
-
-/// The chart-metric choice pill row (ADR-034 stage 2): one focusable
-/// [`elements::Pill`] per family projected from the shared selection.
-/// Available families are keyboard tab-stops with pointer + Enter/Space
-/// activation through the shell's gate; unavailable families stay visible,
-/// dimmed, and outside the focus order — the projection of the same
-/// boundary that rejects the selection, not a second rule.
-fn render_gpu_chart_metric_selector(
-    theme: &Theme,
-    gpu_index: usize,
-    projection: &GpuChartMetricProjection,
-    cx: &mut Context<RootView>,
-) -> Div {
-    let mut row = div()
-        .flex()
-        .flex_row()
-        .flex_wrap()
-        .items_center()
-        .gap(tokens::SPACE_4)
-        .debug_selector(|| "tm-gpu-chart-metric-selector".to_string());
-    for choice in projection.choices {
-        let available = choice.state != GpuChartMetricChoiceState::Unavailable
-            && choice.state != GpuChartMetricChoiceState::SelectedUnavailable;
-        let active = choice.state == GpuChartMetricChoiceState::Selected
-            || choice.state == GpuChartMetricChoiceState::SelectedUnavailable;
-        let stem = choice.metric.id_stem().to_owned();
-        let label = i18n::t(choice.metric.label_key()).to_owned();
-        let metric = choice.metric;
-        let entity = cx.entity();
-        let pill = elements::Pill::new(
-            (ElementId::from("tm-gpu-chart-metric-pill"), stem.clone()),
-            label,
-            move |_window: &mut gpui::Window, app: &mut gpui::App| {
-                entity.update(app, |view, cx| {
-                    view.select_gpu_chart_metric(metric, gpu_index, cx);
-                });
-            },
-            |_, _, _| {},
-        )
-        .active(active)
-        .enabled(available)
-        .render(theme);
-        row = row.child(
-            div()
-                .debug_selector(move || format!("tm-gpu-chart-metric-pill:{stem}"))
-                .child(pill),
-        );
-    }
-    row
-}
-
-impl RootView {
-    /// The pill/keyboard activation path (ADR-034 stage 2): route the family
-    /// through the shell's availability gate for the viewed device. An
-    /// unavailable family changes nothing.
-    pub fn select_gpu_chart_metric(
-        &mut self,
-        metric: GpuChartMetric,
-        gpu_index: usize,
-        cx: &mut Context<RootView>,
-    ) {
-        let gate =
-            taskmanager_shell::gpu_chart_metric_gate(self.system_snapshot().gpu.get(gpu_index));
-        if self.shell.select_gpu_chart_metric(metric, &gate) {
-            cx.notify();
-        }
-    }
-
-    /// The per-tick chart-metric fold (ADR-034 stage 2): reconcile this
-    /// window's shared selection against the viewed GPU's gate. Called from
-    /// the application update loop before render, next to the engine-rows
-    /// visibility reconcile.
-    pub(crate) fn reconcile_gpu_chart_metric(&mut self) {
-        use crate::gpui_app::root::TopPage;
-        use crate::gpui_app::sidebar::SelectedDevice;
-        if let (TopPage::Performance, SelectedDevice::Gpu(index)) = (self.page, self.selected) {
-            let gate =
-                taskmanager_shell::gpu_chart_metric_gate(self.system_snapshot().gpu.get(index));
-            self.shell.reconcile_gpu_chart_metric(&gate);
-        }
     }
 }

@@ -1,4 +1,4 @@
-//! Typed ViewModel contract for telemetry stat panels (ARCH.md §4.0
+//! Typed ViewModel contract for telemetry stat panels (ARCH.md §8.1
 //! "一次折叠，三端渲染", phase 2).
 //!
 //! One fold, three renderers: producers hand the frontend an

@@ -1,6 +1,6 @@
 //! source-inspection: static-policy
 //!
-//! Negative gate for the control-vocabulary boundary (ARCH.md §4.0 语义完备律,
+//! Negative gate for the control-vocabulary boundary (ARCH.md §8.1 语义完备律,
 //! 2026-08-19).
 //!
 //! Two platform-native control vocabularies are banned from the UI shells:
@@ -137,7 +137,7 @@ fn ui_shells_construct_no_raw_nice_priority_control() {
         offenders.is_empty(),
         "raw nice-value priority control in UI shell(s): {offenders:?} — a frontend must \
          construct ProcessBatchAction::SetPriority(PriorityTier) and read labels through \
-         taskmanager_shell::presentation::priority_tier_label (ARCH.md §4.0 语义完备律: a \
+         taskmanager_shell::presentation::priority_tier_label (ARCH.md §8.1 语义完备律: a \
          raw nice number never crosses into a UI; the adapters own the tier→native mapping)."
     );
 }
@@ -150,7 +150,7 @@ fn ui_shells_never_name_the_stop_or_continue_signals() {
         offenders.is_empty(),
         "POSIX stop/continue signal vocabulary in UI shell(s): {offenders:?} — suspend and \
          resume are the neutral ProcessControlRequest::Suspend/Resume concepts; SIGSTOP/SIGCONT \
-         are adapter mapping details that must never cross into a UI (ARCH.md §4.0 语义完备律)."
+         are adapter mapping details that must never cross into a UI (ARCH.md §8.1 语义完备律)."
     );
 }
 
