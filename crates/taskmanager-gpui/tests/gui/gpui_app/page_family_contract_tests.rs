@@ -4,11 +4,21 @@
 //! data page must paint `tm-page-scaffold` (the shared `PageScaffold`
 //! shell). A page that grows its own outer wrapper fails here before the
 //! families can drift apart.
+//!
+//! All selector identities are imported constants shared with the producers
+//! (`taskmanager_ui::layout::selectors`, `list_view`/`perf_views::layout`/
+//! `root::render`): a selector cannot drift between the builder and this
+//! assertion, and a typo is a compile error instead of a silent `None`.
 
-use gpui::{AppContext, TestAppContext, VisualTestContext, px, size};
+use gpui::{AppContext, TestAppContext, VisualTestContext};
 
-use crate::gpui_app::root::{RootView, TopPage};
+use crate::gpui_app::list_view::LIST_PAGE_SCAFFOLD_SELECTOR;
+use crate::gpui_app::perf_views::PERF_MAIN_VIEWPORT_SELECTOR;
+use crate::gpui_app::root::RootView;
+use crate::gpui_app::root::navigation::{PageFamily, TopPage};
+use crate::gpui_app::root::render::TELEMETRY_READY_BODY_SELECTOR;
 use crate::gpui_app::theme::Theme;
+use taskmanager_ui::layout::selectors::{PAGE_SCAFFOLD, PAGE_SCAFFOLD_FOOTER};
 
 fn wrapped_root(cx: &mut TestAppContext) -> (gpui::WindowHandle<RootView>, gpui::Entity<RootView>) {
     let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
@@ -25,7 +35,6 @@ fn draw(cx: &mut TestAppContext, win: gpui::WindowHandle<RootView>) {
 /// surface, every other page is a data surface.
 #[test]
 fn page_family_mapping_has_one_chart_surface() {
-    use crate::gpui_app::root::navigation::PageFamily;
     assert_eq!(TopPage::Performance.family(), PageFamily::Chart);
     for page in TopPage::ALL {
         let expected = if page == TopPage::Performance {
@@ -37,27 +46,20 @@ fn page_family_mapping_has_one_chart_surface() {
     }
 }
 
-/// Every DATA page composes through the one shared outer shell, and the
-/// list-style inventory pages additionally share the one inner
-/// header+body scaffold — so a skeleton adjustment in `PageScaffold` or
-/// `ListPageScaffold` propagates to all of them at once.
+/// Every top-level page paints ITS family's composition root, proven on a
+/// FRESH window per page: one page's deferred render work (service list
+/// internals, focus/scroll handles) can otherwise leak into the next manual
+/// draw in the harness and make a later page observe the previous page's
+/// frame. A fresh surface proves each page composes correctly on its own,
+/// which is what the product contract demands.
 ///
-/// Each page probes on a FRESH window: one page's deferred render work
-/// (service list internals, focus/scroll handles) can otherwise leak into
-/// the next manual draw in the harness and make a later page observe the
-/// previous page's frame. A fresh surface proves every page composes
-/// correctly on its own, which is what the product contract demands.
+/// The loop is exhaustive over `TopPage::ALL`, so a NEW page is covered the
+/// moment it exists. Per-page expectations come from the typed declarations
+/// (`family()`, `uses_list_scaffold()`), never from a second list mirrored
+/// here — the guard reads the mapping instead of re-stating it.
 #[gpui::test]
-async fn every_data_page_paints_the_shared_page_scaffold(cx: &mut TestAppContext) {
-    for page in [
-        TopPage::Apps,
-        TopPage::Services,
-        TopPage::System,
-        TopPage::Startup,
-        TopPage::Users,
-        TopPage::AppHistory,
-        TopPage::Containers,
-    ] {
+async fn every_top_level_page_paints_its_family_root(cx: &mut TestAppContext) {
+    for page in TopPage::ALL {
         let (win, view) = wrapped_root(cx);
         view.update(cx, |v, cx| {
             v.mark_telemetry_frame_ready();
@@ -68,10 +70,10 @@ async fn every_data_page_paints_the_shared_page_scaffold(cx: &mut TestAppContext
         let mut vcx = VisualTestContext::from_window(win.into(), cx);
         if std::env::var("TM_FAMILY_PROBE").is_ok() {
             for probe in [
-                "tm-page-scaffold",
-                "tm-page-scaffold-footer",
-                "tm-list-page-scaffold",
-                "tm-telemetry-ready-body",
+                PAGE_SCAFFOLD,
+                PAGE_SCAFFOLD_FOOTER,
+                LIST_PAGE_SCAFFOLD_SELECTOR,
+                TELEMETRY_READY_BODY_SELECTOR,
             ] {
                 eprintln!(
                     "[family-probe] {page:?} {probe}={:?}",
@@ -79,41 +81,35 @@ async fn every_data_page_paints_the_shared_page_scaffold(cx: &mut TestAppContext
                 );
             }
         }
-        assert!(
-            vcx.debug_bounds("tm-page-scaffold").is_some(),
-            "{page:?} must compose through the shared data-page shell"
-        );
-        // The list-style inventory pages additionally share the ONE inner
-        // header+body scaffold; every other data page must NOT mount it.
-        let expects_list_shell =
-            matches!(page, TopPage::Services | TopPage::Users | TopPage::Startup);
-        assert_eq!(
-            vcx.debug_bounds("tm-list-page-scaffold").is_some(),
-            expects_list_shell,
-            "{page:?} list-shell presence drifted from ListPageScaffold usage"
-        );
-    }
-}
 
-/// The CHART surface never mounts the data shell: it owns its own
-/// composition root, and the two families stay structurally distinct.
-#[gpui::test]
-async fn chart_surface_uses_its_own_root_not_the_data_shell(cx: &mut TestAppContext) {
-    let (win, view) = wrapped_root(cx);
-    cx.simulate_window_resize(win.into(), size(px(1180.0), px(780.0)));
-    view.update(cx, |v, cx| {
-        v.mark_telemetry_frame_ready();
-        v.page = TopPage::Performance;
-        cx.notify();
-    });
-    draw(cx, win);
-    let mut vcx = VisualTestContext::from_window(win.into(), cx);
-    assert!(
-        vcx.debug_bounds("tm-perf-main-viewport").is_some(),
-        "the Performance surface must compose through perf_page"
-    );
-    assert!(
-        vcx.debug_bounds("tm-page-scaffold").is_none(),
-        "the chart surface must not mount the data-page shell"
-    );
+        match page.family() {
+            PageFamily::Chart => {
+                assert!(
+                    vcx.debug_bounds(PERF_MAIN_VIEWPORT_SELECTOR).is_some(),
+                    "{page:?} must compose through its own chart root ({PERF_MAIN_VIEWPORT_SELECTOR} is missing from the rendered frame)"
+                );
+                assert!(
+                    vcx.debug_bounds(PAGE_SCAFFOLD).is_none(),
+                    "the chart surface must not mount the data-page shell ({PAGE_SCAFFOLD} was found in the frame)"
+                );
+                assert!(
+                    vcx.debug_bounds(LIST_PAGE_SCAFFOLD_SELECTOR).is_none(),
+                    "the chart surface must not mount the list-page shell"
+                );
+            }
+            PageFamily::Data => {
+                assert!(
+                    vcx.debug_bounds(PAGE_SCAFFOLD).is_some(),
+                    "{page:?} must compose through the shared data-page shell ({PAGE_SCAFFOLD} is missing from the rendered frame)"
+                );
+                let list_painted = vcx.debug_bounds(LIST_PAGE_SCAFFOLD_SELECTOR).is_some();
+                assert_eq!(
+                    list_painted,
+                    page.uses_list_scaffold(),
+                    "{page:?} list-shell presence drifted: uses_list_scaffold() = {}, {LIST_PAGE_SCAFFOLD_SELECTOR} painted = {list_painted}",
+                    page.uses_list_scaffold()
+                );
+            }
+        }
+    }
 }

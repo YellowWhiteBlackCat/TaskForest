@@ -34,6 +34,7 @@ mod gpu_page;
 mod gpu_stats;
 pub(crate) mod history_replay;
 mod layout;
+pub use layout::PERF_MAIN_VIEWPORT_SELECTOR;
 mod memory_composition;
 mod memory_details;
 mod memory_stats;

@@ -31,10 +31,18 @@ replayed N times, once per page.
 4. The chart surface keeps its own composition root (ADR-039); the two
    families never share a shell.
 5. A render-path guard (`page_family_contract_tests`, mounted in
-   `navigation.rs`) proves the split: every data page paints
-   `tm-page-scaffold`; the chart surface paints `tm-perf-main-viewport`
-   while never mounting the data shell. A page that grows its own outer
-   wrapper fails here before the families can drift apart.
+   `navigation.rs`) proves the split. It iterates `TopPage::ALL` — a NEW
+   page is covered the moment it exists — and reads the per-page
+   expectations from typed declarations (`family()`, `uses_list_scaffold()`)
+   instead of mirroring a second list. Every data page paints
+   `tm-page-scaffold`; list pages additionally paint
+   `tm-list-page-scaffold`; the chart surface paints
+   `tm-perf-main-viewport` while never mounting the data shell. Selector
+   identities are shared constants between producers and the guard
+   (`taskmanager_ui::layout::selectors` and the owning modules), so
+   producer/assertion spelling drift is a compile error, not a silent
+   `None`. Each page probes on a FRESH window: one page's deferred render
+   work can otherwise leak into the next manual draw in the harness.
 6. The telemetry-readiness marker `tm-telemetry-ready-body` lives on the
    shared `page_viewport` wrapper, never stamped onto the page body: the
    body owns its family selector, and re-stamping would erase it before the

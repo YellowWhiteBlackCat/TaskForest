@@ -41,10 +41,12 @@ parent owns the discoverable scroll affordance.
 `PageScaffold` is the data-page family's ONE outer shell (ADR-042): every
 non-chart top-level page in `taskmanager-gpui` composes through this
 viewport/frame/footer column, and no page may grow its own outer wrapper.
-The render-path guard (`page_family_contract_tests`) proves every data page
-paints `tm-page-scaffold`; the telemetry-readiness marker lives on the
-`page_viewport` wrapper, never stamped onto the page body, so the body keeps
-its family selector.
+The render-path guard (`page_family_contract_tests`, exhaustive over
+`TopPage::ALL`) proves every page paints its family root; selector
+identities are shared constants (`layout::selectors`) between this crate
+and the guard, so they cannot drift apart. The telemetry-readiness marker
+lives on the `page_viewport` wrapper, never stamped onto the page body, so
+the body keeps its family selector.
 
 `SelectableText` is the read-only selection authority: stable per-element state,
 UTF-8-safe pointer ranges, palette selection ink, Ctrl/Cmd+A and Ctrl/Cmd+C,

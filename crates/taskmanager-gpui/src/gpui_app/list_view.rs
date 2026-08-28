@@ -46,6 +46,12 @@ use taskmanager_ui::primitives::pill::{Pill, PillState};
 use taskmanager_ui::primitives::state_panel::StatePanel;
 use taskmanager_ui_contract::IconId;
 
+/// Debug-selector identity of the shared list-page inner shell.
+///
+/// Shared between the builder and the render-path guard (ADR-042) so the
+/// assertion can never spell a drifted selector.
+pub const LIST_PAGE_SCAFFOLD_SELECTOR: &str = "tm-list-page-scaffold";
+
 /// Shared page shell for list-oriented top-level views.
 ///
 /// The header is intentionally an already-composed element: Services,
@@ -77,7 +83,7 @@ impl ListPageScaffold {
             // The list-page family's ONE inner shell (ADR-042): header band
             // + bounded body, shared by every inventory page so their
             // chrome/list separation adjusts in one place.
-            .debug_selector(|| "tm-list-page-scaffold".to_string())
+            .debug_selector(|| LIST_PAGE_SCAFFOLD_SELECTOR.to_string())
             .child(self.header)
             .child(
                 div()

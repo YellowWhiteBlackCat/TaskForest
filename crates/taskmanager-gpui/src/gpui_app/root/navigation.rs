@@ -50,6 +50,19 @@ impl TopPage {
         }
     }
 
+    /// Whether this DATA page additionally composes through the shared
+    /// `ListPageScaffold` inner header+body shell (ADR-042). Declared next
+    /// to the family mapping so the render guard reads one typed source
+    /// instead of mirroring a second list in the test.
+    pub const fn uses_list_scaffold(self) -> bool {
+        match self {
+            Self::Services | Self::Users | Self::Startup => true,
+            Self::Performance | Self::Apps | Self::System | Self::AppHistory | Self::Containers => {
+                false
+            }
+        }
+    }
+
     /// Every page, for exhaustive iteration (tests, nav construction).
     pub const ALL: [TopPage; 8] = [
         TopPage::Performance,

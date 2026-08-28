@@ -8,6 +8,12 @@
 //! raw building blocks (`performance_split`, `stats_panel`, the card
 //! assembly) stay module-private on purpose: the only way out is this module.
 
+/// Debug-selector identity of the ONE Performance composition root.
+///
+/// Shared with the page-family render guard (ADR-039/042) so the chart
+/// assertion can never spell a drifted root.
+pub const PERF_MAIN_VIEWPORT_SELECTOR: &str = "tm-perf-main-viewport";
+
 use gpui::{
     AnyElement, Div, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels,
     ScrollHandle, Stateful, Styled, div, px,
@@ -525,7 +531,7 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         .flex_1()
         .h_full()
         .overflow_hidden()
-        .debug_selector(|| "tm-perf-main-viewport".to_string());
+        .debug_selector(|| PERF_MAIN_VIEWPORT_SELECTOR.to_string());
     let mut left = div()
         .flex()
         .flex_col()
