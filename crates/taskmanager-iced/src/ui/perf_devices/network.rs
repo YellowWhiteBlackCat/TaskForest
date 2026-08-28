@@ -25,9 +25,12 @@ pub(crate) fn network_section_state(snapshot: Option<&SystemSnapshot>) -> tables
 /// other adapter carries its typed category plus the interface name.
 #[must_use]
 pub(crate) fn network_title(nic: &NetworkMetrics) -> String {
+    // The fold layer owns the observation reads (ARCH.md §8.1 / the
+    // renderer-fold gate): the paint module never re-reads the metrics.
+    let observed = super::projection::NetworkObservation::from(nic);
     let is_wireless = nic.adapter_type() == NetworkAdapterType::WiFi;
     let category = super::super::perf_rail::network_category_label(nic.adapter_type());
-    match (is_wireless, nic.current_ssid()) {
+    match (is_wireless, observed.ssid.as_deref()) {
         (true, Some(ssid)) if !ssid.is_empty() => {
             format!("{}: {} ({})", t("sidebar.wifi"), ssid, nic.interface_name)
         }
@@ -41,8 +44,9 @@ pub(crate) fn network_title(nic: &NetworkMetrics) -> String {
 /// reports it.
 #[must_use]
 pub(crate) fn network_vital_line(nic: &NetworkMetrics) -> String {
+    let observed = super::projection::NetworkObservation::from(nic);
     let mut segments = vec![t(device_status_i18n_key(nic.device_state.status)).to_string()];
-    if let Some(speed) = nic.current_link_speed_mbps() {
+    if let Some(speed) = observed.link_speed_mbps {
         segments.push(format!("{speed} Mbps"));
     }
     segments.join(" · ")

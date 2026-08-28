@@ -15,29 +15,38 @@
 //!   * Iced — `crates/taskmanager-iced/src`;
 //!   * TUI  — `crates/taskmanager-tui/src`.
 //!
-//! Detection is deliberately narrow and structural — it flags the observable
-//! signature of an inline fold in a render module:
-//!   * a typed observation READ (`.current_*_pct()` / `.current_*_bytes()` /
-//!     `.current_*_mhz()` and the `current_*()` scalar family) inside the
-//!     same file that also paints (`fn render`, `impl TableDelegate`, or a
-//!     gpui `div()` builder — per-frontend paint idioms below).
+//! Detection is deliberately fail-closed and structural — it flags the
+//! observable signature of an inline fold in a render module:
+//!   * a `current_*` observation READ against a typed metrics/observation
+//!     accessor inside the same file that also paints (`fn render`,
+//!     `impl TableDelegate`, or a gpui `div()` builder — per-frontend paint
+//!     idioms below).
 //!
-//! The read signature is shared verbatim across the three frontends: grep
-//! confirmed both `taskmanager-iced` and `taskmanager-tui` read the same
-//! typed `current_*` scalar accessors as GPUI (`current_global_usage_pct()`,
-//! `current_total_bytes(`, `current_frequency_mhz()`, `current_iops()`,
-//! `current_response_time_ms()`, ...), so the suffix family needs no
-//! per-frontend variant. Two other typed-read idioms were surveyed and are
-//! deliberately NOT folded into the signature (宁窄勿误报, GPUI parity):
-//!   * `.current_value()` — the sensor/fan/measurement observation read used
-//!     by `fan.rs`/`insights.rs`-style modules. GPUI's signature does not
-//!     count it either (its sensor files are flagged via their co-located
-//!     `_pct()` reads); adding `_value()` here would make Iced/TUI broader
-//!     than the GPUI gate. Broadening all three is a separate decision.
-//!   * direct `*Availability::` pattern matches (`ServiceLogAvailability::`,
-//!     `ScalarAvailability::`) — those fold availability STATE, not scalar
-//!     observation values, and matching enum variants by prefix would be a
-//!     different (and noisier) gate.
+//! The rule matches the `current_*` accessor family by PREFIX, not by an
+//! exhaustive suffix whitelist. A suffix list fails OPEN: accessors outside
+//! the enumerated suffixes (e.g. `current_link_speed_mbps()`,
+//! `current_slots_used()`, `current_used_rate_mib_per_sec()`,
+//! `current_compressed_swap_cache_enabled()`) silently escape the gate,
+//! which is exactly the drift the gate exists to catch. Prefix matching
+//! fails CLOSED: an unknown `current_*` call in a paint module trips the
+//! gate, and a reviewer decides whether it is a real fold (move the read to
+//! the page's data-layer module) or a surveyed non-observation idiom (add
+//! it to the documented denylist in `has_observation_read`).
+//!
+//! The denylist is small and every entry names WHY it is not a scalar
+//! observation read:
+//!   * `.current_value(` / `.current_number(` — sensor/fan/measurement
+//!     reads on the core `Observation` type (GPUI parity: the GPUI signature
+//!     does not count the sensor read either; its sensor modules are caught
+//!     via co-located `_pct()` reads).
+//!   * `.current_user(` / `.current_start_token(` / `.current_exe_path(` —
+//!     process/session identity accessors, not scalar observations.
+//!   * `"alerts.current_value"` — an i18n key literal whose dotted name
+//!     coincidentally starts with `.current_`.
+//!
+//! Direct `*Availability::` pattern matches stay out by design: they fold
+//! availability STATE, not scalar observation values, and matching enum
+//! variants by prefix would be a different (and noisier) gate.
 //!
 //! A finding is fixed by moving the read into the page's data-layer module and
 //! passing the folded string/ViewModel down. Adding an exception is not a fix.
@@ -64,22 +73,29 @@ fn strip_line_comments(source: &str) -> String {
         .join("\n")
 }
 
-/// The observable signature of an inline fact fold: a typed observation read.
-/// Shared by all three frontends (see module docs for the surveyed-and-
-/// rejected `.current_value()` / `*Availability::` idioms).
+/// `current_*` call sites surveyed as NOT typed scalar observation reads.
+///
+/// Kept on a documented denylist (module docs) so the prefix rule fails
+/// closed: anything matching `.current_` and NOT listed here is treated as
+/// an observation read and trips the gate in a paint module.
+const NON_OBSERVATION_READ_IDS: &[&str] = &[
+    // Sensor/fan/measurement reads on the core `Observation` type (GPUI
+    // parity) — see module docs.
+    ".current_value(",
+    ".current_number(",
+    // Identity/token accessors, not scalar observations.
+    ".current_user(",
+    ".current_start_token(",
+    ".current_exe_path(",
+    // i18n key literal with a coincidental ".current_" prefix.
+    "\"alerts.current_value\"",
+];
+
+/// The observable signature of an inline fact fold: a typed observation
+/// read. Matches the `current_*` accessor family by PREFIX and fails
+/// closed against the surveyed non-observation denylist above.
 fn has_observation_read(code: &str) -> bool {
-    code.contains(".current_")
-        && [
-            "_pct()",
-            "_bytes(",
-            "_mhz()",
-            "_pct_by()",
-            "_secs()",
-            "_iops()",
-            "_ms()",
-        ]
-        .iter()
-        .any(|suffix| code.contains(suffix))
+    code.contains(".current_") && !NON_OBSERVATION_READ_IDS.iter().any(|id| code.contains(id))
 }
 
 /// The observable signature of a render module: it paints. Per frontend:
