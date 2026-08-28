@@ -12,7 +12,7 @@ use taskmanager_shell::{ShellApp, ShellKeyEvent};
 
 use crate::app::{IcedApp, IcedKey, Message};
 use crate::ui::overlays::process_details::{filtered_environment_rows, working_directory_value};
-use crate::ui::perf_devices::network::network_summary_lines;
+use crate::ui::perf_devices::network::{network_summary_lines, network_title};
 use taskmanager_application::ProcessEnvironmentEntry;
 
 #[test]
@@ -71,15 +71,29 @@ fn test_network_wifi_signal_formatting() {
     );
 
     let rows = network_summary_lines(&nic, false, false);
-    let ssid_row = rows.iter().find(|(k, _)| k == "SSID");
-    assert!(ssid_row.is_some());
-    assert_eq!(ssid_row.unwrap().1, "HomeWiFi_5G");
+    // GPUI parity: the SSID lives in the page TITLE, not the stats rail; the
+    // signal row carries the dBm + quality fact.
+    assert_eq!(
+        network_title(&nic),
+        "Wi-Fi: HomeWiFi_5G ()",
+        "an associated wireless link surfaces its SSID as the page heading"
+    );
+    assert!(
+        !rows.iter().any(|row| row.label() == "SSID"),
+        "the SSID stats row is retired (it is the page title now)"
+    );
 
     let sig_row = rows
         .iter()
-        .find(|(k, _)| k == taskmanager_application::i18n::t("common.signal"));
+        .find(|row| row.label() == taskmanager_application::i18n::t("common.signal"));
     assert!(sig_row.is_some());
-    assert!(sig_row.unwrap().1.contains("-60 dBm"));
+    assert!(
+        sig_row
+            .unwrap()
+            .value()
+            .unwrap_or_default()
+            .contains("-60 dBm")
+    );
 }
 
 #[test]

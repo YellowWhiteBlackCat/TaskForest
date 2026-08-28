@@ -21,6 +21,14 @@ impl IcedApp {
         self.viewport.size().width
     }
 
+    /// The full tracked viewport size — the one input the Performance page's
+    /// typed frame budget ([`crate::ui::responsive::PerformancePageBudget::for_perf_frame`])
+    /// allocates its semantic slots from.
+    #[must_use]
+    pub(crate) fn viewport_size(&self) -> iced::Size {
+        self.viewport.size()
+    }
+
     /// Resolved row-density preference for the view layer.
     #[must_use]
     pub fn compact_density(&self) -> bool {

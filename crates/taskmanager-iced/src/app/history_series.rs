@@ -26,6 +26,9 @@ struct Entry {
 pub(crate) enum DeviceSeriesKind {
     DiskBytesPerSec,
     DiskActiveTimePct,
+    /// The SMART temperature window for the Disk page's temperature-trend
+    /// stat row (GPUI `storage_temperature_samples` parity).
+    DiskTemperatureC,
     NetworkBytesPerSec,
     GpuUsagePercent,
     /// The engine name rides the key's `second` field, like every series
@@ -223,6 +226,26 @@ impl IcedApp {
                 &generation.to_string(),
             ),
             |history| history.disk_active_time_pct_for(device_id, generation),
+        )
+    }
+
+    /// The disk's SMART temperature window for the stats-rail trend row (GPUI
+    /// `storage_temperature_samples` parity); generation-scoped like every
+    /// disk family.
+    #[must_use]
+    pub(crate) fn cached_disk_temperature_series(
+        &self,
+        device_id: &str,
+        generation: u64,
+    ) -> Rc<[f32]> {
+        self.cached_device_series(
+            DeviceSeriesKey::new(
+                DeviceSeriesKind::DiskTemperatureC,
+                device_id,
+                "",
+                &generation.to_string(),
+            ),
+            |history| history.disk_temperature_c_for(device_id, generation),
         )
     }
 

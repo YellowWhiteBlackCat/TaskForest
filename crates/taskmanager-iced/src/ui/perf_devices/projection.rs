@@ -4,9 +4,11 @@ use taskmanager_application::{
     BatteryInfo, DiskMetrics, DiskPartition, GpuEngine, GpuMetrics, NetworkMetrics,
 };
 
-/// Responsive GPU chart composition. This is derived from viewport geometry,
-/// never selected by the user: standard space adds every available engine
-/// history below the fixed aggregate graph; compact keeps the aggregate only.
+/// Responsive GPU chart composition. This is derived from the frame budget's
+/// typed chart inventory, never selected by the user: the Full inventory adds
+/// every available engine history below the fixed aggregate graph; the
+/// AggregateOnly inventory keeps the aggregate (GPUI `GpuChartLayout::
+/// for_chart_inventory` parity).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum GpuChartLayout {
     AggregateWithEngines,
@@ -15,11 +17,14 @@ pub(super) enum GpuChartLayout {
 
 impl GpuChartLayout {
     #[must_use]
-    pub(super) const fn from_compact(compact: bool) -> Self {
-        if compact {
-            Self::AggregateOnly
-        } else {
-            Self::AggregateWithEngines
+    pub(super) const fn for_inventory(
+        inventory: super::super::responsive::PerformanceChartInventory,
+    ) -> Self {
+        match inventory {
+            super::super::responsive::PerformanceChartInventory::AggregateOnly => {
+                Self::AggregateOnly
+            }
+            super::super::responsive::PerformanceChartInventory::Full => Self::AggregateWithEngines,
         }
     }
 

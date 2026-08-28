@@ -4,7 +4,7 @@
 //! lives in [`super::battery`].)
 
 use super::super::perf_devices::network::{
-    network_section_state, network_summary_lines, network_title,
+    network_section_state, network_summary_lines, network_title, network_vital_line,
 };
 use super::super::tables::ListState;
 use super::super::*;
@@ -24,6 +24,21 @@ mod fan;
 /// tests that assert the baseline shape; the view uses [`rate_text_pref`].
 pub(crate) fn rate_text(value: Option<u64>) -> String {
     value.map_or_else(|| "—".to_string(), |value| format!("{}/s", bytes(value)))
+}
+
+/// Flatten pre-folded shell [`StatRow`]s into `(label, value-or-dash)` pairs
+/// the table assertions read; `None` renders the shared dash exactly like
+/// the statistics panel does.
+pub(crate) fn flat(rows: &[taskmanager_shell::viewmodel::StatRow]) -> Vec<(&str, &str)> {
+    rows.iter()
+        .map(|row| {
+            (
+                row.label(),
+                row.value()
+                    .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+            )
+        })
+        .collect()
 }
 
 #[test]
@@ -75,26 +90,26 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
 
     let rows = gpu_summary_lines(&gpu);
     assert_eq!(
-        rows,
+        flat(&rows),
         vec![
-            ("Status".into(), "Healthy".into()),
-            ("Utilization".into(), "42%".into()),
-            ("Dedicated VRAM".into(), "4.0 GiB / 8.0 GiB".into()),
-            ("Shared VRAM".into(), "512.0 MiB / 1.0 GiB".into()),
-            ("VRAM".into(), "2.0 GiB / 16.0 GiB".into()),
-            ("Clock".into(), "1800 MHz".into()),
-            ("Max clock".into(), "2100 MHz".into()),
-            ("Idle residency".into(), "78%".into()),
-            ("Temperature".into(), "61 °C".into()),
-            ("Power".into(), "95.0 W".into()),
-            ("Driver".into(), "nvidia".into()),
-            ("Render/3D".into(), "77%".into()),
+            ("Status", "Healthy"),
+            ("Utilization", "42%"),
+            ("Dedicated VRAM", "4.0 GiB / 8.0 GiB"),
+            ("Shared VRAM", "512.0 MiB / 1.0 GiB"),
+            ("VRAM", "2.0 GiB / 16.0 GiB"),
+            ("Clock", "1800 MHz"),
+            ("Max clock", "2100 MHz"),
+            ("Idle residency", "78%"),
+            ("Temperature", "61 °C"),
+            ("Power", "95.0 W"),
+            ("Driver", "nvidia"),
+            ("Render/3D", "77%"),
             // A measured-idle engine stays 0% — never suppressed into "—".
-            ("Copy".into(), "0%".into()),
-            ("Throttling".into(), "hardware thermal limit".into()),
+            ("Copy", "0%"),
+            ("Throttling", "hardware thermal limit"),
         ]
     );
-    assert_eq!(gpu_title(&gpu), "GPU: NVIDIA GeForce");
+    assert_eq!(gpu_title(&gpu), "NVIDIA GeForce");
 
     // A measured-idle GPU utilization stays 0% — the honest opposite of "—".
     let idle = GpuMetrics::from_observations(GpuScalarObservations {
@@ -104,8 +119,8 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
     let idle_rows = gpu_summary_lines(&idle);
     // Status leads; a measured-idle utilization stays 0% — the honest opposite
     // of "—".
-    assert_eq!(idle_rows[0].0, "Status");
-    assert_eq!(idle_rows[1], ("Utilization".into(), "0%".into()));
+    assert_eq!(flat(&idle_rows)[0].0, "Status");
+    assert_eq!(flat(&idle_rows)[1], ("Utilization", "0%"));
 
     set_language(Language::En);
 }
@@ -131,15 +146,15 @@ fn gpu_summary_keeps_honest_dashes_for_unavailable_fields() {
         2,
         "unavailable VRAM/clock/power/engines are omitted"
     );
-    assert_eq!(rows[0], ("Status".into(), "Unsupported".into()));
-    assert_eq!(rows[1], ("Utilization".into(), "—".into()));
+    assert_eq!(flat(&rows)[0], ("Status", "Unsupported"));
+    assert_eq!(flat(&rows)[1], ("Utilization", "—"));
     assert!(
-        !rows
+        !flat(&rows)
             .iter()
             .any(|(label, _)| label.contains("VRAM") || label.contains("memory")),
         "no VRAM/memory row may appear without a measured total"
     );
-    assert_eq!(gpu_title(&bare), "GPU: gpu:pci:0000:00:02.0");
+    assert_eq!(gpu_title(&bare), "gpu:pci:0000:00:02.0");
 
     // A zero-total VRAM (unified-memory iGPU) is treated as unavailable, not 0/0.
     let zero_total = GpuMetrics::from_observations(GpuScalarObservations {
@@ -149,7 +164,7 @@ fn gpu_summary_keeps_honest_dashes_for_unavailable_fields() {
     });
     let zero_rows = gpu_summary_lines(&zero_total);
     assert!(
-        !zero_rows
+        !flat(&zero_rows)
             .iter()
             .any(|(label, _)| label.contains("VRAM") || label.contains("memory")),
         "a zero VRAM total is hidden, never printed as 0 / 0"
@@ -170,11 +185,11 @@ fn gpu_summary_promotes_the_pci_marketing_name_without_losing_the_fact_row() {
     set_language(Language::En);
     let mut gpu = GpuMetrics::new("", "Intel Xe Graphics");
     gpu.marketing_name = Some("Arc B390".into());
-    assert_eq!(gpu_title(&gpu), "GPU: Arc B390");
+    assert_eq!(gpu_title(&gpu), "Arc B390");
     assert!(
-        gpu_summary_lines(&gpu)
+        flat(&gpu_summary_lines(&gpu))
             .iter()
-            .any(|(label, value)| label == "Product name" && value == "Arc B390")
+            .any(|(label, value)| *label == "Product name" && *value == "Arc B390")
     );
     set_language(Language::En);
 }
@@ -218,19 +233,27 @@ fn performance_page_renders_the_gpu_section_for_the_demo_snapshot() {
     assert_eq!(gpu_section_state(Some(snapshot)), ListState::Ready);
     assert_eq!(snapshot.gpu.len(), 1);
     let gpu_rows = gpu_summary_lines(&snapshot.gpu[0]);
+    let gpu_flat = flat(&gpu_rows);
     assert_eq!(
-        gpu_rows[0].0, "Status",
+        gpu_flat[0].0, "Status",
         "device.status leads the GPU readout"
     );
-    assert_eq!(gpu_rows[1].0, "Utilization");
-    assert_eq!(gpu_rows[1].1, "18%");
-    assert_eq!(gpu_rows[2].1, "900 MHz", "live xe core clock projects");
+    assert_eq!(gpu_flat[1].0, "Utilization");
+    assert_eq!(gpu_flat[1].1, "18%");
+    assert_eq!(
+        gpu_rows
+            .iter()
+            .find(|row| row.label() == "Clock")
+            .and_then(|row| row.value()),
+        Some("900 MHz"),
+        "live xe core clock projects"
+    );
     assert!(
-        gpu_rows.iter().any(|(label, _)| label == "Temperature"),
+        gpu_flat.iter().any(|(label, _)| *label == "Temperature"),
         "the demo GPU temperature row is present"
     );
     assert!(
-        !gpu_rows
+        !gpu_flat
             .iter()
             .any(|(label, _)| label.contains("VRAM") || label.contains("memory")),
         "the unified-memory demo GPU honestly omits VRAM"
@@ -547,24 +570,40 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
             .build(),
     ];
 
-    let rows = disk_summary_lines(&disk, true, true);
+    let rows = disk_summary_lines(&disk, true, true, &[]);
+    // GPUI row order: status, active time, rates, iops/response, capacity,
+    // free, type, filesystem, then the SMART family. The partition census
+    // lives ONCE in the vital line — the stats rail never duplicates it.
     assert_eq!(
-        rows,
+        flat(&rows),
         vec![
-            ("Status".into(), "Healthy".into()),
-            ("Read".into(), "100.0 MiB/s".into()),
-            ("Write".into(), "40.0 MiB/s".into()),
-            ("Active time".into(), "5%".into()),
-            ("Capacity".into(), "500.0 GiB".into()),
-            ("Free".into(), "250.0 GiB".into()),
-            ("Type".into(), "SATA SSD".into()),
-            ("Temperature".into(), "33 °C".into()),
-            ("Endurance used".into(), "2%".into()),
-            ("Power-on".into(), "7200 h (300 d)".into()),
-            ("Partitions · /home".into(), "70.0 GiB / 100.0 GiB".into()),
+            ("Status", "Healthy"),
+            ("Active time", "5%"),
+            ("Read", "100.0 MiB/s"),
+            ("Write", "40.0 MiB/s"),
+            ("IOPS", "—"),
+            ("Response", "—"),
+            ("Capacity", "500.0 GiB"),
+            ("Free", "250.0 GiB"),
+            ("Type", "SATA SSD"),
+            ("Filesystem", ""),
+            ("Temperature", "33 °C"),
+            ("Endurance used", "2%"),
+            ("Power-on", "7200 h (300 d)"),
         ]
     );
-    assert_eq!(disk_title(&disk), "Disk: nvme1n1");
+    assert_eq!(disk_title(&disk), "nvme1n1");
+    // The SMART temperature trend row renders only with finite samples.
+    let trend_rows = disk_summary_lines(&disk, true, true, &[33.0, 35.0, 31.0]);
+    assert_eq!(
+        flat(&trend_rows)
+            .iter()
+            .find(|(label, _)| *label == "Trend")
+            .map(|(_, value)| *value),
+        Some("Latest 31 °C · Avg 33 °C · Peak 35 °C")
+    );
+    // The one-line vital fact carries the capacity + partition census.
+    assert!(disk_vital_line(&disk, crate::ui::UnitPrefs::default()).contains("partitions"));
 
     set_language(Language::En);
 }
@@ -579,29 +618,42 @@ fn disk_summary_keeps_honest_dashes_and_omits_unavailable_scalars() {
     // omitted rather than fabricated as zero. The SMART section is hidden too:
     // a provider that could not supply readings has nothing to show.
     let bare = DiskMetrics::default();
-    let rows = disk_summary_lines(&bare, true, true);
+    let rows = disk_summary_lines(&bare, true, true, &[]);
     assert_eq!(
-        rows,
+        flat(&rows),
         vec![
             // The default DeviceState is Unsupported (DeviceStatus::default),
             // so a bare disk surfaces its status honestly as the first row.
-            ("Status".into(), "Unsupported".into()),
-            ("Read".into(), "—".into()),
-            ("Write".into(), "—".into()),
-            ("Active time".into(), "—".into()),
+            ("Status", "Unsupported"),
+            ("Active time", "—"),
+            ("Read", "—"),
+            ("Write", "—"),
+            ("IOPS", "—"),
+            ("Response", "—"),
+            ("Capacity", "—"),
+            ("Free", "—"),
+            // Type/FileSystem always render (GPUI parity) with honest empties.
+            ("Type", ""),
+            ("Filesystem", ""),
         ]
     );
+    // Rate-family gaps keep their rows with the shared dash (GPUI parity);
+    // only EXISTENCE facts omit rows entirely.
     assert!(
-        !rows
+        flat(&rows)
             .iter()
-            .any(|(label, _)| label == "Capacity" || label == "Free"),
-        "capacity/free stay hidden when no total is observed"
+            .any(|(label, value)| *label == "Capacity" && *value == "—"),
+        "an unobserved capacity is an honest dash, never a fabricated zero"
     );
     assert!(
-        !rows.iter().any(|(label, _)| label == "Temperature"),
+        !flat(&rows).iter().any(|(label, _)| *label == "Temperature"),
         "SMART temperature is omitted when unobserved"
     );
-    assert_eq!(disk_title(&bare), "Disk", "no identity → neutral heading");
+    assert_eq!(
+        disk_title(&bare),
+        "",
+        "no identity → the /dev/-stripped name is empty (GPUI parity)"
+    );
 
     set_language(Language::En);
 }
@@ -618,33 +670,34 @@ fn disk_summary_surfaces_critical_warning_prefix_and_removable_flag() {
         .smart_critical_warning(Some(true))
         .smart_temp_critical_c(Some(70.0))
         .build();
-    let rows = disk_summary_lines(&disk, true, true);
+    let rows = disk_summary_lines(&disk, true, true, &[]);
     let temp = rows
         .iter()
-        .find(|(label, _)| label.starts_with("Temperature"))
+        .find(|row| row.label().starts_with("Temperature"))
         .expect("temperature row must render");
     assert!(
-        temp.0.contains('\u{26a0}'),
+        temp.label().contains('\u{26a0}'),
         "critical-warning must prefix the label with ⚠: {}",
-        temp.0
+        temp.label()
     );
-    assert_eq!(temp.1, "81 / 70 °C");
+    assert_eq!(temp.value(), Some("81 / 70 °C"));
 
     // Without the warning bit the label is the plain localized temperature.
     disk.smart_critical_warning = None;
-    let rows = disk_summary_lines(&disk, true, true);
+    let rows = disk_summary_lines(&disk, true, true, &[]);
     let temp = rows
         .iter()
-        .find(|(label, _)| label.starts_with("Temperature"))
+        .find(|row| row.label().starts_with("Temperature"))
         .expect("temperature row must render");
-    assert!(!temp.0.contains('\u{26a0}'));
+    assert!(!temp.label().contains('\u{26a0}'));
 
     // A removable device (USB / optical) gains a Removable = Yes row.
     disk.apply_attachment_capabilities(Some(true), disk.hotplug_capable());
-    let rows = disk_summary_lines(&disk, true, true);
+    let rows = disk_summary_lines(&disk, true, true, &[]);
     assert!(
-        rows.iter()
-            .any(|(label, value)| label == "Removable" && value == "Yes"),
+        flat(&rows)
+            .iter()
+            .any(|(label, value)| *label == "Removable" && *value == "Yes"),
         "a removable device must surface a Removable = Yes row"
     );
 
@@ -707,29 +760,32 @@ fn network_summary_projects_wireless_ssid_signal_and_utilization() {
         .build();
 
     let rows = network_summary_lines(&nic, true, true);
+    // GPUI row order + omit rules: status, rates, connection, totals, type,
+    // existing addresses, link speed + utilization pair, driver, adapter,
+    // wireless facts. Absent addresses omit their rows; the SSID lives in the
+    // page TITLE, not the stats rail.
     assert_eq!(
-        rows,
+        flat(&rows),
         vec![
-            ("Status".into(), "Unsupported".into()),
-            ("Receive".into(), "5.0 MiB/s".into()),
-            ("Send".into(), "1.0 MiB/s".into()),
-            ("Link".into(), "866 Mbps".into()),
-            ("Type".into(), "Wireless".into()),
-            ("IPv4".into(), "192.168.1.10".into()),
-            ("IPv6".into(), "fe80::2".into()),
-            ("MAC".into(), "aa:bb:cc:dd:ee:ff".into()),
-            ("Connection".into(), "Connected".into()),
-            ("Total received".into(), "2.0 GiB".into()),
-            ("Total sent".into(), "512.0 MiB".into()),
-            ("Driver".into(), "iwlwifi".into()),
-            ("Adapter".into(), "Intel AX201".into()),
-            ("Utilization".into(), "22%".into()),
-            ("SSID".into(), "TaskForest-5G".into()),
+            ("Status", "Unsupported"),
+            ("Receive", "5.0 MiB/s"),
+            ("Send", "1.0 MiB/s"),
+            ("Connection", "Connected"),
+            ("Total received", "2.0 GiB"),
+            ("Total sent", "512.0 MiB"),
+            ("Type", "Wireless"),
+            ("IPv4", "192.168.1.10"),
+            ("IPv6", "fe80::2"),
+            ("MAC", "aa:bb:cc:dd:ee:ff"),
+            ("Link", "866 Mbps"),
+            ("Utilization", "22%"),
+            ("Driver", "iwlwifi"),
+            ("Adapter", "Intel AX201"),
             // -47 dBm → (43/60)*100 ≈ 72% quality.
-            ("Signal".into(), "-47 dBm (72%)".into()),
+            ("Signal", "-47 dBm (72%)"),
         ]
     );
-    assert_eq!(network_title(&nic), "Wireless: wlp3s0");
+    assert_eq!(network_title(&nic), "Wi-Fi: TaskForest-5G (wlp3s0)");
 
     set_language(Language::En);
 }
@@ -744,36 +800,44 @@ fn network_summary_omits_utilization_without_a_link_and_keeps_dashes_honest() {
     let bare = NetworkMetrics::default();
     let rows = network_summary_lines(&bare, true, true);
     assert_eq!(
-        rows,
+        flat(&rows),
         vec![
-            ("Status".into(), "Unsupported".into()),
-            ("Receive".into(), "—".into()),
-            ("Send".into(), "—".into()),
-            ("Link".into(), "—".into()),
-            ("Type".into(), "Other".into()),
-            ("IPv4".into(), "—".into()),
-            ("IPv6".into(), "—".into()),
-            ("MAC".into(), "—".into()),
+            ("Status", "Unsupported"),
+            ("Receive", "—"),
+            ("Send", "—"),
             // No carrier and no assigned address → Disconnected (never a
             // fabricated "Connected").
-            ("Connection".into(), "Disconnected".into()),
+            ("Connection", "Disconnected"),
+            // Rate-family totals keep their rows with the shared dash (GPUI
+            // parity); only EXISTENCE facts omit rows entirely.
+            ("Total received", "—"),
+            ("Total sent", "—"),
+            ("Type", "Other"),
         ]
     );
     assert!(
-        !rows.iter().any(|(label, _)| label == "Utilization"),
+        !flat(&rows).iter().any(|(label, _)| *label == "Utilization"),
         "utilization is hidden when no link speed is known"
     );
     assert!(
-        !rows
+        !flat(&rows)
             .iter()
-            .any(|(label, _)| label == "SSID" || label == "Signal"),
+            .any(|(label, _)| *label == "SSID" || *label == "Signal"),
         "wireless rows stay hidden for a non-wireless adapter"
+    );
+    assert!(
+        !flat(&rows)
+            .iter()
+            .any(|(label, _)| *label == "Link" || *label == "IPv4" || *label == "IPv6"),
+        "absent link speed and addresses omit their rows entirely (GPUI parity)"
     );
     assert_eq!(
         network_title(&bare),
-        "Other",
-        "no identity → the typed category alone"
+        "Other ()",
+        "no identity → the typed category + empty interface (GPUI parity)"
     );
+    // The one-line vital fact carries the honest status alone.
+    assert_eq!(network_vital_line(&bare), "Unsupported");
 
     set_language(Language::En);
 }
@@ -815,91 +879,83 @@ fn performance_page_renders_disk_and_network_sections_for_the_demo_snapshot() {
     assert_eq!(disk_section_state(Some(snapshot)), ListState::Ready);
     assert_eq!(network_section_state(Some(snapshot)), ListState::Ready);
 
-    let disk_rows = disk_summary_lines(&snapshot.disks[0], true, true);
-    assert_eq!(disk_title(&snapshot.disks[0]), "Disk: nvme0n1");
+    let disk_rows = disk_summary_lines(&snapshot.disks[0], true, true, &[]);
+    let disk_flat = flat(&disk_rows);
+    // GPUI parity: the model leads the page title; the /dev/ name rides the
+    // subtitle.
+    assert_eq!(disk_title(&snapshot.disks[0]), "TiPro9000 2TB");
     assert_eq!(
-        disk_rows
+        disk_flat
             .iter()
-            .find(|(label, _)| label == "Read")
-            .map(|(_, value)| value.as_str()),
+            .find(|(label, _)| *label == "Read")
+            .map(|(_, value)| *value),
         Some("84.0 MiB/s")
     );
     assert_eq!(
-        disk_rows
+        disk_flat
             .iter()
-            .find(|(label, _)| label == "Write")
-            .map(|(_, value)| value.as_str()),
+            .find(|(label, _)| *label == "Write")
+            .map(|(_, value)| *value),
         Some("31.0 MiB/s")
     );
     assert_eq!(
-        disk_rows
+        disk_flat
             .iter()
-            .find(|(label, _)| label == "Active time")
-            .map(|(_, value)| value.as_str()),
+            .find(|(label, _)| *label == "Active time")
+            .map(|(_, value)| *value),
         Some("13%")
     );
     assert_eq!(
-        disk_rows
+        disk_flat
             .iter()
-            .find(|(label, _)| label == "Type")
-            .map(|(_, value)| value.as_str()),
+            .find(|(label, _)| *label == "Type")
+            .map(|(_, value)| *value),
         Some("NVMe SSD")
     );
-    // The demo disk has no SMART provider and no partitions: those rows stay
-    // honestly absent rather than printing fabricated zeros.
+    // The demo disk has no SMART provider: those rows stay honestly absent
+    // rather than printing fabricated zeros. The partition census lives in
+    // the vital line, never in the stats rail.
     assert!(
-        !disk_rows
+        !disk_flat
             .iter()
-            .any(|(label, _)| label == "Temperature" || label.starts_with("Partitions")),
+            .any(|(label, _)| *label == "Temperature" || label.starts_with("Partitions")),
         "demo disk SMART/partition rows stay hidden when unobserved"
     );
 
     let net_rows = network_summary_lines(&snapshot.networks[0], true, true);
-    assert_eq!(network_title(&snapshot.networks[0]), "Wireless: wlan0");
+    let net_flat = flat(&net_rows);
+    // The demo NIC is a typed WiFi adapter carrying an SSID, so the page
+    // TITLE surfaces it; signal is unobserved and utilization needs a link
+    // speed, so those stay honestly hidden.
     assert_eq!(
-        net_rows
+        network_title(&snapshot.networks[0]),
+        "Wi-Fi: TaskForest Lab (wlan0)"
+    );
+    assert_eq!(
+        net_flat
             .iter()
-            .find(|(label, _)| label == "Receive")
-            .map(|(_, value)| value.as_str()),
+            .find(|(label, _)| *label == "Receive")
+            .map(|(_, value)| *value),
         Some("12.0 MiB/s")
     );
     assert_eq!(
-        net_rows
+        net_flat
             .iter()
-            .find(|(label, _)| label == "Send")
-            .map(|(_, value)| value.as_str()),
+            .find(|(label, _)| *label == "Send")
+            .map(|(_, value)| *value),
         Some("2.0 MiB/s")
     );
-    // The demo wlan0 fixture is not flagged wireless and has no link speed, so
-    // SSID/signal/utilization are honestly omitted and link renders a dash.
     assert_eq!(
-        net_rows
+        net_flat
             .iter()
-            .find(|(label, _)| label == "Link")
-            .map(|(_, value)| value.as_str()),
-        Some("—")
-    );
-    assert_eq!(
-        net_rows
-            .iter()
-            .find(|(label, _)| label == "Type")
-            .map(|(_, value)| value.as_str()),
+            .find(|(label, _)| *label == "Type")
+            .map(|(_, value)| *value),
         Some("Wireless")
     );
-    // The demo NIC is a typed WiFi adapter carrying an SSID, so the SSID row
-    // shows it; signal is unobserved and utilization needs a link speed, so
-    // those stay honestly hidden.
-    assert_eq!(
-        net_rows
-            .iter()
-            .find(|(label, _)| label == "SSID")
-            .map(|(_, value)| value.as_str()),
-        Some("TaskForest Lab")
-    );
     assert!(
-        !net_rows
+        !net_flat
             .iter()
-            .any(|(label, _)| label == "Signal" || label == "Utilization"),
+            .any(|(label, _)| *label == "Signal" || *label == "Utilization"),
         "demo NIC signal/utilization rows stay hidden without observations"
     );
 

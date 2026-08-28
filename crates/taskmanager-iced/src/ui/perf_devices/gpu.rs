@@ -9,7 +9,10 @@ use taskmanager_shell::presentation::gpu_engine_rows::{
 use taskmanager_shell::presentation::{
     device_status_i18n_key, gpu_display_identity, missing_value,
 };
+use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
+
+use super::super::responsive::{DeviceNavigationPresentation, PerformancePageBudget};
 
 /// The Performance-page GPU panel readiness.
 #[must_use]
@@ -21,31 +24,62 @@ pub(crate) fn gpu_section_state(snapshot: Option<&SystemSnapshot>) -> tables::Li
     }
 }
 
-/// One GPU's display identity.
+/// One GPU's display identity (GPUI parity): the resolved identity headline
+/// (product name) else the device id — no family prefix.
 #[must_use]
 pub(crate) fn gpu_title(gpu: &GpuMetrics) -> String {
-    let name = gpu_display_identity(gpu)
+    gpu_display_identity(gpu)
         .headline
         .map(str::to_owned)
-        .or_else(|| (!gpu.device_id.trim().is_empty()).then(|| gpu.device_id.trim().to_string()));
-    match name {
-        Some(name) => format!("{}: {name}", t("common.gpu")),
-        None => t("common.gpu").to_string(),
-    }
+        .or_else(|| (!gpu.device_id.trim().is_empty()).then(|| gpu.device_id.trim().to_string()))
+        .unwrap_or_else(|| t("common.gpu").to_string())
 }
 
-/// Project one GPU's honest scalar readouts as label/value rows for the Performance page.
+/// The GPU page's undroppable one-line VRAM fact (GPUI `gpu_vram_vital_line`
+/// parity): dedicated then shared used/total pairs, honest dashes for
+/// uncollected halves.
 #[must_use]
-pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<(String, String)> {
+pub(crate) fn gpu_vram_vital_line(gpu: &GpuMetrics, units: UnitPrefs) -> String {
+    let observed = super::projection::GpuObservation::from(gpu);
+    let pair = |used: Option<u64>, total: Option<u64>| match (used, total) {
+        (Some(used), Some(total)) => format!(
+            "{} / {}",
+            quantity_text_pref(used, units.use_bytes, units.use_base2),
+            quantity_text_pref(total, units.use_bytes, units.use_base2),
+        ),
+        _ => missing_value(),
+    };
+    format!(
+        "{} · {}",
+        pair(
+            observed.dedicated_vram_used_bytes,
+            observed.dedicated_vram_total_bytes
+        ),
+        pair(
+            observed.shared_vram_used_bytes,
+            observed.shared_vram_total_bytes
+        ),
+    )
+}
+
+/// Project one GPU's honest scalar readouts as pre-folded shell [`StatRow`]s
+/// (GPUI `gpu_stats` parity: one fold, three renderers). Headline facts whose
+/// absence is a sampling gap (utilization) keep their row and render the
+/// shared dash; facts that simply do not exist on this GPU family (power
+/// draw, temperature, VRAM pairs, throttle reason) omit their rows entirely.
+#[must_use]
+pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
     let observed = super::projection::GpuObservation::from(gpu);
     let mut rows = vec![
-        (
-            t("device.status").to_string(),
-            t(device_status_i18n_key(gpu.device_state.status)).to_string(),
+        StatRow::text(
+            t("device.status"),
+            Some(t(device_status_i18n_key(gpu.device_state.status)).to_string()),
         ),
-        (
-            t("common.utilization").to_string(),
-            gpu_percent_readout(observed.utilization_pct),
+        StatRow::text(
+            t("common.utilization"),
+            observed
+                .utilization_pct
+                .map(|value| format!("{:.0}%", value.round())),
         ),
     ];
     if let Some(name) = gpu
@@ -53,7 +87,33 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<(String, String)> {
         .as_deref()
         .filter(|value| !value.is_empty())
     {
-        rows.push((t("gpu.marketing_name").to_string(), name.to_owned()));
+        rows.push(StatRow::text(
+            t("gpu.marketing_name"),
+            Some(name.to_owned()),
+        ));
+    }
+    // Graphics-API versions (GPUI parity).
+    if let Some(api) = &gpu.graphics_api {
+        if let Some(version) = api
+            .opengl_version
+            .as_deref()
+            .filter(|value| !value.is_empty())
+        {
+            rows.push(StatRow::text(
+                t("gpu.opengl_version"),
+                Some(version.to_owned()),
+            ));
+        }
+        if let Some(version) = api
+            .vulkan_version
+            .as_deref()
+            .filter(|value| !value.is_empty())
+        {
+            rows.push(StatRow::text(
+                t("gpu.vulkan_version"),
+                Some(version.to_owned()),
+            ));
+        }
     }
 
     for (label, used, total) in [
@@ -72,56 +132,70 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<(String, String)> {
             && let Some(total) = total
             && total > 0
         {
-            rows.push((
-                label.to_string(),
-                format!("{} / {}", bytes(used), bytes(total)),
+            rows.push(StatRow::pair(
+                label,
+                Some(format!("{} / {}", bytes(used), bytes(total))),
             ));
         }
     }
     if let Some(used) = observed.memory_used_bytes
         && let Some(total) = observed.memory_total_bytes
     {
-        rows.push((
-            t("gpu.vram").to_string(),
-            format!("{} / {}", bytes(used), bytes(total)),
+        rows.push(StatRow::pair(
+            t("gpu.vram"),
+            Some(format!("{} / {}", bytes(used), bytes(total))),
         ));
     }
 
     if let Some(mhz) = observed.frequency_mhz {
-        rows.push((t("common.clock").to_string(), format!("{} MHz", mhz)));
+        rows.push(StatRow::text(t("common.clock"), Some(format!("{mhz} MHz"))));
     }
     if let Some(mhz) = observed.max_frequency_mhz {
-        rows.push((t("gpu.max_clock").to_string(), format!("{} MHz", mhz)));
+        rows.push(StatRow::text(
+            t("gpu.max_clock"),
+            Some(format!("{mhz} MHz")),
+        ));
     }
     if let Some(value) = observed.idle_residency_pct {
-        rows.push((
-            t("gpu.idle_residency").to_string(),
-            gpu_percent_readout(Some(value)),
+        rows.push(StatRow::text(
+            t("gpu.idle_residency"),
+            Some(format!("{:.0}%", value.round())),
         ));
     }
     if let Some(value) = observed.temperature_c {
-        rows.push((
-            t("common.temperature").to_string(),
-            format!("{:.0} °C", value.round()),
+        rows.push(StatRow::text(
+            t("common.temperature"),
+            Some(format!("{:.0} \u{b0}C", value.round())),
         ));
     }
     if let Some(watts) = observed.power_w {
-        rows.push((t("common.power").to_string(), format!("{:.1} W", watts)));
+        rows.push(StatRow::text(
+            t("common.power"),
+            Some(format!("{watts:.1} W")),
+        ));
     }
     if let Some(driver) = gpu.driver.as_deref() {
-        rows.push((t("common.driver").to_string(), driver.to_string()));
+        rows.push(StatRow::text(t("common.driver"), Some(driver.to_string())));
     }
 
     for engine in &gpu.engines {
         if !engine.name.trim().is_empty() && engine.usage_pct.is_finite() {
-            rows.push((
+            rows.push(StatRow::text(
                 engine.name.clone(),
-                gpu_percent_readout(Some(engine.usage_pct)),
+                Some(format!("{:.0}%", engine.usage_pct.round())),
             ));
         }
     }
     if let Some(reason) = observed.throttle_reason.filter(|reason| !reason.is_empty()) {
-        rows.push((t("gpu.throttling").to_string(), reason));
+        rows.push(StatRow::text(t("gpu.throttling"), Some(reason)));
+    }
+    // PCI slot (GPUI parity).
+    if let Some(slot) = gpu
+        .pci_slot
+        .as_deref()
+        .filter(|slot| !slot.trim().is_empty())
+    {
+        rows.push(StatRow::text(t("gpu.pci_slot"), Some(slot.to_owned())));
     }
     rows
 }
@@ -187,10 +261,12 @@ fn gpu_headline_readouts(
 pub(crate) fn gpu_section(
     app: &crate::IcedApp,
     index: usize,
+    budget: PerformancePageBudget,
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let snapshot = app.shell.projection().snapshot.as_ref();
     let theme_snapshot = app.theme();
     let color = theme::color(theme_snapshot.gpu);
+    let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let rows = match (gpu_section_state(snapshot), snapshot) {
         (tables::ListState::Loading, _) => {
             vec![tables::message_panel(
@@ -207,8 +283,9 @@ pub(crate) fn gpu_section(
                 gpu,
                 color,
                 theme: theme_snapshot,
-                compact: app.compact_layout(),
+                compact,
                 engine_rows: engine_rows_presentation(app, gpu),
+                budget,
             })],
             None => vec![tables::message_panel(theme_snapshot, t("gpu.empty"))],
         },
@@ -229,6 +306,7 @@ struct GpuBlockProps<'a> {
     theme: &'a taskmanager_theme::Theme,
     compact: bool,
     engine_rows: GpuEngineRowsPresentation<'a>,
+    budget: PerformancePageBudget,
 }
 
 fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -239,9 +317,12 @@ fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, iced::Theme, 
         theme: theme_snapshot,
         compact,
         engine_rows,
+        budget,
     } = props;
     let smooth = true;
-    let chart_layout = super::projection::GpuChartLayout::from_compact(compact);
+    // The chart inventory comes from the typed frame budget (both axes); no
+    // local compact-flag derivation remains.
+    let chart_layout = super::projection::GpuChartLayout::for_inventory(budget.chart_inventory);
     // The shared shell projection (ADR-034): one selection, one availability
     // gate, one explicit per-family state — this view renders exactly this
     // projection and holds no second copy.
@@ -291,15 +372,15 @@ fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, iced::Theme, 
     match &engine_rows {
         GpuEngineRowsPresentation::Active(engines) => {
             if engines.is_empty() {
-                stats.push((
-                    t("gpu.per_engine_title").to_string(),
-                    t("gpu.engines_none_reported").to_string(),
+                stats.push(StatRow::text(
+                    t("gpu.per_engine_title"),
+                    Some(t("gpu.engines_none_reported").to_string()),
                 ));
             }
             for engine in *engines {
-                stats.push((
+                stats.push(StatRow::text(
                     engine.name.clone(),
-                    format!("{:.0}%", engine.utilization_pct.round()),
+                    Some(format!("{:.0}%", engine.utilization_pct.round())),
                 ));
             }
         }
@@ -307,40 +388,36 @@ fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, iced::Theme, 
             if let Some(message_key) = presentation.message_key()
                 && !matches!(presentation, GpuEngineRowsPresentation::PermissionRequired)
             {
-                stats.push((
-                    t("gpu.per_engine_title").to_string(),
-                    t(message_key).to_string(),
+                stats.push(StatRow::text(
+                    t("gpu.per_engine_title"),
+                    Some(t(message_key).to_string()),
                 ));
                 if matches!(presentation, GpuEngineRowsPresentation::MissingDependency) {
-                    stats.push((String::new(), t("gpu.engines_install_hint").to_string()));
+                    stats.push(StatRow::text(
+                        "",
+                        Some(t("gpu.engines_install_hint").to_string()),
+                    ));
                 }
             }
         }
     }
+    let stats_footer = super::device_status_footer(theme_snapshot, gpu.device_state.status);
+    let block = perf_layout::main_with_stats(
+        theme_snapshot,
+        gpu_title(gpu),
+        t(selected.label_key()).to_string(),
+        // The undroppable one-line VRAM fact renders at every vertical rung
+        // (GPUI `gpu_vram_vital_line` parity).
+        Some(gpu_vram_vital_line(gpu, app.drive_units())),
+        graphs,
+        stats,
+        stats_footer,
+        budget,
+        perf_layout::DetailExtent::Fill,
+    );
     match engine_rows_toggle_section(theme_snapshot, engine_rows.action()) {
-        Some(toggle) => iced::widget::column![
-            perf_layout::main_with_stats(
-                theme_snapshot,
-                gpu_title(gpu),
-                t(selected.label_key()).to_string(),
-                graphs,
-                stats,
-                compact,
-                perf_layout::DetailExtent::Fill,
-            ),
-            toggle
-        ]
-        .spacing(8)
-        .into(),
-        None => perf_layout::main_with_stats(
-            theme_snapshot,
-            gpu_title(gpu),
-            t(selected.label_key()).to_string(),
-            graphs,
-            stats,
-            compact,
-            perf_layout::DetailExtent::Fill,
-        ),
+        Some(toggle) => iced::widget::column![block, toggle].spacing(8).into(),
+        None => block,
     }
 }
 

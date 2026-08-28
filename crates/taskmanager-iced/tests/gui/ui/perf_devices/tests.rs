@@ -61,8 +61,14 @@ fn gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact() {
             usage_pct: f32::NAN,
         },
     ];
-    let standard = projection::GpuChartLayout::from_compact(false);
-    let compact = projection::GpuChartLayout::from_compact(true);
+    // The layout derives from the typed chart inventory (both frame axes),
+    // never from a local compact flag.
+    let standard = projection::GpuChartLayout::for_inventory(
+        crate::ui::responsive::PerformanceChartInventory::Full,
+    );
+    let compact = projection::GpuChartLayout::for_inventory(
+        crate::ui::responsive::PerformanceChartInventory::AggregateOnly,
+    );
     assert_eq!(standard, projection::GpuChartLayout::AggregateWithEngines);
     assert_eq!(compact, projection::GpuChartLayout::AggregateOnly);
     assert_eq!(
@@ -116,11 +122,16 @@ fn compact_gpu_headline_projects_all_four_current_facts_without_a_selector() {
 
 /// Look one summary row's value up by its localized label so the tests
 /// assert the VALUE (the unit-pair formatting), not the surrounding row
-/// order.
-fn row_value<'a>(rows: &'a [(String, String)], label: &str) -> &'a str {
-    rows.iter()
-        .find(|(key, _)| key == label)
-        .map_or("\u{ab}row absent\u{bb}", |(_, value)| value.as_str())
+/// order. A present-but-uncollected row reads as the shared dash.
+fn row_value(rows: &[taskmanager_shell::viewmodel::StatRow], label: &str) -> String {
+    rows.iter().find(|row| row.label() == label).map_or(
+        "\u{ab}row absent\u{bb}".to_string(),
+        |row| {
+            row.value()
+                .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE)
+                .to_string()
+        },
+    )
 }
 
 /// Battery health and runtime estimates are typed facts, not decorations:
@@ -144,9 +155,7 @@ fn battery_health_and_estimate_rows_follow_typed_availability() {
     assert_eq!(row_value(&rows, t("battery.time_to_empty")), "01h 03m");
     // The status-gated twin and any missing fact stay absent rows.
     assert_eq!(
-        rows.iter()
-            .find(|(key, _)| key == t("battery.time_to_full"))
-            .map_or("\u{ab}row absent\u{bb}", |(_, value)| value.as_str()),
+        row_value(&rows, t("battery.time_to_full")),
         "\u{ab}row absent\u{bb}"
     );
 
@@ -160,10 +169,7 @@ fn battery_health_and_estimate_rows_follow_typed_availability() {
         "battery.time_to_empty",
     ] {
         assert_eq!(
-            sparse
-                .iter()
-                .find(|(label, _)| label == t(key))
-                .map_or("\u{ab}row absent\u{bb}", |(_, value)| value.as_str()),
+            row_value(&sparse, t(key)),
             "\u{ab}row absent\u{bb}",
             "{key} row must be absent when unavailable"
         );
@@ -196,19 +202,29 @@ fn static_quantities_follow_the_resolved_unit_pairs() {
             })
             .build(),
     ];
-    let partition_label = format!("{} · /", t("disk.partitions"));
-
+    // The partition census lives ONCE in the vital line (GPUI parity): the
+    // stats rail carries the disk totals; per-partition usage renders in the
+    // panel below the charts, never as duplicated stats rows.
     // Default pair (binary bytes) — the historical readout, unchanged.
-    let rows = disk_summary_lines(&disk, true, true);
+    let rows = disk_summary_lines(&disk, true, true, &[]);
     assert_eq!(row_value(&rows, t("disk.capacity")), "2.0 GiB");
     assert_eq!(row_value(&rows, t("disk.free")), "1.0 GiB");
-    assert_eq!(row_value(&rows, &partition_label), "1.0 GiB / 2.0 GiB");
+    let vital = disk_vital_line(&disk, crate::ui::UnitPrefs::default());
+    assert!(vital.starts_with("1.0 GiB / 2.0 GiB"), "vital: {vital}");
+    assert!(vital.ends_with("1 partitions"), "vital: {vital}");
 
     // Bits + base-10: the SAME quantities print decimal bits.
-    let rows = disk_summary_lines(&disk, false, false);
+    let rows = disk_summary_lines(&disk, false, false, &[]);
     assert_eq!(row_value(&rows, t("disk.capacity")), "17.2 Gb");
     assert_eq!(row_value(&rows, t("disk.free")), "8.6 Gb");
-    assert_eq!(row_value(&rows, &partition_label), "8.6 Gb / 17.2 Gb");
+    let vital = disk_vital_line(
+        &disk,
+        crate::ui::UnitPrefs {
+            use_bytes: false,
+            use_base2: false,
+        },
+    );
+    assert!(vital.starts_with("8.6 Gb / 17.2 Gb"), "vital: {vital}");
 
     let nic = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
         .interface_name("enp3s0".into())
