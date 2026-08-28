@@ -30,6 +30,8 @@ use crate::gpui_app::theme::Theme;
 mod cpu;
 #[path = "tests/disk_activity.rs"]
 mod disk_activity;
+#[path = "tests/dynamic_readout.rs"]
+mod dynamic_readout;
 #[path = "tests/fixtures.rs"]
 mod fixtures;
 #[path = "tests/gpu_chart_metric.rs"]
@@ -1009,79 +1011,4 @@ async fn mc04_gpu_layout_case_gpu_page_adapts_complete_engine_inventory_to_avail
         aggregate.size.width > px(100.0) && aggregate.size.height > px(100.0),
         "compact aggregate GPU graph must remain readable: {aggregate:?}"
     );
-}
-
-#[gpui::test]
-async fn mc01_dynamic_readout_case_battery_and_fan_pages_paint_typed_dynamic_device_data(
-    cx: &mut TestAppContext,
-) {
-    let (win, view) = wrapped_root(cx);
-    view.update(cx, |v, cx| {
-        v.mark_telemetry_frame_ready();
-        v.page = TopPage::Performance;
-        let battery = with_battery_scalars(
-            {
-                let mut battery = BatteryInfo::new("power-supply:BAT0", DeviceState::healthy(10));
-                battery.display_name = "Internal battery".into();
-                battery.device_generation = DeviceGeneration::new(1);
-                battery
-            },
-            10,
-            73,
-            12.5,
-        );
-        let battery_snapshot = PowerSupplySnapshot {
-            timestamp_ms: 10,
-            batteries: vec![battery.clone()],
-            ..Default::default()
-        };
-        v.replace_dynamic_devices_for_test(
-            SensorCenterSnapshot::default(),
-            battery_snapshot.clone(),
-        );
-        v.telemetry_ingestor
-            .ingest_correlated_power_supplies(
-                taskmanager_telemetry_store::CorrelatedTelemetryStamp::from_accepted_event(1, 20)
-                    .expect("fixture revision is non-zero"),
-                &battery_snapshot,
-            )
-            .expect("battery fixture enters dynamic history");
-        v.selected = SelectedDevice::Battery(0);
-        cx.notify();
-    });
-    draw(cx, win);
-    let mut vcx = VisualTestContext::from_window(win.into(), cx);
-    assert!(vcx.debug_bounds("tm-perf-title").is_some());
-    assert!(vcx.debug_bounds("tm-perf-stat:0").is_some());
-
-    view.update(cx, |v, cx| {
-        let fan = sensor_reading(
-            DeviceId::new("hwmon:pwm"),
-            "hwmon:pwm:fan1_input",
-            "CPU fan",
-            SensorDescriptor::fan_speed(SensorScale::IDENTITY),
-            SensorMagnitude::Unsigned(1_380),
-            30,
-            2,
-        );
-        let fan_snapshot = SensorCenterSnapshot {
-            timestamp_ms: 30,
-            readings: vec![fan],
-            ..Default::default()
-        };
-        let power_supplies = v.power_supplies().clone();
-        v.replace_dynamic_devices_for_test(fan_snapshot.clone(), power_supplies);
-        v.telemetry_ingestor
-            .ingest_correlated_sensors(
-                taskmanager_telemetry_store::CorrelatedTelemetryStamp::from_accepted_event(1, 40)
-                    .expect("fixture revision is non-zero"),
-                &fan_snapshot,
-            )
-            .expect("fan fixture enters dynamic history");
-        v.selected = SelectedDevice::Fan(0);
-        cx.notify();
-    });
-    vcx.update(|window, cx| window.draw(cx).clear());
-    assert!(vcx.debug_bounds("tm-perf-title").is_some());
-    assert!(vcx.debug_bounds("tm-perf-stat:0").is_some());
 }
