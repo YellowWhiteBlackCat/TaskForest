@@ -42,7 +42,7 @@ fn process_batch(count: u32) -> PlatformEventBatch {
 }
 
 #[gpui::test]
-async fn apps_table_remains_the_dominant_readable_surface_at_capture_sizes(
+async fn mc07_compact_matrix_case_apps_table_remains_the_dominant_readable_surface_at_capture_sizes(
     cx: &mut gpui::TestAppContext,
 ) {
     let (win, view) = super::wrapped_root(cx);

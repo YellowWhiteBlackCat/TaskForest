@@ -7,7 +7,7 @@ resolver = "2"
 
 [package]
 name = "taskmanager"
-version = "0.1.0-rc.4"
+version = "0.1.0-rc.5"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "TaskForest — an eye-friendly native system monitor with GPUI, Iced, Ratatui, and Bevy frontends"

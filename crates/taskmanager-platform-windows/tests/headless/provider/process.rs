@@ -1,6 +1,9 @@
 //! Unit and integration tests for Windows process providers and controls.
 
 use super::insights::{environment_value_from_boundary, open_files_value_from_boundary};
+use super::target_observation::{
+    WinProcessAffinityProvider, WinProcessIsolationProvider, WinProcessNetworkProvider,
+};
 use super::*;
 
 fn frozen(pid: u32) -> FrozenProcessIdentity {

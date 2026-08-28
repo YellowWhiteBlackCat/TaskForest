@@ -63,7 +63,9 @@ fn seed_chart_metric_gpu(view: &mut RootView, device_id: &str, frames: [(f32, f3
 /// the utilization headline plus one card per additional available family —
 /// with no selector row and no chart for an unobserved family.
 #[gpui::test]
-async fn gpu_page_renders_every_measured_family_without_selector(cx: &mut TestAppContext) {
+async fn mc04_gpu_metric_families_case_gpu_page_renders_every_measured_family_without_selector(
+    cx: &mut TestAppContext,
+) {
     use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
 
     let (win, view) = wrapped_root(cx);
@@ -226,7 +228,7 @@ fn same_window(direct_track: &[f32], composed_track: &[f32]) -> bool {
 /// capacity-narrowed view return the SAME window for every family — values,
 /// lengths and NaN gap positions — because both call the one dispatch.
 #[test]
-fn gpu_chart_metric_sampling_is_one_track_across_view_capacities() {
+fn mc04_gpu_metric_track_case_gpu_chart_metric_sampling_is_one_track_across_view_capacities() {
     use taskmanager_shell::presentation::gpu_chart_metric::{
         GpuChartMetric, gpu_chart_metric_history,
     };
@@ -288,7 +290,8 @@ fn gpu_chart_metric_sampling_is_one_track_across_view_capacities() {
 /// mismatch and an unbound `0` generation yield an honest empty window —
 /// never the previous device instance's samples.
 #[test]
-fn gpu_chart_metric_sampling_tails_one_window_and_scopes_generation() {
+fn mc04_gpu_metric_generation_case_gpu_chart_metric_sampling_tails_one_window_and_scopes_generation()
+ {
     use taskmanager_shell::presentation::gpu_chart_metric::{
         GpuChartMetric, gpu_chart_metric_history,
     };

@@ -45,12 +45,6 @@ ignore = [
     # Re-evaluate and remove this exception when Iced/cryoglyph moves to the
     # fixed lru line.
     "RUSTSEC-2026-0253",
-    # glib 0.18 (via gtk 0.18 -> libappindicator, the Linux tray stack) has an
-    # unsound Iterator impl for VariantStrIter. A fix requires the gtk 0.20
-    # generation, unreachable without a major tray-stack bump. The vulnerable
-    # iterator is never driven by this workspace: the tray path only passes
-    # owned menu models, never a VariantStrIter.
-    "RUSTSEC-2024-0429",
 ]
 
 # licenses: reject any license expression not explicitly approved below. The

@@ -4,12 +4,17 @@ use std::rc::Rc;
 
 use super::*;
 use iced::Element;
-use taskmanager_application::{DiskMetrics, SystemSnapshot};
+use taskmanager_application::{DiskMetrics, DiskPartition, SystemSnapshot};
 use taskmanager_shell::presentation::{
-    MISSING_VALUE, device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
+    device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
     smart_section_visible,
 };
+use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
+
+use super::super::responsive::{
+    DeviceNavigationPresentation, PerformanceChartInventory, PerformancePageBudget,
+};
 
 /// The Performance-page per-disk panel readiness.
 #[must_use]
@@ -21,156 +26,199 @@ pub(crate) fn disk_section_state(snapshot: Option<&SystemSnapshot>) -> tables::L
     }
 }
 
-/// One disk's display identity.
+/// One disk's display identity (GPUI parity): the model when known, else the
+/// `/dev/`-stripped name — no family prefix.
 #[must_use]
 pub(crate) fn disk_title(disk: &DiskMetrics) -> String {
-    let name = (!disk.name.trim().is_empty())
-        .then(|| disk.name.trim().to_string())
-        .or_else(|| (!disk.model.trim().is_empty()).then(|| disk.model.trim().to_string()));
-    match name {
-        Some(name) => format!("{}: {name}", t("common.disk")),
-        None => t("common.disk").to_string(),
+    if disk.model.trim().is_empty() {
+        disk.name.trim_start_matches("/dev/").to_string()
+    } else {
+        disk.model.trim().to_string()
     }
 }
 
-/// Build the disk stat readout rows for the Performance device page.
+/// The disk page's undroppable one-line capacity fact (GPUI
+/// `disk_vital_line` parity): used/total plus the partition census. Honest
+/// absence — a disk whose capacity or partition facts are uncollected keeps
+/// the dash or omits the segment, never a fabricated zero.
+#[must_use]
+pub(crate) fn disk_vital_line(disk: &DiskMetrics, units: UnitPrefs) -> String {
+    let observed = super::projection::DiskObservation::from(disk);
+    let mut segments = Vec::new();
+    match (observed.capacity_bytes, observed.available_bytes) {
+        (Some(total), Some(free)) if total > 0 => {
+            let used = total.saturating_sub(free).min(total);
+            segments.push(format!(
+                "{} / {}",
+                quantity_text_pref(used, units.use_bytes, units.use_base2),
+                quantity_text_pref(total, units.use_bytes, units.use_base2),
+            ));
+        }
+        _ => segments.push(missing_value()),
+    }
+    if !disk.partitions.is_empty() {
+        segments.push(format!(
+            "{} {}",
+            disk.partitions.len(),
+            t("disk.partitions").to_lowercase(),
+        ));
+    }
+    segments.join(" · ")
+}
+
+/// Build the disk stat readout rows as pre-folded shell [`StatRow`]s for the
+/// Performance device page (GPUI `disk_stats` parity: one fold, three
+/// renderers). Rate-family fields whose absence is a sampling gap keep their
+/// row with `None` (the shared dash); existence facts omit their rows when
+/// the host does not have them.
 #[must_use]
 pub(crate) fn disk_summary_lines(
     disk: &DiskMetrics,
     use_bytes: bool,
     use_base2: bool,
-) -> Vec<(String, String)> {
+    temperature_samples: &[f32],
+) -> Vec<StatRow> {
     let observed = super::projection::DiskObservation::from(disk);
+    let rate = |value: Option<u64>| value.map(|v| rate_text_pref(Some(v), use_bytes, use_base2));
     let mut rows = vec![
-        (
-            t("device.status").to_string(),
-            t(device_status_i18n_key(disk.device_state.status)).to_string(),
+        StatRow::text(
+            t("device.status"),
+            Some(t(device_status_i18n_key(disk.device_state.status)).to_string()),
         ),
-        (
-            t("disk.read").to_string(),
-            rate_text_pref(observed.read_bytes_per_sec, use_bytes, use_base2),
-        ),
-        (
-            t("disk.write").to_string(),
-            rate_text_pref(observed.write_bytes_per_sec, use_bytes, use_base2),
-        ),
-        (
-            t("disk.active_time").to_string(),
+        StatRow::text(
+            t("disk.active_time"),
             observed
                 .active_time_pct
-                .map_or_else(missing_value, |value| format!("{:.0}%", value.round())),
+                .map(|value| format!("{:.0}%", value.round())),
         ),
+        StatRow::text(t("disk.read"), rate(observed.read_bytes_per_sec)),
+        StatRow::text(t("disk.write"), rate(observed.write_bytes_per_sec)),
+        StatRow::text(t("disk.iops"), observed.iops.map(|v| v.to_string())),
+        StatRow::text(
+            t("disk.response"),
+            observed
+                .response_time_ms
+                .map(|value| format!("{value:.2} ms")),
+        ),
+        StatRow::text(
+            t("disk.capacity"),
+            observed
+                .capacity_bytes
+                .map(|v| quantity_text_pref(v, use_bytes, use_base2)),
+        ),
+        StatRow::text(
+            t("disk.free"),
+            observed
+                .available_bytes
+                .map(|v| quantity_text_pref(v, use_bytes, use_base2)),
+        ),
+        StatRow::text(t("common.type"), Some(disk.disk_type.trim().to_string())),
+        StatRow::text(t("disk.filesystem"), Some(disk.fs_type.trim().to_string())),
     ];
-
-    if let Some(ms) = observed.response_time_ms {
-        rows.push((t("disk.response").to_string(), format!("{ms:.2} ms")));
-    }
-    if let Some(iops) = observed.iops {
-        rows.push((t("disk.iops").to_string(), iops.to_string()));
-    }
-    if let Some(total) = observed.capacity_bytes {
-        rows.push((
-            t("disk.capacity").to_string(),
-            quantity_text_pref(total, use_bytes, use_base2),
-        ));
-    }
-    if let Some(free) = observed.available_bytes {
-        rows.push((
-            t("disk.free").to_string(),
-            quantity_text_pref(free, use_bytes, use_base2),
-        ));
-    }
-    if !disk.disk_type.trim().is_empty() {
-        rows.push((
-            t("common.type").to_string(),
-            disk.disk_type.trim().to_string(),
-        ));
-    }
     if let Some(serial) = disk.serial.as_deref().filter(|value| !value.is_empty()) {
-        rows.push((t("disk.serial").to_string(), serial.to_owned()));
+        rows.push(StatRow::text(t("disk.serial"), Some(serial.to_owned())));
     }
     if let Some(revision) = disk.revision.as_deref().filter(|value| !value.is_empty()) {
-        rows.push((t("disk.revision").to_string(), revision.to_owned()));
+        rows.push(StatRow::text(t("disk.revision"), Some(revision.to_owned())));
     }
-    if !disk.fs_type.trim().is_empty() {
-        rows.push((
-            t("disk.filesystem").to_string(),
-            disk.fs_type.trim().to_string(),
-        ));
-    }
-
+    // ── NVMe / SMART health (only when the kernel exposes a health node) ──
+    // The critical-warning prefix surfaces the most actionable SMART bit the
+    // hwmon layer carries; otherwise a plain temperature readout.
     if let Some(temp) = disk.smart_temperature_c {
         let warn = disk.smart_critical_warning == Some(true);
         let label = if warn {
-            format!("{} ⚠", t("common.temperature"))
+            format!("{} \u{26a0}", t("common.temperature"))
         } else {
             t("common.temperature").to_string()
         };
-        let value = match disk.smart_temp_critical_c {
-            Some(crit) if crit > 0.0 => format!("{temp:.0} / {crit:.0} °C"),
-            _ => format!("{temp:.0} °C"),
+        let val = match disk.smart_temp_critical_c {
+            Some(crit) if crit > 0.0 => format!("{:.0} / {:.0} \u{b0}C", temp, crit),
+            _ => format!("{:.0} \u{b0}C", temp),
         };
-        rows.push((label, value));
+        rows.push(StatRow::text(label, Some(val)));
+        // SMART temperature trend from this disk identity's generation-scoped
+        // window. Only a window with at least one finite sample renders a row;
+        // another disk can never influence it.
+        if let Some(trend) = temperature_trend_value(temperature_samples) {
+            rows.push(StatRow::text(t("proc.trend"), Some(trend)));
+        }
     }
     if let Some(pct) = disk.smart_percent_used {
-        rows.push((t("disk.endurance_used").to_string(), format!("{pct:.0}%")));
+        rows.push(StatRow::text(
+            t("disk.endurance_used"),
+            Some(format!("{pct:.0}%")),
+        ));
     }
     if let Some(hours) = disk.smart_power_on_hours {
-        rows.push((
-            t("disk.power_on").to_string(),
-            format!("{} h ({} d)", hours, hours / 24),
+        let days = hours / 24;
+        rows.push(StatRow::text(
+            t("disk.power_on"),
+            Some(
+                t("disk.power_on_format")
+                    .replace("{hours}", &hours.to_string())
+                    .replace("{days}", &days.to_string()),
+            ),
         ));
     }
     if smart_section_visible(disk) && !has_smart_fields(disk) {
-        rows.push((
-            t("disk.smart_status").to_string(),
-            t(device_status_i18n_key(effective_smart_status(disk))).to_string(),
+        rows.push(StatRow::text(
+            t("disk.smart_status"),
+            Some(t(device_status_i18n_key(effective_smart_status(disk))).to_string()),
         ));
     }
     if disk.media_removable() == Some(true) {
-        rows.push((t("disk.removable").to_string(), t("common.yes").to_string()));
+        rows.push(StatRow::text(
+            t("disk.removable"),
+            Some(t("common.yes").to_string()),
+        ));
     }
-
-    for (partition, partition_observation) in disk.partitions.iter().zip(&observed.partitions) {
-        let heading = if !partition.mount_point.is_empty() {
-            partition.mount_point.clone()
-        } else if !partition.name.is_empty() {
-            format!("/dev/{}", partition.name)
-        } else {
-            continue;
-        };
-        let value = match (
-            partition_observation.used_bytes,
-            partition_observation.capacity_bytes,
-        ) {
-            (Some(used), Some(total)) if total > 0 => format!(
-                "{} / {}",
-                quantity_text_pref(used, use_bytes, use_base2),
-                quantity_text_pref(total, use_bytes, use_base2)
-            ),
-            (None, Some(total)) => {
-                format!(
-                    "{MISSING_VALUE} / {}",
-                    quantity_text_pref(total, use_bytes, use_base2)
-                )
-            }
-            (Some(used), _) => quantity_text_pref(used, use_bytes, use_base2),
-            _ => missing_value(),
-        };
-        rows.push((format!("{} · {}", t("disk.partitions"), heading), value));
-    }
+    // The partition census lives ONCE, in the vital line (GPUI parity): the
+    // panel below carries per-partition usage; the stats rail never
+    // duplicates it.
     rows
+}
+
+/// Latest/average/peak summary of one disk's SMART temperature window (°C) —
+/// GPUI `temperature_trend_value` parity. `None` when the window holds no
+/// finite sample: the honest absence renders no row, never a fabricated
+/// "0 °C" trend.
+#[must_use]
+pub(crate) fn temperature_trend_value(samples: &[f32]) -> Option<String> {
+    let mut latest = f32::NAN;
+    let mut peak = f32::NAN;
+    let mut sum = 0.0_f32;
+    let mut count = 0_u32;
+    for &value in samples.iter().filter(|value| value.is_finite()) {
+        latest = value;
+        // `f32::max` ignores NaN operands, so the first sample seeds `peak`.
+        peak = peak.max(value);
+        sum += value;
+        count += 1;
+    }
+    if count == 0 {
+        return None;
+    }
+    Some(format!(
+        "{} {:.0} \u{b0}C · {} {:.0} \u{b0}C · {} {:.0} \u{b0}C",
+        t("common.latest"),
+        latest,
+        t("common.avg"),
+        sum / count as f32,
+        t("common.peak"),
+        peak,
+    ))
 }
 
 /// The Performance-page per-disk panel.
 pub(crate) fn disk_section(
     app: &crate::IcedApp,
     index: usize,
+    budget: PerformancePageBudget,
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let snapshot = app.shell.projection().snapshot.as_ref();
     let theme_snapshot = app.theme();
     let color = theme::color(theme_snapshot.disk);
-    let compact = app.compact_layout();
+    let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let mut disk_graph = app.graph_prefs();
     disk_graph.hover = true;
     let rows = match (disk_section_state(snapshot), snapshot) {
@@ -185,11 +233,23 @@ pub(crate) fn disk_section(
         }
         (tables::ListState::Ready, Some(snapshot)) => match snapshot.disks.get(index) {
             Some(disk) => vec![disk_block(
+                app,
                 disk,
-                disk_graphs(app, index, disk, color, theme_snapshot, disk_graph, compact),
+                index,
+                disk_graphs(
+                    app,
+                    disk,
+                    index,
+                    color,
+                    theme_snapshot,
+                    disk_graph,
+                    compact,
+                    budget,
+                ),
+                smart_footer(app, disk, index, theme_snapshot),
                 theme_snapshot,
                 compact,
-                app.drive_units(),
+                budget,
             )],
             None => vec![tables::message_panel(theme_snapshot, t("disk.empty"))],
         },
@@ -203,34 +263,48 @@ pub(crate) fn disk_section(
     device_rows_panel(rows, theme_snapshot)
 }
 
-fn disk_graphs<'a>(
-    app: &'a crate::IcedApp,
+/// The SMART footer pinned under the statistics rail (GPUI parity): the
+/// health button when the disk exposes SMART fields, the honest status
+/// footer when the section is visible but fields are absent, and nothing
+/// when the section is hidden.
+fn smart_footer<'a>(
+    _app: &crate::IcedApp,
+    disk: &DiskMetrics,
     index: usize,
-    disk: &'a DiskMetrics,
-    color: iced::Color,
     theme_snapshot: &'a taskmanager_theme::Theme,
-    graph: device_chart::GraphPrefs,
-    compact: bool,
-) -> Vec<Element<'a, Message, iced::Theme, iced::Renderer>> {
-    let (read_samples, write_samples) =
-        app.cached_disk_split_series(&disk.device_id, disk.device_generation.get());
-    let smart_button = (smart_section_visible(disk) && has_smart_fields(disk)).then(|| {
-        crate::ui::focus::ghost_button(
+) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
+    if !smart_section_visible(disk) {
+        return None;
+    }
+    if has_smart_fields(disk) {
+        Some(crate::ui::focus::ghost_button(
             theme_snapshot,
             crate::app::FocusTarget::DiskSmartOpen { index },
             t("disk.smart_health"),
             Message::OpenDiskSmart { index },
-        )
-    });
-    let mut graphs = Vec::with_capacity(4);
-    if let Some(smart_button) = smart_button {
-        graphs.push(
-            iced::widget::row![smart_button]
-                .spacing(f32::from(tokens::SPACE_8))
-                .into(),
-        );
+        ))
+    } else {
+        super::device_status_footer(theme_snapshot, effective_smart_status(disk))
     }
-    graphs.extend([
+}
+
+#[allow(clippy::too_many_arguments)]
+fn disk_graphs<'a>(
+    app: &'a crate::IcedApp,
+    disk: &'a DiskMetrics,
+    index: usize,
+    color: iced::Color,
+    theme_snapshot: &'a taskmanager_theme::Theme,
+    graph: device_chart::GraphPrefs,
+    compact: bool,
+    budget: PerformancePageBudget,
+) -> Vec<Element<'a, Message, iced::Theme, iced::Renderer>> {
+    let _ = index;
+    let (read_samples, write_samples) =
+        app.cached_disk_split_series(&disk.device_id, disk.device_generation.get());
+    let activity_samples =
+        app.cached_disk_active_time_series(&disk.device_id, disk.device_generation.get());
+    let mut graphs = vec![
         // Two-series read/write graph: the disk family token strokes read, the
         // same token lifted toward white strokes write, both resolved through
         // one shared slot grid and one shared max so the directions stay
@@ -250,24 +324,29 @@ fn disk_graphs<'a>(
             theme_snapshot,
             compact,
         ),
-        // Active-time percentage curve beneath the throughput pair: the same
-        // generation-scoped ring the recorder feeds, on the fixed 0..100
-        // ceiling every percentage series shares (no selector, no second
-        // scale authority). The caption keeps the honest "· collecting" state
-        // while the window holds fewer than two samples.
-        device_chart::device_mini_graph_with_height(
-            app.cached_disk_active_time_series(&disk.device_id, disk.device_generation.get()),
+    ];
+    // Active-time percentage curve beneath the throughput pair: rendered only
+    // when the ring holds samples AND the Full chart inventory keeps
+    // secondary charts (GPUI parity) — a cold window or an AggregateOnly
+    // frame keeps the absence instead of a captioned empty card.
+    if !activity_samples.is_empty() && budget.chart_inventory == PerformanceChartInventory::Full {
+        graphs.push(device_chart::device_mini_graph_with_height(
+            activity_samples,
             device_chart::DeviceMetricScale::Percent,
             color,
             t("disk.active_time").to_string(),
             theme_snapshot,
             device_chart::SECONDARY_DEVICE_CHART_HEIGHT,
             graph,
-        ),
-        directory_usage::usage_panel(app, disk),
-    ]);
-    if let Some(panel) = partition_panel(disk, theme_snapshot, app.drive_units()) {
-        graphs.push(panel);
+        ));
+    }
+    // The below band renders from the Core rung up (GPUI parity): directory
+    // usage and the partition panel yield first when height collapses.
+    if budget.vertical.carries_core_stack() {
+        graphs.push(directory_usage::usage_panel(app, disk));
+        if let Some(panel) = partition_panel(disk, theme_snapshot, app.drive_units()) {
+            graphs.push(panel);
+        }
     }
     graphs
 }
@@ -305,17 +384,19 @@ fn drive_throughput_formatter(units: UnitPrefs) -> fn(f32) -> String {
     }
 }
 
-/// Dedicated visual cards for disk partitions with progress bars and filesystem tags.
+/// The per-partition filesystem-space panel (GPUI `partition_stats` parity):
+/// a titled card that ALWAYS renders for a disk — an empty partition list
+/// shows the explicit "no partitions" line, mounted partitions get the full
+/// identity row + usage row + 6px family-colored bar, and unmounted
+/// partitions collapse into one dim summary line because they have no
+/// trustworthy free/used numbers.
 pub(crate) fn partition_panel<'a>(
     disk: &'a DiskMetrics,
     theme_snapshot: &'a taskmanager_theme::Theme,
     units: UnitPrefs,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
-    if disk.partitions.is_empty() {
-        return None;
-    }
     let mut rows: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> =
-        Vec::with_capacity(disk.partitions.len() + 1);
+        Vec::with_capacity(disk.partitions.len() + 2);
     rows.push(
         iced::widget::text(t("disk.partitions"))
             .size(f32::from(tokens::FONT_13))
@@ -324,151 +405,51 @@ pub(crate) fn partition_panel<'a>(
             })
             .into(),
     );
-
-    let accent_color = theme::color(theme_snapshot.palette().accent);
-    let danger_color = theme::color(theme_snapshot.palette().danger);
-    let bar_bg = theme::color(theme_snapshot.shade);
-
-    let observed = super::projection::DiskObservation::from(disk);
-    for (partition, partition_observation) in disk.partitions.iter().zip(&observed.partitions) {
-        let name = if !partition.mount_point.is_empty() {
-            partition.mount_point.as_str()
-        } else if !partition.name.is_empty() {
-            partition.name.as_str()
-        } else {
-            "Partition"
-        };
-        let fs = if !partition.fs_type.is_empty() {
-            partition.fs_type.as_str()
-        } else {
-            ""
-        };
-
-        let used = partition_observation.used_bytes;
-        let total = partition_observation.capacity_bytes;
-        let free = partition_observation.free_bytes;
-        let pct = match (used, total) {
-            (Some(used), Some(total)) if total > 0 => {
-                Some((used as f32 / total as f32).clamp(0.0, 1.0))
-            }
-            _ => None,
-        };
-
-        let used_str = used.map_or_else(missing_value, |value| {
-            quantity_text_pref(value, units.use_bytes, units.use_base2)
-        });
-        let total_str = total.map_or_else(missing_value, |value| {
-            quantity_text_pref(value, units.use_bytes, units.use_base2)
-        });
-        let free_str = free.map_or_else(missing_value, |value| {
-            quantity_text_pref(value, units.use_bytes, units.use_base2)
-        });
-
-        let bar_fill_color = if pct.is_some_and(|value| value > 0.90) {
-            danger_color
-        } else {
-            accent_color
-        };
-
-        let header_row = iced::widget::row![
-            iced::widget::text(name)
+    if disk.partitions.is_empty() {
+        rows.push(
+            iced::widget::text(t("disk.no_partitions"))
                 .size(f32::from(tokens::FONT_12))
-                .width(iced::Length::Fill)
-                .wrapping(iced::widget::text::Wrapping::Glyph),
-            iced::widget::container(iced::widget::text(fs).size(f32::from(tokens::FONT_10)))
-                .padding([1, 4])
-                .style(move |_| iced::widget::container::Style {
-                    background: Some(iced::Background::Color(bar_bg)),
-                    border: iced::Border {
-                        radius: 3.0.into(),
-                        width: 1.0,
-                        color: theme::color(theme_snapshot.palette().border),
-                    },
-                    ..Default::default()
-                }),
-        ]
-        .spacing(6)
-        .align_y(iced::Alignment::Center)
-        .width(iced::Length::Fill);
-
-        // `FillPortion` is resolved by a flex parent. Keeping the fill and
-        // the remainder as siblings makes the measured used fraction visible;
-        // putting a single `FillPortion` inside a container can collapse it
-        // to the child's intrinsic zero width on Iced.
-        let progress_bar_content = match pct {
-            Some(value) => {
-                let fill_portion = ((value * 1000.0).round() as u16).clamp(1, 1000);
-                let remainder_portion = 1000_u16.saturating_sub(fill_portion);
-                let fill = iced::widget::container(iced::widget::text("").size(0))
-                    .width(iced::Length::FillPortion(fill_portion))
-                    .height(iced::Length::Fixed(6.0))
-                    .style(move |_| iced::widget::container::Style {
-                        background: Some(iced::Background::Color(bar_fill_color)),
-                        border: iced::Border {
-                            radius: 3.0.into(),
-                            ..Default::default()
-                        },
-                        ..Default::default()
-                    });
-                let remainder = iced::widget::container(iced::widget::text("").size(0))
-                    .width(if remainder_portion > 0 {
-                        iced::Length::FillPortion(remainder_portion)
-                    } else {
-                        iced::Length::Shrink
-                    })
-                    .height(iced::Length::Fixed(6.0));
-                iced::widget::row![fill, remainder]
-                    .width(iced::Length::Fill)
-                    .height(iced::Length::Fixed(6.0))
-            }
-            None => iced::widget::row![]
-                .width(iced::Length::Fill)
-                .height(iced::Length::Fixed(6.0)),
-        };
-        let progress_bar = iced::widget::container(progress_bar_content)
-            .width(iced::Length::Fill)
-            .height(iced::Length::Fixed(6.0))
-            .style(move |_| iced::widget::container::Style {
-                background: Some(iced::Background::Color(bar_bg)),
-                border: iced::Border {
-                    radius: 3.0.into(),
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
-
-        let stats_row = iced::widget::row![
-            iced::widget::text(format!(
-                "{used_str} / {total_str} ({})",
-                pct.map_or_else(missing_value, |value| format!("{:.1}%", value * 100.0))
-            ))
-            .size(f32::from(tokens::FONT_11)),
-            iced::widget::text(format!("{} {free_str}", t("disk.free")))
-                .size(f32::from(tokens::FONT_11))
                 .style(move |_| iced::widget::text::Style {
                     color: Some(theme::muted_text_color(theme_snapshot)),
-                }),
-        ]
-        .spacing(8)
-        .align_y(iced::Alignment::Center);
-
-        let card = iced::widget::container(
-            iced::widget::column![header_row, progress_bar, stats_row].spacing(4),
-        )
-        .padding(6)
-        .style(move |_| iced::widget::container::Style {
-            background: Some(iced::Background::Color(theme::color(
-                theme_snapshot.palette().surface,
-            ))),
-            border: iced::Border {
-                radius: 4.0.into(),
-                width: 1.0,
-                color: theme::color(theme_snapshot.palette().border),
-            },
-            ..Default::default()
-        });
-
-        rows.push(card.into());
+                })
+                .into(),
+        );
+    } else {
+        let observed = super::projection::DiskObservation::from(disk);
+        let mut mounted_names = Vec::new();
+        for (partition, partition_observation) in disk.partitions.iter().zip(&observed.partitions) {
+            if partition.mount_point.trim().is_empty() {
+                mounted_names.push(
+                    partition
+                        .name
+                        .trim_start_matches("/dev/")
+                        .trim()
+                        .to_string(),
+                );
+                continue;
+            }
+            rows.push(partition_row(
+                partition,
+                partition_observation,
+                theme_snapshot,
+                units,
+            ));
+        }
+        if !mounted_names.is_empty() {
+            let names = mounted_names
+                .into_iter()
+                .filter(|name| !name.is_empty())
+                .collect::<Vec<_>>()
+                .join(" · ");
+            rows.push(
+                iced::widget::text(t("disk.unmounted_summary").replace("{names}", &names))
+                    .size(f32::from(tokens::FONT_11))
+                    .style(move |_| iced::widget::text::Style {
+                        color: Some(theme::muted_text_color(theme_snapshot)),
+                    })
+                    .into(),
+            );
+        }
     }
 
     Some(
@@ -479,21 +460,170 @@ pub(crate) fn partition_panel<'a>(
     )
 }
 
-fn disk_block<'a>(
-    disk: &'a DiskMetrics,
-    graphs: Vec<Element<'a, Message, iced::Theme, iced::Renderer>>,
+/// One mounted partition's identity row + usage row + 6px family bar (GPUI
+/// `partition_row` parity).
+fn partition_row<'a>(
+    partition: &taskmanager_application::DiskPartition,
+    observed: &super::projection::PartitionObservation,
     theme_snapshot: &'a taskmanager_theme::Theme,
-    compact: bool,
     units: UnitPrefs,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let label = partition_label(partition);
+    // Usage text: "used / total · free · pct"; unavailable facts name the
+    // reason instead of an empty bar with numbers that do not exist.
+    let usage = match (observed.used_bytes, observed.capacity_bytes) {
+        (Some(used), Some(total)) if total > 0 => {
+            let used = used.min(total);
+            let ratio = (used as f32 / total as f32).clamp(0.0, 1.0);
+            let free = observed.free_bytes.unwrap_or(0);
+            (
+                format!(
+                    "{} / {} · {} {} · {:.0}%",
+                    quantity_text_pref(used, units.use_bytes, units.use_base2),
+                    quantity_text_pref(total, units.use_bytes, units.use_base2),
+                    t("disk.free"),
+                    quantity_text_pref(free, units.use_bytes, units.use_base2),
+                    ratio * 100.0,
+                ),
+                Some(ratio),
+            )
+        }
+        _ => (
+            if partition.device_state.status == taskmanager_application::DeviceStatus::Healthy {
+                t("disk.usage_unavailable").to_string()
+            } else {
+                t(device_status_i18n_key(partition.device_state.status)).to_string()
+            },
+            None,
+        ),
+    };
+
+    // 6px family-colored progress bar (FillPortion siblings keep the measured
+    // fraction visible on Iced).
+    let bar_fill_color = theme::color(theme_snapshot.disk);
+    let bar_bg = theme::color(theme_snapshot.shade);
+    let progress_bar_content = match usage.1 {
+        Some(value) => {
+            let fill_portion = ((value * 1000.0).round() as u16).clamp(1, 1000);
+            let remainder_portion = 1000_u16.saturating_sub(fill_portion);
+            let fill = iced::widget::container(iced::widget::text("").size(0))
+                .width(iced::Length::FillPortion(fill_portion))
+                .height(iced::Length::Fixed(6.0))
+                .style(move |_| iced::widget::container::Style {
+                    background: Some(iced::Background::Color(bar_fill_color)),
+                    border: iced::Border {
+                        radius: 3.0.into(),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                });
+            let remainder = iced::widget::container(iced::widget::text("").size(0))
+                .width(if remainder_portion > 0 {
+                    iced::Length::FillPortion(remainder_portion)
+                } else {
+                    iced::Length::Shrink
+                })
+                .height(iced::Length::Fixed(6.0));
+            iced::widget::row![fill, remainder]
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fixed(6.0))
+        }
+        None => iced::widget::row![]
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fixed(6.0)),
+    };
+    let progress_bar = iced::widget::container(progress_bar_content)
+        .width(iced::Length::Fill)
+        .height(iced::Length::Fixed(6.0))
+        .style(move |_| iced::widget::container::Style {
+            background: Some(iced::Background::Color(bar_bg)),
+            border: iced::Border {
+                radius: 3.0.into(),
+                ..Default::default()
+            },
+            ..Default::default()
+        });
+
+    iced::widget::column![
+        iced::widget::text(label).size(f32::from(tokens::FONT_12)),
+        iced::widget::text(usage.0)
+            .size(f32::from(tokens::FONT_11))
+            .style(move |_| iced::widget::text::Style {
+                color: Some(theme::muted_text_color(theme_snapshot)),
+            }),
+        progress_bar,
+    ]
+    .spacing(4)
+    .width(iced::Length::Fill)
+    .into()
+}
+
+/// One partition's identity: `name · mount · fs` with `/dev/` handling and
+/// the unmounted qualifier (GPUI `partition_label` parity).
+fn partition_label(partition: &DiskPartition) -> String {
+    let raw_name = partition.name.trim();
+    let raw_mount = partition.mount_point.trim();
+    let is_windows_path = raw_name.contains(':')
+        || raw_name.starts_with('\\')
+        || raw_mount.contains(':')
+        || raw_mount.starts_with('\\')
+        || cfg!(target_os = "windows");
+    let name = raw_name.trim_start_matches("/dev/");
+    let mount = raw_mount.trim_start_matches("/dev/");
+    let prefix = if !is_windows_path && !name.starts_with('/') && !name.is_empty() {
+        "/dev/"
+    } else {
+        ""
+    };
+
+    if mount.is_empty() {
+        format!("{prefix}{name} · {}", t("disk.unmounted"))
+    } else if partition.fs_type.is_empty() {
+        if name.eq_ignore_ascii_case(mount) || name.is_empty() {
+            mount.to_string()
+        } else {
+            format!("{prefix}{name} · {mount}")
+        }
+    } else if name.eq_ignore_ascii_case(mount) || name.is_empty() {
+        format!("{mount} · {}", partition.fs_type)
+    } else {
+        format!("{prefix}{name} · {mount} · {}", partition.fs_type)
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn disk_block<'a>(
+    app: &'a crate::IcedApp,
+    disk: &'a DiskMetrics,
+    _index: usize,
+    graphs: Vec<Element<'a, Message, iced::Theme, iced::Renderer>>,
+    stats_footer: Option<Element<'a, Message, iced::Theme, iced::Renderer>>,
+    theme_snapshot: &'a taskmanager_theme::Theme,
+    _compact: bool,
+    budget: PerformancePageBudget,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let temperature_samples =
+        app.cached_disk_temperature_series(&disk.device_id, disk.device_generation.get());
     perf_layout::main_with_stats(
         theme_snapshot,
         disk_title(disk),
-        t("disk.throughput").to_string(),
+        format!(
+            "{} · {} · {}",
+            disk.name.trim_start_matches("/dev/"),
+            disk.disk_type,
+            disk.fs_type
+        ),
+        Some(disk_vital_line(disk, app.drive_units())),
         graphs,
-        disk_summary_lines(disk, units.use_bytes, units.use_base2),
-        compact,
-        perf_layout::DetailExtent::for_scroll_parent(compact),
+        disk_summary_lines(
+            disk,
+            app.drive_units().use_bytes,
+            app.drive_units().use_base2,
+            &temperature_samples,
+        ),
+        stats_footer,
+        budget,
+        perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation),
     )
 }
 

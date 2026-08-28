@@ -8,6 +8,18 @@ pub mod adaptive_grid;
 
 pub use adaptive_grid::AdaptiveGrid;
 
+/// Debug-selector identities owned by this layout contract (ADR-042).
+///
+/// Producers and the render-path guard share these constants: a selector
+/// can no longer drift between the builder and the assertion, and a
+/// typo surfaces as a compile-time mismatch instead of a silent `None`.
+pub mod selectors {
+    /// The data-page family's ONE outer shell (`PageScaffold`).
+    pub const PAGE_SCAFFOLD: &str = "tm-page-scaffold";
+    /// The shell-owned footer slot inside `PageScaffold`.
+    pub const PAGE_SCAFFOLD_FOOTER: &str = "tm-page-scaffold-footer";
+}
+
 use std::rc::Rc;
 
 use gpui::prelude::FluentBuilder;
@@ -131,9 +143,21 @@ impl PageScaffold {
             .min_w(px(0.0))
             .min_h(px(0.0))
             .w_full()
+            // The data-page family's ONE outer shell (ADR-042): the
+            // render-path guard proves every non-chart page paints through
+            // this selector, so a skeleton adjustment propagates to all of
+            // them from this single place.
+            .debug_selector(|| selectors::PAGE_SCAFFOLD.to_string())
             .child(self.frame.render());
         if let Some(footer) = self.footer {
-            scaffold = scaffold.child(div().flex_shrink_0().min_w(px(0.0)).w_full().child(footer));
+            scaffold = scaffold.child(
+                div()
+                    .flex_shrink_0()
+                    .min_w(px(0.0))
+                    .w_full()
+                    .debug_selector(|| selectors::PAGE_SCAFFOLD_FOOTER.to_string())
+                    .child(footer),
+            );
         }
         scaffold
     }

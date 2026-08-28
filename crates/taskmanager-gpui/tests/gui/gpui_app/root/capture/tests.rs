@@ -273,7 +273,7 @@ fn system_about_capture_waits_for_live_data_and_requires_open_projection() {
 }
 
 #[test]
-fn about_capture_waits_for_live_data_and_requires_open_projection() {
+fn mc07_capture_readiness_case_about_capture_waits_for_live_data_and_requires_open_projection() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::About));
     assert!(!evidence.about_requested());
 
@@ -553,7 +553,7 @@ fn smart_scenario_prepares_explicit_missing_tool_state() {
 }
 
 #[test]
-fn hotplug_capture_exposes_disconnect_after_stable_identity_was_seen() {
+fn mc02_hotplug_case_hotplug_capture_exposes_disconnect_after_stable_identity_was_seen() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::DeviceHotplug));
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);

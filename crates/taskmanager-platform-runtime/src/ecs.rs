@@ -11,7 +11,7 @@ use std::sync::{Arc, LockResult, Mutex, MutexGuard};
 
 use bevy_app::prelude::{App, Update};
 use bevy_ecs::component::Component;
-use bevy_ecs::prelude::{Entity, Query, Res, ResMut, Resource};
+use bevy_ecs::prelude::{Entity, Resource};
 use bevy_ecs::schedule::{IntoScheduleConfigs, SystemSet};
 use bevy_ecs::world::World;
 use taskmanager_application::{
@@ -33,6 +33,7 @@ mod lifecycle;
 #[cfg(test)]
 #[path = "../tests/headless/ecs_replay.rs"]
 mod replay;
+mod scheduling_systems;
 #[cfg(test)]
 #[path = "../tests/headless/ecs_state_machine.rs"]
 mod state_machine;
@@ -288,98 +289,6 @@ pub(crate) struct EcsWorkPlan {
     pub(crate) stalled: Vec<StalledSubject>,
 }
 
-fn mark_stalled_system(
-    clock: Res<SchedulerClock>,
-    stall_policy: Res<StallPolicy>,
-    mut stalled_work: ResMut<StalledWork>,
-    mut diagnostics: ResMut<EcsDiagnostics>,
-    mut capabilities: Query<(&CapabilityNode, &mut WorkState)>,
-) {
-    for (node, mut state) in &mut capabilities {
-        if let Some(request_id) =
-            state.expire_lease(clock.monotonic_now_ms, stall_policy.lifetime_ms)
-        {
-            stalled_work.subjects.push(StalledSubject::Capability {
-                capability: node.capability.clone(),
-                request_id,
-            });
-            diagnostics.stalled = diagnostics.stalled.saturating_add(1);
-        }
-    }
-}
-
-fn mark_due_system(
-    clock: Res<SchedulerClock>,
-    mut due_work: ResMut<DueWork>,
-    mut capabilities: Query<(&CapabilityNode, &DueAt, &mut WorkState)>,
-) {
-    for (node, due_at, mut state) in &mut capabilities {
-        if *state == WorkState::Waiting && due_at.0 <= clock.monotonic_now_ms {
-            *state = WorkState::Ready;
-            due_work.items.push(EcsWorkItem {
-                capability: node.capability.clone(),
-                provider: node.provider.clone(),
-                delivery: node.delivery,
-                domain: node.domain,
-            });
-        }
-    }
-}
-
-fn order_due_system(mut due_work: ResMut<DueWork>) {
-    due_work.items.sort_by(|left, right| {
-        delivery_rank(left.delivery)
-            .cmp(&delivery_rank(right.delivery))
-            .then_with(|| left.provider.cmp(&right.provider))
-            .then_with(|| left.capability.cmp(&right.capability))
-    });
-    due_work
-        .items
-        .dedup_by(|left, right| left.capability == right.capability);
-}
-
-/// Retire capability-level stalled owners whose abandonment deadline passed.
-/// The route requeues with the ordinary retry backoff; delivery capacity is
-/// recycled by `tick_plan`'s post-pass over [`AbandonedWork`]. A very late
-/// completion of the retired request is then a tolerated stale publication.
-fn abandon_stalled_system(
-    clock: Res<SchedulerClock>,
-    retry: Res<RetryIntervalMs>,
-    mut abandoned: ResMut<AbandonedWork>,
-    mut diagnostics: ResMut<EcsDiagnostics>,
-    mut capabilities: Query<(&CapabilityNode, &mut WorkState, &mut DueAt)>,
-) {
-    for (node, mut state, mut due_at) in &mut capabilities {
-        let WorkState::Stalled {
-            request_id,
-            abandon_at_ms,
-        } = *state
-        else {
-            continue;
-        };
-        if abandon_at_ms > clock.monotonic_now_ms {
-            continue;
-        }
-        *state = WorkState::Waiting;
-        due_at.0 = clock
-            .monotonic_now_ms
-            .saturating_add(retry.0)
-            .max(abandon_at_ms);
-        abandoned.subjects.push(StalledSubject::Capability {
-            capability: node.capability.clone(),
-            request_id,
-        });
-        diagnostics.abandoned_stalls = diagnostics.abandoned_stalls.saturating_add(1);
-    }
-}
-
-const fn delivery_rank(delivery: crate::config::DeliveryClass) -> u8 {
-    match delivery {
-        crate::config::DeliveryClass::Control => 0,
-        crate::config::DeliveryClass::Observation => 1,
-    }
-}
-
 /// Runtime-local plugin seam for domain systems.
 ///
 /// A plugin may add ECS systems and schedule constraints, but it cannot bypass
@@ -405,16 +314,19 @@ impl RuntimeEcsPlugin for CapabilityLifecyclePlugin {
         app.add_systems(
             Update,
             (
-                mark_stalled_system,
+                scheduling_systems::mark_stalled_system,
                 mark_stalled_target_jobs_system,
-                abandon_stalled_system,
+                scheduling_systems::abandon_stalled_system,
                 abandon_stalled_target_jobs_system,
-                mark_due_system,
+                scheduling_systems::mark_due_system,
             )
                 .chain()
                 .in_set(EcsScheduleSet::Lifecycle),
         );
-        app.add_systems(Update, order_due_system.in_set(EcsScheduleSet::Plan));
+        app.add_systems(
+            Update,
+            scheduling_systems::order_due_system.in_set(EcsScheduleSet::Plan),
+        );
     }
 }
 

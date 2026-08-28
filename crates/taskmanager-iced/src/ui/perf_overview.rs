@@ -15,20 +15,25 @@ use crate::perf_chart::PerfChart;
 use crate::theme;
 use iced::Length;
 use iced::widget::{canvas, column, row, text};
+use std::rc::Rc;
 use taskmanager_application::{CpuTemperatureSource, MemoryMetrics};
 use taskmanager_shell::history::MetricSeries;
 use taskmanager_shell::presentation::missing_value;
+use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
+
+use super::responsive::{PerformanceChartInventory, PerformancePageBudget};
 
 /// Dispatch the two singleton Performance resources to their named renderers.
 pub(super) fn cpu_memory_detail(
     app: &crate::IcedApp,
     device: PerfDevice,
+    budget: PerformancePageBudget,
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     if device == PerfDevice::Cpu {
-        cpu_detail(app)
+        cpu_detail(app, budget)
     } else {
-        memory_detail(app)
+        memory_detail(app, budget)
     }
 }
 
@@ -52,7 +57,10 @@ fn overview_gauges(app: &crate::IcedApp) -> Element<'static, Message, iced::Them
     .into()
 }
 
-fn cpu_detail(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
+fn cpu_detail(
+    app: &crate::IcedApp,
+    budget: PerformancePageBudget,
+) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let theme_snapshot = app.theme();
     let observed = app
         .shell
@@ -75,29 +83,33 @@ fn cpu_detail(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::R
             snapshot.cpu.temperature_source
         });
     let headline = projection::cpu_headline_metrics(observed);
-    let compact = app.compact_layout();
-    let chart_layout = projection::CpuChartLayout::from_compact(compact);
-    let (chart_extent, chart_height) = match chart_layout {
-        projection::CpuChartLayout::AggregateWithPerCore => (
-            perf_layout::DetailExtent::Content,
-            Length::Fixed(chart_height(false)),
-        ),
-        projection::CpuChartLayout::AggregateOnly => {
-            (perf_layout::DetailExtent::Fill, Length::Fill)
-        }
+    // The chart inventory comes from the typed frame budget (both axes); no
+    // local compact-flag derivation remains.
+    let chart_layout = projection::CpuChartLayout::for_inventory(budget.chart_inventory);
+    let extent = perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation);
+    let chart_height = if extent == perf_layout::DetailExtent::Fill {
+        // Fixed-viewport frames hand the headline chart the column's
+        // remaining height — it grows like GPUI's flex-1 headline tier.
+        Length::Fill
+    } else {
+        // Strip frames live in the page scroll and keep the shared headline
+        // floor (GPUI MAIN_GRAPH_MIN_HEIGHT parity).
+        Length::Fixed(cpu::HEADLINE_CHART_FLOOR)
     };
-    let chart_content = column![
-        chart_time_axis(theme_snapshot),
-        performance_chart(app, theme_snapshot, chart_height),
-        column(utilization_graph_summary_elements(app)).spacing(2),
-    ]
-    .spacing(8)
-    .height(chart_extent.length());
+    let mut chart_content = column![chart_time_axis(theme_snapshot)].spacing(8);
+    chart_content = chart_content.push(performance_chart(app, theme_snapshot, chart_height));
+    // Vertical ladder (GPUI parity): the per-chart summary rows drop
+    // explicitly at the Floor rung — before the headline floor is touched.
+    if budget.vertical.carries_core_stack() {
+        chart_content =
+            chart_content.push(column(utilization_graph_summary_elements(app)).spacing(2));
+    }
+    let chart_content = chart_content.height(extent.length());
     let mut left = vec![
         overview_gauges(app),
         cpu_headline_readouts(&headline, bogomips, temperature_source, theme_snapshot),
     ];
-    let chart_panel = perf_layout::graph_card(theme_snapshot, chart_content.into(), chart_extent);
+    let chart_panel = perf_layout::graph_card(theme_snapshot, chart_content.into(), extent);
     match chart_layout {
         projection::CpuChartLayout::AggregateWithPerCore => {
             left.push(performance_graph_resolution_selector(
@@ -105,14 +117,10 @@ fn cpu_detail(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::R
                 app.graph_data_points(),
             ));
             left.push(chart_panel);
-            left.push(trend_strip_panel(app, theme_snapshot));
-            left.push(core_grid::per_core_grid_panel(app, theme_snapshot));
-            if app.history_replay_entry_available() {
-                left.push(super::history_replay::history_replay_panel(
-                    theme_snapshot,
-                    app.history_replay_state(),
-                    &app.local_time_rules,
-                ));
+            // The below band renders from the Core rung up (GPUI parity).
+            if budget.vertical.carries_core_stack() {
+                left.push(trend_strip_panel(app, theme_snapshot));
+                left.push(core_grid::per_core_grid_panel(app, theme_snapshot));
             }
         }
         projection::CpuChartLayout::AggregateOnly => left.push(chart_panel),
@@ -122,26 +130,35 @@ fn cpu_detail(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::R
         theme_snapshot,
         title,
         subtitle,
+        // CPU/Memory pages carry no device-loss fact: the family cannot
+        // disappear (GPUI passes `None` too).
+        None,
         left,
         stats,
-        compact,
+        None,
+        budget,
         perf_layout::DetailExtent::Fill,
     )
 }
 
-fn memory_detail(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
+fn memory_detail(
+    app: &crate::IcedApp,
+    budget: PerformancePageBudget,
+) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let theme_snapshot = app.theme();
     let snapshot = app.shell.projection().snapshot.as_ref();
-    let chart_content = column![
-        chart_time_axis(theme_snapshot),
-        performance_chart(
-            app,
-            theme_snapshot,
-            Length::Fixed(chart_height(app.compact_layout())),
-        ),
-        column(utilization_graph_summary_elements(app)).spacing(2),
-    ]
-    .spacing(8);
+    let extent = perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation);
+    let chart_height = if extent == perf_layout::DetailExtent::Fill {
+        Length::Fill
+    } else {
+        Length::Fixed(cpu::HEADLINE_CHART_FLOOR)
+    };
+    let mut chart_content = column![chart_time_axis(theme_snapshot)].spacing(8);
+    chart_content = chart_content.push(performance_chart(app, theme_snapshot, chart_height));
+    if budget.vertical.carries_core_stack() {
+        chart_content =
+            chart_content.push(column(utilization_graph_summary_elements(app)).spacing(2));
+    }
     let mut left = vec![
         overview_gauges(app),
         performance_graph_resolution_selector(theme_snapshot, app.graph_data_points()),
@@ -159,13 +176,51 @@ fn memory_detail(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced
     left.push(perf_layout::graph_card(
         theme_snapshot,
         chart_content.into(),
-        perf_layout::DetailExtent::Content,
+        extent,
     ));
-    if app.history_replay_entry_available() {
-        left.push(super::history_replay::history_replay_panel(
+    // Swap-over-time headline chart (GPUI parity): gated on swap presence AND
+    // the Full chart inventory so swap-less or inventory-collapsed frames keep
+    // the full-height memory graph. The swap series is a percentage on the
+    // memory family color at reduced alpha — distinct yet memory-adjacent.
+    let has_swap = snapshot.is_some_and(|snapshot| {
+        projection::MemoryObservation::from(&snapshot.memory)
+            .swap_total_bytes
+            .is_some_and(|total| total > 0)
+    });
+    if has_swap && budget.chart_inventory == PerformanceChartInventory::Full {
+        let swap_samples = app.cached_swap_series();
+        let mut swap_content = column![
+            text(t("mem.swap"))
+                .size(f32::from(tokens::FONT_13))
+                .color(theme::muted_text_color(theme_snapshot))
+        ]
+        .spacing(8);
+        let swap_chart = canvas::Canvas::new(PerfChart::new(
+            Rc::clone(&swap_samples),
+            swap_samples.clone(),
+            theme::color(theme_snapshot.memory).scale_alpha(0.75),
+            theme::color(theme_snapshot.palette().border),
+            theme::color(theme_snapshot.palette().border),
+            crate::perf_chart::ReadoutColors {
+                bg: theme::color(theme_snapshot.palette().surface),
+                fg: theme::color(theme_snapshot.palette().fg),
+            },
+            false,
+        ))
+        .width(Length::Fill)
+        .height(chart_height);
+        swap_content = swap_content.push(swap_chart);
+        if budget.vertical.carries_core_stack() {
+            let mut summary = Vec::new();
+            cpu::push_graph_summary(&mut summary, t("mem.swap"), &swap_samples, |value| {
+                format!("{value:.0}%")
+            });
+            swap_content = swap_content.push(column(summary).spacing(2));
+        }
+        left.push(perf_layout::graph_card(
             theme_snapshot,
-            app.history_replay_state(),
-            &app.local_time_rules,
+            swap_content.into(),
+            extent,
         ));
     }
     let (title, subtitle, stats) = cpu_memory_header_and_stats(app, PerfDevice::Memory);
@@ -173,20 +228,25 @@ fn memory_detail(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced
         theme_snapshot,
         title,
         subtitle,
+        None,
         left,
         stats,
-        app.compact_layout(),
-        perf_layout::DetailExtent::for_scroll_parent(app.compact_layout()),
+        None,
+        budget,
+        extent,
     )
 }
 
 /// GPUI-shaped title/subtitle and right-column readouts for CPU and Memory.
 /// The left side owns the graph hierarchy; these rows keep the most important
-/// scalar facts stable while the graph grows or changes overlay.
+/// scalar facts stable while the graph grows or changes overlay. Rows are
+/// pre-folded shell [`StatRow`]s: an applicable-but-uncollected fact keeps its
+/// row with `None` (the panel renders the shared dash dimmed); a fact that
+/// does not exist on this host omits its row entirely.
 fn cpu_memory_header_and_stats(
     app: &crate::IcedApp,
     device: PerfDevice,
-) -> (String, String, Vec<(String, String)>) {
+) -> (String, String, Vec<StatRow>) {
     let Some(snapshot) = app.shell.projection().snapshot.as_ref() else {
         return (
             perf_device_label(device).to_string(),
@@ -217,64 +277,74 @@ fn cpu_memory_header_and_stats(
             .clone()
             .unwrap_or_else(|| t("common.collecting_telemetry").to_string());
         let mut stats = vec![
-            (
-                t("common.utilization").to_string(),
-                observed
-                    .usage_pct
-                    .map(|value| format!("{value:.0}%"))
-                    .unwrap_or_else(missing_value),
+            StatRow::text(
+                t("common.utilization"),
+                observed.usage_pct.map(|value| format!("{value:.0}%")),
             ),
             cpu_speed_row(observed.frequency_mhz, cpu.frequency_source.is_bogomips()),
             cpu_temperature_row(observed.temperature_c, cpu.temperature_source),
-            (
-                t("common.processes").to_string(),
-                snapshot.processes.to_string(),
+            StatRow::text(t("common.processes"), Some(snapshot.processes.to_string())),
+            StatRow::text(
+                t("common.threads"),
+                snapshot.threads.map(|threads| threads.to_string()),
             ),
-            (
-                t("common.threads").to_string(),
-                snapshot
-                    .threads
-                    .map_or_else(missing_value, |threads| threads.to_string()),
-            ),
-            (
-                t("common.uptime").to_string(),
-                duration(snapshot.uptime_secs),
-            ),
-            (
-                t("common.cores").to_string(),
+            StatRow::text(t("common.uptime"), Some(duration(snapshot.uptime_secs))),
+            StatRow::text(
+                t("common.cores"),
                 match (cpu.physical_cores, cpu.logical_cores) {
-                    (Some(physical), Some(logical)) => format!("{physical} / {logical}"),
-                    _ => missing_value(),
+                    (Some(physical), Some(logical)) => Some(format!("{physical} / {logical}")),
+                    _ => None,
                 },
             ),
         ];
         if let Some(hardware) = app.shell.projection().hardware.as_ref() {
             if let Some(sockets) = hardware.sockets {
-                stats.push((t("system.field.sockets").to_string(), sockets.to_string()));
+                stats.push(StatRow::text(
+                    t("system.field.sockets"),
+                    Some(sockets.to_string()),
+                ));
             }
             if let Some(virt) = hardware.virt.as_deref() {
-                stats.push((t("common.virtualization").to_string(), virt.to_string()));
+                stats.push(StatRow::text(
+                    t("common.virtualization"),
+                    Some(virt.to_string()),
+                ));
             }
         }
         if let Some(l1) = cpu.l1_cache_kb {
-            stats.push((t("common.l1_cache").to_string(), format_cache_kb(l1)));
+            stats.push(StatRow::text(
+                t("common.l1_cache"),
+                Some(format_cache_kb(l1)),
+            ));
         }
         if let Some(l2) = cpu.l2_cache_kb {
-            stats.push((t("common.l2_cache").to_string(), format_cache_kb(l2)));
+            stats.push(StatRow::text(
+                t("common.l2_cache"),
+                Some(format_cache_kb(l2)),
+            ));
         }
         if let Some(l3) = cpu.l3_cache_kb {
-            stats.push((t("common.l3_cache").to_string(), format_cache_kb(l3)));
+            stats.push(StatRow::text(
+                t("common.l3_cache"),
+                Some(format_cache_kb(l3)),
+            ));
         }
         if let Some(driver) = cpu.performance_policy.frequency_implementation.as_deref() {
-            stats.push((t("cpu.cpufreq_driver").to_string(), driver.to_string()));
+            stats.push(StatRow::text(
+                t("cpu.cpufreq_driver"),
+                Some(driver.to_string()),
+            ));
         }
         if let Some(governor) = cpu.performance_policy.active_policy.as_deref() {
-            stats.push((t("cpu.cpufreq_governor").to_string(), governor.to_string()));
+            stats.push(StatRow::text(
+                t("cpu.cpufreq_governor"),
+                Some(governor.to_string()),
+            ));
         }
         if let Some(preference) = cpu.performance_policy.energy_preference.as_deref() {
-            stats.push((
-                t("cpu.power_preference").to_string(),
-                preference.to_string(),
+            stats.push(StatRow::text(
+                t("cpu.power_preference"),
+                Some(preference.to_string()),
             ));
         }
         (t("common.cpu").to_string(), subtitle, stats)
@@ -320,116 +390,117 @@ pub(crate) fn format_cache_kb(kb: u64) -> String {
     }
 }
 
-/// The Speed stat row's (label, value), honoring the provider's frequency
-/// source. BogoMIPS is a Linux boot-time calibration value, not a clock
-/// measurement: when the source is BogoMIPS (a VM or any host without cpufreq)
-/// the row relabels to BogoMIPS and keeps the raw calibration value instead of
-/// presenting it as a live MHz reading — the same relabel GPUI's `cpu_view.rs`
-/// Speed row applies. A missing value stays an honest "—" under both sources.
-/// Pure so the source matrix is table-tested.
-fn cpu_speed_row(frequency_mhz: Option<u64>, bogomips: bool) -> (String, String) {
+/// The Speed stat row's label and typed value, honoring the provider's
+/// frequency source. BogoMIPS is a Linux boot-time calibration value, not a
+/// clock measurement: when the source is BogoMIPS (a VM or any host without
+/// cpufreq) the row relabels to BogoMIPS and keeps the raw calibration value
+/// instead of presenting it as a live MHz reading — the same relabel GPUI's
+/// `cpu_view.rs` Speed row applies. A missing value stays an honest `None`
+/// (the shared dash) under both sources. Pure so the source matrix is
+/// table-tested.
+fn cpu_speed_parts(frequency_mhz: Option<u64>, bogomips: bool) -> (&'static str, Option<String>) {
     let label = if bogomips {
         t("cpu.bogomips")
     } else {
         t("common.speed")
     };
-    (
-        label.to_string(),
-        cpu_frequency_readout_for_source(frequency_mhz, bogomips),
-    )
+    let value = match frequency_mhz {
+        Some(value) if bogomips => Some(format!("{value}.00 BogoMIPS")),
+        Some(value) => Some(format!("{value} MHz")),
+        None => None,
+    };
+    (label, value)
+}
+
+/// The Speed stat row as a pre-folded shell [`StatRow`].
+fn cpu_speed_row(frequency_mhz: Option<u64>, bogomips: bool) -> StatRow {
+    let (label, value) = cpu_speed_parts(frequency_mhz, bogomips);
+    StatRow::text(label, value)
 }
 
 /// One CPU frequency readout formatted for its source (GPUI
 /// `cpu_frequency_readout_for_source` parity): a BogoMIPS source prints the
 /// calibration value with `/proc/cpuinfo`'s implied two decimals; a native
-/// source keeps the MHz display; unavailable is "—" either way.
+/// source keeps the MHz display; unavailable is the shared dash either way.
 pub(crate) fn cpu_frequency_readout_for_source(
     frequency_mhz: Option<u64>,
     bogomips: bool,
 ) -> String {
-    match frequency_mhz {
-        Some(value) if bogomips => format!("{value}.00 BogoMIPS"),
-        Some(value) => format!("{value} MHz"),
-        None => missing_value(),
-    }
+    cpu_speed_parts(frequency_mhz, bogomips)
+        .1
+        .unwrap_or_else(missing_value)
 }
 
-/// The Temperature stat row's (label, value), honoring the provider's
-/// temperature source — the counterpart of [`cpu_speed_row`]'s BogoMIPS
+/// The Temperature stat row's label and typed value, honoring the provider's
+/// temperature source — the counterpart of [`cpu_speed_parts`]'s BogoMIPS
 /// relabel. A labeled-fallback tier (a CPU-package-labeled channel on
 /// another hwmon chip, or an ACPI thermal zone) appends the source
 /// qualifier to the value so the reading never masquerades as a dedicated
 /// CPU sensor chip; native chips keep the plain °C reading. A missing value
-/// stays an honest "—" under every source. Pure so the source matrix is
+/// stays an honest `None` under every source. Pure so the source matrix is
 /// table-tested.
-fn cpu_temperature_row(
+fn cpu_temperature_parts(
     temperature_c: Option<f32>,
     source: CpuTemperatureSource,
-) -> (String, String) {
-    let value = temperature_c.map_or_else(missing_value, |value| format!("{value:.0} °C"));
+) -> (&'static str, Option<String>) {
     let note = match source {
         CpuTemperatureSource::PackageHwmon => Some(t("cpu.temperature_source.package_hwmon")),
         CpuTemperatureSource::ThermalZone => Some(t("cpu.temperature_source.thermal_zone")),
         _ => None,
     };
-    let value = match (note, temperature_c.is_some()) {
-        (Some(note), true) => format!("{value} · {note}"),
-        _ => value,
+    let value = temperature_c.map(|value| format!("{value:.0} °C"));
+    let value = match (note, value) {
+        (Some(note), Some(value)) => Some(format!("{value} · {note}")),
+        (_, value) => value,
     };
-    (t("common.temperature").to_string(), value)
+    (t("common.temperature"), value)
 }
 
-/// The Memory stats rows (label, value) for the right-hand readout column —
-/// the same typed `current_*` accessors the gpui Memory page reads, so a
-/// legacy zero-filled field can never masquerade as a measured value in one
-/// frontend but not the other. The eight base rows always render: missing
-/// data is an honest "—", a measured zero stays a real value. The four
-/// enrichment rows (committed / zram / zswap / usage rate) are data-gated
-/// like gpui — a host without zram shows no zram row rather than a
-/// misleading zero.
-fn memory_stats_rows(
-    memory: &MemoryMetrics,
-    use_bytes: bool,
-    use_base2: bool,
-) -> Vec<(String, String)> {
+/// The Temperature stat row as a pre-folded shell [`StatRow`].
+fn cpu_temperature_row(temperature_c: Option<f32>, source: CpuTemperatureSource) -> StatRow {
+    let (label, value) = cpu_temperature_parts(temperature_c, source);
+    StatRow::text(label, value)
+}
+
+/// The Memory stats rows as pre-folded shell [`StatRow`]s for the right-hand
+/// readout column — the same typed `current_*` accessors the gpui Memory page
+/// reads, so a legacy zero-filled field can never masquerade as a measured
+/// value in one frontend but not the other. The eight base rows always
+/// render: missing data is an honest `None` (the shared dash), a measured
+/// zero stays a real value. The four enrichment rows (committed / zram /
+/// zswap / usage rate) are data-gated like gpui — a host without zram shows
+/// no zram row rather than a misleading zero.
+fn memory_stats_rows(memory: &MemoryMetrics, use_bytes: bool, use_base2: bool) -> Vec<StatRow> {
     let observed = projection::MemoryObservation::from(memory);
-    let opt = |value: Option<u64>| {
-        value
-            .map(|v| memory_text_pref(v, use_bytes, use_base2))
-            .unwrap_or_else(missing_value)
-    };
+    let opt = |value: Option<u64>| value.map(|v| memory_text_pref(v, use_bytes, use_base2));
     let mut stats = vec![
-        (t("mem.in_use").to_string(), opt(observed.used_bytes)),
-        (
-            t("mem.available").to_string(),
-            opt(observed.projected_available_bytes),
-        ),
-        (
-            t("mem.hardware_reserved").to_string(),
+        StatRow::text(t("mem.in_use"), opt(observed.used_bytes)),
+        StatRow::text(t("mem.available"), opt(observed.projected_available_bytes)),
+        StatRow::text(
+            t("mem.hardware_reserved"),
             opt(observed.hardware_reserved_bytes),
         ),
-        (t("mem.cached").to_string(), opt(observed.cached_bytes)),
-        (
-            t("mem.swap").to_string(),
+        StatRow::text(t("mem.cached"), opt(observed.cached_bytes)),
+        StatRow::pair(
+            t("mem.swap"),
             match (observed.swap_used_bytes, observed.swap_total_bytes) {
-                (Some(used), Some(total)) => {
-                    format!("{} / {}", opt(Some(used)), opt(Some(total)))
-                }
-                _ => missing_value(),
+                (Some(used), Some(total)) => Some(format!(
+                    "{} / {}",
+                    memory_text_pref(used, use_bytes, use_base2),
+                    memory_text_pref(total, use_bytes, use_base2)
+                )),
+                _ => None,
             },
         ),
-        (
-            t("common.speed").to_string(),
-            observed
-                .speed_mhz
-                .map(|value| format!("{value} MT/s"))
-                .unwrap_or_else(missing_value),
+        StatRow::text(
+            t("common.speed"),
+            observed.speed_mhz.map(|value| format!("{value} MT/s")),
         ),
-        (
-            t("mem.slots").to_string(),
+        StatRow::pair(
+            t("mem.slots"),
             match (observed.slots_used, observed.slots_total) {
-                (Some(used), Some(total)) => format!("{used} / {total}"),
-                _ => missing_value(),
+                (Some(used), Some(total)) => Some(format!("{used} / {total}")),
+                _ => None,
             },
         ),
     ];
@@ -438,9 +509,9 @@ fn memory_stats_rows(
     if let Some(value) = observed.buffers_bytes {
         stats.insert(
             4,
-            (
-                t("mem.buffers").to_string(),
-                memory_text_pref(value, use_bytes, use_base2),
+            StatRow::text(
+                t("mem.buffers"),
+                Some(memory_text_pref(value, use_bytes, use_base2)),
             ),
         );
     }
@@ -449,13 +520,13 @@ fn memory_stats_rows(
     if let Some(arc) = observed.zfs_arc_bytes {
         let swap_row = stats
             .iter()
-            .position(|(label, _)| label == t("mem.swap"))
+            .position(|row| row.label() == t("mem.swap"))
             .unwrap_or(stats.len());
         stats.insert(
             swap_row,
-            (
-                t("mem.zfs_arc").to_string(),
-                memory_text_pref(arc, use_bytes, use_base2),
+            StatRow::text(
+                t("mem.zfs_arc"),
+                Some(memory_text_pref(arc, use_bytes, use_base2)),
             ),
         );
     }
@@ -464,9 +535,13 @@ fn memory_stats_rows(
     if let (Some(committed), Some(limit)) = (observed.committed_bytes, observed.commit_limit_bytes)
         && limit > 0
     {
-        stats.push((
-            t("mem.committed").to_string(),
-            format!("{} / {}", opt(Some(committed)), opt(Some(limit))),
+        stats.push(StatRow::pair(
+            t("mem.committed"),
+            Some(format!(
+                "{} / {}",
+                memory_text_pref(committed, use_bytes, use_base2),
+                memory_text_pref(limit, use_bytes, use_base2)
+            )),
         ));
     }
     // zram compressed swap (only when a zram device exists).
@@ -482,15 +557,22 @@ fn memory_stats_rows(
             .map_or_else(String::new, |ratio| {
                 format!(" · {} {ratio:.1}:1", t("mem.compression_ratio"))
             });
-        stats.push((
-            t("mem.zram_swap").to_string(),
-            format!("{} / {}{ratio}", opt(Some(used)), opt(Some(capacity))),
+        stats.push(StatRow::pair(
+            t("mem.zram_swap"),
+            Some(format!(
+                "{} / {}{ratio}",
+                memory_text_pref(used, use_bytes, use_base2),
+                memory_text_pref(capacity, use_bytes, use_base2)
+            )),
         ));
         // The RAM the zram store actually consumes (`mm_stat`
         // `mem_used_total`, metadata included): a distinct fact from both
         // the swap-used view and the compressed size, so its own row.
         if let Some(ram) = observed.compressed_swap_memory_used_bytes {
-            stats.push((t("mem.zram_ram_used").to_string(), opt(Some(ram))));
+            stats.push(StatRow::text(
+                t("mem.zram_ram_used"),
+                Some(memory_text_pref(ram, use_bytes, use_base2)),
+            ));
         }
     }
     // zswap front-swap compressor (only when the module is loaded).
@@ -500,7 +582,7 @@ fn memory_stats_rows(
         } else {
             t("common.disabled")
         };
-        stats.push((t("mem.zswap").to_string(), state.to_string()));
+        stats.push(StatRow::text(t("mem.zswap"), Some(state.to_string())));
     }
     // Live used-memory delta rate (MiB/s; signed: − when freeing). Suppressed
     // near zero so an idle machine doesn't show a noisy +0.0 row.
@@ -508,9 +590,9 @@ fn memory_stats_rows(
         .used_rate_mib_per_sec
         .filter(|rate| rate.abs() >= 0.05)
     {
-        stats.push((
-            t("mem.usage_rate").to_string(),
-            signed_memory_rate_text(rate, use_bytes, use_base2),
+        stats.push(StatRow::text(
+            t("mem.usage_rate"),
+            Some(signed_memory_rate_text(rate, use_bytes, use_base2)),
         ));
     }
     stats

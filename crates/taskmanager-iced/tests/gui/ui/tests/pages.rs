@@ -16,6 +16,10 @@ use super::super::tables::{
 use super::super::*;
 use super::filtered_services;
 use crate::theme;
+use crate::ui::applications::{
+    apps_columns, apps_table_width, localized_sort_column_label, sort_arrow,
+    trend_header_index_for, visible_apps_columns,
+};
 use taskmanager_application::{HardwareInfo, ServiceAction, ServiceStatus};
 use taskmanager_shell::page_help;
 use taskmanager_shell::{SortCol, SortDir};

@@ -2,17 +2,23 @@
 //!
 //! This module owns the selector → detail mapping, responsive rail geometry,
 //! bounded device windows, and unit preferences. It does not collect provider
-//! data; every label and panel reads the current Iced projection.
+//! data; every label and panel reads the current Iced projection. The page's
+//! ONE layout authority is [`PerformancePageBudget::for_perf_frame`]: the
+//! typed slot allocation from the real tracked viewport (GPUI `from_frame`
+//! parity). No secondary compact-flag derivation remains.
 
 use iced::Element;
 use iced::widget::{column, container, row, scrollable, text};
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
 
-use super::responsive::{COMPACT_TOOLBAR_FIVE_COLUMN_MIN_WIDTH, DeviceNavigationPresentation};
+use super::history_replay;
+use super::responsive::{
+    COMPACT_TOOLBAR_FIVE_COLUMN_MIN_WIDTH, DeviceNavigationPresentation, PerformancePageBudget,
+};
 use super::{
     VirtualWindow, battery_section, cpu_memory_detail, disk_section, fan, gpu_section,
-    network_section, perf_layout, perf_rail, virtual_horizontal_body,
+    network_section, perf_rail, virtual_horizontal_body,
 };
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::{focus, theme};
@@ -42,61 +48,130 @@ pub(crate) fn performance_page(
     app: &crate::IcedApp,
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let theme_snapshot = app.theme();
+    // The ONE frame-local layout authority: the typed slot allocation from
+    // the real tracked viewport. A hidden sidebar collapses navigation to the
+    // strip (GPUI parity) so every device stays reachable at any width; the
+    // statistics rail is Pinned while capacity allows, Stacked below the
+    // main viewport while the main floor survives, and only then Hidden.
+    let budget =
+        PerformancePageBudget::for_perf_frame(app.viewport_size(), app.performance.sidebar_visible);
     let selected = resolved_perf_device(app);
-    // One frame-local presentation mapping at the page boundary: the rail is
-    // the compact strip or the wide sidebar (responsive.rs owns the seam);
-    // every branch below consumes the typed fact instead of re-reading the
-    // viewport.
-    let navigation = DeviceNavigationPresentation::for_compact_frame(app.compact_layout());
-    let selector = performance_sidebar(app, theme_snapshot, selected, navigation);
-    let detail = perf_detail(app, selected);
+    let navigation = budget.device_navigation;
+
+    // History-replay entry (GPUI parity): one toggle above the workspace,
+    // present ONLY when persistence supplied a query — disabled persistence
+    // shows nothing, never a dead button. While open, the replay view
+    // replaces every device's live graphs; the rail keeps navigating.
+    let replay_open = app.history_replay_entry_available() && app.history_replay_state().is_open();
+    let entry_row = history_replay_entry_row(app, theme_snapshot);
+
+    let detail: Element<'_, Message, iced::Theme, iced::Renderer> = if replay_open {
+        scrollable(history_replay::render_history_replay(
+            theme_snapshot,
+            app.history_replay_state(),
+            &app.local_time_rules,
+        ))
+        .width(iced::Length::Fill)
+        .height(iced::Length::Fill)
+        .into()
+    } else {
+        match compact_detail_viewport(selected) {
+            CompactDetailViewport::Elastic => perf_detail(app, selected, budget),
+            CompactDetailViewport::Scrollable => scrollable(perf_detail(app, selected, budget))
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fill)
+                .into(),
+        }
+    };
     let detail = column![detail]
         .width(iced::Length::Fill)
         .height(iced::Length::Fill);
 
+    let selector = performance_sidebar(app, theme_snapshot, selected, navigation, budget);
     match navigation {
         DeviceNavigationPresentation::Strip => {
-            // Compact windows stack the rail above the detail. Variable-length
-            // device pages retain their independent scroll boundary; CPU and GPU
-            // own bounded elastic aggregates and therefore must not show a scrollbar.
-            let detail: Element<'_, Message, iced::Theme, iced::Renderer> =
-                match compact_detail_viewport(selected) {
-                    CompactDetailViewport::Elastic => detail.into(),
-                    CompactDetailViewport::Scrollable => scrollable(detail)
-                        .width(iced::Length::Fill)
-                        .height(iced::Length::Fill)
-                        .into(),
-                };
-            column![selector, detail]
+            // Strip frames stack the rail above the detail. Variable-length
+            // device pages retain their independent scroll boundary; CPU and
+            // GPU own bounded elastic aggregates and therefore must not show
+            // a scrollbar.
+            let mut children: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> =
+                Vec::with_capacity(3);
+            if let Some(entry) = entry_row {
+                children.push(entry);
+            }
+            children.push(selector);
+            children.push(detail.into());
+            column(children)
                 .spacing(8)
                 .width(iced::Length::Fill)
                 .height(iced::Length::Fill)
                 .into()
         }
         DeviceNavigationPresentation::Sidebar => {
-            if app.performance.sidebar_visible {
-                row![selector, detail]
-                    .spacing(12)
-                    .width(iced::Length::Fill)
-                    .height(iced::Length::Fill)
-                    .into()
-            } else {
-                // F9 hid the device sidebar (GPUI parity): the detail panel takes
-                // the full width instead of an empty rail.
-                row![detail]
-                    .spacing(12)
-                    .width(iced::Length::Fill)
-                    .height(iced::Length::Fill)
-                    .into()
+            // The frame budget only admits the sidebar while it is visible
+            // AND every semantic slot stays readable; hidden-sidebar frames
+            // collapsed to the strip branch above (F9 GPUI parity).
+            let mut detail_stack: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> =
+                Vec::with_capacity(2);
+            if let Some(entry) = entry_row {
+                detail_stack.push(entry);
             }
+            detail_stack.push(detail.into());
+            row![selector, column(detail_stack).spacing(8)]
+                .spacing(12)
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fill)
+                .into()
         }
     }
 }
 
+/// The replay toggle row pinned above the Performance workspace. Only the
+/// entry-availability fact decides between the live toggle, the
+/// startup-unavailable notice, and nothing at all.
+fn history_replay_entry_row<'a>(
+    app: &crate::IcedApp,
+    theme_snapshot: &'a taskmanager_theme::Theme,
+) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
+    if app.history_replay_startup_unavailable() {
+        return Some(
+            row![iced::widget::Space::new().width(iced::Length::Fill)]
+                .push(
+                    text(t("perf.replay.startup_unavailable"))
+                        .size(f32::from(tokens::FONT_11))
+                        .color(theme::muted_text_color(theme_snapshot)),
+                )
+                .width(iced::Length::Fill)
+                .height(iced::Length::Fixed(24.0))
+                .into(),
+        );
+    }
+    app.history_replay_entry_available().then(|| {
+        row![iced::widget::Space::new().width(iced::Length::Fill)]
+            .push(focus::dynamic_button(
+                theme_snapshot,
+                FocusTarget::HistoryReplayToggle,
+                t(if app.history_replay_state().is_open() {
+                    "perf.replay.back_to_live"
+                } else {
+                    "perf.replay.toggle"
+                })
+                .to_string(),
+                Message::ToggleHistoryReplay,
+                false,
+            ))
+            .width(iced::Length::Fill)
+            .height(iced::Length::Fixed(30.0))
+            .into()
+    })
+}
+
 /// The resolved Performance device for one frame: the selected device when it
 /// is still visible, else the first visible device (CPU unless the user hid
-/// it too) so the detail panel never renders a device the user asked to hide.
-/// Pure seam the headless tests assert on.
+/// it too) so the rail never highlights a device the user asked to hide. The
+/// DETAIL panel separately renders the explicit disconnected surface when the
+/// user's own selection pointed at a device that disappeared (GPUI
+/// `selected_device_missing` parity) instead of silently migrating the page.
 #[must_use]
 pub(crate) fn resolved_perf_device(app: &crate::IcedApp) -> PerfDevice {
     let available = available_perf_devices(app);
@@ -107,17 +182,81 @@ pub(crate) fn resolved_perf_device(app: &crate::IcedApp) -> PerfDevice {
     }
 }
 
+/// Whether the user's selected device vanished from a still-visible family
+/// (index out of the live snapshot's range). A family the user hid by
+/// preference is intent, not disconnection, and stays `false`.
+#[must_use]
+pub(crate) fn selection_disconnected(app: &crate::IcedApp) -> bool {
+    let projection = app.shell.projection();
+    let Some(snapshot) = projection.snapshot.as_ref() else {
+        return false;
+    };
+    let prefs = app.preferences();
+    match app.perf_device() {
+        PerfDevice::Cpu | PerfDevice::Memory => false,
+        PerfDevice::Disk(index) => prefs.show_disks && index >= snapshot.disks.len(),
+        PerfDevice::Network(index) => prefs.show_network && index >= snapshot.networks.len(),
+        PerfDevice::Gpu(index) => prefs.show_gpus && index >= snapshot.gpu.len(),
+        PerfDevice::Battery(index) => projection
+            .power_supplies
+            .as_ref()
+            .is_some_and(|power| index >= power.batteries.len()),
+        PerfDevice::Fan(index) => projection.sensors.as_ref().is_some_and(|sensors| {
+            index
+                >= sensors
+                    .readings
+                    .iter()
+                    .filter(|reading| {
+                        reading.quantity() == &taskmanager_application::SensorQuantity::FanSpeed
+                    })
+                    .count()
+        }),
+    }
+}
+
+/// The explicit disconnected-device surface (GPUI `disconnected_device`
+/// parity): the page names the loss and waits for the hardware identity
+/// instead of silently rendering another device's facts.
+fn disconnected_device<'a>(
+    theme_snapshot: &'a taskmanager_theme::Theme,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    container(
+        column![
+            text(t("device.disconnected"))
+                .size(f32::from(tokens::FONT_15))
+                .font(theme::ui_font_weight(
+                    theme_snapshot,
+                    iced::font::Weight::Semibold,
+                )),
+            text(t("device.reconnect_hint"))
+                .size(f32::from(tokens::FONT_12))
+                .color(theme::muted_text_color(theme_snapshot)),
+        ]
+        .spacing(8)
+        .width(iced::Length::Fill),
+    )
+    .max_width(460.0)
+    .padding(18.0)
+    .width(iced::Length::Fill)
+    .height(iced::Length::Fill)
+    .center_x(iced::Length::Fill)
+    .center_y(iced::Length::Fill)
+    .style(move |_| theme::card_style(theme_snapshot))
+    .into()
+}
+
 /// GPUI-shaped device rail for the Iced Performance page. The active device
 /// owns the detail card on the right. Wide windows render the information-dense
 /// rail ([`perf_rail::device_cards`]: identity heading + two caption lines +
 /// that device's own history sparkline per card, vertically windowed so many
-/// disks/NICs stay reachable); compact windows use a separate horizontally
+/// disks/NICs stay reachable); strip frames use a separate horizontally
 /// windowed pill strip so offscreen identities do not enter the element tree.
 fn performance_sidebar<'a>(
     app: &crate::IcedApp,
     theme_snapshot: &'a taskmanager_theme::Theme,
     selected: PerfDevice,
     navigation: DeviceNavigationPresentation,
+    budget: PerformancePageBudget,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let devices = available_perf_devices(app);
     // The page maps the frame's device navigation presentation once; the
@@ -207,7 +346,7 @@ fn performance_sidebar<'a>(
         .width(if compact {
             iced::Length::Fill
         } else {
-            iced::Length::Fixed(perf_layout::geometry_contract(false).sidebar_width)
+            iced::Length::Fixed(budget.sidebar_width)
         })
         .height(if compact {
             iced::Length::Shrink
@@ -458,20 +597,25 @@ pub(crate) enum PerfDetail {
     Fan,
 }
 
-/// Render ONLY the selected resource's detail panel. The sections are the
-/// unchanged existing fns; this dispatches on [`perf_detail_kind`] (the single
-/// selector→panel mapping) so the page displays one device at a time (MC's
-/// model) instead of stacking all.
+/// Render ONLY the selected resource's detail panel through the frame's
+/// typed budget. The disconnected seam comes first: when the user's own
+/// selection pointed at a device that vanished, the page names the loss
+/// explicitly instead of silently rendering the fallback device's facts.
 fn perf_detail(
     app: &crate::IcedApp,
     device: PerfDevice,
+    budget: PerformancePageBudget,
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
+    if selection_disconnected(app) {
+        let theme_snapshot = app.theme();
+        return disconnected_device(theme_snapshot);
+    }
     match perf_detail_kind(device) {
-        PerfDetail::CpuOrMemory => cpu_memory_detail(app, device),
-        PerfDetail::Disk => disk_section(app, device.index().unwrap_or(0)),
-        PerfDetail::Network => network_section(app, device.index().unwrap_or(0)),
-        PerfDetail::Gpu => gpu_section(app, device.index().unwrap_or(0)),
-        PerfDetail::Battery => battery_section(app, device.index().unwrap_or(0)),
-        PerfDetail::Fan => fan::fan_section(app, device.index().unwrap_or(0)),
+        PerfDetail::CpuOrMemory => cpu_memory_detail(app, device, budget),
+        PerfDetail::Disk => disk_section(app, device.index().unwrap_or(0), budget),
+        PerfDetail::Network => network_section(app, device.index().unwrap_or(0), budget),
+        PerfDetail::Gpu => gpu_section(app, device.index().unwrap_or(0), budget),
+        PerfDetail::Battery => battery_section(app, device.index().unwrap_or(0), budget),
+        PerfDetail::Fan => fan::fan_section(app, device.index().unwrap_or(0), budget),
     }
 }

@@ -446,7 +446,7 @@ pub(crate) fn page_scene(page: Page, context: &PageContext<'_>) -> Box<dyn Scene
         Page::Sessions => Box::new(crate::pages::sessions::content(context)),
         Page::Alerts => Box::new(crate::pages::alerts::content(context)),
         Page::Settings => Box::new(crate::pages::settings::content(context)),
-        Page::AppHistory => Box::new(crate::pages::history::content(
+        Page::AppHistory => Box::new(crate::pages::history::scene::content(
             context.history,
             context.palette,
         )),

@@ -75,15 +75,16 @@ fn fan_summary_lines_project_typed_values_and_honest_dashes() {
     };
     assert_eq!(fan_section_state(Some(&sensors)), tables::ListState::Ready);
     let rows = fan_summary_lines(&sensors, &sensors.readings[0]);
-    assert_eq!(rows[0], ("Speed".to_string(), "2400 RPM".to_string()));
+    assert_eq!(rows[0].label(), "Speed");
+    assert_eq!(rows[0].value(), Some("2400 RPM"));
     assert!(
         rows.iter()
-            .any(|(label, value)| label == "PWM" && value == "24%"),
+            .any(|row| row.label() == "PWM" && row.value() == Some("24%")),
         "duty cycle must project as percent of maximum: {rows:?}"
     );
     assert!(
         rows.iter()
-            .any(|(label, value)| label == "Temperature cpu_temp" && value == "54.5 °C"),
+            .any(|row| row.label() == "Temperature cpu_temp" && row.value() == Some("54.5 °C")),
         "device temperature must project: {rows:?}"
     );
 }

@@ -153,7 +153,7 @@ async fn shared_action_excludes_disabled_control_from_tab_order(cx: &mut TestApp
 /// Root capture must update modality before descendants handle focus, and the
 /// state must remain isolated between windows that share one GPUI application.
 #[gpui::test]
-async fn focus_visible_modality_follows_keyboard_pointer_keyboard_per_window(
+async fn mc07_focus_modality_case_focus_visible_modality_follows_keyboard_pointer_keyboard_per_window(
     cx: &mut TestAppContext,
 ) {
     let (window, view) = wrapped_root(cx);

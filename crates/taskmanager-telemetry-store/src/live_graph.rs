@@ -363,6 +363,15 @@ impl LiveGraphHistory {
             .collect()
     }
 
+    /// The correlated host swap-usage window (percent, oldest..newest, NaN =
+    /// gap) — the same `SystemHistory` rings every frontend reads. Frontends
+    /// whose live-graph handle is this type (Iced) read swap through here
+    /// instead of growing a second store handle just for the Memory page.
+    #[must_use]
+    pub fn swap_usage_pct(&self) -> Vec<f32> {
+        self.f32_history(self.store.system_history.swap_usage())
+    }
+
     /// The disk's read+write throughput window in bytes/sec — the device leg
     /// of [`MetricSeries::DiskBytesPerSec`]; the host leg is the summed
     /// aggregate of the same accepted observation. The read is

@@ -12,5 +12,7 @@
 test-threads = 4
 
 [profile.ci]
-# Report every failure in one run instead of stopping at the first failing test.
-fail-fast = false
+# Stop scheduling work after the first failing test. This keeps PR and local
+# standard feedback bounded; acceptance matrices that need a complete receipt
+# explicitly pass --no-fail-fast.
+fail-fast = true

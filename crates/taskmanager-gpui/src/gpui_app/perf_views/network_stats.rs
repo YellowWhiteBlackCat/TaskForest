@@ -14,6 +14,18 @@ use taskmanager_shell::viewmodel::StatRow;
 use super::{device_status_i18n_key, rate_str};
 use crate::gpui_app::sidebar::network_category_label;
 
+/// The Network page's undroppable one-line fact: adapter health plus the
+/// negotiated link speed. Lives in the DATA layer (ARCH.md §8.1) because it
+/// reads the link observation; the paint module only formats the line.
+pub(super) fn vital_line(network: &NetworkMetrics) -> String {
+    let mut segments: Vec<String> =
+        vec![i18n::t(device_status_i18n_key(network.device_state.status)).to_string()];
+    if let Some(speed) = network.current_link_speed_mbps() {
+        segments.push(format!("{speed} Mbps"));
+    }
+    segments.join(" · ")
+}
+
 pub(super) fn network_stats(
     n: &NetworkMetrics,
     is_wireless: bool,

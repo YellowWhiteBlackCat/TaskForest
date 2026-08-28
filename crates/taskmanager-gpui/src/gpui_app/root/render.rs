@@ -1,5 +1,13 @@
 //! Rendering for the root application shell.
 
+/// Debug-selector identity of the telemetry-ready viewport wrapper.
+///
+/// Lives on the shared `page_viewport` wrapper, never on the page body: the
+/// body owns its family selector (`tm-page-scaffold`, ADR-042), and
+/// re-stamping the body would erase it before the render-path guard could
+/// observe it.
+pub const TELEMETRY_READY_BODY_SELECTOR: &str = "tm-telemetry-ready-body";
+
 use super::{
     Hover, InputModality, RootView, TopPage, WindowCorner, alert_ui, device_label,
     init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
@@ -319,9 +327,18 @@ impl Render for RootView {
         let body = if self.telemetry_frame_state.is_collecting() {
             overlays::cold_start_placeholder(&t, window, cx)
         } else {
-            body.debug_selector(|| "tm-telemetry-ready-body".to_string())
+            body
         };
         let body = page_viewport(body);
+        // The readiness marker lives on the shared viewport wrapper, never on
+        // the page body itself: the data-page shell owns its own
+        // `tm-page-scaffold` selector (ADR-042), and re-stamping the body div
+        // here would erase it before the family guard could observe it.
+        let body = if self.telemetry_frame_state.is_collecting() {
+            body
+        } else {
+            body.debug_selector(|| TELEMETRY_READY_BODY_SELECTOR.to_string())
+        };
 
         // Page-switch fade: the body fades in over the hover-class duration
         // (120ms), keyed by the active page so switching pages replays the

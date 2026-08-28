@@ -1,5 +1,4 @@
 use super::*;
-use crate::perf_chart::CHART_HEIGHT;
 
 mod graph_summary_tests {
     use super::*;
@@ -26,10 +25,11 @@ mod graph_summary_tests {
     }
 
     #[test]
-    fn compact_chart_height_preserves_a_legible_but_bounded_viewport() {
-        assert_eq!(chart_height(false), CHART_HEIGHT);
-        assert_eq!(chart_height(true), 80.0);
-        assert!(chart_height(true) < chart_height(false));
+    fn headline_chart_floor_keeps_a_legible_but_bounded_viewport() {
+        // GPUI headline-tier parity: a headline chart inside a scrolling strip
+        // frame keeps the shared 180px floor (the old compact 80px was below
+        // the authority's MAIN_GRAPH_MIN_HEIGHT).
+        assert_eq!(cpu::HEADLINE_CHART_FLOOR, 180.0);
     }
 }
 
@@ -41,10 +41,16 @@ mod memory_stats_tests {
     const GIB: u64 = 1024 * 1024 * 1024;
     const MIB: u64 = 1024 * 1024;
 
-    fn flat(stats: &[(String, String)]) -> Vec<(&str, &str)> {
+    fn flat(stats: &[taskmanager_shell::viewmodel::StatRow]) -> Vec<(&str, &str)> {
         stats
             .iter()
-            .map(|(label, value)| (label.as_str(), value.as_str()))
+            .map(|row| {
+                (
+                    row.label(),
+                    row.value()
+                        .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+                )
+            })
             .collect()
     }
 
@@ -187,22 +193,17 @@ mod cpu_frequency_source_tests {
     #[test]
     fn speed_row_relabels_bogomips_and_never_fakes_a_mhz_clock() {
         taskmanager_test_support::pin_english();
+        // The row keeps its typed missingness: an absent frequency is `None`
+        // (the shared dash), never a fabricated clock.
+        assert_eq!(cpu_speed_row(Some(5300), true).label(), "BogoMIPS");
         assert_eq!(
-            cpu_speed_row(Some(5300), true),
-            ("BogoMIPS".to_string(), "5300.00 BogoMIPS".to_string())
+            cpu_speed_row(Some(5300), true).value(),
+            Some("5300.00 BogoMIPS")
         );
-        assert_eq!(
-            cpu_speed_row(None, true),
-            ("BogoMIPS".to_string(), "—".to_string())
-        );
-        assert_eq!(
-            cpu_speed_row(Some(3500), false),
-            ("Speed".to_string(), "3500 MHz".to_string())
-        );
-        assert_eq!(
-            cpu_speed_row(None, false),
-            ("Speed".to_string(), "—".to_string())
-        );
+        assert_eq!(cpu_speed_row(None, true).value(), None);
+        assert_eq!(cpu_speed_row(Some(3500), false).label(), "Speed");
+        assert_eq!(cpu_speed_row(Some(3500), false).value(), Some("3500 MHz"));
+        assert_eq!(cpu_speed_row(None, false).value(), None);
     }
 
     #[test]
@@ -287,11 +288,15 @@ mod cpu_frequency_source_tests {
     #[test]
     fn cpu_chart_layout_keeps_secondary_surfaces_out_of_compact_space() {
         assert_eq!(
-            projection::CpuChartLayout::from_compact(false),
+            projection::CpuChartLayout::for_inventory(
+                crate::ui::responsive::PerformanceChartInventory::Full
+            ),
             projection::CpuChartLayout::AggregateWithPerCore
         );
         assert_eq!(
-            projection::CpuChartLayout::from_compact(true),
+            projection::CpuChartLayout::for_inventory(
+                crate::ui::responsive::PerformanceChartInventory::AggregateOnly
+            ),
             projection::CpuChartLayout::AggregateOnly
         );
     }

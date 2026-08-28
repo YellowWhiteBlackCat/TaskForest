@@ -282,7 +282,9 @@ async fn settings_text_rendering_choice_is_isolated_per_window(cx: &mut TestAppC
 /// this test uses the unknown-appearance fallback to prove the selection is
 /// not a UI-only label and that B cannot rewrite A.
 #[gpui::test]
-async fn settings_color_scheme_choice_is_isolated_per_window(cx: &mut TestAppContext) {
+async fn mc05_color_isolation_case_settings_color_scheme_choice_is_isolated_per_window(
+    cx: &mut TestAppContext,
+) {
     let (win_a, view_a) = wrapped_root(cx);
     let (win_b, view_b) = wrapped_root(cx);
     open_settings(cx, &view_a);
@@ -363,7 +365,9 @@ async fn settings_color_scheme_choice_is_isolated_per_window(cx: &mut TestAppCon
 /// `settings_switches` entity map, so a keyboard toggle in B changes only
 /// B's flags. Drives the real ui `Switch` through focus + Enter.
 #[gpui::test]
-async fn settings_switches_are_isolated_per_window(cx: &mut TestAppContext) {
+async fn mc05_switch_isolation_case_settings_switches_are_isolated_per_window(
+    cx: &mut TestAppContext,
+) {
     let (win_a, view_a) = wrapped_root(cx);
     let (win_b, view_b) = wrapped_root(cx);
     open_settings(cx, &view_a);

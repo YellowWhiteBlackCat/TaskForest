@@ -3,10 +3,7 @@
 use gpui::{Context, Div, Entity, Window, px};
 use taskmanager_application::ServiceStatus;
 use taskmanager_theme::Theme;
-use taskmanager_ui::{
-    layout::{PageScaffold, page_frame},
-    primitives::button::ButtonState,
-};
+use taskmanager_ui::{layout::PageScaffold, primitives::button::ButtonState};
 
 use super::{Hover, RootView, elements, i18n};
 use crate::gpui_app::{
@@ -88,7 +85,7 @@ impl RootView {
             .startup_table
             .get_or_insert_with(|| startup_view::init_table_entity(*theme, cx))
             .clone();
-        page_frame(
+        PageScaffold::new(
             startup_view::render_startup(
                 startup_view::StartupViewProps {
                     theme,
@@ -115,6 +112,7 @@ impl RootView {
             ),
             px(page_layout.page_padding),
         )
+        .render()
     }
 
     pub(super) fn render_users_page(
@@ -132,7 +130,7 @@ impl RootView {
             .users_table
             .get_or_insert_with(|| users_view::init_table_entity(*theme, cx))
             .clone();
-        page_frame(
+        PageScaffold::new(
             users_view::render_users(
                 users_view::UsersViewProps {
                     theme,
@@ -150,5 +148,6 @@ impl RootView {
             ),
             px(page_padding),
         )
+        .render()
     }
 }

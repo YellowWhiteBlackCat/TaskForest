@@ -211,7 +211,8 @@ fn graphics_section_omits_live_gpu_facts() {
 }
 
 #[test]
-fn graphics_section_projects_complete_current_npu_facts_without_fabricating_gaps() {
+fn mc04_npu_current_case_graphics_section_projects_complete_current_npu_facts_without_fabricating_gaps()
+ {
     use crate::core::metrics::ScalarObservation;
     use crate::core::{
         DeviceId, FailureKind, NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot,

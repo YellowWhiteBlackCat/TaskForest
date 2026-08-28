@@ -44,9 +44,10 @@ plist = "1.10"
 serde_json = "1.0"
 
 # Safe native macOS tray icon + context menu (NSStatusItem behind a safe
-# public API; ADR-0NN). Target-gated so non-macOS builds never pull AppKit.
+# public API; ADR-0NN). Keep upstream default features off: macOS does not
+# need tray-icon's Linux GTK/libappindicator path.
 [target.'cfg(target_os = "macos")'.dependencies]
-tray-icon = "0.24"
+tray-icon = { version = "0.24", default-features = false }
 
 [dev-dependencies]
 taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }

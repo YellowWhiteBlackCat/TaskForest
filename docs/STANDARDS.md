@@ -172,9 +172,9 @@
 
 ## 5. 文件规模与职责门禁
 
-采用非空、非注释代码行口径：生产 Rust 文件达到 650 行预警，超过 1200 行阻断；测试 Rust 文件超过 999 行阻断。统一入口为 `python3 scripts/quality/rust_line_guard.py`。
+采用非空、非注释代码行口径：生产 Rust 文件达到 650 行即硬失败，强制按命名职责或业务语义切分；测试 Rust 文件超过 999 行硬失败。统一入口为 `python3 scripts/quality/rust_line_guard.py`。
 
-拆分必须按可命名职责或数据边界进行，使用 `foo.rs + foo/` 的真实模块树；禁止 `part_2.rs`、`misc.rs`、泛化 `helpers.rs`、`include!` 或机械 re-export 隐藏耦合。超限文件被触碰时必须优先缩减；CI 以 `--mode enforce` 阻断硬超限，预警保留在报告中供后续拆分审查。
+拆分必须按可命名职责或数据边界进行，使用 `foo.rs + foo/` 的真实模块树；禁止 `part_2.rs`、`misc.rs`、泛化 `helpers.rs`、`include!` 或机械 re-export 隐藏耦合。达到 650 行的生产文件不得继续添加逻辑；CI 以 `--mode enforce` 硬阻断，不能用 warning、allowlist 或报告备注延后切分。
 
 函数职责由 Clippy 全 workspace 统一收紧（`cognitive_complexity` 上限 48、单函数非注释行
 上限 650，`-D warnings` 阻断；阈值是存量棘轮，不是新代码目标）。新增或触碰交互/更新/渲染

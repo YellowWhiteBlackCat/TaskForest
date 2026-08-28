@@ -7,6 +7,7 @@
 
 use super::process_projection::{ProcessRowFacts, ProjectedRow};
 use super::*;
+use iced::widget::canvas;
 use taskmanager_theme::tokens;
 
 /// Render one projected row: the process lookup joins the projection's

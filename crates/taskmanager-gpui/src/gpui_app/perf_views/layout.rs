@@ -8,6 +8,12 @@
 //! raw building blocks (`performance_split`, `stats_panel`, the card
 //! assembly) stay module-private on purpose: the only way out is this module.
 
+/// Debug-selector identity of the ONE Performance composition root.
+///
+/// Shared with the page-family render guard (ADR-039/042) so the chart
+/// assertion can never spell a drifted root.
+pub const PERF_MAIN_VIEWPORT_SELECTOR: &str = "tm-perf-main-viewport";
+
 use gpui::{
     AnyElement, Div, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels,
     ScrollHandle, Stateful, Styled, div, px,
@@ -284,7 +290,13 @@ pub(crate) fn render_chart(
         .w_full()
         .min_w(px(0.0));
     section = match spec.tier {
-        ChartTier::Headline => section.flex_1().min_h(px(0.0)),
+        // A headline section contains more than its graph card: dual charts
+        // also own a legend and every chart owns its summary row. Keeping the
+        // section's intrinsic basis and disabling shrink makes that complete
+        // contract the flex boundary. Without it, the parent can allocate a
+        // zero-height section while the card keeps its 180px minimum, causing
+        // the below band to be positioned on top of the card at compact sizes.
+        ChartTier::Headline => section.flex_auto().flex_shrink_0(),
         ChartTier::Secondary => section.flex_auto().min_h(spec.tier.min_height()),
     };
     if let Some(title) = spec.title.as_deref() {
@@ -434,6 +446,10 @@ pub(crate) struct PerfPageProps<'a> {
     pub(crate) stats_scroll: ScrollHandle,
     pub(crate) title: String,
     pub(crate) subtitle: String,
+    /// One-line distilled fact that keeps the page's meaning when every
+    /// other band has degraded (disk capacity, VRAM totals, link state).
+    /// Never gated by the vertical ladder — it survives the Floor rung.
+    pub(crate) vital_line: Option<String>,
     /// Band under the title row: CPU readouts, Memory composition.
     pub(crate) header_extra: Option<AnyElement>,
     pub(crate) headline: HeadlineSurface<'a>,
@@ -465,6 +481,7 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         stats_scroll,
         title,
         subtitle,
+        vital_line,
         header_extra,
         headline,
         below,
@@ -490,6 +507,22 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         // itself owns the divider and its left padding.
         .pr(px(budget.main_trailing_inset))
         .child(performance_title_row(theme, title, subtitle));
+    // The vital line is the page's undroppable one-line fact: unlike the
+    // header band it renders at EVERY rung, so even the Floor composition
+    // (title + headline) still answers "how full / how fast / how healthy".
+    if let Some(vital) = vital_line {
+        let line = div()
+            .text_size(tokens::FONT_13)
+            .text_color(theme.fg_dim)
+            .w_full()
+            .min_w(px(0.0))
+            .flex_shrink_0()
+            .truncate()
+            .child(vital);
+        #[cfg(any(test, feature = "test-support"))]
+        let line = line.debug_selector(|| "tm-perf-vital-line".to_string());
+        main_body = main_body.child(line);
+    }
     // Vertical ladder, Floor rung: the header band (readouts / composition)
     // drops before the headline card is squeezed.
     if let Some(extra) = header_extra.filter(|_| runway.carries_core_stack()) {
@@ -525,7 +558,7 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         .flex_1()
         .h_full()
         .overflow_hidden()
-        .debug_selector(|| "tm-perf-main-viewport".to_string());
+        .debug_selector(|| PERF_MAIN_VIEWPORT_SELECTOR.to_string());
     let mut left = div()
         .flex()
         .flex_col()

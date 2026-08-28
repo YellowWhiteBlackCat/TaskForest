@@ -1,8 +1,8 @@
 # Native portability CI.
 #
-# Windows is a blocking peer of the Linux CI on every pull request and main
-# push. macOS remains an advisory signal on manual dispatch and the monthly
-# schedule; its job is intentionally skipped on routine pull requests.
+# Windows and macOS are compile/test peers of the Linux CI on every pull
+# request and main push. macOS has no packaging or real-device visual evidence
+# job here; it proves the target builds and its library contracts compile/run.
 name: Portability
 
 on:
@@ -21,27 +21,32 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Keep this env identical to ci.yml's and packaging.yml's: rust-cache keys
-# hash all CARGO*/RUST* variables, so aligned envs let the Windows job here
-# share one cache with the Windows packaging job (same job id), turning the
-# monthly guard into a cache warmer for releases instead of a cold start.
+# Cache alignment: rust-cache keys hash all CARGO*/RUST* variables. The env
+# below must stay aligned with packaging.yml's workflow env so the Windows
+# job here shares one cache line with the Windows packaging job (same job
+# id), turning the monthly guard into a cache warmer for releases instead of
+# a cold start. CARGO_PROFILE_DEV_DEBUG is shared verbatim by ci.yml and
+# packaging.yml for the same reason. ci.yml's RUSTFLAGS additionally carries
+# the Linux-only mold link flag — this workflow runs on macOS/Windows runners
+# where mold does not exist, so it must NOT copy that flag.
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
   CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   macos:
-    name: macOS (build + lib tests)
-    if: github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
+    name: macOS (compile + lib tests; no packaging)
     runs-on: macos-latest
     timeout-minutes: 120
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-workspace-crates: true
       # Build the GUI bin natively on macOS — Cargo.toml's target-conditional
       # gpui dep pulls in `macos-blade` (Metal) additively on this target.
       - run: cargo build --locked
@@ -67,9 +72,11 @@ jobs:
         shell: bash
     steps:
       - uses: actions/checkout@v7
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-workspace-crates: true
       # Build the GUI bin natively on Windows (MSVC) — Cargo.toml's
       # target-conditional gpui dep pulls in `windows-manifest` additively here.
       - run: cargo build --locked -j 4

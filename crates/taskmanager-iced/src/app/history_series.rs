@@ -24,8 +24,13 @@ struct Entry {
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 pub(crate) enum DeviceSeriesKind {
+    /// The host-wide swap-usage window (percent) — host-scoped, keyed once.
+    SwapUsedPct,
     DiskBytesPerSec,
     DiskActiveTimePct,
+    /// The SMART temperature window for the Disk page's temperature-trend
+    /// stat row (GPUI `storage_temperature_samples` parity).
+    DiskTemperatureC,
     NetworkBytesPerSec,
     GpuUsagePercent,
     /// The engine name rides the key's `second` field, like every series
@@ -206,6 +211,18 @@ impl IcedApp {
         )
     }
 
+    /// The host-wide swap-usage window (percent) for the Memory page's swap
+    /// headline chart (GPUI `swap_usage` parity): revision-keyed like every
+    /// other window, read through the live-graph accessor over the same
+    /// `SystemHistory` rings.
+    #[must_use]
+    pub(crate) fn cached_swap_series(&self) -> Rc<[f32]> {
+        self.cached_device_series(
+            DeviceSeriesKey::new(DeviceSeriesKind::SwapUsedPct, "host", "", ""),
+            |history| history.swap_usage_pct(),
+        )
+    }
+
     /// The disk's active-time percentage window for the Disk page's secondary
     /// curve; the percent ring is distinct from every rate family, so it keeps
     /// its own `DeviceSeriesKind` entry.
@@ -223,6 +240,26 @@ impl IcedApp {
                 &generation.to_string(),
             ),
             |history| history.disk_active_time_pct_for(device_id, generation),
+        )
+    }
+
+    /// The disk's SMART temperature window for the stats-rail trend row (GPUI
+    /// `storage_temperature_samples` parity); generation-scoped like every
+    /// disk family.
+    #[must_use]
+    pub(crate) fn cached_disk_temperature_series(
+        &self,
+        device_id: &str,
+        generation: u64,
+    ) -> Rc<[f32]> {
+        self.cached_device_series(
+            DeviceSeriesKey::new(
+                DeviceSeriesKind::DiskTemperatureC,
+                device_id,
+                "",
+                &generation.to_string(),
+            ),
+            |history| history.disk_temperature_c_for(device_id, generation),
         )
     }
 

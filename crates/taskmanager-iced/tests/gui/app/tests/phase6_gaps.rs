@@ -12,7 +12,7 @@ use taskmanager_shell::{ShellApp, ShellKeyEvent};
 
 use crate::app::{IcedApp, IcedKey, Message};
 use crate::ui::overlays::process_details::{filtered_environment_rows, working_directory_value};
-use crate::ui::perf_devices::network::network_summary_lines;
+use crate::ui::perf_devices::network::{network_summary_lines, network_title};
 use taskmanager_application::ProcessEnvironmentEntry;
 
 #[test]
@@ -71,51 +71,58 @@ fn test_network_wifi_signal_formatting() {
     );
 
     let rows = network_summary_lines(&nic, false, false);
-    let ssid_row = rows.iter().find(|(k, _)| k == "SSID");
-    assert!(ssid_row.is_some());
-    assert_eq!(ssid_row.unwrap().1, "HomeWiFi_5G");
+    // GPUI parity: the SSID lives in the page TITLE, not the stats rail; the
+    // signal row carries the dBm + quality fact.
+    assert_eq!(
+        network_title(&nic),
+        "Wi-Fi: HomeWiFi_5G ()",
+        "an associated wireless link surfaces its SSID as the page heading"
+    );
+    assert!(
+        !rows.iter().any(|row| row.label() == "SSID"),
+        "the SSID stats row is retired (it is the page title now)"
+    );
 
     let sig_row = rows
         .iter()
-        .find(|(k, _)| k == taskmanager_application::i18n::t("common.signal"));
+        .find(|row| row.label() == taskmanager_application::i18n::t("common.signal"));
     assert!(sig_row.is_some());
-    assert!(sig_row.unwrap().1.contains("-60 dBm"));
+    assert!(
+        sig_row
+            .unwrap()
+            .value()
+            .unwrap_or_default()
+            .contains("-60 dBm")
+    );
 }
 
 #[test]
-fn test_wifi_quality_mapping_and_hardware_card_rows() {
-    use crate::ui::perf_devices::network::{network_hardware_rows, wifi_signal_quality_percent};
+fn test_wifi_quality_mapping_and_hardware_facts_live_in_the_stats_rail() {
+    use crate::ui::perf_devices::network::{network_summary_lines, wifi_signal_quality_percent};
     assert_eq!(wifi_signal_quality_percent(-90), 0.0);
     assert_eq!(wifi_signal_quality_percent(-60), 50.0);
     assert_eq!(wifi_signal_quality_percent(-30), 100.0);
     assert_eq!(wifi_signal_quality_percent(-120), 0.0, "clamped below");
     assert_eq!(wifi_signal_quality_percent(0), 100.0, "clamped above");
 
-    let empty_nic = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
-        .adapter_type(NetworkAdapterType::WiFi)
-        .build();
-    assert!(network_hardware_rows(&empty_nic).is_empty());
+    // The dedicated hardware card is retired (pure duplication of the stats
+    // rail): adapter and driver ride the statistics rows like GPUI.
     let nic = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
         .adapter_type(NetworkAdapterType::WiFi)
         .adapter(Some("Intel Wi-Fi 6E AX211".into()))
         .driver(Some("iwlwifi".into()))
         .build();
-    let rows = network_hardware_rows(&nic);
-    assert_eq!(rows.len(), 2);
-    assert_eq!(
-        rows[0],
-        (
-            taskmanager_application::i18n::t("common.adapter").to_string(),
-            "Intel Wi-Fi 6E AX211".to_string()
-        )
-    );
-    assert_eq!(
-        rows[1],
-        (
-            taskmanager_application::i18n::t("common.driver").to_string(),
-            "iwlwifi".to_string()
-        )
-    );
+    let rows = network_summary_lines(&nic, true, true);
+    let adapter = rows
+        .iter()
+        .find(|row| row.label() == taskmanager_application::i18n::t("common.adapter"))
+        .and_then(|row| row.value());
+    let driver = rows
+        .iter()
+        .find(|row| row.label() == taskmanager_application::i18n::t("common.driver"))
+        .and_then(|row| row.value());
+    assert_eq!(adapter, Some("Intel Wi-Fi 6E AX211"));
+    assert_eq!(driver, Some("iwlwifi"));
 }
 
 #[test]

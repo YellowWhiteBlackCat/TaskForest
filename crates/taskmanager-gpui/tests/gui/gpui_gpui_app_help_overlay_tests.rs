@@ -113,7 +113,9 @@ fn binding_declaration_mirrors_the_help_modal_command_rows() {
 /// rows paint a render-geometry marker — token lookups (`card_bg` /
 /// `border` / `small_radius`) never panic on any variant.
 #[gpui::test]
-async fn modal_renders_shared_rows_for_every_skin_and_mode(cx: &mut gpui::TestAppContext) {
+async fn mc07_skins_case_modal_renders_shared_rows_for_every_skin_and_mode(
+    cx: &mut gpui::TestAppContext,
+) {
     for skin in Skin::ALL {
         for mode in [LightDark::Light, LightDark::Dark] {
             let win = cx.add_window(|_window, cx| {

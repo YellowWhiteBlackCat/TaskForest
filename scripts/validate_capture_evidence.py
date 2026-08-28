@@ -61,6 +61,10 @@ MAX_PNG_BYTES = 64 * 1024 * 1024
 EXPECTED_NIRI_OUTPUT = "winit"
 EXPECTED_NIRI_SCALE = Decimal("1")
 EXPECTED_APP_ID = "io.github.YellowWhiteBlackCat.TaskForestG"
+# Niri's nested winit backend currently creates its own 1280x800 output. In
+# the isolated KWin mode the requested capture window may be larger than that
+# output; the exact per-scenario PNG dimensions below remain authoritative.
+BACKGROUND_NIRI_MINIMUM = (1280, 800)
 
 
 class EvidenceError(RuntimeError):
@@ -366,9 +370,14 @@ def validate_bundle(args: argparse.Namespace) -> dict[str, object]:
     niri_receipt = None
     window_receipts = None
     if args.niri_outputs is not None and args.window_receipts is not None:
-        minimum_size = tuple(
+        maximum_capture_size = tuple(
             max(parse_capture_size(row["capture_size"], row["name"])[index] for row in matrix_rows)
             for index in range(2)
+        )
+        minimum_size = (
+            BACKGROUND_NIRI_MINIMUM
+            if metadata.get("niri_host") == "kwin-wayland-virtual"
+            else maximum_capture_size
         )
         niri_receipt = niri_output_receipt(args.niri_outputs, minimum_size)
         window_receipts = validate_window_receipts(args.window_receipts, repo_root, matrix)

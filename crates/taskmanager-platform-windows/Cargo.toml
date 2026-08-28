@@ -56,9 +56,9 @@ smbios-lib = "0.9"
 # Safe native Windows desktop notification (Toast) wrapper.
 notify-rust = "4.18"
 # Safe native Windows tray icon + context menu (Shell_NotifyIcon + Win32
-# menu behind a safe public API; ADR-0NN). Windows-only, so the GTK/Linux
-# surface of these crates never enters the Linux CI dependency tree.
-tray-icon = "0.24"
+# menu behind a safe public API; ADR-0NN). Keep upstream default features off:
+# the Windows product does not need tray-icon's Linux GTK/libappindicator path.
+tray-icon = { version = "0.24", default-features = false }
 
 [dev-dependencies]
 taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }

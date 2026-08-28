@@ -1,15 +1,23 @@
 //! GPUI-aligned layout primitives for the Iced Performance page.
 //!
 //! The data stays in the sibling performance modules; this file only owns the
-//! renderer geometry that every device detail shares: a large left graph area
-//! and a fixed right-hand statistics column inside one elevated card. Keeping
-//! this projection in one place prevents Disk/Network/GPU/Battery/Fan from
-//! drifting back into unrelated one-column layouts.
+//! renderer geometry every device detail shares: the GPUI `perf_page` slot
+//! contract (title row → vital line → left graph column → pinned/stacked
+//! statistics rail with an optional footer), driven by the one typed
+//! [`PerformancePageBudget`] instead of a local compact flag. Statistics rows
+//! consume the shared shell [`StatRow`] contract so missing values render the
+//! ONE shared dash in a dim style — the same fold all three renderers read.
 
-use iced::widget::{column, container, row, text};
+use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};
+use taskmanager_shell::presentation::missing_value;
+use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
+use super::responsive::{
+    DeviceNavigationPresentation, PERFORMANCE_STATS_STACK_HEIGHT, PerformanceDetailsPresentation,
+    PerformancePageBudget,
+};
 use crate::app::Message;
 use crate::theme;
 
@@ -40,9 +48,9 @@ pub(super) fn headline_readouts(
     row(cells).spacing(12).width(Length::Fill).into()
 }
 
-/// Vertical ownership of a Performance detail surface. Scrollable compact
-/// device pages need intrinsic content height; the compact CPU aggregate owns
-/// its viewport directly and must fill it without creating a scrollbar.
+/// Vertical ownership of a Performance detail surface. Strip frames own an
+/// outer scrollable and need intrinsic content height; sidebar frames own a
+/// fixed viewport whose charts absorb the remaining height.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum DetailExtent {
     Fill,
@@ -50,9 +58,14 @@ pub(super) enum DetailExtent {
 }
 
 impl DetailExtent {
+    /// Strip navigation keeps the page-level scroll boundary: the detail
+    /// column reports intrinsic height so the scrollable can measure it.
     #[must_use]
-    pub(super) const fn for_scroll_parent(compact: bool) -> Self {
-        if compact { Self::Content } else { Self::Fill }
+    pub(super) const fn for_scroll_parent(navigation: DeviceNavigationPresentation) -> Self {
+        match navigation {
+            DeviceNavigationPresentation::Strip => Self::Content,
+            DeviceNavigationPresentation::Sidebar => Self::Fill,
+        }
     }
 
     pub(super) fn length(self) -> Length {
@@ -63,14 +76,11 @@ impl DetailExtent {
     }
 }
 
-/// The two geometry contracts shared by the Iced Performance rail and every
-/// detail card. These are renderer constants, not a second source of data;
-/// the headless tests pin the same values the real widgets consume.
+/// The typed title-size contract shared by every Performance detail card
+/// (strip frames render the smaller heading). Statistics and rail widths are
+/// NOT geometry literals anymore: they come from the frame budget.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(super) struct GeometryContract {
-    pub sidebar_width: f32,
-    pub stats_width: f32,
-    pub stats_label_width: f32,
     pub title_size: f32,
     pub compact: bool,
 }
@@ -79,37 +89,39 @@ pub(super) struct GeometryContract {
 pub(super) const fn geometry_contract(compact: bool) -> GeometryContract {
     if compact {
         GeometryContract {
-            sidebar_width: 0.0,
-            stats_width: 154.0,
-            stats_label_width: 62.0,
             title_size: 19.0,
             compact: true,
         }
     } else {
         GeometryContract {
-            sidebar_width: 216.0,
-            stats_width: 246.0,
-            stats_label_width: 96.0,
             title_size: 24.0,
             compact: false,
         }
     }
 }
 
-/// Build one GPUI-shaped Performance detail card.
+/// Build one GPUI-shaped Performance detail card through the shared slot
+/// contract: title row, undroppable vital line, left graph column, and the
+/// statistics rail in the frame's presentation — Pinned beside the graphs,
+/// Stacked below them, or Hidden when the frame cannot carry either.
 ///
-/// `left` contains the title, graph controls, primary graph, summaries and
-/// optional secondary graphs. `stats` is rendered as aligned label/value rows
-/// in a fixed right column, matching GPUI's `main_with_stats` projection.
+/// `left` contains the header band, graph controls, primary graph, summaries
+/// and secondary graphs. `stats` are pre-folded shell [`StatRow`]s; missing
+/// values render the shared dash dimmed. `stats_footer` pins one element
+/// (status footer, SMART button) under the statistics rail.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn main_with_stats<'a>(
     theme_snapshot: &'a taskmanager_theme::Theme,
     title: String,
     subtitle: String,
+    vital_line: Option<String>,
     left: Vec<Elem<'a>>,
-    stats: Vec<(String, String)>,
-    compact: bool,
+    stats: Vec<StatRow>,
+    stats_footer: Option<Elem<'a>>,
+    budget: PerformancePageBudget,
     extent: DetailExtent,
 ) -> Elem<'a> {
+    let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let geometry = geometry_contract(compact);
     let subtitle_size = if geometry.compact { 12 } else { 15 };
     let heading = row![
@@ -121,27 +133,59 @@ pub(super) fn main_with_stats<'a>(
     .spacing(if compact { 6 } else { 10 })
     .align_y(iced::Alignment::Center);
 
-    let left = column(std::iter::once(heading.into()).chain(left))
+    // The vital line is the page's undroppable one-line fact: unlike the
+    // header band it renders at EVERY vertical rung, so even the Floor
+    // composition still answers "how full / how fast / how healthy".
+    let left_column = std::iter::once(heading.into()).chain(vital_line.map(|line| {
+        text(line)
+            .size(f32::from(tokens::FONT_13))
+            .color(theme::muted_text_color(theme_snapshot))
+            .width(Length::Fill)
+            .into()
+    }));
+    let left = column(left_column.chain(left))
         .spacing(if compact { 8 } else { 12 })
         .width(Length::Fill)
         .height(extent.length());
-    // The compact contract is intentionally single-column. Keeping the stats
-    // column beside the graph at 720×480 makes its intrinsic rows paint over
-    // the chart because Iced's row measurement cannot shrink a fixed-width
-    // facts panel below its content. The facts remain available in the wide
-    // layout; the narrow layout reserves the viewport for the primary graph.
-    let content: Elem<'a> = if compact {
-        column![left]
+
+    let content: Elem<'a> = match budget.details {
+        PerformanceDetailsPresentation::Hidden => column![left]
             .width(Length::Fill)
             .height(extent.length())
-            .into()
-    } else {
-        let stats = stats_panel(theme_snapshot, stats, false);
-        row![left, stats]
-            .spacing(16)
-            .width(Length::Fill)
-            .height(extent.length())
-            .into()
+            .into(),
+        PerformanceDetailsPresentation::Pinned => {
+            let stats = stats_rail(
+                theme_snapshot,
+                stats,
+                stats_footer,
+                Length::Fixed(budget.stats_width),
+                RailEdge::Left,
+                compact,
+            );
+            row![left, stats]
+                .spacing(16)
+                .width(Length::Fill)
+                .height(extent.length())
+                .into()
+        }
+        PerformanceDetailsPresentation::Stacked => {
+            // Narrow-capacity fallback (GPUI parity): the rail stays available
+            // below the main viewport with one fixed readable height instead
+            // of starving the primary graph.
+            let stats = stats_rail(
+                theme_snapshot,
+                stats,
+                stats_footer,
+                Length::Fill,
+                RailEdge::Top,
+                compact,
+            );
+            column![left, stats]
+                .spacing(12)
+                .width(Length::Fill)
+                .height(extent.length())
+                .into()
+        }
     };
 
     container(content)
@@ -149,6 +193,103 @@ pub(super) fn main_with_stats<'a>(
         .width(Length::Fill)
         .height(extent.length())
         .style(move |_| theme::panel_style(theme_snapshot))
+        .into()
+}
+
+/// Which edge of the statistics rail carries the divider to the main
+/// viewport: Pinned rails hang off the left edge, Stacked rails off the top.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RailEdge {
+    Left,
+    Top,
+}
+
+/// The one statistics surface used by both pinned and stacked modes: the
+/// pre-folded rows plus the optional footer, inside the rail's own vertical
+/// scroll boundary so a long inventory never clips silently (GPUI parity —
+/// its stats rail scrolls through `scroll_region_with_rail`).
+#[allow(clippy::too_many_arguments)]
+fn stats_rail<'a>(
+    theme_snapshot: &'a taskmanager_theme::Theme,
+    stats: Vec<StatRow>,
+    footer: Option<Elem<'a>>,
+    width: Length,
+    edge: RailEdge,
+    compact: bool,
+) -> Elem<'a> {
+    let mut body = stats_panel(theme_snapshot, stats, compact);
+    if let Some(footer) = footer {
+        body = column![body, footer].spacing(12).into();
+    }
+    let mut rail = container(
+        scrollable(body)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .direction(iced::widget::scrollable::Direction::Vertical(
+                iced::widget::scrollable::Scrollbar::new()
+                    .width(4)
+                    .scroller_width(4),
+            )),
+    )
+    .width(width)
+    .height(Length::Fill)
+    .padding(if compact { 2.0 } else { 4.0 });
+    match edge {
+        RailEdge::Left => {
+            rail = rail
+                .style(move |_| theme::rail_divider_left(theme_snapshot))
+                .padding(if compact { 8.0 } else { 12.0 });
+        }
+        RailEdge::Top => {
+            rail = rail
+                .height(Length::Fixed(PERFORMANCE_STATS_STACK_HEIGHT))
+                .max_height(PERFORMANCE_STATS_STACK_HEIGHT)
+                .style(move |_| theme::rail_divider_top(theme_snapshot))
+                .padding(12.0);
+        }
+    }
+    rail.into()
+}
+
+/// The fixed statistics column shared by every detail card. Rows read the
+/// shell [`StatRow`] contract: the label owns the elastic side, the value
+/// keeps its intrinsic width flush right, and `None` values draw the ONE
+/// shared dash in the dim foreground so an uncollected field reads quieter
+/// than present data.
+pub(super) fn stats_panel(
+    theme_snapshot: &taskmanager_theme::Theme,
+    stats: Vec<StatRow>,
+    compact: bool,
+) -> Elem<'static> {
+    let value_size = if compact { 11 } else { 13 };
+    let rows: Vec<Elem<'static>> = stats
+        .into_iter()
+        .map(|stat| {
+            let (value, missing) = match stat.value() {
+                Some(value) => (value.to_owned(), false),
+                None => (missing_value(), true),
+            };
+            row![
+                text(stat.label().to_owned())
+                    .size(if compact { 10 } else { 12 })
+                    .color(theme::muted_text_color(theme_snapshot))
+                    .width(Length::Fill),
+                text(value).size(value_size).color(if missing {
+                    theme::muted_text_color(theme_snapshot)
+                } else {
+                    theme::color(theme_snapshot.palette().fg)
+                }),
+            ]
+            .spacing(if compact { 4 } else { 8 })
+            .align_y(iced::Alignment::Start)
+            .width(Length::Fill)
+            .into()
+        })
+        .collect();
+
+    column(rows)
+        .spacing(if compact { 5 } else { 9 })
+        .width(Length::Fill)
         .into()
 }
 
@@ -164,44 +305,6 @@ pub(super) fn bounded_heading(value: &str, max_chars: usize) -> String {
     }
     let take = max_chars.saturating_sub(1).max(1);
     format!("{}…", chars.into_iter().take(take).collect::<String>())
-}
-
-/// The fixed-width right-hand statistics column shared by every detail card.
-fn stats_panel<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
-    stats: Vec<(String, String)>,
-    compact: bool,
-) -> Elem<'a> {
-    let geometry = geometry_contract(compact);
-    let value_size = if compact { 11 } else { 13 };
-    let rows: Vec<Elem<'static>> = stats
-        .into_iter()
-        .map(|(label, value)| {
-            row![
-                text(label)
-                    .size(if compact { 10 } else { 12 })
-                    .color(theme::muted_text_color(theme_snapshot))
-                    .width(Length::Fixed(geometry.stats_label_width)),
-                text(value)
-                    .size(value_size)
-                    .width(Length::Fill)
-                    .align_x(iced::alignment::Horizontal::Right),
-            ]
-            .spacing(if compact { 4 } else { 8 })
-            .align_y(iced::Alignment::Start)
-            .into()
-        })
-        .collect();
-
-    container(column(rows).spacing(if compact { 5 } else { 9 }))
-        .width(Length::Fixed(geometry.stats_width))
-        .height(if compact {
-            Length::Shrink
-        } else {
-            Length::Fill
-        })
-        .padding(if compact { [2.0, 0.0] } else { [4.0, 0.0] })
-        .into()
 }
 
 /// A nested graph card keeps the main plot visually distinct from the outer

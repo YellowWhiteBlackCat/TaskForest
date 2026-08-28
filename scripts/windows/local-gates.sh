@@ -23,14 +23,15 @@
 #              workstation pass where their boundary crates and toolchains
 #              exist.
 #
-# Every stage is bounded by `timeout --kill-after=`; scratch lives under
-# .tmp/ on the repository drive and is removed on exit; TMP/TEMP/TMPDIR are
-# all redirected because MSVC tooling ignores TMPDIR. Parallelism caps at 4
-# jobs (repo policy; .config/nextest.toml pins test threads).
+# Every stage is bounded by `timeout --kill-after=`. The default is fail-fast;
+# use `--keep-going` only when collecting a diagnostic batch. Scratch lives
+# under .tmp/ on the repository drive and is removed on exit; TMP/TEMP/TMPDIR
+# are all redirected because MSVC tooling ignores TMPDIR. Parallelism caps at
+# 4 jobs (repo policy; .config/nextest.toml pins test threads).
 #
 # Usage:
 #   bash scripts/windows/local-gates.sh [quick|standard] [--with-gui]
-#     [--skip-release] [--only <stage>]
+#     [--skip-release] [--keep-going] [--only <stage>]
 #   No tier argument runs `quick`. Run scripts/windows/env-probe.sh first on
 #   a fresh machine.
 #
@@ -59,6 +60,18 @@ export TMP="$TMPDIR"
 export TEMP="$TMPDIR"
 scratch="${TMPDIR%/tmp}"
 mkdir -p "$TMPDIR"
+
+# Keep Windows local Cargo invocations on the same moving stable channel and
+# warning/profile policy as portability.yml. The Linux-only mold linker is
+# intentionally not added on this platform.
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
+export CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}"
+export CARGO_PROFILE_DEV_DEBUG="${CARGO_PROFILE_DEV_DEBUG:-line-tables-only}"
+rustflags="${RUSTFLAGS:-}"
+if [[ "$rustflags" != *"-D warnings"* ]]; then
+    rustflags="${rustflags:+$rustflags }-D warnings"
+fi
+export RUSTFLAGS="$rustflags"
 
 stage_timeout="${STAGE_TIMEOUT:-3600}"
 quick_timeout="${QUICK_TIMEOUT:-300}"
@@ -97,6 +110,10 @@ run_stage() {
         record "$name" "$tier" "FAIL" "$(( $(date +%s) - started ))"
         echo "FAIL $name"
         failures=$((failures + 1))
+        if [[ "$fail_fast" == "1" ]]; then
+            echo "windows local-gates: fail-fast after $name (rc=$rc); use --keep-going for a diagnostic batch" >&2
+            exit "$rc"
+        fi
     fi
     stages_run=$((stages_run + 1))
 }
@@ -126,6 +143,8 @@ maybe() {
 
 with_gui=0
 skip_release=0
+fail_fast=1
+[[ "${KEEP_GOING:-0}" == "1" ]] && fail_fast=0
 tier="quick"
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -137,6 +156,7 @@ while [[ $# -gt 0 ]]; do
         ;;
     --with-gui) with_gui=1 ;;
     --skip-release) skip_release=1 ;;
+    --keep-going) fail_fast=0 ;;
     --only)
         shift
         ONLY_STAGE="$1"

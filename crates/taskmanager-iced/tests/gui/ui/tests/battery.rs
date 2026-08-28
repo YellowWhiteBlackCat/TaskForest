@@ -93,11 +93,11 @@ fn battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_hones
     );
     let rows = battery_summary_lines(&battery);
     // Headline capacity stays a real percentage, not a fabricated zero.
-    assert_eq!(rows[0].0, "Charge");
-    assert_eq!(rows[0].1, "82%");
+    assert_eq!(rows[0].label(), "Charge");
+    assert_eq!(rows[0].value(), Some("82%"));
     // Status carries the charge/discharge direction.
-    assert_eq!(rows[1].0, "Status");
-    assert_eq!(rows[1].1, "Discharging");
+    assert_eq!(rows[1].label(), "Status");
+    assert_eq!(rows[1].value(), Some("Discharging"));
     // Rate magnitude (watts) and voltage are projected in their readout units.
     assert_eq!(lookup(&rows, "Power"), "8.4 W");
     assert_eq!(lookup(&rows, "Voltage"), "12.40 V");
@@ -105,22 +105,24 @@ fn battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_hones
     assert_eq!(lookup(&rows, "Technology"), "Li-ion");
     assert_eq!(lookup(&rows, "Manufacturer"), "TaskForest Cells");
 
-    // The title prefers the model name over the raw display name.
-    assert_eq!(battery_title(&battery, 0), "Battery: Li-ion Pack");
+    // The title prefers the bare model name over the raw display name (GPUI
+    // parity — no family prefix).
+    assert_eq!(battery_title(&battery, 0), "Li-ion Pack");
 
     // Unknown capacity MUST render an honest dash, NEVER 0%.
     let mut unmeasured = BatteryInfo::new("power-supply:BAT1", DeviceState::healthy(100));
     unmeasured.status = "Unknown".into();
     let unmeasured_rows = battery_summary_lines(&unmeasured);
-    assert_eq!(unmeasured_rows[0].0, "Charge");
+    assert_eq!(unmeasured_rows[0].label(), "Charge");
     assert_eq!(
-        unmeasured_rows[0].1, "—",
+        unmeasured_rows[0].value(),
+        None,
         "unknown capacity is an honest dash"
     );
     assert!(
-        !unmeasured_rows
-            .iter()
-            .any(|(_, value)| value == "0%" || value.contains("0.0 W")),
+        !unmeasured_rows.iter().any(|row| row
+            .value()
+            .is_some_and(|value| value == "0%" || value.contains("0.0 W"))),
         "unobserved rate/voltage are omitted, not fabricated as zero"
     );
     // With no model or display name, the title falls back to the per-battery
@@ -201,10 +203,14 @@ fn battery_panel_renders_honest_states_and_routes_through_the_selector() {
 }
 
 /// Look up the value projected under one label, failing loudly if the row is
-/// absent (mirrors the table-test helper convention used by the disk/gpu tests).
-fn lookup<'a>(rows: &'a [(String, String)], label: &str) -> &'a str {
+/// absent (mirrors the table-test helper convention used by the disk/gpu
+/// tests). `None` values render the shared dash exactly like the panel.
+fn lookup<'a>(rows: &'a [taskmanager_shell::viewmodel::StatRow], label: &str) -> &'a str {
     rows.iter()
-        .find(|(key, _)| key == label)
-        .map(|(_, value)| value.as_str())
+        .find(|row| row.label() == label)
+        .map(|row| {
+            row.value()
+                .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE)
+        })
         .expect("projected battery row must be present")
 }

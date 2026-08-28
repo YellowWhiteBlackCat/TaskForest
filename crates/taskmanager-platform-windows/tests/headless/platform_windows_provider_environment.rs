@@ -1,4 +1,7 @@
 use super::*;
+use taskmanager_core::{
+    DeviceState, DeviceStatus, SessionControlAction, SessionId, StartupEvidenceFailure,
+};
 
 #[test]
 fn win_environment_providers_degrade_honestly_off_windows() {
