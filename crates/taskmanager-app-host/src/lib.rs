@@ -25,6 +25,7 @@ mod diagnostic_bundle_runtime;
 mod history_frontend;
 mod history_persistence_runtime;
 mod history_replay_runtime;
+mod presentation;
 mod process_termination;
 mod snapshot_export_runtime;
 mod worker_fault;
@@ -45,6 +46,11 @@ pub use history_persistence_runtime::{
 };
 use history_replay_runtime::HistoryReplayCoordinator;
 pub use history_replay_runtime::{HistoryReplayClient, HistoryReplayRuntimeStartError};
+pub use presentation::{
+    LayerShellAnchor, LayerShellFallbackPolicy, LayerShellKeyboardInteractivity, LayerShellLayer,
+    LayerShellMargins, LayerShellOutput, LayerShellSize, LayerShellSpec, LayerShellSpecError,
+    WindowPresentation,
+};
 pub use process_termination::{ProcessTermination, ProcessTerminationInstallError};
 use snapshot_export_runtime::SnapshotExportCoordinator;
 pub use snapshot_export_runtime::{SnapshotExportClient, SnapshotExportRuntimeStartError};

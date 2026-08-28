@@ -469,7 +469,11 @@ fn query_system_handle_table() -> Result<Vec<u8>, WindowsApiError> {
             )
         };
         if status.is_ok() {
-            let filled = (returned_bytes as usize).min(capacity_bytes);
+            let filled =
+                usize::try_from(returned_bytes).map_err(|_| WindowsApiError::ResourceLimit)?;
+            if filled == 0 || filled > capacity_bytes {
+                return Err(WindowsApiError::QueryFailed);
+            }
             // SAFETY: `filled` bytes of `buffer` were initialized by the
             // kernel and the u8 view reads them at a narrower alignment.
             return Ok(unsafe {
@@ -515,7 +519,11 @@ fn query_object_types_buffer() -> Result<Vec<u8>, WindowsApiError> {
             )
         };
         if status.is_ok() {
-            let filled = (returned_bytes as usize).min(capacity_bytes);
+            let filled =
+                usize::try_from(returned_bytes).map_err(|_| WindowsApiError::ResourceLimit)?;
+            if filled == 0 || filled > capacity_bytes {
+                return Err(WindowsApiError::QueryFailed);
+            }
             buffer.truncate(filled);
             return Ok(buffer);
         }
@@ -643,6 +651,9 @@ where
         slot: NameQuerySlot,
     }
 
+    // SAFETY: the function uses the Windows thread-entry ABI and receives the
+    // exact `Box::into_raw` job pointer supplied to `CreateThread`; the
+    // worker validates ownership and publishes its result before returning.
     unsafe extern "system" fn threadproc<F>(parameter: *mut core::ffi::c_void) -> u32
     where
         F: Fn(

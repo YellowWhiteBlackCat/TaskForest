@@ -35,7 +35,7 @@ impl PriorityChoice {
 
 impl std::fmt::Display for PriorityChoice {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        // The shell owns the tier→label fold (§4.0 同一律).
+        // The shell owns the tier→label fold (§8.1 同一律).
         let tier = match self {
             Self::High => PriorityTier::High,
             Self::Normal => PriorityTier::Normal,

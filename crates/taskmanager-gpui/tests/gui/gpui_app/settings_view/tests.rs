@@ -17,6 +17,7 @@ mod tests_inner {
     use crate::core::config::{
         STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER, TEXT_RENDERING_PLATFORM_DEFAULT,
     };
+    use crate::gpui_app::first_run::{self, FirstRunPhase};
     use crate::gpui_app::formatting::DisplayUnits;
     use crate::gpui_app::graph::GraphSettings;
     use crate::gpui_app::root::RootView;
@@ -25,6 +26,7 @@ mod tests_inner {
     use crate::gpui_app::theme::tokens;
     use crate::gpui_app::theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
     use crate::i18n;
+    use taskmanager_application::SetupScriptInfo;
     use taskmanager_ui::inputs::switch::SwitchState;
 
     /// Test harness: a window whose root renders the Settings dialog content
@@ -104,6 +106,7 @@ mod tests_inner {
                                 gray_zero_values: presentation.gray_zero_values,
                                 notify_enabled: v.projection().alert_center.policy().enabled,
                                 history_persistence: false,
+                                first_run: &v.first_run,
                                 notify_quiet_start: v
                                     .projection()
                                     .alert_center
@@ -140,6 +143,20 @@ mod tests_inner {
                 }
             });
             div().p(tokens::SPACE_4).child(content)
+        }
+    }
+
+    struct OptionalSetupHarness {
+        root_view: Entity<RootView>,
+    }
+
+    impl Render for OptionalSetupHarness {
+        fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+            let root = self.root_view.clone();
+            let row = root.read_with(cx, |view, _| {
+                first_run::render_settings_row(&view.theme, root.clone())
+            });
+            div().p(tokens::SPACE_4).child(row)
         }
     }
 
@@ -212,6 +229,47 @@ mod tests_inner {
             network_wired.origin.y < network_other.origin.y,
             "network category preferences must retain their upstream order"
         );
+    }
+
+    /// Optional setup is discoverable from Settings, but it only becomes a
+    /// modal surface after an explicit user activation.
+    #[gpui::test]
+    async fn settings_exposes_optional_setup_as_an_explicit_action(cx: &mut TestAppContext) {
+        let root_view = cx.new(|cx| RootView::new(Theme::dark(), cx));
+        root_view.update(cx, |view, _cx| {
+            view.first_run.phase = FirstRunPhase::Available;
+            view.first_run.info = Some(SetupScriptInfo {
+                path: std::path::PathBuf::from("/usr/share/taskmanager/setup/99-taskmanager.rules"),
+                run_command: "taskmanager-setup-helper --apply".to_owned(),
+                revert_command: "taskmanager-setup-helper --revert".to_owned(),
+            });
+        });
+        {
+            let (_, settings_window) = cx.add_window_view(|_window, _cx| SettingsHarness {
+                root_view: root_view.clone(),
+                full: true,
+            });
+            settings_window.update(|window, cx| window.draw(cx).clear());
+
+            settings_window
+                .debug_bounds("first-run-open-from-settings")
+                .expect("optional setup must have an explicit Settings action");
+        }
+        assert!(!root_view.read_with(cx, |view, _| view.first_run_open()));
+        let (_, action_window) = cx.add_window_view(|_window, _cx| OptionalSetupHarness {
+            root_view: root_view.clone(),
+        });
+        action_window.update(|window, cx| window.draw(cx).clear());
+        let action = action_window
+            .debug_bounds("first-run-open-from-settings")
+            .expect("optional setup action must be rendered as a real control");
+        action_window.simulate_mouse_move(
+            action.center(),
+            None::<gpui::MouseButton>,
+            Default::default(),
+        );
+        action_window.simulate_click(action.center(), Default::default());
+        assert!(root_view.read_with(cx, |view, _| view.first_run_open()));
     }
 
     /// Product modes are represented by real preview cards, not only text

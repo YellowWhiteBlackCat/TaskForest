@@ -58,7 +58,7 @@ pub fn enumerate_compute_accelerators() -> Result<Vec<WindowsComputeAccelerator>
     let _guard = DeviceInfoSetGuard(device_info_set);
 
     let mut devices = Vec::new();
-    for member_index in 0..MAX_COMPUTE_ACCELERATORS {
+    for member_index in 0..=MAX_COMPUTE_ACCELERATORS {
         let mut info_data = SP_DEVINFO_DATA {
             cbSize: u32::try_from(core::mem::size_of::<SP_DEVINFO_DATA>())
                 .map_err(|_| WindowsApiError::QueryFailed)?,
@@ -71,6 +71,9 @@ pub fn enumerate_compute_accelerators() -> Result<Vec<WindowsComputeAccelerator>
         if unsafe { SetupDiEnumDeviceInfo(device_info_set, member_index, &mut info_data) }.is_err()
         {
             break;
+        }
+        if member_index == MAX_COMPUTE_ACCELERATORS {
+            return Err(WindowsApiError::ResourceLimit);
         }
         let instance_path = device_instance_path(device_info_set, &info_data)?;
         let device_desc = device_registry_string(device_info_set, &info_data, SPDRP_DEVICEDESC);

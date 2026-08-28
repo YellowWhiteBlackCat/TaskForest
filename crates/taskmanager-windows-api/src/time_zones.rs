@@ -319,7 +319,10 @@ fn query_time_zone_rules_windows() -> Result<WindowsTimeZoneRules, WindowsApiErr
     // instant, not the rules; only the filled struct is consumed.
     // SAFETY: `dynamic` is a writable caller-owned struct; the call writes
     // only this fixed-size value and retains no pointer.
-    let _current_state = unsafe { GetDynamicTimeZoneInformation(&mut dynamic) };
+    let current_state = unsafe { GetDynamicTimeZoneInformation(&mut dynamic) };
+    if current_state == u32::MAX {
+        return Err(WindowsApiError::QueryFailed);
+    }
     let zone_key_name = decode_zone_key_name(&dynamic.TimeZoneKeyName)?;
 
     let current_year = current_utc_year()?;

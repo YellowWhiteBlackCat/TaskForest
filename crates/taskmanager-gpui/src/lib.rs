@@ -18,6 +18,7 @@ pub use taskmanager_core::core;
 mod assets;
 pub mod gpui_app;
 mod run;
+mod window_presentation;
 
 // Windows-only evidence mode (`--capture-window`): real-window self-capture
 // via Windows.Graphics.Capture. The module is empty elsewhere so the frontend

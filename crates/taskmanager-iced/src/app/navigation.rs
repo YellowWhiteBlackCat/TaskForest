@@ -99,7 +99,9 @@ impl IcedApp {
     /// hierarchy. Up/Down/PageUp/PageDown move the
     /// cursor over the visible-row projection — the same rows the renderer
     /// draws (ADR-020 render-time projection) — and Left/Right expand or
-    /// collapse the aggregate/process row at the cursor (GPUI parity). Every
+    /// collapse the aggregate/process row at the cursor (the shared bare-arrow
+    /// tree matrix; the GPUI row handler executes the same rules, pinned by
+    /// behavior tests on both frontends). Every
     /// other page keeps the shared shell `move_selection` path.
     fn visual_nav_intercepts(&mut self, event: ShellKeyEvent) -> bool {
         if self.shell.page() != AppPage::Applications {
@@ -210,7 +212,8 @@ impl IcedApp {
     /// Expand (Right) or collapse (Left) the row at the visual cursor. A
     /// group header toggles its group; a tree node toggles its subtree; Left
     /// on an already-collapsed tree node moves the cursor up to its parent
-    /// (GPUI parity).
+    /// (the same structural-arrow fold the GPUI row handler executes; parity
+    /// is pinned by behavior tests on both frontends).
     fn toggle_at_visual_cursor(&mut self, expand: bool) {
         let Some(row) = ({
             let projection = self.projected_rows();
@@ -262,7 +265,8 @@ impl IcedApp {
                     let _ = self.shell.select_row(flat_index);
                 } else if !expand && collapsed {
                     // Left on a collapsed node moves the cursor to its parent
-                    // (the subtree is already hidden; GPUI parity).
+                    // (the subtree is already hidden; same rule as the GPUI
+                    // structural-arrow fold).
                     if let Some(index) = parent_pid
                         .and_then(|parent| self.shell.visible_process_index_of_pid(parent))
                     {

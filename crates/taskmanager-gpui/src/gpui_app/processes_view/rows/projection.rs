@@ -327,6 +327,16 @@ pub struct VisibleRow {
     pub depth: usize,
     pub has_children: bool,
     pub collapsed: bool,
+    /// Nearest visible selectable ancestor row (iced-parity tree keyboard
+    /// navigation). An in-tree parent carries its [`ProcessRowKey::Process`];
+    /// a root process row under an application aggregate carries the
+    /// aggregate's [`ProcessRowKey::Application`]. Rows whose parent is a
+    /// structural category header — or that have no visible parent — carry
+    /// `None`, so a bare Left on them is a no-op instead of falling through
+    /// to column stepping. Computed once per projection rebuild (a Copy
+    /// field on the row the recursion already owns); the renderer never
+    /// re-derives it.
+    pub parent_key: Option<ProcessRowKey>,
     /// Small inline annotation (e.g. "×3" instance count on group rows).
     pub badge: Option<String>,
     pub toggle: Toggle,
@@ -361,6 +371,7 @@ fn tree_row_from_node(
     node: &ProcessNode<'_>,
     depth_offset: usize,
     collapsed: &HashSet<u32>,
+    parent_key: Option<ProcessRowKey>,
 ) -> VisibleRow {
     let has_children = !node.children.is_empty();
     let mut row = VisibleRow {
@@ -387,6 +398,7 @@ fn tree_row_from_node(
         depth: node.depth.saturating_add(depth_offset),
         has_children,
         collapsed: collapsed.contains(&node.item.pid),
+        parent_key,
         badge: None,
         toggle: if has_children {
             Toggle::TreePid(node.item.pid)
@@ -403,12 +415,62 @@ fn push_tree_rows<'a>(
     depth_offset: usize,
     collapsed: &HashSet<u32>,
     rows: &mut Vec<VisibleRow>,
+    parent_key: Option<ProcessRowKey>,
 ) {
-    rows.push(tree_row_from_node(node, depth_offset, collapsed));
+    rows.push(tree_row_from_node(
+        node,
+        depth_offset,
+        collapsed,
+        parent_key,
+    ));
     if !node.children.is_empty() && !collapsed.contains(&node.item.pid) {
         for child in &node.children {
-            push_tree_rows(child, depth_offset, collapsed, rows);
+            // The in-tree parent is always rendered directly above (the row
+            // is only skipped when the subtree is hidden entirely), so its
+            // real pid is the child's nearest visible selectable ancestor.
+            push_tree_rows(
+                child,
+                depth_offset,
+                collapsed,
+                rows,
+                Some(ProcessRowKey::Process(node.item.pid)),
+            );
         }
+    }
+}
+
+/// One bare structural arrow's meaning on a row that owns a subtree — the
+/// tree-keyboard-navigation matrix shared verbatim with the iced frontend's
+/// `toggle_at_visual_cursor` (same semantics, per-frontend execution). Pure
+/// so tests pin the matrix without driving a real window, and so the row key
+/// handler stays a thin executor with no second copy of the rules.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum StructuralArrow {
+    /// Left on an expanded row: collapse its subtree; the row itself stays
+    /// selected and visible.
+    Collapse,
+    /// Right on a collapsed row: expand its subtree; the row stays selected.
+    Expand,
+    /// Left on an already-collapsed row: move the selection up to the nearest
+    /// visible selectable ancestor ([`VisibleRow::parent_key`]).
+    GotoParent(ProcessRowKey),
+}
+
+/// Resolve one bare structural arrow (the caller has already gated on
+/// `has_children` and the absence of Alt/Shift column modifiers). Right on an
+/// expanded row is an honest no-op, as is Left with no selectable ancestor —
+/// neither falls through to column stepping.
+#[must_use]
+pub(crate) fn structural_arrow_action(
+    collapsed: bool,
+    parent_key: Option<ProcessRowKey>,
+    right: bool,
+) -> Option<StructuralArrow> {
+    match (right, collapsed) {
+        (false, false) => Some(StructuralArrow::Collapse),
+        (true, true) => Some(StructuralArrow::Expand),
+        (false, true) => parent_key.map(StructuralArrow::GotoParent),
+        (true, false) => None,
     }
 }
 
@@ -532,12 +594,23 @@ pub fn category_tree_rows(
                     app_row.collapsed = !expanded.contains(&expansion_key);
                     rows.push(app_row);
                     if expanded.contains(&expansion_key) {
-                        push_tree_rows(root, 2, collapsed, &mut rows);
+                        // The app aggregate row is the visible parent of the
+                        // root process row: Left on that root climbs to it.
+                        push_tree_rows(
+                            root,
+                            2,
+                            collapsed,
+                            &mut rows,
+                            Some(ProcessRowKey::Application(group.main_pid)),
+                        );
                     }
                 }
             } else {
                 for node in &tree {
-                    push_tree_rows(node, 1, collapsed, &mut rows);
+                    // The parent of a category-tree root is the structural
+                    // category header — not selectable, so `None` (Left on a
+                    // collapsed root is an honest no-op, matching iced).
+                    push_tree_rows(node, 1, collapsed, &mut rows, None);
                 }
             }
         }
@@ -564,6 +637,12 @@ pub struct ProcRowProps<'a> {
     /// Ordered selectable semantic rows. Includes PID-less application roots
     /// and excludes structural category headers.
     pub row_keys: Rc<Vec<ProcessRowKey>>,
+    /// The full visible-row projection this row belongs to, shared with the
+    /// key handlers. Bare Left/Right resolve the LIVE selected row through it
+    /// (focus and selection diverge after Home/End/PageUp) so the structural
+    /// action never consults a stale focused row; the Rc clone per rendered
+    /// row is one non-atomic refcount bump, the same cost as `pids`/`row_keys`.
+    pub rows: Rc<Vec<VisibleRow>>,
     /// Apps-page preference: dim current zero-valued resource cells while
     /// leaving missing values rendered as the unavailable-value dash.
     pub gray_zero_values: bool,

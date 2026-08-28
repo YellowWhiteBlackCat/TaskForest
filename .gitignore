@@ -42,6 +42,9 @@ __pycache__/
 # Local agent session plans are private workspace material.
 .zcode/
 
+# Local agent runner configuration — private, never commit.
+.codex/
+
 # Private publication-preparation material. This directory is intentionally
 # outside the public documentation contract and must never be committed.
 .private/

@@ -46,7 +46,7 @@ pub fn active_power_scheme_name() -> Result<String, WindowsApiError> {
         }
         let size_usize =
             usize::try_from(buffer_size).map_err(|_| WindowsApiError::ResourceLimit)?;
-        if size_usize > MAX_SCHEME_NAME_BYTES {
+        if size_usize == 0 || size_usize > MAX_SCHEME_NAME_BYTES || !size_usize.is_multiple_of(2) {
             return Err(WindowsApiError::ResourceLimit);
         }
 
@@ -66,11 +66,17 @@ pub fn active_power_scheme_name() -> Result<String, WindowsApiError> {
         if status != WIN32_ERROR(0) {
             return Err(WindowsApiError::QueryFailed);
         }
+        let returned_bytes =
+            usize::try_from(buffer_size).map_err(|_| WindowsApiError::ResourceLimit)?;
+        if returned_bytes == 0 || returned_bytes > buffer.len() || !returned_bytes.is_multiple_of(2)
+        {
+            return Err(WindowsApiError::QueryFailed);
+        }
 
         // Decode UTF-16 from bytes
-        let u16_len = size_usize / 2;
+        let u16_len = returned_bytes / 2;
         let mut u16_vec = Vec::with_capacity(u16_len);
-        for chunk in buffer.as_chunks::<2>().0 {
+        for chunk in buffer[..returned_bytes].as_chunks::<2>().0 {
             u16_vec.push(u16::from_le_bytes(*chunk));
         }
         // Strip trailing null if present

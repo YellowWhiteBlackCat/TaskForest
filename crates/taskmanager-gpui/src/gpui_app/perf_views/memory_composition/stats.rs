@@ -1,4 +1,4 @@
-//! Pure data-layer folds for the memory-composition card (ARCH.md §4.0): the
+//! Pure data-layer folds for the memory-composition card (ARCH.md §8.1): the
 //! typed memory observation reads (totals, swap, compressed swap, summary
 //! tiles) live here so the render module only paints folded strings, shares,
 //! and bars.

@@ -14,6 +14,21 @@ Local process clocks, Properties timestamps and replay status times use the
 app-host-injected local-time observation and shared pure formatters. GPUI uses
 no toolkit host-local clock API and discovers no host time-zone state.
 
+The normal desktop host remains the default and keeps the complete application
+shell. On Linux/Wayland, setting `TASKFOREST_WINDOW_HOST=layer-shell` explicitly
+requests the GPUI layer-shell desktop widget through the neutral
+`taskmanager-app-host::WindowPresentation` contract. That opt-in uses a fixed
+`520×360` top-right surface and a compact Dashboard projection; it does not
+change the standalone RootView or its `xdg_toplevel` geometry. The patched GPUI
+backend owns the raw protocol role and configure/ack lifecycle; an unavailable
+global or output follows the contract's explicit standalone fallback. Iced and
+Bevy remain standalone until their own layer hosts exist.
+
+The optional Linux setup capability is observed quietly during startup. Its
+First Run surface is opened only from the explicit Settings entry or after a
+user-initiated setup action; capability discovery never becomes a recurring
+startup modal.
+
 ## Key modules
 
 - `src/gpui_app/root/projection_materialization.rs` owns the private, revision-keyed GPUI read
@@ -45,7 +60,8 @@ no toolkit host-local clock API and discovers no host time-zone state.
   toasts remain only for copy/browser/config presentation and cannot duplicate that outcome.
 - `src/gpui_app/root/render/surfaces.rs` exhaustively maps that authority to one active
   renderer; `render/transients.rs` composes pause, feedback, warmup and tooltip lifecycle
-  layers after it. The root renderer owns layout orchestration rather than branch policy.
+  layers after it. `root/responsive.rs` owns the pure `FrameBudget` → `ContentBudget` → page-slot
+  projection; the root renderer only supplies shell geometry and mounts the result.
 - `src/gpui_app/root/startup/capture_systems.rs` applies capture-only presentation transforms
   after the shared fold through typed named systems; it has no general mutable materialization
   accessor. Startup owns acquisition/configuration and schedules the loop.
@@ -100,8 +116,9 @@ no toolkit host-local clock API and discovers no host time-zone state.
 - `tests/common/test_support.rs` provides crate test support; the repository-level GUI behavior
   suite is `../../tests/gui/`.
 
-Root navigation is a bounded layout region: horizontal tabs flex within their strip and truncate
-only their labels; vertical tabs live in a fixed rail and the body receives the remaining width.
+Root navigation is a bounded layout region: horizontal tabs flex within their strip and scroll when
+the locale/page set exceeds the slot; vertical tabs live in a fixed, scrollable rail and the body
+receives the remaining width.
 The Applications page exposes one category-first hierarchy (Applications / Background /
 Uncategorized). The Applications bucket then inserts a PID-less application-root total before
 each real parent/child process tree; category/application totals own the sums, while every
@@ -114,17 +131,29 @@ verbs freeze the live subtree, while single-process details/affinity stay unavai
 UI size is Small/Standard/Large: `RootView` sets the GPUI rem to 14/16/18px so every owned
 `FONT_*` token responds across the app, while process-table icon/control metrics consume the
 same `UiSize` directly. Row density remains independent.
-Every page receives one frame-local `PageLayoutBudget`: horizontal
-`LayoutProfile` and vertical capacity remain independent, and page modules
+Every page receives one frame-local `FrameBudget`/`ContentBudget` projection:
+shell chrome is deducted once at the root, horizontal `LayoutProfile` and vertical capacity remain
+independent, and page modules
 derive typed chrome/chart/timeline presentations rather than width/height
-booleans. The Performance CPU page renders the stable shared aggregate series
-and, when the chart-inventory budget permits, the per-core matrix; it owns no
-metric/detail selector state. Its leading identity and trailing model slots
-share the full heading width, while the main graph keeps an internal inset
-before the pinned detail rail and the rail itself reaches the page edge. The
-GPU page likewise owns no metric/detail selector: full-inventory budgets render
-every reported engine when multiple engines exist, aggregate-only budgets keep
-one readable utilization graph, and both preserve immutable stats/VRAM facts.
+booleans. Every Performance device page (CPU/Memory/Disk/Network/GPU/Battery/Fan)
+composes through the ONE `perf_views::layout` root (`perf_page`, ADR-039):
+pages declare `ChartSpec` charts whose `ChartTier` (headline/secondary)
+derives the height floor, first-frame state overlay, hover surface, legend,
+aesthetic injection, and summary row in one place; mini density cells render
+through the shared `mini_graph_cell`. The main column is one fixed
+`overflow_hidden` viewport — never a scrolling body — and the statistics rail
+follows the budget's pinned/stacked/hidden presentation at the budget's
+width. The CPU page adds its readout band as the header slot and, when the
+chart-inventory budget permits, the per-core matrix below; it owns no
+metric/detail selector state. The GPU page likewise owns no metric/detail
+selector: full-inventory budgets render every reported engine when multiple
+engines exist (the dominant engine wears the full headline chart contract),
+aggregate-only budgets keep one readable utilization graph, and both preserve
+immutable stats/VRAM facts. On full-inventory budgets every chartable scalar
+family the adapter actually reports (power, temperature, frequency, memory,
+dedicated/shared VRAM, idle residency) renders as its own secondary chart
+beneath the headline; a family the platform cannot measure renders nothing at
+all — never a fabricated zero and never a selector.
 Disk and network main graphs draw two series from the store's split-direction
 lanes (read/write, rx/tx; family color and its 0.32 tint) under one shared
 peak and one cached static grid — the dynamic scene keys carry an explicit
@@ -156,8 +185,11 @@ exceeds the actual x viewport (the page width minus the pinned vertical rail). T
 virtualized body share one outer `ScrollHandle`, so dragging translates one already-laid-out
 content surface instead of rebuilding the row projection for each pointer position; wide windows
 do not reserve an empty rail. Both that x owner and the vertical `uniform_list` explicitly
-restrict wheel input to their own axis. The Name column remains the leading identity column,
-while the existing Left/Right keyboard path remains available for column/sort navigation.
+restrict wheel input to their own axis. The Name column remains the leading identity column.
+Bare Left/Right on the table run the iced-parity tree keyboard matrix: a subtree row
+collapses (Left), expands (Right), and a Left on an already-collapsed row climbs the
+selection to its nearest visible selectable ancestor, while leaf rows and
+Alt/Shift+Left/Right keep the column-cursor/sort navigation path.
 Apps chrome consumes one `ProcessChromePresentation` mapped from the frame's typed
 `PageLayoutBudget`; it never re-tests viewport pixels or carries compact booleans. Wide surfaces
 place title/search in one overview band and primary actions/hierarchy/status filters in one bounded
@@ -183,9 +215,11 @@ GPUI process scroll behavior module, the process-tree projection tests, the Perf
 offset test, and the UI scrollbar/rail tests; performance, keyboard/pointer, and Niri gates remain
 required for changes to this host.
 
-The Performance device sidebar has one width authority: the persisted, drag-clamped value. Its
-outer slot pins `min/width/max` to that value, so provider-owned device text truncates inside the
-rail and can never expand shell chrome through flex min-content sizing. The pinned scrollbar ends
+The Performance device sidebar has one persisted width preference, but the frame budget is the
+current geometry authority: its effective width is clamped to the available page slots before the
+outer slot pins `min/width/max`. Provider-owned device text therefore truncates inside the rail and
+can never expand shell chrome through flex min-content sizing. When the sidebar cannot coexist with
+the main viewport and statistics rail, the same devices move to the strip. The pinned scrollbar ends
 before a dedicated resize gutter, so its wheel-preserving hit layer cannot cover the drag target.
 Rows are collected as immutable props, ordered once, and only then rendered with the exact visual
 order in an `Rc<[String]>`; drag payloads never recover order through a render-time `RefCell`.

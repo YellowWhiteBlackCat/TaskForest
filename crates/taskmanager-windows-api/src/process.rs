@@ -404,8 +404,8 @@ pub fn process_threads(pid: u32) -> Result<Vec<WindowsThreadInfo>, WindowsApiErr
                     base_priority: entry.tpBasePri,
                     delta_priority: entry.tpDeltaPri,
                 });
-                if threads.len() >= MAX_THREADS_PER_PROCESS {
-                    break;
+                if threads.len() == MAX_THREADS_PER_PROCESS {
+                    return Err(WindowsApiError::ResourceLimit);
                 }
             }
             has_next = {
@@ -529,9 +529,12 @@ fn decode_thread_description(pointer: *const u16) -> Option<String> {
         // SAFETY: GetThreadDescription documents a NUL-terminated buffer; the
         // hard bound keeps a malformed allocation from running off the end.
         unsafe {
-            while *pointer.add(length) != 0 && length < MAX_THREAD_DESCRIPTION_UTF16 {
+            while length < MAX_THREAD_DESCRIPTION_UTF16 && *pointer.add(length) != 0 {
                 length += 1;
             }
+        }
+        if length == MAX_THREAD_DESCRIPTION_UTF16 {
+            return None;
         }
         length
     };

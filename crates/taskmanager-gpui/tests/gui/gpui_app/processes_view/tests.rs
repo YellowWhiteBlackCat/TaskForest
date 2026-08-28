@@ -8,6 +8,8 @@
 
 #[path = "tests/category.rs"]
 mod category;
+#[path = "tests/keyboard_tree_nav.rs"]
+mod keyboard_tree_nav;
 #[path = "tests/landscape.rs"]
 mod landscape;
 #[path = "tests/projection.rs"]
@@ -636,6 +638,7 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
                     entity: &self.entity,
                     pids: Rc::new(vec![4242]),
                     row_keys: Rc::new(vec![ProcessRowKey::Process(4242)]),
+                    rows: Rc::new(Vec::new()),
                     gray_zero_values: false,
                     density: RowDensity::Comfortable,
                     ui_size: UiSize::Standard,
@@ -680,6 +683,7 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
                 depth: 0,
                 has_children: false,
                 collapsed: false,
+                parent_key: None,
                 badge: None,
                 toggle: Toggle::None,
             },
@@ -726,6 +730,7 @@ async fn verified_application_asset_mounts_as_a_gpui_image(cx: &mut TestAppConte
                     entity: &self.entity,
                     pids: Rc::new(vec![4243]),
                     row_keys: Rc::new(vec![ProcessRowKey::Process(4243)]),
+                    rows: Rc::new(Vec::new()),
                     gray_zero_values: false,
                     density: RowDensity::Comfortable,
                     ui_size: UiSize::Standard,
@@ -775,6 +780,7 @@ async fn verified_application_asset_mounts_as_a_gpui_image(cx: &mut TestAppConte
                 depth: 0,
                 has_children: false,
                 collapsed: false,
+                parent_key: None,
                 badge: None,
                 toggle: Toggle::None,
             },
@@ -842,6 +848,7 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
                     entity: &self.entity,
                     pids: Rc::new(vec![4242]),
                     row_keys: Rc::new(vec![ProcessRowKey::Process(4242)]),
+                    rows: Rc::new(Vec::new()),
                     gray_zero_values: false,
                     density: RowDensity::Comfortable,
                     ui_size: UiSize::Standard,
@@ -876,6 +883,7 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
         depth: 0,
         has_children: false,
         collapsed: false,
+        parent_key: None,
         badge: None,
         toggle: Toggle::None,
     };

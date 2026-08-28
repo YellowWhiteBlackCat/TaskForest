@@ -20,7 +20,7 @@
 //! RootView's session snapshot generation + the shell-owned inventory sort,
 //! and the per-cell
 //! telemetry→display fold lives in the data-layer `row_vm` module (ARCH.md
-//! §4.0) — `render_td` only styles and paints the pre-folded strings.
+//! §8.1) — `render_td` only styles and paints the pre-folded strings.
 
 use std::rc::Rc;
 

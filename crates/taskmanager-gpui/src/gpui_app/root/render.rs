@@ -4,12 +4,15 @@ use super::{
     Hover, InputModality, RootView, TopPage, WindowCorner, alert_ui, device_label,
     init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
 };
+use crate::core::SystemSnapshot;
+use crate::gpui_app::dashboard;
 use crate::gpui_app::dashboard::SystemSection;
 use crate::gpui_app::system_view;
 use crate::gpui_app::theme::{tokens, ui_font_with_fallback, window_chrome_state};
+use crate::window_presentation::GpuiSurfaceRole;
 use gpui::{
     Animation, AnimationExt, Context, Div, InteractiveElement, IntoElement, MouseMoveEvent,
-    ParentElement, Render, Styled, Window, div, ease_in_out, px,
+    ParentElement, Render, Stateful, Styled, Window, div, ease_in_out, px,
 };
 use taskmanager_ui::{focus::restore_modal, layout::page_viewport};
 mod overlays;
@@ -177,9 +180,15 @@ impl Render for RootView {
         // `TestWindow` always reports Server, so the CSD branch is otherwise
         // unreachable headlessly); production leaves it `None` and reads the
         // live platform value.
-        let server_decorations = self
-            .decorations_override
-            .unwrap_or_else(|| matches!(window.window_decorations(), gpui::Decorations::Server));
+        let server_decorations = if self.surface_role == GpuiSurfaceRole::DesktopWidget {
+            // A layer-shell surface has no native titlebar/decorations. The
+            // widget paints its own rounded surface even when GPUI reports the
+            // standalone default decoration value.
+            false
+        } else {
+            self.decorations_override
+                .unwrap_or_else(|| matches!(window.window_decorations(), gpui::Decorations::Server))
+        };
         // The system frame owns the outer outline and corners when Server is
         // granted, so painting our own CSD rounding would be double decoration.
         // `window_corner_radius` stays the single source of per-corner radius;
@@ -188,6 +197,21 @@ impl Render for RootView {
         // to 0 for maximized/fullscreen/tiled states via `corner_enabled`).
         let corner_radius_factor = if server_decorations { 0.0 } else { 1.0 };
         let t = t.with_focus_visible(self.input_modality.shows_focus_ring());
+
+        if self.surface_role == GpuiSurfaceRole::DesktopWidget {
+            let snapshot = self.system_snapshot_rc().clone();
+            let root = render_widget_surface(
+                self,
+                &t,
+                &snapshot,
+                presentation.appearance.ui_size,
+                window,
+                cx,
+            );
+            let root = surfaces::compose_active_surface(self, root, &t, window, cx);
+            return transients::compose(self, root, &t, false, None, window, cx);
+        }
+
         // Push frame-level state (focus ring) into gpui-component's global
         // ActiveTheme. Theme-level color/font tokens are synced once per
         // change by the theme mutation paths (RootView::set_skin /
@@ -234,7 +258,20 @@ impl Render for RootView {
         let cursor_tooltip_active = tooltip_text.is_some();
 
         let viewport = window.viewport_size();
-        let layout = responsive::PageLayoutBudget::for_frame(viewport, self.nav_orientation);
+        // The root is the sole owner of frame geometry. Pages receive the
+        // post-chrome content slot rather than re-deriving capacity from the
+        // outer window, which keeps navigation, alerts, and page allocations
+        // coherent during resize.
+        let frame_budget = responsive::FrameBudget::for_root(
+            viewport,
+            self.nav_orientation,
+            responsive::FrameChromeBudget::new(
+                crate::gpui_app::chrome::titlebar_height(&t),
+                !server_decorations,
+                !self.active_alerts().is_empty(),
+            ),
+        );
+        let layout = frame_budget.page_layout();
         // CSD titlebar (drag + title + controls): rendered ONLY in the CSD
         // fallback. The nav strip below is app content and renders in BOTH modes.
         let titlebar: Option<Div> = if server_decorations {
@@ -269,7 +306,7 @@ impl Render for RootView {
                 telemetry: &telemetry,
                 hovered: hovered.as_ref(),
                 selected,
-                layout,
+                frame: frame_budget,
                 corner_radius_factor,
                 selected_pid: sel_pid,
             },
@@ -399,6 +436,44 @@ impl Render for RootView {
         let root = surfaces::compose_active_surface(self, root, &t, window, cx);
         transients::compose(self, root, &t, server_decorations, tooltip_text, window, cx)
     }
+}
+
+/// Build the widget-only root after the layer-shell configure has supplied its
+/// effective size. This branch is intentionally separate from the normal page
+/// shell so the standalone application still renders its titlebar, navigation,
+/// pages, dialogs, and existing responsive policy unchanged.
+fn render_widget_surface(
+    view: &mut RootView,
+    theme: &crate::gpui_app::theme::Theme,
+    snapshot: &SystemSnapshot,
+    ui_size: crate::gpui_app::theme::tokens::UiSize,
+    _window: &mut Window,
+    cx: &mut Context<RootView>,
+) -> Stateful<Div> {
+    div()
+        .id("root")
+        .size_full()
+        .bg(theme.window_bg)
+        .text_color(theme.fg)
+        .font(crate::gpui_app::theme::ui_font_with_fallback(theme))
+        .font_weight(crate::gpui_app::theme::tokens::FONT_WEIGHT_BODY.into())
+        .text_size(ui_size.body_font_size())
+        .flex()
+        .flex_col()
+        .capture_any_mouse_down(cx.listener(RootView::capture_input_modality_mouse_down))
+        .capture_key_down(cx.listener(RootView::capture_input_modality_key_down))
+        .on_modifiers_changed(cx.listener(RootView::handle_root_modifiers_changed))
+        .on_key_down(cx.listener(RootView::handle_root_key_down))
+        .rounded_tl(px(theme.window_corner_radius(WindowCorner::TopLeft)))
+        .rounded_tr(px(theme.window_corner_radius(WindowCorner::TopRight)))
+        .rounded_bl(px(theme.window_corner_radius(WindowCorner::BottomLeft)))
+        .rounded_br(px(theme.window_corner_radius(WindowCorner::BottomRight)))
+        .child(dashboard::render_widget(dashboard::DashboardWidgetProps {
+            theme,
+            snapshot,
+            process_count: view.processes().len(),
+            active_alert_count: view.active_alerts().len(),
+        }))
 }
 
 /// Build the inherited UI font with an explicit CJK fallback. GPUI's

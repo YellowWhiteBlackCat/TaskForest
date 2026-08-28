@@ -1,4 +1,4 @@
-//! Pure data-layer readout folds for the Dashboard page (ARCH.md §4.0): the
+//! Pure data-layer readout folds for the Dashboard page (ARCH.md §8.1): the
 //! typed observation read behind the summary cards lives here so the render
 //! module only paints the folded readout string.
 

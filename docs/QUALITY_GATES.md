@@ -85,6 +85,18 @@ job 才能创建或更新 GitHub Release，避免半成品发布。
 演示数据，并检查用户名、进程、网络、设备、路径和元数据。无真实目标环境时只能报告
 SKIP，不能把 fixture、编译或静态图片写成平台验证通过。
 
+捕获后端按能力分类，不得用一个后端的成功替代另一个后端的语义验证：
+
+- nested Niri 已建立 IPC socket，但在客户端映射后 `niri msg` 超时：标记为
+  `BLOCKED (compositor/backend)`。这不是产品 PASS，也不把 TaskForest 判为产品 FAIL；保留本地
+  证据，不更新 accepted screenshots，等待真实 compositor 或后端修复后重跑。
+- gamescope 可以作为单应用、固定输出尺寸的辅助像素捕获后端。只有真实应用 marker、PNG、
+  source manifest 和独立验证器全部通过时，结果才覆盖 standalone 渲染与弹性布局审查。
+- gamescope 即使广播 `zwlr_layer_shell_v1`，也不能单独证明 layer surface 已正确合成。anchor、
+  margin、exclusive zone、keyboard interactivity、output 选择、close/restart 和桌面窗口管理
+  仍必须在目标桌面 compositor 上验证；未建立专用、可复现的 layer-shell capture receipt 前，
+  gamescope 结果只能报告 `SKIP`，不能冒充 Layer-Shell PASS。
+
 ## 7. 验证器质量
 
 验证器必须自动发现范围、执行目标、检查结果和副作用，并在范围为空、解析失败或回执不完整

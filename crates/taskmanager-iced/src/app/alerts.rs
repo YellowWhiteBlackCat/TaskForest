@@ -145,7 +145,7 @@ impl IcedApp {
 }
 
 // ── Data Projection Models & Pure Functions ──────────────────────────────────
-// Pure data-layer fact folds live here (ARCH.md §4.0), separating observation
+// Pure data-layer fact folds live here (ARCH.md §8.1), separating observation
 // reads from the Iced widget tree in `ui/alerts.rs`.
 
 use taskmanager_application::SystemSnapshot;

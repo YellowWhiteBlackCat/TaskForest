@@ -1,9 +1,10 @@
 use gpui::{px, size};
 
 use super::{
-    DeviceNavigationPresentation, LayoutProfile, NavigationPresentation, PageLayoutBudget,
-    PerformanceChartInventory, PerformanceDetailsPresentation, PerformancePageBudget,
-    SystemPageBudget, SystemSurfacePresentation, VerticalSpace, layout_profile, parse_window_size,
+    DeviceNavigationPresentation, FrameBudget, FrameChromeBudget, LayoutProfile,
+    NavigationPresentation, PageLayoutBudget, PerformanceChartInventory,
+    PerformanceDetailsPresentation, PerformancePageBudget, SystemPageBudget,
+    SystemSurfacePresentation, VerticalSpace, layout_profile, parse_window_size,
     settings_content_max_height,
 };
 use crate::gpui_app::root::NavOrientation;
@@ -72,7 +73,11 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
 
     let vertical =
         PageLayoutBudget::for_frame(size(px(900.0), px(1200.0)), NavOrientation::Vertical);
-    assert_eq!(vertical.profile, LayoutProfile::Compact);
+    // The profile is now resolved against the post-rail, post-padding content
+    // slot. At this size the icon rail plus its outer inset leaves an 818px
+    // page canvas, which is intentionally UltraCompact even though the outer
+    // body is 834px wide.
+    assert_eq!(vertical.profile, LayoutProfile::UltraCompact);
     assert_eq!(vertical.navigation, NavigationPresentation::IconOnly);
     let vertical_standard =
         PageLayoutBudget::for_frame(size(px(1180.0), px(780.0)), NavOrientation::Vertical);
@@ -81,6 +86,89 @@ fn typed_layout_profiles_keep_horizontal_and_vertical_capacity_independent() {
         vertical_standard.navigation,
         NavigationPresentation::Labeled
     );
+}
+
+#[test]
+fn root_frame_budget_deducts_shell_before_page_policy() {
+    let frame = FrameBudget::for_root(
+        size(px(1180.0), px(780.0)),
+        NavOrientation::Horizontal,
+        FrameChromeBudget::new(36.0, false, false),
+    );
+    assert_eq!(frame.navigation, NavigationPresentation::Labeled);
+    assert_eq!(frame.body.width, px(1180.0));
+    assert_eq!(frame.body.height, px(730.0));
+    assert_eq!(frame.content.size.width, px(1148.0));
+    assert_eq!(frame.content.size.height, px(698.0));
+    assert_eq!(frame.content.profile, LayoutProfile::Standard);
+    assert_eq!(frame.content.vertical_space, VerticalSpace::Standard);
+
+    let vertical = FrameBudget::for_root(
+        size(px(1180.0), px(780.0)),
+        NavOrientation::Vertical,
+        FrameChromeBudget::new(36.0, false, false),
+    );
+    assert_eq!(vertical.navigation, NavigationPresentation::Labeled);
+    assert_eq!(vertical.navigation_width, 156.0);
+    assert_eq!(vertical.body.width, px(1024.0));
+    assert_eq!(vertical.content.size.width, px(1000.0));
+
+    let with_csd_and_alert = FrameBudget::for_root(
+        size(px(1180.0), px(780.0)),
+        NavOrientation::Horizontal,
+        FrameChromeBudget::new(36.0, true, true),
+    );
+    assert_eq!(with_csd_and_alert.body.height, px(662.0));
+    assert_eq!(with_csd_and_alert.content.size.height, px(630.0));
+    assert_eq!(
+        with_csd_and_alert.content.vertical_space,
+        VerticalSpace::Constrained
+    );
+}
+
+#[test]
+fn performance_slots_reflow_as_a_unit_instead_of_starving_the_main_view() {
+    let medium = FrameBudget::for_root(
+        size(px(900.0), px(780.0)),
+        NavOrientation::Horizontal,
+        FrameChromeBudget::new(36.0, false, false),
+    );
+    let medium_perf = PerformancePageBudget::from_frame(medium, true, 320.0);
+    assert_eq!(
+        medium_perf.device_navigation,
+        DeviceNavigationPresentation::Sidebar
+    );
+    assert_eq!(medium_perf.details, PerformanceDetailsPresentation::Pinned);
+    assert!(medium_perf.sidebar_width < 320.0);
+    assert!(medium_perf.main_width >= super::PERFORMANCE_MAIN_MIN_WIDTH);
+
+    let tight = FrameBudget::for_root(
+        size(px(560.0), px(780.0)),
+        NavOrientation::Horizontal,
+        FrameChromeBudget::new(36.0, false, false),
+    );
+    let tight_perf = PerformancePageBudget::from_frame(tight, true, 260.0);
+    assert_eq!(
+        tight_perf.device_navigation,
+        DeviceNavigationPresentation::Strip
+    );
+    assert_eq!(tight_perf.details, PerformanceDetailsPresentation::Stacked);
+    assert_eq!(tight_perf.sidebar_width, 0.0);
+    assert!(tight_perf.main_width >= super::PERFORMANCE_MAIN_MIN_WIDTH);
+
+    let hidden_sidebar = PerformancePageBudget::from_frame(medium, false, 320.0);
+    assert_eq!(
+        hidden_sidebar.device_navigation,
+        DeviceNavigationPresentation::Strip
+    );
+    assert_eq!(hidden_sidebar.sidebar_width, 0.0);
+    assert_eq!(
+        hidden_sidebar.details,
+        PerformanceDetailsPresentation::Pinned
+    );
+
+    let invalid_preference = PerformancePageBudget::from_frame(medium, true, f32::NAN);
+    assert!(invalid_preference.sidebar_width.is_finite());
 }
 
 #[test]

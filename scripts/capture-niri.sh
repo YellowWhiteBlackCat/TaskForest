@@ -31,6 +31,10 @@ APP="$REPO/target/debug/taskforest-g"
 APP_ID="io.github.YellowWhiteBlackCat.TaskForestG"
 HOST_XDG="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 HOST_DISPLAY="$HOST_XDG/${WAYLAND_DISPLAY:-wayland-0}"
+# The nested winit backend is sensitive to host GPU/frame pacing while a client
+# maps. Keep capture deterministic and isolate that variable by default. Set
+# TM_CAPTURE_LIBGL_ALWAYS_SOFTWARE=0 only for an explicit hardware-driver probe.
+CAPTURE_LIBGL_ALWAYS_SOFTWARE="${TM_CAPTURE_LIBGL_ALWAYS_SOFTWARE:-1}"
 OUT="$REPO/target/screenshot-evidence/latest"
 CANONICAL_MATRIX="$REPO/scripts/capture_scenarios.tsv"
 MATRIX="$CANONICAL_MATRIX"
@@ -178,6 +182,7 @@ BINARY_SHA256="$(sha256sum "$APP" | cut -d' ' -f1)"
   printf 'publish=%s\n' "$([ "$PUBLISH_CAPTURE" -eq 1 ] && printf full-matrix || printf targeted)"
   printf 'source_scope=gpui\n'
   printf 'source_manifest_sha256=%s\n' "$SOURCE_MANIFEST_SHA256"
+  printf 'libgl_always_software=%s\n' "$CAPTURE_LIBGL_ALWAYS_SOFTWARE"
   printf 'niri_outputs=target/screenshot-evidence/%s/niri-outputs.json\n' "$RUN_ID"
   printf 'window_receipts=target/screenshot-evidence/%s/capture-window-receipts.tsv\n' "$RUN_ID"
   printf 'command=bash scripts/capture-niri.sh\n'
@@ -203,9 +208,15 @@ timeout 10s niri validate --config "$CONF" || {
   exit 1
 }
 
-XDG_RUNTIME_DIR="$NIRI_RUNTIME" WAYLAND_DISPLAY="$HOST_DISPLAY" \
+XDG_RUNTIME_DIR="$NIRI_RUNTIME" WAYLAND_DISPLAY="$HOST_DISPLAY" DISPLAY= \
+  LIBGL_ALWAYS_SOFTWARE="$CAPTURE_LIBGL_ALWAYS_SOFTWARE" \
   setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" &>"$RUN_DIR/niri.log" & NIRI_PID=$!
-NIRI_PGID="$(process_group "$NIRI_PID")"
+NIRI_PGID=""
+for i in $(seq 1 40); do
+  NIRI_PGID="$(process_group "$NIRI_PID")"
+  [ "$NIRI_PGID" = "$NIRI_PID" ] && break
+  sleep 0.1
+done
 if [ "$NIRI_PGID" != "$NIRI_PID" ]; then
   printf 'nested Niri did not obtain a private process group; evidence retained at %s\n' "$RUN_DIR" >&2
   exit 1
@@ -333,6 +344,7 @@ PY
 
 # capture <name> <skin> <page> <device> <settings> <scenario> <window-size> <capture-size>
 FAILURES=0
+BLOCKED_CAPTURES=0
 capture() {
   local name="$1" skin="$2" page="$3" device="$4" settings="$5" scenario="$6" window_size="$7" capture_size="$8"
   local log="$RUN_DIR/app-$name.log"
@@ -371,7 +383,8 @@ capture() {
   esac
   local launch_attempt
   for launch_attempt in 1 2 3; do
-    XDG_RUNTIME_DIR="$NIRI_RUNTIME" XDG_CONFIG_HOME="$config_home" WAYLAND_DISPLAY="$SOCK" \
+    XDG_RUNTIME_DIR="$NIRI_RUNTIME" XDG_CONFIG_HOME="$config_home" WAYLAND_DISPLAY="$SOCK" DISPLAY= \
+      LIBGL_ALWAYS_SOFTWARE="$CAPTURE_LIBGL_ALWAYS_SOFTWARE" \
       TM_SKIN="$skin" TM_PAGE="$page" TM_DEVICE="$device" \
       TM_SKIN_HC="" TM_SETTINGS="$settings" \
       TM_CAPTURE_EVIDENCE=1 TM_CAPTURE_SCENARIO="$scenario" \
@@ -462,10 +475,23 @@ capture() {
     window_ready=missing
   fi
 
+  # Keep an unavailable compositor distinct from an application failure. The
+  # initial output probe succeeded before launch; if the same IPC endpoint is
+  # no longer able to answer after the client mapped, this run is blocked by
+  # the nested compositor/backend and must not be reported as a product FAIL.
+  local capture_class=product-or-app
+  local niri_health_json="$RUN_DIR/niri-health-$name.json"
+  local niri_health_error="$RUN_DIR/niri-health-$name.err"
+  if ! NIRI_SOCKET="$IPC" timeout 1s niri msg -j outputs \
+    >"$niri_health_json" 2>"$niri_health_error"; then
+    capture_class=compositor/backend
+  fi
+
   local action=failed
   {
     printf 'app_pid=%s\n' "$APP_PID"
     printf 'window_id=%s\n' "$window_id"
+    printf 'capture_class=%s\n' "$capture_class"
     printf 'command=niri msg action screenshot-window --id %s --write-to-disk true --path %s\n' "$window_id" "$shot"
   } >"$action_log"
   if [ "$markers" = ready ] && [ "$window_ready" = ready ] && kill -0 "$APP_PID" 2>/dev/null; then
@@ -496,7 +522,12 @@ capture() {
     fi
   fi
   if [ "$status" != ok ]; then
-    echo "  FAIL $name (markers=$markers window=$window_ready id=$window_id action=$action expected=${expected_width}x${expected_height}; see $log)"
+    if [ "$capture_class" = compositor/backend ]; then
+      echo "  BLOCKED $name (compositor/backend: nested Niri IPC stopped responding after client mapping; markers=$markers window=$window_ready id=$window_id action=$action expected=${expected_width}x${expected_height}; see $log)"
+      BLOCKED_CAPTURES=$((BLOCKED_CAPTURES + 1))
+    else
+      echo "  FAIL $name (product/app: markers=$markers window=$window_ready id=$window_id action=$action expected=${expected_width}x${expected_height}; see $log)"
+    fi
     FAILURES=$((FAILURES + 1))
     rm -f "$f" 2>/dev/null
   fi
@@ -540,6 +571,9 @@ if [ "$PUBLISH_CAPTURE" -eq 1 ] && [ "$EXPECTED_COUNT" -ne "$CANONICAL_COUNT" ];
 fi
 
 if [ "$FAILURES" -ne 0 ]; then
+  if [ "$BLOCKED_CAPTURES" -ne 0 ]; then
+    printf 'BLOCKED: %s capture(s) unavailable because the nested compositor/backend stopped answering; accepted screenshots were not replaced.\n' "$BLOCKED_CAPTURES"
+  fi
   printf 'FAILED: %s capture(s); accepted screenshots were not replaced. Evidence: %s\n' "$FAILURES" "$RUN_DIR"
   exit 1
 fi
@@ -594,5 +628,7 @@ fi
 
 echo "DONE: accepted $EXPECTED_COUNT/$EXPECTED_COUNT; durable manifest -> $OUT/capture-manifest.tsv"
 echo "Full logs and worktree evidence -> $RUN_DIR"
-ls -la "$OUT"/*.png "$OUT"/capture-manifest.tsv "$OUT"/capture-metadata.txt \
-  "$OUT"/capture-markers.log "$OUT"/capture-validation.json 2>/dev/null
+if [ "$PUBLISH_CAPTURE" -eq 1 ]; then
+  ls -la "$OUT"/*.png "$OUT"/capture-manifest.tsv "$OUT"/capture-metadata.txt \
+    "$OUT"/capture-markers.log "$OUT"/capture-validation.json 2>/dev/null
+fi

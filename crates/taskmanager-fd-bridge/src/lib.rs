@@ -2,9 +2,10 @@
 //! `unsafe` trust root (ADR-025), the safe-Rust seam for passing a file
 //! descriptor between processes over a Unix domain socket.
 //!
-//! This is ONE of THREE places in the product tree allowed to contain `unsafe`
-//! (the others being `taskmanager-perf-ioctl`, ADR-022, and
-//! `taskmanager-afpacket`, ADR-024). It is the OS ABI seam for `sendmsg`/
+//! This is ONE of FOUR places in the product tree allowed to contain `unsafe`
+//! (the others being `taskmanager-perf-ioctl`, ADR-022,
+//! `taskmanager-afpacket`, ADR-024, and `taskmanager-windows-api`, ADR-031).
+//! It is the OS ABI seam for `sendmsg`/
 //! `recvmsg` with `SCM_RIGHTS` ancillary data — the only portable way to
 //! transfer an open file descriptor from one process to another on Linux. The
 //! CAP_NET_RAW launcher uses it to hand an `AF_PACKET` socket fd (which it
@@ -264,16 +265,13 @@ pub fn recv_fd(channel: &impl AsFd) -> io::Result<OwnedFd> {
     }
     // Walk the control messages for the SCM_RIGHTS fds. Bounded: AF_PACKET
     // passes exactly one fd; anything else is a protocol violation handled
-    // below.
+    // below. Always materialize the visible fd list before checking
+    // MSG_CTRUNC so the truncation path also closes every descriptor that the
+    // kernel exposed in the received control slab, including the no-visible-fd
+    // case.
     // SAFETY: `msg` is the kernel-filled msghdr from recvmsg; the walk inside
     // stays within the cmsghdr-aligned `cmsg_buf` slab (see find_scm_rights).
-    let recovered = find_scm_rights(&cmsg_buf, msg.msg_controllen);
-    let Some(mut fds) = recovered else {
-        return Err(io::Error::new(
-            io::ErrorKind::InvalidData,
-            "no SCM_RIGHTS file descriptor in the received message",
-        ));
-    };
+    let mut fds = find_scm_rights(&cmsg_buf, msg.msg_controllen).unwrap_or_default();
     if (msg.msg_flags & libc::MSG_CTRUNC) != 0 {
         // The kernel installed the fds that fit before truncating; close them
         // so the violation leaves no residue.
@@ -281,6 +279,12 @@ pub fn recv_fd(channel: &impl AsFd) -> io::Result<OwnedFd> {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             "control data truncated: the peer sent more ancillary data than the one-fd protocol carries",
+        ));
+    }
+    if fds.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "no SCM_RIGHTS file descriptor in the received message",
         ));
     }
     if fds.len() != 1 {
@@ -377,7 +381,11 @@ fn find_scm_rights<const N: usize>(
                     break;
                 }
                 let header_len = libc::CMSG_LEN(0) as usize;
-                let count = (cmsg_len - header_len) / std::mem::size_of::<libc::c_int>();
+                let payload_len = cmsg_len - header_len;
+                if !payload_len.is_multiple_of(std::mem::size_of::<libc::c_int>()) {
+                    break;
+                }
+                let count = payload_len / std::mem::size_of::<libc::c_int>();
                 let payload: *mut u8 = libc::CMSG_DATA(cmsg);
                 for index in 0..count {
                     let mut raw: libc::c_int = 0;

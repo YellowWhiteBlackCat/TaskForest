@@ -23,7 +23,7 @@ use crate::TuiTheme;
 /// The actions offered by the batch menu, in display order. Each applies to
 /// the whole marked set; End / Kill are gated behind the confirmation, the
 /// rest submit directly. The priority picker offers the same typed tier set
-/// as GPUI's action bar and Iced's pick_list (§4.0 语义平价律).
+/// as GPUI's action bar and Iced's pick_list (§8.1 语义平价律).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum BatchMenuAction {
     End,
@@ -62,7 +62,7 @@ pub fn priority_tier(action: BatchMenuAction) -> Option<PriorityTier> {
 
 /// Localized label for one batch-menu action. The priority tiers route
 /// through the shell's single tier→label fold
-/// (`presentation::priority_tier_label`, §4.0 同一律).
+/// (`presentation::priority_tier_label`, §8.1 同一律).
 pub fn action_label(action: BatchMenuAction) -> &'static str {
     match action {
         BatchMenuAction::End => t("proc.end_task"),

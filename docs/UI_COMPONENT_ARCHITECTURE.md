@@ -51,12 +51,16 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
 
 ## GPUI 弹性布局合同
 
-- 页面只消费 viewport-derived `PageLayoutBudget`，不在每个页面重复判断窗口宽高；横向
+- root 先消费窗口、装饰、告警和导航方向，生成一次 `FrameBudget`；它扣除实际 shell chrome
+  后生成 `ContentBudget`，页面只消费这个内容槽位，不在每个页面重复判断窗口宽高。横向
   `LayoutProfile` 固定区分 ultra-compact、compact、standard 和 wide，垂直空间是独立 typed axis，
   因此超宽矮窗仍可合并横向 chrome，同时折叠吃高度的次级内容。
-- 全局 budget 只拥有 profile、vertical space、padding 与 navigation；Performance、Apps、Startup、
-  System 各自在页面边界恰好一次映射为 exhaustive page presentation，primitive 不再接受
+- `PageLayoutBudget` 是从 `ContentBudget` 导出的兼容页面投影；Performance、Apps、Startup、System
+  各自在页面边界恰好一次映射为 exhaustive page presentation，primitive 不再接受
   `compact`/`fill` 等响应式 bool，也不能重新读取 viewport 像素。
+- Performance 的设备导航、主视图和统计栏由同一份页面槽位预算分配：不足以容纳三列时，设备栏
+  自动变为横向 strip；统计栏下沉为 stacked 或在极限空间隐藏，主视图始终保留可读最小宽度。
+  持久化侧栏宽度只是偏好，当前帧会在槽位上限内临时收缩，不会污染独立 App 的窗口状态。
 - 自适应网格必须以内容最小可读宽度为约束，允许换行但禁止压缩文字、图表和操作控件到不可见；`flex_1` 的兄弟必须显式
   `min_w(0)` / `min_h(0)`，滚动内容必须保留真实 intrinsic extent。
 - 页面自身拥有 pinned trailing rail 时，`PageFrame` 的外层 trailing inset 必须归零；可点击的

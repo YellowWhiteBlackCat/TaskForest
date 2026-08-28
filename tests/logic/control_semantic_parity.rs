@@ -1,6 +1,6 @@
 //! source-inspection: static-policy
 //!
-//! Control-semantic parity gate (ARCH.md §4.0 语义平价律, 2026-08-19).
+//! Control-semantic parity gate (ARCH.md §8.1 语义平价律, 2026-08-19).
 //!
 //! [`super::control_vocabulary_boundary`] pins the NEGATIVE side of the
 //! control vocabulary (no raw nice payloads, no POSIX stop/continue signal
@@ -105,7 +105,7 @@ fn tier_offer(code: &str) -> Vec<&'static str> {
         .collect()
 }
 
-/// Tier parity (§4.0 语义平价律): each frontend's priority surface offers
+/// Tier parity (§8.1 语义平价律): each frontend's priority surface offers
 /// EXACTLY the neutral `PriorityTier` set {High, Normal, Low} — a frontend
 /// that drops a tier or invents one makes the same control command mean
 /// different things per frontend, which is a parity bug, not a style choice.
@@ -119,7 +119,7 @@ fn all_three_frontends_offer_exactly_the_high_normal_low_priority_tiers() {
         assert_eq!(
             offered, TIERS,
             "{frontend} priority offer drifted: found {offered:?} in {rel_path}, expected \
-             exactly [High, Normal, Low] (ARCH.md §4.0 语义平价律: the three frontends must \
+             exactly [High, Normal, Low] (ARCH.md §8.1 语义平价律: the three frontends must \
              offer the same tier set; a missing tier is a dropped capability, an extra tier \
              is a private vocabulary)."
         );
@@ -172,7 +172,7 @@ fn all_three_frontends_offer_exactly_the_high_normal_low_priority_tiers() {
     }
 }
 
-/// Suspend/resume parity (§4.0 语义完备律 + 语义平价律): every frontend
+/// Suspend/resume parity (§8.1 语义完备律 + 语义平价律): every frontend
 /// expresses the suspend CONCEPT through the neutral vocabulary — GPUI's
 /// direct track composes `ProcessControlRequest::Suspend/Resume`, TUI/Iced
 /// submit `ProcessBatchAction::Suspend/Resume` through the shell batch
@@ -203,7 +203,7 @@ fn suspend_resume_reach_every_adapter_through_the_neutral_vocabulary() {
                 gpui[start..arm_end].contains(&format!("ProcessControlRequest::{concept}")),
                 "GPUI menu_control_submission maps {concept} to something other than \
                  ProcessControlRequest::{concept} in {GPUI_MENU_SUBMISSION} — the neutral \
-                 request is the only legal spelling of the concept (§4.0 语义完备律)."
+                 request is the only legal spelling of the concept (§8.1 语义完备律)."
             );
             arms += 1;
             head = start + arm.len();
@@ -226,13 +226,13 @@ fn suspend_resume_reach_every_adapter_through_the_neutral_vocabulary() {
                 )),
                 "{frontend} process menu stopped submitting \
                  ProcessBatchAction::{concept} in {rel_path} — the neutral batch action is \
-                 the only legal spelling of the concept on the shell track (§4.0)."
+                 the only legal spelling of the concept on the shell track (§8.1)."
             );
         }
     }
 }
 
-/// Label-fold parity (§4.0 同一律): exactly ONE tier→label fold exists —
+/// Label-fold parity (§8.1 同一律): exactly ONE tier→label fold exists —
 /// `taskmanager_shell::presentation::priority_tier_label`, routing through
 /// `tier.i18n_key()`. Every frontend that labels tiers must read that fold
 /// (directly or via `tier.i18n_key()`), and any local
@@ -246,7 +246,7 @@ fn the_priority_tier_label_fold_is_single_sourced_and_read_by_every_frontend() {
     let Some(fold_at) = shell.find("pub fn priority_tier_label") else {
         panic!(
             "the single priority tier label fold disappeared from {SHELL_PRESENTATION} — \
-             it must live in the shell presentation layer (§4.0 同一律)"
+             it must live in the shell presentation layer (§8.1 同一律)"
         );
     };
     let fold_end = (fold_at + 400).min(shell.len());
@@ -305,7 +305,7 @@ fn the_priority_tier_label_fold_is_single_sourced_and_read_by_every_frontend() {
             referencing_files > 0,
             "{scan_root} never references the shared tier label fold \
              (presentation::priority_tier_label or tier.i18n_key()) — a frontend that \
-             labels tiers must read the single fold (§4.0 同一律)"
+             labels tiers must read the single fold (§8.1 同一律)"
         );
         assert!(
             offenders.is_empty(),

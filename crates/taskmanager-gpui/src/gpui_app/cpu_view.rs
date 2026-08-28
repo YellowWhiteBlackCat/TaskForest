@@ -1,7 +1,6 @@
 //! CPU performance view: one dominant aggregate utilization graph above an
 //! elastic per-core matrix, plus the shared pinned details surface.
 
-mod aggregate;
 mod details_panel;
 mod per_core;
 mod per_core_grid;
@@ -13,17 +12,15 @@ mod stats;
 // CPU-page-internal until a second surface genuinely shares its formats.
 pub(super) use details_panel::{heterogeneous_core_rows, sockets_row};
 
-use gpui::{Div, InteractiveElement, ParentElement, ScrollHandle, Styled, div, px};
+use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div};
 use taskmanager_telemetry_store::TelemetryStore;
 
 use crate::core::hardware::HardwareInfo;
 use crate::core::metrics::{CpuFrequencySource, CpuMetrics, CpuTemperatureSource, SystemSnapshot};
-use crate::gpui_app::elements;
-use crate::gpui_app::formatting;
-use crate::gpui_app::graph::{GraphHover, GraphSettings, graph_hover};
-use crate::gpui_app::root::responsive::{
-    PerformanceChartInventory, PerformanceDetailsPresentation, PerformancePageBudget,
-};
+use crate::gpui_app::formatting::{self, GraphUnit};
+use crate::gpui_app::graph::GraphHover;
+use crate::gpui_app::perf_views::{ChartSpec, HeadlineSurface, PerfPageProps, perf_page};
+use crate::gpui_app::root::responsive::{PerformanceChartInventory, PerformancePageBudget};
 use crate::gpui_app::theme::Theme;
 use crate::gpui_app::theme::tokens;
 use crate::i18n;
@@ -100,12 +97,12 @@ fn cpu_temperature_readout_for_source(
 /// per-window cache state mutated during render, not a read-only input.
 pub(crate) struct CpuViewProps<'a> {
     pub theme: &'a Theme,
-    pub stats_scroll: ScrollHandle,
+    pub stats_scroll: gpui::ScrollHandle,
     pub snap: &'a SystemSnapshot,
     pub telemetry: &'a TelemetryStore,
     pub hardware: &'a HardwareInfo,
     pub hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
-    pub graph_settings: GraphSettings,
+    pub graph_settings: crate::gpui_app::graph::GraphSettings,
     pub layout: PerformancePageBudget,
 }
 
@@ -125,74 +122,124 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
     let chart_layout = CpuChartLayout::for_inventory(layout.chart_inventory);
     let aggregate_series = core_history.aggregate(telemetry);
     let core_series = core_history.refresh(telemetry);
-    let mut left = div()
-        .debug_selector(|| "tm-cpu-chart-surface".to_string())
-        .flex()
-        .flex_col()
-        .gap(tokens::SPACE_10)
-        .flex_1()
-        .min_w(px(0.0))
-        .min_h(px(0.0))
-        .w_full()
-        // Performance's outer trailing inset is intentionally zero because
-        // the details rail reaches the page edge. The chart column owns this
-        // internal inset so graph ink never touches the divider.
-        .pr(px(layout.main_trailing_inset))
-        .child(header(theme, cpu))
-        .child(aggregate::render(aggregate::AggregateGraphsProps {
-            theme,
-            stats: &stats,
-            series: aggregate_series,
-            hover_slot,
-            graph_settings,
-            layout: chart_layout,
-        }));
-    left = match chart_layout {
-        CpuChartLayout::AggregateOnly => left,
-        CpuChartLayout::AggregateWithPerCore => left.child(per_core_grid::render(
-            theme,
-            &stats,
-            hardware,
-            &core_series,
-            graph_settings,
-        )),
-    };
-    if let Some((position, text)) = graph_hover(hover_slot) {
-        left = left.child(elements::tooltip_overlay(theme, &text, position));
-    }
-    match layout.details {
-        PerformanceDetailsPresentation::Hidden => left,
-        PerformanceDetailsPresentation::Pinned => crate::gpui_app::perf_views::performance_split(
-            theme,
-            left,
-            details_panel::render_pinned(theme, snap, hardware, &stats.details),
-            stats_scroll,
+    // The per-core matrix is the Full-inventory companion; an aggregate-only
+    // budget keeps one readable headline chart.
+    let below = match chart_layout {
+        CpuChartLayout::AggregateOnly => None,
+        CpuChartLayout::AggregateWithPerCore => Some(
+            per_core_grid::render(theme, &stats, hardware, &core_series, graph_settings)
+                .into_any_element(),
         ),
-    }
+    };
+    perf_page(PerfPageProps {
+        theme,
+        stats_scroll,
+        title: i18n::t("common.cpu").to_owned(),
+        subtitle: cpu_brand(cpu),
+        header_extra: Some(readout_band(theme, &stats).into_any_element()),
+        headline: HeadlineSurface::Charts(vec![ChartSpec::headline(
+            "cpu-headline-graph",
+            "cpu-headline-graph",
+            aggregate_series.usage,
+            theme.cpu,
+            GraphUnit::Percent,
+        )]),
+        below,
+        stats: details_panel::render_pinned(theme, snap, hardware, &stats.details),
+        stats_footer: None,
+        hover_slot,
+        graph_settings,
+        budget: layout,
+    })
 }
 
-fn header(theme: &Theme, cpu: &CpuMetrics) -> Div {
-    let brand = cpu
-        .brand
+fn cpu_brand(cpu: &CpuMetrics) -> String {
+    cpu.brand
         .as_deref()
         .map(str::trim)
         .filter(|brand| !brand.is_empty())
-        .map_or_else(formatting::missing_value, str::to_string);
-    let subtitle_key = "cpu.utilization_over_60s";
+        .map_or_else(formatting::missing_value, str::to_string)
+}
+
+/// The header band under the title row: the window qualifier caption plus
+/// the always-visible big-number readouts (utilization, frequency,
+/// temperature, power).
+fn readout_band(theme: &Theme, stats: &CpuLiveStats) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_2)
-        .child(crate::gpui_app::perf_views::performance_title_row(
-            theme,
-            i18n::t("common.cpu").to_owned(),
-            brand,
-        ))
+        .gap(tokens::SPACE_10)
         .child(
             div()
                 .text_size(tokens::FONT_12)
                 .text_color(theme.fg_dim)
-                .child(i18n::t(subtitle_key)),
+                .child(i18n::t("cpu.utilization_over_60s")),
+        )
+        .child(readouts(theme, stats))
+}
+
+fn readouts(theme: &Theme, stats: &CpuLiveStats) -> Div {
+    let mut strip = div()
+        .debug_selector(|| "tm-cpu-readouts".to_string())
+        .flex()
+        .flex_wrap()
+        .items_baseline()
+        .gap(tokens::SPACE_16)
+        .child(readout(
+            theme,
+            i18n::t("common.utilization"),
+            stats.utilization_readout.clone(),
+            true,
+        ));
+    if let Some(frequency) = &stats.frequency_readout {
+        strip = strip.child(readout(
+            theme,
+            i18n::t("cpu.frequency"),
+            frequency.clone(),
+            false,
+        ));
+    }
+    if let Some(temperature) = &stats.temperature_readout {
+        strip = strip.child(readout(
+            theme,
+            i18n::t("common.temperature"),
+            temperature.clone(),
+            false,
+        ));
+    }
+    if let Some(power) = &stats.power_readout {
+        strip = strip.child(readout(
+            theme,
+            i18n::t("common.power"),
+            power.clone(),
+            false,
+        ));
+    }
+    strip
+}
+
+fn readout(theme: &Theme, label: &str, value: String, primary: bool) -> Div {
+    div()
+        .flex()
+        .items_baseline()
+        .gap(tokens::SPACE_6)
+        .child(
+            div()
+                .text_size(tokens::FONT_13)
+                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
+                .text_color(if primary { theme.fg } else { theme.fg_dim })
+                .child(label.to_owned()),
+        )
+        .child(
+            div()
+                .text_size(if primary {
+                    tokens::FONT_20
+                } else {
+                    tokens::FONT_18
+                })
+                .font_weight(tokens::FONT_WEIGHT_EXTRA_BOLD.into())
+                .text_color(theme.fg)
+                .child(value),
         )
 }
 

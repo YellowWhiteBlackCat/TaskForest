@@ -1,4 +1,4 @@
-//! Pure data-layer folds for the System Health page (ARCH.md §4.0): the typed
+//! Pure data-layer folds for the System Health page (ARCH.md §8.1): the typed
 //! observation reads (sensor measurement values, per-filesystem capacity)
 //! live here so the render module only paints folded strings.
 

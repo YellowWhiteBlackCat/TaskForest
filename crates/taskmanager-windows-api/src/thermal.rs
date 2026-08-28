@@ -2,6 +2,8 @@
 
 use crate::WindowsApiError;
 
+const MAX_WMI_OBJECTS: usize = 256;
+
 /// An ACPI thermal zone temperature reading in Celsius.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WindowsThermalZoneReading {
@@ -118,7 +120,7 @@ fn query_wmi_thermal(
         CoSetProxyBlanket, EOLE_AUTHENTICATION_CAPABILITIES, RPC_C_AUTHN_LEVEL_CALL,
         RPC_C_IMP_LEVEL_IMPERSONATE,
     };
-    use windows::Win32::System::Variant::{VARIANT, VariantClear};
+    use windows::Win32::System::Variant::{VARIANT, VT_BSTR, VT_I4, VariantClear};
     use windows::Win32::System::Wmi::{
         WBEM_FLAG_FORWARD_ONLY, WBEM_FLAG_RETURN_IMMEDIATELY, WBEM_GENERIC_FLAG_TYPE,
     };
@@ -168,10 +170,25 @@ fn query_wmi_thermal(
     let mut results = Vec::new();
     let mut objects = [const { None }; 8];
     let mut returned = 0u32;
+    let mut seen_objects = 0usize;
 
     // SAFETY: Next retrieves thermal zone objects into the array.
-    while unsafe { enumerator.Next(1000, &mut objects, &mut returned) }.is_ok() && returned > 0 {
-        for obj_opt in &mut objects[..returned as usize] {
+    loop {
+        // SAFETY: the enumerator is a live COM interface and `objects` plus
+        // `returned` are writable outputs sized for eight VARIANT pointers.
+        let status = unsafe { enumerator.Next(1000, &mut objects, &mut returned) };
+        if status.is_err() {
+            return Err(WindowsApiError::QueryFailed);
+        }
+        let returned = usize::try_from(returned).map_err(|_| WindowsApiError::ResourceLimit)?;
+        if returned == 0 {
+            break;
+        }
+        if returned > objects.len() || seen_objects > MAX_WMI_OBJECTS.saturating_sub(returned) {
+            return Err(WindowsApiError::ResourceLimit);
+        }
+        seen_objects += returned;
+        for obj_opt in &mut objects[..returned] {
             let Some(obj) = obj_opt.take() else { continue };
 
             let mut temp_val = VARIANT::default();
@@ -181,9 +198,13 @@ fn query_wmi_thermal(
             let temp_k = unsafe {
                 let name = BSTR::from(temp_prop);
                 if obj.Get(&name, 0, &mut temp_val, None, None).is_ok() {
-                    let k = temp_val.Anonymous.Anonymous.Anonymous.lVal;
+                    let k = if temp_val.Anonymous.Anonymous.vt == VT_I4 {
+                        Some(temp_val.Anonymous.Anonymous.Anonymous.lVal)
+                    } else {
+                        None
+                    };
                     let _ = VariantClear(&mut temp_val);
-                    k
+                    k.unwrap_or_default()
                 } else {
                     0
                 }
@@ -193,9 +214,13 @@ fn query_wmi_thermal(
             let name_str = unsafe {
                 let name = BSTR::from(name_prop);
                 if obj.Get(&name, 0, &mut name_val, None, None).is_ok() {
-                    let bstr = &name_val.Anonymous.Anonymous.Anonymous.bstrVal;
-                    let s = if !bstr.is_empty() {
-                        bstr.to_string()
+                    let s = if name_val.Anonymous.Anonymous.vt == VT_BSTR {
+                        let bstr = &name_val.Anonymous.Anonymous.Anonymous.bstrVal;
+                        if !bstr.is_empty() {
+                            bstr.to_string()
+                        } else {
+                            "Thermal Zone".to_string()
+                        }
                     } else {
                         "Thermal Zone".to_string()
                     };
@@ -240,7 +265,7 @@ fn query_lhm_thermal(
         CoSetProxyBlanket, EOLE_AUTHENTICATION_CAPABILITIES, RPC_C_AUTHN_LEVEL_CALL,
         RPC_C_IMP_LEVEL_IMPERSONATE,
     };
-    use windows::Win32::System::Variant::{VARIANT, VariantClear};
+    use windows::Win32::System::Variant::{VARIANT, VT_BSTR, VT_I4, VT_R4, VT_R8, VariantClear};
     use windows::Win32::System::Wmi::{
         WBEM_FLAG_FORWARD_ONLY, WBEM_FLAG_RETURN_IMMEDIATELY, WBEM_GENERIC_FLAG_TYPE,
     };
@@ -290,10 +315,25 @@ fn query_lhm_thermal(
     let mut results = Vec::new();
     let mut objects = [const { None }; 8];
     let mut returned = 0u32;
+    let mut seen_objects = 0usize;
 
     // SAFETY: Next retrieves sensor objects.
-    while unsafe { enumerator.Next(1000, &mut objects, &mut returned) }.is_ok() && returned > 0 {
-        for obj_opt in &mut objects[..returned as usize] {
+    loop {
+        // SAFETY: the enumerator is a live COM interface and `objects` plus
+        // `returned` are writable outputs sized for eight VARIANT pointers.
+        let status = unsafe { enumerator.Next(1000, &mut objects, &mut returned) };
+        if status.is_err() {
+            return Err(WindowsApiError::QueryFailed);
+        }
+        let returned = usize::try_from(returned).map_err(|_| WindowsApiError::ResourceLimit)?;
+        if returned == 0 {
+            break;
+        }
+        if returned > objects.len() || seen_objects > MAX_WMI_OBJECTS.saturating_sub(returned) {
+            return Err(WindowsApiError::ResourceLimit);
+        }
+        seen_objects += returned;
+        for obj_opt in &mut objects[..returned] {
             let Some(obj) = obj_opt.take() else { continue };
 
             let mut val_var = VARIANT::default();
@@ -303,7 +343,12 @@ fn query_lhm_thermal(
             let val_f32 = unsafe {
                 let name = BSTR::from("Value");
                 if obj.Get(&name, 0, &mut val_var, None, None).is_ok() {
-                    let v = val_var.Anonymous.Anonymous.Anonymous.fltVal;
+                    let v = match val_var.Anonymous.Anonymous.vt {
+                        VT_R4 => val_var.Anonymous.Anonymous.Anonymous.fltVal,
+                        VT_R8 => val_var.Anonymous.Anonymous.Anonymous.dblVal as f32,
+                        VT_I4 => val_var.Anonymous.Anonymous.Anonymous.lVal as f32,
+                        _ => 0.0,
+                    };
                     let _ = VariantClear(&mut val_var);
                     v
                 } else {
@@ -315,9 +360,13 @@ fn query_lhm_thermal(
             let name_str = unsafe {
                 let name = BSTR::from("Name");
                 if obj.Get(&name, 0, &mut name_var, None, None).is_ok() {
-                    let bstr = &name_var.Anonymous.Anonymous.Anonymous.bstrVal;
-                    let s = if !bstr.is_empty() {
-                        bstr.to_string()
+                    let s = if name_var.Anonymous.Anonymous.vt == VT_BSTR {
+                        let bstr = &name_var.Anonymous.Anonymous.Anonymous.bstrVal;
+                        if !bstr.is_empty() {
+                            bstr.to_string()
+                        } else {
+                            "CPU Temperature".to_string()
+                        }
                     } else {
                         "CPU Temperature".to_string()
                     };

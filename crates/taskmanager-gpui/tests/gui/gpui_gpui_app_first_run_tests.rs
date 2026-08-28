@@ -1,4 +1,39 @@
 use super::*;
+use gpui::AppContext;
+
+#[gpui::test]
+async fn background_setup_observation_does_not_open_first_run_surface(
+    cx: &mut gpui::TestAppContext,
+) {
+    let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
+    root.update(cx, |view, cx| {
+        let request_id = taskmanager_application::RequestId::MIN;
+        view.first_run_requests
+            .insert(request_id, SetupScriptAction::Observe);
+        let handled = view.apply_first_run_event(
+            taskmanager_application::CorrelatedSetupScriptEvent {
+                request_id,
+                capability: taskmanager_application::CapabilityId::FIRST_RUN_SETUP,
+                provider: None,
+                sequence: taskmanager_application::EventSequence::new(1),
+                observed_at_ms: 1,
+                event: SetupScriptEvent::Observed(Some(SetupScriptInfo {
+                    path: std::path::PathBuf::from(
+                        "/usr/share/taskmanager/setup/99-taskmanager.rules",
+                    ),
+                    run_command: "taskmanager-setup-helper --apply".to_owned(),
+                    revert_command: "taskmanager-setup-helper --revert".to_owned(),
+                })),
+            },
+            cx,
+        );
+
+        assert!(handled);
+        assert_eq!(view.first_run.phase, FirstRunPhase::Available);
+        assert!(view.first_run.info.is_some());
+        assert!(!view.first_run_open());
+    });
+}
 
 #[test]
 fn phase_and_failure_mapping_remain_typed() {

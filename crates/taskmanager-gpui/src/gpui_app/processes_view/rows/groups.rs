@@ -105,6 +105,9 @@ pub(super) fn aggregate_row(
         // Category/application roots remain hierarchy nodes for singletons.
         has_children: true,
         collapsed: true,
+        // An aggregate row's only parent is a structural category header (or
+        // nothing) — never a selectable ancestor.
+        parent_key: None,
         badge: Some(format!("\u{00d7}{}", group.process_count)),
         toggle,
     };

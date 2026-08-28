@@ -30,8 +30,8 @@ therefore calls for a *third* boundary crate for the fd-pass.
 
 ## Decision
 
-Introduce `crates/taskmanager-fd-bridge` — the workspace's **third** audited
-`unsafe` boundary crate — as the seam for passing a file descriptor between
+Introduce `crates/taskmanager-fd-bridge` — the workspace's **third Unix**
+audited `unsafe` boundary crate (and fourth boundary overall) — as the seam for passing a file descriptor between
 processes over a Unix domain socket via `SCM_RIGHTS`. The layered gate mirrors
 ADR-022/024:
 
@@ -60,10 +60,10 @@ ADR-022/024:
 
 `tests/logic/workspace_architecture_test/dependency_firewall.rs` enforces:
 
-1. `default_build_is_strict_safe_rust_with_zero_unsafe` allowlists the three
-   boundary dirs (`perf-ioctl`, `afpacket`, `fd-bridge`); every other production
-   source stays `unsafe`-free.
-2. `audited_boundary_crate_carries_its_own_unsafe_contract` checks all three:
+1. `default_build_is_strict_safe_rust_with_zero_unsafe` allowlists all four
+   boundary dirs (`perf-ioctl`, `afpacket`, `fd-bridge`, `windows-api`); every
+   other production source stays `unsafe`-free.
+2. `audited_boundary_crate_carries_its_own_unsafe_contract` checks all four:
    root carries `#![deny(unsafe_op_in_unsafe_fn)]`; every `unsafe` block/fn has
    a `// SAFETY:` comment; no forbidden cast/`impl AsRawFd`/raw pub handle.
 3. `audited_fd_bridge_boundary_crate_is_depended_on_only_by_sanctioned_consumers`
@@ -89,8 +89,9 @@ ADR-022/024:
   wired into the live provider; today an unprivileged host sees
   `RequiresEscalation(PerProcessNet)` and a `CAP_NET_RAW` host runs the worker.
   Closing this link is a focused boundary completion, not a re-design.
-- **Three trust roots, each minimal:** the audited surface stays one
-  syscall-set per crate; the fd-bridge is `sendmsg`/`recvmsg` + `CMSG_*` only.
+- **Four trust roots, each minimal:** the audited surface stays one OS/ABI
+  family per crate; the fd-bridge owns the Unix fd-transfer and pidfd/peer-
+  credential seams without exposing raw handles to its consumers.
 
 ## Alternatives considered
 

@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::ProcessItem;
 use crate::core::FailureKind;
 
-/// Platform-neutral scheduling priority tier (ARCH.md §4.0).
+/// Platform-neutral scheduling priority tier (ARCH.md §8.1).
 ///
 /// The UI vocabulary is High/Normal/Low; adapters map each tier to the
 /// native primitive (Linux/macOS nice, Windows priority class). A raw nice
@@ -130,7 +130,7 @@ impl FrozenProcessIdentity {
     }
 }
 
-/// How a process-tree termination expands its target set (ARCH.md §4.0).
+/// How a process-tree termination expands its target set (ARCH.md §8.1).
 ///
 /// `PidAdjacency` freezes the descendant closure over `parent_pid` — the
 /// universally available projection. `NativeGroup` names a provider-native

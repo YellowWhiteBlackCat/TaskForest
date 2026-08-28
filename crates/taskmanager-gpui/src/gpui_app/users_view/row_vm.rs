@@ -1,4 +1,4 @@
-//! Session-row ViewModel (ARCH.md §4.0 data layer): folds one
+//! Session-row ViewModel (ARCH.md §8.1 data layer): folds one
 //! [`SessionItem`] into its pre-formatted cell strings exactly once per data
 //! swap, so [`super::UsersDelegate::render_td`] only styles and paints. The
 //! shared em-dash placeholder

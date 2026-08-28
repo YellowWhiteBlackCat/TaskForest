@@ -72,13 +72,16 @@ pub fn query_smbios_processor_max_mhz() -> Option<u64> {
         return None;
     }
     let table_len = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]) as usize;
-    let end = (8 + table_len).min(bytes.len());
-    let mut offset = 8;
+    let end = 8_usize.checked_add(table_len)?;
+    if end > bytes.len() {
+        return None;
+    }
+    let mut offset = 8_usize;
 
-    while offset + 4 <= end {
+    while end.saturating_sub(offset) >= 4 {
         let type_id = bytes[offset];
         let length = bytes[offset + 1] as usize;
-        if length < 4 || offset + length > end {
+        if length < 4 || length > end.saturating_sub(offset) {
             break;
         }
 
@@ -93,11 +96,11 @@ pub fn query_smbios_processor_max_mhz() -> Option<u64> {
             break;
         }
 
-        offset += length;
-        while offset + 1 < end && !(bytes[offset] == 0 && bytes[offset + 1] == 0) {
-            offset += 1;
+        offset = offset.checked_add(length)?;
+        while end.saturating_sub(offset) >= 2 && !(bytes[offset] == 0 && bytes[offset + 1] == 0) {
+            offset = offset.checked_add(1)?;
         }
-        offset += 2;
+        offset = offset.checked_add(2)?;
     }
 
     None

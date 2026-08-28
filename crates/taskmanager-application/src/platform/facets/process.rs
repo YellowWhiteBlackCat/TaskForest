@@ -72,7 +72,7 @@ pub enum ProcessControlRequest {
     },
     /// Semantically suspend (freeze) one process. Adapters map the concept to
     /// the native primitive (Linux: SIGSTOP; macOS: stop signal); a platform
-    /// without a safe primitive completes with a typed failure (ARCH §4.0
+    /// without a safe primitive completes with a typed failure (ARCH §8.1
     /// 映射穷尽律). UIs must prefer this over `SendSignal(Stop)` — signal
     /// vocabulary is an adapter mapping detail, not the user concept.
     Suspend {

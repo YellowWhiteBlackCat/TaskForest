@@ -7,7 +7,7 @@
 //! them) — the assertions target rows, titles, and layout containers, and the
 //! data-driven row/cell counts prove rendering follows the snapshot.
 
-use gpui::{AppContext, TestAppContext, VisualTestContext, point, px, size};
+use gpui::{AppContext, TestAppContext, VisualTestContext, px, size};
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
 use crate::core::metrics::{
@@ -34,6 +34,8 @@ mod disk_activity;
 mod fixtures;
 #[path = "tests/gpu_chart_metric.rs"]
 mod gpu_chart_metric;
+#[path = "tests/root_contract.rs"]
+mod root_contract;
 #[path = "tests/split_lanes.rs"]
 mod split_lanes;
 use fixtures::{sensor_reading, with_battery_scalars};
@@ -249,7 +251,7 @@ async fn memory_page_paints_title_and_stats_panel_geometry(cx: &mut TestAppConte
 }
 
 /// Render-path assertion (后置): a device page built by the shared
-/// `main_with_stats` helper (disk / network / GPU) must paint its data-driven
+/// `perf_page` composition root (disk / network / GPU) must paint its data-driven
 /// title and its stats column when a device snapshot row exists.
 #[gpui::test]
 async fn disk_page_paints_title_and_stats_from_device_data(cx: &mut TestAppContext) {
@@ -266,6 +268,9 @@ async fn disk_page_paints_title_and_stats_from_device_data(cx: &mut TestAppConte
                 .model("Test NVMe 2TB".into())
                 .fs_type("ext4".into())
                 .mount_point("/".into())
+                .serial(Some(
+                    "A-DELIBERATELY-LONG-SERIAL-NUMBER-FOR-LAYOUT-REGRESSION-0420".into(),
+                ))
                 .current_capacity_bytes(gib(2000))
                 .current_available_bytes(gib(1200))
                 .partitions(vec![
@@ -319,6 +324,25 @@ async fn disk_page_paints_title_and_stats_from_device_data(cx: &mut TestAppConte
         "stats panel geometry collapsed: {panel:?}"
     );
     assert!(
+        title_text.origin.x + title_text.size.width <= subtitle_text.origin.x + px(0.5)
+            || subtitle_text.origin.y >= title_text.origin.y + title_text.size.height - px(0.5),
+        "long device identity and context must stay in their own slots (truncate or wrap), never overlap: title={title_text:?}, subtitle={subtitle_text:?}"
+    );
+    // Every stats value — including the long serial readout — must stay on
+    // its bounded row inside the pinned stats surface instead of clipping
+    // past the panel's right edge.
+    for i in 0..16 {
+        let selector: &'static str = Box::leak(format!("tm-perf-stat-value:{i}").into_boxed_str());
+        let Some(value) = vcx.debug_bounds(selector) else {
+            break;
+        };
+        assert!(
+            value.origin.x >= panel.origin.x - px(0.5)
+                && value.origin.x + value.size.width <= panel.origin.x + panel.size.width + px(0.5),
+            "stats value {i} must render inside the stats panel: value={value:?}, panel={panel:?}"
+        );
+    }
+    assert!(
         title_text.origin.x + title_text.size.width <= panel.origin.x,
         "compact title text must not intrude into the stats panel: title={title_text:?}, panel={panel:?}"
     );
@@ -331,11 +355,11 @@ async fn disk_page_paints_title_and_stats_from_device_data(cx: &mut TestAppConte
         .expect("first stats row must render");
     assert!(r0.size.height > px(10.0), "stats row collapsed: {r0:?}");
     let graph = vcx
-        .debug_bounds("tm-graph:main-graph")
-        .expect("disk page must paint the shared main graph");
+        .debug_bounds("tm-perf-chart-card:main-graph")
+        .expect("disk page must paint the shared main graph card");
     assert!(
-        graph.size.height >= px(160.0),
-        "shared disk graph must retain a readable height: {graph:?}"
+        graph.size.height >= px(180.0),
+        "shared disk graph must retain the headline tier floor: {graph:?}"
     );
     let partition = vcx
         .debug_bounds("tm-disk-partition:0")
@@ -380,7 +404,9 @@ async fn disk_page_paints_title_and_stats_from_device_data(cx: &mut TestAppConte
     // The shared page viewport must constrain the fixed stats column at every
     // supported aspect ratio. This catches a missing min-width boundary in the
     // shell, which otherwise lets the graph/title intrinsic width push the
-    // right-hand panel beyond the actual window.
+    // right-hand panel beyond the actual window. The width-aware budget pins
+    // the rail at every supported size (the workspace always reserves the
+    // stats minimum), so containment holds across the whole range.
     for (width, height) in [(720.0f32, 480.0f32), (1180.0, 780.0), (1900.0, 1344.0)] {
         cx.simulate_window_resize(win.into(), size(px(width), px(height)));
         draw(cx, win);
@@ -389,7 +415,7 @@ async fn disk_page_paints_title_and_stats_from_device_data(cx: &mut TestAppConte
             .debug_bounds("tm-perf-stats-panel")
             .expect("disk stats panel must remain rendered after resize");
         let graph = vcx
-            .debug_bounds("tm-graph:main-graph")
+            .debug_bounds("tm-perf-chart-card:main-graph")
             .expect("disk graph must remain rendered after resize");
         assert!(
             f32::from(panel.origin.x) >= -0.5
@@ -399,19 +425,19 @@ async fn disk_page_paints_title_and_stats_from_device_data(cx: &mut TestAppConte
             "disk stats panel must stay inside the {width}x{height} viewport: {panel:?}"
         );
         assert!(
-            graph.size.height >= px(160.0),
-            "disk graph must remain readable at {width}x{height}: {graph:?}"
+            graph.size.height >= px(180.0),
+            "disk graph must hold the headline tier floor at {width}x{height}: {graph:?}"
         );
         drop(vcx);
     }
 }
 
-/// The Performance page must expose the real left-column scroll range and
-/// accept its exact bottom offset. This is a behavior check against the live
-/// GPUI handle, not a fixed rail rectangle: a visually plausible rail is not
-/// enough if the content handle stops short of its max range.
+/// The device-page main column is one fixed viewport (the CPU-page
+/// contract): even a partition-heavy disk page must compose into the window
+/// — the headline graph compresses to its readable minimum and no second
+/// scrolling body may appear between the sidebar and the pinned stats rail.
 #[gpui::test]
-async fn performance_left_scroll_reaches_the_true_bottom(cx: &mut TestAppContext) {
+async fn disk_page_composes_instead_of_scrolling(cx: &mut TestAppContext) {
     let (win, view) = wrapped_root(cx);
     view.update(cx, |v, cx| {
         v.mark_telemetry_frame_ready();
@@ -425,7 +451,7 @@ async fn performance_left_scroll_reaches_the_true_bottom(cx: &mut TestAppContext
                     .device_generation(DeviceGeneration::new(1))
                     .device_state(DeviceState::healthy(10))
                     .name(format!("fixture{index}"))
-                    .mount_point(format!("/mnt/taskforest-scroll-{index}"))
+                    .mount_point(format!("/mnt/taskforest-compose-{index}"))
                     .fs_type("ext4".into())
                     .scalar_observations(DiskPartitionScalarObservations {
                         capacity_bytes: ScalarObservation::available(gib(10), 10),
@@ -448,40 +474,32 @@ async fn performance_left_scroll_reaches_the_true_bottom(cx: &mut TestAppContext
     });
     cx.simulate_window_resize(win.into(), size(px(720.0), px(480.0)));
     draw(cx, win);
-
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
-    let viewport = vcx
-        .debug_bounds("tm-perf-left-scroll")
-        .expect("the Performance left scroll viewport must render");
-    let rail = vcx
-        .debug_bounds("tm-perf-left-scrollbar")
-        .expect("the Performance left scrollbar rail must render");
-    assert!(rail.origin.y >= viewport.origin.y - px(0.5));
-    assert!(rail.bottom() <= viewport.bottom() + px(0.5));
-    let max = view.read_with(cx, |v, _| v.performance_scroll.0.max_offset().height);
     assert!(
-        max > px(0.0),
-        "the partition fixture must create a real scroll range"
+        vcx.debug_bounds("tm-perf-left-scroll").is_none()
+            && vcx.debug_bounds("tm-perf-left-scrollbar").is_none(),
+        "a device page must not mount a scrolling main column beside the stats rail"
     );
-
-    view.update(cx, |v, cx| {
-        v.performance_scroll.0.set_offset(point(px(0.0), -max));
-        cx.notify();
-    });
-    draw(cx, win);
-    let (offset, max_after) = view.read_with(cx, |v, _| {
-        (
-            v.performance_scroll.0.offset().y,
-            v.performance_scroll.0.max_offset().height,
-        )
-    });
-    assert_eq!(
-        max_after, max,
-        "a redraw must not change the measured range"
+    let viewport = vcx
+        .debug_bounds("tm-perf-main-viewport")
+        .expect("the fixed main viewport must render");
+    assert!(
+        f32::from(viewport.bottom()) <= 480.5,
+        "the main viewport must stay inside the window: {viewport:?}"
     );
-    assert_eq!(
-        offset, -max,
-        "the Performance handle must reach its true bottom"
+    let graph = vcx
+        .debug_bounds("tm-perf-chart-card:main-graph")
+        .expect("the shared main graph card must render");
+    assert!(
+        graph.size.height >= px(180.0),
+        "at the product minimum window the headline card must still hold its tier floor: {graph:?}"
+    );
+    let panel = vcx
+        .debug_bounds("tm-perf-stats-panel")
+        .expect("the width-aware budget keeps the stats rail pinned at the minimum size");
+    assert!(
+        f32::from(panel.origin.x) >= -0.5 && f32::from(panel.origin.x + panel.size.width) <= 720.5,
+        "the pinned stats panel must remain inside the viewport: {panel:?}"
     );
 }
 
@@ -512,8 +530,8 @@ async fn network_page_keeps_shared_main_graph_readable_in_compact_view(cx: &mut 
         .debug_bounds("tm-graph:main-graph")
         .expect("network page must paint the shared main graph");
     assert!(
-        vcx.debug_bounds("tm-perf-left-scrollbar").is_some(),
-        "the network main column must keep its vertical rail mounted"
+        vcx.debug_bounds("tm-perf-left-scrollbar").is_none(),
+        "the network main column is a fixed viewport and must not mount a scrollbar"
     );
     assert!(
         vcx.debug_bounds("tm-perf-stats-scrollbar").is_some(),

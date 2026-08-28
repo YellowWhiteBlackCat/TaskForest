@@ -75,6 +75,7 @@ pub fn run(out: &Path) -> Result<(), String> {
                     native_locale_name,
                     local_time_rules,
                     custom_app_id: None,
+                    presentation: taskmanager_app_host::WindowPresentation::standalone(),
                 },
             ) {
                 error!(%composition_error, "native platform composition failed");

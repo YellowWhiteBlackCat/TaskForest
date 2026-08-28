@@ -178,7 +178,6 @@ fn spawn_update_loop(
                 super::tray::drain_tray_events(view, cx, window_handle);
                 view.drain_history_replay_completions(cx);
                 view.reconcile_gpu_engines_visibility();
-                view.reconcile_gpu_chart_metric();
                 if view.drain_snapshot_export_completions() {
                     cx.notify();
                 }
@@ -272,6 +271,7 @@ pub struct StartupEnvironment {
     pub native_locale_name: Option<String>,
     pub local_time_rules: taskmanager_application::LocalTimeRulesObservation,
     pub custom_app_id: Option<String>,
+    pub presentation: taskmanager_app_host::WindowPresentation,
 }
 
 pub fn init<E>(
@@ -291,6 +291,7 @@ pub fn init<E>(
         native_locale_name,
         local_time_rules,
         custom_app_id,
+        presentation,
     } = environment;
     // Single-instance (ADR-032 follow-up): a second launch activates the
     // existing instance's window and exits before any UI is set up. A typed
@@ -464,7 +465,13 @@ pub fn init<E>(
         // `taskmanager`; the config dir (~/.../taskmanager/) is keyed off the
         // binary name, not the app_id, so it is unaffected.
         app_id: Some(resolve_app_id(custom_app_id)),
-        window_min_size: Some(size(px(720.0), px(480.0))),
+        // The window-level floor of the three-layer minimum-space doctrine
+        // (ADR-039): the compositor may not shrink the surface below the
+        // product minimum, so every inner budget (width slots, chart tiers)
+        // reasons about a BOUNDED space. Single source: the responsive
+        // constants — never a second literal here.
+        window_min_size: Some(size(px(responsive::MIN_WIDTH), px(responsive::MIN_HEIGHT))),
+        presentation: crate::window_presentation::to_gpui(&presentation),
         ..Default::default()
     };
 
@@ -479,6 +486,7 @@ pub fn init<E>(
         local_time_rules,
     };
     let _ = platform.request_refresh(RefreshRequest::All, platform_submission_time_ms());
+    let surface_role = crate::window_presentation::surface_role(&presentation);
     let window_result = cx.open_window(options, move |window, cx| {
         // gpui 0.2.2 forwards `TitlebarOptions::title` when constructing its
         // Windows and X11 windows, but its Wayland constructor currently drops
@@ -490,12 +498,13 @@ pub fn init<E>(
         // theme (Copy) carries the cfg-overridden skin/mode/hc; cfg's toggles
         // + last_page are applied to the fresh view right after construction.
         let entity: Entity<RootView> = cx.new(|cx| {
-            let mut v = RootView::new_with_platform(
+            let mut v = RootView::new_with_platform_and_surface_role(
                 theme,
                 telemetry,
                 telemetry_ingestor,
                 telemetry_refresh_policy,
                 platform,
+                surface_role,
                 cx,
             );
             v.snapshot_export.install(snapshot_export_client);

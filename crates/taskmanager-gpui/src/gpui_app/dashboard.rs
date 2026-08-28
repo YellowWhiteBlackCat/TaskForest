@@ -7,7 +7,9 @@ pub use panels::{DashboardPanelOverlayProps, render_panel_overlay};
 mod readouts;
 pub mod saved_view_transfer;
 mod view;
+mod widget;
 pub use view::{DashboardViewProps, render_dashboard, render_system_header};
+pub use widget::{DashboardWidgetProps, render_widget};
 
 use crate::core::{Alert, AlertMetric, AlertSeverity};
 use crate::gpui_app::processes_view::{ProcessStatusFilter, SortCol};

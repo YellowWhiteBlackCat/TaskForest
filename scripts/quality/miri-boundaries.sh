@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Miri on the three audited boundary crates (ADR-022 perf-ioctl, ADR-024
-# afpacket, ADR-025 fd-bridge). These are the workspace's ONLY `unsafe`
-# trust roots, so they get the Miri pass everything else skips.
+# Miri on the three Linux-audited boundary crates (ADR-022 perf-ioctl, ADR-024
+# afpacket, ADR-025 fd-bridge). Together with the Windows-target boundary
+# (ADR-031 windows-api), these are the workspace's ONLY `unsafe` trust roots.
+# Miri cannot execute the Windows ABI boundary, so that fourth root is covered
+# by Windows-target compilation, clippy, and native/contract tests instead.
 #
 # Miri cannot emulate real syscalls (perf_event_open, sendmsg, socket), so
 # a test that stops at an "unsupported operation" is EXPECTED and is not a
@@ -11,7 +13,7 @@
 # CMSG buffer UB that release builds shipped silently (2026-08-07).
 #
 # Usage: scripts/quality/miri-boundaries.sh [--full]
-#   --full   run every test in the three crates (slower; hits the syscall
+#   --full   run every test in the three Linux crates (slower; hits the syscall
 #            wall in each crate). Default: run, for EACH of the three
 #            crates, only the pure-logic tests (no syscalls) that Miri can
 #            execute to completion — a syscall-bound test stopped at the
@@ -59,8 +61,8 @@ if [[ "${1:-}" == "--full" ]]; then
 else
     # Pure-logic passes Miri can execute to completion. Every filter below
     # was verified to finish under Miri (no "unsupported operation"); the
-    # syscall-bound halves of each crate stay in --full, where they stop at
-    # the wall (PASS = no UB, but zero execution value).
+    # syscall-bound halves of the three Linux crates stay in --full, where
+    # they stop at the wall (PASS = no UB, but zero execution value).
     #
     # afpacket: the five-tuple frame parser — the whole point of the crate's
     # unsafe is feeding it bytes.

@@ -31,16 +31,30 @@ use taskmanager_ui_contract::IconId;
 /// failed source and a genuinely empty host never share copy.
 pub fn render_containers(t: &Theme, rollup: &ContainerRollup) -> Div {
     let body = match rollup.state.status {
-        DeviceStatus::Unsupported => typed_message(t, i18n::t("containers.unsupported"), None),
-        DeviceStatus::PermissionDenied => {
-            typed_message(t, i18n::t("containers.permission_denied"), None)
-        }
-        DeviceStatus::Stale => typed_message(t, i18n::t("containers.unavailable"), None),
+        DeviceStatus::Unsupported => typed_message(
+            t,
+            "tm-containers-state-unsupported",
+            i18n::t("containers.unsupported"),
+            None,
+        ),
+        DeviceStatus::PermissionDenied => typed_message(
+            t,
+            "tm-containers-state-permission",
+            i18n::t("containers.permission_denied"),
+            None,
+        ),
+        DeviceStatus::Stale => typed_message(
+            t,
+            "tm-containers-state-stale",
+            i18n::t("containers.unavailable"),
+            None,
+        ),
         // Healthy covers both a populated list and a genuinely container-free host.
         DeviceStatus::Healthy | DeviceStatus::MissingTool => {
             if rollup.containers.is_empty() {
                 typed_message(
                     t,
+                    "tm-containers-empty",
                     i18n::t("containers.no_containers"),
                     Some(i18n::t("containers.empty_hint")),
                 )
@@ -74,16 +88,42 @@ fn header_row(t: &Theme) -> Div {
 fn container_list(t: &Theme, containers: &[ContainerSummary]) -> Div {
     let (shown, hidden) = container_row_window(containers.len());
     let mut list = div().flex().flex_col();
-    for container in &containers[..shown] {
-        list = list.child(row_for(t, container));
+    for (index, container) in containers[..shown].iter().enumerate() {
+        list = list.child(with_row_selector(row_for(t, container), index));
     }
     if hidden > 0 {
-        list = list.child(elements::more_rows_hint(t, hidden));
+        list = list.child(with_more_hint_selector(elements::more_rows_hint(t, hidden)));
     }
     list
 }
 
-/// Pre-folded display strings for one container row (ARCH.md §4.0 data
+/// Geometry breakpoint per data row — the render-path assertions count these
+/// to prove the list paints one bounded row per materialized container and
+/// stops exactly at the shared row-window bound. Noop outside test support.
+#[cfg(any(test, feature = "test-support"))]
+fn with_row_selector(row: Div, index: usize) -> Div {
+    use gpui::InteractiveElement;
+    row.debug_selector(move || format!("tm-containers-row:{index}"))
+}
+
+#[cfg(not(any(test, feature = "test-support")))]
+fn with_row_selector(row: Div, _index: usize) -> Div {
+    row
+}
+
+/// Geometry breakpoint for the "+N more" overflow line.
+#[cfg(any(test, feature = "test-support"))]
+fn with_more_hint_selector(hint: Div) -> Div {
+    use gpui::InteractiveElement;
+    hint.debug_selector(|| "tm-containers-more".to_string())
+}
+
+#[cfg(not(any(test, feature = "test-support")))]
+fn with_more_hint_selector(hint: Div) -> Div {
+    hint
+}
+
+/// Pre-folded display strings for one container row (ARCH.md §8.1 data
 /// layer): the telemetry→display fold happens once here; the `row_for` /
 /// `row_skeleton` render helpers only lay out and paint. No theme or gpui
 /// types.
@@ -206,14 +246,29 @@ fn fixed_cell(label: &str, width: f32, fg: Color, weight: taskmanager_theme::Wei
 
 /// Centered typed empty/unavailable message with an optional secondary hint.
 /// Mirrors [`crate::gpui_app::list_view::unavailable_state`] but localized for
-/// the containers domain.
-fn typed_message(t: &Theme, primary: &str, secondary: Option<&str>) -> Div {
+/// the containers domain. `state_selector` is the per-branch geometry
+/// breakpoint (test support) so render-path assertions can prove WHICH typed
+/// branch painted — a failed source and an empty host must never share copy.
+fn typed_message(
+    t: &Theme,
+    state_selector: &'static str,
+    primary: &str,
+    secondary: Option<&str>,
+) -> Div {
     let mut panel =
         StatePanel::new(IconId::Applications, primary.to_owned(), t.palette()).tone(t.warning);
     if let Some(hint) = secondary {
         panel = panel.detail(hint.to_owned());
     }
-    panel.render()
+    let rendered = panel.render();
+    #[cfg(any(test, feature = "test-support"))]
+    let rendered = {
+        use gpui::InteractiveElement;
+        rendered.debug_selector(move || state_selector.to_owned())
+    };
+    #[cfg(not(any(test, feature = "test-support")))]
+    let _ = state_selector;
+    rendered
 }
 
 /// Friendly runtime label for the runtime column. Kept short so the fixed

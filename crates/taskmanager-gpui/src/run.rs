@@ -67,6 +67,7 @@ pub fn run(app_id: Option<String>, demo: bool) {
                     native_locale_name,
                     local_time_rules,
                     custom_app_id: app_id,
+                    presentation: crate::window_presentation::from_environment(),
                 },
             ) {
                 error!(%composition_error, "native platform composition failed");

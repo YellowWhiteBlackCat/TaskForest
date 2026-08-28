@@ -7,6 +7,9 @@
 use super::WindowsApiError;
 
 #[cfg(windows)]
+const MAX_THREAD_SNAPSHOT_ENTRIES: usize = 1_000_000;
+
+#[cfg(windows)]
 pub struct WindowsProcessJob {
     handle: windows::Win32::Foundation::HANDLE,
 }
@@ -129,7 +132,14 @@ fn assign_and_resume_suspended_process_windows(
     // SAFETY: snapshot and sized output are live for each synchronous call.
     let mut present = unsafe { Thread32First(snapshot.0, &mut entry) }.is_ok();
     let mut thread_id = None;
+    let mut inspected = 0usize;
     while present {
+        inspected = inspected
+            .checked_add(1)
+            .ok_or(WindowsApiError::ResourceLimit)?;
+        if inspected > MAX_THREAD_SNAPSHOT_ENTRIES {
+            return Err(WindowsApiError::ResourceLimit);
+        }
         if entry.th32OwnerProcessID == pid {
             thread_id = Some(entry.th32ThreadID);
             break;

@@ -90,11 +90,11 @@ async fn cpu_page_renders_dominant_graph_readouts_and_per_core_content(cx: &mut 
         .debug_bounds("tm-perf-stats-surface")
         .expect("shared pinned stats surface");
     let utilization = vcx
-        .debug_bounds("tm-cpu-main-utilization-graph")
+        .debug_bounds("tm-perf-chart:cpu-headline-graph")
         .expect("dominant utilization graph");
     assert!(utilization.left() >= main_surface.left() - px(0.5));
     assert!(
-        utilization.right() <= stats_surface.left() - px(15.0),
+        utilization.right() <= stats_surface.left() - px(11.0),
         "CPU graph content must keep its internal trailing inset before the pinned rail: graph={utilization:?}, stats={stats_surface:?}"
     );
     assert_eq!(
@@ -146,17 +146,20 @@ async fn cpu_page_renders_dominant_graph_readouts_and_per_core_content(cx: &mut 
     draw(cx, compact_win);
     let mut vcx = VisualTestContext::from_window(compact_win.into(), cx);
     let compact_surface = vcx
-        .debug_bounds("tm-cpu-chart-surface")
+        .debug_bounds("tm-perf-main-viewport")
         .expect("compact elastic CPU chart surface");
     let graph = vcx
-        .debug_bounds("tm-cpu-main-utilization-graph")
+        .debug_bounds("tm-perf-chart-card:cpu-headline-graph")
         .expect("compact dominant utilization graph");
     assert!(graph.left() >= compact_surface.left() - px(0.5));
     assert!(
         graph.right() <= compact_surface.right() - px(7.0),
         "rail-less ultra-compact CPU view must retain a real trailing page inset"
     );
-    assert!(graph.size.height > px(180.0));
+    assert!(
+        graph.size.height >= px(180.0),
+        "the headline tier keeps its readable card floor under a compact budget: {graph:?}"
+    );
     assert!(vcx.debug_bounds("tm-cpu-readouts").is_some());
     assert!(vcx.debug_bounds("tm-cpu-per-core-matrix").is_none());
 }
@@ -186,10 +189,13 @@ async fn cpu_page_uses_wide_short_budget_without_reintroducing_compact_mode(
         .debug_bounds("tm-perf-stats-surface")
         .expect("wide-short layout retains the pinned details surface");
     let graph = vcx
-        .debug_bounds("tm-cpu-main-utilization-graph")
+        .debug_bounds("tm-perf-chart-card:cpu-headline-graph")
         .expect("wide-short layout retains the dominant graph");
     assert!(vcx.debug_bounds("tm-cpu-per-core-matrix").is_none());
     assert_eq!(main.right(), stats.left());
-    assert!(graph.right() <= stats.left() - px(15.0));
-    assert!(graph.size.height > px(180.0));
+    assert!(graph.right() <= stats.left() - px(11.0));
+    assert!(
+        graph.size.height >= px(180.0),
+        "the headline tier keeps its readable card floor: {graph:?}"
+    );
 }

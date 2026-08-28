@@ -11,7 +11,7 @@ publish = false
 # This is one feature-specific privileged piece of TaskForest (ADR-023, docs/PERMISSION_MODEL.md
 # Boundary 2). It performs exactly ONE operation: a system-wide Intel i915/xe GPU
 # per-engine utilization read via the audited perf_event_open boundary crate
-# (taskmanager-perf-ioctl, ADR-022 — the workspace's sole unsafe trust root, used
+# (taskmanager-perf-ioctl, ADR-022 — one of the workspace's four unsafe trust roots, used
 # here only through its safe API). It emits ONE JSON object to stdout then exits.
 # There are NO flags and NO file access beyond /sys discovery plus the perf
 # counter read itself, keeping the privileged attack surface minimal. Missing or

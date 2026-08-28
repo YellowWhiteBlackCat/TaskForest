@@ -16,7 +16,7 @@
 #              matrix on a live Wayland session.
 #   extended   the expensive pass: llvm-cov with per-crate floors, mutation
 #              testing of the core/application diff, Miri on the three
-#              audited unsafe crates, fuzz-target build (+ runs on demand),
+#              Linux-audited unsafe crates, fuzz-target build (+ runs on demand),
 #              release bloat and bench trends vs docs/quality/*-trend.tsv.
 #
 # Every stage is bounded by an outer `timeout --kill-after=` deadline and
@@ -241,7 +241,7 @@ if maybe clippy; then
 fi
 if maybe nextest-core; then
     # Unit tests across every workspace crate plus non-root integration
-    # targets (platform contract proofs, adapter tests, ...). The three root
+    # targets (platform contract proofs, adapter tests, ...). The root
     # integration binaries are partitioned into their own layers below so a
     # failing layer is attributable without re-running the whole suite.
     # nextest 0.9 exposes `-j` and `--test-threads` as aliases for the same

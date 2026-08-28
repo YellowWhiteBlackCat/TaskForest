@@ -1,9 +1,11 @@
 //! Audited `perf_event_open` boundary crate — the workspace's FIRST `unsafe`
-//! trust root (one of three: `perf-ioctl` / `afpacket` / `fd-bridge`).
+//! trust root (one of four: `perf-ioctl` / `afpacket` / `fd-bridge` /
+//! `windows-api`).
 //!
-//! This is the first of three places in the product tree allowed to contain
-//! `unsafe` (ADR-022; the others are `taskmanager-afpacket` ADR-024 and
-//! `taskmanager-fd-bridge` ADR-025). It is the OS/driver ABI seam: a tiny, reviewed, fully
+//! This is one of four places in the product tree allowed to contain `unsafe`
+//! (ADR-022; the others are `taskmanager-afpacket` ADR-024,
+//! `taskmanager-fd-bridge` ADR-025, and `taskmanager-windows-api` ADR-031). It
+//! is the OS/driver ABI seam: a tiny, reviewed, fully
 //! safe-public-API wrapper around the Linux `perf_event_open(2)` syscall and
 //! its `ioctl` controls, used to read Intel i915 PMU per-engine busy counters.
 //!

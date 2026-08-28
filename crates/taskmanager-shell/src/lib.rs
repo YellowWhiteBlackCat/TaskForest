@@ -20,7 +20,7 @@
 //! - [`memory`] — the shared memory-composition segment breakdown every
 //!   frontend renders as the composition bar.
 //! - [`viewmodel`] — the typed stat-panel ViewModel contract (one fold,
-//!   three renderers; ARCH.md §4.0).
+//!   three renderers; ARCH.md §8.1).
 
 #![forbid(unsafe_code)]
 

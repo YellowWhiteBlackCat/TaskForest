@@ -47,7 +47,7 @@ pub fn enumerate_display_monitors() -> Result<Vec<WindowsMonitorDescriptor>, Win
         .map_err(|_| WindowsApiError::ResourceLimit)?;
     let mut monitors: Vec<WindowsMonitorDescriptor> = Vec::new();
 
-    for adapter_index in 0..MAX_DISPLAY_ADAPTERS {
+    for adapter_index in 0..=MAX_DISPLAY_ADAPTERS {
         let mut adapter = DISPLAY_DEVICEW {
             cb: struct_bytes,
             ..DISPLAY_DEVICEW::default()
@@ -56,11 +56,20 @@ pub fn enumerate_display_monitors() -> Result<Vec<WindowsMonitorDescriptor>, Win
         // matches its allocated size; a null device name enumerates display
         // adapters; flags 0 keeps the legacy GDI names; no pointer is
         // retained past this synchronous call.
-        if !unsafe { EnumDisplayDevicesW(PCWSTR::null(), adapter_index, &mut adapter, 0) }.as_bool()
-        {
+        // SAFETY: `adapter` is initialized to the documented struct size and
+        // remains live for this synchronous enumeration call.
+        let present = {
+            // SAFETY: `adapter` remains live and writable for this
+            // synchronous enumeration call.
+            unsafe { EnumDisplayDevicesW(PCWSTR::null(), adapter_index, &mut adapter, 0) }.as_bool()
+        };
+        if !present {
             // FALSE ends the adapter enumeration; zero adapters is an honest
             // empty inventory, not a failure.
             break;
+        }
+        if adapter_index == MAX_DISPLAY_ADAPTERS {
+            return Err(WindowsApiError::ResourceLimit);
         }
         let device_name = wide_field_string(&adapter.DeviceName);
         if device_name.is_empty() {
@@ -72,7 +81,7 @@ pub fn enumerate_display_monitors() -> Result<Vec<WindowsMonitorDescriptor>, Win
         adapter_name_utf16.extend_from_slice(&adapter.DeviceName);
         adapter_name_utf16.push(0);
 
-        for monitor_index in 0..MAX_MONITORS_PER_ADAPTER {
+        for monitor_index in 0..=MAX_MONITORS_PER_ADAPTER {
             let mut monitor = DISPLAY_DEVICEW {
                 cb: struct_bytes,
                 ..DISPLAY_DEVICEW::default()
@@ -80,7 +89,9 @@ pub fn enumerate_display_monitors() -> Result<Vec<WindowsMonitorDescriptor>, Win
             // SAFETY: `monitor` is a valid writable `DISPLAYDEVICEW` sized by
             // `cb`; `adapter_name_utf16` is NUL-terminated and alive for this
             // synchronous call; flags 0 keeps the legacy names.
-            if !unsafe {
+            // SAFETY: `monitor` is initialized to the documented struct size;
+            // the adapter-name buffer remains live for this synchronous call.
+            let present = unsafe {
                 EnumDisplayDevicesW(
                     PCWSTR(adapter_name_utf16.as_ptr()),
                     monitor_index,
@@ -88,9 +99,12 @@ pub fn enumerate_display_monitors() -> Result<Vec<WindowsMonitorDescriptor>, Win
                     0,
                 )
             }
-            .as_bool()
-            {
+            .as_bool();
+            if !present {
                 break;
+            }
+            if monitor_index == MAX_MONITORS_PER_ADAPTER {
+                return Err(WindowsApiError::ResourceLimit);
             }
             let is_active = (monitor.StateFlags & DISPLAY_DEVICE_ATTACHED_TO_DESKTOP).0 != 0;
             let instance = wide_field_string(&monitor.DeviceID);

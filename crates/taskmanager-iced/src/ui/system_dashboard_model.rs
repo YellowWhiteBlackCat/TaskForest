@@ -1,4 +1,4 @@
-//! The System-page dashboard's data layer (ARCH.md §4.0): the pure fold of
+//! The System-page dashboard's data layer (ARCH.md §8.1): the pure fold of
 //! the shell projection into the summary card values. Kept in its own
 //! non-render module so the paint file (`ui/system_dashboard.rs`) consumes
 //! pre-folded strings and never reads observations inline.

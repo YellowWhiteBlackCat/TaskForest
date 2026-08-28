@@ -105,9 +105,11 @@ pub fn query_memory_compression_used_bytes() -> Result<Option<u64>, WindowsApiEr
             )
         };
         if status.0 >= 0 {
-            let filled = usize::try_from(returned_bytes)
-                .unwrap_or(buffer.len())
-                .min(buffer.len());
+            let filled =
+                usize::try_from(returned_bytes).map_err(|_| WindowsApiError::ResourceLimit)?;
+            if filled == 0 || filled > buffer.len() {
+                return Err(WindowsApiError::QueryFailed);
+            }
             return find_memory_compression_working_set(
                 &buffer[..filled],
                 buffer.as_ptr() as usize,

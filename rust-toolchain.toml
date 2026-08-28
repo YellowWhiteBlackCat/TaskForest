@@ -1,4 +1,7 @@
 [toolchain]
-channel = "1.97.1"
+# Developer and local-gate builds follow the current stable channel. Package
+# manifests intentionally keep `rust-version = "1.97.1"` as the compatibility
+# floor; the two are different contracts and must not be coupled.
+channel = "stable"
 profile = "minimal"
 components = ["clippy", "rustfmt"]
