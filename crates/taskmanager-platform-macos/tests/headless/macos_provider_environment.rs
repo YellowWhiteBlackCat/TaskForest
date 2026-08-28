@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(not(target_os = "macos"))]
 #[test]
 fn mac_environment_providers_degrade_honestly_off_macos() {
     // `sysctl -n kern.boottime` is macOS-specific: on Linux CI procps
@@ -26,6 +27,28 @@ fn mac_environment_providers_degrade_honestly_off_macos() {
     assert!(snapshot.critical_chain.is_empty());
     // Session control (disconnect/lock) still has no safe CLI route on
     // macOS, so it completes with a typed Unsupported (stays pending).
+    let mut session_control = PendingSessionControlProvider;
+    assert_eq!(
+        session_control.control(&SessionId::new("1"), SessionControlAction::Lock),
+        Err(ProviderFailure::Unsupported)
+    );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn mac_environment_provider_reports_native_boot_without_systemd_views() {
+    let mut evidence = MacStartupEvidenceProvider;
+    let snapshot = evidence
+        .observe(1)
+        .expect("macOS boot evidence observes the native sysctl record");
+    assert_eq!(snapshot.state, DeviceState::healthy(1));
+    assert_eq!(snapshot.failed_units_state, DeviceState::healthy(1));
+    assert_eq!(snapshot.critical_chain_state, DeviceState::healthy(1));
+    assert_eq!(snapshot.failed_units_failure, None);
+    assert_eq!(snapshot.critical_chain_failure, None);
+    assert!(snapshot.failed_units.is_empty());
+    assert!(snapshot.critical_chain.is_empty());
+
     let mut session_control = PendingSessionControlProvider;
     assert_eq!(
         session_control.control(&SessionId::new("1"), SessionControlAction::Lock),
