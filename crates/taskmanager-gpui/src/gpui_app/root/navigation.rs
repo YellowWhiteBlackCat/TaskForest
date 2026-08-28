@@ -17,7 +17,39 @@ pub enum TopPage {
     Containers,
 }
 
+/// The two page families of the composition doctrine (ADR-041).
+///
+/// Every top-level page declares its family, and each family owns exactly
+/// ONE composition root: chart pages (the Performance surface) compose
+/// through `perf_page` with the chart-tier grammar (ADR-039); data pages
+/// compose through the shared `PageScaffold` shell — the list-style ones
+/// share the inner `ListPageScaffold` header+body split. The family split
+/// is what makes a layout adjustment propagate everywhere at once: one
+/// root per family, proven by the page-family render guard.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PageFamily {
+    /// Chart-first telemetry surface; one `perf_page` composition root.
+    Chart,
+    /// Text/table-first inventory surface; one `PageScaffold` shell root.
+    Data,
+}
+
 impl TopPage {
+    /// The composition family this page belongs to. New pages must declare
+    /// into one of the two roots — a third family is an ADR-level decision.
+    pub const fn family(self) -> PageFamily {
+        match self {
+            Self::Performance => PageFamily::Chart,
+            Self::Apps
+            | Self::Services
+            | Self::System
+            | Self::Startup
+            | Self::Users
+            | Self::AppHistory
+            | Self::Containers => PageFamily::Data,
+        }
+    }
+
     /// Every page, for exhaustive iteration (tests, nav construction).
     pub const ALL: [TopPage; 8] = [
         TopPage::Performance,
@@ -31,7 +63,6 @@ impl TopPage {
     ];
 
     /// Adapt one application-owned shared route into the GPUI page identity.
-    ///
     /// The GPUI-only `Containers` page deliberately has no `AppPage` source;
     /// keeping that fact explicit prevents a renderer extension from leaking
     /// into the shared shell contract.
@@ -75,3 +106,7 @@ pub enum StableDeviceKind {
     Battery,
     Fan,
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_app/page_family_contract_tests.rs"]
+mod page_family_contract_tests;

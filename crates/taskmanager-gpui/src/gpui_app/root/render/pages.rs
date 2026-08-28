@@ -16,7 +16,7 @@ use gpui::{
 };
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_theme::Theme;
-use taskmanager_ui::layout::{PageFrame, PageScaffold, page_frame};
+use taskmanager_ui::layout::{PageFrame, PageScaffold};
 
 mod inventory;
 mod vm;
@@ -493,7 +493,7 @@ impl RootView {
                         .into_any_element()
                     }
                 };
-                page_frame(
+                PageScaffold::new(
                     div()
                         .flex()
                         .flex_col()
@@ -516,6 +516,7 @@ impl RootView {
                         ),
                     px(page_padding),
                 )
+                .render()
             }
             TopPage::Startup => self.render_startup_page(
                 window,
@@ -566,10 +567,11 @@ impl RootView {
                 ))
                 .render()
             }
-            TopPage::Containers => page_frame(
+            TopPage::Containers => PageScaffold::new(
                 containers_view::render_containers(t, self.containers()),
                 px(page_padding),
-            ),
+            )
+            .render(),
         }
     }
 }

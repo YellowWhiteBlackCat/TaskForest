@@ -131,9 +131,21 @@ impl PageScaffold {
             .min_w(px(0.0))
             .min_h(px(0.0))
             .w_full()
+            // The data-page family's ONE outer shell (ADR-041): the
+            // render-path guard proves every non-chart page paints through
+            // this selector, so a skeleton adjustment propagates to all of
+            // them from this single place.
+            .debug_selector(|| "tm-page-scaffold".to_string())
             .child(self.frame.render());
         if let Some(footer) = self.footer {
-            scaffold = scaffold.child(div().flex_shrink_0().min_w(px(0.0)).w_full().child(footer));
+            scaffold = scaffold.child(
+                div()
+                    .flex_shrink_0()
+                    .min_w(px(0.0))
+                    .w_full()
+                    .debug_selector(|| "tm-page-scaffold-footer".to_string())
+                    .child(footer),
+            );
         }
         scaffold
     }
