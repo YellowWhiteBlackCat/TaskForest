@@ -92,10 +92,9 @@ if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ] \
 fi
 mkdir -p "$OUT" "$STAGED" "$TMP" "$SCRATCH_ROOT"
 # Niri puts its IPC socket below XDG_RUNTIME_DIR. Keep this private runtime on
-# the repository NVMe, but deliberately short: Linux sockaddr_un caps the path
 # at SUN_LEN and the repository/lease path is already long. Cargo scratch and
 # build output still use the agent lease supplied by the caller.
-NIRI_RUNTIME="$(mktemp -d "$SCRATCH_ROOT/niri.XXXXXX")"
+NIRI_RUNTIME="$(mktemp -d /tmp/taskforest-niri.XXXXXX)"
 chmod 700 "$NIRI_RUNTIME"
 NIRI_PID=""
 NIRI_PGID=""
@@ -185,6 +184,9 @@ cleanup() {
   terminate_owned "$APP_PID" "$APP_PGID"
   terminate_owned "$NIRI_PID" "$NIRI_PGID"
   terminate_owned "$KWIN_PID" "$KWIN_PGID"
+  if [ -n "$KWIN_RUNTIME" ] && [ -d "$KWIN_RUNTIME" ]; then
+    rm -rf -- "$KWIN_RUNTIME"
+  fi
   # A failed run keeps its private runtime tree (per-scenario XDG config/data
   # homes) so the fixture state can be inspected post-mortem.
   if [ "${FAILURES:-0}" -gt 0 ]; then
@@ -305,11 +307,19 @@ start_niri() {
 
   SOCK=""
   for i in $(seq 1 40); do
-    SOCK="$(grep -oE 'wayland-[0-9]+' "$niri_log" | head -1)"
+    SOCK="$(find "$NIRI_RUNTIME" -maxdepth 1 -type s -name 'wayland-[0-9]*' \
+      -printf '%f\n' -quit 2>/dev/null || true)"
+    if [ -z "$SOCK" ]; then
+      SOCK="$(grep -oE 'wayland-[0-9]+' "$niri_log" | head -1 || true)"
+    fi
     [ -n "$SOCK" ] && [ -S "$NIRI_RUNTIME/$SOCK" ] && break
     sleep 0.2
   done
-  IPC="$(grep -oE "$NIRI_RUNTIME/niri\.[^ ]*\.sock" "$niri_log" | head -1)"
+  IPC="$(find "$NIRI_RUNTIME" -maxdepth 1 -type s -name 'niri.*.sock' \
+    -print -quit 2>/dev/null || true)"
+  if [ -z "$IPC" ]; then
+    IPC="$(grep -oE "$NIRI_RUNTIME/niri\.[^ ]*\.sock" "$niri_log" | head -1 || true)"
+  fi
   if ! kill -0 "$NIRI_PID" 2>/dev/null || [ -z "$SOCK" ] || [ -z "$IPC" ]; then
     printf 'niri did not start nested; tail of log:\n'
     tail -8 "$niri_log"
@@ -401,7 +411,9 @@ start_capture_host() {
   # backend inside a private virtual KWin compositor so the capture remains
   # a real Wayland/Niri render while no test window can steal the operator's
   # desktop focus or paint over the current work.
-  KWIN_RUNTIME="$NIRI_RUNTIME/kwin-runtime"
+  # Keep the socket path below Linux's sockaddr_un limit even when the
+  # checkout itself lives under a long mounted workspace path.
+  KWIN_RUNTIME="$(mktemp -d /tmp/taskforest-kwin.XXXXXX)"
   KWIN_DISPLAY="$KWIN_RUNTIME/wayland-outer"
   mkdir -p "$KWIN_RUNTIME"
   chmod 700 "$KWIN_RUNTIME"

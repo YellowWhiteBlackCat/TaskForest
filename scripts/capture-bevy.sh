@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Capture the current taskforest-b build in a private nested Wayland/Niri
 # compositor. The app id, PID and Niri window id are matched exactly;
-# focused-window or stale PNG capture is not accepted.
+# focused-window or stale PNG capture is not accepted. By default Niri is
+# hosted by a private virtual KWin framebuffer, so the operator's desktop is
+# not disturbed; set TM_CAPTURE_NIRI_BACKGROUND=0 for visible debugging.
 set -euo pipefail
 export LC_ALL=C
 
@@ -19,10 +21,18 @@ mkdir -p "$RUN_DIR"
 die() { printf 'Bevy Wayland capture: FAIL: %s\n' "$1" >&2; exit 1; }
 need() { command -v "$1" >/dev/null 2>&1 || die "required command unavailable: $1"; }
 
-for command in cargo niri jq file setsid timeout sha256sum; do need "$command"; done
+for command in cargo niri jq file setsid timeout sha256sum ps; do need "$command"; done
 [ -n "${WAYLAND_DISPLAY:-}" ] || die 'WAYLAND_DISPLAY is not set'
 [ -n "${XDG_RUNTIME_DIR:-}" ] || die 'XDG_RUNTIME_DIR is not set'
 [ -s "$MATRIX" ] || die "missing capture matrix: $MATRIX"
+CAPTURE_NIRI_BACKGROUND="${TM_CAPTURE_NIRI_BACKGROUND:-1}"
+case "$CAPTURE_NIRI_BACKGROUND" in
+    0|1) ;;
+    *) die 'TM_CAPTURE_NIRI_BACKGROUND must be 0 or 1' ;;
+esac
+if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+    need kwin_wayland
+fi
 HOST_XDG_RUNTIME_DIR="$XDG_RUNTIME_DIR"
 HOST_WAYLAND_DISPLAY="$WAYLAND_DISPLAY"
 
@@ -37,12 +47,54 @@ install -Dm755 "$REPO/target/debug/taskforest-b" "$APP"
 BINARY_SHA256="$(sha256sum "$APP" | cut -d' ' -f1)"
 SOURCE_MANIFEST_SHA256="$(sha256sum "$SOURCE_MANIFEST" | cut -d' ' -f1)"
 
-RUNTIME_DIR="$(mktemp -d "$REPO/.tmp/bevy-wayland.XXXXXX")"
+# Keep Niri's IPC and Wayland socket paths below Linux's sockaddr_un limit even
+# when the checkout itself lives under a long mounted workspace path.
+RUNTIME_DIR="$(mktemp -d /tmp/taskforest-bevy.XXXXXX)"
 NIRI_PID=""
+NIRI_PGID=""
+KWIN_PID=""
+KWIN_PGID=""
+KWIN_RUNTIME=""
+KWIN_DISPLAY=""
+NIRI_PARENT_WAYLAND="$HOST_WAYLAND_DISPLAY"
+
+process_group() {
+    local pid="$1"
+    ps -o pgid= -p "$pid" 2>/dev/null | tr -d '[:space:]'
+}
+
+terminate_owned() {
+    local pid="$1" pgid="$2"
+    [ -n "$pid" ] || return 0
+    if [[ "$pgid" =~ ^[0-9]+$ ]] && [ "$pgid" = "$pid" ]; then
+        kill -TERM -- "-$pgid" 2>/dev/null || true
+    else
+        kill -TERM "$pid" 2>/dev/null || true
+    fi
+    for _ in $(seq 1 20); do
+        if [[ "$pgid" =~ ^[0-9]+$ ]] && [ "$pgid" = "$pid" ]; then
+            kill -0 -- "-$pgid" 2>/dev/null || break
+        else
+            kill -0 "$pid" 2>/dev/null || break
+        fi
+        sleep 0.1
+    done
+    if [[ "$pgid" =~ ^[0-9]+$ ]] && [ "$pgid" = "$pid" ]; then
+        kill -0 -- "-$pgid" 2>/dev/null && kill -KILL -- "-$pgid" 2>/dev/null || true
+    elif kill -0 "$pid" 2>/dev/null; then
+        kill -KILL "$pid" 2>/dev/null || true
+    fi
+    wait "$pid" 2>/dev/null || true
+}
+
 cleanup() {
     if [ -n "$NIRI_PID" ] && kill -0 "$NIRI_PID" 2>/dev/null; then
         kill "$NIRI_PID" 2>/dev/null || true
         wait "$NIRI_PID" 2>/dev/null || true
+    fi
+    terminate_owned "$KWIN_PID" "$KWIN_PGID"
+    if [ -n "$KWIN_RUNTIME" ] && [ -d "$KWIN_RUNTIME" ]; then
+        rm -rf -- "$KWIN_RUNTIME"
     fi
     rm -rf "$RUNTIME_DIR"
 }
@@ -62,19 +114,63 @@ window-rule {
 }
 KDL
 timeout 10s niri validate --config "$CONF"
-# The nested compositor is itself a Wayland client of the real host compositor.
-# Keep the host runtime for this connection; only child applications switch to
-# the socket that nested Niri creates below.
-XDG_RUNTIME_DIR="$HOST_XDG_RUNTIME_DIR" WAYLAND_DISPLAY="$HOST_WAYLAND_DISPLAY" \
-    LIBGL_ALWAYS_SOFTWARE=1 setsid timeout --foreground --kill-after=10s 20m \
+
+start_capture_host() {
+    if [ "$CAPTURE_NIRI_BACKGROUND" -eq 0 ]; then
+        return 0
+    fi
+    # Keep the socket path below Linux's sockaddr_un limit even when the
+    # checkout itself lives under a long mounted workspace path.
+    KWIN_RUNTIME="$(mktemp -d /tmp/taskforest-bevy-kwin.XXXXXX)"
+    KWIN_DISPLAY="$KWIN_RUNTIME/wayland-outer"
+    mkdir -p "$KWIN_RUNTIME"
+    chmod 700 "$KWIN_RUNTIME"
+    XDG_RUNTIME_DIR="$KWIN_RUNTIME" WAYLAND_DISPLAY= DISPLAY= \
+        QT_QPA_PLATFORM=wayland setsid timeout --foreground --kill-after=10s 20m \
+        kwin_wayland --virtual --socket=wayland-outer --width=1920 --height=1080 \
+        --scale=1 --no-global-shortcuts --no-lockscreen \
+        >"$RUN_DIR/kwin-wayland.log" 2>&1 &
+    KWIN_PID=$!
+    KWIN_PGID=""
+    for _ in $(seq 1 40); do
+        KWIN_PGID="$(process_group "$KWIN_PID")"
+        [ "$KWIN_PGID" = "$KWIN_PID" ] && break
+        sleep 0.1
+    done
+    [ "$KWIN_PGID" = "$KWIN_PID" ] || die 'virtual KWin did not obtain a private process group'
+    for _ in $(seq 1 40); do
+        [ -S "$KWIN_DISPLAY" ] && break
+        sleep 0.2
+    done
+    if ! kill -0 "$KWIN_PID" 2>/dev/null || [ ! -S "$KWIN_DISPLAY" ]; then
+        tail -20 "$RUN_DIR/kwin-wayland.log" >&2 || true
+        die 'virtual KWin did not start'
+    fi
+    NIRI_PARENT_WAYLAND="$KWIN_DISPLAY"
+    printf 'background capture host: kwin-wayland --virtual (%s)\n' "$KWIN_DISPLAY"
+}
+
+start_capture_host
+
+XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$NIRI_PARENT_WAYLAND" \
+    LIBGL_ALWAYS_SOFTWARE=1 RUST_LOG=niri=info setsid timeout --foreground --kill-after=10s 20m \
     niri --config "$CONF" >"$RUN_DIR/niri.log" 2>&1 &
 NIRI_PID=$!
+NIRI_PGID="$(process_group "$NIRI_PID")"
 
 SOCK=""; IPC=""
 for _ in $(seq 1 80); do
-    SOCK="$(grep -oE 'wayland-[0-9]+' "$RUN_DIR/niri.log" | head -1 || true)"
-    IPC="$(grep -oE "$HOST_XDG_RUNTIME_DIR/niri\.[^ ]*\.sock" "$RUN_DIR/niri.log" | head -1 || true)"
-    if [ -n "$SOCK" ] && [ -S "$HOST_XDG_RUNTIME_DIR/$SOCK" ] && [ -n "$IPC" ]; then break; fi
+    SOCK="$(find "$RUNTIME_DIR" -maxdepth 1 -type s -name 'wayland-[0-9]*' \
+        -printf '%f\n' -quit 2>/dev/null || true)"
+    if [ -z "$SOCK" ]; then
+        SOCK="$(grep -oE 'wayland-[0-9]+' "$RUN_DIR/niri.log" | head -1 || true)"
+    fi
+    IPC="$(find "$RUNTIME_DIR" -maxdepth 1 -type s -name 'niri.*.sock' \
+        -print -quit 2>/dev/null || true)"
+    if [ -z "$IPC" ]; then
+        IPC="$(grep -oE "$RUNTIME_DIR/niri\.[^ ]*\.sock" "$RUN_DIR/niri.log" | head -1 || true)"
+    fi
+    if [ -n "$SOCK" ] && [ -S "$RUNTIME_DIR/$SOCK" ] && [ -n "$IPC" ]; then break; fi
     sleep 0.2
 done
 if grep -q 'NoCompositor' "$RUN_DIR/niri.log" 2>/dev/null; then
@@ -107,7 +203,7 @@ capture_one() {
     local width=0 height=0 bytes=0 hash=- status=failed app_pid="" window_id=""
     local expected_width expected_height
     IFS=x read -r expected_width expected_height <<<"$window_size"
-    XDG_RUNTIME_DIR="$HOST_XDG_RUNTIME_DIR" WAYLAND_DISPLAY="$SOCK" \
+    XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$SOCK" \
         TM_BEVY_CAPTURE_PAGE="$page" TM_BEVY_WINDOW_SIZE="$window_size" \
         LIBGL_ALWAYS_SOFTWARE=1 setsid "$APP" --demo >"$log" 2>&1 &
     app_pid=$!
@@ -183,6 +279,12 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf 'binary_sha256=%s\n' "$BINARY_SHA256"
     printf 'app_id=%s\n' "$APP_ID"
     printf 'capture_backend=niri-screenshot-window-wayland\n'
+    if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+        printf 'niri_host=kwin-wayland-virtual\n'
+    else
+        printf 'niri_host=host-wayland-visible\n'
+    fi
+    printf 'niri_background=%s\n' "$CAPTURE_NIRI_BACKGROUND"
     printf 'matrix=scripts/capture_bevy_scenarios.tsv\n'
     printf 'scenario_count=%s\n' "$COUNT"
     printf 'source_scope=bevy\n'

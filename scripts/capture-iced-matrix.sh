@@ -5,7 +5,9 @@
 # private compositor, launch one scenario at a time, bind each screenshot to
 # its exact PID/app-id/window-id, and validate the complete receipt at the end.
 # It never starts one compositor per device and never publishes partial Iced
-# evidence into the public documentation tree.
+# evidence into the public documentation tree. By default the nested Niri runs
+# inside a private virtual KWin host, so the operator's desktop is untouched;
+# set TM_CAPTURE_NIRI_BACKGROUND=0 only for visible compositor debugging.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -25,7 +27,9 @@ else
 fi
 RUN_ID="${RUN_STAMP}_${GIT_HEAD}_${WORKTREE_STATE}_$$"
 RUN_DIR="$EVIDENCE_ROOT/$RUN_ID"
-RUNTIME_DIR="$(mktemp -d "$REPO/.tmp/iced-niri.XXXXXX")"
+# Keep Niri's IPC and Wayland socket paths below Linux's sockaddr_un limit even
+# when the checkout itself lives under a long mounted workspace path.
+RUNTIME_DIR="$(mktemp -d /tmp/taskforest-iced-niri.XXXXXX)"
 CONF="$RUN_DIR/config.kdl"
 METADATA="$RUN_DIR/iced-capture-metadata.txt"
 SOURCE_MANIFEST="$RUN_DIR/iced-source-manifest.sha256"
@@ -35,10 +39,16 @@ MATRIX_RECEIPT="$RUN_DIR/iced-capture-validation.json"
 HOST_XDG="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 HOST_DISPLAY="$HOST_XDG/${WAYLAND_DISPLAY:-wayland-0}"
 APP_ID="io.github.YellowWhiteBlackCat.TaskForestI"
+CAPTURE_NIRI_BACKGROUND="${TM_CAPTURE_NIRI_BACKGROUND:-1}"
 NIRI_PID=""
 NIRI_PGID=""
 APP_PID=""
 APP_PGID=""
+KWIN_PID=""
+KWIN_PGID=""
+KWIN_RUNTIME=""
+KWIN_DISPLAY=""
+NIRI_PARENT_WAYLAND="$HOST_DISPLAY"
 
 mkdir -p "$RUN_DIR"
 chmod 700 "$RUNTIME_DIR"
@@ -75,6 +85,10 @@ terminate_owned() {
 cleanup() {
   terminate_owned "$APP_PID" "$APP_PGID"
   terminate_owned "$NIRI_PID" "$NIRI_PGID"
+  terminate_owned "$KWIN_PID" "$KWIN_PGID"
+  if [ -n "$KWIN_RUNTIME" ] && [ -d "$KWIN_RUNTIME" ]; then
+    rm -rf -- "$KWIN_RUNTIME"
+  fi
   if [ -d "$RUNTIME_DIR" ]; then
     rm -rf -- "$RUNTIME_DIR"
   fi
@@ -92,6 +106,19 @@ for command in cargo file git jq niri rustc sha256sum setsid stat timeout; do
     exit 2
   }
 done
+case "$CAPTURE_NIRI_BACKGROUND" in
+  0|1) ;;
+  *)
+    printf 'TM_CAPTURE_NIRI_BACKGROUND must be 0 or 1: %s\n' \
+      "$CAPTURE_NIRI_BACKGROUND" >&2
+    exit 2
+    ;;
+esac
+if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ] \
+  && ! command -v kwin_wayland >/dev/null 2>&1; then
+  printf 'background Iced capture requires kwin_wayland --virtual; set TM_CAPTURE_NIRI_BACKGROUND=0 for visible nested debug mode\n' >&2
+  exit 2
+fi
 
 MATRIX="$CANONICAL_MATRIX"
 CAPTURE_SCOPE=full-matrix
@@ -192,6 +219,12 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'nested_output_logical=%s\n' 'pending'
   printf 'source_scope=iced\n'
   printf 'source_manifest_sha256=%s\n' "$SOURCE_MANIFEST_SHA256"
+  if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+    printf 'niri_host=kwin-wayland-virtual\n'
+  else
+    printf 'niri_host=host-wayland-visible\n'
+  fi
+  printf 'niri_background=%s\n' "$CAPTURE_NIRI_BACKGROUND"
   printf 'command=bash scripts/capture-iced.sh\n'
 } >"$METADATA"
 printf 'scenario\tdevice\trequested_window\timage\tmarkers\twindows\taction\tapp_pid\twindow_id\twidth\theight\tbytes\tsha256\tstatus\n' >"$MANIFEST"
@@ -211,8 +244,55 @@ window-rule {
 KDL
 timeout 10s niri validate --config "$CONF"
 
-XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$HOST_DISPLAY" \
-  LIBGL_ALWAYS_SOFTWARE=1 \
+start_capture_host() {
+  if [ "$CAPTURE_NIRI_BACKGROUND" -eq 0 ]; then
+    return 0
+  fi
+
+  # Niri's nested winit backend is a host window. Put that backend inside a
+  # private virtual KWin compositor so no capture window can steal focus or
+  # paint over the operator's current desktop.
+  # Keep the socket path below Linux's sockaddr_un limit even when the
+  # checkout itself lives under a long mounted workspace path.
+  KWIN_RUNTIME="$(mktemp -d /tmp/taskforest-iced-kwin.XXXXXX)"
+  KWIN_DISPLAY="$KWIN_RUNTIME/wayland-outer"
+  mkdir -p "$KWIN_RUNTIME"
+  chmod 700 "$KWIN_RUNTIME"
+  local kwin_log="$RUN_DIR/kwin-wayland.log"
+  XDG_RUNTIME_DIR="$KWIN_RUNTIME" WAYLAND_DISPLAY= DISPLAY= \
+    QT_QPA_PLATFORM=wayland setsid timeout --foreground --kill-after=10s 20m \
+    kwin_wayland --virtual --socket=wayland-outer --width=1920 --height=1080 \
+      --scale=1 --no-global-shortcuts --no-lockscreen \
+      &>"$kwin_log" & KWIN_PID=$!
+  KWIN_PGID=""
+  local i
+  for i in $(seq 1 40); do
+    KWIN_PGID="$(process_group "$KWIN_PID")"
+    [ "$KWIN_PGID" = "$KWIN_PID" ] && break
+    sleep 0.1
+  done
+  if [ "$KWIN_PGID" != "$KWIN_PID" ]; then
+    printf 'virtual KWin did not obtain a private process group; evidence retained at %s\n' \
+      "$RUN_DIR" >&2
+    return 1
+  fi
+  for i in $(seq 1 40); do
+    [ -S "$KWIN_DISPLAY" ] && break
+    sleep 0.2
+  done
+  if ! kill -0 "$KWIN_PID" 2>/dev/null || [ ! -S "$KWIN_DISPLAY" ]; then
+    printf 'virtual KWin did not start; tail of log:\n' >&2
+    tail -20 "$kwin_log" >&2
+    return 1
+  fi
+  NIRI_PARENT_WAYLAND="$KWIN_DISPLAY"
+  printf 'background capture host: kwin-wayland --virtual (%s)\n' "$KWIN_DISPLAY"
+}
+
+start_capture_host || exit 1
+
+XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$NIRI_PARENT_WAYLAND" \
+  LIBGL_ALWAYS_SOFTWARE=1 RUST_LOG=niri=info \
   setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" \
   >"$RUN_DIR/niri.log" 2>&1 &
 NIRI_PID=$!
@@ -225,8 +305,16 @@ NIRI_PGID="$(process_group "$NIRI_PID")"
 SOCK=""
 IPC=""
 for _ in $(seq 1 60); do
-  SOCK="$(grep -oE 'wayland-[0-9]+' "$RUN_DIR/niri.log" | head -1 || true)"
-  IPC="$(grep -oE "$RUNTIME_DIR/niri\.[^ ]*\.sock" "$RUN_DIR/niri.log" | head -1 || true)"
+  SOCK="$(find "$RUNTIME_DIR" -maxdepth 1 -type s -name 'wayland-[0-9]*' \
+    -printf '%f\n' -quit 2>/dev/null || true)"
+  if [ -z "$SOCK" ]; then
+    SOCK="$(grep -oE 'wayland-[0-9]+' "$RUN_DIR/niri.log" | head -1 || true)"
+  fi
+  IPC="$(find "$RUNTIME_DIR" -maxdepth 1 -type s -name 'niri.*.sock' \
+    -print -quit 2>/dev/null || true)"
+  if [ -z "$IPC" ]; then
+    IPC="$(grep -oE "$RUNTIME_DIR/niri\.[^ ]*\.sock" "$RUN_DIR/niri.log" | head -1 || true)"
+  fi
   if [ -n "$SOCK" ] && [ -S "$RUNTIME_DIR/$SOCK" ] && [ -n "$IPC" ]; then
     break
   fi
