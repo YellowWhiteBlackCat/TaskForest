@@ -289,36 +289,40 @@ fn wrapped_toolbar_columns_match_the_pre_port_chunk_breakpoint() {
 }
 
 #[test]
-fn device_navigation_preserves_the_pre_port_compact_flag_decision() {
-    // The oracle is the pre-port page condition: the Iced compact flag
-    // (820px width OR 540px height). The typed presentation must agree with
-    // the app's live compact decision at every boundary, including the
-    // short-but-wide windows the GPUI width-only grid would have flipped.
+fn device_navigation_follows_the_frame_budget_slot_authority() {
+    // The pre-port compact flag (820px width OR 540px height) is RETIRED: the
+    // one authority is the typed slot allocation from the real tracked
+    // viewport (GPUI `from_frame` parity). The strip appears when the sidebar
+    // is hidden OR the frame cannot carry all three semantic slots — never
+    // merely because a window is short.
     let cases = [
-        (819.0, 700.0),
-        (820.0, 700.0),
-        (821.0, 700.0),
-        (1000.0, 539.0),
-        (1000.0, 540.0),
-        (1000.0, 541.0),
-        (720.0, 480.0),
-        (900.0, 500.0),
-        (1180.0, 780.0),
-        (1920.0, 1080.0),
+        // (width, height, sidebar_visible, expected_strip)
+        (719.0, 700.0, true, true),  // workspace below the sidebar floor
+        (803.0, 700.0, true, true),  // still below the UltraCompact slot floor
+        (900.0, 700.0, true, false), // all three slots fit
+        (1920.0, 1080.0, true, false),
+        (1920.0, 1080.0, false, true), // hidden sidebar collapses to the strip
+        // Short-but-wide windows KEEP the sidebar (the vertical ladder owns
+        // height degradation, not the navigation axis).
+        (1280.0, 420.0, true, false),
+        (1000.0, 500.0, true, false),
     ];
-    for (width, height) in cases {
-        let expected = if width <= 820.0 || height <= 540.0 {
-            DeviceNavigationPresentation::Strip
-        } else {
-            DeviceNavigationPresentation::Sidebar
-        };
-        let mut app = crate::IcedApp::demo_for_capture();
-        let _ = app.update(Message::WindowResized(frame(width, height)));
+    for (width, height, sidebar_visible, expected_strip) in cases {
+        let budget = PerformancePageBudget::for_perf_frame(frame(width, height), sidebar_visible);
+        let actual_strip = budget.device_navigation == DeviceNavigationPresentation::Strip;
         assert_eq!(
-            DeviceNavigationPresentation::for_compact_frame(app.compact_layout()),
-            expected,
-            "device navigation must keep the pre-port decision at {width}x{height}"
+            actual_strip, expected_strip,
+            "device navigation must follow the slot allocation at {width}x{height} (sidebar visible: {sidebar_visible})"
         );
+        // The hidden sidebar keeps every device reachable through the strip;
+        // a visible sidebar that cannot fit moves the same devices to the
+        // strip — the preference is never silently discarded, only deferred.
+        if !sidebar_visible {
+            assert_eq!(
+                budget.sidebar_width, 0.0,
+                "a strip frame carries no sidebar slot"
+            );
+        }
     }
 }
 

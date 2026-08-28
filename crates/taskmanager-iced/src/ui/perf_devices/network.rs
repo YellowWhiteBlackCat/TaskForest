@@ -3,8 +3,10 @@
 use std::rc::Rc;
 
 use super::*;
-use iced::widget::column;
+use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
+
+use super::super::responsive::{DeviceNavigationPresentation, PerformancePageBudget};
 
 /// The Performance-page per-NIC panel readiness, mirroring the GPU/disk
 /// panels' Loading/Empty/Ready states.
@@ -17,20 +19,33 @@ pub(crate) fn network_section_state(snapshot: Option<&SystemSnapshot>) -> tables
     }
 }
 
-/// One network adapter's display identity: the typed adapter category (the
-/// six-way `NetworkAdapterType` classification, shared with the device rail
-/// via [`super::super::perf_rail::network_category_label`]) plus the interface
-/// name when known, else the stable device id, else the category alone.
+/// One network adapter's display identity (GPUI `network_title` parity): an
+/// associated Wi-Fi link surfaces its SSID as the page heading ("Wi-Fi: ssid
+/// (iface)"); an unassociated wireless link keeps the wireless label; every
+/// other adapter carries its typed category plus the interface name.
 #[must_use]
 pub(crate) fn network_title(nic: &NetworkMetrics) -> String {
+    let is_wireless = nic.adapter_type() == NetworkAdapterType::WiFi;
     let category = super::super::perf_rail::network_category_label(nic.adapter_type());
-    let name = (!nic.interface_name.trim().is_empty())
-        .then(|| nic.interface_name.trim().to_string())
-        .or_else(|| (!nic.device_id.trim().is_empty()).then(|| nic.device_id.trim().to_string()));
-    match name {
-        Some(name) => format!("{category}: {name}"),
-        None => category,
+    match (is_wireless, nic.current_ssid()) {
+        (true, Some(ssid)) if !ssid.is_empty() => {
+            format!("{}: {} ({})", t("sidebar.wifi"), ssid, nic.interface_name)
+        }
+        (true, _) => format!("{} ({})", t("sidebar.wireless"), nic.interface_name),
+        (false, _) => format!("{} ({})", category, nic.interface_name),
     }
+}
+
+/// The network page's undroppable one-line fact (GPUI `network_vital_line`
+/// parity): adapter health plus the negotiated link speed when the platform
+/// reports it.
+#[must_use]
+pub(crate) fn network_vital_line(nic: &NetworkMetrics) -> String {
+    let mut segments = vec![t(device_status_i18n_key(nic.device_state.status)).to_string()];
+    if let Some(speed) = nic.current_link_speed_mbps() {
+        segments.push(format!("{speed} Mbps"));
+    }
+    segments.join(" · ")
 }
 
 /// The single dBm → percentage mapping for Wi-Fi signal quality
@@ -55,121 +70,95 @@ pub(crate) fn network_connected(nic: &NetworkMetrics) -> bool {
     }
 }
 
-/// The physical NIC model and kernel driver as a dedicated hardware card —
-/// only rows with a proven value; a missing driver never renders a dash.
-#[must_use]
-pub(crate) fn network_hardware_rows(nic: &NetworkMetrics) -> Vec<(String, String)> {
-    let mut rows = Vec::new();
-    if let Some(adapter) = nic.adapter.as_deref().filter(|text| !text.is_empty()) {
-        rows.push((t("common.adapter").to_string(), adapter.to_string()));
-    }
-    if let Some(driver) = nic.driver.as_deref().filter(|text| !text.is_empty()) {
-        rows.push((t("common.driver").to_string(), driver.to_string()));
-    }
-    rows
-}
-
-/// Project one network adapter's honest scalar readouts as label/value rows
-/// for the Performance page. Unavailable observations render "—" or are
-/// omitted entirely so a missing provider cannot masquerade as a measured zero.
+/// Project one network adapter's honest scalar readouts as pre-folded shell
+/// [`StatRow`]s (GPUI `network_stats` parity: one fold, three renderers). A
+/// field that exists on this host but whose current sample is missing keeps
+/// its row with `None` (the shared dash); a field that simply does not exist
+/// here (no IPv6 address, unknown link speed) omits its row entirely instead
+/// of parking a permanent dash.
 #[must_use]
 pub(crate) fn network_summary_lines(
     nic: &NetworkMetrics,
     use_bytes: bool,
     use_base2: bool,
-) -> Vec<(String, String)> {
+) -> Vec<StatRow> {
     let observed = super::projection::NetworkObservation::from(nic);
     // The Type row carries the typed six-way classification, not the legacy
     // wireless boolean. Association facts below still require WiFi.
     let type_label = super::super::perf_rail::network_category_label(nic.adapter_type());
     let is_wireless = nic.adapter_type() == NetworkAdapterType::WiFi;
+    let rate = |value: Option<u64>| value.map(|v| rate_text_pref(Some(v), use_bytes, use_base2));
     let mut rows = vec![
-        (
-            t("device.status").to_string(),
-            t(device_status_i18n_key(nic.device_state.status)).to_string(),
+        StatRow::text(
+            t("device.status"),
+            Some(t(device_status_i18n_key(nic.device_state.status)).to_string()),
         ),
-        (
-            t("net.receive").to_string(),
-            rate_text_pref(observed.rx_bytes_per_sec, use_bytes, use_base2),
+        StatRow::text(t("net.receive"), rate(observed.rx_bytes_per_sec)),
+        StatRow::text(t("net.send"), rate(observed.tx_bytes_per_sec)),
+        StatRow::text(
+            t("net.connection"),
+            Some(if network_connected(nic) {
+                t("common.connected").to_string()
+            } else {
+                t("common.disconnected").to_string()
+            }),
         ),
-        (
-            t("net.send").to_string(),
-            rate_text_pref(observed.tx_bytes_per_sec, use_bytes, use_base2),
-        ),
-        (
-            t("net.link").to_string(),
+        StatRow::text(
+            t("net.total_received"),
             observed
-                .link_speed_mbps
-                .map(|speed| format!("{speed} Mbps"))
-                .unwrap_or_else(missing_value),
+                .total_rx_bytes
+                .map(|v| quantity_text_pref(v, use_bytes, use_base2)),
         ),
-        (t("common.type").to_string(), type_label.to_string()),
+        StatRow::text(
+            t("net.total_sent"),
+            observed
+                .total_tx_bytes
+                .map(|v| quantity_text_pref(v, use_bytes, use_base2)),
+        ),
+        StatRow::text(t("common.type"), Some(type_label.to_string())),
     ];
 
-    for (label, value) in [
-        (t("net.ipv4"), nic.ipv4_addr.as_deref()),
-        (t("net.ipv6"), nic.ipv6_addr.as_deref()),
-        (t("net.mac"), nic.mac_addr.as_deref()),
-    ] {
-        rows.push((
-            label.to_string(),
-            value
-                .filter(|text| !text.is_empty())
-                .map_or_else(missing_value, str::to_owned),
-        ));
+    // ── Address facts: rows exist only when the address exists ──
+    if let Some(ipv4) = nic.ipv4_addr.as_deref().filter(|text| !text.is_empty()) {
+        rows.push(StatRow::text(t("net.ipv4"), Some(ipv4.to_owned())));
     }
-
-    let connected = network_connected(nic);
-    rows.push((
-        t("net.connection").to_string(),
-        if connected {
-            t("common.connected").to_string()
-        } else {
-            t("common.disconnected").to_string()
-        },
-    ));
-
-    if let Some(total) = observed.total_rx_bytes {
-        rows.push((
-            t("net.total_received").to_string(),
-            quantity_text_pref(total, use_bytes, use_base2),
-        ));
+    if let Some(ipv6) = nic.ipv6_addr.as_deref().filter(|text| !text.is_empty()) {
+        rows.push(StatRow::text(t("net.ipv6"), Some(ipv6.to_owned())));
     }
-    if let Some(total) = observed.total_tx_bytes {
-        rows.push((
-            t("net.total_sent").to_string(),
-            quantity_text_pref(total, use_bytes, use_base2),
+    if let Some(mac) = nic.mac_addr.as_deref().filter(|text| !text.is_empty()) {
+        rows.push(StatRow::text(t("net.mac"), Some(mac.to_owned())));
+    }
+    // ── Link speed: absent speed omits the row (and the utilization row
+    // below is keyed on the same fact, so the pair appears together). ──
+    if let Some(speed) = observed.link_speed_mbps {
+        rows.push(StatRow::text(t("net.link"), Some(format!("{speed} Mbps"))));
+        rows.push(StatRow::text(
+            t("common.utilization"),
+            observed
+                .utilization_pct
+                .map(|value| format!("{:.0}%", value.round())),
         ));
     }
     if let Some(driver) = nic.driver.as_deref().filter(|text| !text.is_empty()) {
-        rows.push((t("common.driver").to_string(), driver.to_string()));
+        rows.push(StatRow::text(t("common.driver"), Some(driver.to_string())));
     }
     if let Some(adapter) = nic.adapter.as_deref().filter(|text| !text.is_empty()) {
-        rows.push((t("common.adapter").to_string(), adapter.to_string()));
-    }
-
-    if observed.link_speed_mbps.is_some() {
-        rows.push((
-            t("common.utilization").to_string(),
-            observed
-                .utilization_pct
-                .map_or_else(missing_value, |value| format!("{:.0}%", value.round())),
+        rows.push(StatRow::text(
+            t("common.adapter"),
+            Some(adapter.to_string()),
         ));
     }
 
     if is_wireless {
-        if let Some(ssid) = observed.ssid.as_deref() {
-            rows.push(("SSID".to_string(), ssid.to_string()));
-        }
         if let Some(dbm) = observed.signal_dbm {
             let quality = wifi_signal_quality_percent(dbm);
-            rows.push((
-                t("common.signal").to_string(),
-                format!("{dbm} dBm ({quality:.0}%)"),
+            rows.push(StatRow::text(
+                t("common.signal"),
+                Some(format!("{dbm} dBm ({quality:.0}%)")),
             ));
         }
         if let Some(bssid) = observed.bssid.as_deref() {
-            rows.push((t("net.bssid").to_string(), bssid.to_owned()));
+            rows.push(StatRow::text(t("net.bssid"), Some(bssid.to_owned())));
         }
         let mut details = Vec::new();
         if let Some(protocol) = observed.protocol.as_deref() {
@@ -188,7 +177,10 @@ pub(crate) fn network_summary_lines(
             details.push(format!("{} {rate} Mbps", t("net.tx_rate")));
         }
         if !details.is_empty() {
-            rows.push((t("net.wireless_details").to_string(), details.join(" · ")));
+            rows.push(StatRow::text(
+                t("net.wireless_details"),
+                Some(details.join(" · ")),
+            ));
         }
     }
     rows
@@ -199,10 +191,12 @@ pub(crate) fn network_summary_lines(
 pub(crate) fn network_section(
     app: &crate::IcedApp,
     index: usize,
+    budget: PerformancePageBudget,
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let snapshot = app.shell.projection().snapshot.as_ref();
     let theme_snapshot = app.theme();
     let color = theme::color(theme_snapshot.network);
+    let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let rows = match (network_section_state(snapshot), snapshot) {
         (tables::ListState::Loading, _) => {
             vec![tables::message_panel(
@@ -228,9 +222,10 @@ pub(crate) fn network_section(
                     nic,
                     color,
                     theme_snapshot,
-                    app.compact_layout(),
+                    compact,
                     app.network_units(),
                     graph,
+                    budget,
                 )]
             }
             None => vec![tables::message_panel(theme_snapshot, t("network.empty"))],
@@ -245,6 +240,7 @@ pub(crate) fn network_section(
     device_rows_panel(rows, theme_snapshot)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn network_block<'a>(
     app: &'a crate::IcedApp,
     nic: &NetworkMetrics,
@@ -253,6 +249,7 @@ fn network_block<'a>(
     compact: bool,
     units: UnitPrefs,
     graph: device_chart::GraphPrefs,
+    budget: PerformancePageBudget,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let observed = super::projection::NetworkObservation::from(nic);
     let (rx_samples, tx_samples) =
@@ -375,50 +372,21 @@ fn network_block<'a>(
             );
         }
     }
-    let hardware_rows = network_hardware_rows(nic);
-    if !hardware_rows.is_empty() {
-        let cells: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = hardware_rows
-            .iter()
-            .map(|(label, value)| {
-                row![
-                    text(label.clone())
-                        .width(iced::Length::Fixed(110.0))
-                        .size(f32::from(tokens::FONT_12)),
-                    text(value.clone())
-                        .size(f32::from(tokens::FONT_12))
-                        .width(iced::Length::Fill),
-                ]
-                .spacing(8)
-                .padding(2)
-                .width(iced::Length::Fill)
-                .into()
-            })
-            .collect();
-        graphs.push(
-            container(
-                column![
-                    text(t("common.hardware")).size(f32::from(tokens::FONT_13)),
-                    column(cells).spacing(1),
-                ]
-                .spacing(4),
-            )
-            .style(move |_| theme::card_style(theme_snapshot))
-            .padding(8)
-            .width(iced::Length::Fill)
-            .into(),
-        );
-    }
     if !copy_actions.is_empty() {
         graphs.push(row(copy_actions).spacing(6).into());
     }
     perf_layout::main_with_stats(
         theme_snapshot,
         network_title(nic),
-        t("net.throughput").to_string(),
+        // GPUI parity: the subtitle is the adapter's IPv4 address (empty when
+        // unassigned), and the one-line vital fact carries status + link speed.
+        nic.ipv4_addr.as_deref().unwrap_or_default().to_string(),
+        Some(network_vital_line(nic)),
         graphs,
         network_summary_lines(nic, units.use_bytes, units.use_base2),
-        compact,
-        perf_layout::DetailExtent::for_scroll_parent(compact),
+        super::device_status_footer(theme_snapshot, nic.device_state.status),
+        budget,
+        perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation),
     )
 }
 

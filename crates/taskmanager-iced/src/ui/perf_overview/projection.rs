@@ -2,10 +2,11 @@
 
 use taskmanager_application::{CpuMetrics, MemoryMetrics};
 
-/// Responsive CPU composition selected from the existing viewport breakpoint.
-/// This is layout state, not user-selectable mode: compact space keeps the
-/// aggregate headline legible, while standard space adds the bounded context
-/// surfaces below it.
+/// Responsive CPU composition derived from the frame budget's typed chart
+/// inventory (GPUI `CpuChartLayout::for_inventory` parity). This is layout
+/// state, not user-selectable mode: the Full inventory adds the bounded
+/// context surfaces below the aggregate headline; AggregateOnly keeps the
+/// aggregate legible.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum CpuChartLayout {
     AggregateWithPerCore,
@@ -14,11 +15,14 @@ pub(super) enum CpuChartLayout {
 
 impl CpuChartLayout {
     #[must_use]
-    pub(super) const fn from_compact(compact: bool) -> Self {
-        if compact {
-            Self::AggregateOnly
-        } else {
-            Self::AggregateWithPerCore
+    pub(super) const fn for_inventory(
+        inventory: super::super::responsive::PerformanceChartInventory,
+    ) -> Self {
+        match inventory {
+            super::super::responsive::PerformanceChartInventory::AggregateOnly => {
+                Self::AggregateOnly
+            }
+            super::super::responsive::PerformanceChartInventory::Full => Self::AggregateWithPerCore,
         }
     }
 }

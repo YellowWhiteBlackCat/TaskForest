@@ -11,7 +11,6 @@ use taskmanager_theme::tokens;
 
 use super::projection::{CpuHeadlineKind, CpuHeadlineMetric, CpuHeadlineValue};
 use crate::app::Message;
-use crate::perf_chart::CHART_HEIGHT;
 
 /// Render every current CPU fact at once in the shared product order. These
 /// replace the retired graph-selector pills without multiplying the number of
@@ -49,14 +48,16 @@ pub(super) fn cpu_headline_label_value(
                 Some(CpuHeadlineValue::FrequencyMhz(value)) => Some(value),
                 _ => None,
             };
-            super::cpu_speed_row(frequency, bogomips)
+            let (label, value) = super::cpu_speed_parts(frequency, bogomips);
+            (label.to_owned(), value.unwrap_or_else(missing))
         }
         CpuHeadlineKind::Temperature => {
             let temperature = match metric.value {
                 Some(CpuHeadlineValue::TemperatureC(value)) => Some(value),
                 _ => None,
             };
-            super::cpu_temperature_row(temperature, temperature_source)
+            let (label, value) = super::cpu_temperature_parts(temperature, temperature_source);
+            (label.to_owned(), value.unwrap_or_else(missing))
         }
         CpuHeadlineKind::Power => (
             t("common.power").to_owned(),
@@ -68,9 +69,11 @@ pub(super) fn cpu_headline_label_value(
     }
 }
 
-pub(super) fn chart_height(compact: bool) -> f32 {
-    if compact { 80.0 } else { CHART_HEIGHT }
-}
+/// The shared headline-chart height floor (GPUI `MAIN_GRAPH_MIN_HEIGHT`
+/// parity): a headline chart inside a scrolling strip frame keeps this
+/// readable fixed height; fixed-viewport frames hand the chart the column's
+/// remaining height instead.
+pub(super) const HEADLINE_CHART_FLOOR: f32 = 180.0;
 
 pub(super) fn gauge(
     title: &'static str,

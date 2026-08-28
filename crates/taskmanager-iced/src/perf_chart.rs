@@ -44,11 +44,6 @@ use taskmanager_application::i18n::t;
 
 use crate::app::Message;
 
-/// The fixed canvas height for the time-series. Width is `Fill` so the chart
-/// tracks the panel; the `Canvas` reports this height to layout and `draw`
-/// receives the resolved width through `bounds`.
-pub(crate) const CHART_HEIGHT: f32 = 128.0;
-
 /// Stroke width for each series polyline.
 const SERIES_STROKE_WIDTH: f32 = 1.6;
 

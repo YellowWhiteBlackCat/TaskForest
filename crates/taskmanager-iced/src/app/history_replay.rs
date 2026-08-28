@@ -202,6 +202,13 @@ impl IcedHistoryRuntime {
         matches!(&self.resources, IcedHistoryResources::Active(_))
     }
 
+    /// Persistence was requested but the runtime never became active: the
+    /// startup-unavailable notice state. Never true for runs that did not
+    /// request history persistence.
+    const fn startup_unavailable(&self) -> bool {
+        self.requested && !self.is_active()
+    }
+
     fn install_connector(
         &mut self,
         connector: Result<
@@ -354,6 +361,14 @@ impl IcedApp {
 
     pub(crate) fn history_replay_entry_available(&self) -> bool {
         self.history_runtime.is_active()
+    }
+
+    /// Whether persistence was requested for this run but the replay runtime
+    /// could not start — the startup-unavailable notice state (GPUI
+    /// `history_replay_startup_unavailable` parity). A run that never
+    /// requested persistence shows nothing, never a dead notice.
+    pub(crate) fn history_replay_startup_unavailable(&self) -> bool {
+        self.history_runtime.startup_unavailable()
     }
 
     pub(crate) fn activate_history_replay_for_boot(&mut self) {

@@ -149,6 +149,35 @@ expand directly to real process rows. Legacy grouping tokens are normalized when
 loads. Small/Standard/Large UI size uses the application scale hook on top of compositor DPI;
 density remains a separate table-whitespace preference.
 
+## Performance-page divergence registry (求同存异登记)
+
+Every Iced-only surface on the Performance page hangs on a shared semantic and exists
+because of a real Iced-vs-GPUI architecture difference (ARCH.md §8.2). Anything that
+duplicates GPUI semantics without such a driver was removed or aligned instead.
+
+- Copy IP/MAC buttons (network): Iced text widgets have no selection, so buttons are the
+  only channel for GPUI's `selectable_value` copy semantic.
+- CPU-page trend strip: the device rail's sparklines are unreachable in Strip frames
+  (narrow width or F9); the strip keeps the five shared family trends visible.
+- Inline 60/120/300s graph-points pills: the same shared persisted preference GPUI's
+  Settings page owns; Iced's full-screen settings modal makes a local access surface the
+  density-appropriate execution.
+- Gauges row (CPU/Memory): a skin/density execution of the same used-percentage
+  observations; the Memory page has no GPUI readout-band equivalent to carry them.
+- Wi-Fi status card (network): skin-level presentation (status dot + signal-quality bar)
+  of the same wireless facts the stats rail carries.
+- Earlier/now chart-axis labels: a skin-level annotation of the shared chronological
+  contract (oldest-left, newest-right).
+- CPU+Memory dual-series chart: density execution over the same shared history store;
+  the Memory page still carries its own swap headline chart so the shared swap-over-time
+  semantic stays covered.
+- VRAM meters in the left column and the engine-escalation toggle below the card:
+  placement differences for facts GPUI pins in its stats-rail footer; the facts, gating,
+  and honesty rules are identical.
+- `Message::SelectGpuChartMetric` has no UI emitter (the GPU selector was aligned away —
+  GPUI renders the engine inventory plus every available family simultaneously); the
+  message stays as the behavior-test entry into the shared shell selection state machine.
+
 ## Contract and verification
 
 Cross-crate owners and transition matrices are authoritative in

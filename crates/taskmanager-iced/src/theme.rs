@@ -401,6 +401,32 @@ pub fn muted_text_color(theme: &Theme) -> iced::Color {
     color(theme.palette().fg_muted)
 }
 
+/// The Performance pinned statistics rail: transparent surface with the
+/// left divider separating it from the main viewport (GPUI
+/// `performance_stats_surface` parity — one continuous workspace, not a
+/// floating card).
+#[must_use]
+pub fn rail_divider_left(theme: &Theme) -> container::Style {
+    let palette = theme.palette();
+    container::Style {
+        background: None,
+        text_color: Some(color(palette.fg)),
+        border: iced::Border {
+            color: color(palette.border),
+            width: 1.0,
+            radius: 0.0.into(),
+        },
+        ..container::Style::default()
+    }
+}
+
+/// The Performance stacked statistics rail: the same divider grammar on the
+/// top edge for the below-viewport fallback.
+#[must_use]
+pub fn rail_divider_top(theme: &Theme) -> container::Style {
+    rail_divider_left(theme)
+}
+
 /// Status tint for health/state text: the skin's semantic status token for
 /// one health bucket. Typed here so views never hardcode a status color.
 #[must_use]

@@ -41,6 +41,45 @@ pub(crate) fn device_rows_panel<'a>(
         .into()
 }
 
+/// The accent-tinted action-hint footer pinned under a device's statistics
+/// rail when its status is not Healthy — the iced equivalent of GPUI's
+/// `perf_views::smart_status::status_footer`. Returns `None` for a healthy
+/// device so the footer space is not occupied unnecessarily. The hint text is
+/// the shared `device_action_i18n_key` projection, so iced and GPUI never
+/// disagree on which hint to render for a given status.
+pub(crate) fn device_status_footer<'a>(
+    theme_snapshot: &'a taskmanager_theme::Theme,
+    status: DeviceStatus,
+) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
+    if status == DeviceStatus::Healthy {
+        return None;
+    }
+    let palette = theme_snapshot.palette();
+    Some(
+        container(text(t(device_action_i18n_key(status))).size(f32::from(tokens::FONT_12)))
+            .padding([
+                f32::from(taskmanager_theme::tokens::SPACE_7),
+                f32::from(taskmanager_theme::tokens::SPACE_10),
+            ])
+            .style(move |_| {
+                use iced::widget::container::Style;
+                let accent = theme::color(theme_snapshot.accent);
+                Style {
+                    background: Some(iced::Background::Color(iced::Color { a: 0.12, ..accent })),
+                    border: iced::Border {
+                        color: iced::Color::TRANSPARENT,
+                        width: 0.0,
+                        radius: f32::from(palette.control_radius).into(),
+                    },
+                    text_color: Some(theme::color(theme_snapshot.fg)),
+                    ..Style::default()
+                }
+            })
+            .width(iced::Length::Fill)
+            .into(),
+    )
+}
+
 #[cfg(test)]
 #[path = "../../tests/gui/ui/perf_devices/tests.rs"]
 mod tests;
