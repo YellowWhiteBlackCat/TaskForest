@@ -9,6 +9,7 @@ use taskmanager_shell::ShellKeyEvent;
 
 use super::viewport_state::ViewportRegion;
 use super::*;
+use crate::ui::applications::application_row_height;
 
 impl IcedApp {
     /// Ctrl+C: copy the current selected row's summary through the shared
@@ -324,7 +325,7 @@ impl IcedApp {
         let (region, row_height) = match page {
             AppPage::Applications => (
                 ViewportRegion::Applications,
-                crate::ui::applications::application_row_height(compact),
+                application_row_height(compact),
             ),
             AppPage::Services => (
                 ViewportRegion::Services,

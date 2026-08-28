@@ -17,8 +17,42 @@
 #   - coverage job      -> local extended (same llvm-cov invocation)
 #   - ui-shapes matrix  -> local standard (shape-tui / shape-iced stages)
 #   - gpui interaction  -> local standard --with-gui (needs a live session)
-#   - macOS / Windows   -> .github/workflows/portability.yml (dispatch +
-#       monthly cron; they remain non-blocking guards, never release gates)
+#   - macOS             -> .github/workflows/portability.yml (PR/main compile
+#       and library tests; packaging and real-device visual validation remain
+#       deferred)
+#   - Windows           -> .github/workflows/portability.yml (native boundary
+#       receipt on every PR/main push; blocking, but kept out of Linux jobs)
+#
+# Wall-clock budget: the cheap `policy` gate runs first and fails before any
+# compile-heavy job spends runner time. Once it passes, `lint`, `test`, `docs`,
+# and `linux` run in parallel, so successful PR feedback waits for the slowest
+# job instead of the sum of every stage. Each job owns its rust-cache line.
+# The release-smoke job keeps the job id `linux` because rust-cache keys by
+# job id — that id is what lets packaging.yml's `linux` release job restore
+# the dependency cache this job warmed on the same commit.
+#
+# Compile-time budget (env changes here MUST stay aligned with
+# portability.yml and packaging.yml: rust-cache hashes every CARGO*/RUST*
+# variable, and any divergence silently splits the shared cache lines):
+#   - CARGO_PROFILE_DEV_DEBUG=line-tables-only: test binaries keep line
+#     numbers for failure backtraces but drop full DWARF, cutting dev/test
+#     compile and link time and shrinking every cache line.
+#   - RUSTFLAGS carries `-C link-arg=-fuse-ld=mold` (Linux-only): the GPUI
+#     closure links large binaries and mold cuts link time. packaging.yml's
+#     Linux job carries the byte-identical RUSTFLAGS for the same
+#     cache-sharing reason; portability.yml and the Windows packaging jobs
+#     must NOT add it (no mold on Windows/macOS runners).
+#   - cache-workspace-crates: unchanged workspace members become cache
+#     hits, so a PR recompiles only the crates it touched plus dependents.
+#   - PR release builds override LTO off / codegen-units 16: the smokes
+#     below validate artifact *shape* (package() replay, install modes,
+#     polkit exec resolution, rollback), not optimization level. main
+#     pushes, dispatches, and tags still build the shipping profile
+#     (packaging.yml release artifacts always use the manifest profile).
+#
+# Toolchain policy: all workflows follow the repository's moving `stable`
+# channel. `Cargo.toml::rust-version` remains the compatibility floor and must
+# not be used as a stale CI pin.
 #
 # Architecture context (unchanged):
 # - `taskmanager-core` owns platform-neutral contracts and shared services.
@@ -40,8 +74,11 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  RUSTFLAGS: -D warnings
+  RUSTFLAGS: -D warnings -C link-arg=-fuse-ld=mold
   CARGO_INCREMENTAL: 0
+  # Shared verbatim by portability.yml and packaging.yml so every workflow's
+  # rust-cache line hashes the same dev-profile setting.
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 # Burst dedupe: when several commits land on one ref back-to-back, only the
 # newest verdict matters — superseded in-flight runs cancel instead of
@@ -58,91 +95,132 @@ permissions:
   contents: read
 
 jobs:
-  linux:
-    name: Linux (essential gate)
+  policy:
+    name: Linux (fast policy gates + dependency audit)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      # The public repository must not carry host receipts, screenshots,
-      # private publication material, credentials, or personal addresses.
-      - name: Public repository guard
-        run: python3 scripts/quality/public_repo_guard.py
-      - name: Public documentation guard
-        run: |
-          python3 scripts/quality/doc_governance_guard.py --self-test
-          python3 scripts/quality/doc_governance_guard.py
-      # A cold release build of the gpui workspace plus the all-targets test
-      # binaries overflows the ubuntu-latest runner's free disk. Reclaim ~10GB
-      # of pre-installed SDKs this Rust CI never uses before any compilation.
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+      # This is the same cheap fail-fast entry point developers run locally.
+      # It completes before GUI packages, Cargo caches, or workspace builds.
+      - name: Fast local-equivalent gates
+        run: timeout --kill-after=10s 300s bash scripts/quality/local-gates.sh quick
+      # Dependency audit needs neither Rust compilation nor Linux GUI libraries.
+      - uses: EmbarkStudios/cargo-deny-action@v2
+
+  lint:
+    name: Linux (clippy)
+    needs: policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+      # gpui links against xkbcommon on Linux; the runner image ships the
+      # runtime lib but not always the -dev link flags, so install it
+      # explicitly (idempotent if already present). mold is the link-time
+      # accelerator behind the workflow-level RUSTFLAGS.
+      - name: Install Linux GUI system deps and mold
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install -y --no-install-recommends
+          libxkbcommon-dev libxkbcommon-x11-dev mold
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-workspace-crates: true
+      # `test-support` is DEV-only: gpui's upstream test-support hard-wires
+      # X11, so it is enabled for test targets but never for the release build
+      # below (strict Wayland product policy).
+      - run: cargo clippy --locked --workspace --all-targets --features test-support -- -D warnings
+
+  test:
+    name: Linux (workspace tests + doctests)
+    needs: policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      # The all-targets debug build still needs headroom on the free runner.
       - name: Free runner disk space
         run: |
           sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup /usr/local/share/boost
           sudo apt-get clean
           df -h /
-      # gpui links against xkbcommon on Linux; the runner image ships the
-      # runtime lib but not always the -dev link flags, so install it
-      # explicitly (idempotent if already present).
-      - name: Install Linux GUI system deps
-        run: sudo apt-get update && sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev
-      - uses: dtolnay/rust-toolchain@1.97.1
-        with:
-          components: rustfmt, clippy
+      - name: Install Linux GUI system deps and mold
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install -y --no-install-recommends
+          libxkbcommon-dev libxkbcommon-x11-dev mold
+      - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
-      # Dependency gate: block PRs that introduce a CVE, an unapproved license,
-      # or a duplicate crate before spending time on a full build. Policy lives
-      # in deny.toml. Run early because it needs no compilation.
-      - uses: EmbarkStudios/cargo-deny-action@v2
-      # Reject non-progressing Python loops, unmanaged subprocesses, global
-      # process killing, and background shell jobs without cleanup ownership.
-      # These two runs are the CI twin of the same scripts in local-gates quick.
-      - run: timeout 30s python3 scripts/quality/automation_safety_guard.py
-      - run: timeout 30s python3 scripts/quality/automation_safety_guard.py --self-test
-      # Every host-installed path must be present in the audited manifest, and
-      # the only direct root install manager must pass an isolated rollback smoke
-      # after the release helper binaries have been built below.
-      - run: timeout 30s python3 scripts/quality/system_install_manifest_guard.py --self-test
-      - run: timeout 30s python3 scripts/quality/system_install_manifest_guard.py
-      # Block oversized source/test files after the repository-wide split pass.
-      - run: python3 scripts/quality/rust_line_guard.py --mode enforce
-      # Every crate root and substantial source module must carry a //! purpose
-      # header so rustdoc and contributors always see what a module owns.
-      - run: python3 scripts/quality/module_doc_guard.py --mode enforce
-      # The per-crate coverage gate parses the same lcov the extended tier
-      # produces; CI only proves the gate itself is correct via its self-test.
-      - run: timeout 30s python3 scripts/quality/per_crate_coverage_gate.py --self-test
-      - run: cargo fmt --all -- --check
-      # `test-support` is DEV-only: gpui's upstream test-support hard-wires
-      # X11, so it is enabled for test targets but never for the release build
-      # below (strict Wayland product policy).
-      - run: cargo clippy --locked --workspace --all-targets --features test-support -- -D warnings
-      # Product artifacts are OS variants, never hardware-vendor variants.
-      # The package smoke also needs the four standalone helper binaries, so
-      # name every release binary explicitly instead of relying on the root
-      # package's default-member build.
-      - run: >-
-          cargo build --locked --release -j 4
-          -p taskmanager
-          -p taskmanager-setup-helper
-          -p taskmanager-privilege-helper
-          -p taskmanager-net-launcher
-          -p taskmanager-process-control-helper
-      - run: timeout --kill-after=10s 30s scripts/test-system-install-manager.sh
-      # The release build above just produced the full package binary set;
-      # validate the packaging layout in the SAME gate so PKGBUILD layout
-      # drift fails the PR instead of surfacing at the first rehearsal.
-      # stage-package-sim replays every package() install line and checks
-      # the manifest whitelist, modes, and polkit exec.path resolution.
-      - run: install -m755 target/release/taskmanager target/release/taskforest-g
-      - run: timeout 120s packaging/arch/stage-package-sim.sh
+        with:
+          cache-workspace-crates: true
       - run: cargo nextest run --locked --workspace --all-targets --features test-support --profile ci -j 4 -E 'not binary(throughput)'
       # nextest does not execute doctests on stable Rust.
       - run: cargo test --locked --doc --workspace
+
+  docs:
+    name: Linux (rustdoc)
+    needs: policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install Linux GUI system deps and mold
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install -y --no-install-recommends
+          libxkbcommon-dev libxkbcommon-x11-dev mold
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-workspace-crates: true
       # Rustdoc must stay warning-free: broken intra-doc links, unresolved
       # symbol references, public docs linking to private items, and unclosed
       # HTML tags in doc comments are all CI failures.
       - run: RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps
+
+  # Job id `linux` is load-bearing: rust-cache keys by job id, and
+  # packaging.yml's `linux` release job restores the dependency cache this
+  # job warms on the same commit. Do not rename it.
+  linux:
+    name: Linux (release build + packaging smoke)
+    needs: policy
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v7
+      # A release build of the gpui workspace overflows the ubuntu-latest
+      # runner's free disk. Reclaim ~10GB of pre-installed SDKs this Rust CI
+      # never uses before any compilation.
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup /usr/local/share/boost
+          sudo apt-get clean
+          df -h /
+      - name: Install Linux GUI system deps and mold
+        run: >-
+          sudo apt-get update &&
+          sudo apt-get install -y --no-install-recommends
+          libxkbcommon-dev libxkbcommon-x11-dev mold
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@nextest
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-workspace-crates: true
+      # Reuse the local release-shape smoke so a package-layout regression is
+      # found before the fallback matrix and the same artifact contract can be
+      # exercised before CI is spent.
+      - name: Release build and packaging smoke
+        env:
+          PR_SMOKE_PROFILE: ${{ github.event_name == 'pull_request' }}
+        run: timeout --kill-after=30s 3600s scripts/quality/release-smoke.sh
       # Isolate the vendor backend only as a development/fallback matrix. The
       # standard tests above already include it through default hardware-all.
       # ADR-029 still requires an explicit UI shape when defaults are disabled.

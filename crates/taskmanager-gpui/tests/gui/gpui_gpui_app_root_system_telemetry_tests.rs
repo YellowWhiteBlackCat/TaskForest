@@ -359,7 +359,7 @@ fn lifecycle(now_ms: u64) -> DeviceLifecycle {
 }
 
 #[test]
-fn device_lifecycles_apply_as_three_independent_typed_partitions() {
+fn mc02_partition_recovery_case_device_lifecycles_apply_as_three_independent_typed_partitions() {
     let revision = SystemTelemetryRevision::new(1);
     let storage = correlated(
         1,

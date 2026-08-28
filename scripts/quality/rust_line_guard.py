@@ -9,8 +9,7 @@ import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
-SOURCE_WARN = 650
-SOURCE_LIMIT = 1200
+SOURCE_LIMIT = 650
 TEST_LIMIT = 999
 
 
@@ -20,6 +19,13 @@ class FileStat:
     kind: str
     code_lines: int
     level: str
+
+
+def exceeds_limit(kind: str, code_lines: int) -> bool:
+    """Return whether a file must fail the non-comment line-budget gate."""
+    if kind == "source":
+        return code_lines >= SOURCE_LIMIT
+    return code_lines > TEST_LIMIT
 
 
 def line_has_code(line: str, block_depth: int) -> tuple[bool, int]:
@@ -72,11 +78,8 @@ def collect(repository: Path) -> list[FileStat]:
             continue
         for path in sorted(root.rglob("*.rs")):
             lines = count_code_lines(path)
-            limit = SOURCE_LIMIT if kind == "source" else TEST_LIMIT
-            if lines > limit:
+            if exceeds_limit(kind, lines):
                 level = "fail"
-            elif kind == "source" and lines >= SOURCE_WARN:
-                level = "warn"
             else:
                 level = "ok"
             stats.append(FileStat(path.relative_to(repository).as_posix(), kind, lines, level))
@@ -86,16 +89,13 @@ def collect(repository: Path) -> list[FileStat]:
 
 
 def report(stats: list[FileStat]) -> str:
-    warnings = sorted((item for item in stats if item.level == "warn"), key=lambda item: -item.code_lines)
     failures = sorted((item for item in stats if item.level == "fail"), key=lambda item: -item.code_lines)
     lines = [
         "# Rust File Line Budget Report",
         "",
         f"- Scanned files: {len(stats)}",
-        f"- Source warning: {SOURCE_WARN} non-comment lines",
-        f"- Source hard limit: {SOURCE_LIMIT} non-comment lines",
-        f"- Test hard limit: {TEST_LIMIT} non-comment lines",
-        f"- Warnings: {len(warnings)}",
+        f"- Source hard limit: {SOURCE_LIMIT} non-comment lines (at or above fails)",
+        f"- Test hard limit: {TEST_LIMIT} non-comment lines (above fails)",
         f"- Failures: {len(failures)}",
         "",
         "## Hard-limit findings",
@@ -106,17 +106,15 @@ def report(stats: list[FileStat]) -> str:
     )
     if not failures:
         lines.append("_None._")
-    lines.extend(("", "## Warning findings", ""))
-    lines.extend(f"- `{item.path}`: {item.code_lines} ({item.kind})" for item in warnings)
-    if not warnings:
-        lines.append("_None._")
     lines.extend(
         (
             "",
             "## Policy",
             "",
-            "Split by named responsibility before adding logic. Do not use line-number parts, " +
-            "generic helpers, `include!`, or blanket re-exports to hide coupling.",
+            f"Production files at or above {SOURCE_LIMIT} non-comment lines and test files above " +
+            f"{TEST_LIMIT} non-comment lines fail. Split by named responsibility before adding " +
+            "logic. Do not use line-number parts, generic helpers, `include!`, or blanket " +
+            "re-exports to hide coupling.",
         )
     )
     return "\n".join(lines) + "\n"
@@ -129,6 +127,14 @@ def self_test() -> None:
         path.write_text(sample, encoding="utf-8")
         if count_code_lines(path) != 2:
             raise RuntimeError("comment-aware line count self-test failed")
+    if not exceeds_limit("source", SOURCE_LIMIT):
+        raise RuntimeError("source hard-limit boundary self-test failed")
+    if exceeds_limit("source", SOURCE_LIMIT - 1):
+        raise RuntimeError("source pre-limit boundary self-test failed")
+    if exceeds_limit("test", TEST_LIMIT):
+        raise RuntimeError("test inclusive boundary self-test failed")
+    if not exceeds_limit("test", TEST_LIMIT + 1):
+        raise RuntimeError("test hard-limit boundary self-test failed")
 
 
 def parse_args() -> argparse.Namespace:
@@ -157,13 +163,11 @@ def main() -> int:
             output.parent.mkdir(parents=True, exist_ok=True)
             output.write_text(content, encoding="utf-8")
         failures = [item for item in stats if item.level == "fail"]
-        warnings = [item for item in stats if item.level == "warn"]
         print(
-            f"Rust line guard: scanned={len(stats)} warnings={len(warnings)} "
-            f"failures={len(failures)} mode={args.mode}"
+            f"Rust line guard: scanned={len(stats)} failures={len(failures)} mode={args.mode}"
         )
-        for item in sorted(failures + warnings, key=lambda value: (-value.code_lines, value.path)):
-            print(f" - {item.level}: {item.path}: {item.code_lines}")
+        for item in failures:
+            print(f" - fail: {item.path}: {item.code_lines}")
         return 1 if args.mode == "enforce" and failures else 0
     except (OSError, RuntimeError) as error:
         print(f"Rust line guard: FAIL: {error}", file=sys.stderr)

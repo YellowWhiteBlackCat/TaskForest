@@ -13,7 +13,7 @@
 ## Platform and composition
 
 - [app host](taskmanager-app-host/README.md) · [native selection](taskmanager-platform-native/README.md)
-- [Linux](taskmanager-platform-linux/README.md) · [macOS](taskmanager-platform-macos/README.md) · [Windows](taskmanager-platform-windows/README.md)
+- [Linux](taskmanager-platform-linux/README.md) · [macOS](taskmanager-platform-macos/README.md) · [Windows](taskmanager-platform-windows/README.md) · [Android (feature-gated)](taskmanager-platform-android/README.md) · [OpenHarmony](taskmanager-platform-ohos/README.md)
 - [conformance](taskmanager-platform-conformance/README.md) · [accessibility](taskmanager-accessibility-linux/README.md)
 
 ## Product surfaces

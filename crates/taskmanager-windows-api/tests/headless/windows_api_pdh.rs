@@ -1,4 +1,12 @@
-use super::*;
+use super::cpu::{
+    parse_engine_type_from_instance_name, parse_luid_from_instance_name,
+    parse_pid_from_instance_name, per_core_current_mhz, total_frequency_from_counters,
+};
+#[cfg(windows)]
+use super::{
+    query_cpu_dynamic_frequencies, query_gpu_adapter_memory, query_gpu_engine_instances,
+    query_gpu_engine_utilization, query_gpu_process_memory,
+};
 
 #[test]
 fn engine_instance_names_parse_into_pid_luid_and_engine_type() {

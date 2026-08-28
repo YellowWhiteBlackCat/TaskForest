@@ -21,9 +21,10 @@
 #   * Every run gets a private XDG runtime directory. Nested Wayland/IPC sockets and
 #     exact child PIDs are therefore owned by this script without global `pkill`.
 #
-# Prereqs: cargo + niri + jq + setsid + file + sha256sum; magick/montage is
-# optional for the contact sheet. The script always rebuilds the current locked
-# worktree before capture.
+# Prereqs: cargo + niri + jq + kwin_wayland + setsid + file + sha256sum;
+# magick/montage is optional for the contact sheet. Set
+# TM_CAPTURE_NIRI_BACKGROUND=0 only for an explicit visible-host debug run.
+# The script always rebuilds the current locked worktree before capture.
 # Usage: bash scripts/capture-niri.sh
 set -u
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -35,6 +36,17 @@ HOST_DISPLAY="$HOST_XDG/${WAYLAND_DISPLAY:-wayland-0}"
 # maps. Keep capture deterministic and isolate that variable by default. Set
 # TM_CAPTURE_LIBGL_ALWAYS_SOFTWARE=0 only for an explicit hardware-driver probe.
 CAPTURE_LIBGL_ALWAYS_SOFTWARE="${TM_CAPTURE_LIBGL_ALWAYS_SOFTWARE:-1}"
+CAPTURE_NIRI_LOG="${TM_CAPTURE_NIRI_LOG:-niri=info}"
+# Run the nested compositor inside a private virtual KWin framebuffer by
+# default. Set this to 0 only when a visible host-wayland nested window is
+# explicitly desired for manual compositor debugging.
+CAPTURE_NIRI_BACKGROUND="${TM_CAPTURE_NIRI_BACKGROUND:-1}"
+# A fresh nested compositor per scenario isolates Smithay/winit state from the
+# previous client. Hosts that have independently qualified longer-lived Niri
+# sessions may raise this value, but the fail-closed default favors complete,
+# reproducible evidence over a small startup-time saving.
+CAPTURE_NIRI_BATCH_SIZE="${TM_CAPTURE_NIRI_BATCH_SIZE:-1}"
+CAPTURE_NIRI_MAX_ATTEMPTS="${TM_CAPTURE_NIRI_MAX_ATTEMPTS:-3}"
 OUT="$REPO/target/screenshot-evidence/latest"
 CANONICAL_MATRIX="$REPO/scripts/capture_scenarios.tsv"
 MATRIX="$CANONICAL_MATRIX"
@@ -65,6 +77,19 @@ for command in cargo file git jq niri rustc sha256sum setsid stat timeout; do
     exit 2
   fi
 done
+case "$CAPTURE_NIRI_BACKGROUND" in
+  0|1) ;;
+  *)
+    printf 'TM_CAPTURE_NIRI_BACKGROUND must be 0 or 1: %s\n' \
+      "$CAPTURE_NIRI_BACKGROUND" >&2
+    exit 2
+    ;;
+esac
+if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ] \
+  && ! command -v kwin_wayland >/dev/null 2>&1; then
+  printf 'background Niri capture requires kwin_wayland --virtual; set TM_CAPTURE_NIRI_BACKGROUND=0 for visible nested debug mode\n' >&2
+  exit 2
+fi
 mkdir -p "$OUT" "$STAGED" "$TMP" "$SCRATCH_ROOT"
 # Niri puts its IPC socket below XDG_RUNTIME_DIR. Keep this private runtime on
 # the repository NVMe, but deliberately short: Linux sockaddr_un caps the path
@@ -74,8 +99,31 @@ NIRI_RUNTIME="$(mktemp -d "$SCRATCH_ROOT/niri.XXXXXX")"
 chmod 700 "$NIRI_RUNTIME"
 NIRI_PID=""
 NIRI_PGID=""
+NIRI_START_COUNT=0
+SOCK=""
+IPC=""
 APP_PID=""
 APP_PGID=""
+KWIN_PID=""
+KWIN_PGID=""
+KWIN_RUNTIME=""
+KWIN_DISPLAY=""
+NIRI_PARENT_WAYLAND="$HOST_DISPLAY"
+
+case "$CAPTURE_NIRI_BATCH_SIZE" in
+  ''|*[!0-9]*|0)
+    printf 'TM_CAPTURE_NIRI_BATCH_SIZE must be a positive integer: %s\n' \
+      "$CAPTURE_NIRI_BATCH_SIZE" >&2
+    exit 2
+    ;;
+esac
+case "$CAPTURE_NIRI_MAX_ATTEMPTS" in
+  ''|*[!0-9]*|0)
+    printf 'TM_CAPTURE_NIRI_MAX_ATTEMPTS must be a positive integer: %s\n' \
+      "$CAPTURE_NIRI_MAX_ATTEMPTS" >&2
+    exit 2
+    ;;
+esac
 
 # Optional targeted review mode. The canonical/default path remains the full
 # matrix; a comma-separated filter is useful for a single visual proof (e.g.
@@ -136,6 +184,7 @@ terminate_owned() {
 cleanup() {
   terminate_owned "$APP_PID" "$APP_PGID"
   terminate_owned "$NIRI_PID" "$NIRI_PGID"
+  terminate_owned "$KWIN_PID" "$KWIN_PGID"
   # A failed run keeps its private runtime tree (per-scenario XDG config/data
   # homes) so the fixture state can be inspected post-mortem.
   if [ "${FAILURES:-0}" -gt 0 ]; then
@@ -183,6 +232,14 @@ BINARY_SHA256="$(sha256sum "$APP" | cut -d' ' -f1)"
   printf 'source_scope=gpui\n'
   printf 'source_manifest_sha256=%s\n' "$SOURCE_MANIFEST_SHA256"
   printf 'libgl_always_software=%s\n' "$CAPTURE_LIBGL_ALWAYS_SOFTWARE"
+  if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+    printf 'niri_host=kwin-wayland-virtual\n'
+  else
+    printf 'niri_host=host-wayland-visible\n'
+  fi
+  printf 'niri_background=%s\n' "$CAPTURE_NIRI_BACKGROUND"
+  printf 'niri_batch_size=%s\n' "$CAPTURE_NIRI_BATCH_SIZE"
+  printf 'niri_max_attempts=%s\n' "$CAPTURE_NIRI_MAX_ATTEMPTS"
   printf 'niri_outputs=target/screenshot-evidence/%s/niri-outputs.json\n' "$RUN_ID"
   printf 'window_receipts=target/screenshot-evidence/%s/capture-window-receipts.tsv\n' "$RUN_ID"
   printf 'command=bash scripts/capture-niri.sh\n'
@@ -208,58 +265,179 @@ timeout 10s niri validate --config "$CONF" || {
   exit 1
 }
 
-XDG_RUNTIME_DIR="$NIRI_RUNTIME" WAYLAND_DISPLAY="$HOST_DISPLAY" DISPLAY= \
-  LIBGL_ALWAYS_SOFTWARE="$CAPTURE_LIBGL_ALWAYS_SOFTWARE" \
-  setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" &>"$RUN_DIR/niri.log" & NIRI_PID=$!
-NIRI_PGID=""
-for i in $(seq 1 40); do
-  NIRI_PGID="$(process_group "$NIRI_PID")"
-  [ "$NIRI_PGID" = "$NIRI_PID" ] && break
-  sleep 0.1
-done
-if [ "$NIRI_PGID" != "$NIRI_PID" ]; then
-  printf 'nested Niri did not obtain a private process group; evidence retained at %s\n' "$RUN_DIR" >&2
-  exit 1
-fi
-SOCK=""; for i in $(seq 1 40); do
-  SOCK=$(grep -oE "wayland-[0-9]+" "$RUN_DIR/niri.log" | head -1)
-  [ -n "$SOCK" ] && [ -S "$NIRI_RUNTIME/$SOCK" ] && break
-  sleep 0.2
-done
-IPC=$(grep -oE "$NIRI_RUNTIME/niri\.[^ ]*\.sock" "$RUN_DIR/niri.log" | head -1)
-if ! kill -0 "$NIRI_PID" 2>/dev/null || [ -z "$SOCK" ] || [ -z "$IPC" ]; then
-  echo "niri did not start nested; tail of log:"; tail -8 "$RUN_DIR/niri.log"; exit 1
-fi
-echo "niri nested on $SOCK (ipc $(basename "$IPC"))"
 NIRI_OUTPUTS="$RUN_DIR/niri-outputs.json"
 NIRI_OUTPUTS_ERROR="$RUN_DIR/niri-outputs.err"
 NIRI_OUTPUTS_TMP="$RUN_DIR/niri-outputs.json.tmp"
-OUTPUT_READY=0
-for i in $(seq 1 24); do
-  if NIRI_SOCKET="$IPC" timeout 1s niri msg -j outputs >"$NIRI_OUTPUTS_TMP" 2>"$NIRI_OUTPUTS_ERROR" \
-    && jq -e '((type == "object" and (.winit | type == "object") and .winit.name == "winit" and .winit.logical.scale == 1) or (type == "array" and length == 1 and .[0].name == "winit" and .[0].logical.scale == 1))' \
-      "$NIRI_OUTPUTS_TMP" >/dev/null 2>&1; then
-    mv "$NIRI_OUTPUTS_TMP" "$NIRI_OUTPUTS"
-    OUTPUT_READY=1
-    break
-  fi
-  sleep 0.5
-done
-if [ "$OUTPUT_READY" -ne 1 ]; then
-  [ -f "$NIRI_OUTPUTS_TMP" ] && cp "$NIRI_OUTPUTS_TMP" "$NIRI_OUTPUTS" || : >"$NIRI_OUTPUTS"
-  printf 'nested Niri output receipt failed; evidence retained at %s\n' "$RUN_DIR" >&2
-  exit 1
-fi
-NIRI_OUTPUT_LOGICAL="$(jq -r 'if type == "object" then .winit.logical else .[0].logical end as $logical | if ($logical.width and $logical.height) then "\($logical.width)x\($logical.height)" else empty end' "$NIRI_OUTPUTS")"
-[ -n "$NIRI_OUTPUT_LOGICAL" ] || {
-  printf 'nested Niri output has no logical dimensions; evidence retained at %s\n' "$RUN_DIR" >&2
-  exit 1
+NIRI_OUTPUT_LOGICAL=""
+
+stop_niri() {
+  terminate_owned "$NIRI_PID" "$NIRI_PGID"
+  NIRI_PID=""
+  NIRI_PGID=""
+  SOCK=""
+  IPC=""
 }
-{
-  printf 'nested_output_name=winit\n'
-  printf 'nested_output_scale=1\n'
-  printf 'nested_output_logical=%s\n' "$NIRI_OUTPUT_LOGICAL"
-} >>"$METADATA"
+
+start_niri() {
+  NIRI_START_COUNT=$((NIRI_START_COUNT + 1))
+  local niri_log="$RUN_DIR/niri.log"
+  if [ "$NIRI_START_COUNT" -gt 1 ]; then
+    niri_log="$RUN_DIR/niri-restart-$NIRI_START_COUNT.log"
+  fi
+
+  XDG_RUNTIME_DIR="$NIRI_RUNTIME" WAYLAND_DISPLAY="$NIRI_PARENT_WAYLAND" DISPLAY= \
+    LIBGL_ALWAYS_SOFTWARE="$CAPTURE_LIBGL_ALWAYS_SOFTWARE" \
+    RUST_LOG="$CAPTURE_NIRI_LOG" \
+    setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" \
+      &>"$niri_log" & NIRI_PID=$!
+  NIRI_PGID=""
+  local i
+  for i in $(seq 1 40); do
+    NIRI_PGID="$(process_group "$NIRI_PID")"
+    [ "$NIRI_PGID" = "$NIRI_PID" ] && break
+    sleep 0.1
+  done
+  if [ "$NIRI_PGID" != "$NIRI_PID" ]; then
+    printf 'nested Niri did not obtain a private process group; evidence retained at %s\n' \
+      "$RUN_DIR" >&2
+    return 1
+  fi
+
+  SOCK=""
+  for i in $(seq 1 40); do
+    SOCK="$(grep -oE 'wayland-[0-9]+' "$niri_log" | head -1)"
+    [ -n "$SOCK" ] && [ -S "$NIRI_RUNTIME/$SOCK" ] && break
+    sleep 0.2
+  done
+  IPC="$(grep -oE "$NIRI_RUNTIME/niri\.[^ ]*\.sock" "$niri_log" | head -1)"
+  if ! kill -0 "$NIRI_PID" 2>/dev/null || [ -z "$SOCK" ] || [ -z "$IPC" ]; then
+    printf 'niri did not start nested; tail of log:\n'
+    tail -8 "$niri_log"
+    return 1
+  fi
+
+  local output_ready=0
+  for i in $(seq 1 60); do
+    # Two seconds per IPC probe and a large retry budget: a live host session
+    # (KWin/Plasma) can pause new nested-client setup for tens of seconds
+    # after a burst of compositor start/stop cycles. A probe budget this size
+    # absorbs that without mistaking a busy host for a dead compositor.
+    if NIRI_SOCKET="$IPC" timeout 2s niri msg -j outputs \
+      >"$NIRI_OUTPUTS_TMP" 2>"$NIRI_OUTPUTS_ERROR" \
+      && jq -e '((type == "object" and (.winit | type == "object") and .winit.name == "winit" and .winit.logical.scale == 1) or (type == "array" and length == 1 and .[0].name == "winit" and .[0].logical.scale == 1))' \
+        "$NIRI_OUTPUTS_TMP" >/dev/null 2>&1; then
+      mv "$NIRI_OUTPUTS_TMP" "$NIRI_OUTPUTS"
+      output_ready=1
+      break
+    fi
+    sleep 0.5
+  done
+  if [ "$output_ready" -ne 1 ]; then
+    [ -f "$NIRI_OUTPUTS_TMP" ] && cp "$NIRI_OUTPUTS_TMP" "$NIRI_OUTPUTS" || : >"$NIRI_OUTPUTS"
+    printf 'nested Niri output receipt failed after %s probes; evidence retained at %s\n' \
+      "$i" "$RUN_DIR" >&2
+    printf 'probe stderr:\n' >&2
+    cat "$NIRI_OUTPUTS_ERROR" >&2
+    printf 'tail of %s:\n' "$niri_log" >&2
+    tail -8 "$niri_log" >&2
+    return 1
+  fi
+  # Let the host settle for one second after a compositor maps: the next
+  # client launches immediately and back-to-back nested startups are what
+  # wedged the host session in the first place.
+  sleep 1
+
+  local logical
+  logical="$(jq -r 'if type == "object" then .winit.logical else .[0].logical end as $logical | if ($logical.width and $logical.height) then "\($logical.width)x\($logical.height)" else empty end' "$NIRI_OUTPUTS")"
+  if [ -z "$logical" ]; then
+    printf 'nested Niri output has no logical dimensions; evidence retained at %s\n' \
+      "$RUN_DIR" >&2
+    return 1
+  fi
+  if [ -n "$NIRI_OUTPUT_LOGICAL" ] && [ "$logical" != "$NIRI_OUTPUT_LOGICAL" ]; then
+    printf 'nested Niri output changed across batches: %s -> %s\n' \
+      "$NIRI_OUTPUT_LOGICAL" "$logical" >&2
+    return 1
+  fi
+  if [ -z "$NIRI_OUTPUT_LOGICAL" ]; then
+    NIRI_OUTPUT_LOGICAL="$logical"
+    {
+      printf 'nested_output_name=winit\n'
+      printf 'nested_output_scale=1\n'
+      printf 'nested_output_logical=%s\n' "$NIRI_OUTPUT_LOGICAL"
+    } >>"$METADATA"
+  fi
+  printf 'niri nested batch %s on %s (ipc %s)\n' \
+    "$NIRI_START_COUNT" "$SOCK" "$(basename "$IPC")"
+}
+
+ensure_niri() {
+  # A live host session can refuse nested-compositor setup for minutes at a
+  # time (observed: a KWin/Plasma pause after a burst of nested start/stop
+  # cycles). Fail closed, but spend the budget retrying with backoff before
+  # giving up the whole single-run matrix receipt.
+  if start_niri; then
+    return 0
+  fi
+  local backoff
+  for backoff in 5 20 60; do
+    printf '  nested Niri start failed; retrying in %ss (host session may be pausing new clients)\n' \
+      "$backoff" >&2
+    sleep "$backoff"
+    stop_niri
+    if start_niri; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+start_capture_host() {
+  if [ "$CAPTURE_NIRI_BACKGROUND" -eq 0 ]; then
+    return 0
+  fi
+
+  # Niri's nested winit backend is necessarily a host window. Put that
+  # backend inside a private virtual KWin compositor so the capture remains
+  # a real Wayland/Niri render while no test window can steal the operator's
+  # desktop focus or paint over the current work.
+  KWIN_RUNTIME="$NIRI_RUNTIME/kwin-runtime"
+  KWIN_DISPLAY="$KWIN_RUNTIME/wayland-outer"
+  mkdir -p "$KWIN_RUNTIME"
+  chmod 700 "$KWIN_RUNTIME"
+  local kwin_log="$RUN_DIR/kwin-wayland.log"
+  XDG_RUNTIME_DIR="$KWIN_RUNTIME" WAYLAND_DISPLAY= DISPLAY= \
+    QT_QPA_PLATFORM=wayland setsid timeout --foreground --kill-after=10s 20m \
+    kwin_wayland --virtual --socket=wayland-outer --width=1920 --height=1080 \
+      --scale=1 --no-global-shortcuts --no-lockscreen \
+      &>"$kwin_log" & KWIN_PID=$!
+  KWIN_PGID=""
+  local i
+  for i in $(seq 1 40); do
+    KWIN_PGID="$(process_group "$KWIN_PID")"
+    [ "$KWIN_PGID" = "$KWIN_PID" ] && break
+    sleep 0.1
+  done
+  if [ "$KWIN_PGID" != "$KWIN_PID" ]; then
+    printf 'virtual KWin did not obtain a private process group; evidence retained at %s\n' \
+      "$RUN_DIR" >&2
+    return 1
+  fi
+  for i in $(seq 1 40); do
+    [ -S "$KWIN_DISPLAY" ] && break
+    sleep 0.2
+  done
+  if ! kill -0 "$KWIN_PID" 2>/dev/null || [ ! -S "$KWIN_DISPLAY" ]; then
+    printf 'virtual KWin did not start; tail of log:\n' >&2
+    tail -20 "$kwin_log" >&2
+    return 1
+  fi
+  NIRI_PARENT_WAYLAND="$KWIN_DISPLAY"
+  printf 'background capture host: kwin-wayland --virtual (%s)\n' "$KWIN_DISPLAY"
+}
+
+start_capture_host || exit 1
+start_niri || ensure_niri || exit 1
 
 # seed_history_fixtures <dir> — deterministic JSONL series for the replay
 # panel (roadmap #4): five system series spanning the last ~23h so the 24h
@@ -342,16 +520,20 @@ for index, (identity, cpu, memory, count) in enumerate(applications):
 PY
 }
 
-# capture <name> <skin> <page> <device> <settings> <scenario> <window-size> <capture-size>
+# capture <name> <skin> <page> <device> <settings> <scenario> <window-size> <capture-size> <attempt>
 FAILURES=0
 BLOCKED_CAPTURES=0
 capture() {
-  local name="$1" skin="$2" page="$3" device="$4" settings="$5" scenario="$6" window_size="$7" capture_size="$8"
-  local log="$RUN_DIR/app-$name.log"
-  local windows_json="$RUN_DIR/window-$name.json"
-  local windows_json_tmp="$RUN_DIR/window-$name.json.tmp"
-  local windows_error="$RUN_DIR/window-$name.err"
-  local action_log="$RUN_DIR/screenshot-$name.log"
+  local name="$1" skin="$2" page="$3" device="$4" settings="$5" scenario="$6" window_size="$7" capture_size="$8" evidence_attempt="$9"
+  local attempt_suffix=""
+  if [ "$evidence_attempt" -gt 1 ]; then
+    attempt_suffix="-attempt-$evidence_attempt"
+  fi
+  local log="$RUN_DIR/app-$name$attempt_suffix.log"
+  local windows_json="$RUN_DIR/window-$name$attempt_suffix.json"
+  local windows_json_tmp="$RUN_DIR/window-$name$attempt_suffix.json.tmp"
+  local windows_error="$RUN_DIR/window-$name$attempt_suffix.err"
+  local action_log="$RUN_DIR/screenshot-$name$attempt_suffix.log"
   local shot="$TMP/$name.png"
   local marker_scenario="${scenario:-standard}"
   local config_home="$NIRI_RUNTIME/config-$name"
@@ -405,14 +587,14 @@ capture() {
   if [ "$APP_PGID" != "$APP_PID" ] || [ -z "$APP_PID" ]; then
     printf '  FAIL %s (app did not obtain a private process group; see %s)\n' "$name" "$log"
     FAILURES=$((FAILURES + 1))
-    return
+    return 1
   fi
   # Poll for the exact current-build window. A broad `grep taskmanager` can
   # match an unrelated window and leaves screenshot-window dependent on focus;
   # bind the Niri window id to this launch's app PID and app_id instead.
-  local window_id="" window_ready=missing
+  local window_id="" window_ready=missing capture_class=product-or-app
   local i; for i in $(seq 1 25); do
-  if NIRI_SOCKET="$IPC" timeout 3s niri msg -j windows >"$windows_json_tmp" 2>"$windows_error"; then
+    if NIRI_SOCKET="$IPC" timeout 2s niri msg -j windows >"$windows_json_tmp" 2>"$windows_error"; then
       if jq -e --arg app "$APP_ID" --arg pid "$APP_PID" \
         'any(.[]; .app_id == $app and ((.pid | tostring) == $pid))' \
         "$windows_json_tmp" >/dev/null 2>&1; then
@@ -423,6 +605,13 @@ capture() {
         window_ready=ready
         break
       fi
+    elif ! NIRI_SOCKET="$IPC" timeout 2s niri msg -j outputs >/dev/null 2>&1; then
+      # Only classify a compositor/backend block after a confirming second
+      # probe: one expired deadline under host load is not a dead compositor.
+      if ! NIRI_SOCKET="$IPC" timeout 2s niri msg -j outputs >/dev/null 2>&1; then
+        capture_class=compositor/backend
+        break
+      fi
     fi
     sleep 1
   done
@@ -431,24 +620,26 @@ capture() {
   # that telemetry and background UI data reached RootView; special scenarios
   # must additionally confirm that their controlled state is active.
   local markers=missing
-  for i in $(seq 1 80); do
-    if grep -q "CAPTURE_MARKER event=telemetry_ready scenario=$marker_scenario" "$log" 2>/dev/null \
-      && grep -q "CAPTURE_MARKER event=ui_data_ready scenario=$marker_scenario" "$log" 2>/dev/null \
-      && grep -q "CAPTURE_MARKER event=theme_ready scenario=$marker_scenario theme=$skin high_contrast=false" "$log" 2>/dev/null \
-      && { [ -z "$scenario" ] || grep -q "CAPTURE_MARKER event=scenario_ready scenario=$scenario" "$log" 2>/dev/null; }; then
-      markers=ready
-      break
-    fi
-    sleep 0.5
-  done
-  sleep 1.5 # allow the marker-triggered notify to paint the final frame
+  if [ "$capture_class" != compositor/backend ]; then
+    for i in $(seq 1 80); do
+      if grep -q "CAPTURE_MARKER event=telemetry_ready scenario=$marker_scenario" "$log" 2>/dev/null \
+        && grep -q "CAPTURE_MARKER event=ui_data_ready scenario=$marker_scenario" "$log" 2>/dev/null \
+        && grep -q "CAPTURE_MARKER event=theme_ready scenario=$marker_scenario theme=$skin high_contrast=false" "$log" 2>/dev/null \
+        && { [ -z "$scenario" ] || grep -q "CAPTURE_MARKER event=scenario_ready scenario=$scenario" "$log" 2>/dev/null; }; then
+        markers=ready
+        break
+      fi
+      sleep 0.5
+    done
+    sleep 1.5 # allow the marker-triggered notify to paint the final frame
+  fi
 
   # A GPUI surface can map after the first window poll even though readiness
   # markers are already present. Re-acquire by the exact PID/app-id before
   # capture; never guess from focus or a broad title match.
   if [ "$markers" = ready ] && [ "$window_ready" != ready ]; then
     for i in $(seq 1 20); do
-      if NIRI_SOCKET="$IPC" timeout 1s niri msg -j windows >"$windows_json_tmp" 2>"$windows_error" \
+      if NIRI_SOCKET="$IPC" timeout 2s niri msg -j windows >"$windows_json_tmp" 2>"$windows_error" \
         && jq -e --arg app "$APP_ID" --arg pid "$APP_PID" \
           'any(.[]; .app_id == $app and ((.pid | tostring) == $pid))' \
           "$windows_json_tmp" >/dev/null 2>&1; then
@@ -479,10 +670,10 @@ capture() {
   # initial output probe succeeded before launch; if the same IPC endpoint is
   # no longer able to answer after the client mapped, this run is blocked by
   # the nested compositor/backend and must not be reported as a product FAIL.
-  local capture_class=product-or-app
-  local niri_health_json="$RUN_DIR/niri-health-$name.json"
-  local niri_health_error="$RUN_DIR/niri-health-$name.err"
-  if ! NIRI_SOCKET="$IPC" timeout 1s niri msg -j outputs \
+  local niri_health_json="$RUN_DIR/niri-health-$name$attempt_suffix.json"
+  local niri_health_error="$RUN_DIR/niri-health-$name$attempt_suffix.err"
+  if [ "$capture_class" != compositor/backend ] \
+    && ! NIRI_SOCKET="$IPC" timeout 2s niri msg -j outputs \
     >"$niri_health_json" 2>"$niri_health_error"; then
     capture_class=compositor/backend
   fi
@@ -523,8 +714,12 @@ capture() {
   fi
   if [ "$status" != ok ]; then
     if [ "$capture_class" = compositor/backend ]; then
-      echo "  BLOCKED $name (compositor/backend: nested Niri IPC stopped responding after client mapping; markers=$markers window=$window_ready id=$window_id action=$action expected=${expected_width}x${expected_height}; see $log)"
-      BLOCKED_CAPTURES=$((BLOCKED_CAPTURES + 1))
+      echo "  retry $name (compositor/backend attempt $evidence_attempt: nested Niri IPC stopped responding after client mapping; markers=$markers window=$window_ready id=$window_id action=$action; see $log)"
+      rm -f "$f" 2>/dev/null
+      terminate_owned "$APP_PID" "$APP_PGID"
+      APP_PID=""
+      APP_PGID=""
+      return 75
     else
       echo "  FAIL $name (product/app: markers=$markers window=$window_ready id=$window_id action=$action expected=${expected_width}x${expected_height}; see $log)"
     fi
@@ -537,20 +732,24 @@ capture() {
   local windows_hash=- action_hash=-
   [ -f "$windows_json" ] && windows_hash=$(sha256sum "$windows_json" | cut -d' ' -f1)
   [ -f "$action_log" ] && action_hash=$(sha256sum "$action_log" | cut -d' ' -f1)
+  local log_receipt="target/screenshot-evidence/$RUN_ID/$(basename "$log")"
+  local windows_receipt="target/screenshot-evidence/$RUN_ID/$(basename "$windows_json")"
+  local action_receipt="target/screenshot-evidence/$RUN_ID/$(basename "$action_log")"
   grep 'CAPTURE_MARKER' "$log" 2>/dev/null | sed "s/^/$name\t/" >>"$MARKERS"
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$CAPTURED_AT" "$GIT_HEAD" "$WORKTREE_STATE" "$RUST_VERSION" "$marker_scenario" \
     "$name.png" "$skin" "$page" "$device" "$settings" "$width" "$height" "$bytes" \
-    "$hash" "$markers" "target/screenshot-evidence/$RUN_ID/app-$name.log" "$log_hash" \
+    "$hash" "$markers" "$log_receipt" "$log_hash" \
     "target/screenshot-evidence/$RUN_ID/capture-markers.log" >>"$MANIFEST"
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
-    "$name" "$APP_PID" "$window_id" "target/screenshot-evidence/$RUN_ID/window-$name.json" \
-    "$windows_hash" "target/screenshot-evidence/$RUN_ID/screenshot-$name.log" "$action_hash" \
+    "$name" "$APP_PID" "$window_id" "$windows_receipt" \
+    "$windows_hash" "$action_receipt" "$action_hash" \
     >>"$WINDOW_MANIFEST"
 
   terminate_owned "$APP_PID" "$APP_PGID"
   APP_PID=""
   APP_PGID=""
+  [ "$status" = ok ]
 }
 
 echo "capturing evidence matrix -> $RUN_DIR"
@@ -558,8 +757,33 @@ EXPECTED_COUNT=0
 while IFS=$'\t' read -r name skin page device settings scenario window_size capture_size; do
   [ "$name" = name ] && continue
   [ -z "$name" ] && continue
+  if [ "$EXPECTED_COUNT" -gt 0 ] \
+    && [ $((EXPECTED_COUNT % CAPTURE_NIRI_BATCH_SIZE)) -eq 0 ]; then
+    stop_niri
+    ensure_niri || exit 1
+  fi
   [ "$scenario" = standard ] && scenario=""
-  capture "$name" "$skin" "$page" "$device" "$settings" "$scenario" "$window_size" "$capture_size"
+  capture_attempt=1
+  while true; do
+    capture "$name" "$skin" "$page" "$device" "$settings" "$scenario" \
+      "$window_size" "$capture_size" "$capture_attempt"
+    capture_status=$?
+    [ "$capture_status" -eq 0 ] && break
+    if [ "$capture_status" -eq 75 ] \
+      && [ "$capture_attempt" -lt "$CAPTURE_NIRI_MAX_ATTEMPTS" ]; then
+      stop_niri
+      ensure_niri || exit 1
+      capture_attempt=$((capture_attempt + 1))
+      continue
+    fi
+    if [ "$capture_status" -eq 75 ]; then
+      printf '  BLOCKED %s (compositor/backend remained unavailable after %s attempts)\n' \
+        "$name" "$capture_attempt"
+      BLOCKED_CAPTURES=$((BLOCKED_CAPTURES + 1))
+      FAILURES=$((FAILURES + 1))
+    fi
+    break
+  done
   EXPECTED_COUNT=$((EXPECTED_COUNT + 1))
 done <"$MATRIX"
 
@@ -577,6 +801,8 @@ if [ "$FAILURES" -ne 0 ]; then
   printf 'FAILED: %s capture(s); accepted screenshots were not replaced. Evidence: %s\n' "$FAILURES" "$RUN_DIR"
   exit 1
 fi
+
+printf 'niri_instances=%s\n' "$NIRI_START_COUNT" >>"$METADATA"
 
 # The app/runner cannot certify its own evidence. Re-open every PNG, validate
 # chunk CRC/dimensions/hash, join the canonical scenario matrix to runtime

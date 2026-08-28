@@ -5,29 +5,30 @@
 # environment-dependent checks moved home. This script is the single entry
 # point that reproduces them on this machine, tiered by cost:
 #
-#   quick      seconds-minutes: fmt, python policy gates, install-manager
+#   quick      seconds-minutes: toolchain/platform preflight, fmt, python policy gates, install-manager
 #              smoke, line/doc/test-layout/source-inspection/bevy-bsn/headless
 #              side-effect guards, per-crate coverage gate self-test.
-#   standard   ~ the old Linux CI job: quick + cargo deny + clippy + the
+#   standard   ~ the blocking Linux CI surface: quick + cargo deny + clippy + the
 #              nextest workspace split into core/logic/gui/perf layers
 #              (failure attribution per layer; `--only nextest-core` gives a
 #              bottom-up dev loop) + doctests + rustdoc + the nvidia fallback
-#              matrix + release build + (with --with-gui) the GPUI interaction
-#              matrix on a live Wayland session.
+#              matrix + release/package smoke + (with --with-gui) the GPUI
+#              interaction matrix and fresh capture receipt route.
 #   extended   the expensive pass: llvm-cov with per-crate floors, mutation
 #              testing of the core/application diff, Miri on the three
 #              Linux-audited unsafe crates, fuzz-target build (+ runs on demand),
 #              release bloat and bench trends vs docs/quality/*-trend.tsv.
 #
 # Every stage is bounded by an outer `timeout --kill-after=` deadline and
-# the result is recorded per stage; the script exits non-zero if any stage
-# failed. Scratch space lives under .tmp/ (repo NVMe, gitignored), never
-# /tmp, and is removed on exit. Parallelism caps at CARGO_BUILD_JOBS (4)
-# so interactive work is not starved.
+# the result is recorded per stage. The default is fail-fast: the first failed
+# stage exits immediately; use `--keep-going` only when collecting a diagnostic
+# batch. Scratch space lives under .tmp/ (repo NVMe, gitignored), never /tmp,
+# and is removed on exit. Parallelism caps at CARGO_BUILD_JOBS (4) so
+# interactive work is not starved.
 #
 # Usage:
 #   scripts/quality/local-gates.sh [quick|standard|extended] [--with-gui]
-#     [--with-fuzz-runs] [--skip-release] [--only <stage>]
+#     [--with-fuzz-runs] [--skip-release] [--keep-going] [--only <stage>]
 #   No tier argument runs `quick`.
 #
 # Environment overrides:
@@ -44,6 +45,21 @@ export CARGO_BUILD_JOBS="${JOBS:-4}"
 export TMPDIR="$repo/.tmp/local-gates-$$-$(date +%s)/tmp"
 scratch="${TMPDIR%/tmp}"
 mkdir -p "$TMPDIR"
+
+# Keep local Cargo invocations on the same moving stable channel and warning
+# policy as CI. The repository's rust-version remains a compatibility floor;
+# it is not the toolchain selected for the current gate run.
+export RUSTUP_TOOLCHAIN="${RUSTUP_TOOLCHAIN:-stable}"
+export CARGO_INCREMENTAL="${CARGO_INCREMENTAL:-0}"
+export CARGO_PROFILE_DEV_DEBUG="${CARGO_PROFILE_DEV_DEBUG:-line-tables-only}"
+rustflags="${RUSTFLAGS:-}"
+if [[ "$rustflags" != *"-D warnings"* ]]; then
+    rustflags="${rustflags:+$rustflags }-D warnings"
+fi
+if command -v mold >/dev/null 2>&1 && [[ "$rustflags" != *"-fuse-ld=mold"* ]]; then
+    rustflags="${rustflags:+$rustflags }-C link-arg=-fuse-ld=mold"
+fi
+export RUSTFLAGS="$rustflags"
 
 stage_timeout="${STAGE_TIMEOUT:-3600}"
 quick_timeout="${QUICK_TIMEOUT:-300}"
@@ -82,6 +98,10 @@ run_stage() {
         record "$name" "$tier" "FAIL" "$(( $(date +%s) - started ))"
         echo "FAIL $name"
         failures=$((failures + 1))
+        if [[ "$fail_fast" == "1" ]]; then
+            echo "local-gates: fail-fast after $name (rc=$rc); use --keep-going for a diagnostic batch" >&2
+            exit "$rc"
+        fi
     fi
     stages_run=$((stages_run + 1))
 }
@@ -104,6 +124,8 @@ maybe() {
 with_gui=0
 with_fuzz_runs=0
 skip_release=0
+fail_fast=1
+[[ "${KEEP_GOING:-0}" == "1" ]] && fail_fast=0
 tier="quick"
 while [[ $# -gt 0 ]]; do
     case "$1" in
@@ -111,6 +133,7 @@ while [[ $# -gt 0 ]]; do
     --with-gui) with_gui=1 ;;
     --with-fuzz-runs) with_fuzz_runs=1 ;;
     --skip-release) skip_release=1 ;;
+    --keep-going) fail_fast=0 ;;
     --only)
         shift
         ONLY_STAGE="$1"
@@ -148,6 +171,55 @@ quick | standard | extended) ;;
     exit 2
     ;;
 esac
+
+preflight() {
+    local missing=0
+    local command
+    case "$(uname -s)" in
+    Linux*) ;;
+    *)
+        echo "this gate entry is Linux-only (uname: $(uname -s)); on Windows use scripts/windows/local-gates.sh" >&2
+        missing=1
+        ;;
+    esac
+    for command in cargo rustc git timeout install mktemp stat; do
+        if ! command -v "$command" >/dev/null 2>&1; then
+            echo "required command is unavailable: $command" >&2
+            missing=1
+        fi
+    done
+    if ! timeout 5s python3 --version >/dev/null 2>&1; then
+        echo "Python 3 interpreter is not runnable" >&2
+        missing=1
+    fi
+    if command -v cargo >/dev/null 2>&1 && ! cargo fmt --version >/dev/null 2>&1; then
+        echo "cargo fmt is unavailable (install the rustfmt component)" >&2
+        missing=1
+    fi
+    printf 'toolchain: %s\n' "$(rustc -V 2>/dev/null || printf 'unavailable')"
+    if [[ "$rustflags" == *"-fuse-ld=mold"* ]] && ! command -v mold >/dev/null 2>&1; then
+        echo "note: RUSTFLAGS requests mold, but mold is not installed yet; compile stages must install it"
+    elif command -v mold >/dev/null 2>&1; then
+        echo "linker: mold (CI-compatible accelerator enabled)"
+    else
+        echo "note: mold is unavailable; using the platform default linker"
+    fi
+    return "$missing"
+}
+
+echo ""
+echo "=== preflight ==="
+if preflight; then
+    record preflight quick PASS 0
+    stages_run=$((stages_run + 1))
+    echo "PASS preflight"
+else
+    record preflight quick FAIL 0
+    stages_run=$((stages_run + 1))
+    failures=1
+    echo "FAIL preflight" >&2
+    exit 2
+fi
 
 # ---- quick -----------------------------------------------------------
 if maybe fmt; then
@@ -222,13 +294,26 @@ fi
 if maybe coverage-gate-self; then
     run_stage coverage-gate-self quick run_py scripts/quality/per_crate_coverage_gate.py --self-test
 fi
-if maybe coverage-gate; then
-    run_stage coverage-gate quick run_py scripts/quality/per_crate_coverage_gate.py --lcov target/lcov.info --check
-fi
 
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 
 # ---- standard --------------------------------------------------------
+if maybe ui-route; then
+    # This diff-only route is intentionally first: a UI change without the
+    # required headless/capture mode should fail before compiling the workspace.
+    if [[ "$with_gui" == "1" ]]; then
+        run_stage ui-route standard bash scripts/quality/ui-evidence-route.sh --with-gui
+    else
+        run_stage ui-route standard bash scripts/quality/ui-evidence-route.sh
+    fi
+fi
+if [[ "$with_gui" == "1" ]]; then
+    if maybe ui-capture-route; then
+        # Capture acceptance is also cheap to reject early because it only
+        # checks the freshness of receipts; the capture itself remains explicit.
+        run_stage ui-capture-route standard bash scripts/quality/ui-evidence-route.sh --with-gui --require-capture
+    fi
+fi
 if maybe deny; then
     run_stage deny standard timeout --kill-after=30s 600 cargo deny check
 fi
@@ -263,14 +348,6 @@ if maybe live-smoke; then
     # only). Fixtures prove parsers; this stage proves the composition edge.
     run_stage live-smoke standard cargo nextest run --locked -p taskmanager --test logic --features test-support -j 4 --profile ci -E 'test(live_smoke_)'
 fi
-if maybe ui-route; then
-    # UI diffs must carry the headless GUI matrix: pure core changes skip it.
-    if [[ "$with_gui" == "1" ]]; then
-        run_stage ui-route standard bash scripts/quality/ui-evidence-route.sh --with-gui
-    else
-        run_stage ui-route standard bash scripts/quality/ui-evidence-route.sh
-    fi
-fi
 if maybe doctests; then
     run_stage doctests standard cargo test --locked --doc --workspace
 fi
@@ -292,15 +369,13 @@ if [[ "$skip_release" == "1" ]]; then
     record release standard SKIP 0
 else
     if maybe release; then
-        run_stage release standard cargo build --locked --release
+        # Reuse the same release/package smoke as the blocking Linux CI job.
+        # PR-style LTO/codegen overrides keep this local gate fast; extended
+        # bloat measurement rebuilds with the shipping profile below.
+        run_stage release standard env PR_SMOKE_PROFILE=true scripts/quality/release-smoke.sh
     fi
 fi
 if [[ "$with_gui" == "1" ]]; then
-    if maybe ui-capture-route; then
-        # Capture acceptance additionally requires fresh pixel receipts for
-        # every touched frontend shape (run the selected capture workflow).
-        run_stage ui-capture-route standard bash scripts/quality/ui-evidence-route.sh --with-gui --require-capture
-    fi
     if maybe gpui-interactions; then
         run_stage gpui-interactions standard timeout --kill-after=10s 2400 bash scripts/accept-gpui-interactions.sh
     fi
@@ -335,7 +410,7 @@ if [[ "$with_fuzz_runs" == "1" ]]; then
 fi
 if maybe bloat; then
     run_stage bloat extended bash -c \
-        '[[ -f target/release/taskmanager ]] || cargo build --locked --release; scripts/quality/trend-gate.sh --metric bloat --current "$(stat -c %s target/release/taskmanager 2>/dev/null || echo 0)" --trend docs/quality/bloat-trend.tsv --limit 5'
+        'CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 CARGO_PROFILE_RELEASE_STRIP=debuginfo timeout --kill-after=30s 3600 cargo build --locked --release -j 4 -p taskmanager; scripts/quality/trend-gate.sh --metric bloat --current "$(stat -c %s target/release/taskmanager 2>/dev/null || echo 0)" --trend docs/quality/bloat-trend.tsv --limit 5'
 fi
 if maybe benches; then
     run_stage benches extended scripts/quality/bench-gate.sh

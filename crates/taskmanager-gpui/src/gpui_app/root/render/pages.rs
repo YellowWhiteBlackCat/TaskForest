@@ -271,8 +271,8 @@ impl RootView {
                     // the accessible device switcher rather than disappearing
                     // with it. The selected device must remain reachable at
                     // every width.
-                    body = body.child(responsive::device_strip(
-                        responsive::DeviceStripProps {
+                    body = body.child(responsive::device_strip::device_strip(
+                        responsive::device_strip::DeviceStripProps {
                             theme: t,
                             snapshot: snap,
                             power_supplies: self.power_supplies(),

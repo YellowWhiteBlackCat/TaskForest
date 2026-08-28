@@ -34,7 +34,7 @@ fn accept_snapshot(
 }
 
 #[test]
-fn ready_session_renders_only_the_matching_session_payload() {
+fn mc04_gpu_panel_case_ready_session_renders_only_the_matching_session_payload() {
     let snapshot = GpuEngineRowsSnapshot::success(device(), sample_engines());
     let mut session = GpuEngineRowsSession::default();
     accept_snapshot(&mut session, 1, snapshot.clone());
@@ -96,7 +96,7 @@ fn closed_session_never_resurrects_a_late_payload() {
 }
 
 #[test]
-fn provider_failures_keep_their_named_honest_presentations() {
+fn mc04_gpu_unavailable_case_provider_failures_keep_their_named_honest_presentations() {
     for (request, kind, expected) in [
         (
             1,

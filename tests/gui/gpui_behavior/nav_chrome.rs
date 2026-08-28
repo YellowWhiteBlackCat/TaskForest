@@ -47,7 +47,9 @@ fn render_in_mode(cx: &mut TestAppContext, server_decorations: bool) -> WindowHa
 /// modes — it is app content, not window chrome. Tabs keep their stable English
 /// identity ids ("Apps"/"Services"/…); the gear keeps "settings-btn".
 #[gpui::test]
-async fn nav_strip_renders_tabs_and_gear_in_both_decoration_modes(cx: &mut TestAppContext) {
+async fn mc00_page_sweep_case_nav_strip_renders_tabs_and_gear_in_both_decoration_modes(
+    cx: &mut TestAppContext,
+) {
     for server_decorations in [true, false] {
         let win = render_in_mode(cx, server_decorations);
         let mut vcx = VisualTestContext::from_window(win.into(), cx);
@@ -75,7 +77,9 @@ async fn nav_strip_renders_tabs_and_gear_in_both_decoration_modes(cx: &mut TestA
 /// Edit mode exposes a concrete device control whose pointer path updates the
 /// persisted per-device override, not the category-wide visibility switch.
 #[gpui::test]
-async fn sidebar_edit_click_updates_the_exact_device_override(cx: &mut TestAppContext) {
+async fn mc05_sidebar_edit_case_sidebar_edit_click_updates_the_exact_device_override(
+    cx: &mut TestAppContext,
+) {
     let win = render_in_mode(cx, true);
     let mut visual = VisualTestContext::from_window(win.into(), cx);
     let edit = visual
@@ -108,7 +112,9 @@ async fn sidebar_edit_click_updates_the_exact_device_override(cx: &mut TestAppCo
 /// The persisted order drives both wide row placement and the compact pill's
 /// pointer target; the compact renderer cannot fall back to discovery order.
 #[gpui::test]
-async fn configured_sidebar_order_drives_wide_and_compact_pointer_targets(cx: &mut TestAppContext) {
+async fn mc05_sidebar_order_case_configured_sidebar_order_drives_wide_and_compact_pointer_targets(
+    cx: &mut TestAppContext,
+) {
     let win = render_in_mode(cx, true);
     win.update(cx, |view, _window, cx| {
         view.set_sidebar_order(vec!["memory".into(), "cpu".into()], cx);
@@ -146,7 +152,9 @@ async fn configured_sidebar_order_drives_wide_and_compact_pointer_targets(cx: &m
 /// The Settings density control writes the same typed geometry axis consumed
 /// by Apps headers and rows; no test-only field mutation bypasses the click.
 #[gpui::test]
-async fn density_setting_click_updates_the_table_geometry_contract(cx: &mut TestAppContext) {
+async fn mc05_density_case_density_setting_click_updates_the_table_geometry_contract(
+    cx: &mut TestAppContext,
+) {
     let win = render_in_mode(cx, true);
     let mut visual = VisualTestContext::from_window(win.into(), cx);
     let settings = visual
@@ -175,7 +183,9 @@ async fn density_setting_click_updates_the_table_geometry_contract(cx: &mut Test
 /// Performance unit choices are independent typed preferences: changing one
 /// pair updates only that pair and stays on the owning RootView window.
 #[gpui::test]
-async fn settings_units_switches_update_per_window_preferences(cx: &mut TestAppContext) {
+async fn mc05_units_case_settings_units_switches_update_per_window_preferences(
+    cx: &mut TestAppContext,
+) {
     let win = render_in_mode(cx, true);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     let settings = vcx
@@ -344,7 +354,7 @@ async fn titlebar_chrome_absent_in_native_mode_present_in_csd(cx: &mut TestAppCo
 /// the old in-titlebar tabs used (the tab helper moved unchanged into
 /// `nav_strip`). Starts on Performance, clicks the Services tab center.
 #[gpui::test]
-async fn nav_tab_click_switches_page(cx: &mut TestAppContext) {
+async fn mc00_nav_pointer_case_nav_tab_click_switches_page(cx: &mut TestAppContext) {
     let win = render_in_mode(cx, true);
     let initial = win.read_with(cx, |v, _cx| v.page).unwrap();
     assert_eq!(
@@ -370,7 +380,7 @@ async fn nav_tab_click_switches_page(cx: &mut TestAppContext) {
 /// modal state, keep System Information closed, render its copy action, and
 /// close through the same root Escape path as every other modal.
 #[gpui::test]
-async fn system_page_about_entry_opens_independent_modal(cx: &mut TestAppContext) {
+async fn mc06_about_case_system_page_about_entry_opens_independent_modal(cx: &mut TestAppContext) {
     let win = render_in_mode(cx, true);
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     let system = vcx.debug_bounds("System").expect("System tab renders");
@@ -428,7 +438,9 @@ async fn system_page_about_entry_opens_independent_modal(cx: &mut TestAppContext
 /// exposes View/Run/Revert, and a missing runtime port turns Run into an honest
 /// typed failure instead of claiming that setup succeeded.
 #[gpui::test]
-async fn first_run_dialog_keeps_setup_actions_typed_and_failure_visible(cx: &mut TestAppContext) {
+async fn mc06_first_run_case_first_run_dialog_keeps_setup_actions_typed_and_failure_visible(
+    cx: &mut TestAppContext,
+) {
     let win = render_in_mode(cx, true);
     win.update(cx, |view, _window, cx| {
         view.first_run = FirstRunUiState {

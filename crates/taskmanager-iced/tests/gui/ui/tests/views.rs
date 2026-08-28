@@ -4,6 +4,11 @@
 
 use super::super::*;
 use super::applications_table_rows;
+use crate::ui::applications::rows::RowRender;
+use crate::ui::applications::{
+    APPLICATION_HEADER_HEIGHT, application_row_height, applications_table_key,
+    applications_table_rows_range, process_view_selector,
+};
 use taskmanager_application::ProcessItem;
 use taskmanager_shell::{SortCol, SortDir};
 

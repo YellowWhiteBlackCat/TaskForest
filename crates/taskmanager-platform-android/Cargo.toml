@@ -1,0 +1,26 @@
+[package]
+name = "taskmanager-platform-android"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Feature-gated standalone Android platform provider seam for TaskForest"
+publish = false
+
+# Android is a separate platform adapter. It must not select the Linux adapter
+# or inherit desktop windowing, tray, service, or privilege assumptions.
+
+[features]
+default = []
+# Explicit experimental composition marker. This does not claim that an
+# Android capability is Available; the current seam remains capability-absent
+# until a target-device provider source and failure mapping are verified.
+android-provider = []
+
+[dependencies]
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
+
+[lib]
+name = "taskmanager_platform_android"
+path = "src/lib.rs"

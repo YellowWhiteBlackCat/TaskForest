@@ -66,16 +66,21 @@ on:
         description: Optional password for WINDOWS_CERT_B64
         required: false
 
-# These env vars MUST stay identical to ci.yml's workflow env (and
-# portability.yml's): rust-cache derives its key partly from a hash of all
-# CARGO*/RUST* environment variables, so any difference splits the cache and
+# Cache alignment: rust-cache keys hash all CARGO*/RUST* variables, so any
+# divergence from ci.yml/portability.yml splits the shared cache lines and
 # the release jobs cold-build the dependencies CI just compiled on the same
-# commit. RUSTFLAGS also keeps release artifacts warning-clean exactly like
-# the blocking gate.
+# commit. The base env below is shared verbatim by ci.yml and portability.yml
+# (CARGO_PROFILE_DEV_DEBUG included). The Linux job additionally overrides
+# RUSTFLAGS with the byte-identical mold link flag from ci.yml's workflow
+# env, keeping the `linux` job-id cache line shared with CI's release-smoke
+# job; the Windows jobs keep the plain `-D warnings` flag, matching
+# portability.yml's Windows job (same job id, shared cache). RUSTFLAGS also
+# keeps release artifacts warning-clean exactly like the blocking gate.
 env:
   CARGO_TERM_COLOR: always
   RUSTFLAGS: -D warnings
   CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   linux:
@@ -84,7 +89,7 @@ jobs:
     if: inputs.linux
     timeout-minutes: 120
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - arch: x64
@@ -98,6 +103,11 @@ jobs:
     env:
       DEB_ARCH: ${{ matrix.deb_arch }}
       RPM_ARCH: ${{ matrix.rpm_arch }}
+      # Byte-identical to ci.yml's workflow-level RUSTFLAGS so this job keeps
+      # sharing the `linux` job-id rust-cache line with CI's release-smoke
+      # job. mold is a link-time-only ELF accelerator; the produced binaries
+      # are unchanged apart from being linked faster.
+      RUSTFLAGS: -D warnings -C link-arg=-fuse-ld=mold
     steps:
       # An empty `ref` input falls back to the event's natural ref (tag push
       # → the tag commit; rehearsal → the dispatch branch head).
@@ -112,9 +122,11 @@ jobs:
       - name: Install build and packaging deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y libxkbcommon-dev libxkbcommon-x11-dev rpm file
-      - uses: dtolnay/rust-toolchain@1.97.1
+          sudo apt-get install -y --no-install-recommends libxkbcommon-dev libxkbcommon-x11-dev rpm file mold
+      - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-workspace-crates: true
       # Native runner builds: the host target is the package target, so a
       # successful arm64 job cannot accidentally contain an x86_64 binary.
       - name: Build release binaries
@@ -192,7 +204,7 @@ jobs:
     if: inputs.windows
     timeout-minutes: 150
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
           - arch: x64
@@ -211,11 +223,13 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@stable
       - name: Install Rust target
         shell: bash
         run: rustup target add "$RUST_TARGET"
       - uses: Swatinem/rust-cache@v2
+        with:
+          cache-workspace-crates: true
       # GPUI shape only — the release surface deliberately skips the Iced
       # build. The Windows edge embeds the exe icon on the native MSVC toolchain.
       - name: Build release exe

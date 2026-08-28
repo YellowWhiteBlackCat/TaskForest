@@ -54,7 +54,7 @@ fn taskmanager_modal_focused(cx: &mut TestAppContext, win: WindowHandle<RootView
 /// directions inside its scope, close through the typed Escape route, and
 /// restore the exact trigger control rather than an arbitrary global tab stop.
 #[gpui::test]
-async fn modal_traps_tab_and_restores_trigger_focus(cx: &mut TestAppContext) {
+async fn mc06_modal_focus_case_modal_traps_tab_and_restores_trigger_focus(cx: &mut TestAppContext) {
     let (win, view) = wrapped_root(cx);
     view.update(cx, |view, cx| {
         view.mark_telemetry_frame_ready();
@@ -131,7 +131,7 @@ async fn modal_traps_tab_and_restores_trigger_focus(cx: &mut TestAppContext) {
 /// Ctrl+F changes pages when needed and focuses the real search input; Tab must
 /// then escape that input instead of trapping keyboard-only users.
 #[gpui::test]
-async fn ctrl_f_focuses_search_and_tab_leaves_input(cx: &mut TestAppContext) {
+async fn mc03_apps_search_case_ctrl_f_focuses_search_and_tab_leaves_input(cx: &mut TestAppContext) {
     let (win, view) = wrapped_root(cx);
     view.update(cx, |v, cx| {
         v.mark_telemetry_frame_ready();
@@ -188,7 +188,7 @@ fn dispatch_control_modifier(cx: &mut TestAppContext, win: WindowHandle<RootView
 /// Bare `Escape` dismisses the one typed surface that owns this window. Opening
 /// later surfaces replaces earlier ones and cleans their render caches.
 #[gpui::test]
-async fn escape_closes_open_modals(cx: &mut TestAppContext) {
+async fn mc06_modal_cancel_case_escape_closes_open_modals(cx: &mut TestAppContext) {
     let win = cx.add_window(|_w, cx| RootView::new(Theme::dark(), cx));
     win.update(cx, |v, _w, cx| {
         v.mark_telemetry_frame_ready();
@@ -259,7 +259,7 @@ async fn escape_closes_open_modals(cx: &mut TestAppContext) {
 /// the capture/page render suites; this test covers the key WIRING for
 /// the pages whose Inputs don't get in the way.
 #[gpui::test]
-async fn alt_digit_switches_top_page(cx: &mut TestAppContext) {
+async fn mc00_nav_keyboard_case_alt_digit_switches_top_page(cx: &mut TestAppContext) {
     let win = cx.add_window(|_w, cx| RootView::new(Theme::dark(), cx));
     win.update(cx, |v, _w, cx| {
         v.mark_telemetry_frame_ready();
@@ -304,7 +304,7 @@ async fn alt_digit_switches_top_page(cx: &mut TestAppContext) {
 
 /// `Ctrl+Space` toggles the frontend-owned refresh policy synchronously.
 #[gpui::test]
-async fn ctrl_space_toggles_pause(cx: &mut TestAppContext) {
+async fn mc06_pause_shortcut_case_ctrl_space_toggles_pause(cx: &mut TestAppContext) {
     let win = cx.add_window(|_w, cx| RootView::new(Theme::dark(), cx));
     win.update(cx, |v, _w, cx| {
         v.mark_telemetry_frame_ready();
@@ -332,7 +332,9 @@ async fn ctrl_space_toggles_pause(cx: &mut TestAppContext) {
 /// GPUI modifier lifecycle; releasing it resumes unless the independent
 /// Ctrl+Space/manual pause remains active.
 #[gpui::test]
-async fn holding_ctrl_pauses_and_releasing_ctrl_resumes_ui_refresh(cx: &mut TestAppContext) {
+async fn mc06_ctrl_pause_case_holding_ctrl_pauses_and_releasing_ctrl_resumes_ui_refresh(
+    cx: &mut TestAppContext,
+) {
     let win = cx.add_window(|_w, cx| RootView::new(Theme::dark(), cx));
     win.update(cx, |v, _w, cx| {
         v.mark_telemetry_frame_ready();
@@ -383,7 +385,7 @@ async fn holding_ctrl_pauses_and_releasing_ctrl_resumes_ui_refresh(cx: &mut Test
 /// renderable in both states. The command must not alter telemetry or persisted
 /// device preferences; only the RootView layout projection changes.
 #[gpui::test]
-async fn f9_toggles_sidebar_visibility(cx: &mut TestAppContext) {
+async fn mc05_sidebar_keyboard_case_f9_toggles_sidebar_visibility(cx: &mut TestAppContext) {
     let win = cx.add_window(|_w, cx| RootView::new(Theme::dark(), cx));
     win.update(cx, |v, _w, cx| {
         v.mark_telemetry_frame_ready();
@@ -414,7 +416,9 @@ async fn f9_toggles_sidebar_visibility(cx: &mut TestAppContext) {
 /// Ctrl+A opens the per-window dialog and Escape closes it without touching the
 /// correlated telemetry read model.
 #[gpui::test]
-async fn ctrl_a_opens_and_escape_closes_system_information(cx: &mut TestAppContext) {
+async fn mc06_system_about_case_ctrl_a_opens_and_escape_closes_system_information(
+    cx: &mut TestAppContext,
+) {
     let win = cx.add_window(|_w, cx| RootView::new(Theme::dark(), cx));
     win.update(cx, |view, _window, cx| {
         view.mark_telemetry_frame_ready();

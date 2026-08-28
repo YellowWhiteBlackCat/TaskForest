@@ -1,0 +1,22 @@
+[package]
+name = "taskmanager-platform-ohos"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Standalone OpenHarmony platform adapter seam for TaskForest"
+publish = false
+
+# This crate is deliberately independent from the Linux adapter. The Rust
+# OpenHarmony targets report target_os = "linux" and target_env = "ohos";
+# selecting taskmanager-platform-linux from target_os alone would pull Linux
+# desktop, procfs, privilege, and ABI assumptions into this target.
+
+[dependencies]
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
+taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
+
+[lib]
+name = "taskmanager_platform_ohos"
+path = "src/lib.rs"

@@ -25,6 +25,8 @@ pub(crate) use super::performance::{
 use super::process_projection::ProcessProjection;
 use super::tables::{ServiceRow, service_matches_lower};
 use super::*;
+use crate::ui::applications::applications_table_rows_range;
+use crate::ui::applications::rows::RowRender;
 
 /// Build the Applications data rows from the shared visible-row projection.
 /// The projection is the single source of render order (and of the keyboard

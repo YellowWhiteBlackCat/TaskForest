@@ -39,12 +39,14 @@ use self::integration::{
     WinDesktopNotificationProvider, WinResourceRevealProvider, WinUrlOpenProvider,
 };
 use self::power::WinPowerSupplyProvider;
+use self::process::target_observation::{
+    PendingProcessIsolationProvider, PendingProcessNetworkProvider, WinProcessAffinityProvider,
+    WinProcessGpuProvider, WinProcessResourcesProvider,
+};
 use self::process::{
-    PendingProcessIsolationProvider, PendingProcessNetworkEscalationProvider,
-    PendingProcessNetworkProvider, WinProcessAffinityControlProvider, WinProcessAffinityProvider,
-    WinProcessControlProvider, WinProcessEnvironmentProvider, WinProcessGpuProvider,
-    WinProcessListProvider, WinProcessOpenFilesProvider, WinProcessResourceControlProvider,
-    WinProcessResourcesProvider, WinProcessThreadsProvider,
+    PendingProcessNetworkEscalationProvider, WinProcessAffinityControlProvider,
+    WinProcessControlProvider, WinProcessEnvironmentProvider, WinProcessListProvider,
+    WinProcessOpenFilesProvider, WinProcessResourceControlProvider, WinProcessThreadsProvider,
 };
 use self::sensor::WinSensorProvider;
 use self::service::{
