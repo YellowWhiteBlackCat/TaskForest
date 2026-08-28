@@ -17,7 +17,7 @@ pub enum TopPage {
     Containers,
 }
 
-/// The two page families of the composition doctrine (ADR-041).
+/// The two page families of the composition doctrine (ADR-042).
 ///
 /// Every top-level page declares its family, and each family owns exactly
 /// ONE composition root: chart pages (the Performance surface) compose

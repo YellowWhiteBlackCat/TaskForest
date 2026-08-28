@@ -74,7 +74,7 @@ impl ListPageScaffold {
             .flex_col()
             .gap(tokens::SPACE_8)
             .size_full()
-            // The list-page family's ONE inner shell (ADR-041): header band
+            // The list-page family's ONE inner shell (ADR-042): header band
             // + bounded body, shared by every inventory page so their
             // chrome/list separation adjusts in one place.
             .debug_selector(|| "tm-list-page-scaffold".to_string())

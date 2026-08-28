@@ -38,6 +38,14 @@ outside the tracked coordinate tree and gives the whole column one width
 authority. Unrailed bounded regions are reserved for embedded sub-lists whose
 parent owns the discoverable scroll affordance.
 
+`PageScaffold` is the data-page family's ONE outer shell (ADR-042): every
+non-chart top-level page in `taskmanager-gpui` composes through this
+viewport/frame/footer column, and no page may grow its own outer wrapper.
+The render-path guard (`page_family_contract_tests`) proves every data page
+paints `tm-page-scaffold`; the telemetry-readiness marker lives on the
+`page_viewport` wrapper, never stamped onto the page body, so the body keeps
+its family selector.
+
 `SelectableText` is the read-only selection authority: stable per-element state,
 UTF-8-safe pointer ranges, palette selection ink, Ctrl/Cmd+A and Ctrl/Cmd+C,
 plus Linux primary-selection sync on release. A window-level coordinator makes

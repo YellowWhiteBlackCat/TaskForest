@@ -131,7 +131,7 @@ impl PageScaffold {
             .min_w(px(0.0))
             .min_h(px(0.0))
             .w_full()
-            // The data-page family's ONE outer shell (ADR-041): the
+            // The data-page family's ONE outer shell (ADR-042): the
             // render-path guard proves every non-chart page paints through
             // this selector, so a skeleton adjustment propagates to all of
             // them from this single place.

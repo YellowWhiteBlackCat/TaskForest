@@ -324,7 +324,7 @@ impl Render for RootView {
         let body = page_viewport(body);
         // The readiness marker lives on the shared viewport wrapper, never on
         // the page body itself: the data-page shell owns its own
-        // `tm-page-scaffold` selector (ADR-041), and re-stamping the body div
+        // `tm-page-scaffold` selector (ADR-042), and re-stamping the body div
         // here would erase it before the family guard could observe it.
         let body = if self.telemetry_frame_state.is_collecting() {
             body

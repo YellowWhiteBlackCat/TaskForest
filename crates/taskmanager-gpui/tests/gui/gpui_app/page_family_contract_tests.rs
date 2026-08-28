@@ -1,4 +1,4 @@
-//! Page-family composition guard (ADR-041): every top-level page declares a
+//! Page-family composition guard (ADR-042): every top-level page declares a
 //! family, and each family owns exactly ONE composition root. The chart
 //! surface must paint `tm-perf-main-viewport` (the `perf_page` root); every
 //! data page must paint `tm-page-scaffold` (the shared `PageScaffold`
@@ -41,9 +41,14 @@ fn page_family_mapping_has_one_chart_surface() {
 /// list-style inventory pages additionally share the one inner
 /// header+body scaffold — so a skeleton adjustment in `PageScaffold` or
 /// `ListPageScaffold` propagates to all of them at once.
+///
+/// Each page probes on a FRESH window: one page's deferred render work
+/// (service list internals, focus/scroll handles) can otherwise leak into
+/// the next manual draw in the harness and make a later page observe the
+/// previous page's frame. A fresh surface proves every page composes
+/// correctly on its own, which is what the product contract demands.
 #[gpui::test]
 async fn every_data_page_paints_the_shared_page_scaffold(cx: &mut TestAppContext) {
-    let (win, view) = wrapped_root(cx);
     for page in [
         TopPage::Apps,
         TopPage::Services,
@@ -53,6 +58,7 @@ async fn every_data_page_paints_the_shared_page_scaffold(cx: &mut TestAppContext
         TopPage::AppHistory,
         TopPage::Containers,
     ] {
+        let (win, view) = wrapped_root(cx);
         view.update(cx, |v, cx| {
             v.mark_telemetry_frame_ready();
             v.page = page;
@@ -65,6 +71,7 @@ async fn every_data_page_paints_the_shared_page_scaffold(cx: &mut TestAppContext
                 "tm-page-scaffold",
                 "tm-page-scaffold-footer",
                 "tm-list-page-scaffold",
+                "tm-telemetry-ready-body",
             ] {
                 eprintln!(
                     "[family-probe] {page:?} {probe}={:?}",
@@ -75,6 +82,15 @@ async fn every_data_page_paints_the_shared_page_scaffold(cx: &mut TestAppContext
         assert!(
             vcx.debug_bounds("tm-page-scaffold").is_some(),
             "{page:?} must compose through the shared data-page shell"
+        );
+        // The list-style inventory pages additionally share the ONE inner
+        // header+body scaffold; every other data page must NOT mount it.
+        let expects_list_shell =
+            matches!(page, TopPage::Services | TopPage::Users | TopPage::Startup);
+        assert_eq!(
+            vcx.debug_bounds("tm-list-page-scaffold").is_some(),
+            expects_list_shell,
+            "{page:?} list-shell presence drifted from ListPageScaffold usage"
         );
     }
 }
