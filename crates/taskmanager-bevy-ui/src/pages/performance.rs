@@ -29,7 +29,7 @@
 //! the memory/swap breakdown comes from `taskmanager_shell::memory` (the
 //! saturating single source), and byte/temperature/power/clock strings come
 //! from `taskmanager_shell::presentation` (ADR-020). The one local formatter
-//! is [`observed_percentage`] — no shared percent entry exists (the TUI keeps
+//! is [`metrics::observed_percentage`] — no shared percent entry exists (the TUI keeps
 //! its own copy in `ui/units.rs`), so this page owns one with the same shape.
 
 use bevy::ecs::component::Component;

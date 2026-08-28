@@ -516,6 +516,7 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
             .text_color(theme.fg_dim)
             .w_full()
             .min_w(px(0.0))
+            .flex_shrink_0()
             .truncate()
             .child(vital);
         #[cfg(any(test, feature = "test-support"))]

@@ -90,7 +90,7 @@ pub(super) fn query_cpu_dynamic_frequencies_windows()
     if status != 0 || query.0.is_null() {
         return Err(WindowsApiError::QueryFailed);
     }
-    let _query_guard = PdhQuery(query);
+    let _query_guard = PdhQuery::new(query);
 
     let mut freq_counter = PDH_HCOUNTER::default();
     let freq_path = w!("\\Processor Information(*)\\Processor Frequency");
@@ -133,7 +133,7 @@ pub(super) fn query_cpu_dynamic_frequencies_windows()
             let mut total_val = None;
             let mut core_map = BTreeMap::new();
             for item in items {
-                let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
+                let Some(name) = items_buffer.decode_name(item, MAX_PDH_NAME_UTF16) else {
                     continue;
                 };
                 // SAFETY: Anonymous union contains doubleValue per PDH_FMT_DOUBLE.

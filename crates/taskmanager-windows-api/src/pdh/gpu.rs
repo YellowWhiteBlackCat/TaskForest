@@ -3,6 +3,11 @@
 #[cfg(windows)]
 use super::counters::{PdhQuery, query_pdh_counter_items};
 #[cfg(windows)]
+use super::cpu::{
+    parse_engine_type_from_instance_name, parse_luid_from_instance_name,
+    parse_pid_from_instance_name,
+};
+#[cfg(windows)]
 use super::{
     MAX_PDH_NAME_UTF16, WindowsApiError, WindowsGpuAdapterMemorySample, WindowsGpuEngineDetail,
     WindowsGpuEngineInstanceSample, WindowsGpuEngineSample, WindowsGpuProcessMemorySample,
@@ -24,7 +29,7 @@ pub(super) fn query_gpu_adapter_memory_windows()
     if status != 0 || query.0.is_null() {
         return Err(WindowsApiError::QueryFailed);
     }
-    let _query_guard = PdhQuery(query);
+    let _query_guard = PdhQuery::new(query);
 
     let mut dedicated_counter = PDH_HCOUNTER::default();
     let dedicated_path = w!("\\GPU Adapter Memory(*)\\Dedicated Usage");
@@ -59,7 +64,7 @@ pub(super) fn query_gpu_adapter_memory_windows()
             let items = items_buffer.items();
             let mut map = BTreeMap::new();
             for item in items {
-                let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
+                let Some(name) = items_buffer.decode_name(item, MAX_PDH_NAME_UTF16) else {
                     continue;
                 };
                 if name == "_Total" {
@@ -106,7 +111,7 @@ pub(super) fn query_gpu_engine_utilization_windows()
     if status != 0 || query.0.is_null() {
         return Err(WindowsApiError::QueryFailed);
     }
-    let _query_guard = PdhQuery(query);
+    let _query_guard = PdhQuery::new(query);
 
     let mut counter = PDH_HCOUNTER::default();
     let counter_path = w!("\\GPU Engine(*)\\Utilization Percentage");
@@ -140,7 +145,7 @@ pub(super) fn query_gpu_engine_utilization_windows()
     let mut luid_engines: HashMap<u64, HashMap<String, f32>> = HashMap::new();
 
     for item in items_slice {
-        let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
+        let Some(name) = items_buffer.decode_name(item, MAX_PDH_NAME_UTF16) else {
             continue;
         };
 
@@ -191,7 +196,7 @@ const MAX_GPU_ENGINE_INSTANCE_ROWS: usize = 2048;
 const MAX_GPU_PROCESS_MEMORY_ROWS: usize = 1024;
 
 #[cfg(windows)]
-fn query_gpu_engine_instances_windows()
+pub(super) fn query_gpu_engine_instances_windows()
 -> Result<Vec<WindowsGpuEngineInstanceSample>, WindowsApiError> {
     use std::collections::BTreeMap;
     use windows::Win32::System::Performance::{
@@ -206,7 +211,7 @@ fn query_gpu_engine_instances_windows()
     if status != 0 || query.0.is_null() {
         return Err(WindowsApiError::QueryFailed);
     }
-    let _query_guard = PdhQuery(query);
+    let _query_guard = PdhQuery::new(query);
 
     let mut counter = PDH_HCOUNTER::default();
     let counter_path = w!("\\GPU Engine(*)\\Utilization Percentage");
@@ -238,7 +243,7 @@ fn query_gpu_engine_instances_windows()
     // row Task Manager shows per process; sum them per (pid, LUID, type).
     let mut rows: BTreeMap<(u32, u64, String), f32> = BTreeMap::new();
     for item in items_slice {
-        let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
+        let Some(name) = items_buffer.decode_name(item, MAX_PDH_NAME_UTF16) else {
             continue;
         };
         let (Some(pid), Some(luid)) = (
@@ -289,7 +294,7 @@ pub(super) fn query_gpu_process_memory_windows()
     if status != 0 || query.0.is_null() {
         return Err(WindowsApiError::QueryFailed);
     }
-    let _query_guard = PdhQuery(query);
+    let _query_guard = PdhQuery::new(query);
 
     let mut dedicated_counter = PDH_HCOUNTER::default();
     let dedicated_path = w!("\\GPU Process Memory(*)\\Dedicated Usage");
@@ -322,7 +327,7 @@ pub(super) fn query_gpu_process_memory_windows()
             let items = items_buffer.items();
             let mut map: BTreeMap<(u32, u64), u64> = BTreeMap::new();
             for item in items {
-                let Some(name) = items_buffer.decode_name(item.szName, MAX_PDH_NAME_UTF16) else {
+                let Some(name) = items_buffer.decode_name(item, MAX_PDH_NAME_UTF16) else {
                     continue;
                 };
                 if name == "_Total" {
