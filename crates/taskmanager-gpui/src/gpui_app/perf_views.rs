@@ -303,6 +303,7 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
         stats_scroll,
         title: i18n::t("common.memory").into(),
         subtitle: format!("{} {}", i18n::t("mem.total"), memory_stats.total_readout),
+        vital_line: None,
         header_extra: Some(composition_block(theme, m, units).into_any_element()),
         headline: HeadlineSurface::Charts(charts),
         below: None,
@@ -431,6 +432,10 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
             d.disk_type,
             d.fs_type
         ),
+        // The throughput chart never answers "how full is this disk"; the
+        // partition panel can degrade away. This one line carries the
+        // capacity fact through EVERY vertical rung.
+        vital_line: Some(disk_stats::vital_line(d, units)),
         header_extra: None,
         headline: HeadlineSurface::Charts(vec![
             ChartSpec::dual_headline(
@@ -529,6 +534,7 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
         stats_scroll,
         title,
         subtitle: n.ipv4_addr.as_deref().unwrap_or_default().to_owned(),
+        vital_line: Some(network_stats::vital_line(n)),
         header_extra: None,
         headline: HeadlineSurface::Charts(vec![
             ChartSpec::dual_headline(
@@ -554,6 +560,8 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
         budget,
     })
 }
+
+// ---- shared helpers ----
 
 // ---- shared helpers ----
 

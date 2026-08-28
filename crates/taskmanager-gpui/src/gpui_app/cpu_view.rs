@@ -136,6 +136,7 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
         stats_scroll,
         title: i18n::t("common.cpu").to_owned(),
         subtitle: cpu_brand(cpu),
+        vital_line: None,
         header_extra: Some(readout_band(theme, &stats).into_any_element()),
         headline: HeadlineSurface::Charts(vec![ChartSpec::headline(
             "cpu-headline-graph",

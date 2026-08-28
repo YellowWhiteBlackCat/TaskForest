@@ -16,6 +16,34 @@ use super::{
     smart_section_visible,
 };
 
+/// The Disk page's undroppable one-line capacity fact: used/total plus the
+/// partition census. Lives in the DATA layer (ARCH.md §8.1) because it reads
+/// capacity observations; the paint module only formats the resulting line.
+/// Honest absence — a disk whose capacity or partition facts are uncollected
+/// keeps the dash or omits the segment, never a fabricated zero.
+pub(super) fn vital_line(d: &DiskMetrics, units: DisplayUnits) -> String {
+    let mut segments: Vec<String> = Vec::new();
+    match (d.current_capacity_bytes(), d.current_available_bytes()) {
+        (Some(total), Some(free)) if total > 0 => {
+            let used = total.saturating_sub(free).min(total);
+            segments.push(format!(
+                "{} / {}",
+                units.format(used, UnitKind::Drive, false),
+                units.format(total, UnitKind::Drive, false),
+            ));
+        }
+        _ => segments.push(crate::gpui_app::formatting::missing_value()),
+    }
+    if !d.partitions.is_empty() {
+        segments.push(format!(
+            "{} {}",
+            d.partitions.len(),
+            i18n::t("disk.partitions").to_lowercase(),
+        ));
+    }
+    segments.join(" · ")
+}
+
 pub(super) fn disk_stats(
     d: &DiskMetrics,
     units: DisplayUnits,

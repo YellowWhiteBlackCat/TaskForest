@@ -56,6 +56,24 @@ below the layer above's floor.
    below `responsive::MIN_WIDTH × MIN_HEIGHT` (720×480), set once as the
    window's `window_min_size` from those constants — never a second literal.
    Windowed capture parsing clamps to the same constants.
+
+   The page's complete vertical grammar, in order, with each slot's ladder
+   contract:
+
+   | Slot | Content | Drops at |
+   |---|---|---|
+   | title row | identity + context | never |
+   | vital line | one-line distilled fact (disk capacity, VRAM totals, link state) | never |
+   | header band | CPU readouts, memory composition | Floor |
+   | headline surface | the tier-180 chart(s) or engine inventory | never |
+   | data band | partition/directory panels, secondary charts | Core (charts), Floor (panels) |
+   | stats rail | typed statistic column | width budget (Pinned/Stacked/Hidden) |
+
+   Charts are the headline of a Performance page, but they are not its whole
+   meaning: every page whose primary fact is not carried by a chart declares
+   a `vital_line` so the Floor composition (title + vital + headline) still
+   answers the page's question — a disk page never collapses to a chart-only
+   surface.
 2. **Budget layer (ordered degradation).** Width: the frame budget allocates
    typed slot floors (`PERFORMANCE_MAIN_MIN_WIDTH` 360, stats 236–280,
    device sidebar 220–460) and degrades Sidebar→Strip, Pinned→Stacked→Hidden
