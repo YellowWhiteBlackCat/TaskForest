@@ -1,4 +1,10 @@
 use super::*;
+// The neutral presentation contract is platform-independent, but the module
+// above imports `LayerShellSpec` only for Linux (its only live consumer).
+// Import it here from the app-host contract directly so these headless
+// contract tests compile on every platform, not just where the gated
+// re-import exists.
+use taskmanager_app_host::LayerShellSpec;
 
 #[test]
 fn neutral_layer_profile_reaches_gpui_without_losing_role_or_policy() {
