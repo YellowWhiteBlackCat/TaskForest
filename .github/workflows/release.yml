@@ -57,10 +57,6 @@ jobs:
           # On dispatch, github.ref_name is the BRANCH — the explicit input
           # tag is the only correct source. On tag push they coincide.
           ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-      - name: Public repository and history guard
-        run: |
-          python3 scripts/quality/public_repo_guard.py
-          python3 scripts/quality/public_repo_guard.py --history
       - name: Resolve the releasing tag
         id: resolve-tag
         run: |
@@ -82,9 +78,15 @@ jobs:
             echo "tag '$tag' does not match Cargo.toml version '$version'" >&2
             echo "bump Cargo.toml (and Cargo.lock) or set allow_version_mismatch" >&2; exit 1
           fi
+      # Reject an invalid tag/version before spending time on the full history
+      # scan or any Cargo metadata work.
+      - name: Public repository and history guard
+        run: |
+          python3 scripts/quality/public_repo_guard.py
+          python3 scripts/quality/public_repo_guard.py --history
       # `cargo metadata --locked` fails the moment the committed Cargo.lock
       # does not satisfy the manifest, proving the tag builds reproducibly.
-      - uses: dtolnay/rust-toolchain@1.97.1
+      - uses: dtolnay/rust-toolchain@stable
       - run: cargo metadata --locked --format-version 1 >/dev/null
       # Every host-installed path must stay allowlisted before a release
       # ships new package layouts (same guard as the CI blocking gate).

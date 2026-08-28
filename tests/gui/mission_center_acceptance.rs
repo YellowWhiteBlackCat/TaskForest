@@ -15,7 +15,9 @@ fn draw(cx: &mut TestAppContext, window: WindowHandle<RootView>) {
 }
 
 #[gpui::test]
-async fn all_top_level_tabs_are_pointer_reachable_and_settings_escapes(cx: &mut TestAppContext) {
+async fn mc00_nav_complete_pointer_case_all_top_level_tabs_are_pointer_reachable_and_settings_escapes(
+    cx: &mut TestAppContext,
+) {
     let window = root(cx);
     let view = window.entity(cx).expect("RootView window entity");
     view.update(cx, |view, cx| {

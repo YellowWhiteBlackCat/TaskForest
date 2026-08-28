@@ -3,6 +3,12 @@
 //! UTF-16 environment-block shapes, so the width-derived offsets, bounds
 //! checks, truncation counting, and noise handling all run off-Windows.
 
+use super::environment::{
+    POINTER_BYTES, basic_information_bytes, basic_information_peb_field,
+    ends_with_utf16_terminator, params_current_directory_field, params_environment_field,
+    parse_environment_block, parse_process_parameters, peb_process_parameters_field,
+    unicode_string_buffer_field, unicode_string_bytes,
+};
 use super::*;
 
 fn put_u16(buffer: &mut [u8], at: usize, value: u16) {

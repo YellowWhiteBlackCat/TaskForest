@@ -1,14 +1,16 @@
 //! Structural gate for the GPUI interaction acceptance contract.
 //!
-//! The actual behavior is proved by the GPUI tests named in the matrix. This
+//! The actual behavior is proved by GPUI tests that advertise each stable case
+//! ID as a function-name prefix. This
 //! gate keeps the matrix synchronized with the public interaction requirements
 //! and the canonical screenshot scenarios; the acceptance script then
-//! resolves every test name through nextest and verifies an `ok` event.
+//! auto-discovers the executable tests through nextest and verifies every
+//! discovered case received an `ok` event.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 
-const MATRIX_HEADER: &str = "case_id\tp0_id\ttarget\ttest_name\tpaths\tcapture_scenarios";
+const MATRIX_HEADER: &str = "case_id\tp0_id\ttarget\tpaths\tcapture_scenarios";
 const CAPTURE_HEADER: &str =
     "name\tskin\tpage\tdevice\tsettings\tscenario\twindow_size\tcapture_size";
 
@@ -62,14 +64,14 @@ fn gpui_interaction_matrix_covers_every_parity_row_and_capture_token() {
     let requirements = requirement_ids();
     let capture_scenarios = capture_scenario_ids();
     let mut cases = BTreeSet::new();
-    let mut tests_by_target: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
+    let mut cases_by_target: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
     let mut covered = BTreeSet::new();
     let mut success = BTreeSet::new();
 
     for line in lines {
         let fields: Vec<_> = line.split('\t').collect();
-        assert_eq!(fields.len(), 6, "malformed GPUI interaction row: {line}");
-        let [case_id, p0_id, target, test_name, paths, captures] = fields.as_slice() else {
+        assert_eq!(fields.len(), 5, "malformed GPUI interaction row: {line}");
+        let [case_id, p0_id, target, paths, captures] = fields.as_slice() else {
             unreachable!("field count checked above");
         };
         assert!(
@@ -85,15 +87,20 @@ fn gpui_interaction_matrix_covers_every_parity_row_and_capture_token() {
             "invalid test target: {target}"
         );
         assert!(
-            !test_name.is_empty(),
-            "interaction test name must not be empty"
+            case_id.starts_with("mc")
+                && case_id
+                    .chars()
+                    .all(|character| character.is_ascii_lowercase()
+                        || character.is_ascii_digit()
+                        || character == '-'),
+            "interaction case IDs must be stable lowercase kebab-case: {case_id}"
         );
         assert!(
-            tests_by_target
+            cases_by_target
                 .entry(target)
                 .or_default()
-                .insert((*test_name).to_string()),
-            "duplicate interaction test in target {target}: {test_name}"
+                .insert((*case_id).to_string()),
+            "duplicate interaction case in target {target}: {case_id}"
         );
 
         let path_names: BTreeSet<_> = paths.split('|').filter(|path| !path.is_empty()).collect();
@@ -146,7 +153,7 @@ fn gpui_interaction_matrix_covers_every_parity_row_and_capture_token() {
         "every interaction requirement needs a success path"
     );
     assert!(
-        tests_by_target.values().all(|tests| !tests.is_empty()),
-        "the matrix must contain at least one GUI or library test"
+        cases_by_target.values().all(|cases| !cases.is_empty()),
+        "the matrix must contain at least one GUI or library case"
     );
 }

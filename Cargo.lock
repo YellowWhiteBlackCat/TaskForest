@@ -10080,6 +10080,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "taskmanager-platform-android"
+version = "0.1.0"
+dependencies = [
+ "taskmanager-application",
+ "taskmanager-platform-runtime",
+]
+
+[[package]]
 name = "taskmanager-platform-conformance"
 version = "0.1.0"
 dependencies = [
@@ -10156,6 +10164,15 @@ dependencies = [
  "taskmanager-platform-linux",
  "taskmanager-platform-macos",
  "taskmanager-platform-windows",
+]
+
+[[package]]
+name = "taskmanager-platform-ohos"
+version = "0.1.0"
+dependencies = [
+ "taskmanager-application",
+ "taskmanager-platform-contract",
+ "taskmanager-platform-runtime",
 ]
 
 [[package]]

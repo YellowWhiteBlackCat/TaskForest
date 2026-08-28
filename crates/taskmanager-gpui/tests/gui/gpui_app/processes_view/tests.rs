@@ -410,7 +410,9 @@ async fn compact_apps_action_bar_prioritizes_the_table_without_hiding_commands(
 /// mouse event path with `click_count = 2`, then proves both the RootView state
 /// and the rendered visible-row projection changed in both directions.
 #[gpui::test]
-async fn apps_group_double_click_expands_and_collapses_the_row(cx: &mut TestAppContext) {
+async fn mc03_apps_doubleclick_case_apps_group_double_click_expands_and_collapses_the_row(
+    cx: &mut TestAppContext,
+) {
     let (win, view) = wrapped_root(cx);
     view.update(cx, |v, cx| {
         v.mark_telemetry_frame_ready();
@@ -711,7 +713,9 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
 /// Linux icon asset; the generic glyph test above remains a separate failure
 /// fallback assertion.
 #[gpui::test]
-async fn verified_application_asset_mounts_as_a_gpui_image(cx: &mut TestAppContext) {
+async fn mc03_app_icon_case_verified_application_asset_mounts_as_a_gpui_image(
+    cx: &mut TestAppContext,
+) {
     use crate::gpui_app::processes_view::rows::{ProcRowProps, Toggle, VisibleRow, proc_row};
 
     struct RowHarness {

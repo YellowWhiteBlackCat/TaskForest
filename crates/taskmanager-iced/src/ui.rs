@@ -84,7 +84,7 @@ pub(crate) use virtual_list::{
 // re-imports items the child defined as `pub(super)`/`pub(crate)`; private
 // `use` imports inside the children are not re-exported.
 use app_history_view::*;
-use applications::*;
+use applications::page::applications_page;
 pub(crate) use device_chart::GraphPrefs;
 use perf_devices::*;
 use perf_overview::*;

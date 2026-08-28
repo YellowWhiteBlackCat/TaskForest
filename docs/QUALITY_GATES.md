@@ -13,15 +13,16 @@
 | cargo-deny | 拒绝已知漏洞、不允许的许可证和依赖策略违规 |
 | Python/Shell 政策门 | 检查安装清单、自动化安全、模块边界和测试布局 |
 | rustfmt / clippy | 格式和 warning-free 编译 |
-| release build | 验证默认 GPUI 发布形态 |
+| release build | 验证默认 GPUI 发布形态（PR 用无 LTO 冒烟 profile，main 与 tag 用完整发布 profile） |
 | package stage simulation | 验证 Linux 安装树、权限和 polkit 路径 |
 | workspace nextest | 行为和平台无关契约 |
 | doctests / rustdoc | 文档代码和公开 API 链接 |
 | fallback feature matrix | 验证可选 provider 不产生产品 SKU 分叉 |
 
-CI 使用锁文件和固定 Rust 工具链，Cargo 并行度不超过四。Windows 原生边界在每次 PR 与
-main push 的 portability workflow 中阻塞运行；macOS 保持手动/月度 advisory。跨平台编译
-不能替代原生 API 证据。
+CI 与本地门禁都使用 [`rust-toolchain.toml`](../rust-toolchain.toml) 声明的 stable 最新版；
+`Cargo.toml` 的 `rust-version` 仅是兼容性下限。所有 Cargo 验证使用锁文件，并行度不超过四。
+Windows 原生边界以及 macOS 编译/库测试在每次 PR 与 main push 的 portability workflow 中阻塞运行；
+macOS 打包和真实设备视觉验证仍然 deferred，跨平台编译不能替代原生 API 或设备证据。
 
 ## 2. 本地层级
 
@@ -35,8 +36,12 @@ bash scripts/quality/local-gates.sh extended
 
 - `quick`：公开边界、文档、格式、模块、安装清单、自动化和测试布局政策门；
 - `standard`：quick + dependency audit、clippy、nextest、doctest、rustdoc、release build 和
-  平台无关形态矩阵；
+  平台无关形态矩阵，以及 Linux release/package smoke；
 - `extended`：standard + coverage、mutation、Miri、fuzz 和性能/体积回归。
+
+默认遇到首个失败即退出；需要一次性收集多个失败时显式追加 `--keep-going`。Linux
+`release/package smoke` 与 CI 使用同一入口，平台不具备 Linux 打包能力时不在 Windows/macOS
+本地门禁中伪造通过。
 
 Windows 开发机使用 `scripts/windows/local-gates.sh`，通过 Git Bash 调用同一组可移植门禁；
 Windows telemetry、测试和 helper 不使用 PowerShell 或其他命令解释器采集系统事实。

@@ -290,7 +290,13 @@ pub(crate) fn render_chart(
         .w_full()
         .min_w(px(0.0));
     section = match spec.tier {
-        ChartTier::Headline => section.flex_1().min_h(px(0.0)),
+        // A headline section contains more than its graph card: dual charts
+        // also own a legend and every chart owns its summary row. Keeping the
+        // section's intrinsic basis and disabling shrink makes that complete
+        // contract the flex boundary. Without it, the parent can allocate a
+        // zero-height section while the card keeps its 180px minimum, causing
+        // the below band to be positioned on top of the card at compact sizes.
+        ChartTier::Headline => section.flex_auto().flex_shrink_0(),
         ChartTier::Secondary => section.flex_auto().min_h(spec.tier.min_height()),
     };
     if let Some(title) = spec.title.as_deref() {

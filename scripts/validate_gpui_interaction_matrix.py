@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -14,7 +15,6 @@ MATRIX_FIELDS = (
     "case_id",
     "p0_id",
     "target",
-    "test_name",
     "paths",
     "capture_scenarios",
 )
@@ -90,21 +90,24 @@ def validate_rows(
 ) -> dict[str, object]:
     case_ids: set[str] = set()
     matrix_ids: set[str] = set()
-    tests_by_target: dict[str, set[str]] = {target: set() for target in ALLOWED_TARGETS}
+    cases_by_target: dict[str, set[str]] = {target: set() for target in ALLOWED_TARGETS}
+    case_tokens: set[str] = set()
     path_coverage: dict[str, set[str]] = {p0_id: set() for p0_id in requirements}
     for row in rows:
         case_id = row["case_id"]
         p0_id = row["p0_id"]
         target = row["target"]
-        test_name = row["test_name"]
         if not case_id or case_id in case_ids:
             raise MatrixError(f"duplicate or empty case_id: {case_id!r}")
+        if re.fullmatch(r"mc[0-9]{2}(?:-[a-z0-9]+)+", case_id) is None:
+            raise MatrixError(f"invalid stable case_id: {case_id!r}")
         if p0_id not in requirements:
             raise MatrixError(f"{case_id}: unknown requirement ID {p0_id!r}")
         if target not in ALLOWED_TARGETS:
             raise MatrixError(f"{case_id}: invalid target {target!r}")
-        if not test_name or test_name in tests_by_target[target]:
-            raise MatrixError(f"{case_id}: duplicate or empty test_name for {target}")
+        token = case_token(case_id)
+        if token in case_tokens:
+            raise MatrixError(f"case IDs collide after Rust normalization: {case_id!r}")
         paths = {item for item in row["paths"].split("|") if item}
         if not paths or not paths.issubset(ALLOWED_PATHS):
             raise MatrixError(f"{case_id}: invalid paths {sorted(paths)}")
@@ -117,8 +120,9 @@ def validate_rows(
                 f"{case_id}: unknown capture scenarios {sorted(missing_scenarios)}"
             )
         case_ids.add(case_id)
+        case_tokens.add(token)
         matrix_ids.add(p0_id)
-        tests_by_target[target].add(test_name)
+        cases_by_target[target].add(case_id)
         path_coverage[p0_id].update(paths)
 
     if matrix_ids != requirements:
@@ -132,9 +136,14 @@ def validate_rows(
     return {
         "case_count": len(rows),
         "p0_count": len(matrix_ids),
-        "tests_by_target": {target: sorted(names) for target, names in tests_by_target.items()},
+        "cases_by_target": {target: sorted(names) for target, names in cases_by_target.items()},
         "path_coverage": {p0_id: sorted(paths) for p0_id, paths in sorted(path_coverage.items())},
     }
+
+
+def case_token(case_id: str) -> str:
+    """Map a stable kebab-case matrix ID to its Rust test-name prefix."""
+    return case_id.replace("-", "_")
 
 
 def nextest_tests(path: Path, target: str) -> set[str]:
@@ -159,14 +168,55 @@ def nextest_tests(path: Path, target: str) -> set[str]:
     return found
 
 
-def validate_discovery(summary: dict[str, object], gui: set[str], lib: set[str]) -> None:
-    tests_by_target = summary["tests_by_target"]
-    assert isinstance(tests_by_target, dict)
+def validate_discovery(
+    summary: dict[str, object], gui: set[str], lib: set[str]
+) -> dict[str, set[str]]:
+    """Resolve matrix cases from stable prefixes in nextest's live test list.
+
+    The matrix intentionally owns no Rust function names. A backing test may be
+    renamed freely after the ``<case_id>_case_`` prefix; nextest remains the only
+    authority for the executable test inventory.
+    """
+    cases_by_target = summary["cases_by_target"]
+    assert isinstance(cases_by_target, dict)
+    discovered: dict[str, set[str]] = {target: set() for target in ALLOWED_TARGETS}
+    tests_by_case: dict[str, list[str]] = {}
     for target, available in (("gui", gui), ("lib", lib)):
-        expected = set(tests_by_target[target])
-        missing = sorted(expected - available)
-        if missing:
-            raise MatrixError(f"{target}: matrix tests were not discovered: {missing}")
+        target_cases = cases_by_target[target]
+        assert isinstance(target_cases, list)
+        tokens = {case_token(case_id): case_id for case_id in target_cases}
+        for case_id in target_cases:
+            prefix = f"{case_token(case_id)}_case_"
+            matches = sorted(
+                name for name in available if name.rsplit("::", 1)[-1].startswith(prefix)
+            )
+            if not matches:
+                raise MatrixError(
+                    f"{target}: no nextest test advertises stable case prefix {prefix!r}"
+                )
+            discovered[target].update(matches)
+            tests_by_case[case_id] = matches
+
+        unregistered = []
+        for name in available:
+            leaf = name.rsplit("::", 1)[-1]
+            tag, separator, _ = leaf.partition("_case_")
+            if separator and re.fullmatch(r"mc[0-9]{2}(?:_[a-z0-9]+)+", tag):
+                if tag not in tokens:
+                    unregistered.append(name)
+        if unregistered:
+            raise MatrixError(
+                f"{target}: acceptance-tagged tests have no matrix contract: "
+                f"{sorted(unregistered)}"
+            )
+
+    summary["tests_by_case"] = {
+        case_id: names for case_id, names in sorted(tests_by_case.items())
+    }
+    summary["tests_by_target"] = {
+        target: sorted(names) for target, names in discovered.items()
+    }
+    return discovered
 
 
 def run_tests_from_logs(paths: list[Path], expected: dict[str, set[str]]) -> dict[str, object]:
@@ -228,16 +278,17 @@ def write_receipt(path: Path | None, payload: dict[str, object]) -> None:
 def self_test() -> None:
     rows = [
         {
-            "case_id": "case",
+            "case_id": "mc00-case",
             "p0_id": "P0",
             "target": "gui",
-            "test_name": "one",
             "paths": "success|failure",
             "capture_scenarios": "-",
         }
     ]
     summary = validate_rows(rows, {"P0"}, set())
     assert summary["case_count"] == 1
+    discovered = validate_discovery(summary, {"module::mc00_case_case_behavior"}, set())
+    assert discovered["gui"] == {"module::mc00_case_case_behavior"}
     try:
         validate_rows(rows + [rows[0]], {"P0"}, set())
     except MatrixError:
@@ -273,7 +324,7 @@ def main() -> int:
         )
         gui = nextest_tests(args.gui_list, "gui")
         lib = nextest_tests(args.lib_list, "lib")
-        validate_discovery(summary, gui, lib)
+        tests_by_target = validate_discovery(summary, gui, lib)
         receipt: dict[str, object] = {
             "status": "pass",
             "matrix": summary,
@@ -282,7 +333,7 @@ def main() -> int:
         if args.run_log:
             receipt["run"] = run_tests_from_logs(
                 args.run_log,
-                {target: set(names) for target, names in summary["tests_by_target"].items()},
+                tests_by_target,
             )
         write_receipt(args.receipt, receipt)
     except MatrixError as error:

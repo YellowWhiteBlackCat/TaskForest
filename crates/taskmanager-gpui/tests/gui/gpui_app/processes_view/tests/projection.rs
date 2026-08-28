@@ -49,7 +49,7 @@ fn visible_sort_cols_drops_hidden_columns_and_keeps_canonical_order() {
 }
 
 #[test]
-fn swap_column_auto_hide_requires_confirmed_zero_not_unknown() {
+fn mc03_swap_truth_case_swap_column_auto_hide_requires_confirmed_zero_not_unknown() {
     let user_visible = HashSet::new();
     let user_hidden = HashSet::from([SortCol::Memory]);
 
