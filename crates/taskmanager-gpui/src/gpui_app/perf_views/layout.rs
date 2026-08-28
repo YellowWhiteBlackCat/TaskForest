@@ -434,6 +434,10 @@ pub(crate) struct PerfPageProps<'a> {
     pub(crate) stats_scroll: ScrollHandle,
     pub(crate) title: String,
     pub(crate) subtitle: String,
+    /// One-line distilled fact that keeps the page's meaning when every
+    /// other band has degraded (disk capacity, VRAM totals, link state).
+    /// Never gated by the vertical ladder — it survives the Floor rung.
+    pub(crate) vital_line: Option<String>,
     /// Band under the title row: CPU readouts, Memory composition.
     pub(crate) header_extra: Option<AnyElement>,
     pub(crate) headline: HeadlineSurface<'a>,
@@ -465,6 +469,7 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         stats_scroll,
         title,
         subtitle,
+        vital_line,
         header_extra,
         headline,
         below,
@@ -490,6 +495,21 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         // itself owns the divider and its left padding.
         .pr(px(budget.main_trailing_inset))
         .child(performance_title_row(theme, title, subtitle));
+    // The vital line is the page's undroppable one-line fact: unlike the
+    // header band it renders at EVERY rung, so even the Floor composition
+    // (title + headline) still answers "how full / how fast / how healthy".
+    if let Some(vital) = vital_line {
+        let line = div()
+            .text_size(tokens::FONT_13)
+            .text_color(theme.fg_dim)
+            .w_full()
+            .min_w(px(0.0))
+            .truncate()
+            .child(vital);
+        #[cfg(any(test, feature = "test-support"))]
+        let line = line.debug_selector(|| "tm-perf-vital-line".to_string());
+        main_body = main_body.child(line);
+    }
     // Vertical ladder, Floor rung: the header band (readouts / composition)
     // drops before the headline card is squeezed.
     if let Some(extra) = header_extra.filter(|_| runway.carries_core_stack()) {

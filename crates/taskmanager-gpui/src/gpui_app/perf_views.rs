@@ -302,6 +302,7 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
         stats_scroll,
         title: i18n::t("common.memory").into(),
         subtitle: format!("{} {}", i18n::t("mem.total"), memory_stats.total_readout),
+        vital_line: None,
         header_extra: Some(composition_block(theme, m, units).into_any_element()),
         headline: HeadlineSurface::Charts(charts),
         below: None,
@@ -430,6 +431,10 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
             d.disk_type,
             d.fs_type
         ),
+        // The throughput chart never answers "how full is this disk"; the
+        // partition panel can degrade away. This one line carries the
+        // capacity fact through EVERY vertical rung.
+        vital_line: Some(disk_vital_line(d, units)),
         header_extra: None,
         headline: HeadlineSurface::Charts(vec![
             ChartSpec::dual_headline(
@@ -528,6 +533,7 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
         stats_scroll,
         title,
         subtitle: n.ipv4_addr.as_deref().unwrap_or_default().to_owned(),
+        vital_line: Some(network_vital_line(n)),
         header_extra: None,
         headline: HeadlineSurface::Charts(vec![
             ChartSpec::dual_headline(
@@ -555,6 +561,47 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
 }
 
 // ---- shared helpers ----
+
+/// The Disk page's undroppable one-line capacity fact: used/total plus the
+/// partition census. Honest absence — a disk whose capacity or partition
+/// facts are uncollected keeps the dash or omits the segment, never a
+/// fabricated zero.
+fn disk_vital_line(d: &crate::core::metrics::DiskMetrics, units: DisplayUnits) -> String {
+    let mut segments: Vec<String> = Vec::new();
+    match (d.current_capacity_bytes(), d.current_available_bytes()) {
+        (Some(total), Some(free)) if total > 0 => {
+            let used = total.saturating_sub(free).min(total);
+            segments.push(format!(
+                "{} / {}",
+                units.format(used, UnitKind::Drive, false),
+                units.format(total, UnitKind::Drive, false),
+            ));
+        }
+        _ => segments.push(formatting_missing_value()),
+    }
+    if !d.partitions.is_empty() {
+        segments.push(format!(
+            "{} {}",
+            d.partitions.len(),
+            i18n::t("disk.partitions").to_lowercase(),
+        ));
+    }
+    segments.join(" · ")
+}
+
+fn formatting_missing_value() -> String {
+    crate::gpui_app::formatting::missing_value()
+}
+
+/// The Network page's undroppable one-line fact: adapter health plus the
+/// negotiated link speed when the platform reports it.
+fn network_vital_line(n: &crate::core::metrics::NetworkMetrics) -> String {
+    let mut segments: Vec<String> = vec![device_status_i18n_key(n.device_state.status).to_string()];
+    if let Some(speed) = n.current_link_speed_mbps() {
+        segments.push(format!("{speed} Mbps"));
+    }
+    segments.join(" · ")
+}
 
 /// Greatest finite sample of a window, floored — the shared dynamic max of a
 /// throughput graph. `f32::max` ignores the NaN gaps, so an all-gap (or

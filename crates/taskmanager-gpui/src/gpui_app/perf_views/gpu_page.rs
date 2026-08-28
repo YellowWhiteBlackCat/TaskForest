@@ -341,6 +341,26 @@ fn render_gpu_engine_grid(
     container
 }
 
+/// The GPU page's undroppable one-line VRAM fact: dedicated and shared
+/// totals when the device reports them. Mirrors the VRAM composition
+/// block's numbers so the two can never disagree.
+fn gpu_vram_vital_line(vram: Option<&VramCompositionData>, units: DisplayUnits) -> Option<String> {
+    let vram = vram?;
+    let mut segments = vec![format!(
+        "{} / {}",
+        units.format(vram.dedicated_used, UnitKind::Memory, false),
+        units.format(vram.dedicated_total, UnitKind::Memory, false),
+    )];
+    if vram.shared_total > 0 {
+        segments.push(format!(
+            "{} / {}",
+            units.format(vram.shared_used, UnitKind::Memory, false),
+            units.format(vram.shared_total, UnitKind::Memory, false),
+        ));
+    }
+    Some(segments.join(" · "))
+}
+
 pub(crate) fn render_gpu(
     theme: &Theme,
     snap: &SystemSnapshot,
@@ -452,6 +472,7 @@ pub(crate) fn render_gpu(
         stats_scroll: gpu_state.stats_scroll,
         title,
         subtitle,
+        vital_line: gpu_vram_vital_line(vram_data.as_ref(), gpu_state.performance.units),
         header_extra: None,
         headline,
         below: render_gpu_metric_graphs(

@@ -313,6 +313,102 @@ async fn vertical_runway_degrades_in_order_before_the_headline_floor(cx: &mut Te
     }
 }
 
+/// The Disk page's non-chart primary fact (capacity) survives every
+/// vertical rung: the partition PANEL degrades away below the Core rung,
+/// but the one-line vital capacity stays beside the headline chart even at
+/// the Floor rung — the page never collapses to a chart-only surface.
+#[gpui::test]
+async fn disk_page_keeps_its_capacity_fact_through_every_vertical_rung(cx: &mut TestAppContext) {
+    fn seed_disk(v: &mut RootView) {
+        v.mark_telemetry_frame_ready();
+        v.page = TopPage::Performance;
+        v.selected = SelectedDevice::Disk(0);
+        v.system_snapshot_mut_for_test().disks = vec![
+            taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+                .device_id("vital-disk".into())
+                .name("vital0n1".into())
+                .disk_type("NVMe SSD".into())
+                .fs_type("ext4".into())
+                .current_capacity_bytes(gib(2000))
+                .current_available_bytes(gib(1200))
+                .partitions(vec![
+                    taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+                        .device_id("partition:vital:vital0n1p1".into())
+                        .parent_device_id("vital-disk".into())
+                        .device_generation(DeviceGeneration::new(1))
+                        .device_state(DeviceState::healthy(10))
+                        .name("vital0n1p1".into())
+                        .mount_point("/".into())
+                        .fs_type("ext4".into())
+                        .build(),
+                    taskmanager_test_support::DiskPartitionFixtureBuilder::new()
+                        .device_id("partition:vital:vital0n1p2".into())
+                        .parent_device_id("vital-disk".into())
+                        .device_generation(DeviceGeneration::new(1))
+                        .device_state(DeviceState::healthy(10))
+                        .name("vital0n1p2".into())
+                        .build(),
+                ])
+                .build(),
+        ];
+    }
+
+    // Charts rung: panel + vital + chart all compose.
+    {
+        let (win, view) = wrapped_root(cx);
+        cx.simulate_window_resize(win.into(), size(px(1180.0), px(780.0)));
+        view.update(cx, |v, cx| {
+            seed_disk(v);
+            cx.notify();
+        });
+        draw(cx, win);
+        let mut vcx = VisualTestContext::from_window(win.into(), cx);
+        assert!(vcx.debug_bounds("tm-perf-vital-line").is_some());
+        assert!(
+            vcx.debug_bounds("tm-disk-partitions").is_some(),
+            "the Charts rung carries the partition panel"
+        );
+        assert!(
+            vcx.debug_bounds("tm-perf-chart-card:main-graph")
+                .expect("headline card")
+                .size
+                .height
+                >= px(180.0)
+        );
+    }
+
+    // Floor rung: the panel and every secondary chart are gone, but the
+    // capacity vital stays — never a chart-only disk page.
+    {
+        let (win, view) = wrapped_root(cx);
+        cx.simulate_window_resize(win.into(), size(px(1180.0), px(340.0)));
+        view.update(cx, |v, cx| {
+            seed_disk(v);
+            cx.notify();
+        });
+        draw(cx, win);
+        let mut vcx = VisualTestContext::from_window(win.into(), cx);
+        let vital = vcx
+            .debug_bounds("tm-perf-vital-line")
+            .expect("the capacity vital survives the Floor rung");
+        assert!(
+            vital.size.width > px(40.0) && vital.size.height > px(10.0),
+            "the vital line must paint readable: {vital:?}"
+        );
+        assert!(
+            vcx.debug_bounds("tm-disk-partitions").is_none(),
+            "the partition panel yields at the Floor rung"
+        );
+        assert!(
+            vcx.debug_bounds("tm-perf-chart-card:main-graph")
+                .expect("headline card")
+                .size
+                .height
+                >= px(180.0)
+        );
+    }
+}
+
 /// The tier height contract: headline cards hold their 180px floor while
 /// secondary charts hold 140px, on one page that carries both tiers.
 #[gpui::test]

@@ -103,6 +103,7 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         stats_scroll,
         title,
         subtitle: i18n::t("battery.charge_graph").to_string(),
+        vital_line: None,
         header_extra: None,
         headline: HeadlineSurface::Charts(vec![ChartSpec::headline(
             "main-graph",
@@ -205,6 +206,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
         stats_scroll,
         title: format!("{} — {}", i18n::t("common.fan"), fan.label()),
         subtitle: i18n::t("fan.speed_graph").to_string(),
+        vital_line: None,
         header_extra: None,
         headline: HeadlineSurface::Charts(vec![
             ChartSpec::headline(
