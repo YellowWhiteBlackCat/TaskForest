@@ -35,6 +35,8 @@
 #   JOBS=<n>                cargo/test parallelism (default 4)
 #   STAGE_TIMEOUT=<sec>     per-stage deadline (default 3600)
 #   QUICK_TIMEOUT=<sec>     quick-stage deadline (default 300)
+#   SKIP_INSTALL_MANAGER_SMOKE=1  defer that smoke until the release build
+#                                 has produced its helper binaries
 
 set -u
 
@@ -63,6 +65,14 @@ export RUSTFLAGS="$rustflags"
 
 stage_timeout="${STAGE_TIMEOUT:-3600}"
 quick_timeout="${QUICK_TIMEOUT:-300}"
+skip_install_manager_smoke="${SKIP_INSTALL_MANAGER_SMOKE:-0}"
+case "$skip_install_manager_smoke" in
+    0|1) ;;
+    *)
+        echo "SKIP_INSTALL_MANAGER_SMOKE must be 0 or 1" >&2
+        exit 2
+        ;;
+esac
 results_file="$scratch/results.tsv"
 failures=0
 stages_run=0
@@ -246,7 +256,10 @@ fi
 if maybe visual-capture-coverage; then
     run_stage visual-capture-coverage quick run_py scripts/quality/visual_capture_coverage.py --repo-root "$repo"
 fi
-if maybe install-manager-smoke; then
+if [[ "$skip_install_manager_smoke" == "1" ]]; then
+    echo "SKIP install-manager-smoke (release helper build is owned by a later gate)"
+    record install-manager-smoke quick SKIP 0
+elif maybe install-manager-smoke; then
     run_stage install-manager-smoke quick timeout --kill-after=10s 30s scripts/test-system-install-manager.sh
 fi
 if maybe line-guard; then

@@ -106,7 +106,12 @@ jobs:
           components: rustfmt
       # This is the same cheap fail-fast entry point developers run locally.
       # It completes before GUI packages, Cargo caches, or workspace builds.
+      # The release helper binaries do not exist in this policy job yet, so
+      # install-manager-smoke is repeated in the later release job after its
+      # helper build; it remains a blocking check there.
       - name: Fast local-equivalent gates
+        env:
+          SKIP_INSTALL_MANAGER_SMOKE: "1"
         run: timeout --kill-after=10s 300s bash scripts/quality/local-gates.sh quick
       # Dependency audit needs neither Rust compilation nor Linux GUI libraries.
       - uses: EmbarkStudios/cargo-deny-action@v2
