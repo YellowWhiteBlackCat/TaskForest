@@ -193,7 +193,7 @@ fn setup_policy_matches_fixed_helper_path_and_action() {
         "<policyconfig>",
         "io.github.YellowWhiteBlackCat.TaskForest.first-run-setup",
         "auth_admin",
-        "/usr/libexec/taskmanager-setup-helper",
+        "/usr/libexec/taskforest-setup-helper",
         "</policyconfig>",
     ] {
         assert!(

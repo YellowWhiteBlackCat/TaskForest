@@ -150,28 +150,27 @@ mod canonical_category {
     use taskmanager_shell::SortCol;
     use taskmanager_shell::{ProcessRowId, ProcessStatusFilter};
 
-/// The expected row id of one fixture process (token from
-/// `fixture_start_token`, the builder's single source).
-fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
-    taskmanager_shell::ProcessRowId::Process(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            pid,
-            taskmanager_test_support::fixture_start_token(pid),
+    /// The expected row id of one fixture process (token from
+    /// `fixture_start_token`, the builder's single source).
+    fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
+        taskmanager_shell::ProcessRowId::Process(
+            taskmanager_shell::ProcessRowIdentity::from_parts(
+                pid,
+                taskmanager_test_support::fixture_start_token(pid),
+            )
+            .expect("fixture pid and token are non-zero"),
         )
-        .expect("fixture pid and token are non-zero"),
-    )
-}
+    }
 
-fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
-    taskmanager_shell::ProcessRowId::Application(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            pid,
-            taskmanager_test_support::fixture_start_token(pid),
+    fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
+        taskmanager_shell::ProcessRowId::Application(
+            taskmanager_shell::ProcessRowIdentity::from_parts(
+                pid,
+                taskmanager_test_support::fixture_start_token(pid),
+            )
+            .expect("fixture pid and token are non-zero"),
         )
-        .expect("fixture pid and token are non-zero"),
-    )
-}
-
+    }
 
     fn app_item(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
         let identity = ProcessApplicationIdentity::new("org.example.Editor", "Editor", None)

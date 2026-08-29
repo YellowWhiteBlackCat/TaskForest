@@ -16,7 +16,7 @@ fn process_snapshot_batch(sequence: u64) -> PlatformEventBatch {
             sequence: EventSequence::new(sequence),
             observed_at_ms: sequence,
         },
-        ProcessEvent::Snapshot(Vec::new()),
+        ProcessEvent::Snapshot(std::sync::Arc::new(Vec::new())),
     ));
     batch
 }

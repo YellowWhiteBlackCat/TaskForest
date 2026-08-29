@@ -195,7 +195,7 @@ pub(crate) fn drain_system(
         taskmanager_shell::queue_effect(
             &mut track.shell,
             &mut client,
-            PlatformEffect::Refresh(RefreshRequest::All),
+            PlatformEffect::Refresh(RefreshRequest::Dashboard),
         );
         track.initial_refresh_submitted = true;
     }

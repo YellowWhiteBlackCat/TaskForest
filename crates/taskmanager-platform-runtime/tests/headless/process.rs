@@ -139,6 +139,7 @@ fn spawn_fixture(state: FixtureState) -> (taskmanager_application::PlatformHandl
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let list_state = state.clone();
     let telemetry_state = state.clone();

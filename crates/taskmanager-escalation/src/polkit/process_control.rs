@@ -14,7 +14,8 @@ use super::json_reader::{Json, JsonReader};
 use super::{EscalationDenialReason, HelperOutput};
 
 #[cfg(target_os = "linux")]
-pub(super) const PROCESS_CONTROL_HELPER_PATH: &str = "/usr/lib/taskforest-process-control-helper";
+pub(super) const PROCESS_CONTROL_HELPER_PATH: &str =
+    "/usr/libexec/taskforest-process-control-helper";
 
 /// The provider-native identity supplied to the privileged helper.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

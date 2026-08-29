@@ -37,10 +37,10 @@ use crate::EscalationDenialReason;
 
 /// The absolute install path of the net-launcher binary. MUST match the
 /// `org.freedesktop.policykit.exec.path` annotation in
-/// `polkit/com.taskforest.net-launcher.policy.in` byte-for-byte — polkit resolves
-/// the action by that path.
+/// `polkit/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy.in`
+/// byte-for-byte — polkit resolves the action by that path.
 #[cfg(target_os = "linux")]
-pub(crate) const NET_LAUNCHER_PATH: &str = "/usr/libexec/taskmanager-net-launcher";
+pub(crate) const NET_LAUNCHER_PATH: &str = "/usr/libexec/taskforest-net-launcher";
 
 // The platform-agnostic owned handle a successful net-launch hands back. Unix
 // models an AF_PACKET socket as an owned file descriptor; Windows would model

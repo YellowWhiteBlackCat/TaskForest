@@ -61,9 +61,12 @@ use crate::delivery::LaneFlow;
 fn invalid_target_scope_never_reaches_the_lane_or_ecs() {
     let provider = ProviderId::borrowed("fixture.runtime");
     let scheduler = scheduler_handle();
-    let (Some(port), Some(receiver)) =
-        request_lane::<ScopedFixtureRequest>(1, Some(&provider), scheduler.clone())
-    else {
+    let (Some(port), Some(receiver)) = request_lane::<ScopedFixtureRequest>(
+        1,
+        Some(&provider),
+        scheduler.clone(),
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
 
@@ -118,9 +121,12 @@ fn invalid_target_scope_never_reaches_the_lane_or_ecs() {
 fn unaudited_sideband_fails_before_the_worker_lane() {
     let provider = ProviderId::borrowed("fixture.runtime");
     let scheduler = scheduler_handle();
-    let (Some(port), Some(receiver)) =
-        request_lane::<UnownedFixtureRequest>(1, Some(&provider), scheduler.clone())
-    else {
+    let (Some(port), Some(receiver)) = request_lane::<UnownedFixtureRequest>(
+        1,
+        Some(&provider),
+        scheduler.clone(),
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
 
@@ -148,9 +154,12 @@ fn unaudited_sideband_fails_before_the_worker_lane() {
 #[test]
 fn typed_port_validates_capability_and_reports_bounded_backpressure() {
     let provider = ProviderId::borrowed("fixture.runtime");
-    let (Some(port), Some(receiver)) =
-        request_lane::<HardwareInventoryRequest>(1, Some(&provider), scheduler_handle())
-    else {
+    let (Some(port), Some(receiver)) = request_lane::<HardwareInventoryRequest>(
+        1,
+        Some(&provider),
+        scheduler_handle(),
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
     let first_id = RequestId::new(1).expect("fixture request id");
@@ -202,9 +211,12 @@ fn accepted_typed_enqueue_is_observed_by_the_ecs_lifecycle() {
         }],
         zero_clock,
     );
-    let (Some(port), Some(_receiver)) =
-        request_lane::<HardwareInventoryRequest>(1, Some(&provider), scheduler.clone())
-    else {
+    let (Some(port), Some(_receiver)) = request_lane::<HardwareInventoryRequest>(
+        1,
+        Some(&provider),
+        scheduler.clone(),
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
     port.try_submit(RequestEnvelope {
@@ -232,9 +244,12 @@ fn ecs_admission_rejects_duplicate_in_flight_work_before_lane_capacity() {
         }],
         zero_clock,
     );
-    let (Some(port), Some(receiver)) =
-        request_lane::<HardwareInventoryRequest>(2, Some(&provider), scheduler)
-    else {
+    let (Some(port), Some(receiver)) = request_lane::<HardwareInventoryRequest>(
+        2,
+        Some(&provider),
+        scheduler,
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
 
@@ -273,9 +288,12 @@ fn target_tracked_scan_accepts_its_sideband_cancel_without_a_residual_job() {
         }],
         zero_clock,
     );
-    let (Some(port), Some(receiver)) =
-        request_lane::<DirectoryUsageRequest>(2, Some(&provider), scheduler.clone())
-    else {
+    let (Some(port), Some(receiver)) = request_lane::<DirectoryUsageRequest>(
+        2,
+        Some(&provider),
+        scheduler.clone(),
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
     let scan_request = RequestId::new(60).expect("fixture request id");
@@ -334,9 +352,12 @@ fn full_target_lane_rolls_back_the_unqueued_ecs_entity() {
         }],
         zero_clock,
     );
-    let (Some(port), Some(receiver)) =
-        request_lane::<DirectoryUsageRequest>(1, Some(&provider), scheduler.clone())
-    else {
+    let (Some(port), Some(receiver)) = request_lane::<DirectoryUsageRequest>(
+        1,
+        Some(&provider),
+        scheduler.clone(),
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
     let scan = |id: u64, root: &str| RequestEnvelope {
@@ -373,9 +394,12 @@ fn full_target_lane_rolls_back_the_unqueued_ecs_entity() {
 fn disconnected_capability_lane_rolls_back_its_ecs_claim() {
     let provider = ProviderId::borrowed("fixture.runtime");
     let scheduler = scheduler_handle();
-    let (Some(port), Some(receiver)) =
-        request_lane::<HardwareInventoryRequest>(1, Some(&provider), scheduler.clone())
-    else {
+    let (Some(port), Some(receiver)) = request_lane::<HardwareInventoryRequest>(
+        1,
+        Some(&provider),
+        scheduler.clone(),
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
     drop(receiver);
@@ -391,9 +415,12 @@ fn disconnected_capability_lane_rolls_back_its_ecs_claim() {
         Err(SubmissionErrorKind::RuntimeStopped)
     );
 
-    let (Some(replacement), Some(_receiver)) =
-        request_lane::<HardwareInventoryRequest>(1, Some(&provider), scheduler)
-    else {
+    let (Some(replacement), Some(_receiver)) = request_lane::<HardwareInventoryRequest>(
+        1,
+        Some(&provider),
+        scheduler,
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("replacement lane must exist");
     };
     replacement
@@ -420,9 +447,12 @@ fn disconnected_target_lane_retires_the_unqueued_ecs_entity() {
         }],
         zero_clock,
     );
-    let (Some(port), Some(receiver)) =
-        request_lane::<DirectoryUsageRequest>(1, Some(&provider), scheduler.clone())
-    else {
+    let (Some(port), Some(receiver)) = request_lane::<DirectoryUsageRequest>(
+        1,
+        Some(&provider),
+        scheduler.clone(),
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
     drop(receiver);
@@ -463,9 +493,12 @@ fn failed_scheduled_submission_cannot_rollback_an_interleaved_explicit_owner() {
         &routes, zero_clock,
     ));
     let scheduler = catalog.ecs_scheduler_handle();
-    let (Some(port), Some(receiver)) =
-        request_lane::<HardwareInventoryRequest>(1, Some(&provider), scheduler)
-    else {
+    let (Some(port), Some(receiver)) = request_lane::<HardwareInventoryRequest>(
+        1,
+        Some(&provider),
+        scheduler,
+        std::sync::Arc::new(crate::delivery::LaneStartRegistry::default()),
+    ) else {
         panic!("present provider must create a typed lane");
     };
     let request = |id| RequestEnvelope {

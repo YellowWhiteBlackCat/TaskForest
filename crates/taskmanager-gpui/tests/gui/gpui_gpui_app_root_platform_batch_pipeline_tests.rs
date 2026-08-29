@@ -47,7 +47,7 @@ fn snapshot_batch(processes: Vec<ProcessItem>) -> PlatformEventBatch {
                 sequence: EventSequence::new(1),
                 observed_at_ms: 1000,
             },
-            ProcessEvent::Snapshot(processes),
+            ProcessEvent::Snapshot(std::sync::Arc::new(processes)),
         )],
         ..Default::default()
     }
@@ -133,7 +133,7 @@ async fn process_materialization_is_single_fold_and_shared_by_render_and_input(
             assert_eq!(generation, 1, "one raw batch must fold exactly once");
             assert_eq!(generation, view.projection().process_revision);
 
-            let process_snapshot = view.processes_rc().clone();
+            let process_snapshot = view.processes_arc().clone();
             let (render_rows, _, _) = view.processes_projection();
             let rendered_pid = render_rows
                 .iter()
@@ -154,7 +154,10 @@ async fn process_materialization_is_single_fold_and_shared_by_render_and_input(
             assert!(!unrelated.processes);
             let (reused_rows, _, _) = view.processes_projection();
             assert_eq!(view.processes_generation(), generation);
-            assert!(std::rc::Rc::ptr_eq(&process_snapshot, view.processes_rc(),));
+            assert!(std::sync::Arc::ptr_eq(
+                &process_snapshot,
+                view.processes_arc(),
+            ));
             assert!(std::rc::Rc::ptr_eq(&render_rows, &reused_rows));
         });
     })

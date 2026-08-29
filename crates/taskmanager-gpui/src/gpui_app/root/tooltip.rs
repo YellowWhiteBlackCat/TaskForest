@@ -2,33 +2,33 @@
 //! Properties modal target).
 
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use taskmanager_core::core::process::ProcessItem;
 
 use super::RootView;
 
 /// Lazy PID index for cursor tooltips. The process table already owns the
-/// authoritative `Rc<Vec<ProcessItem>>`; retaining that same `Rc` lets the
+/// authoritative `Arc<Vec<ProcessItem>>`; retaining that same `Arc` lets the
 /// index detect a new snapshot without relying on every test/capture fixture
 /// to remember a generation bump. The map is built only when a process tooltip
 /// is first needed, then reused for every row crossing in that snapshot.
 #[derive(Default)]
 pub(crate) struct ProcessTooltipIndex {
-    processes: Option<Rc<Vec<ProcessItem>>>,
+    processes: Option<Arc<Vec<ProcessItem>>>,
     by_pid: HashMap<u32, usize>,
 }
 
 impl ProcessTooltipIndex {
     pub(super) fn index_for(
         &mut self,
-        processes: &Rc<Vec<ProcessItem>>,
+        processes: &Arc<Vec<ProcessItem>>,
         pid: u32,
     ) -> Option<usize> {
         let snapshot_changed = self
             .processes
             .as_ref()
-            .is_none_or(|cached| !Rc::ptr_eq(cached, processes));
+            .is_none_or(|cached| !Arc::ptr_eq(cached, processes));
         if snapshot_changed {
             self.by_pid.clear();
             self.by_pid.reserve(processes.len());
@@ -61,7 +61,7 @@ impl RootView {
     /// Resolve a process tooltip without scanning the live snapshot for every
     /// hover transition. Clone the command line only when it is displayed.
     pub(crate) fn process_tooltip_text(&mut self, pid: u32) -> Option<String> {
-        let processes = Rc::clone(self.processes_rc());
+        let processes = Arc::clone(self.processes_arc());
         let index = self.process_tooltip_index.index_for(&processes, pid)?;
         let process = processes.get(index)?;
         (process.cmdline.len() > process.name.len()).then(|| process.cmdline.clone())
@@ -77,7 +77,7 @@ impl RootView {
         &mut self,
         pid: u32,
     ) -> Option<(Rc<ProcessItem>, Rc<ProcessHistories>)> {
-        let processes = Rc::clone(self.processes_rc());
+        let processes = Arc::clone(self.processes_arc());
         if let Some(cached) = self.projection_caches.process_details(&processes, pid) {
             return Some(cached);
         }

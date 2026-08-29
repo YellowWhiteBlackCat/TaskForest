@@ -202,6 +202,7 @@ pub use request_session::{
 
 pub use platform::{
     AutomaticSchedule, AutomaticScheduleProfile, automatic_cadence_ms, automatic_schedules,
+    default_automatic_cadence_ms,
 };
 pub use ports::{PlatformEffect, ServiceControlTarget, SessionControlTarget};
 pub use reducer::{AppState, Reduction, UiEffect, reduce};

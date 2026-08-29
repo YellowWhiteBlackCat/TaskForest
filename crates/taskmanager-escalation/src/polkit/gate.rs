@@ -66,21 +66,19 @@ fn probe_intel_pmu() -> EscalationAvailability {
 }
 
 /// The installed polkit action for the net-launcher — the `.in` template
-/// (`polkit/com.taskforest.net-launcher.policy.in`) drops its suffix at install
-/// time (see `packaging/arch/PKGBUILD`). Probing the ACTION FILE (not just the
-/// actions dir) matters: polkit resolves the `pkexec` action by the annotated
-/// helper path, so an installed helper without its action is unusable.
+/// (`polkit/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy.in`)
+/// drops its suffix at install time (see `packaging/arch/PKGBUILD`). Probing
+/// the ACTION FILE (not just the actions dir) matters: polkit resolves the
+/// `pkexec` action by the annotated helper path, so an installed helper
+/// without its action is unusable.
 #[cfg(target_os = "linux")]
-const NET_LAUNCHER_ACTION_INSTALLED: &str =
-    "/usr/share/polkit-1/actions/com.taskforest.net-launcher.policy";
+const NET_LAUNCHER_ACTION_INSTALLED: &str = "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy";
 
 #[cfg(target_os = "linux")]
-const PERF_HELPER_ACTION_INSTALLED: &str =
-    "/usr/share/polkit-1/actions/com.taskforest.perf-helper.policy";
+const PERF_HELPER_ACTION_INSTALLED: &str = "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy";
 
 #[cfg(target_os = "linux")]
-const PROCESS_CONTROL_ACTION_INSTALLED: &str =
-    "/usr/share/polkit-1/actions/com.taskforest.process-control.policy";
+const PROCESS_CONTROL_ACTION_INSTALLED: &str = "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy";
 
 #[cfg(target_os = "linux")]
 fn probe_net_launcher() -> EscalationAvailability {

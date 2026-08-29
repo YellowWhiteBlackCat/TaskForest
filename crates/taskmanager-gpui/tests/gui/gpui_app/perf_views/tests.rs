@@ -40,6 +40,8 @@ mod gpu_chart_metric;
 mod root_contract;
 #[path = "tests/split_lanes.rs"]
 mod split_lanes;
+#[path = "tests/width_contract.rs"]
+mod width_contract;
 use fixtures::{sensor_reading, with_battery_scalars};
 
 fn gib(n: u64) -> u64 {

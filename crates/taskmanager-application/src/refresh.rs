@@ -33,6 +33,9 @@ pub enum ServiceUpdate {
 /// A refresh scope understood by application and platform adapters.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RefreshRequest {
+    /// Refresh the data needed by the visible dashboard. Detail pages and
+    /// their low-frequency providers are loaded only when requested.
+    Dashboard,
     All,
     Telemetry,
     HardwareInventory,

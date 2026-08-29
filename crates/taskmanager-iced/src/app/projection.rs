@@ -407,12 +407,7 @@ impl IcedApp {
             // The shell already memoizes the filtered/sorted raw indices.
             // Materialize row references only when this Iced cache misses.
             let visible_indices = self.shell.visible_process_indices();
-            let processes = self
-                .shell
-                .projection()
-                .processes
-                .as_deref()
-                .unwrap_or_default();
+            let processes = self.shell.projection().processes_slice();
             let flat: Vec<_> = visible_indices
                 .iter()
                 .filter_map(|&index| processes.get(index))

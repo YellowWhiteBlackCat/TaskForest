@@ -467,9 +467,9 @@ impl CaptureEvidence {
     #[must_use]
     pub fn first_run_fixture_info() -> SetupScriptInfo {
         SetupScriptInfo {
-            path: PathBuf::from("/usr/share/taskmanager/setup/99-taskmanager.rules"),
-            run_command: "pkexec /usr/libexec/taskmanager-setup-helper install".to_owned(),
-            revert_command: "pkexec /usr/libexec/taskmanager-setup-helper revert".to_owned(),
+            path: PathBuf::from("/usr/share/taskforest/setup/99-taskforest.rules"),
+            run_command: "pkexec /usr/libexec/taskforest-setup-helper install".to_owned(),
+            revert_command: "pkexec /usr/libexec/taskforest-setup-helper revert".to_owned(),
         }
     }
 

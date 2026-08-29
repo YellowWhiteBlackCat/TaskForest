@@ -19,10 +19,10 @@ async fn background_setup_observation_does_not_open_first_run_surface(
                 observed_at_ms: 1,
                 event: SetupScriptEvent::Observed(Some(SetupScriptInfo {
                     path: std::path::PathBuf::from(
-                        "/usr/share/taskmanager/setup/99-taskmanager.rules",
+                        "/usr/share/taskforest/setup/99-taskforest.rules",
                     ),
-                    run_command: "taskmanager-setup-helper --apply".to_owned(),
-                    revert_command: "taskmanager-setup-helper --revert".to_owned(),
+                    run_command: "taskforest-setup-helper --apply".to_owned(),
+                    revert_command: "taskforest-setup-helper --revert".to_owned(),
                 })),
             },
             cx,

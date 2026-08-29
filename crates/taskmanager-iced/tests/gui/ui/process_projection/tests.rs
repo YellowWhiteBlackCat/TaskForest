@@ -1,11 +1,16 @@
 use super::*;
 
-
 /// Expected row id for a fixture process (single source: the fixture
 /// builder's default start token).
-fn expected_row_key(kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId, pid: u32) -> Option<taskmanager_shell::ProcessRowId> {
-    taskmanager_shell::ProcessRowIdentity::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
-        .map(kind)
+fn expected_row_key(
+    kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId,
+    pid: u32,
+) -> Option<taskmanager_shell::ProcessRowId> {
+    taskmanager_shell::ProcessRowIdentity::from_parts(
+        pid,
+        taskmanager_test_support::fixture_start_token(pid),
+    )
+    .map(kind)
 }
 
 fn proc(pid: u32, name: &str, parent_pid: Option<u32>) -> ProcessItem {

@@ -7,13 +7,13 @@
   accounting only through this one OS-native prompt (ADR-024/025).
 
   Install paths (see polkit/README.md):
-    this file  -> /usr/share/polkit-1/actions/com.taskforest.net-launcher.policy
-    launcher   -> /usr/libexec/taskmanager-net-launcher
+    this file  -> /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy
+    launcher   -> /usr/libexec/taskforest-net-launcher
 
   The org.freedesktop.policykit.exec.path annotation below MUST match the program
   path passed to pkexec exactly: polkit resolves the action by that path, so a
   bare binary name would fail to match this action and be denied. The consumer
-  invokes `pkexec /usr/libexec/taskmanager-net-launcher <socket> <iface>`.
+  invokes `pkexec /usr/libexec/taskforest-net-launcher <socket> <iface>`.
 
   auth_admin_keep on the active session means ONE prompt authorizes the launcher
   for the whole session. The launcher is one-shot (open + pass fd + exit); the
@@ -21,7 +21,7 @@
   privilege, so there is no long-lived privileged process.
 -->
 <policyconfig>
-  <action id="com.taskforest.net-launcher">
+  <action id="io.github.YellowWhiteBlackCat.TaskForest.net-launcher">
     <description>Open an AF_PACKET socket to measure per-process network rates</description>
     <message>TaskForest needs to open a raw network socket (CAP_NET_RAW) to attribute network traffic to processes. Authentication is remembered for the session.</message>
     <defaults>
@@ -29,7 +29,7 @@
       <allow_inactive>auth_admin_keep</allow_inactive>
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/taskmanager-net-launcher</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/taskforest-net-launcher</annotate>
     <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
   </action>
 </policyconfig>

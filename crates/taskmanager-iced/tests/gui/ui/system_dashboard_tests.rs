@@ -46,7 +46,11 @@ fn summary_fold_tracks_the_live_projection() {
     let model = summary_model(app.shell.projection());
     assert_eq!(
         model.processes,
-        app.shell.projection().processes.as_ref().map(Vec::len),
+        app.shell
+            .projection()
+            .processes
+            .as_ref()
+            .map(|processes| processes.len()),
         "the processes card mirrors the projection's inventory count"
     );
     assert_eq!(

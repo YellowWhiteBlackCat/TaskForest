@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use gpui::TestAppContext;
 
@@ -54,11 +54,11 @@ async fn details_histories_share_the_memo_identity(cx: &mut TestAppContext) {
 
 #[test]
 fn pid_index_reuses_one_snapshot_and_rebuilds_for_a_new_one() {
-    let first = Rc::new(vec![
+    let first = Arc::new(vec![
         process(11, "short", "short"),
         process(22, "worker", "/usr/bin/worker --long"),
     ]);
-    let second = Rc::new(vec![process(33, "replacement", "/bin/replacement")]);
+    let second = Arc::new(vec![process(33, "replacement", "/bin/replacement")]);
     let mut index = ProcessTooltipIndex::default();
 
     assert_eq!(index.index_for(&first, 22), Some(1));

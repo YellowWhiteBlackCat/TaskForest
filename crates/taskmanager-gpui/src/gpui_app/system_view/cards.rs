@@ -91,20 +91,24 @@ pub(super) fn tile_row(theme: &Theme, tiles: &[SystemTile]) -> Div {
                             .text_color(theme.fg_dim)
                             .child(tile.title.clone()),
                     )
+                    // Truncating text lives in a flex-row wrapper (the
+                    // title-row pattern): `truncate()` on a bare flex-column
+                    // child poisons gpui's nowrap text measure cache and the
+                    // value hard-clips mid-glyph at narrow tile widths.
                     .child(
-                        div()
-                            .truncate()
-                            .text_size(tokens::FONT_16)
-                            .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                            .text_color(theme.fg)
-                            .child(tile.value.clone()),
+                        div().flex().flex_row().min_w(px(0.0)).child(
+                            crate::gpui_app::elements::truncated_text(&tile.value)
+                                .text_size(tokens::FONT_16)
+                                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
+                                .text_color(theme.fg),
+                        ),
                     )
                     .child(
-                        div()
-                            .truncate()
-                            .text_size(tokens::FONT_11)
-                            .text_color(theme.fg_dim)
-                            .child(tile.note.clone()),
+                        div().flex().flex_row().min_w(px(0.0)).child(
+                            crate::gpui_app::elements::truncated_text(&tile.note)
+                                .text_size(tokens::FONT_11)
+                                .text_color(theme.fg_dim),
+                        ),
                     ),
             );
         cards.push(

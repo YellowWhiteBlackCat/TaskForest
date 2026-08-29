@@ -35,7 +35,6 @@ use taskmanager_core::core::process::{
 };
 use taskmanager_shell::ProcessRowId;
 
-
 /// The expected row id of one fixture process (token from
 /// `fixture_start_token`, the builder's single source).
 fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {

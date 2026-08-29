@@ -14,9 +14,21 @@ fn disabled_frontend_history_is_inert_before_any_path_or_worker_lookup() {
 #[test]
 fn connector_submission_is_bounded_and_request_ids_are_monotonic() {
     let (request_tx, request_rx) = std::sync::mpsc::sync_channel(2);
-    let (_completion_tx, completion_rx) = std::sync::mpsc::sync_channel(1);
+    let (completion_tx, completion_rx) = std::sync::mpsc::sync_channel(1);
+    let start_result = std::sync::OnceLock::new();
+    let _ = start_result.set(Ok(()));
     let mut connector = HistoryFrontendConnector {
-        requests: request_tx,
+        inner: std::sync::Arc::new(HistoryFrontendRuntimeInner {
+            requests: request_tx,
+            start_receiver: std::sync::Mutex::new(None),
+            completion_tx,
+            host: fixture_host(
+                std::path::PathBuf::from("config.json"),
+                std::path::PathBuf::from("history"),
+            ),
+            start_result,
+            join: std::sync::Mutex::new(None),
+        }),
         completions: completion_rx,
         next_request: Some(1),
     };

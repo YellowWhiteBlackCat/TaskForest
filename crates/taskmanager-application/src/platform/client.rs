@@ -28,6 +28,7 @@ mod process;
 mod scheduler;
 pub use scheduler::{
     AutomaticSchedule, AutomaticScheduleProfile, automatic_cadence_ms, automatic_schedules,
+    default_automatic_cadence_ms,
 };
 mod sensor;
 mod service;
@@ -94,6 +95,20 @@ impl PlatformClient {
         submitted_at_ms: u64,
     ) -> Vec<Result<RequestId, SubmissionError>> {
         match request {
+            crate::RefreshRequest::Dashboard => {
+                let mut outcomes = self.system_refresh_results(submitted_at_ms);
+                outcomes.extend([
+                    self.submit_process_list(ProcessListRequest::Refresh, submitted_at_ms),
+                    self.submit_storage_health(StorageHealthRequest::Refresh, submitted_at_ms),
+                    self.submit_sensor(SensorRequest::Refresh, submitted_at_ms),
+                    self.submit_power_supply(PowerSupplyRequest::Refresh, submitted_at_ms),
+                    self.submit_smart_observation(
+                        SmartObservationRequest::RefreshAll,
+                        submitted_at_ms,
+                    ),
+                ]);
+                outcomes
+            }
             crate::RefreshRequest::All => {
                 let mut outcomes = self.system_refresh_results(submitted_at_ms);
                 outcomes.extend([

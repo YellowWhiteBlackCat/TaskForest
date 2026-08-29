@@ -6,10 +6,8 @@ use super::*;
 
 #[allow(dead_code)]
 fn identity_of(app: &crate::ShellApp, pid: u32) -> crate::app::process_rows::ProcessRowIdentity {
-    app.data
-        .processes
-        .as_deref()
-        .unwrap_or_default()
+    app.projection()
+        .processes_slice()
         .iter()
         .find(|process| process.pid == pid)
         .and_then(crate::app::process_rows::ProcessRowIdentity::from_process)

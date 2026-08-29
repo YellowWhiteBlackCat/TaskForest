@@ -21,8 +21,8 @@ Persistent history has one writer owner: the enabled frontend session. App-host
 creates its bounded writer and read-only replay generation together on a worker
 and returns both in `HistoryFrontendSession`. Disabled frontend state sends no
 request, so it starts no query or writer worker and performs no history-path
-access; the inert connector control thread itself owns no platform or storage
-capability until an enable request.
+access; the connector is an inert typed handle until an enable request starts
+the history worker.
 
 The app-host read-only worker owns `HistoryQuery`. Requests and immutable typed
 completions cross fixed-capacity lanes; no frontend receives a path or storage
@@ -32,13 +32,14 @@ line. Final-handle shutdown for either worker has an independent signal and
 bounded wait; a filesystem operation that never returns is detached instead of
 freezing window teardown.
 
-Snapshot and diagnostic publication have one process-wide bounded worker each.
-Snapshot serialization, current-directory discovery and the atomic three-file
-transaction live entirely here. Diagnostic plans cross the boundary only after
-application redaction; one worker serves independent named client completion
-lanes for full bundles and service-log exports. Frontends only submit immutable
-typed requests, drain correlated completions and project shell feedback; they
-never construct a filesystem adapter or spawn a per-window writer.
+Snapshot and diagnostic publication have one process-wide bounded worker each,
+started lazily by the first submitted request. Snapshot serialization,
+current-directory discovery and the atomic three-file transaction live entirely
+here. Diagnostic plans cross the boundary only after application redaction; one
+worker serves independent named client completion lanes for full bundles and
+service-log exports. Frontends only submit immutable typed requests, drain
+correlated completions and project shell feedback; they never construct a
+filesystem adapter or spawn a per-window writer.
 
 The host owns one `StartupLocalTimeCache` shared by every cloned host and
 window. Native discovery runs exactly once when the production host is built;

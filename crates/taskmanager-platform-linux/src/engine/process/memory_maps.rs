@@ -5,9 +5,12 @@
 //! periodically sampled sharing factor. This module owns only Linux I/O and
 //! the approximation. The typed scalar contract remains in `taskmanager-core`.
 
+use std::borrow::Borrow;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::hash::Hash;
 use std::io::Read;
+use std::sync::Arc;
 
 use taskmanager_core::{FailureKind, SourceOutcome};
 
@@ -21,11 +24,14 @@ const MAX_MAP_BYTES: u64 = 8 * 1024 * 1024;
 /// A process list can be very large. A deterministic cap keeps one refresh
 /// bounded; processes outside the cap remain typed-unavailable until a later
 /// bounded sample rather than receiving a guessed memory value.
-const MAX_MAP_PROCESSES: usize = 4_096;
+const MAX_MAP_PROCESSES: usize = 1_024;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct FileMapping {
-    path: String,
+    /// Paths are interned across all sampled processes. `/proc/<pid>/maps`
+    /// repeats the same shared libraries many times; an `Arc<str>` keeps one
+    /// allocation for the path while retaining one size entry per process.
+    path: Arc<str>,
     size_bytes: u64,
 }
 
@@ -58,7 +64,7 @@ impl ProcessMemoryObservation {
 pub(super) struct MemoryMaps {
     refreshed_at_ms: Option<u64>,
     processes: HashMap<u32, CachedProcessMaps>,
-    share_count: HashMap<String, u32>,
+    share_count: HashMap<Arc<str>, u32>,
 }
 
 impl MemoryMaps {
@@ -101,8 +107,11 @@ impl MemoryMaps {
             };
             let mut unique_paths = HashSet::new();
             for mapping in mappings {
-                if unique_paths.insert(mapping.path.as_str()) {
-                    let count = self.share_count.entry(mapping.path.clone()).or_default();
+                if unique_paths.insert(&*mapping.path) {
+                    let count = self
+                        .share_count
+                        .entry(Arc::clone(&mapping.path))
+                        .or_default();
                     *count = count.saturating_add(1);
                 }
             }
@@ -201,14 +210,20 @@ fn parse_maps_line(line: &str) -> Result<Option<FileMapping>, FailureKind> {
     if inode == 0 || path.is_empty() || path.starts_with('[') || path.ends_with(" (deleted)") {
         return Ok(None);
     }
-    Ok(Some(FileMapping { path, size_bytes }))
+    Ok(Some(FileMapping {
+        path: Arc::from(path),
+        size_bytes,
+    }))
 }
 
-fn hybrid_pss(
+fn hybrid_pss<K>(
     status: ProcStatusMemoryFields,
     mappings: &[FileMapping],
-    share_count: &HashMap<String, u32>,
-) -> Result<u64, FailureKind> {
+    share_count: &HashMap<K, u32>,
+) -> Result<u64, FailureKind>
+where
+    K: Borrow<str> + Eq + Hash,
+{
     let private_bytes = status
         .rss_anon_bytes
         .checked_add(status.rss_shmem_bytes)
@@ -233,7 +248,7 @@ fn hybrid_pss(
     let mut weighted_inverse_share = 0.0_f64;
     for mapping in mappings {
         let share = share_count
-            .get(&mapping.path)
+            .get(mapping.path.as_ref())
             .copied()
             .filter(|share| *share > 0)
             .ok_or(FailureKind::ProviderFault)?;

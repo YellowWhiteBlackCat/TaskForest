@@ -6,10 +6,12 @@ use std::io;
 use std::path::PathBuf;
 
 use taskmanager_core::{
-    FailureKind, ProcessItem, ProcessMetadataFailure, ProcessMetadataObservation,
-    ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity, SourceOutcome,
+    FailureKind, ProcessMetadataFailure, ProcessMetadataObservation, ProcessMetadataObservations,
+    ProcessOwner, ProcessOwnerIdentity, SourceOutcome,
 };
 use tracing::warn;
+
+use super::PreviousProcessView;
 
 pub(super) type PasswdLabels = Result<HashMap<u32, String>, ProcessMetadataFailure>;
 
@@ -30,12 +32,12 @@ pub(super) fn load_passwd_labels() -> PasswdLabels {
     )
 }
 
-pub(super) fn observe_process_metadata(
+pub(super) fn observe_process_metadata<P: PreviousProcessView + ?Sized>(
     pid: u32,
     passwd: &PasswdLabels,
     observed_at_ms: u64,
     current_start_token: Result<u64, FailureKind>,
-    previous: Option<&ProcessItem>,
+    previous: Option<&P>,
 ) -> (ProcessMetadataObservations, ProcessMetadataEvidence) {
     let current_start_token = match current_start_token {
         Ok(token) => token,
@@ -73,10 +75,10 @@ fn unavailable_for_identity_failure(
     )
 }
 
-fn retain_for_same_identity(
+fn retain_for_same_identity<P: PreviousProcessView + ?Sized>(
     current: ProcessMetadataObservations,
     current_start_token: Option<u64>,
-    previous: Option<&ProcessItem>,
+    previous: Option<&P>,
 ) -> ProcessMetadataObservations {
     let Some(previous) = previous.filter(|previous| {
         current_start_token.is_some_and(|token| previous.current_start_token() == Some(token))

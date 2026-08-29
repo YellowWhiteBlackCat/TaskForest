@@ -37,6 +37,7 @@ fn shared_power_runtime_reports_typed_provider_failure() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_power_lanes(

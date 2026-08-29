@@ -16,9 +16,10 @@ use taskmanager_core::{
 };
 use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
 
+use crate::delivery::{recv_or_shutdown_with_idle, spawn_or_register_lane};
 use crate::health::CapabilityHealth;
 use crate::{
-    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_observation_lane,
+    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lazy_observation_lane,
 };
 
 type HostExecutor =
@@ -380,7 +381,7 @@ pub fn spawn_system_lanes(
             },
     } = executors;
 
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         host,
         events.clone(),
@@ -394,7 +395,7 @@ pub fn spawn_system_lanes(
             })
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         cpu,
         events.clone(),
@@ -408,7 +409,7 @@ pub fn spawn_system_lanes(
             })
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         memory,
         events.clone(),
@@ -422,14 +423,14 @@ pub fn spawn_system_lanes(
             })
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         containers,
         events.clone(),
         move |ContainerRollupRequest::Refresh| execute_containers(clock_ms()),
         |rollup| PlatformEvent::Containers(ContainerRollupEvent::Snapshot(Box::new(rollup))),
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         storage,
         events.clone(),
@@ -443,7 +444,7 @@ pub fn spawn_system_lanes(
             })
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         network,
         events.clone(),
@@ -457,7 +458,7 @@ pub fn spawn_system_lanes(
             })
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         gpu,
         events.clone(),
@@ -477,7 +478,7 @@ pub fn spawn_system_lanes(
     if let (Some(receiver), Some(execute)) = (npu_inventory, execute_npu_inventory) {
         spawn_npu_inventory_lane(workers, receiver, events.clone(), execute, clock_ms)?;
     }
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         hardware_inventory,
         events,
@@ -497,50 +498,63 @@ fn spawn_npu_inventory_lane(
     workers: &WorkerRuntime,
     receiver: Receiver<Queued<NpuInventoryRequest>>,
     publisher: Arc<RuntimeEventPublisher>,
-    mut execute: Box<NpuInventoryExecutor>,
+    execute: Box<NpuInventoryExecutor>,
     clock_ms: fn() -> u64,
 ) -> Result<(), WorkerSpawnError> {
-    workers.spawn(CapabilityId::ACCELERATOR_NPU.to_string(), move |shutdown| {
-        let _lane_exit = crate::delivery::LaneExitGuard::new(publisher.lane_exit_counter());
-        let panic_notes = publisher.panic_ledger();
-        let lane = CapabilityId::ACCELERATOR_NPU.to_string();
-        while let Some(queued) = crate::delivery::recv_or_shutdown(&receiver, &shutdown) {
-            let observed_at_ms = clock_ms();
-            let (snapshot, health) = match crate::delivery::execute_isolated(
-                &panic_notes,
-                crate::delivery::ProviderPanicContext {
-                    lane: lane.clone(),
-                    capability: queued.capability.clone(),
-                    request_id: queued.request_id,
-                },
-                || execute(observed_at_ms),
-            ) {
-                Ok(snapshot) => (snapshot, CapabilityHealth::Available),
-                Err(failure) => (
-                    NpuInventorySnapshot::failed(
-                        failure.kind(),
-                        format!("provider failure: {failure:?}"),
-                        observed_at_ms,
-                    ),
-                    CapabilityHealth::Unavailable(failure),
-                ),
-            };
-            let event = PlatformEvent::NpuInventory(NpuInventoryEvent::Update(snapshot));
-            if crate::delivery::shutdown_requested(&shutdown)
-                || publisher
-                    .publish_health(
-                        queued.request_id,
-                        queued.capability,
-                        queued.provider,
-                        event,
-                        health,
-                    )
-                    .is_stop()
+    let lane = CapabilityId::ACCELERATOR_NPU.to_string();
+    spawn_or_register_lane(
+        workers,
+        Some(CapabilityId::ACCELERATOR_NPU),
+        receiver,
+        publisher,
+        execute,
+        move |receiver, execute, publisher, shutdown, idle_timeout| {
+            let _lane_exit = crate::delivery::LaneExitGuard::new(publisher.lane_exit_counter());
+            let panic_notes = publisher.panic_ledger();
+            while let Some(queued) = recv_or_shutdown_with_idle(&receiver, &shutdown, idle_timeout)
             {
-                break;
+                let observed_at_ms = clock_ms();
+                let (snapshot, health) = match crate::delivery::execute_isolated(
+                    &panic_notes,
+                    crate::delivery::ProviderPanicContext {
+                        lane: lane.clone(),
+                        capability: queued.capability.clone(),
+                        request_id: queued.request_id,
+                    },
+                    || {
+                        let mut execute = execute
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
+                        execute(observed_at_ms)
+                    },
+                ) {
+                    Ok(snapshot) => (snapshot, CapabilityHealth::Available),
+                    Err(failure) => (
+                        NpuInventorySnapshot::failed(
+                            failure.kind(),
+                            format!("provider failure: {failure:?}"),
+                            observed_at_ms,
+                        ),
+                        CapabilityHealth::Unavailable(failure),
+                    ),
+                };
+                let event = PlatformEvent::NpuInventory(NpuInventoryEvent::Update(snapshot));
+                if crate::delivery::shutdown_requested(&shutdown)
+                    || publisher
+                        .publish_health(
+                            queued.request_id,
+                            queued.capability,
+                            queued.provider,
+                            event,
+                            health,
+                        )
+                        .is_stop()
+                {
+                    break;
+                }
             }
-        }
-    })
+        },
+    )
 }
 
 /// Spawn the per-engine GPU utilization lane: one bounded executor call per
@@ -552,15 +566,20 @@ fn spawn_gpu_engine_rows_lane(
     workers: &WorkerRuntime,
     receiver: Receiver<Queued<GpuEngineRowsRequest>>,
     publisher: Arc<RuntimeEventPublisher>,
-    mut execute: Box<GpuEngineRowsExecutor>,
+    execute: Box<GpuEngineRowsExecutor>,
 ) -> Result<(), WorkerSpawnError> {
-    workers.spawn(
-        CapabilityId::TELEMETRY_GPU_ENGINES.to_string(),
-        move |shutdown| {
+    let lane = CapabilityId::TELEMETRY_GPU_ENGINES.to_string();
+    spawn_or_register_lane(
+        workers,
+        Some(CapabilityId::TELEMETRY_GPU_ENGINES),
+        receiver,
+        publisher,
+        execute,
+        move |receiver, execute, publisher, shutdown, idle_timeout| {
             let _lane_exit = crate::delivery::LaneExitGuard::new(publisher.lane_exit_counter());
             let panic_notes = publisher.panic_ledger();
-            let lane = CapabilityId::TELEMETRY_GPU_ENGINES.to_string();
-            while let Some(queued) = crate::delivery::recv_or_shutdown(&receiver, &shutdown) {
+            while let Some(queued) = recv_or_shutdown_with_idle(&receiver, &shutdown, idle_timeout)
+            {
                 let request = queued.payload;
                 let (snapshot, health) = match crate::delivery::execute_isolated(
                     &panic_notes,
@@ -569,7 +588,12 @@ fn spawn_gpu_engine_rows_lane(
                         capability: queued.capability.clone(),
                         request_id: queued.request_id,
                     },
-                    || execute(&request),
+                    || {
+                        let mut execute = execute
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
+                        execute(&request)
+                    },
                 ) {
                     Ok(snapshot) => (snapshot, CapabilityHealth::Available),
                     Err(failure) => (

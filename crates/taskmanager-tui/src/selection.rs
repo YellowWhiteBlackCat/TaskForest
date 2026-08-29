@@ -410,11 +410,7 @@ impl TuiApp {
         // on-demand resolution lands on the process the ids were built from.
         let visible = process_view::VisibleProcesses::new(
             self.shell.visible_process_indices(),
-            self.shell
-                .projection()
-                .processes
-                .as_deref()
-                .unwrap_or_default(),
+            self.shell.projection().processes_slice(),
         );
         match cache.as_ref() {
             Some(cache) => read(&cache.canonical_rows, &visible),
@@ -672,9 +668,7 @@ impl TuiApp {
         let current: std::collections::HashMap<u32, Option<u64>> = self
             .shell
             .projection()
-            .processes
-            .as_deref()
-            .unwrap_or_default()
+            .processes_slice()
             .iter()
             .map(|process| (process.pid, process.current_start_token()))
             .collect();
@@ -822,9 +816,7 @@ impl TuiApp {
     fn process_start_token_for_pid(&self, pid: u32) -> Option<u64> {
         self.shell
             .projection()
-            .processes
-            .as_deref()
-            .unwrap_or_default()
+            .processes_slice()
             .iter()
             .find(|process| process.pid == pid)
             .and_then(ProcessItem::current_start_token)

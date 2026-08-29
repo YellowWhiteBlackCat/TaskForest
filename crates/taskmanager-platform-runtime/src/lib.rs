@@ -35,6 +35,10 @@ pub use delivery::{
     WorkerSpawnError, spawn_health_observation_lane, spawn_lane, spawn_observation_lane,
     spawn_typed_outcome_lane,
 };
+pub(crate) use delivery::{
+    spawn_lazy_health_observation_lane, spawn_lazy_lane, spawn_lazy_observation_lane,
+    spawn_lazy_typed_outcome_lane,
+};
 mod environment;
 pub use environment::{
     EnvironmentExecutors, EnvironmentRuntimeLanes, PendingEnvironmentRuntimeLanes,

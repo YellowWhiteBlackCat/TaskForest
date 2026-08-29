@@ -138,7 +138,7 @@ fn composition_legend(
     if shown { column } else { div() }
 }
 
-fn swap_bar(theme: &Theme, memory: &MemoryMetrics, units: DisplayUnits) -> Div {
+fn swap_bar(theme: &Theme, memory: &MemoryMetrics, units: DisplayUnits, with_label: bool) -> Div {
     let Some(stats) = swap_bar_stats(memory, units) else {
         return div();
     };
@@ -146,18 +146,22 @@ fn swap_bar(theme: &Theme, memory: &MemoryMetrics, units: DisplayUnits) -> Div {
         (with_alpha(theme.network, 0.9), stats.used_share),
         (with_alpha(theme.fg_dim, 0.22), 1.0 - stats.used_share),
     ];
-    div()
+    let mut bar = div()
         .flex()
         .flex_col()
         .gap(tokens::SPACE_5)
-        .mt(tokens::SPACE_2)
-        .child(
+        .mt(tokens::SPACE_2);
+    // Compact mode keeps only the bars: the prose captions are the text the
+    // memory ladder omits first (the charts-keep-their-floors policy).
+    if with_label {
+        bar = bar.child(
             div()
                 .text_size(tokens::FONT_12)
                 .text_color(theme.fg_dim)
                 .child(stats.label),
-        )
-        .child(stacked_bar(theme, &segments, "", 8.0))
+        );
+    }
+    bar.child(stacked_bar(theme, &segments, "", 8.0))
 }
 
 fn metric_tile(theme: &Theme, title: &str, value: String, note: String) -> Div {
@@ -174,12 +178,14 @@ fn metric_tile(theme: &Theme, title: &str, value: String, note: String) -> Div {
                 .child(title.to_string()),
         )
         .child(
-            div()
-                .truncate()
-                .text_size(tokens::FONT_16)
-                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                .text_color(theme.fg)
-                .child(value),
+            // Row-wrapped truncation: a bare column-child `truncate()`
+            // poisons gpui's nowrap text measure cache (see the vital line).
+            div().flex().flex_row().min_w(px(0.0)).child(
+                elements::truncated_text(&value)
+                    .text_size(tokens::FONT_16)
+                    .font_weight(tokens::FONT_WEIGHT_BOLD.into())
+                    .text_color(theme.fg),
+            ),
         )
         .child(
             div()
@@ -219,7 +225,33 @@ fn summary_metrics(theme: &Theme, memory: &MemoryMetrics, units: DisplayUnits) -
         ))
 }
 
-pub(super) fn composition_block(theme: &Theme, memory: &MemoryMetrics, units: DisplayUnits) -> Div {
+/// How much of the composition detail card the memory page's vertical
+/// policy admits. The card is the page's essential multi-line fact, so its
+/// degradation is TEXT-first: `Compact` keeps the composition bar (and the
+/// swap bar) and drops the tiles / legend list / swap prose, while both
+/// headline charts keep their floors. This is the memory page's own ladder —
+/// deliberately unlike the CPU page's all-or-nothing matrix (求同存异).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum MemoryDetailMode {
+    /// Tiles + composition caption + bar + legend list + swap annotation.
+    Full,
+    /// Caption + composition bar (+ swap bar): the proportions, no prose.
+    Compact,
+}
+
+/// Approximate rendered height of the FULL detail card (tiles row, caption,
+/// bar, five legend rows, swap annotation, paddings). A fit-check constant,
+/// generous by intent: underestimating would squeeze the card.
+pub(crate) const MEMORY_DETAIL_FULL_MIN_HEIGHT: f32 = 380.0;
+/// Approximate rendered height of the COMPACT detail card.
+pub(crate) const MEMORY_DETAIL_COMPACT_MIN_HEIGHT: f32 = 110.0;
+
+pub(super) fn composition_block(
+    theme: &Theme,
+    memory: &MemoryMetrics,
+    units: DisplayUnits,
+    mode: MemoryDetailMode,
+) -> Div {
     let overview = overview_stats(memory);
     let labels = composition_labels(memory, units);
     let total_bytes = overview.total_bytes;
@@ -238,42 +270,62 @@ pub(super) fn composition_block(theme: &Theme, memory: &MemoryMetrics, units: Di
         .border_1()
         .border_color(theme.border)
         .bg(theme.card_surface())
-        .shadow(elements::card_shadow(theme))
-        .child(summary_metrics(theme, memory, units))
+        .shadow(elements::card_shadow(theme));
+    if mode == MemoryDetailMode::Full {
+        column = column.child(summary_metrics(theme, memory, units));
+    }
+    let mut caption = div()
+        .flex()
+        .flex_row()
+        .items_baseline()
+        .justify_between()
         .child(
             div()
                 .flex()
-                .flex_row()
-                .items_baseline()
-                .justify_between()
-                .child(
-                    div()
-                        .flex()
-                        .items_center()
-                        .gap(tokens::SPACE_6)
-                        .text_size(tokens::FONT_13)
-                        .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                        .text_color(theme.fg)
-                        .child(taskmanager_icons::icon(IconId::Performance).size(px(14.0)))
-                        .child(i18n::t("mem.composition")),
-                )
-                .child(
-                    div()
-                        .text_size(tokens::FONT_12)
-                        .text_color(theme.fg_dim)
-                        .child(format!(
-                            "{} {}  ·  {} {}",
-                            i18n::t("mem.in_use"),
-                            labels.used,
-                            labels.total,
-                            i18n::t("mem.total"),
-                        )),
-                ),
+                .items_center()
+                .gap(tokens::SPACE_6)
+                .text_size(tokens::FONT_13)
+                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
+                .text_color(theme.fg)
+                .child(taskmanager_icons::icon(IconId::Performance).size(px(14.0)))
+                .child(i18n::t("mem.composition")),
         )
-        .child(stacked_bar(theme, &bar_segments, &labels.pair, 20.0))
-        .child(composition_legend(theme, &segments, total_bytes, units));
+        .child(
+            div()
+                .text_size(tokens::FONT_12)
+                .text_color(theme.fg_dim)
+                .child(format!(
+                    "{} {}  ·  {} {}",
+                    i18n::t("mem.in_use"),
+                    labels.used,
+                    labels.total,
+                    i18n::t("mem.total"),
+                )),
+        );
+    #[cfg(any(test, feature = "test-support"))]
+    {
+        let full = mode == MemoryDetailMode::Full;
+        caption = caption.debug_selector(move || {
+            if full {
+                "tm-mem-detail-full".into()
+            } else {
+                "tm-mem-detail-compact".into()
+            }
+        });
+    }
+    column = column
+        .child(caption)
+        .child(stacked_bar(theme, &bar_segments, &labels.pair, 20.0));
+    if mode == MemoryDetailMode::Full {
+        column = column.child(composition_legend(theme, &segments, total_bytes, units));
+    }
     if overview.has_swap {
-        column = column.child(swap_bar(theme, memory, units));
+        column = column.child(swap_bar(
+            theme,
+            memory,
+            units,
+            mode == MemoryDetailMode::Full,
+        ));
     }
     #[cfg(any(test, feature = "test-support"))]
     {

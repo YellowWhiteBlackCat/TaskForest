@@ -1,11 +1,14 @@
 //! Bounded Linux desktop-entry discovery keyed by `/proc/<pid>/exe` and argv.
 
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use taskmanager_core::{
-    FailureKind, ProcessApplicationIdentity, ProcessItem, ProcessMetadataAvailability,
-    ProcessMetadataFailure, ProcessMetadataObservation, SourceOutcome,
+    FailureKind, ProcessApplicationIdentity, ProcessMetadataAvailability, ProcessMetadataFailure,
+    ProcessMetadataObservation, SourceOutcome,
 };
+
+use super::PreviousProcessView;
 
 mod catalog;
 mod failures;
@@ -19,6 +22,10 @@ use matching::select_candidate;
 
 const APPLICATION_CACHE_TTL_MS: u64 = 30_000;
 const APPLICATION_CACHE_RETRY_MS: u64 = 5_000;
+/// Only icons used by observed processes are resolved and retained. The
+/// bounded byte budget prevents a desktop catalog with many large assets from
+/// consuming the monitor's memory budget before the user opens a page.
+const MAX_ICON_CACHE_BYTES: usize = 2 * 1024 * 1024;
 const MAX_DESKTOP_FILES: usize = 4_096;
 const MAX_DESKTOP_FILE_BYTES: u64 = 256 * 1024;
 
@@ -28,6 +35,12 @@ struct CatalogEntry {
     identity: ProcessApplicationIdentity,
     executable: ExecutableSelector,
     exec_args: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+struct CachedIconResolution {
+    asset: Option<taskmanager_core::ApplicationIconAsset>,
+    failure: Option<ProcessMetadataFailure>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +62,9 @@ pub(super) struct ApplicationCatalog {
     loaded_at_ms: Option<u64>,
     entries: Vec<CatalogEntry>,
     failure: Option<ProcessMetadataFailure>,
+    icon_dirs: Vec<PathBuf>,
+    icon_cache: HashMap<String, CachedIconResolution>,
+    icon_cache_bytes: usize,
 }
 
 impl ApplicationCatalog {
@@ -119,6 +135,7 @@ impl ApplicationCatalog {
                 };
             }
         };
+        let identity = self.resolve_icon(identity);
 
         let partial_failure = [
             executable_failure,
@@ -206,6 +223,52 @@ impl ApplicationCatalog {
             .ok_or(CatalogMatch::InsufficientEvidence)
     }
 
+    fn resolve_icon(&mut self, identity: ProcessApplicationIdentity) -> ProcessApplicationIdentity {
+        let Some(token) = identity.icon_token.as_deref() else {
+            return identity.with_icon_resolution(None, Some(ProcessMetadataFailure::NotFound));
+        };
+        // Test/embedded catalogs may provide parsed entries without any XDG
+        // data roots. There is no icon source to classify in that state, so
+        // preserve the matched identity without inventing a dependency
+        // failure. A real catalog always records its discovered roots during
+        // `refresh_if_due` before reaching this branch.
+        if self.icon_dirs.is_empty() {
+            return identity.with_icon_resolution(None, None);
+        }
+        if let Some(resolution) = self.icon_cache.get(token).cloned() {
+            return identity.with_icon_resolution(resolution.asset, resolution.failure);
+        }
+
+        let (asset, failure) = resolve_icon_asset_from_dirs(&self.icon_dirs, Some(token));
+        let resolution = CachedIconResolution {
+            asset: asset.clone(),
+            failure,
+        };
+        let bytes = asset.as_ref().map_or(0, |asset| asset.bytes.len());
+        let retain = bytes > 0
+            && bytes <= MAX_ICON_CACHE_BYTES
+            && self.icon_cache_bytes.saturating_add(bytes) <= MAX_ICON_CACHE_BYTES;
+        if retain {
+            self.icon_cache_bytes = self.icon_cache_bytes.saturating_add(bytes);
+            self.icon_cache.insert(token.to_owned(), resolution.clone());
+        }
+        if retain {
+            identity.with_icon_resolution(resolution.asset, resolution.failure)
+        } else {
+            // Do not attach an uncached large asset to the current process
+            // snapshot: doing so would defeat the catalog budget when many
+            // distinct desktop icons are observed in one refresh. The process
+            // identity remains valid and the UI uses its typed generic-icon
+            // fallback until the bounded cache has room again.
+            identity.with_icon_resolution(
+                None,
+                resolution
+                    .failure
+                    .or(Some(ProcessMetadataFailure::Unsupported)),
+            )
+        }
+    }
+
     fn refresh_if_due(&mut self, observed_at_ms: u64) {
         if !self.loaded_at_ms.is_none_or(|loaded_at| {
             observed_at_ms.saturating_sub(loaded_at)
@@ -217,18 +280,22 @@ impl ApplicationCatalog {
         }) {
             return;
         }
-        let (entries, failure) = load_catalog();
+        let data_dirs = application_dirs();
+        let (entries, failure) = load_catalog_from_dirs(&data_dirs);
         self.entries = entries;
         self.failure = failure;
+        self.icon_dirs = data_dirs;
+        self.icon_cache.clear();
+        self.icon_cache_bytes = 0;
         self.loaded_at_ms = Some(observed_at_ms);
     }
 }
 
 /// Retain an application observation only for the same nonzero start token.
-pub(super) fn retain_for_same_identity(
+pub(super) fn retain_for_same_identity<P: PreviousProcessView + ?Sized>(
     current: ProcessMetadataObservation<ProcessApplicationIdentity>,
     current_start_token: Option<u64>,
-    previous: Option<&ProcessItem>,
+    previous: Option<&P>,
 ) -> ProcessMetadataObservation<ProcessApplicationIdentity> {
     if current.availability()
         == ProcessMetadataAvailability::Unavailable(ProcessMetadataFailure::PidRace)
@@ -240,7 +307,7 @@ pub(super) fn retain_for_same_identity(
         return current;
     };
     if previous
-        .and_then(ProcessItem::current_start_token)
+        .and_then(PreviousProcessView::current_start_token)
         .is_some_and(|previous_start_token| previous_start_token == current_start_token)
     {
         current.retain_previous(

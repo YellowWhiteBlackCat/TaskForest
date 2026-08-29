@@ -446,9 +446,9 @@ async fn mc06_first_run_case_first_run_dialog_keeps_setup_actions_typed_and_fail
         view.first_run = FirstRunUiState {
             phase: FirstRunPhase::Available,
             info: Some(SetupScriptInfo {
-                path: std::path::PathBuf::from("/usr/share/taskmanager/setup/99-taskmanager.rules"),
-                run_command: "pkexec /usr/libexec/taskmanager-setup-helper install".into(),
-                revert_command: "pkexec /usr/libexec/taskmanager-setup-helper revert".into(),
+                path: std::path::PathBuf::from("/usr/share/taskforest/setup/99-taskforest.rules"),
+                run_command: "pkexec /usr/libexec/taskforest-setup-helper install".into(),
+                revert_command: "pkexec /usr/libexec/taskforest-setup-helper revert".into(),
             }),
             last_action: None,
         };

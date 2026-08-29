@@ -21,7 +21,10 @@ use taskmanager_platform_contract::{
 
 #[derive(Clone, Debug)]
 pub enum ProcessEvent {
-    Snapshot(Vec<ProcessItem>),
+    /// One immutable process snapshot shared by the shell fold, history sink,
+    /// and every frontend. Cloning a correlated event therefore only clones
+    /// the Arc handle, not every row and its histories.
+    Snapshot(Arc<Vec<ProcessItem>>),
     EndTaskCompleted(FrozenProcessIdentity),
     BatchCompleted(ProcessBatchResult),
     SignalCompleted {

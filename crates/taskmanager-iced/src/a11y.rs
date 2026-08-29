@@ -78,7 +78,7 @@ fn base_builder(shell: &ShellApp) -> SemanticSnapshotBuilder {
         .snapshot
         .as_ref()
         .and_then(|snapshot| snapshot.memory.current_total_bytes());
-    let processes = shell.projection().processes.as_deref().unwrap_or_default();
+    let processes = shell.projection().processes_slice();
     for (index, &raw_index) in shell
         .visible_process_indices()
         .iter()

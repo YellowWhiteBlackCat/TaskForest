@@ -11,7 +11,7 @@ use taskmanager_core::{
 use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, ProviderFailure};
 
 use crate::{
-    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_observation_lane,
+    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lazy_observation_lane,
 };
 
 type SensorExecutor = dyn FnMut(u64) -> Result<DeviceSourceSnapshot<SensorCenterSnapshot>, ProviderFailure>
@@ -81,7 +81,7 @@ pub fn spawn_sensor_lanes(
         observation: mut observe,
     } = executors;
 
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         observation,
         events,

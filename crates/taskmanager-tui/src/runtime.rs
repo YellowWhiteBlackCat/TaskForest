@@ -184,7 +184,7 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         taskmanager_shell::queue_effect(
             &mut app,
             platform,
-            PlatformEffect::Refresh(RefreshRequest::All),
+            PlatformEffect::Refresh(RefreshRequest::Dashboard),
         );
     }
     let capture_marker = std::env::var_os("TM_TUI_CAPTURE_MARKER_FILE");

@@ -223,8 +223,11 @@ mkdir -p -- "$DATA_DIR"
 STAGE="$(mktemp -d "$DATA_DIR/.taskforest-frontends.XXXXXX")"
 chmod 700 "$STAGE"
 
-write_desktop_with_exec "$GPUI_DESKTOP_SRC" "$GPUI_BIN" "$STAGE/gpui.desktop"
-write_desktop_with_exec "$ICED_DESKTOP_SRC" "$ICED_BIN" "$STAGE/iced.desktop"
+# Keep the two Linux desktop entries on the same low-fragmentation launch path
+# as the packaged entries. The environment is harmless on non-glibc Linux and
+# makes the normal user-facing launch independent of the inherited shell env.
+write_desktop_with_exec "$GPUI_DESKTOP_SRC" "env MALLOC_ARENA_MAX=1 $GPUI_BIN" "$STAGE/gpui.desktop"
+write_desktop_with_exec "$ICED_DESKTOP_SRC" "env MALLOC_ARENA_MAX=1 $ICED_BIN" "$STAGE/iced.desktop"
 install -m 0644 -- "$ICON_SRC" "$STAGE/taskforest-taskboard.svg"
 chmod 0644 "$STAGE/gpui.desktop" "$STAGE/iced.desktop"
 

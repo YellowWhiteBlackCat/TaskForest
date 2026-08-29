@@ -74,10 +74,9 @@ impl RootView {
         if !output.changes.processes {
             return;
         }
-        self.materialized.replace_processes(
-            self.projection().process_revision,
-            self.projection().processes.clone().unwrap_or_default(),
-        );
+        let processes = self.projection().processes.clone().unwrap_or_default();
+        self.materialized
+            .replace_processes(self.projection().process_revision, processes);
         // Token-aware reconcile (CORE-01): a pid reused by a new process
         // drops instead of retargeting.
         let snapshot: &[taskmanager_core::core::process::ProcessItem] =

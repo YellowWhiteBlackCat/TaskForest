@@ -19,6 +19,19 @@ use pathfinder_geometry::{
 use smallvec::SmallVec;
 use std::{borrow::Cow, sync::Arc};
 
+/// A font database `Binary` source normally owns a `Vec<u8>`. The product
+/// fonts are already immutable `include_bytes!` data, so copying a large
+/// variable font into a second heap allocation only increases the process
+/// working set. This wrapper keeps the database's source contract while
+/// retaining the bytes in the executable's read-only image.
+struct StaticFontData(&'static [u8]);
+
+impl AsRef<[u8]> for StaticFontData {
+    fn as_ref(&self) -> &[u8] {
+        self.0
+    }
+}
+
 pub(crate) struct CosmicTextSystem(RwLock<CosmicTextSystemState>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -43,6 +56,10 @@ struct CosmicTextSystemState {
     /// for every font face in a family.
     font_ids_by_family_cache: HashMap<FontKey, SmallVec<[FontId; 4]>>,
 }
+
+const MAX_SWASH_IMAGE_ENTRIES: usize = 4_096;
+const MAX_SWASH_IMAGE_BYTES: usize = 8 * 1024 * 1024;
+const MAX_SWASH_OUTLINE_ENTRIES: usize = 2_048;
 
 struct LoadedFont {
     font: Arc<CosmicTextFont>,
@@ -190,13 +207,40 @@ impl CosmicTextSystemState {
         &self.loaded_fonts[font_id.0]
     }
 
+    /// `cosmic-text` intentionally exposes an unbounded HashMap cache. A
+    /// monitor can encounter a large number of glyph/scale combinations after
+    /// font changes or DPI cycling, so keep the cache a bounded performance
+    /// aid rather than a second lifetime-long memory owner. Clearing on the
+    /// next miss is simple and keeps the hot hit path free of per-entry LRU
+    /// bookkeeping.
+    fn trim_swatch_cache(&mut self) {
+        let image_bytes = self
+            .swash_cache
+            .image_cache
+            .values()
+            .flatten()
+            .fold(0usize, |total, image| {
+                total.saturating_add(image.data.len())
+            });
+        if self.swash_cache.image_cache.len() > MAX_SWASH_IMAGE_ENTRIES
+            || image_bytes > MAX_SWASH_IMAGE_BYTES
+        {
+            self.swash_cache.image_cache.clear();
+        }
+        if self.swash_cache.outline_command_cache.len() > MAX_SWASH_OUTLINE_ENTRIES {
+            self.swash_cache.outline_command_cache.clear();
+        }
+    }
+
     #[profiling::function]
     fn add_fonts(&mut self, fonts: Vec<Cow<'static, [u8]>>) -> Result<()> {
         let db = self.font_system.db_mut();
         for bytes in fonts {
             match bytes {
                 Cow::Borrowed(embedded_font) => {
-                    db.load_font_data(embedded_font.to_vec());
+                    db.load_font_source(cosmic_text::fontdb::Source::Binary(Arc::new(
+                        StaticFontData(embedded_font),
+                    )));
                 }
                 Cow::Owned(bytes) => {
                     db.load_font_data(bytes);
@@ -273,26 +317,28 @@ impl CosmicTextSystemState {
     }
 
     fn raster_bounds(&mut self, params: &RenderGlyphParams) -> Result<Bounds<DevicePixels>> {
-        let font = &self.loaded_fonts[params.font_id.0].font;
-        let subpixel_shift = point(
-            params.subpixel_variant.x as f32 / SUBPIXEL_VARIANTS_X as f32 / params.scale_factor,
-            params.subpixel_variant.y as f32 / SUBPIXEL_VARIANTS_Y as f32 / params.scale_factor,
-        );
-        let image = self
-            .swash_cache
-            .get_image(
-                &mut self.font_system,
-                CacheKey::new(
-                    font.id(),
-                    params.glyph_id.0 as u16,
-                    (params.font_size * params.scale_factor).into(),
-                    (subpixel_shift.x, subpixel_shift.y.trunc()),
-                    cosmic_text::CacheKeyFlags::empty(),
+        let image = {
+            let font = &self.loaded_fonts[params.font_id.0].font;
+            let subpixel_shift = point(
+                params.subpixel_variant.x as f32 / SUBPIXEL_VARIANTS_X as f32 / params.scale_factor,
+                params.subpixel_variant.y as f32 / SUBPIXEL_VARIANTS_Y as f32 / params.scale_factor,
+            );
+            self.swash_cache
+                .get_image(
+                    &mut self.font_system,
+                    CacheKey::new(
+                        font.id(),
+                        params.glyph_id.0 as u16,
+                        (params.font_size * params.scale_factor).into(),
+                        (subpixel_shift.x, subpixel_shift.y.trunc()),
+                        cosmic_text::CacheKeyFlags::empty(),
+                    )
+                    .0,
                 )
-                .0,
-            )
-            .clone()
-            .with_context(|| format!("no image for {params:?} in font {font:?}"))?;
+                .clone()
+                .with_context(|| format!("no image for {params:?} in font {font:?}"))
+        }?;
+        self.trim_swatch_cache();
         Ok(Bounds {
             origin: point(image.placement.left.into(), (-image.placement.top).into()),
             size: size(image.placement.width.into(), image.placement.height.into()),
@@ -309,26 +355,32 @@ impl CosmicTextSystemState {
             anyhow::bail!("glyph bounds are empty");
         } else {
             let bitmap_size = glyph_bounds.size;
-            let font = &self.loaded_fonts[params.font_id.0].font;
-            let subpixel_shift = point(
-                params.subpixel_variant.x as f32 / SUBPIXEL_VARIANTS_X as f32 / params.scale_factor,
-                params.subpixel_variant.y as f32 / SUBPIXEL_VARIANTS_Y as f32 / params.scale_factor,
-            );
-            let mut image = self
-                .swash_cache
-                .get_image(
-                    &mut self.font_system,
-                    CacheKey::new(
-                        font.id(),
-                        params.glyph_id.0 as u16,
-                        (params.font_size * params.scale_factor).into(),
-                        (subpixel_shift.x, subpixel_shift.y.trunc()),
-                        cosmic_text::CacheKeyFlags::empty(),
+            let mut image = {
+                let font = &self.loaded_fonts[params.font_id.0].font;
+                let subpixel_shift = point(
+                    params.subpixel_variant.x as f32
+                        / SUBPIXEL_VARIANTS_X as f32
+                        / params.scale_factor,
+                    params.subpixel_variant.y as f32
+                        / SUBPIXEL_VARIANTS_Y as f32
+                        / params.scale_factor,
+                );
+                self.swash_cache
+                    .get_image(
+                        &mut self.font_system,
+                        CacheKey::new(
+                            font.id(),
+                            params.glyph_id.0 as u16,
+                            (params.font_size * params.scale_factor).into(),
+                            (subpixel_shift.x, subpixel_shift.y.trunc()),
+                            cosmic_text::CacheKeyFlags::empty(),
+                        )
+                        .0,
                     )
-                    .0,
-                )
-                .clone()
-                .with_context(|| format!("no image for {params:?} in font {font:?}"))?;
+                    .clone()
+                    .with_context(|| format!("no image for {params:?} in font {font:?}"))
+            }?;
+            self.trim_swatch_cache();
 
             if params.is_emoji {
                 // Convert from RGBA to BGRA.

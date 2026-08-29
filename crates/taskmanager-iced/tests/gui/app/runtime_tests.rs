@@ -172,12 +172,12 @@ fn tick_drains_the_directly_owned_platform_before_view_local_finish() {
             sequence: taskmanager_platform_contract::EventSequence::new(1),
             observed_at_ms: 100,
             outcome: Ok(taskmanager_application::PlatformEvent::Processes(
-                taskmanager_application::ProcessEvent::Snapshot(vec![
+                taskmanager_application::ProcessEvent::Snapshot(std::sync::Arc::new(vec![
                     taskmanager_test_support::ProcessItemFixtureBuilder::new()
                         .pid(77)
                         .name("runtime-owned".into())
                         .build(),
-                ]),
+                ])),
             )),
         });
     let client =

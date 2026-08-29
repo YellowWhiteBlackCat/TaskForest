@@ -110,6 +110,7 @@ fn slow_storage_lane_does_not_block_cpu_completion() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_system_lanes(
@@ -241,6 +242,7 @@ fn container_lane_emits_snapshot_event_carrying_the_provider_rollup() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_system_lanes(

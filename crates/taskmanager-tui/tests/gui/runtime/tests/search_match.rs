@@ -26,7 +26,7 @@ fn search_matches_the_command_line() {
     let mut first = processes.first().expect("demo has processes").clone();
     first.cmdline = "/usr/bin/servicemanager --daemonize --config run.conf".to_owned();
     first.name = "smd".to_owned();
-    let mut updated = processes.clone();
+    let mut updated = processes.as_ref().clone();
     updated[0] = first;
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,

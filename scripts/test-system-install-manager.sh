@@ -118,8 +118,8 @@ case "$(uname -s)" in
     MINGW*|MSYS*|CYGWIN*) ;;
     *) [[ "$(stat -c %a "$OWNERSHIP_RECEIPT")" == "600" ]] ;;
 esac
-grep -Fx "Exec=$(realpath -e "$DEV_BIN/taskforest-g")" "$GPUI_DESKTOP" >/dev/null
-grep -Fx "Exec=$(realpath -e "$DEV_BIN/taskforest-i")" "$ICED_DESKTOP" >/dev/null
+grep -Fx "Exec=env MALLOC_ARENA_MAX=1 $(realpath -e "$DEV_BIN/taskforest-g")" "$GPUI_DESKTOP" >/dev/null
+grep -Fx "Exec=env MALLOC_ARENA_MAX=1 $(realpath -e "$DEV_BIN/taskforest-i")" "$ICED_DESKTOP" >/dev/null
 cmp -s "$HICOLOR_FIXTURE" "$HICOLOR_INDEX"
 grep -q '^kbuildsycoca6' "$CACHE_LOG"
 

@@ -36,7 +36,7 @@ fn process_batch(count: u32) -> PlatformEventBatch {
                 sequence: EventSequence::new(1),
                 observed_at_ms: 1_000,
             },
-            ProcessEvent::Snapshot(processes),
+            ProcessEvent::Snapshot(std::sync::Arc::new(processes)),
         )],
         ..PlatformEventBatch::default()
     }

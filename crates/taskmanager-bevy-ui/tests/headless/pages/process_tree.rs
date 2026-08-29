@@ -1,7 +1,11 @@
 use super::*;
 use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
 
-fn tokened(pid: u32, name: &str, parent: Option<u32>) -> taskmanager_core::core::process::ProcessItem {
+fn tokened(
+    pid: u32,
+    name: &str,
+    parent: Option<u32>,
+) -> taskmanager_core::core::process::ProcessItem {
     use taskmanager_core::core::metrics::ScalarObservation;
     use taskmanager_core::core::process::ProcessScalarObservations;
     let mut item = taskmanager_core::core::process::ProcessItem::new(pid, name);
@@ -12,20 +16,29 @@ fn tokened(pid: u32, name: &str, parent: Option<u32>) -> taskmanager_core::core:
     })
 }
 
-fn key_of(kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId, pid: u32) -> taskmanager_shell::ProcessRowId {
+fn key_of(
+    kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId,
+    pid: u32,
+) -> taskmanager_shell::ProcessRowId {
     taskmanager_shell::ProcessRowIdentity::from_parts(pid, u64::from(pid) * 10 + 1)
         .map(kind)
         .expect("non-zero parts")
 }
 
-
 fn application(pid: u32, parent_pid: Option<u32>, name: &str) -> ProcessItem {
+    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskmanager_core::core::process::ProcessScalarObservations;
+
     let identity =
         ProcessApplicationIdentity::new(format!("org.example.{name}"), name.to_owned(), None)
             .expect("fixture identity is non-empty");
     let mut item = ProcessItem::new(pid, name)
         .with_application_identity_observation(ProcessMetadataObservation::available(identity, 1));
     item.parent_pid = parent_pid;
+    item.apply_scalar_observations(ProcessScalarObservations {
+        start_token: ScalarObservation::available(u64::from(pid) * 10 + 1, 1),
+        ..ProcessScalarObservations::default()
+    });
     item
 }
 
@@ -74,13 +87,22 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
     let mut expansion = ProcessTreeExpansion::default();
     expansion.toggle_category(ProcessCategory::Application);
     let category_open = project_items(&items, &expansion);
-    assert_eq!(category_open[1].key, key_of(taskmanager_shell::ProcessRowId::Application, 10));
+    assert_eq!(
+        category_open[1].key,
+        key_of(taskmanager_shell::ProcessRowId::Application, 10)
+    );
     assert_eq!(category_open[1].member_count, 2);
 
     expansion.toggle_application(10);
     let tree_open = project_items(&items, &expansion);
-    assert_eq!(tree_open[2].key, key_of(taskmanager_shell::ProcessRowId::Process, 10));
-    assert_eq!(tree_open[3].key, key_of(taskmanager_shell::ProcessRowId::Process, 11));
+    assert_eq!(
+        tree_open[2].key,
+        key_of(taskmanager_shell::ProcessRowId::Process, 10)
+    );
+    assert_eq!(
+        tree_open[3].key,
+        key_of(taskmanager_shell::ProcessRowId::Process, 11)
+    );
     assert_eq!(tree_open[2].item.map(|item| item.pid), Some(10));
     assert_eq!(tree_open[1].item, None);
     assert_eq!(tree_open[2].depth, 2);

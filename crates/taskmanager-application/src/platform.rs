@@ -7,7 +7,7 @@
 mod client;
 pub use client::{
     AutomaticSchedule, AutomaticScheduleProfile, PlatformClient, automatic_cadence_ms,
-    automatic_schedules,
+    automatic_schedules, default_automatic_cadence_ms,
 };
 mod event_batch;
 pub use event_batch::*;

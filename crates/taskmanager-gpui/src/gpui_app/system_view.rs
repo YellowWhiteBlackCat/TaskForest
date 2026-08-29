@@ -6,6 +6,7 @@ use gpui::{
     App, ClipboardItem, Div, Entity, InteractiveElement, ParentElement, ScrollHandle,
     StatefulInteractiveElement, Styled, Window, div, px,
 };
+use std::sync::Arc;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
@@ -27,7 +28,7 @@ pub struct SystemViewData<'a> {
     /// Shared by refcount: the render rows borrow it and the export pill's
     /// `'static` closure captures a clone of the handle — no per-frame deep
     /// copy of the process table.
-    pub processes: std::rc::Rc<Vec<ProcessItem>>,
+    pub processes: Arc<Vec<ProcessItem>>,
     /// Per-window scroll handle for the sectioned spec cards, so the scroll
     /// position never crosses windows.
     pub scroll: &'a ScrollHandle,

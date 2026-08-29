@@ -113,11 +113,12 @@ impl RootView {
 
     pub fn replace_processes_for_test(&mut self, processes: Vec<ProcessItem>) {
         let revision = self.processes_generation().saturating_add(1);
-        self.materialized.replace_processes(revision, processes);
+        self.materialized
+            .replace_processes(revision, std::sync::Arc::new(processes));
     }
 
     pub fn processes_mut_for_test(&mut self) -> &mut Vec<ProcessItem> {
-        std::rc::Rc::make_mut(&mut self.materialized.processes.value)
+        std::sync::Arc::make_mut(&mut self.materialized.processes.value)
     }
 
     pub fn hardware_mut_for_test(&mut self) -> &mut HardwareInfo {

@@ -71,6 +71,7 @@ fn shared_integration_runtime_maps_command_completion_without_native_event_logic
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_integration_lanes(
@@ -129,6 +130,7 @@ fn optional_setup_script_lane_is_typed_and_does_not_change_complete_core_require
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_integration_lanes(

@@ -79,6 +79,7 @@ fn shared_storage_runtime_owns_filesystem_and_smart_request_event_policy() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_storage_lanes(

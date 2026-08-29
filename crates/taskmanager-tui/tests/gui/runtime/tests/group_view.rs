@@ -186,7 +186,9 @@ fn a_process_domain_change_prunes_stale_per_pid_tree_state() {
             sequence: EventSequence::new(1),
             observed_at_ms: 1,
         },
-        ProcessEvent::Snapshot(vec![trustworthy_process(1, "root", None)]),
+        ProcessEvent::Snapshot(std::sync::Arc::new(vec![trustworthy_process(
+            1, "root", None,
+        )])),
     ));
     app.apply_platform_batch(batch);
 
@@ -238,12 +240,12 @@ fn a_reused_pid_cannot_inherit_old_tree_expansion_state() {
             sequence: EventSequence::new(2),
             observed_at_ms: 2,
         },
-        ProcessEvent::Snapshot(vec![trustworthy_process_with_token(
+        ProcessEvent::Snapshot(std::sync::Arc::new(vec![trustworthy_process_with_token(
             7,
             "new-process",
             None,
             701,
-        )]),
+        )])),
     ));
     app.apply_platform_batch(batch);
 

@@ -307,8 +307,7 @@ fn rail_rows_project_every_visible_device_from_its_own_window() {
         shell: &shell,
         device_samples: None,
         cpu_samples: std::rc::Rc::from(
-            taskmanager_shell::presentation::trend::cpu_usage_percent(history)
-                .into_boxed_slice(),
+            taskmanager_shell::presentation::trend::cpu_usage_percent(history).into_boxed_slice(),
         ),
         memory_samples: std::rc::Rc::from(
             taskmanager_shell::presentation::trend::memory_usage_percent(history)

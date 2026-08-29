@@ -713,7 +713,7 @@ fn route<R: CapabilityRequest>(
             provider: provider.clone(),
             delivery,
             domain,
-            cadence_ms: automatic_cadence_ms(&R::CAPABILITY),
+            cadence_ms: default_automatic_cadence_ms(&R::CAPABILITY),
             sideband_policy: R::SIDEBAND_POLICY,
         },
         initial_status,
@@ -723,6 +723,6 @@ fn route<R: CapabilityRequest>(
 /// Product-owned automatic cadence defaults. Manual capabilities remain in
 /// the ECS catalog so their lifecycle is correlated, but they do not become
 /// background work merely because a provider exists.
-fn automatic_cadence_ms(capability: &CapabilityId) -> Option<u64> {
-    taskmanager_application::automatic_cadence_ms(capability)
+fn default_automatic_cadence_ms(capability: &CapabilityId) -> Option<u64> {
+    taskmanager_application::default_automatic_cadence_ms(capability)
 }

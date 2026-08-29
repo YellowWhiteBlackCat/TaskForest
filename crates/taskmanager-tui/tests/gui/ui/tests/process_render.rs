@@ -730,7 +730,13 @@ fn gray_zero_dims_measured_zeros_but_keeps_unavailable_dashes() {
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
     // Force every row to a measured zero CPU and memory so the first screen
     // (any sort order) carries a zeroed reading.
-    let mut processes = app.projection().processes.clone().expect("demo processes");
+    let mut processes = app
+        .projection()
+        .processes
+        .as_ref()
+        .expect("demo processes")
+        .as_ref()
+        .clone();
     for process in &mut processes {
         let mut observations = *process.scalar_observations();
         observations.cpu_percentage = ScalarObservation::available(0.0, 1);

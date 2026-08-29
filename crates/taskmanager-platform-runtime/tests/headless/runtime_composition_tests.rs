@@ -1,4 +1,6 @@
-use taskmanager_application::{DirectoryUsageRequest, automatic_schedules};
+use taskmanager_application::{
+    DirectoryUsageRequest, automatic_schedules, default_automatic_cadence_ms,
+};
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_platform_contract::CapabilityRequest;
 
@@ -257,8 +259,8 @@ fn complete_routes_are_total_and_catalog_attribution_is_unique() {
     for route in &routes {
         assert_eq!(
             route.cadence_ms,
-            automatic.get(&route.capability).copied(),
-            "route cadence must be derived from the closed application registry"
+            default_automatic_cadence_ms(&route.capability),
+            "route cadence must be derived from the dashboard application registry"
         );
     }
     for capability in automatic.keys() {

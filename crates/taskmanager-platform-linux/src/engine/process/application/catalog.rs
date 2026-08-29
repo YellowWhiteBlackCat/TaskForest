@@ -14,10 +14,6 @@ pub(super) struct ParsedDesktopEntry {
     pub(super) identity: ProcessApplicationIdentity,
 }
 
-pub(super) fn load_catalog() -> (Vec<CatalogEntry>, Option<ProcessMetadataFailure>) {
-    load_catalog_from_dirs(&application_dirs())
-}
-
 pub(super) fn load_catalog_from_dirs(
     data_dirs: &[PathBuf],
 ) -> (Vec<CatalogEntry>, Option<ProcessMetadataFailure>) {
@@ -87,15 +83,10 @@ pub(super) fn load_catalog_from_dirs(
             else {
                 continue;
             };
-            let (icon_asset, icon_failure) =
-                resolve_icon_asset_from_dirs(data_dirs, parsed.identity.icon_token.as_deref());
-            let identity = parsed
-                .identity
-                .with_icon_resolution(icon_asset, icon_failure);
-            let id = identity.launcher_id.clone();
+            let id = parsed.identity.launcher_id.clone();
             // XDG order gives the user's entry precedence.
             entries_by_id.entry(id).or_insert(CatalogEntry {
-                identity,
+                identity: parsed.identity,
                 executable,
                 exec_args: parsed.exec_args,
             });

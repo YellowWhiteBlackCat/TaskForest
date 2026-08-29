@@ -12,7 +12,7 @@ mod stats;
 // CPU-page-internal until a second surface genuinely shares its formats.
 pub(super) use details_panel::{heterogeneous_core_rows, sockets_row};
 
-use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div};
+use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
 use taskmanager_telemetry_store::TelemetryStore;
 
 use crate::gpui_app::formatting::{self, GraphUnit};
@@ -126,13 +126,36 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
     let core_series = core_history.refresh(telemetry);
     // The per-core matrix is the Full-inventory companion; an aggregate-only
     // budget keeps one readable headline chart.
+    //
+    // Vertical page policy: the matrix composes only when its summed row
+    // floors fit beneath the headline's floor — a band that cannot meet its
+    // minimums hides WHOLE and hands the viewport to the aggregate graph
+    // (never squeezed half-visible rows). `content_height == 0.0` is the
+    // legacy no-frame budget: fall back to the coarse inventory gate only.
+    let matrix_min_height = per_core_grid::min_height(&stats, hardware);
+    let matrix_fits = layout.content_height == 0.0
+        || layout.content_height >= CPU_VERTICAL_CHROME + HEADLINE_FLOOR + matrix_min_height;
     let below = match chart_layout {
         CpuChartLayout::AggregateOnly => None,
-        CpuChartLayout::AggregateWithPerCore => Some(
+        CpuChartLayout::AggregateWithPerCore if matrix_fits => Some(
             per_core_grid::render(theme, &stats, hardware, &core_series, graph_settings)
                 .into_any_element(),
         ),
+        CpuChartLayout::AggregateWithPerCore => None,
     };
+    // Headline-stays-small: while the matrix carries the page, the aggregate
+    // chart is capped — it is the clear-at-a-glance surface. When the matrix
+    // hides, the cap lifts and the headline fills the viewport.
+    let mut headline = ChartSpec::headline(
+        "cpu-headline-graph",
+        "cpu-headline-graph",
+        aggregate_series.usage,
+        theme.cpu,
+        GraphUnit::Percent,
+    );
+    if below.is_some() {
+        headline = headline.with_max_height(px(HEADLINE_CAP_WITH_MATRIX));
+    }
     perf_page(PerfPageProps {
         theme,
         stats_scroll,
@@ -140,13 +163,7 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
         subtitle: cpu_brand(cpu),
         vital_line: None,
         header_extra: Some(readout_band(theme, &stats).into_any_element()),
-        headline: HeadlineSurface::Charts(vec![ChartSpec::headline(
-            "cpu-headline-graph",
-            "cpu-headline-graph",
-            aggregate_series.usage,
-            theme.cpu,
-            GraphUnit::Percent,
-        )]),
+        headline: HeadlineSurface::Charts(vec![headline]),
         below,
         stats: details_panel::render_pinned(theme, snap, hardware, &stats.details),
         stats_footer: None,
@@ -156,6 +173,17 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
     })
 }
 
+/// Fixed vertical chrome above the chart area: the title row, the readout
+/// band, the headline's summary row, and the main-column gaps. Generous by
+/// a small margin — it only gates a whole-band hide, never a squeeze.
+const CPU_VERTICAL_CHROME: f32 = 150.0;
+/// The headline card's floor while the matrix is visible. Lower than the
+/// 180px solo tier floor: the aggregate graph is small by default and the
+/// matrix carries the page's information density.
+const HEADLINE_FLOOR: f32 = 140.0;
+/// The headline card's ceiling while the per-core matrix is visible.
+const HEADLINE_CAP_WITH_MATRIX: f32 = 240.0;
+
 fn cpu_brand(cpu: &CpuMetrics) -> String {
     cpu.brand
         .as_deref()
@@ -164,21 +192,12 @@ fn cpu_brand(cpu: &CpuMetrics) -> String {
         .map_or_else(formatting::missing_value, str::to_string)
 }
 
-/// The header band under the title row: the window qualifier caption plus
-/// the always-visible big-number readouts (utilization, frequency,
-/// temperature, power).
+/// The header band under the title row: the always-visible big-number
+/// readouts (utilization, frequency, temperature, power). No separate
+/// caption row — a full-width row for a caption starved the chart area, and
+/// the readouts' own labels already say what they measure.
 fn readout_band(theme: &Theme, stats: &CpuLiveStats) -> Div {
-    div()
-        .flex()
-        .flex_col()
-        .gap(tokens::SPACE_10)
-        .child(
-            div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
-                .child(i18n::t("cpu.utilization_over_60s")),
-        )
-        .child(readouts(theme, stats))
+    div().flex().flex_col().child(readouts(theme, stats))
 }
 
 fn readouts(theme: &Theme, stats: &CpuLiveStats) -> Div {
@@ -186,7 +205,10 @@ fn readouts(theme: &Theme, stats: &CpuLiveStats) -> Div {
         .debug_selector(|| "tm-cpu-readouts".to_string())
         .flex()
         .flex_wrap()
-        .items_baseline()
+        // Center, not baseline: gpui's baseline alignment through nested
+        // divs is unreliable with mixed font sizes, and the drifted label
+        // row was visibly uneven (labels sit one line-height low).
+        .items_center()
         .gap(tokens::SPACE_16)
         .child(readout(
             theme,
@@ -224,7 +246,7 @@ fn readouts(theme: &Theme, stats: &CpuLiveStats) -> Div {
 fn readout(theme: &Theme, label: &str, value: String, primary: bool) -> Div {
     div()
         .flex()
-        .items_baseline()
+        .items_center()
         .gap(tokens::SPACE_6)
         .child(
             div()

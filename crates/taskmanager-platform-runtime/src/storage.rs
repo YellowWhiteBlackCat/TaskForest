@@ -19,8 +19,8 @@ use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
 
 use crate::{
-    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_health_observation_lane,
-    spawn_observation_lane,
+    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError,
+    spawn_lazy_health_observation_lane, spawn_lazy_observation_lane,
 };
 
 mod directory_scan;
@@ -197,7 +197,7 @@ pub fn spawn_storage_lanes(
         directory_usage: execute_directory_usage,
     } = executors;
 
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         health,
         events.clone(),
@@ -209,7 +209,7 @@ pub fn spawn_storage_lanes(
     // generation-guarded state machine. Different disks coexist; an old poll
     // can never overwrite a restarted, canceled, removed, or expired job.
     let smart_state = Arc::new(SharedSmartRuntimeState::default());
-    spawn_health_observation_lane(workers, smart_observation, events.clone(), {
+    spawn_lazy_health_observation_lane(workers, smart_observation, events.clone(), {
         let smart_state = smart_state.clone();
         move |request| {
             smart_tracking::refresh(
@@ -220,7 +220,7 @@ pub fn spawn_storage_lanes(
             )
         }
     })?;
-    spawn_health_observation_lane(workers, smart_control, events.clone(), {
+    spawn_lazy_health_observation_lane(workers, smart_control, events.clone(), {
         let smart_state = smart_state.clone();
         move |request| {
             smart_tracking::control(

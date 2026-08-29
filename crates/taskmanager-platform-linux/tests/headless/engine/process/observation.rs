@@ -51,7 +51,7 @@ fn observe_with_fd_opt(
                 write_bytes: Ok(0),
             }),
         },
-        ProcessObservationContext {
+        ProcessObservationContext::<ProcessItem> {
             boot_time: &Ok(1_720_000_000),
             clock_ticks: &clock_ticks,
             observed_at_ms,
@@ -217,7 +217,7 @@ fn identity_race_invalidates_other_successful_proc_fields() {
                 write_bytes: Ok(20),
             }),
         },
-        ProcessObservationContext {
+        ProcessObservationContext::<ProcessItem> {
             boot_time: &Ok(1_720_000_000),
             clock_ticks: &Ok(100),
             observed_at_ms: 20,

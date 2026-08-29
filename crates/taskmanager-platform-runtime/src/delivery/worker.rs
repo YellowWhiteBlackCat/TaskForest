@@ -4,7 +4,7 @@
 //! Dropping that owner disconnects a shared shutdown channel, which wakes idle
 //! lanes immediately. A lane already blocked inside a provider can only stop
 //! after that provider returns; drop therefore never waits for an unfinished
-//! thread. Native providers remain responsible for bounding their OS I/O.
+//! thread. Native providers remain responsible for bounding their own OS I/O.
 
 use std::any::Any;
 use std::error;
@@ -15,16 +15,34 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
 
 use crossbeam_channel::{Receiver, Sender, TryRecvError, select};
-use taskmanager_application::PlatformEvent;
-use taskmanager_platform_contract::{ProviderFailure, RequestId};
+use taskmanager_platform_contract::ProviderFailure;
 
 use super::catalog::{ProviderPanicContext, ProviderPanicLedger};
 use super::publisher::RuntimeEventPublisher;
 use crate::channel::Queued;
-use crate::health::{CapabilityHealth, ObservationHealth};
+
+mod lanes;
+mod registry;
+
+pub use lanes::{
+    spawn_health_observation_lane, spawn_lane, spawn_observation_lane, spawn_typed_outcome_lane,
+};
+pub(crate) use lanes::{
+    spawn_lazy_health_observation_lane, spawn_lazy_lane, spawn_lazy_observation_lane,
+    spawn_lazy_typed_outcome_lane,
+};
+pub(crate) use registry::{LaneStartRegistry, recv_or_shutdown_with_idle, spawn_or_register_lane};
 
 /// Defensive ceiling for the standard runtime's independently blocking lanes.
 pub const DEFAULT_WORKER_LIMIT: usize = 64;
+
+/// Provider lanes are allowed to block independently, but their default
+/// stacks should not reserve the platform's large libc default for every
+/// short-lived adapter callback. The limit is deliberately conservative:
+/// providers still have a full MiB for native call frames, while the runtime
+/// avoids reserving several hundred MiB of virtual address space as routes
+/// grow.
+const DEFAULT_WORKER_STACK_SIZE: usize = 1024 * 1024;
 
 /// Process-wide ceiling retained by stuck, detached provider threads too.
 pub const PROCESS_WORKER_LIMIT: usize = 128;
@@ -80,6 +98,10 @@ pub enum WorkerSpawnError {
         kind: std::io::ErrorKind,
         message: String,
     },
+    /// The composition attempted to register two workers for one capability.
+    Registration { worker: String, message: String },
+    /// A lazy starter outlived the runtime owner that should execute it.
+    OwnerGone { worker: String },
 }
 
 impl fmt::Display for WorkerSpawnError {
@@ -101,6 +123,13 @@ impl fmt::Display for WorkerSpawnError {
                 formatter,
                 "operating system rejected worker for {worker} ({kind:?}): {message}"
             ),
+            Self::Registration { worker, message } => write!(
+                formatter,
+                "worker registration failed for {worker}: {message}"
+            ),
+            Self::OwnerGone { worker } => {
+                write!(formatter, "runtime owner gone before starting {worker}")
+            }
         }
     }
 }
@@ -119,6 +148,7 @@ pub struct WorkerRuntime {
     handles: Mutex<Vec<JoinHandle<()>>>,
     limit: usize,
     quota: Arc<WorkerQuota>,
+    lane_starters: OnceLock<Arc<registry::LaneStartRegistry>>,
 }
 
 impl Default for WorkerRuntime {
@@ -144,7 +174,20 @@ impl WorkerRuntime {
             handles: Mutex::new(Vec::new()),
             limit,
             quota,
+            lane_starters: OnceLock::new(),
         }
+    }
+
+    /// Install the shared lazy-lane registry before native assembly registers
+    /// any provider closure. The registry only keeps a weak reference back to
+    /// this owner, so dropping the last platform handle still shuts down the
+    /// runtime without a reference cycle.
+    pub(crate) fn install_lane_starters(&self, starters: Arc<registry::LaneStartRegistry>) {
+        let _ = self.lane_starters.set(starters);
+    }
+
+    fn lane_starters(&self) -> Option<Arc<registry::LaneStartRegistry>> {
+        self.lane_starters.get().cloned()
     }
 
     /// Number of workers successfully created for this runtime.
@@ -158,11 +201,6 @@ impl WorkerRuntime {
 
     /// Join and remove workers that have already returned without waiting on
     /// any provider that is still executing.
-    ///
-    /// `WorkerRuntime::spawn` performs the same reclamation inside its own
-    /// lock before every capacity check, so a lane whose thread died cannot
-    /// pin the runtime ceiling; this method remains for callers that want to
-    /// reclaim eagerly between spawns.
     pub fn reap_finished(&self) -> usize {
         let mut handles = self
             .handles
@@ -179,10 +217,6 @@ impl WorkerRuntime {
             .handles
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
-        // Reclaim lanes whose threads already exited before consulting the
-        // capacity bound: a dead lane's lingering JoinHandle must not keep
-        // occupying the runtime ceiling and turn every rebuild into a
-        // `Capacity` rejection.
         reap_finished_locked(&mut handles);
         if handles.len() >= self.limit {
             return Err(WorkerSpawnError::Capacity {
@@ -200,6 +234,7 @@ impl WorkerRuntime {
         let name = format!("taskforest-{worker}");
         let handle = thread::Builder::new()
             .name(name)
+            .stack_size(DEFAULT_WORKER_STACK_SIZE)
             .spawn(move || {
                 let _permit = permit;
                 run(shutdown);
@@ -276,11 +311,11 @@ pub(crate) fn recv_or_shutdown<R>(
 /// whether it returned from its loop, broke on a gone transport, or panicked
 /// outside the provider isolation boundary.
 pub(crate) struct LaneExitGuard {
-    exits: std::sync::Arc<std::sync::atomic::AtomicU64>,
+    exits: Arc<std::sync::atomic::AtomicU64>,
 }
 
 impl LaneExitGuard {
-    pub(crate) fn new(exits: std::sync::Arc<std::sync::atomic::AtomicU64>) -> Self {
+    pub(crate) fn new(exits: Arc<std::sync::atomic::AtomicU64>) -> Self {
         Self { exits }
     }
 }
@@ -293,14 +328,6 @@ impl Drop for LaneExitGuard {
 }
 
 /// Run a provider closure with panic isolation and bounded panic diagnostics.
-///
-/// Every lane — including the dedicated directory-scan driver — routes its
-/// provider call through this seam, so a provider panic degrades into one
-/// typed `ProviderFault` publication instead of killing the lane thread and
-/// stranding every later request on it as an unrecoverable stall. The panic
-/// payload is additionally downcast to text and retained, with the lane and
-/// request context, in `panic_notes`: the typed failure alone cannot say what
-/// the provider actually panicked on.
 pub(crate) fn execute_isolated<T, F>(
     panic_notes: &ProviderPanicLedger,
     context: ProviderPanicContext,
@@ -318,9 +345,6 @@ where
     }
 }
 
-/// Best-effort text of one panic payload: `panic!` with a literal or
-/// formatted message downcasts to `&str`/`String`; a `panic_any` payload of
-/// any other type gets the fixed placeholder instead of fabricated details.
 fn panic_payload_text(payload: &(dyn Any + Send)) -> String {
     if let Some(text) = payload.downcast_ref::<&str>() {
         (*text).to_owned()
@@ -331,7 +355,6 @@ fn panic_payload_text(payload: &(dyn Any + Send)) -> String {
     }
 }
 
-/// Lane/request context for one isolated call on a generic request lane.
 fn panic_context(lane: &str, queued: &Queued<impl Sized>) -> ProviderPanicContext {
     ProviderPanicContext {
         lane: lane.to_owned(),
@@ -340,193 +363,7 @@ fn panic_context(lane: &str, queued: &Queued<impl Sized>) -> ProviderPanicContex
     }
 }
 
-/// Attach one independently blocking provider closure to a bounded request lane.
-pub fn spawn_lane<R, F>(
-    workers: &WorkerRuntime,
-    receiver: Receiver<Queued<R>>,
-    publisher: Arc<RuntimeEventPublisher>,
-    mut execute: F,
-) -> Result<(), WorkerSpawnError>
-where
-    R: Send + 'static,
-    F: FnMut(R) -> Result<PlatformEvent, ProviderFailure> + Send + 'static,
-{
-    let lane_exits = publisher.lane_exit_counter();
-    let panic_notes = publisher.panic_ledger();
-    let lane = worker_name::<R>();
-    workers.spawn(lane.clone(), move |shutdown| {
-        let _lane_exit = LaneExitGuard::new(lane_exits);
-        while let Some(queued) = recv_or_shutdown(&receiver, &shutdown) {
-            let result = execute_isolated(&panic_notes, panic_context(&lane, &queued), || {
-                execute(queued.payload)
-            });
-            if shutdown_requested(&shutdown)
-                || publisher
-                    .publish(
-                        queued.request_id,
-                        queued.capability,
-                        queued.provider,
-                        result,
-                    )
-                    .is_stop()
-            {
-                break;
-            }
-        }
-    })
-}
-
-/// Attach a source-rich observation provider whose execution result and
-/// observation health are independent.
-pub fn spawn_health_observation_lane<R, F>(
-    workers: &WorkerRuntime,
-    receiver: Receiver<Queued<R>>,
-    publisher: Arc<RuntimeEventPublisher>,
-    mut execute: F,
-) -> Result<(), WorkerSpawnError>
-where
-    R: Send + 'static,
-    F: FnMut(R) -> Result<(PlatformEvent, CapabilityHealth), ProviderFailure> + Send + 'static,
-{
-    let lane_exits = publisher.lane_exit_counter();
-    let panic_notes = publisher.panic_ledger();
-    let lane = worker_name::<R>();
-    workers.spawn(lane.clone(), move |shutdown| {
-        let _lane_exit = LaneExitGuard::new(lane_exits);
-        while let Some(queued) = recv_or_shutdown(&receiver, &shutdown) {
-            let publication = execute_isolated(&panic_notes, panic_context(&lane, &queued), || {
-                execute(queued.payload)
-            });
-            if shutdown_requested(&shutdown) {
-                break;
-            }
-            let published = match publication {
-                Ok((event, health)) => publisher.publish_health(
-                    queued.request_id,
-                    queued.capability,
-                    queued.provider,
-                    event,
-                    health,
-                ),
-                Err(failure) => publisher.publish(
-                    queued.request_id,
-                    queued.capability,
-                    queued.provider,
-                    Err(failure),
-                ),
-            };
-            if published.is_stop() {
-                break;
-            }
-        }
-    })
-}
-
-/// Attach a typed observation provider whose health is derived from the exact
-/// snapshot mapped into the published domain event.
-pub fn spawn_observation_lane<R, S, F, M>(
-    workers: &WorkerRuntime,
-    receiver: Receiver<Queued<R>>,
-    publisher: Arc<RuntimeEventPublisher>,
-    mut observe: F,
-    map_event: M,
-) -> Result<(), WorkerSpawnError>
-where
-    R: Send + 'static,
-    S: ObservationHealth + Send + 'static,
-    F: FnMut(R) -> Result<S, ProviderFailure> + Send + 'static,
-    M: Fn(S) -> PlatformEvent + Send + 'static,
-{
-    let lane_exits = publisher.lane_exit_counter();
-    let panic_notes = publisher.panic_ledger();
-    let lane = worker_name::<R>();
-    workers.spawn(lane.clone(), move |shutdown| {
-        let _lane_exit = LaneExitGuard::new(lane_exits);
-        while let Some(queued) = recv_or_shutdown(&receiver, &shutdown) {
-            // The observation health and the event mapping run inside the same
-            // isolation boundary as the observation itself: they are pure
-            // projections of the snapshot, and a panic in either must degrade
-            // to one typed failure rather than escaping the lane thread.
-            let publication = execute_isolated(&panic_notes, panic_context(&lane, &queued), || {
-                let snapshot = observe(queued.payload)?;
-                let health = snapshot.observation_health();
-                let event = map_event(snapshot);
-                Ok((event, health))
-            });
-            if shutdown_requested(&shutdown) {
-                break;
-            }
-            let published = match publication {
-                Ok((event, health)) => publisher.publish_health(
-                    queued.request_id,
-                    queued.capability,
-                    queued.provider,
-                    event,
-                    health,
-                ),
-                Err(failure) => publisher.publish(
-                    queued.request_id,
-                    queued.capability,
-                    queued.provider,
-                    Err(failure),
-                ),
-            };
-            if published.is_stop() {
-                break;
-            }
-        }
-    })
-}
-
-/// Attach a provider closure whose domain event carries its own typed outcome.
-pub fn spawn_typed_outcome_lane<R, F>(
-    workers: &WorkerRuntime,
-    receiver: Receiver<Queued<R>>,
-    publisher: Arc<RuntimeEventPublisher>,
-    mut execute: F,
-) -> Result<(), WorkerSpawnError>
-where
-    R: Send + 'static,
-    F: FnMut(RequestId, R) -> (PlatformEvent, Result<(), ProviderFailure>) + Send + 'static,
-{
-    let lane_exits = publisher.lane_exit_counter();
-    let panic_notes = publisher.panic_ledger();
-    let lane = worker_name::<R>();
-    workers.spawn(lane.clone(), move |shutdown| {
-        let _lane_exit = LaneExitGuard::new(lane_exits);
-        while let Some(queued) = recv_or_shutdown(&receiver, &shutdown) {
-            // Same isolation seam and panic-note semantics as every other
-            // lane; the provider result tuple is only wrapped in `Ok` so the
-            // typed outcome survives unchanged when the call does not panic.
-            let publication = execute_isolated(&panic_notes, panic_context(&lane, &queued), || {
-                Ok(execute(queued.request_id, queued.payload))
-            });
-            if shutdown_requested(&shutdown) {
-                break;
-            }
-            let published = match publication {
-                Ok((event, provider_result)) => publisher.publish_typed_outcome(
-                    queued.request_id,
-                    queued.capability,
-                    queued.provider,
-                    event,
-                    provider_result,
-                ),
-                Err(failure) => publisher.publish(
-                    queued.request_id,
-                    queued.capability,
-                    queued.provider,
-                    Err(failure),
-                ),
-            };
-            if published.is_stop() {
-                break;
-            }
-        }
-    })
-}
-
-fn worker_name<R>() -> String {
+pub(super) fn worker_name<R>() -> String {
     std::any::type_name::<R>()
         .rsplit("::")
         .next()

@@ -50,6 +50,8 @@ pub(crate) const SUBPIXEL_VARIANTS_Y: u8 =
         SUBPIXEL_VARIANTS_X
     };
 
+const MAX_RASTER_BOUNDS_ENTRIES: usize = 16_384;
+
 /// The GPUI text rendering sub system.
 pub struct TextSystem {
     platform_text_system: Arc<dyn PlatformTextSystem>,
@@ -313,6 +315,9 @@ impl TextSystem {
         } else {
             let mut raster_bounds = RwLockUpgradableReadGuard::upgrade(raster_bounds);
             let bounds = self.platform_text_system.glyph_raster_bounds(params)?;
+            if raster_bounds.len() >= MAX_RASTER_BOUNDS_ENTRIES {
+                raster_bounds.clear();
+            }
             raster_bounds.insert(params.clone(), bounds);
             Ok(bounds)
         }

@@ -1,5 +1,7 @@
 //! Renderer-independent shell state and shared-command adapter (ADR-027).
 
+use std::sync::Arc;
+
 use taskmanager_application::{
     AlertCenter, AlertEvaluation, AppAction, AppPage, AppState, CommandContext, CommandScope,
     ConfirmationKind, ContainerRollupEvent, DesktopNotificationRequest,
@@ -110,7 +112,8 @@ pub struct SystemProjectionStore {
     /// Source truth paired with the latest hardware inventory snapshot, or
     /// the typed failure that left the last usable value in place.
     pub hardware_source: Option<Vec<SourceStatus>>,
-    pub processes: Option<Vec<ProcessItem>>,
+    /// One immutable process snapshot shared by all frontend adapters.
+    pub processes: Option<Arc<Vec<ProcessItem>>>,
     pub services: Option<Vec<ServiceItem>>,
     pub startup_entries: Option<Vec<StartupEntry>>,
     pub sessions: Option<Vec<SessionItem>>,
@@ -242,6 +245,15 @@ impl SystemProjectionStore {
     #[must_use]
     pub const fn process_projection_generation(&self) -> ProcessProjectionGeneration {
         ProcessProjectionGeneration::new(self.process_revision)
+    }
+
+    /// Borrow the canonical immutable process snapshot without exposing the
+    /// Arc wrapper to renderer code. All frontends read this same allocation.
+    #[must_use]
+    pub fn processes_slice(&self) -> &[ProcessItem] {
+        self.processes
+            .as_ref()
+            .map_or(&[][..], |processes| processes.as_slice())
     }
 
     #[must_use]
@@ -380,7 +392,7 @@ impl ShellApp {
     pub(crate) fn seed_fixture_projection(&mut self, seed: crate::fixture::ProjectionSeed) {
         self.data.snapshot = seed.snapshot;
         self.data.hardware = seed.hardware;
-        self.data.processes = seed.processes;
+        self.data.processes = seed.processes.map(Arc::new);
         self.data.services = seed.services;
         self.data.startup_entries = seed.startup_entries;
         self.data.sessions = seed.sessions;
@@ -406,7 +418,7 @@ impl ShellApp {
                 self.data.system_revision = self.data.system_revision.saturating_add(1);
             }
             ProjectionSeedFact::Processes(value) => {
-                self.data.processes = value;
+                self.data.processes = value.map(Arc::new);
                 self.data.process_revision = self.data.process_revision.saturating_add(1);
             }
             ProjectionSeedFact::Services(value) => {
@@ -472,7 +484,9 @@ impl ShellApp {
         &mut self,
         edit: impl FnOnce(&mut Option<Vec<ProcessItem>>),
     ) {
-        edit(&mut self.data.processes);
+        let mut processes = self.data.processes.as_deref().map(ToOwned::to_owned);
+        edit(&mut processes);
+        self.data.processes = processes.map(Arc::new);
         self.data.process_revision = self.data.process_revision.saturating_add(1);
         self.data.refresh_count = self.data.refresh_count.saturating_add(1);
     }
@@ -643,7 +657,7 @@ impl ShellApp {
     #[must_use]
     pub fn visible_processes(&self) -> Vec<&ProcessItem> {
         let rows = self.visible_processes_indices();
-        let processes = self.data.processes.as_deref().unwrap_or_default();
+        let processes = self.data.processes_slice();
         rows.iter().map(|&index| &processes[index]).collect()
     }
 
@@ -677,7 +691,7 @@ impl ShellApp {
         // borrower (the filter/sort closures never re-enter), so the plain
         // borrow cannot conflict — mirrors the iced `ProjectionMemo` pattern.
         let mut memo = self.visible_processes_memo.borrow_mut();
-        let source_len = self.data.processes.as_ref().map_or(0, Vec::len);
+        let source_len = self.data.processes_slice().len();
         if let Some(cache) = memo.as_ref()
             && cache.process_revision == self.data.process_revision
             && cache.source_len == source_len
@@ -690,8 +704,8 @@ impl ShellApp {
         let mut indices: Vec<usize> = self
             .data
             .processes
-            .as_deref()
-            .unwrap_or_default()
+            .as_ref()
+            .map_or(&[][..], |processes| processes.as_slice())
             .iter()
             .enumerate()
             .filter(|(_, process)| {
@@ -700,7 +714,7 @@ impl ShellApp {
             })
             .map(|(index, _)| index)
             .collect();
-        let processes = self.data.processes.as_deref().unwrap_or_default();
+        let processes = self.data.processes_slice();
         indices.sort_by(|&left, &right| {
             let (column, direction) = self.process_sort;
             let left_item = &processes[left];
@@ -734,7 +748,7 @@ impl ShellApp {
         // positional fallback applies only when no semantic row is set.
         match self.selected_row {
             Some(ProcessRowId::Process(identity)) => {
-                let processes = self.data.processes.as_deref().unwrap_or_default();
+                let processes = self.data.processes_slice();
                 processes
                     .iter()
                     .find(|process| {

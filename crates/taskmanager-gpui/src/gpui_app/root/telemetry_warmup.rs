@@ -16,7 +16,7 @@ use super::RootView;
 /// These phases never replace the shared TelemetryFrameState and never
 /// claim that a provider failed. They only decide when the startup surface
 /// should explain that waiting is taking longer than expected and offer the
-/// same typed `RefreshRequest::All` retry used by the normal shell.
+/// same typed `RefreshRequest::Dashboard` retry used by the normal shell.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) enum TelemetryWarmupPhase {
     #[default]
@@ -60,13 +60,13 @@ impl RootView {
         telemetry_warmup_phase(self.telemetry_warmup_started_at.elapsed())
     }
 
-    /// Re-submit the full initial collection request and restart the UI
+    /// Re-submit the dashboard collection request and restart the UI
     /// watchdog. The shared projection remains authoritative; a retry never
     /// clears a committed snapshot or invents a new frame state.
     pub(crate) fn retry_telemetry_warmup(&mut self, cx: &mut Context<Self>) {
         self.telemetry_warmup_started_at = Instant::now();
         self.telemetry_warmup_retry_button = None;
-        self.request_refresh(RefreshRequest::All);
+        self.request_refresh(RefreshRequest::Dashboard);
         cx.notify();
     }
 }

@@ -1,8 +1,9 @@
 //! Read-only persistent-history composition for product frontends.
 
 use std::fmt;
-use std::sync::Arc;
 use std::sync::mpsc::{Receiver, SyncSender, TrySendError, sync_channel};
+use std::sync::{Arc, Mutex, OnceLock};
+use std::thread::JoinHandle;
 
 use super::{HistoryPersistenceWriter, HistoryReplayClient, NativeAppHost};
 
@@ -126,9 +127,91 @@ impl From<HistoryFrontendStartErrorKind>
 /// preference at runtime. Filesystem bootstrap and replay startup stay on this
 /// worker; both capabilities stop with the owning frontend process.
 pub struct HistoryFrontendConnector {
-    requests: SyncSender<HistoryFrontendConnectRequest>,
+    inner: Arc<HistoryFrontendRuntimeInner>,
     completions: Receiver<HistoryFrontendConnectCompletion>,
     next_request: Option<u64>,
+}
+
+struct HistoryFrontendRuntimeInner {
+    requests: SyncSender<HistoryFrontendConnectRequest>,
+    start_receiver: Mutex<Option<Receiver<HistoryFrontendConnectRequest>>>,
+    completion_tx: SyncSender<HistoryFrontendConnectCompletion>,
+    host: NativeAppHost,
+    start_result: OnceLock<Result<(), Arc<str>>>,
+    join: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl HistoryFrontendRuntimeInner {
+    fn ensure_started(&self) -> Result<(), Arc<str>> {
+        let result = self.start_result.get_or_init(|| {
+            let Some(request_rx) = self
+                .start_receiver
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take()
+            else {
+                return Err(Arc::from(
+                    "history frontend worker start state was consumed",
+                ));
+            };
+            let host = self.host.clone();
+            let completion_tx = self.completion_tx.clone();
+            let join = std::thread::Builder::new()
+                .name("taskforest-history-frontend".to_owned())
+                .stack_size(1024 * 1024)
+                .spawn(move || {
+                    while let Ok(request) = request_rx.recv() {
+                        // Per-request isolation with an honest exit: a fault
+                        // resolves the submitted request with a typed startup
+                        // failure and then stops this connector worker.
+                        let (result, faulted) =
+                            match catch_worker_panic(|| host.connect_enabled_history()) {
+                                Ok(result) => (result, false),
+                                Err(detail) => (
+                                    Err(HistoryFrontendStartError {
+                                        kind: HistoryFrontendStartErrorKind::PersistenceWriter,
+                                        detail,
+                                    }),
+                                    true,
+                                ),
+                            };
+                        let completion = HistoryFrontendConnectCompletion {
+                            request: request.id,
+                            result,
+                        };
+                        if completion_tx.send(completion).is_err() || faulted {
+                            break;
+                        }
+                    }
+                })
+                .map_err(|error| Arc::<str>::from(error.to_string()));
+            match join {
+                Ok(join) => {
+                    *self
+                        .join
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(join);
+                    Ok(())
+                }
+                Err(error) => Err(error),
+            }
+        });
+        result.clone()
+    }
+}
+
+impl Drop for HistoryFrontendRuntimeInner {
+    fn drop(&mut self) {
+        // Dropping the last request sender disconnects the receiver. Join only
+        // when the worker has already observed that disconnect; a provider
+        // bootstrap must never make frontend teardown block indefinitely.
+        let join = self.join.get_mut().ok().and_then(Option::take);
+        if let Some(join) = join
+            && join.is_finished()
+        {
+            let _ = join.join();
+        }
+    }
 }
 
 impl HistoryFrontendConnector {
@@ -138,10 +221,13 @@ impl HistoryFrontendConnector {
         let Some(next_request) = self.next_request else {
             return Err(HistoryFrontendConnectSubmitError::RequestSpaceExhausted);
         };
+        if self.inner.ensure_started().is_err() {
+            return Err(HistoryFrontendConnectSubmitError::WorkerStopped);
+        }
         let request = HistoryFrontendConnectRequest {
             id: HistoryFrontendConnectRequestId(next_request),
         };
-        match self.requests.try_send(request) {
+        match self.inner.requests.try_send(request) {
             Ok(()) => {
                 self.next_request = next_request.checked_add(1);
                 Ok(request.id)
@@ -172,48 +258,16 @@ impl NativeAppHost {
     ) -> Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError> {
         let (request_tx, request_rx) = sync_channel::<HistoryFrontendConnectRequest>(4);
         let (completion_tx, completion_rx) = sync_channel::<HistoryFrontendConnectCompletion>(2);
-        let host = self.clone();
-        std::thread::Builder::new()
-            .name("taskforest-history-frontend".to_owned())
-            .spawn(move || {
-                while let Ok(request) = request_rx.recv() {
-                    // Per-request isolation with an honest exit: composition
-                    // panics resolve the submitted request with a typed
-                    // startup failure instead of leaving the frontend waiting
-                    // forever, and the connector then stops. `request_rx`
-                    // drops with the thread, so later `try_connect` observes
-                    // the typed `WorkerStopped` disconnect rather than a
-                    // silent zombie lane. The fault maps to the broadest
-                    // existing start kind; the bounded detail carries the
-                    // isolated-panic fact.
-                    let (result, faulted) =
-                        match catch_worker_panic(|| host.connect_enabled_history()) {
-                            Ok(result) => (result, false),
-                            Err(detail) => (
-                                Err(HistoryFrontendStartError {
-                                    kind: HistoryFrontendStartErrorKind::PersistenceWriter,
-                                    detail,
-                                }),
-                                true,
-                            ),
-                        };
-                    let completion = HistoryFrontendConnectCompletion {
-                        request: request.id,
-                        result,
-                    };
-                    if completion_tx.send(completion).is_err() {
-                        break;
-                    }
-                    if faulted {
-                        break;
-                    }
-                }
-            })
-            .map_err(|error| HistoryFrontendConnectorStartError {
-                detail: Arc::from(error.to_string()),
-            })?;
-        Ok(HistoryFrontendConnector {
+        let inner = Arc::new(HistoryFrontendRuntimeInner {
             requests: request_tx,
+            start_receiver: Mutex::new(Some(request_rx)),
+            completion_tx,
+            host: self.clone(),
+            start_result: OnceLock::new(),
+            join: Mutex::new(None),
+        });
+        Ok(HistoryFrontendConnector {
+            inner,
             completions: completion_rx,
             next_request: Some(1),
         })

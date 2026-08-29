@@ -445,11 +445,13 @@ fn polkit_gate_probe_unwired_features_defer_to_requires_escalation() {
 // --- polkit .policy.in is well-formed and complete ------------------------
 
 /// Locate the polkit policy template relative to this crate. It lives at the
-/// repository root (`polkit/com.taskforest.perf-helper.policy.in`); from this
-/// crate that is `../../polkit/...`.
+/// repository root
+/// (`polkit/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy.in`);
+/// from this crate that is `../../polkit/...`.
 fn policy_in_path() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../polkit/com.taskforest.perf-helper.policy.in")
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../polkit/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy.in",
+    )
 }
 
 #[test]
@@ -466,11 +468,11 @@ fn polkit_policy_template_is_well_formed_and_complete() {
     for fragment in [
         "<?xml version=\"1.0\"",
         "<policyconfig>",
-        "<action id=\"com.taskforest.perf-helper\">",
+        "<action id=\"io.github.YellowWhiteBlackCat.TaskForest.perf-helper\">",
         "<description>",
         "<message>",
         "auth_admin_keep",
-        "/usr/libexec/taskmanager-privilege-helper",
+        "/usr/libexec/taskforest-privilege-helper",
         "</policyconfig>",
     ] {
         assert!(
@@ -504,8 +506,9 @@ fn polkit_policy_template_is_well_formed_and_complete() {
 #[cfg(target_os = "linux")]
 #[test]
 fn net_launcher_policy_template_is_well_formed_and_complete() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../polkit/com.taskforest.net-launcher.policy.in");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../polkit/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy.in",
+    );
     let content = std::fs::read_to_string(&path).unwrap_or_else(|error| {
         panic!(
             "net-launcher policy template should be readable at {}: {error}",
@@ -517,11 +520,11 @@ fn net_launcher_policy_template_is_well_formed_and_complete() {
     for fragment in [
         "<?xml version=\"1.0\"",
         "<policyconfig>",
-        "<action id=\"com.taskforest.net-launcher\">",
+        "<action id=\"io.github.YellowWhiteBlackCat.TaskForest.net-launcher\">",
         "<description>",
         "<message>",
         "auth_admin_keep",
-        "/usr/libexec/taskmanager-net-launcher",
+        "/usr/libexec/taskforest-net-launcher",
         "</policyconfig>",
     ] {
         assert!(
@@ -531,7 +534,7 @@ fn net_launcher_policy_template_is_well_formed_and_complete() {
     }
     assert_eq!(
         net_launcher::NET_LAUNCHER_PATH,
-        "/usr/libexec/taskmanager-net-launcher",
+        "/usr/libexec/taskforest-net-launcher",
         "NET_LAUNCHER_PATH must match the policy's exec.path annotation"
     );
 }
@@ -539,8 +542,9 @@ fn net_launcher_policy_template_is_well_formed_and_complete() {
 #[cfg(target_os = "linux")]
 #[test]
 fn process_control_policy_template_matches_the_fixed_helper_path() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../polkit/com.taskforest.process-control.policy.in");
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../polkit/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy.in",
+    );
     let content = std::fs::read_to_string(&path).unwrap_or_else(|error| {
         panic!(
             "process-control policy template should be readable at {}: {error}",
@@ -550,9 +554,9 @@ fn process_control_policy_template_matches_the_fixed_helper_path() {
     for fragment in [
         "<?xml version=\"1.0\"",
         "<policyconfig>",
-        "<action id=\"com.taskforest.process-control\">",
+        "<action id=\"io.github.YellowWhiteBlackCat.TaskForest.process-control\">",
         "auth_admin_keep",
-        "/usr/lib/taskforest-process-control-helper",
+        "/usr/libexec/taskforest-process-control-helper",
         "</policyconfig>",
     ] {
         assert!(
@@ -562,7 +566,7 @@ fn process_control_policy_template_matches_the_fixed_helper_path() {
     }
     assert_eq!(
         process_control::PROCESS_CONTROL_HELPER_PATH,
-        "/usr/lib/taskforest-process-control-helper",
+        "/usr/libexec/taskforest-process-control-helper",
         "process-control helper path must match the policy annotation"
     );
 }

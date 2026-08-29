@@ -260,9 +260,9 @@ impl DirectTrackState {
             return;
         };
         for correlated in &output.process_events {
-            let taskmanager_application::ProcessEvent::Snapshot(processes) = &correlated.event
-            else {
-                continue;
+            let processes = match &correlated.event {
+                taskmanager_application::ProcessEvent::Snapshot(processes) => processes,
+                _ => continue,
             };
             let _ = recorder.record_process_snapshot(
                 processes,

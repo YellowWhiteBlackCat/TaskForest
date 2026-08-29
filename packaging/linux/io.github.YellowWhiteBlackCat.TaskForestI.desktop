@@ -6,7 +6,9 @@ GenericName=System Monitor (Iced)
 GenericName[zh_CN]=系统监视器（Iced）
 Comment=Eye-friendly native system monitor powered by Iced
 Comment[zh_CN]=基于 Iced 的护眼原生系统监视器
-Exec=taskforest-i
+# Keep glibc's allocator arena count bounded for the multi-threaded provider
+# runtime. This is a process-memory policy shared by the Linux UI packages.
+Exec=env MALLOC_ARENA_MAX=1 taskforest-i
 Icon=taskforest-taskboard
 Terminal=false
 Categories=System;Monitor;

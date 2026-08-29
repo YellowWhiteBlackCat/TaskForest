@@ -8,7 +8,11 @@ description = "OS-neutral bounded capability runtime for TaskForest native adapt
 
 [dependencies]
 bevy_app = { version = "0.19", default-features = false, features = ["std"] }
-bevy_ecs = { version = "0.19", default-features = false, features = ["std", "multi_threaded"] }
+# The runtime owns one scheduler and its systems are explicitly chained. The
+# multi-threaded ECS executor otherwise initializes a full compute pool for a
+# handful of short bookkeeping systems; use Bevy's single-threaded executor
+# and keep concurrency in the typed provider lanes below.
+bevy_ecs = { version = "0.19", default-features = false, features = ["std"] }
 crossbeam-channel = "0.5"
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-core = { path = "../taskmanager-core" }

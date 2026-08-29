@@ -19,8 +19,8 @@ use taskmanager_platform_contract::{
 };
 
 use crate::{
-    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_observation_lane,
-    spawn_typed_outcome_lane,
+    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lazy_observation_lane,
+    spawn_lazy_typed_outcome_lane,
 };
 
 type InventoryExecutor =
@@ -176,26 +176,26 @@ pub fn spawn_service_lanes(
         log_stream: mut execute_log_stream,
     } = executors;
 
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         inventory,
         events.clone(),
         move |ServiceInventoryRequest::Refresh| execute_inventory(),
         |snapshot| PlatformEvent::Services(ServiceEvent::Snapshot(snapshot)),
     )?;
-    spawn_typed_outcome_lane(
+    spawn_lazy_typed_outcome_lane(
         workers,
         dependencies,
         events.clone(),
         move |request_id, request| dependency_event(request_id, request, &mut execute_dependencies),
     )?;
-    spawn_typed_outcome_lane(workers, control, events.clone(), move |_, request| {
+    spawn_lazy_typed_outcome_lane(workers, control, events.clone(), move |_, request| {
         control_event(request, &mut execute_control)
     })?;
-    spawn_typed_outcome_lane(workers, log_snapshot, events.clone(), move |_, request| {
+    spawn_lazy_typed_outcome_lane(workers, log_snapshot, events.clone(), move |_, request| {
         log_snapshot_event(request, &mut execute_log_snapshot)
     })?;
-    spawn_typed_outcome_lane(workers, log_stream, events, move |request_id, request| {
+    spawn_lazy_typed_outcome_lane(workers, log_stream, events, move |request_id, request| {
         log_stream_event(request_id, request, &mut execute_log_stream, clock_ms())
     })
 }

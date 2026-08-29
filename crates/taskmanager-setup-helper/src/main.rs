@@ -33,8 +33,8 @@ use std::thread;
 #[cfg(unix)]
 use std::time::{Duration, Instant};
 
-const RULE_PATH: &str = "/etc/udev/rules.d/99-taskmanager.rules";
-const RULE_CONTENT: &str = include_str!("../../../packaging/linux/99-taskmanager.rules");
+const RULE_PATH: &str = "/etc/udev/rules.d/99-taskforest.rules";
+const RULE_CONTENT: &str = include_str!("../../../packaging/linux/99-taskforest.rules");
 const EXIT_INVALID_ARGUMENT: u8 = 64;
 const EXIT_MISSING_DEPENDENCY: u8 = 69;
 const EXIT_IO: u8 = 74;

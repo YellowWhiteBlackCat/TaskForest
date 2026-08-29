@@ -3,6 +3,7 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::bounded;
+use taskmanager_application::HardwareInventoryRequest;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_platform_contract::{
@@ -12,7 +13,9 @@ use taskmanager_platform_contract::{
 use super::fixture;
 use crate::Queued;
 use crate::delivery::RuntimeCapabilityCatalog;
-use crate::delivery::worker::{PROCESS_WORKER_LIMIT, WorkerQuota, WorkerRuntime, WorkerSpawnError};
+use crate::delivery::worker::{
+    LaneStartRegistry, PROCESS_WORKER_LIMIT, WorkerQuota, WorkerRuntime, WorkerSpawnError,
+};
 
 struct WorkerExitSignal(crossbeam_channel::Sender<()>);
 
@@ -20,6 +23,29 @@ impl Drop for WorkerExitSignal {
     fn drop(&mut self) {
         let _ = self.0.send(());
     }
+}
+
+#[test]
+fn lazy_lane_stays_dormant_until_its_first_typed_request() {
+    let quota = Arc::new(WorkerQuota::new(1));
+    let workers = Arc::new(WorkerRuntime::with_quota(1, quota));
+    let starters = Arc::new(LaneStartRegistry::default());
+    starters.bind_worker(&workers);
+    workers.install_lane_starters(starters.clone());
+    let (publisher, _, observation_rx, _) = fixture();
+    let (_request_tx, request_rx) = bounded::<Queued<HardwareInventoryRequest>>(1);
+
+    crate::delivery::worker::spawn_lazy_lane(&workers, request_rx, publisher, |_| {
+        Err(ProviderFailure::Unsupported)
+    })
+    .expect("lazy lane registers without starting a thread");
+    assert_eq!(workers.worker_count(), 0);
+
+    starters
+        .ensure_started(&CapabilityId::HARDWARE_INVENTORY)
+        .expect("first typed request can start the registered lane");
+    assert_eq!(workers.worker_count(), 1);
+    assert!(observation_rx.try_recv().is_err());
 }
 
 #[test]

@@ -1,4 +1,10 @@
 //! Fixed per-core utilization matrix renderer.
+//!
+//! Vertical contract (page policy, ADR-039): every core cell keeps the
+//! `ROW_HEIGHT` floor — rows NEVER shrink. The matrix either fits under the
+//! numeric check in `cpu_view` (which composes it) or hides whole, handing
+//! the viewport to the aggregate chart; a squeezed half-visible row is the
+//! one outcome this module refuses to paint.
 
 use std::rc::Rc;
 
@@ -13,6 +19,49 @@ use super::per_core::PerCoreSeries;
 use super::stats::CpuLiveStats;
 use taskmanager_theme::tokens;
 
+/// One per-core sparkline row's floor. A row may grow when the page has
+/// surplus height, but never compresses below this — unsatisfiable budgets
+/// hide the matrix instead (see `min_height` / the cpu_view fit check).
+pub(super) const ROW_HEIGHT: f32 = 40.0;
+/// A class caption ("P-cores 4") above its rows.
+const SECTION_LABEL_HEIGHT: f32 = 16.0;
+/// Vertical gap between row-class sections (tokens::SPACE_10).
+const SECTION_GAP: f32 = 10.0;
+/// Gap between a class caption and its rows, and between rows.
+const INNER_GAP: f32 = 4.0;
+
+/// The matrix's summed minimum height for this topology: the number the
+/// cpu_view fit check compares against the viewport's remaining height. Rows
+/// are fixed-floor, so this is exact (no text measurement involved).
+pub(super) fn min_height(stats: &CpuLiveStats, hardware: &HardwareInfo) -> f32 {
+    let core_count = stats.cores.len().max(1);
+    let mut sections = 0.0_f32;
+    let mut total = 0.0_f32;
+    for core_type in [
+        CpuType::Performance,
+        CpuType::Efficient,
+        CpuType::LowPower,
+        CpuType::Unknown,
+    ] {
+        let indices: Vec<usize> = (0..core_count)
+            .filter(|&index| {
+                hardware.cpu_types.get(index).copied().unwrap_or_default() == core_type
+            })
+            .collect();
+        if indices.is_empty() {
+            continue;
+        }
+        let columns = compute_column_count(indices.len()).max(1);
+        let row_count = indices.len().div_ceil(columns) as f32;
+        total += SECTION_LABEL_HEIGHT
+            + INNER_GAP
+            + row_count * ROW_HEIGHT
+            + (row_count - 1.0).max(0.0) * INNER_GAP;
+        sections += 1.0;
+    }
+    total + (sections - 1.0).max(0.0) * SECTION_GAP
+}
+
 pub(super) fn render(
     theme: &Theme,
     stats: &CpuLiveStats,
@@ -25,7 +74,11 @@ pub(super) fn render(
         .debug_selector(|| "tm-cpu-per-core-matrix".to_string())
         .flex()
         .flex_col()
-        .flex_1()
+        // Grow with page surplus (sparkline rows get taller), but NEVER
+        // shrink: a squeezed row reads as a broken page. The cpu_view fit
+        // check hides the whole matrix when the floor cannot be met.
+        .flex_grow()
+        .flex_shrink_0()
         .min_h(px(0.0))
         .gap(tokens::SPACE_10)
         .w_full();
@@ -54,7 +107,8 @@ pub(super) fn render(
         let mut section = div()
             .flex()
             .flex_col()
-            .flex_1()
+            .flex_grow()
+            .flex_shrink_0()
             .min_h(px(0.0))
             .gap(tokens::SPACE_4)
             .w_full()
@@ -81,15 +135,15 @@ pub(super) fn render(
             .flex_col()
             .flex_1()
             .min_h(px(0.0))
-            .gap(tokens::SPACE_5)
+            .gap(px(INNER_GAP))
             .w_full();
         for row_index in 0..row_count {
             let mut row = div()
                 .flex()
-                .h(px(56.0))
-                .flex_shrink()
-                .min_h(px(0.0))
-                .gap(tokens::SPACE_5)
+                .h(px(ROW_HEIGHT))
+                .flex_grow()
+                .flex_shrink_0()
+                .gap(px(INNER_GAP))
                 .w_full();
             for column_index in 0..columns {
                 let position = row_index * columns + column_index;

@@ -12,6 +12,7 @@ use taskmanager_application::PlatformHandle;
 use taskmanager_platform_contract::CapabilityId;
 
 use crate::channel::{ChannelRuntime, RuntimeLanes};
+use crate::delivery::LaneStartRegistry;
 use crate::delivery::RuntimeEventPublisher;
 use crate::environment::EnvironmentRuntimeLanes;
 use crate::integration::IntegrationRuntimeLanes;
@@ -207,6 +208,7 @@ pub struct CompleteChannelRuntime {
     pub handle: PlatformHandle,
     pub publisher: Arc<RuntimeEventPublisher>,
     pub lanes: CompleteRuntimeLanes,
+    pub(crate) lane_starters: Arc<LaneStartRegistry>,
 }
 
 impl ChannelRuntime {
@@ -216,6 +218,7 @@ impl ChannelRuntime {
         let Self {
             handle,
             publisher,
+            lane_starters,
             lanes,
         } = self;
         let lanes = lanes.try_complete()?;
@@ -223,6 +226,7 @@ impl ChannelRuntime {
             handle,
             publisher,
             lanes,
+            lane_starters,
         })
     }
 }

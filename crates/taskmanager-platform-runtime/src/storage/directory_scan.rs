@@ -29,7 +29,7 @@ use taskmanager_platform_contract::{CapabilityId, ProviderFailure, RequestId};
 use crate::channel::Queued;
 use crate::delivery::{
     LaneExitGuard, LaneFlow, ProviderPanicContext, RuntimeEventPublisher, execute_isolated,
-    recv_or_shutdown, shutdown_requested,
+    recv_or_shutdown_with_idle, shutdown_requested, spawn_or_register_lane,
 };
 use crate::health::CapabilityHealth;
 use crate::{WorkerRuntime, WorkerSpawnError};
@@ -62,7 +62,7 @@ pub fn spawn_directory_usage_lane<F>(
     workers: &WorkerRuntime,
     receiver: Receiver<Queued<DirectoryUsageRequest>>,
     publisher: Arc<RuntimeEventPublisher>,
-    mut scan: F,
+    scan: F,
     clock_ms: fn() -> u64,
 ) -> Result<(), WorkerSpawnError>
 where
@@ -74,45 +74,54 @@ where
         + Send
         + 'static,
 {
-    let lane_exits = publisher.lane_exit_counter();
-    workers.spawn(CapabilityId::DIRECTORY_USAGE.to_string(), move |shutdown| {
-        let _lane_exit = LaneExitGuard::new(lane_exits);
-        let mut carry: VecDeque<Queued<DirectoryUsageRequest>> = VecDeque::new();
-        loop {
-            let queued = match carry.pop_front() {
-                Some(queued) => queued,
-                None => match recv_or_shutdown(&receiver, &shutdown) {
+    spawn_or_register_lane(
+        workers,
+        Some(CapabilityId::DIRECTORY_USAGE),
+        receiver,
+        publisher,
+        scan,
+        move |receiver, scan, publisher, shutdown, idle_timeout| {
+            let _lane_exit = LaneExitGuard::new(publisher.lane_exit_counter());
+            let mut carry: VecDeque<Queued<DirectoryUsageRequest>> = VecDeque::new();
+            loop {
+                let queued = match carry.pop_front() {
                     Some(queued) => queued,
-                    None => break,
-                },
-            };
-            match queued.payload {
-                DirectoryUsageRequest::StartScan(spec) => {
-                    drive_scan(
-                        DirectoryScanContext {
-                            receiver: &receiver,
-                            shutdown: &shutdown,
-                            carry: &mut carry,
-                            publisher: publisher.as_ref(),
-                            scan: &mut scan,
-                            clock_ms,
-                        },
-                        DirectoryScanJob {
-                            request_id: queued.request_id,
-                            capability: queued.capability,
-                            provider: queued.provider,
-                            spec,
-                        },
-                        MAX_SCAN_BUDGET,
-                    );
-                }
-                DirectoryUsageRequest::Cancel(_scan_id) => {
-                    // No active scan to cancel: an idempotent no-op by
-                    // contract (documented on the request type).
+                    None => match recv_or_shutdown_with_idle(&receiver, &shutdown, idle_timeout) {
+                        Some(queued) => queued,
+                        None => break,
+                    },
+                };
+                match queued.payload {
+                    DirectoryUsageRequest::StartScan(spec) => {
+                        let mut scan = scan
+                            .lock()
+                            .unwrap_or_else(std::sync::PoisonError::into_inner);
+                        drive_scan(
+                            DirectoryScanContext {
+                                receiver: &receiver,
+                                shutdown: &shutdown,
+                                carry: &mut carry,
+                                publisher: publisher.as_ref(),
+                                scan: &mut *scan,
+                                clock_ms,
+                            },
+                            DirectoryScanJob {
+                                request_id: queued.request_id,
+                                capability: queued.capability,
+                                provider: queued.provider,
+                                spec,
+                            },
+                            MAX_SCAN_BUDGET,
+                        );
+                    }
+                    DirectoryUsageRequest::Cancel(_scan_id) => {
+                        // No active scan to cancel: an idempotent no-op by
+                        // contract (documented on the request type).
+                    }
                 }
             }
-        }
-    })
+        },
+    )
 }
 
 /// Drive one scan to its terminal state on the lane thread.

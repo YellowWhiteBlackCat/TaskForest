@@ -133,6 +133,7 @@ fn apply_root_startup_config(
         view.page,
         has_explicit_page_override,
     );
+    view.request_page_data(view.page);
     if view.capture_evidence.apps_zero_gray_enabled() {
         view.page = TopPage::Apps;
         view.set_gray_zero_values(true, cx);
@@ -485,7 +486,7 @@ pub fn init<E>(
         font_availability,
         local_time_rules,
     };
-    let _ = platform.request_refresh(RefreshRequest::All, platform_submission_time_ms());
+    let _ = platform.request_refresh(RefreshRequest::Dashboard, platform_submission_time_ms());
     let surface_role = crate::window_presentation::surface_role(&presentation);
     let window_result = cx.open_window(options, move |window, cx| {
         // gpui 0.2.2 forwards `TitlebarOptions::title` when constructing its

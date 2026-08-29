@@ -43,6 +43,7 @@ enum ScheduledCapability {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum AutomaticScheduleProfile {
     #[default]
+    Dashboard,
     FullProduct,
     ContinuousHistory,
 }
@@ -112,6 +113,15 @@ impl ScheduledCapability {
 
     const fn enabled_in(self, profile: AutomaticScheduleProfile) -> bool {
         match profile {
+            AutomaticScheduleProfile::Dashboard => matches!(
+                self,
+                Self::System(_)
+                    | Self::Processes
+                    | Self::StorageHealth
+                    | Self::Smart
+                    | Self::Sensors
+                    | Self::PowerSupplies
+            ),
             AutomaticScheduleProfile::FullProduct => true,
             AutomaticScheduleProfile::ContinuousHistory => matches!(
                 self,
@@ -145,6 +155,17 @@ pub fn automatic_schedules() -> impl ExactSizeIterator<Item = AutomaticSchedule>
 #[must_use]
 pub fn automatic_cadence_ms(capability: &CapabilityId) -> Option<u64> {
     ScheduledCapability::from_capability(capability).map(ScheduledCapability::cadence_ms)
+}
+
+/// Default startup cadence for the visible dashboard. The complete product
+/// schedule remains available through [`AutomaticScheduleProfile::FullProduct`]
+/// but detail-page capabilities do not become background work merely because a
+/// provider is installed.
+#[must_use]
+pub fn default_automatic_cadence_ms(capability: &CapabilityId) -> Option<u64> {
+    ScheduledCapability::from_capability(capability)
+        .filter(|scheduled| scheduled.enabled_in(AutomaticScheduleProfile::Dashboard))
+        .map(ScheduledCapability::cadence_ms)
 }
 
 impl PlatformClient {

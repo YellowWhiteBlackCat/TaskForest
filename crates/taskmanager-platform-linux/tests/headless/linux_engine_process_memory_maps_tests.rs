@@ -22,11 +22,11 @@ fn maps_parser_keeps_file_mappings_and_skips_pseudo_or_deleted_entries() {
         mappings,
         vec![
             FileMapping {
-                path: "/usr/bin/app".to_owned(),
+                path: "/usr/bin/app".to_owned().into(),
                 size_bytes: 4096,
             },
             FileMapping {
-                path: "/usr/lib/lib with spaces.so".to_owned(),
+                path: "/usr/lib/lib with spaces.so".to_owned().into(),
                 size_bytes: 4096,
             },
         ]
@@ -36,7 +36,7 @@ fn maps_parser_keeps_file_mappings_and_skips_pseudo_or_deleted_entries() {
 #[test]
 fn hybrid_pss_divides_file_rss_by_weighted_share_and_keeps_private_memory() {
     let mapping = FileMapping {
-        path: "/usr/lib/libshared.so".to_owned(),
+        path: "/usr/lib/libshared.so".to_owned().into(),
         size_bytes: 4096,
     };
     let mappings = vec![mapping.clone(), mapping];
@@ -49,7 +49,7 @@ fn hybrid_pss_divides_file_rss_by_weighted_share_and_keeps_private_memory() {
 
 #[test]
 fn hybrid_pss_does_not_need_maps_when_file_rss_is_zero() {
-    let shares = HashMap::new();
+    let shares: HashMap<String, u32> = HashMap::new();
     assert_eq!(hybrid_pss(status(60, 0, 40), &[], &shares), Ok(100));
     assert_eq!(
         hybrid_pss(status(60, 600, 40), &[], &shares),

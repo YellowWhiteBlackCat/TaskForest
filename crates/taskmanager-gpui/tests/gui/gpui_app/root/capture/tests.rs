@@ -304,15 +304,15 @@ fn first_run_capture_waits_for_live_data_and_uses_fixed_fixture_values() {
     let info = CaptureEvidence::first_run_fixture_info();
     assert_eq!(
         info.path,
-        std::path::Path::new("/usr/share/taskmanager/setup/99-taskmanager.rules")
+        std::path::Path::new("/usr/share/taskforest/setup/99-taskforest.rules")
     );
     assert_eq!(
         info.run_command,
-        "pkexec /usr/libexec/taskmanager-setup-helper install"
+        "pkexec /usr/libexec/taskforest-setup-helper install"
     );
     assert_eq!(
         info.revert_command,
-        "pkexec /usr/libexec/taskmanager-setup-helper revert"
+        "pkexec /usr/libexec/taskforest-setup-helper revert"
     );
 
     evidence.mark_first_run_ready(false);

@@ -31,8 +31,8 @@ use crate::gpui_app::perf_views::{
     graph_summary_row, network_badge_format,
 };
 use crate::gpui_app::root::responsive::{
-    PERFORMANCE_STATS_MAX_WIDTH, PerformanceDetailsPresentation, PerformancePageBudget,
-    PerformanceVerticalRunway,
+    PERFORMANCE_STATS_MAX_WIDTH, PERFORMANCE_STATS_MIN_WIDTH, PerformanceDetailsPresentation,
+    PerformancePageBudget, PerformanceVerticalRunway,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -112,6 +112,11 @@ pub(crate) struct ChartSpec<'a> {
     max: f32,
     series: ChartSeries<'a>,
     tier: ChartTier,
+    /// Optional ceiling for a headline card, used when the page's companion
+    /// band is visible: the aggregate chart is "small by default" while the
+    /// per-core matrix carries the page, and fills the viewport when the
+    /// matrix hides.
+    max_height: Option<Pixels>,
 }
 
 /// A two-direction headline series (read/write, rx/tx): the directions share
@@ -143,6 +148,7 @@ impl<'a> ChartSpec<'a> {
             max: 100.0,
             series: ChartSeries::Single { samples },
             tier: ChartTier::Headline,
+            max_height: None,
         }
     }
 
@@ -176,6 +182,7 @@ impl<'a> ChartSpec<'a> {
                 secondary_label,
             },
             tier: ChartTier::Headline,
+            max_height: None,
         }
     }
 
@@ -197,6 +204,7 @@ impl<'a> ChartSpec<'a> {
             max: 100.0,
             series: ChartSeries::Single { samples },
             tier: ChartTier::Secondary,
+            max_height: None,
         }
     }
 
@@ -209,6 +217,13 @@ impl<'a> ChartSpec<'a> {
     /// Attach a headline caption (memory "Swap", GPU primary engine name).
     pub(crate) fn with_title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
+        self
+    }
+
+    /// Cap the headline card's height (headline-stays-small contract: see
+    /// [`ChartSpec::max_height`]).
+    pub(crate) fn with_max_height(mut self, max_height: Pixels) -> Self {
+        self.max_height = Some(max_height);
         self
     }
 
@@ -297,7 +312,19 @@ pub(crate) fn render_chart(
         // contract the flex boundary. Without it, the parent can allocate a
         // zero-height section while the card keeps its 180px minimum, causing
         // the below band to be positioned on top of the card at compact sizes.
-        ChartTier::Headline => section.flex_auto().flex_shrink_0(),
+        //
+        // A CAPPED headline (companion-band mode) must YIELD, not hold: when
+        // the viewport runs short, the section shrinks so the card descends
+        // toward its companion floor and the fixed-floor rows below are
+        // never clipped by the viewport. The cap→floor span is the safety
+        // margin that absorbs fit-estimate error.
+        ChartTier::Headline => match spec.max_height {
+            // Companion mode: the section NEVER grows — a grown section
+            // around a capped card would pile dead space under the card.
+            // It only shrinks, yielding the card toward its companion floor.
+            Some(_) => section.flex_shrink(),
+            None => section.flex_auto().flex_shrink_0(),
+        },
         ChartTier::Secondary => section.flex_auto().min_h(spec.tier.min_height()),
     };
     if let Some(title) = spec.title.as_deref() {
@@ -308,7 +335,6 @@ pub(crate) fn render_chart(
                 .child(title.to_owned()),
         );
     }
-    let summary;
     match spec.series {
         ChartSeries::Single { samples } => {
             let samples = limited_window(settings, samples);
@@ -323,9 +349,15 @@ pub(crate) fn render_chart(
                 hover_slot.clone(),
             );
             let card = elements::graph_card_with_state(theme, graph, &samples);
-            let card = apply_tier_to_card(card, spec.tier);
+            let card = apply_tier_to_card(card, spec.tier, spec.max_height);
+            let card = match summary_row
+                .filter(|_| vertical.carries_core_stack())
+                .map(|row| summary_overlay(theme, row))
+            {
+                Some(overlay) => card.child(tag_summary(overlay, spec.id.clone())),
+                None => card,
+            };
             section = section.child(tag_card(card, spec.id.clone()));
-            summary = summary_row;
         }
         ChartSeries::Dual {
             aggregate,
@@ -355,7 +387,14 @@ pub(crate) fn render_chart(
                 hover_slot.clone(),
             );
             let card = elements::graph_card_with_dual_state(theme, graph, &primary, &secondary);
-            let card = apply_tier_to_card(card, spec.tier);
+            let card = apply_tier_to_card(card, spec.tier, spec.max_height);
+            let card = match summary_row
+                .filter(|_| vertical.carries_core_stack())
+                .map(|row| summary_overlay(theme, row))
+            {
+                Some(overlay) => card.child(tag_summary(overlay, spec.id.clone())),
+                None => card,
+            };
             section = section
                 .gap(tokens::SPACE_4)
                 .child(elements::graph_legend(
@@ -372,11 +411,7 @@ pub(crate) fn render_chart(
                     ],
                 ))
                 .child(tag_card(card, spec.id.clone()));
-            summary = summary_row;
         }
-    }
-    if let Some(summary_row) = summary.filter(|_| vertical.carries_core_stack()) {
-        section = section.child(tag_summary(summary_row, spec.id.clone()));
     }
     #[cfg(any(test, feature = "test-support"))]
     {
@@ -393,11 +428,39 @@ pub(crate) fn render_chart(
     section
 }
 
-/// Chain the tier's growth/floor contract onto a rendered card, then (in test
-/// support) tag the summary row that follows the card.
-fn apply_tier_to_card(card: Div, tier: ChartTier) -> Div {
+/// The chart's latest/avg/peak readout as an overlay pinned to the card's
+/// TOP-LEFT corner (the value badge owns the top-right): a full-width row
+/// under the card spent vertical space the charts need. The pill background
+/// keeps the numbers readable over the grid lines.
+fn summary_overlay(theme: &Theme, row: Div) -> Div {
+    div().absolute().top(px(6.0)).left(px(8.0)).child(
+        row.rounded(tokens::control_radius(theme))
+            .bg(theme.card_surface().with_alpha(0.85))
+            .px(tokens::SPACE_8)
+            .py(tokens::SPACE_2),
+    )
+}
+
+/// Chain the tier's growth/floor contract onto a rendered card.
+/// A capped headline is a headline sharing the viewport with its page's
+/// companion band (the CPU per-core matrix): its floor drops accordingly.
+const HEADLINE_COMPANION_FLOOR: f32 = 140.0;
+
+fn apply_tier_to_card(card: Div, tier: ChartTier, max_height: Option<Pixels>) -> Div {
     match tier {
-        ChartTier::Headline => card.flex_1().min_h(tier.min_height()).w_full(),
+        ChartTier::Headline => {
+            let card = card.w_full();
+            match max_height {
+                // Companion mode: fixed companion height, shrinkable to the
+                // companion floor under viewport pressure. Never grows — the
+                // matrix below owns the surplus.
+                Some(max_height) => card
+                    .h(max_height)
+                    .min_h(px(HEADLINE_COMPANION_FLOOR))
+                    .flex_shrink(),
+                None => card.flex_1().min_h(tier.min_height()),
+            }
+        }
         ChartTier::Secondary => card
             .flex_auto()
             .min_w(px(0.0))
@@ -406,8 +469,8 @@ fn apply_tier_to_card(card: Div, tier: ChartTier) -> Div {
     }
 }
 
-/// Tag the chart's latest/avg/peak summary row with its per-chart identity
-/// (test-support only).
+/// Tag the chart's latest/avg/peak summary overlay with its per-chart
+/// identity (test-support only).
 #[cfg(any(test, feature = "test-support"))]
 fn tag_summary(summary: Div, id: ElementId) -> Div {
     summary.debug_selector(move || format!("tm-perf-chart-summary:{id}"))
@@ -511,15 +574,25 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
     // The vital line is the page's undroppable one-line fact: unlike the
     // header band it renders at EVERY rung, so even the Floor composition
     // (title + headline) still answers "how full / how fast / how healthy".
+    //
+    // The truncating text MUST live inside a flex-row wrapper (the title
+    // row's proven pattern). `truncate()` applied to a bare flex-column
+    // child poisons gpui's nowrap text measure: the first measure pass
+    // caches a truncated width and the line paints as a bare "…" at every
+    // window size (width-independent, seen on the 720x760 and 1920x1080
+    // niri captures).
     if let Some(vital) = vital_line {
         let line = div()
-            .text_size(tokens::FONT_13)
-            .text_color(theme.fg_dim)
             .w_full()
             .min_w(px(0.0))
             .flex_shrink_0()
-            .truncate()
-            .child(vital);
+            .flex()
+            .flex_row()
+            .child(
+                elements::truncated_text(&vital)
+                    .text_size(tokens::FONT_13)
+                    .text_color(theme.fg_dim),
+            );
         #[cfg(any(test, feature = "test-support"))]
         let line = line.debug_selector(|| "tm-perf-vital-line".to_string());
         main_body = main_body.child(line);
@@ -676,9 +749,17 @@ fn performance_stats_surface(
     // pinned stats column must clear that growth contract before its
     // explicit width is applied; otherwise Taffy can split the available
     // row between the graph and stats column and leave unused space.
+    //
+    // `min_w` is the ELEMENT-level floor of the stats rail: the budget's
+    // 236px is an input, this floor is the contract. If a caller ever hands
+    // the split a width below `PERFORMANCE_STATS_MIN_WIDTH`, the rail still
+    // refuses to compress into an unreadable sliver — the width ladder
+    // (Pinned → Stacked → Hidden) is the sanctioned degradation, never
+    // flex squeeze.
     .flex_none()
     .flex_basis(width)
     .w(width)
+    .min_w(px(PERFORMANCE_STATS_MIN_WIDTH))
     .h_full()
     // The split is one continuous workspace. A real divider plus padding on
     // the stats surface replaces a transparent parent gap that exposed the

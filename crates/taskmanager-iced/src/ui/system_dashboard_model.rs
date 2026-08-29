@@ -37,7 +37,10 @@ pub(crate) fn summary_model(projection: &SystemProjectionStore) -> DashboardSumm
                 || missing_value().to_owned(),
                 |value| format!("{value:.1}%"),
             ),
-        processes: projection.processes.as_ref().map(Vec::len),
+        processes: projection
+            .processes
+            .as_ref()
+            .map(|processes| processes.len()),
         active_alerts: projection.alert_active.len(),
     }
 }

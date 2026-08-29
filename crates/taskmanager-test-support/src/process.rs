@@ -295,8 +295,9 @@ impl<MetadataStage> ProcessItemFixtureBuilder<NamedOverrides, MetadataStage> {
     /// closed on such rows; tests asserting that rule build them this way.
     #[must_use]
     pub fn without_current_start_token(mut self) -> Self {
-        self.scalars.start_token =
-            ScalarObservation::unavailable(taskmanager_core::core::failure::FailureKind::Unsupported);
+        self.scalars.start_token = ScalarObservation::unavailable(
+            taskmanager_core::core::failure::FailureKind::Unsupported,
+        );
         self
     }
 

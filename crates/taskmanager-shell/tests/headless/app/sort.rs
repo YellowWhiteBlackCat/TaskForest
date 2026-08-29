@@ -71,7 +71,7 @@ fn pss_and_swap_sort_use_typed_current_values_without_rss_fallbacks() {
     high_observations.swap_bytes = ScalarObservation::available(8, 1);
     high.apply_scalar_observations(high_observations);
 
-    app.data.processes = Some(vec![low, high]);
+    app.data.processes = Some(vec![low, high].into());
     app.process_sort = (SortCol::Pss, SortDir::Desc);
     assert_eq!(app.visible_processes()[0].pid, 20);
 
@@ -110,7 +110,7 @@ fn advanced_sort_columns_use_typed_current_values_and_skip_the_display_cycle() {
         ..Default::default()
     });
 
-    app.data.processes = Some(vec![low, high.clone()]);
+    app.data.processes = Some(vec![low, high.clone()].into());
 
     for (column, label) in [
         (SortCol::Threads, "Threads"),
@@ -149,7 +149,7 @@ fn advanced_sort_columns_use_typed_current_values_and_skip_the_display_cycle() {
         start_token: ScalarObservation::available(3, 1),
         ..Default::default()
     });
-    app.data.processes = Some(vec![missing, high]);
+    app.data.processes = Some(vec![missing, high].into());
     app.process_sort = (SortCol::Threads, SortDir::Desc);
     assert_eq!(
         app.visible_processes()[0].pid,

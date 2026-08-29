@@ -14,6 +14,7 @@ use taskmanager_application::{
 use super::lanes::RuntimeLanes;
 use super::port::request_lane;
 use crate::config::{DeliveryClass, RuntimeBudgets, RuntimeConfig, RuntimeProviderBindings};
+use crate::delivery::LaneStartRegistry;
 use crate::delivery::{
     EventQueueState, FairEventPort, RuntimeCapabilityCatalog, RuntimeEventPublisher,
 };
@@ -37,6 +38,7 @@ pub struct ChannelRuntime {
     pub handle: PlatformHandle,
     pub publisher: Arc<RuntimeEventPublisher>,
     pub lanes: RuntimeLanes,
+    pub(crate) lane_starters: Arc<LaneStartRegistry>,
 }
 
 impl ChannelRuntime {
@@ -72,231 +74,277 @@ impl ChannelRuntime {
             (capabilities, event_queues)
         };
         let ecs_scheduler = capabilities.ecs_scheduler_handle();
+        let lane_starters = Arc::new(LaneStartRegistry::default());
 
         let (host_telemetry_port, host_telemetry_rx) = request_lane(
             observation_capacity,
             bindings.system.host.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (cpu_telemetry_port, cpu_telemetry_rx) = request_lane(
             observation_capacity,
             bindings.system.cpu.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (memory_telemetry_port, memory_telemetry_rx) = request_lane(
             observation_capacity,
             bindings.system.memory.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (storage_telemetry_port, storage_telemetry_rx) = request_lane(
             observation_capacity,
             bindings.system.storage.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (network_telemetry_port, network_telemetry_rx) = request_lane(
             observation_capacity,
             bindings.system.network.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (gpu_telemetry_port, gpu_telemetry_rx) = request_lane(
             observation_capacity,
             bindings.system.gpu.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (hardware_inventory_port, hardware_inventory_rx) = request_lane(
             observation_capacity,
             bindings.system.hardware_inventory.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (containers_port, containers_rx) = request_lane(
             observation_capacity,
             bindings.system.containers.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (gpu_engine_rows_port, gpu_engine_rows_rx) = request_lane(
             observation_capacity,
             bindings.system.gpu_engine_rows.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (npu_inventory_port, npu_inventory_rx) = request_lane(
             observation_capacity,
             bindings.system.npu_inventory.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_list_port, process_list_rx) = request_lane(
             observation_capacity,
             bindings.process.list.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_network_port, process_network_rx) = request_lane(
             observation_capacity,
             bindings.process.network.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_gpu_port, process_gpu_rx) = request_lane(
             observation_capacity,
             bindings.process.gpu.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_resources_port, process_resources_rx) = request_lane(
             observation_capacity,
             bindings.process.resources.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_isolation_port, process_isolation_rx) = request_lane(
             observation_capacity,
             bindings.process.isolation.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_threads_port, process_threads_rx) = request_lane(
             observation_capacity,
             bindings.process.threads.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_open_files_port, process_open_files_rx) = request_lane(
             observation_capacity,
             bindings.process.open_files.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_environment_port, process_environment_rx) = request_lane(
             observation_capacity,
             bindings.process.environment.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_affinity_port, process_affinity_rx) = request_lane(
             observation_capacity,
             bindings.process.affinity.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_affinity_control_port, process_affinity_control_rx) = request_lane(
             control_capacity,
             bindings.process.affinity_control.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_resource_control_port, process_resource_control_rx) = request_lane(
             control_capacity,
             bindings.process.resource_control.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_network_escalation_port, process_network_escalation_rx) = request_lane(
             control_capacity,
             bindings.process.network_escalation.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (process_control_port, process_control_rx) = request_lane(
             control_capacity,
             bindings.process.control.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (service_inventory_port, service_inventory_rx) = request_lane(
             observation_capacity,
             bindings.service.inventory.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (service_dependencies_port, service_dependencies_rx) = request_lane(
             observation_capacity,
             bindings.service.dependencies.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (service_control_port, service_control_rx) = request_lane(
             control_capacity,
             bindings.service.control.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (service_log_snapshot_port, service_log_snapshot_rx) = request_lane(
             observation_capacity,
             bindings.service.log_snapshot.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (service_log_stream_port, service_log_stream_rx) = request_lane(
             observation_capacity,
             bindings.service.log_stream.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (startup_inventory_port, startup_inventory_rx) = request_lane(
             observation_capacity,
             bindings.environment.startup_inventory.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (startup_evidence_port, startup_evidence_rx) = request_lane(
             observation_capacity,
             bindings.environment.startup_evidence.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (startup_control_port, startup_control_rx) = request_lane(
             control_capacity,
             bindings.environment.startup_control.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (session_inventory_port, session_inventory_rx) = request_lane(
             observation_capacity,
             bindings.environment.session_inventory.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (session_control_port, session_control_rx) = request_lane(
             control_capacity,
             bindings.environment.session_control.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (command_launch_port, command_launch_rx) = request_lane(
             control_capacity,
             bindings.integration.command_launch.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (resource_reveal_port, resource_reveal_rx) = request_lane(
             control_capacity,
             bindings.integration.resource_reveal.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (url_open_port, url_open_rx) = request_lane(
             control_capacity,
             bindings.integration.url_open.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (desktop_appearance_port, desktop_appearance_rx) = request_lane(
             observation_capacity,
             bindings.integration.desktop_appearance.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (setup_script_port, setup_script_rx) = request_lane(
             control_capacity,
             bindings.integration.setup_script.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (desktop_notification_port, desktop_notification_rx) = request_lane(
             control_capacity,
             bindings.integration.desktop_notification.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (storage_health_port, storage_health_rx) = request_lane(
             observation_capacity,
             bindings.storage.health.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (sensor_port, sensor_rx) = request_lane(
             observation_capacity,
             bindings.sensor.observation.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (power_supply_port, power_supply_rx) = request_lane(
             observation_capacity,
             bindings.power.supplies.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (smart_observation_port, smart_observation_rx) = request_lane(
             observation_capacity,
             bindings.storage.smart_observation.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (smart_control_port, smart_control_rx) = request_lane(
             control_capacity,
             bindings.storage.smart_control.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
         let (directory_usage_port, directory_usage_rx) = request_lane(
             observation_capacity,
             bindings.storage.directory_usage.as_ref(),
             ecs_scheduler.clone(),
+            lane_starters.clone(),
         );
 
         let (control_event_tx, control_event_rx) = bounded(config.queues.control_events);
@@ -491,6 +539,7 @@ impl ChannelRuntime {
         Self {
             handle,
             publisher,
+            lane_starters,
             lanes: RuntimeLanes {
                 system: PendingSystemRuntimeLanes::new(
                     crate::PendingSystemObservationLanes::new(

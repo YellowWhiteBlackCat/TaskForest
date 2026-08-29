@@ -85,7 +85,7 @@ fn processes_snapshot_batch(processes: Vec<ProcessItem>) -> PlatformEventBatch {
             sequence: EventSequence::new(1),
             observed_at_ms: 1,
         },
-        ProcessEvent::Snapshot(processes),
+        ProcessEvent::Snapshot(std::sync::Arc::new(processes)),
     ));
     batch
 }

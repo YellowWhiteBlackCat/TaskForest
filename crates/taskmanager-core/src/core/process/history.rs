@@ -66,7 +66,11 @@ struct TimedProcessHistorySample {
 impl Default for ProcessHistoryRing {
     fn default() -> Self {
         Self {
-            samples: VecDeque::with_capacity(PROCESS_HISTORY_MAX_SAMPLES),
+            // Most processes are observed only a handful of times during
+            // startup. Grow lazily instead of reserving 121 samples for
+            // every PID up front; the hard window/capacity remains enforced
+            // by `push` once a process is long-lived.
+            samples: VecDeque::new(),
             last_seen: 0,
             start_token: None,
         }
@@ -169,6 +173,20 @@ impl ProcessHistoryStore {
         ring.note_identity(start_token);
         ring.push(sample, self.tick, self.observed_at);
         ring.snapshot()
+    }
+
+    /// Materialize one retained process history on demand.
+    ///
+    /// Native adapters normally call [`Self::record`] and immediately receive
+    /// the current projection. This read path exists for the rare inventory
+    /// failure fallback, so the process identity cache does not have to keep a
+    /// second copy of every history vector between refreshes.
+    #[must_use]
+    pub fn snapshot_for(&self, pid: u32) -> ProcessHistorySnapshot {
+        self.rings.get(&pid).map_or_else(
+            ProcessHistorySnapshot::default,
+            ProcessHistoryRing::snapshot,
+        )
     }
 
     /// Drop rings that remained absent beyond the fixed refresh grace.

@@ -5,7 +5,7 @@
 //! across another projection build.
 
 use std::cell::RefCell;
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use taskmanager_core::core::services::ServiceItem;
 use taskmanager_core::core::session::SessionItem;
@@ -48,7 +48,7 @@ struct AppHistoryEntry {
 }
 
 struct ProcessDetailsEntry {
-    snapshot: Rc<Vec<ProcessItem>>,
+    snapshot: Arc<Vec<ProcessItem>>,
     pid: u32,
     item: Rc<ProcessItem>,
     histories: Rc<ProcessHistories>,
@@ -186,18 +186,18 @@ impl GpuiProjectionCaches {
 
     pub(super) fn process_details(
         &self,
-        snapshot: &Rc<Vec<ProcessItem>>,
+        snapshot: &Arc<Vec<ProcessItem>>,
         pid: u32,
     ) -> Option<(Rc<ProcessItem>, Rc<ProcessHistories>)> {
         let cache = self.process_details.borrow();
         let entry = cache.as_ref()?;
-        (entry.pid == pid && Rc::ptr_eq(&entry.snapshot, snapshot))
+        (entry.pid == pid && Arc::ptr_eq(&entry.snapshot, snapshot))
             .then(|| (Rc::clone(&entry.item), Rc::clone(&entry.histories)))
     }
 
     pub(super) fn replace_process_details(
         &self,
-        snapshot: Rc<Vec<ProcessItem>>,
+        snapshot: Arc<Vec<ProcessItem>>,
         pid: u32,
         item: Rc<ProcessItem>,
         histories: Rc<ProcessHistories>,

@@ -47,7 +47,11 @@ impl TuiApp {
             );
             return;
         };
-        let processes = self.projection().processes.clone().unwrap_or_default();
+        let processes = self
+            .projection()
+            .processes
+            .as_ref()
+            .map_or_else(Vec::new, |processes| processes.as_slice().to_vec());
         let stem = format!("taskmanager-snapshot-{}", snapshot.timestamp_ms);
         let target = self.export_dir.as_ref().map_or_else(
             || SnapshotExportTarget::current_directory(stem.clone()),

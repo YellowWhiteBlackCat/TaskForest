@@ -14,8 +14,8 @@ use taskmanager_core::core::target::SessionId;
 use taskmanager_platform_contract::{CapabilityId, PartialSourceSnapshot, ProviderFailure};
 
 use crate::{
-    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_observation_lane,
-    spawn_typed_outcome_lane,
+    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lazy_observation_lane,
+    spawn_lazy_typed_outcome_lane,
 };
 
 type StartupInventoryExecutor =
@@ -166,21 +166,21 @@ pub fn spawn_environment_lanes(
         session_control: mut execute_session_control,
     } = executors;
 
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         startup_inventory,
         events.clone(),
         move |StartupInventoryRequest::Refresh| execute_startup_inventory(),
         |snapshot| PlatformEvent::Startup(StartupEvent::Snapshot(snapshot)),
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         startup_evidence,
         events.clone(),
         move |StartupEvidenceRequest::Refresh| execute_startup_evidence(clock_ms()),
         |snapshot| PlatformEvent::StartupEvidence(StartupEvidenceEvent::Snapshot(snapshot)),
     )?;
-    spawn_typed_outcome_lane(
+    spawn_lazy_typed_outcome_lane(
         workers,
         startup_control,
         events.clone(),
@@ -199,14 +199,14 @@ pub fn spawn_environment_lanes(
             )
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         session_inventory,
         events.clone(),
         move |SessionInventoryRequest::Refresh| execute_session_inventory(),
         |snapshot| PlatformEvent::Sessions(SessionEvent::Snapshot(snapshot)),
     )?;
-    spawn_typed_outcome_lane(
+    spawn_lazy_typed_outcome_lane(
         workers,
         session_control,
         events,

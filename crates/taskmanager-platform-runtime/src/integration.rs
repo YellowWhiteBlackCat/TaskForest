@@ -15,8 +15,8 @@ use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent};
 use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
 
 use crate::{
-    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lane,
-    spawn_observation_lane,
+    Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lazy_lane,
+    spawn_lazy_observation_lane,
 };
 
 type CommandLaunchExecutor = dyn FnMut(String) -> Result<u32, ProviderFailure> + Send + 'static;
@@ -200,7 +200,7 @@ pub fn spawn_integration_lanes(
         setup_script: execute_setup_script,
     } = executors;
 
-    spawn_lane(
+    spawn_lazy_lane(
         workers,
         command_launch,
         events.clone(),
@@ -210,7 +210,7 @@ pub fn spawn_integration_lanes(
             }))
         },
     )?;
-    spawn_lane(
+    spawn_lazy_lane(
         workers,
         resource_reveal,
         events.clone(),
@@ -222,7 +222,7 @@ pub fn spawn_integration_lanes(
             Ok(PlatformEvent::Shell(ShellEvent::TargetOpened))
         },
     )?;
-    spawn_lane(
+    spawn_lazy_lane(
         workers,
         url_open,
         events.clone(),
@@ -231,7 +231,7 @@ pub fn spawn_integration_lanes(
             Ok(PlatformEvent::Shell(ShellEvent::TargetOpened))
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         desktop_appearance,
         events.clone(),
@@ -239,7 +239,7 @@ pub fn spawn_integration_lanes(
         |snapshot| PlatformEvent::DesktopAppearance(DesktopAppearanceEvent::Snapshot(snapshot)),
     )?;
     if let (Some(receiver), Some(mut execute)) = (setup_script, execute_setup_script) {
-        spawn_lane(
+        spawn_lazy_lane(
             workers,
             receiver,
             events.clone(),
@@ -249,7 +249,7 @@ pub fn spawn_integration_lanes(
     if let (Some(receiver), Some(mut execute)) =
         (desktop_notification, execute_desktop_notification)
     {
-        spawn_lane(workers, receiver, events.clone(), move |request| {
+        spawn_lazy_lane(workers, receiver, events.clone(), move |request| {
             execute(request)?;
             Ok(PlatformEvent::Shell(ShellEvent::NotificationDelivered))
         })?;

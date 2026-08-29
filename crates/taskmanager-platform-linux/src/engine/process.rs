@@ -1,11 +1,11 @@
 //! Linux process enumeration and control provider.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs;
 use std::time::Instant;
 
 use crate::config::FD_COUNT_REFRESH_EVERY_N_TICKS;
-use sysinfo::{ProcessStatus, System};
+use sysinfo::{ProcessRefreshKind, ProcessStatus, System};
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::{
     FailureKind, ProcessHistorySample, ProcessHistoryStore, ProcessMetadataFailure, ProviderId,
@@ -21,6 +21,7 @@ mod memory_maps;
 mod metadata;
 mod observation;
 pub mod open;
+mod previous;
 mod procfs;
 mod rates;
 pub mod signal;
@@ -45,7 +46,8 @@ pub(crate) use foreign_control::{
 };
 use memory_maps::{MemoryMaps, ProcessMemoryObservation};
 use metadata::{PasswdLabels, load_passwd_labels, observe_process_metadata};
-use observation::{mark_retained_item_stale, observe_clock_ticks, observe_process_scalars};
+use observation::{observe_clock_ticks, observe_process_scalars};
+use previous::{PreviousItems, PreviousProcessView};
 pub(crate) use procfs::validate_exact_start_token;
 use rates::ProcessRateState;
 use tree::{io_failure, read_boot_time_secs};
@@ -126,33 +128,6 @@ impl BootTimeCache {
     }
 }
 
-/// Last tick's rows plus a pid → index lookup, rebuilt together by
-/// [`Self::sync_from`] so the previous-tick lookup is O(1) while preserving
-/// the `Vec::iter().find()` semantics (first occurrence wins) it replaced.
-#[derive(Default)]
-struct PreviousItems {
-    items: Vec<ProcessItem>,
-    by_pid: HashMap<u32, usize>,
-}
-
-impl PreviousItems {
-    fn find(&self, pid: u32) -> Option<&ProcessItem> {
-        self.by_pid
-            .get(&pid)
-            .and_then(|&index| self.items.get(index))
-    }
-
-    fn sync_from(&mut self, items: &[ProcessItem]) {
-        self.items.clear();
-        self.items.extend_from_slice(items);
-        self.by_pid.clear();
-        self.by_pid.reserve(self.items.len());
-        for (index, item) in self.items.iter().enumerate() {
-            self.by_pid.entry(item.pid).or_insert(index);
-        }
-    }
-}
-
 pub struct ProcessManager {
     system: System,
     histories: ProcessHistoryStore,
@@ -220,10 +195,7 @@ impl ProcessManager {
         let procfs_probe = match probe_procfs() {
             Err(failure) => {
                 self.rates.clear();
-                let mut items = self.previous_items.items.clone();
-                for item in &mut items {
-                    mark_retained_item_stale(item, failure);
-                }
+                let items = self.previous_items.stale_items(&self.histories, failure);
                 let item_count = items.len();
                 return PartialSourceSnapshot::new(
                     items,
@@ -239,13 +211,24 @@ impl ProcessManager {
 
         self.histories
             .begin_refresh(self.history_started_at.elapsed());
-        self.system
-            .refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+        // The process inventory never consumes per-thread `sysinfo::Process`
+        // rows; it reads the aggregate thread count from procfs separately.
+        // Asking sysinfo for tasks multiplies its internal process map and
+        // repeats memory/cmdline data for every thread on hosts such as
+        // Chromium-heavy desktops.
+        self.system.refresh_processes_specifics(
+            sysinfo::ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::nothing()
+                .with_memory()
+                .with_cpu()
+                .with_disk_usage()
+                .without_tasks(),
+        );
         let mut process_pids: Vec<u32> = self
             .system
             .processes()
             .iter()
-            .filter(|(_, process)| process.thread_kind().is_none())
             .map(|(pid, _)| pid.as_u32())
             .collect();
         process_pids.sort_unstable();
@@ -266,17 +249,6 @@ impl ProcessManager {
         let mut process_application = FieldSourceSummary::default();
         let mut items = Vec::new();
         for (pid, process) in self.system.processes() {
-            // sysinfo 0.31 populates the process map with individual THREADS
-            // (`thread_kind = Some(Userland/Kernel)`) alongside thread-group
-            // leaders (`thread_kind = None`). A process list shows PROCESSES, not
-            // threads — skip thread entries so Chrome's per-thread names
-            // (`Chrome_ChildIOT`, `ThreadPoolForeg`, …) and the parent's memory
-            // (duplicated onto every thread) don't flood the list. The per-process
-            // thread COUNT column is unaffected (it comes from `/proc/<pid>/stat`,
-            // not from enumerating threads here).
-            if process.thread_kind().is_some() {
-                continue;
-            }
             let status = match process.status() {
                 ProcessStatus::Run => "Running",
                 ProcessStatus::Sleep => "Sleeping",
@@ -307,7 +279,10 @@ impl ProcessManager {
             };
             let pid = pid.as_u32();
             let name = process.name().to_string_lossy().into_owned();
-            let previous = self.previous_items.find(pid);
+            let previous = self
+                .previous_items
+                .find(pid)
+                .map(|previous| previous as &dyn PreviousProcessView);
             let (scalar_observations, evidence) = observe_process_scalars(
                 pid,
                 &boot_time,

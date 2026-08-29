@@ -186,6 +186,36 @@ fn automatic_schedule_lookup_round_trips_registry_policy_and_excludes_manual_wor
 }
 
 #[test]
+fn dashboard_schedule_keeps_detail_inventories_on_demand() {
+    for capability in [
+        CapabilityId::HARDWARE_INVENTORY,
+        CapabilityId::CONTAINERS,
+        CapabilityId::ACCELERATOR_NPU,
+        CapabilityId::SERVICES,
+        CapabilityId::STARTUP,
+        CapabilityId::SESSIONS,
+    ] {
+        assert_eq!(
+            super::default_automatic_cadence_ms(&capability),
+            None,
+            "detail capability must not keep a worker alive on the dashboard"
+        );
+    }
+    for capability in [
+        CapabilityId::PROCESS_LIST,
+        CapabilityId::STORAGE_HEALTH,
+        CapabilityId::SMART,
+        CapabilityId::SENSORS,
+        CapabilityId::POWER_SUPPLIES,
+    ] {
+        assert!(
+            super::default_automatic_cadence_ms(&capability).is_some(),
+            "visible dashboard fact must retain its automatic refresh"
+        );
+    }
+}
+
+#[test]
 fn telemetry_interval_updates_every_system_route_through_the_scheduler_seam() {
     let scheduler = Arc::new(RecordingScheduler::default());
     let handle = PlatformHandle::new(

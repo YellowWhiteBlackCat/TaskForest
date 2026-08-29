@@ -123,6 +123,7 @@ fn snap_and_appimage_process_paths_resolve_without_cross_merging_same_names() {
             ),
         ],
         failure: None,
+        ..Default::default()
     };
 
     let (snap, snap_source) = catalog.observe(
@@ -197,6 +198,7 @@ fn shared_browser_executable_uses_argv_to_select_the_pwa() {
             ),
         ],
         failure: None,
+        ..Default::default()
     };
     let (observation, source) = catalog.observe(
         &available_executable("/usr/bin/google-chrome"),
@@ -238,6 +240,7 @@ fn chrome_wrapper_path_and_split_flags_select_the_pwa() {
             ),
         ],
         failure: None,
+        ..Default::default()
     };
 
     let (observation, source) = catalog.observe(
@@ -289,6 +292,7 @@ fn missing_argv_does_not_fall_back_to_the_generic_browser_for_a_pwa_bucket() {
             ),
         ],
         failure: None,
+        ..Default::default()
     };
     let (observation, source) =
         catalog.observe(&available_executable("/usr/bin/google-chrome"), &[], 20);
@@ -313,6 +317,7 @@ fn snap_run_argv_is_identity_evidence_and_wrong_package_stays_absent() {
             &[],
         )],
         failure: None,
+        ..Default::default()
     };
 
     let (matched, matched_source) = catalog.observe(
@@ -349,6 +354,7 @@ fn appimage_mount_path_matches_only_its_desktop_image() {
             Some("portable-editor"),
         )],
         failure: None,
+        ..Default::default()
     };
 
     let (mounted, mounted_source) = catalog.observe(
@@ -388,6 +394,7 @@ fn shared_executable_without_disambiguating_argv_is_not_assigned_arbitrarily() {
             catalog_entry("browser-two", "Browser Two", "/usr/bin/browser", &[], None),
         ],
         failure: None,
+        ..Default::default()
     };
     let (observation, source) = catalog.observe(&available_executable("/usr/bin/browser"), &[], 20);
 
@@ -411,6 +418,7 @@ fn missing_icon_is_a_partial_identity_not_a_generic_icon_claim() {
             None,
         )],
         failure: None,
+        ..Default::default()
     };
     let (observation, source) = catalog.observe(
         &available_executable("/usr/bin/editor"),
@@ -438,6 +446,7 @@ fn catalog_failure_is_unavailable_and_does_not_become_absent() {
         loaded_at_ms: Some(10),
         entries: Vec::new(),
         failure: Some(ProcessMetadataFailure::PermissionDenied),
+        ..Default::default()
     };
     let (observation, source) = catalog.observe(&executable, &[], 20);
 
@@ -516,10 +525,20 @@ fn catalog_resolves_hicolor_asset_without_leaking_its_linux_path() {
 
     let (entries, failure) = load_catalog_from_dirs(std::slice::from_ref(&data));
     assert_eq!(failure, None);
-    let identity = entries
-        .first()
-        .map(|entry| &entry.identity)
-        .expect("desktop catalog entry");
+    let mut catalog = ApplicationCatalog {
+        loaded_at_ms: Some(10),
+        entries,
+        failure,
+        icon_dirs: vec![data.clone()],
+        ..Default::default()
+    };
+    let (observation, source) = catalog.observe(
+        &available_executable("/usr/bin/editor"),
+        &["/usr/bin/editor".into()],
+        20,
+    );
+    assert_eq!(source, SourceOutcome::Available);
+    let identity = observation.current_value().expect("desktop catalog entry");
     assert_eq!(identity.icon_token.as_deref(), Some("editor"));
     assert_eq!(identity.icon_failure, None);
     let asset = identity.icon_asset.as_ref().expect("icon bytes");
@@ -590,6 +609,7 @@ fn process_guard_uses_real_proc_start_token_and_rejects_reuse() {
         loaded_at_ms: Some(10),
         entries: Vec::new(),
         failure: None,
+        ..Default::default()
     };
 
     let (current, current_source) = catalog.observe_for_process(

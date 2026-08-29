@@ -153,9 +153,7 @@ fn end_process_tree_gates_the_shared_pending_batch_with_a_frozen_tree() {
     let mut chain = app
         .shell
         .projection()
-        .processes
-        .as_deref()
-        .unwrap_or_default()
+        .processes_slice()
         .iter()
         .map(|process| process.pid)
         .filter(|pid| *pid != root_pid)
@@ -163,19 +161,17 @@ fn end_process_tree_gates_the_shared_pending_batch_with_a_frozen_tree() {
     chain.truncate(2);
     assert_eq!(chain.len(), 2, "the demo fixture must provide two pids");
     let [child_pid, grandchild_pid] = [chain[0], chain[1]];
-    let mut processes = app.shell.projection().processes.clone();
-    if let Some(processes) = processes.as_deref_mut() {
-        for process in processes.iter_mut() {
-            match process.pid {
-                pid if pid == child_pid => process.parent_pid = Some(root_pid),
-                pid if pid == grandchild_pid => process.parent_pid = Some(child_pid),
-                _ => {}
-            }
+    let mut processes = app.shell.projection().processes_slice().to_vec();
+    for process in &mut processes {
+        match process.pid {
+            pid if pid == child_pid => process.parent_pid = Some(root_pid),
+            pid if pid == grandchild_pid => process.parent_pid = Some(child_pid),
+            _ => {}
         }
     }
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
-        taskmanager_shell::fixture::ProjectionSeedFact::Processes(processes),
+        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(processes)),
     );
 
     let index = crate::ui::process_menu::MENU_ACTIONS

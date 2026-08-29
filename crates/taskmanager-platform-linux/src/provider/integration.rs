@@ -14,8 +14,8 @@ use taskmanager_platform_provider::{
 use super::process_target::validate_process_identity;
 use crate::engine::process::{ProcessManager, validate_exact_start_token};
 
-const SETUP_SCRIPT_PATH: &str = "/usr/share/taskmanager/setup/99-taskmanager.rules";
-const SETUP_HELPER_PATH: &str = "/usr/libexec/taskmanager-setup-helper";
+const SETUP_SCRIPT_PATH: &str = "/usr/share/taskforest/setup/99-taskforest.rules";
+const SETUP_HELPER_PATH: &str = "/usr/libexec/taskforest-setup-helper";
 
 pub(super) struct NativeCommandLaunchProvider;
 

@@ -107,6 +107,39 @@ impl TopPage {
     }
 }
 
+impl super::RootView {
+    /// Request only the inventory owned by a newly visible detail page.
+    pub(crate) fn request_page_data(&mut self, page: TopPage) {
+        match page {
+            TopPage::System => {
+                self.request_refresh(taskmanager_application::RefreshRequest::HardwareInventory)
+            }
+            TopPage::Containers => {
+                self.request_refresh(taskmanager_application::RefreshRequest::Containers)
+            }
+            TopPage::Performance
+            | TopPage::Apps
+            | TopPage::Services
+            | TopPage::Startup
+            | TopPage::Users
+            | TopPage::AppHistory => {}
+        }
+    }
+
+    /// Select a page and eagerly request only the inventory owned by that
+    /// page. High-rate dashboard facts remain on the shared automatic
+    /// schedule; static/detail inventories become live only while a user
+    /// visits the corresponding surface.
+    pub(crate) fn select_page(&mut self, page: TopPage) {
+        if self.page == page {
+            return;
+        }
+        self.dismiss_current_surface(super::WindowSurfaceDismissReason::PageChanged);
+        self.page = page;
+        self.request_page_data(page);
+    }
+}
+
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_gpui_app_root_navigation_tests.rs"]
 mod tests;

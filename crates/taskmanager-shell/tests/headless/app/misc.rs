@@ -86,7 +86,7 @@ fn visible_process_index_helpers_match_the_borrowed_projection() {
         .iter()
         .map(|process| process.pid)
         .collect::<Vec<_>>();
-    let source = app.data.processes.as_deref().unwrap_or_default();
+    let source = app.projection().processes_slice();
     let indices = app.visible_process_indices();
     let direct = indices
         .iter()

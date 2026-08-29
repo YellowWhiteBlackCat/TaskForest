@@ -213,7 +213,6 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
     });
 }
 
-
 /// The expected row id of one fixture process (token from
 /// `fixture_start_token`, the builder's single source).
 fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {

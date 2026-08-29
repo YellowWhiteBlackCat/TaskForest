@@ -38,6 +38,7 @@ fn shared_sensor_runtime_injects_clock_and_derives_source_health() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_sensor_lanes(

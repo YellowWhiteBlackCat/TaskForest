@@ -16,6 +16,7 @@ use taskmanager_platform_contract::{
 
 use super::lanes::Queued;
 
+use crate::delivery::LaneStartRegistry;
 use crate::ecs::{EcsAdmissionError, RuntimeEcsSchedulerHandle};
 
 type EcsSchedulerHandle = RuntimeEcsSchedulerHandle;
@@ -24,6 +25,7 @@ pub(super) struct ChannelRequestPort<R> {
     sender: Sender<Queued<R>>,
     provider: ProviderId,
     scheduler: EcsSchedulerHandle,
+    lane_starters: Arc<LaneStartRegistry>,
 }
 
 type OptionalRequestLane<R> = (
@@ -45,6 +47,12 @@ where
                 kind: SubmissionErrorKind::InvalidRequest,
             });
         }
+        self.lane_starters
+            .ensure_started(&capability)
+            .map_err(|_| SubmissionError {
+                capability: capability.clone(),
+                kind: SubmissionErrorKind::RuntimeStopped,
+            })?;
         let request_id = request.id;
         let tracking = request
             .payload
@@ -126,6 +134,7 @@ pub(super) fn request_lane<R>(
     capacity: usize,
     provider: Option<&ProviderId>,
     scheduler: EcsSchedulerHandle,
+    lane_starters: Arc<LaneStartRegistry>,
 ) -> OptionalRequestLane<R>
 where
     R: CapabilityRequest,
@@ -139,6 +148,7 @@ where
             sender,
             provider: provider.clone(),
             scheduler,
+            lane_starters,
         })),
         Some(receiver),
     )

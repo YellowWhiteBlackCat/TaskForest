@@ -254,7 +254,8 @@ fn unrelated_sidebar_state_preserves_every_projection_cache() {
     app.performance.process_history = Some(process_history);
 
     let process_perf = app.process_perf_series().unwrap().cpu;
-    let history = app.cached_metric_series(taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent);
+    let history = app
+        .cached_metric_series(taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent);
     let processes = app.projected_table_model().0;
     let app_history = app.projected_app_history_model();
     let services = app.services_projection("").0;
@@ -272,7 +273,9 @@ fn unrelated_sidebar_state_preserves_every_projection_cache() {
     ));
     assert!(Rc::ptr_eq(
         &history,
-        &app.cached_metric_series(taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent)
+        &app.cached_metric_series(
+            taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent
+        )
     ));
     assert!(Rc::ptr_eq(&processes, &app.projected_table_model().0));
     assert!(Rc::ptr_eq(&app_history, &app.projected_app_history_model()));

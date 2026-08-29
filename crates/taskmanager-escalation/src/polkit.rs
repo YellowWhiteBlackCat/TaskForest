@@ -60,12 +60,13 @@ pub use setup::{
 
 /// The helper program the polkit `.policy` authorizes. This is the absolute
 /// install path that MUST match the `org.freedesktop.policykit.exec.path`
-/// annotation in `polkit/com.taskforest.perf-helper.policy.in`: polkit matches
-/// the action by the exact program path passed to `pkexec`, so a bare binary
-/// name would fail to resolve the action and be denied. The integrator verifies
-/// the path on-box; see `polkit/README.md`.
+/// annotation in
+/// `polkit/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy.in`:
+/// polkit matches the action by the exact program path passed to `pkexec`, so
+/// a bare binary name would fail to resolve the action and be denied. The
+/// integrator verifies the path on-box; see `polkit/README.md`.
 #[cfg(target_os = "linux")]
-pub(crate) const PERF_HELPER_PATH: &str = "/usr/libexec/taskmanager-privilege-helper";
+pub(crate) const PERF_HELPER_PATH: &str = "/usr/libexec/taskforest-privilege-helper";
 
 /// One GPU engine reading parsed from a SUCCESS object's `engines` array.
 ///

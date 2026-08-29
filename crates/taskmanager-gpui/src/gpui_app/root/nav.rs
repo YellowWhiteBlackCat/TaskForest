@@ -92,7 +92,7 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
         // locate a tab by its stable English identity and read/click its bounds.
         .debug_selector(move || label.to_string())
         .on_click(cx.listener(move |v, _ev, _win, cx| {
-            v.page = page;
+            v.select_page(page);
             cx.notify();
         }))
         .on_hover(cx.listener(move |v, is_hov: &bool, _win, cx| {

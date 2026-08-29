@@ -5,6 +5,8 @@
 //! promotion from a complete provider set into the eight bounded runtime lane
 //! groups and their common worker lifetime.
 
+use std::sync::Arc;
+
 use taskmanager_application::PlatformHandle;
 
 use crate::{
@@ -55,6 +57,7 @@ pub fn assemble_native_runtime(
         handle,
         publisher: events,
         lanes,
+        lane_starters,
     } = ChannelRuntime::try_new(provider_bindings, config)
         .map_err(CompositionError::runtime_construction)?
         .try_complete()?;
@@ -69,10 +72,12 @@ pub fn assemble_native_runtime(
         power,
     } = lanes;
     let executors = providers.into_runtime_executors();
-    let workers = WorkerRuntime::default();
+    let workers = Arc::new(WorkerRuntime::default());
+    lane_starters.bind_worker(&workers);
+    workers.install_lane_starters(lane_starters);
 
     spawn_system_lanes(
-        &workers,
+        workers.as_ref(),
         system,
         executors.system,
         events.clone(),
@@ -80,7 +85,7 @@ pub fn assemble_native_runtime(
     )
     .map_err(CompositionError::worker_spawn)?;
     spawn_process_lanes(
-        &workers,
+        workers.as_ref(),
         process,
         executors.process,
         events.clone(),
@@ -88,7 +93,7 @@ pub fn assemble_native_runtime(
     )
     .map_err(CompositionError::worker_spawn)?;
     spawn_service_lanes(
-        &workers,
+        workers.as_ref(),
         service,
         executors.service,
         events.clone(),
@@ -96,17 +101,22 @@ pub fn assemble_native_runtime(
     )
     .map_err(CompositionError::worker_spawn)?;
     spawn_environment_lanes(
-        &workers,
+        workers.as_ref(),
         environment,
         executors.environment,
         events.clone(),
         config.clock_ms,
     )
     .map_err(CompositionError::worker_spawn)?;
-    spawn_integration_lanes(&workers, integration, executors.integration, events.clone())
-        .map_err(CompositionError::worker_spawn)?;
+    spawn_integration_lanes(
+        workers.as_ref(),
+        integration,
+        executors.integration,
+        events.clone(),
+    )
+    .map_err(CompositionError::worker_spawn)?;
     spawn_storage_lanes(
-        &workers,
+        workers.as_ref(),
         storage,
         executors.storage,
         events.clone(),
@@ -114,15 +124,21 @@ pub fn assemble_native_runtime(
     )
     .map_err(CompositionError::worker_spawn)?;
     spawn_sensor_lanes(
-        &workers,
+        workers.as_ref(),
         sensor,
         executors.sensor,
         events.clone(),
         config.clock_ms,
     )
     .map_err(CompositionError::worker_spawn)?;
-    spawn_power_lanes(&workers, power, executors.power, events, config.clock_ms)
-        .map_err(CompositionError::worker_spawn)?;
+    spawn_power_lanes(
+        workers.as_ref(),
+        power,
+        executors.power,
+        events,
+        config.clock_ms,
+    )
+    .map_err(CompositionError::worker_spawn)?;
 
     Ok(handle.with_runtime_lifetime(workers))
 }

@@ -16,6 +16,13 @@ struct TimerAfter {
     runnable: Runnable,
 }
 
+/// GPUI's Linux background executor is shared by UI tasks, font/image work,
+/// and small platform jobs. The default of one worker per logical CPU is a
+/// poor fit for a single-window monitor: it duplicates the runtime's own
+/// provider lanes without improving the mostly serialized UI workload.
+const MAX_BACKGROUND_THREADS: usize = 2;
+const BACKGROUND_THREAD_STACK_SIZE: usize = 1024 * 1024;
+
 pub(crate) struct LinuxDispatcher {
     main_sender: Sender<Runnable>,
     timer_sender: Sender<TimerAfter>,
@@ -29,13 +36,15 @@ impl LinuxDispatcher {
         let (background_sender, background_receiver) = flume::unbounded::<Runnable>();
         let thread_count = std::thread::available_parallelism()
             .map(|i| i.get())
-            .unwrap_or(1);
+            .unwrap_or(1)
+            .clamp(1, MAX_BACKGROUND_THREADS);
 
         let mut background_threads = (0..thread_count)
             .map(|i| {
                 let receiver = background_receiver.clone();
                 std::thread::Builder::new()
                     .name(format!("Worker-{i}"))
+                    .stack_size(BACKGROUND_THREAD_STACK_SIZE)
                     .spawn(move || {
                         for runnable in receiver {
                             let start = Instant::now();
@@ -56,6 +65,7 @@ impl LinuxDispatcher {
         let (timer_sender, timer_channel) = calloop::channel::channel::<TimerAfter>();
         let timer_thread = std::thread::Builder::new()
             .name("Timer".to_owned())
+            .stack_size(BACKGROUND_THREAD_STACK_SIZE)
             .spawn(|| {
                 let mut event_loop: EventLoop<()> =
                     EventLoop::try_new().expect("Failed to initialize timer loop!");

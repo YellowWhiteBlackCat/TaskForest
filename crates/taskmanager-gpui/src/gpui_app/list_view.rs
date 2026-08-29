@@ -596,19 +596,22 @@ pub fn source_notice_with_detail_presentation(
             .flex()
             .flex_col()
             .gap(tokens::SPACE_1)
+            // Each truncating line is wrapped in a flex-row (the title-row
+            // pattern): bare column-child `truncate()` poisons gpui's nowrap
+            // measure cache and clips the line hard at narrow widths.
             .child(
-                div()
-                    .truncate()
-                    .text_size(tokens::FONT_11)
-                    .text_color(theme.fg)
-                    .child(format!("{title} · {failure}")),
+                div().flex().flex_row().min_w(px(0.0)).child(
+                    crate::gpui_app::elements::truncated_text(&format!("{title} · {failure}"))
+                        .text_size(tokens::FONT_11)
+                        .text_color(theme.fg),
+                ),
             )
             .children(detail.into_iter().map(|detail| {
-                div()
-                    .truncate()
-                    .text_size(tokens::FONT_11)
-                    .text_color(theme.fg_dim)
-                    .child(detail.to_string())
+                div().flex().flex_row().min_w(px(0.0)).child(
+                    crate::gpui_app::elements::truncated_text(&detail.to_string())
+                        .text_size(tokens::FONT_11)
+                        .text_color(theme.fg_dim),
+                )
             })),
     };
     let mut banner = div()

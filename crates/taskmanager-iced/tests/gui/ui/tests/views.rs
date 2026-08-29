@@ -17,12 +17,7 @@ use super::super::process_projection::ProcessProjection;
 /// Render the Applications table for the app's current view state and return
 /// the row count (the shared seam the view-mode tests assert on).
 fn rendered_row_count(app: &crate::IcedApp) -> usize {
-    let process_source = app
-        .shell
-        .projection()
-        .processes
-        .as_deref()
-        .unwrap_or_default();
+    let process_source = app.shell.projection().processes_slice();
     let visible_indices = app.shell.visible_process_indices();
     let visible: Vec<_> = visible_indices
         .iter()

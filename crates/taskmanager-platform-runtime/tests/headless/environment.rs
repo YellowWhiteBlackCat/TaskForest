@@ -116,6 +116,7 @@ fn shared_environment_runtime_preserves_typed_control_outcome() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_environment_lanes(
@@ -173,6 +174,7 @@ fn startup_evidence_is_correlated_on_its_own_capability() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_environment_lanes(
@@ -235,6 +237,7 @@ fn blocked_startup_evidence_never_stalls_startup_inventory_lane() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let (release_tx, release_rx) = crossbeam_channel::bounded::<()>(1);
     let workers = crate::WorkerRuntime::default();

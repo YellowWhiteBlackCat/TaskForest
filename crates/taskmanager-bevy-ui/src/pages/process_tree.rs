@@ -150,16 +150,16 @@ pub(crate) fn project_items<'a>(
             for root in roots {
                 let application_expanded = expansion.application_expanded(root.item.pid);
                 rows.push(ProcessTreeRow {
-                    key: root.item
+                    key: root
+                        .item
                         .current_start_token()
                         .and_then(|token| {
-                            taskmanager_shell::ProcessRowIdentity::from_parts(
-                                root.item.pid,
-                                token,
-                            )
+                            taskmanager_shell::ProcessRowIdentity::from_parts(root.item.pid, token)
                         })
                         .map(ProcessRowId::Application)
-                        .unwrap_or(ProcessRowId::Category(taskmanager_core::core::process::ProcessCategory::Application)),
+                        .unwrap_or(ProcessRowId::Category(
+                            taskmanager_core::core::process::ProcessCategory::Application,
+                        )),
                     depth: 1,
                     label: root
                         .item
@@ -193,8 +193,9 @@ fn push_process_rows<'a>(
 ) {
     for flat in flatten_tree_visible(std::slice::from_ref(root), collapsed) {
         rows.push(ProcessTreeRow {
-            key: ProcessRowId::from_process(flat.item)
-                .unwrap_or(ProcessRowId::Category(taskmanager_core::core::process::ProcessCategory::Uncategorized)),
+            key: ProcessRowId::from_process(flat.item).unwrap_or(ProcessRowId::Category(
+                taskmanager_core::core::process::ProcessCategory::Uncategorized,
+            )),
             depth: depth_offset + flat.depth,
             label: flat.item.name.clone(),
             member_count: 1,
@@ -258,12 +259,7 @@ fn semantic_key(key: ProcessRowId) -> String {
 /// reducers), while this strip makes category/application/process identity
 /// and the typed control/input anchors part of the formal route.
 pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
-    let items = context
-        .shell
-        .projection()
-        .processes
-        .as_deref()
-        .unwrap_or(&[]);
+    let items = context.shell.projection().processes_slice();
     let expansion = ProcessTreeExpansion::default();
     let rows = project_items(items, &expansion);
     let row_scenes: Vec<Box<dyn Scene>> = rows
@@ -350,12 +346,7 @@ fn refresh_tree_on_fold(
     mut counts: Query<&mut Text, With<ProcessTreeCountLine>>,
     mut commands: Commands,
 ) {
-    let items = track
-        .shell()
-        .projection()
-        .processes
-        .as_deref()
-        .unwrap_or(&[]);
+    let items = track.shell().projection().processes_slice();
     let expansion = ProcessTreeExpansion::default();
     let rows = project_items(items, &expansion);
     for (root, children) in roots.iter() {

@@ -252,8 +252,7 @@ fn apply_app_action(
             move_process_page(view, direction, preserve);
         }
         AppAction::SelectPage(page) => {
-            view.dismiss_current_surface(super::WindowSurfaceDismissReason::PageChanged);
-            view.page = TopPage::from_app_page(page);
+            view.select_page(TopPage::from_app_page(page));
         }
         AppAction::Refresh(_) => view.request_refresh(RefreshRequest::Processes),
         AppAction::RequestEndTask => {

@@ -240,7 +240,7 @@ impl ShellApp {
     /// new position (reorder-stability); otherwise it keeps its position for
     /// the nearest-survivor clamp path.
     pub fn prune_stale_selection(&mut self) {
-        let processes = self.data.processes.as_deref().unwrap_or_default();
+        let processes = self.data.processes_slice();
         let live: HashSet<ProcessRowIdentity> = processes
             .iter()
             .filter_map(ProcessRowIdentity::from_process)

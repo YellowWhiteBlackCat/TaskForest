@@ -129,6 +129,7 @@ fn inventory_health_is_derived_from_the_published_source_snapshot() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_service_lanes(
@@ -200,6 +201,7 @@ fn dependencies_and_action_publish_domain_completion_on_provider_failure() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_service_lanes(
@@ -283,6 +285,7 @@ fn log_truth_controls_domain_event_and_capability_health_together() {
         handle,
         publisher,
         lanes,
+        ..
     } = runtime;
     let workers = crate::WorkerRuntime::default();
     spawn_service_lanes(

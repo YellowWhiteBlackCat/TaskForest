@@ -5,7 +5,7 @@
 //! keys; only platform-batch materialization systems may replace production
 //! values. Render and input code consume immutable `RootView` accessors.
 
-use std::rc::Rc;
+use std::{rc::Rc, sync::Arc};
 
 use taskmanager_application::StartupEvidenceUnavailable;
 use taskmanager_core::core::Alert;
@@ -88,7 +88,11 @@ impl<T> SourcedMaterialized<T> {
 #[derive(Clone, Debug, Default)]
 pub(super) struct ProjectionMaterialization {
     snapshot: Materialized<Rc<SystemSnapshot>>,
-    processes: Materialized<Rc<Vec<ProcessItem>>>,
+    /// Production process events carry an `Arc<Vec<ProcessItem>>`; retaining
+    /// that same allocation here avoids a second full row snapshot in every
+    /// GPUI window. The shell projection remains the shared authority consumed
+    /// by the other frontends.
+    processes: Materialized<Arc<Vec<ProcessItem>>>,
     running_process_count: usize,
     services: SourcedMaterialized<Rc<Vec<ServiceItem>>>,
     startup_entries: SourcedMaterialized<Rc<Vec<StartupEntry>>>,
@@ -110,12 +114,12 @@ impl ProjectionMaterialization {
         let _ = self.snapshot.replace(revision, Rc::new(snapshot));
     }
 
-    pub(super) fn replace_processes(&mut self, revision: u64, processes: Vec<ProcessItem>) {
+    pub(super) fn replace_processes(&mut self, revision: u64, processes: Arc<Vec<ProcessItem>>) {
         let running_process_count = processes
             .iter()
             .filter(|process| process.status == "Running")
             .count();
-        if self.processes.replace(revision, Rc::new(processes)) {
+        if self.processes.replace(revision, processes) {
             self.running_process_count = running_process_count;
         }
     }
@@ -237,7 +241,7 @@ impl ProjectionMaterialization {
         self.snapshot.revision
     }
 
-    pub(super) const fn processes(&self) -> &Rc<Vec<ProcessItem>> {
+    pub(super) const fn processes(&self) -> &Arc<Vec<ProcessItem>> {
         &self.processes.value
     }
 
@@ -398,11 +402,11 @@ impl super::RootView {
 
     #[must_use]
     pub fn processes(&self) -> &[ProcessItem] {
-        self.materialized.processes().as_slice()
+        self.materialized.processes().as_ref().as_slice()
     }
 
     #[must_use]
-    pub fn processes_rc(&self) -> &Rc<Vec<ProcessItem>> {
+    pub fn processes_arc(&self) -> &Arc<Vec<ProcessItem>> {
         self.materialized.processes()
     }
 
@@ -603,7 +607,7 @@ impl super::RootView {
         let (capture_evidence, materialized) = (&mut self.capture_evidence, &mut self.materialized);
         let action = capture_evidence.on_processes_update(
             processes_updated,
-            Rc::make_mut(&mut materialized.processes.value),
+            Arc::make_mut(&mut materialized.processes.value),
         );
         if processes_updated {
             materialized.running_process_count = materialized

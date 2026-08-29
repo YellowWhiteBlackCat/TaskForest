@@ -190,7 +190,7 @@ fn unconfirmed_start_token_blocks_all_metadata_reads_and_current_evidence() {
         &Ok(HashMap::from([(1000, "alice".to_owned())])),
         20,
         Err(FailureKind::IdentityChanged),
-        None,
+        None::<&taskmanager_core::ProcessItem>,
     );
 
     assert_eq!(

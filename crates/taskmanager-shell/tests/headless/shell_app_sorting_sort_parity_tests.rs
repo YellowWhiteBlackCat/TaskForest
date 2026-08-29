@@ -18,7 +18,7 @@ fn visible_processes_match_the_neutral_comparator_on_every_column() {
     for column in SortCol::ALL {
         for direction in [SortDir::Asc, SortDir::Desc] {
             let mut app = ShellApp::new();
-            app.data.processes = Some(items.clone());
+            app.data.processes = Some(items.clone().into());
             app.process_sort = (column, direction);
             let shell_pids: Vec<u32> = app
                 .visible_processes()
@@ -43,7 +43,7 @@ fn visible_processes_match_the_neutral_comparator_on_every_column() {
 fn visible_processes_pin_absolute_converged_orders() {
     let items = sort_parity_fixture();
     let mut app = ShellApp::new();
-    app.data.processes = Some(items);
+    app.data.processes = Some(items.into());
 
     app.process_sort = (SortCol::Cpu, SortDir::Desc);
     let pids: Vec<u32> = app.visible_processes().iter().map(|row| row.pid).collect();
@@ -156,7 +156,7 @@ fn visible_processes_match_the_neutral_comparator_on_the_variance_fixture() {
     for column in SortCol::ALL {
         for direction in [SortDir::Asc, SortDir::Desc] {
             let mut app = ShellApp::new();
-            app.data.processes = Some(items.clone());
+            app.data.processes = Some(items.clone().into());
             app.process_sort = (column, direction);
             let shell_pids: Vec<u32> = app
                 .visible_processes()
@@ -181,7 +181,7 @@ fn visible_processes_match_the_neutral_comparator_on_the_variance_fixture() {
 fn variance_fixture_pins_tie_missing_and_empty_user_semantics() {
     let items = variance_fixture();
     let mut app = ShellApp::new();
-    app.data.processes = Some(items);
+    app.data.processes = Some(items.into());
 
     app.process_sort = (SortCol::Cpu, SortDir::Desc);
     let pids: Vec<u32> = app.visible_processes().iter().map(|row| row.pid).collect();

@@ -255,7 +255,10 @@ impl RootView {
                                 .flex()
                                 .flex_row()
                                 .justify_end()
-                                .child(button)
+                                // The button keeps its intrinsic width: a
+                                // squeezed toolbar control reads as a bare
+                                // "…" box. Text slots yield; controls don't.
+                                .child(div().flex_none().child(button))
                         }))
                         .child(main),
                     px(page_padding),
@@ -427,7 +430,7 @@ impl RootView {
             TopPage::System => {
                 let entity = cx.entity();
                 let hardware = self.hardware_rc().clone();
-                let processes = self.processes_rc().clone();
+                let processes = self.processes_arc().clone();
                 let system_layout = responsive::SystemPageBudget::from_frame(frame);
                 let content: AnyElement = match self.dashboard.section {
                     SystemSection::Dashboard => {

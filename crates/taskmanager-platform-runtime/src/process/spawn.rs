@@ -12,7 +12,8 @@ use taskmanager_application::{
 
 use super::{ProcessControlLanes, ProcessExecutors, ProcessObservationLanes, ProcessRuntimeLanes};
 use crate::{
-    RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lane, spawn_observation_lane,
+    RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lazy_lane,
+    spawn_lazy_observation_lane,
 };
 
 /// Attach all process executors to their independent typed lanes.
@@ -60,14 +61,16 @@ pub fn spawn_process_lanes(
         environment: execute_environment,
     } = executors;
 
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         list,
         events.clone(),
         move |ProcessListRequest::Refresh| execute_list(clock_ms()),
-        |snapshot| PlatformEvent::Processes(ProcessEvent::Snapshot(snapshot.items)),
+        |snapshot| {
+            PlatformEvent::Processes(ProcessEvent::Snapshot(std::sync::Arc::new(snapshot.items)))
+        },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         network,
         events.clone(),
@@ -85,7 +88,7 @@ pub fn spawn_process_lanes(
             )))
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         gpu,
         events.clone(),
@@ -101,7 +104,7 @@ pub fn spawn_process_lanes(
             PlatformEvent::ProcessInsightFacet(ProcessInsightFacetEvent::Gpu(Box::new(observation)))
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         resources,
         events.clone(),
@@ -119,7 +122,7 @@ pub fn spawn_process_lanes(
             )))
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         isolation,
         events.clone(),
@@ -137,7 +140,7 @@ pub fn spawn_process_lanes(
             )))
         },
     )?;
-    spawn_observation_lane(
+    spawn_lazy_observation_lane(
         workers,
         threads,
         events.clone(),
@@ -156,7 +159,7 @@ pub fn spawn_process_lanes(
         },
     )?;
     if let (Some(open_files), Some(mut execute_open_files)) = (open_files, execute_open_files) {
-        spawn_observation_lane(
+        spawn_lazy_observation_lane(
             workers,
             open_files,
             events.clone(),
@@ -176,7 +179,7 @@ pub fn spawn_process_lanes(
         )?;
     }
     if let (Some(environment), Some(mut execute_environment)) = (environment, execute_environment) {
-        spawn_observation_lane(
+        spawn_lazy_observation_lane(
             workers,
             environment,
             events.clone(),
@@ -195,7 +198,7 @@ pub fn spawn_process_lanes(
             },
         )?;
     }
-    spawn_lane(
+    spawn_lazy_lane(
         workers,
         affinity,
         events.clone(),
@@ -206,7 +209,7 @@ pub fn spawn_process_lanes(
             ))
         },
     )?;
-    spawn_lane(
+    spawn_lazy_lane(
         workers,
         affinity_control,
         events.clone(),
@@ -218,7 +221,7 @@ pub fn spawn_process_lanes(
             }))
         },
     )?;
-    spawn_lane(
+    spawn_lazy_lane(
         workers,
         resource_control,
         events.clone(),
@@ -229,7 +232,7 @@ pub fn spawn_process_lanes(
             ))
         },
     )?;
-    spawn_lane(
+    spawn_lazy_lane(
         workers,
         network_escalation,
         events.clone(),
@@ -240,7 +243,7 @@ pub fn spawn_process_lanes(
             ))
         },
     )?;
-    spawn_lane(workers, control, events, move |request| {
+    spawn_lazy_lane(workers, control, events, move |request| {
         Ok(PlatformEvent::Processes(
             execute_control(request)?.into_event(),
         ))

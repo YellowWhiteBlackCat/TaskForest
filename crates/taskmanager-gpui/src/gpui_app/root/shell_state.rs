@@ -15,8 +15,7 @@ use super::RootView;
 use crate::gpui_app::list_view::ActionFeedback;
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_shell::{
-    InfoSortCol, InfoTable, ProcessRowId, ProcessRowIdentity, ProcessStatusFilter, SortCol,
-    SortDir,
+    InfoSortCol, InfoTable, ProcessRowId, ProcessRowIdentity, ProcessStatusFilter, SortCol, SortDir,
 };
 use taskmanager_ui::data::table::SortState;
 
@@ -122,9 +121,7 @@ impl RootView {
 
     /// The authoritative multi-select identity set (row highlighting).
     #[must_use]
-    pub fn selected_process_identities(
-        &self,
-    ) -> &std::collections::HashSet<ProcessRowIdentity> {
+    pub fn selected_process_identities(&self) -> &std::collections::HashSet<ProcessRowIdentity> {
         self.shell.selection.rows()
     }
 

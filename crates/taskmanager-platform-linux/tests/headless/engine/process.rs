@@ -1,5 +1,7 @@
 //! Process-manager source and cache regression tests.
 
+use std::collections::HashMap;
+
 use super::*;
 
 #[test]

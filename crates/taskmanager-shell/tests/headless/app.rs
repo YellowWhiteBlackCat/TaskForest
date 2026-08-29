@@ -100,10 +100,8 @@ mod request_sessions;
 /// Resolve one demo process's validated row identity by pid (fixtures carry
 /// deterministic start tokens).
 fn identity_of(app: &crate::ShellApp, pid: u32) -> ProcessRowIdentity {
-    app.data
-        .processes
-        .as_deref()
-        .unwrap_or_default()
+    app.projection()
+        .processes_slice()
         .iter()
         .find(|process| process.pid == pid)
         .and_then(ProcessRowIdentity::from_process)
@@ -321,13 +319,16 @@ fn legacy_process_row_cannot_open_or_confirm_a_dangerous_action() {
     // carries NO provider start token — the legacy shape whose exact
     // identity is unprovable and therefore must never arm a dangerous
     // action (CORE-01 fail-closed rule).
-    app.data.processes = Some(vec![
-        taskmanager_core::core::process::ProcessItem::new(42, "legacy-worker")
-            .with_scalar_observations(ProcessScalarObservations {
-                start_time_secs: ScalarObservation::available(7_500, 1),
-                ..ProcessScalarObservations::default()
-            }),
-    ]);
+    app.data.processes = Some(
+        vec![
+            taskmanager_core::core::process::ProcessItem::new(42, "legacy-worker")
+                .with_scalar_observations(ProcessScalarObservations {
+                    start_time_secs: ScalarObservation::available(7_500, 1),
+                    ..ProcessScalarObservations::default()
+                }),
+        ]
+        .into(),
+    );
     app.application.active_page = AppPage::Applications;
 
     assert_eq!(app.selected_process_identity(), None);
@@ -748,14 +749,13 @@ fn stale_selected_pids_are_pruned_when_the_process_list_refreshes() {
     // exercises the same `prune_stale_selection` call the process-snapshot
     // refresh path runs, without assembling a full `PlatformEventBatch`.
     let surviving: Vec<_> = app
-        .data
-        .processes
-        .clone()
-        .unwrap_or_default()
-        .into_iter()
+        .projection()
+        .processes_slice()
+        .iter()
+        .cloned()
         .filter(|process| process.pid != pids[2])
         .collect();
-    app.data.processes = Some(surviving);
+    app.data.processes = Some(surviving.into());
     app.prune_stale_selection();
 
     assert!(
@@ -1069,12 +1069,12 @@ fn visible_processes_memo_is_transparent_and_invalidates_correctly() {
     // batch does (bump the refresh watermark) is reflected without touching
     // query or sort — and a same-key different-length direct swap is caught
     // by the length guard even without the bump.
-    app.data.processes = Some(Vec::new());
+    app.data.processes = Some(Vec::new().into());
     assert!(app.visible_processes().is_empty());
     let mut app2 = crate::demo_app();
     let _ = app2.visible_processes();
-    let replacement = vec![app2.data.processes.as_deref().unwrap_or_default()[0].clone()];
-    app2.data.processes = Some(replacement);
+    let replacement = vec![app2.projection().processes_slice()[0].clone()];
+    app2.data.processes = Some(replacement.into());
     assert_eq!(app2.visible_processes().len(), 1);
 }
 

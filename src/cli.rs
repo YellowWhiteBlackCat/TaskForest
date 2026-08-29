@@ -387,7 +387,7 @@ fn collect_one_snapshot(
         // most recently published list is the point-in-time truth.
         for correlated in batch.process_events {
             if let ProcessEvent::Snapshot(items) = correlated.event {
-                processes = items;
+                processes = items.as_ref().clone();
                 have_processes = true;
             }
         }

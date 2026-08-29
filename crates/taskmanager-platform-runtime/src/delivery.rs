@@ -12,7 +12,7 @@ mod terminal_mailbox_tests;
 mod tests;
 mod worker;
 
-pub(crate) use worker::{execute_isolated, recv_or_shutdown, shutdown_requested};
+pub(crate) use worker::{execute_isolated, recv_or_shutdown_with_idle, shutdown_requested};
 
 pub(crate) use catalog::{ProviderPanicContext, RuntimeCapabilityCatalog};
 pub(crate) use event_port::FairEventPort;
@@ -24,3 +24,8 @@ pub use worker::{
 };
 
 pub(crate) use worker::LaneExitGuard;
+pub(crate) use worker::LaneStartRegistry;
+pub(crate) use worker::{
+    spawn_lazy_health_observation_lane, spawn_lazy_lane, spawn_lazy_observation_lane,
+    spawn_lazy_typed_outcome_lane, spawn_or_register_lane,
+};

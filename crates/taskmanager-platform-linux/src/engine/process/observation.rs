@@ -4,6 +4,7 @@ use taskmanager_core::{
     FailureKind, ProcessItem, ProcessScalarObservations, ScalarObservation, SourceOutcome,
 };
 
+use super::PreviousProcessView;
 use super::procfs::{
     FdCount, ProcIoFields, ProcStatFields, clock_ticks_per_second, read_fd_count, read_proc_io,
     read_proc_stat, read_proc_status_memory,
@@ -34,12 +35,12 @@ struct ProcessScalarInputs {
     io: Result<ProcIoFields, FailureKind>,
 }
 
-#[derive(Debug, Clone, Copy)]
-struct ProcessObservationContext<'a> {
+#[derive(Clone, Copy)]
+struct ProcessObservationContext<'a, P: PreviousProcessView + ?Sized = ProcessItem> {
     boot_time: &'a Result<u64, FailureKind>,
     clock_ticks: &'a Result<u64, FailureKind>,
     observed_at_ms: u64,
-    previous: Option<&'a ProcessItem>,
+    previous: Option<&'a P>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -51,12 +52,12 @@ struct CurrentProcessInputs {
     io: Result<ProcIoFields, FailureKind>,
 }
 
-pub(super) fn observe_process_scalars(
+pub(super) fn observe_process_scalars<P: PreviousProcessView + ?Sized>(
     pid: u32,
     boot_time: &Result<u64, FailureKind>,
     clock_ticks: &Result<u64, FailureKind>,
     observed_at_ms: u64,
-    previous: Option<&ProcessItem>,
+    previous: Option<&P>,
     rate_state: &mut ProcessRateState,
     want_fd_count: bool,
 ) -> (ProcessScalarObservations, ProcessScalarEvidence) {
@@ -107,9 +108,9 @@ pub(super) fn mark_retained_item_stale(item: &mut ProcessItem, failure: FailureK
     item.apply_scalar_observations(item.scalar_observations().transition_failure(failure));
 }
 
-fn observations_from_results(
+fn observations_from_results<P: PreviousProcessView + ?Sized>(
     inputs: ProcessScalarInputs,
-    context: ProcessObservationContext<'_>,
+    context: ProcessObservationContext<'_, P>,
     rate_state: &mut ProcessRateState,
 ) -> (ProcessScalarObservations, ProcessScalarEvidence) {
     let ProcessScalarInputs {
@@ -220,9 +221,9 @@ fn observations_from_results(
     )
 }
 
-fn observations_for_current_identity(
+fn observations_for_current_identity<P: PreviousProcessView + ?Sized>(
     inputs: CurrentProcessInputs,
-    context: ProcessObservationContext<'_>,
+    context: ProcessObservationContext<'_, P>,
     rate_state: &mut ProcessRateState,
 ) -> ProcessScalarObservations {
     let CurrentProcessInputs {

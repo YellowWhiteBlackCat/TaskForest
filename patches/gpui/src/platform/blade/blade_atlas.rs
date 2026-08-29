@@ -27,10 +27,37 @@ struct BladeAtlasState {
     uploads: Vec<PendingUpload>,
 }
 
+const MAX_CACHED_ATLAS_TILES: usize = 8_192;
+const MAX_ATLAS_TEXTURES_PER_KIND: usize = 32;
+
 #[cfg(gles)]
 unsafe impl Send for BladeAtlasState {}
 
 impl BladeAtlasState {
+    /// Atlas keys are normally stable, but font/DPI changes can create a new
+    /// key for every glyph size and subpixel variant. Once the cache crosses a
+    /// generous bound, reset only at the frame boundary (the renderer waits
+    /// for the previous sync point before beginning the next frame), so old
+    /// GPU textures can be destroyed safely and the allocator starts fresh.
+    fn trim_if_needed(&mut self) {
+        let texture_count = [
+            self.storage.monochrome_textures.textures.len(),
+            self.storage.polychrome_textures.textures.len(),
+        ];
+        if self.tiles_by_key.len() <= MAX_CACHED_ATLAS_TILES
+            && texture_count
+                .iter()
+                .all(|count| *count <= MAX_ATLAS_TEXTURES_PER_KIND)
+        {
+            return;
+        }
+        self.storage.destroy(&self.gpu);
+        self.storage = BladeAtlasStorage::default();
+        self.tiles_by_key.clear();
+        self.initializations.clear();
+        self.uploads.clear();
+    }
+
     fn destroy(&mut self) {
         self.storage.destroy(&self.gpu);
         self.upload_belt.destroy(&self.gpu);
@@ -63,6 +90,7 @@ impl BladeAtlas {
 
     pub fn before_frame(&self, gpu_encoder: &mut gpu::CommandEncoder) {
         let mut lock = self.0.lock();
+        lock.trim_if_needed();
         lock.flush(gpu_encoder);
     }
 
@@ -149,9 +177,13 @@ impl BladeAtlasState {
         min_size: Size<DevicePixels>,
         kind: AtlasTextureKind,
     ) -> &mut BladeAtlasTexture {
+        // A monitor's steady-state glyph/icon set is small. Starting with a
+        // 512² atlas avoids committing 1 MiB (R8) / 4 MiB (BGRA) per texture
+        // before the UI has actually populated it; additional atlases are
+        // allocated only when the allocator needs them.
         const DEFAULT_ATLAS_SIZE: Size<DevicePixels> = Size {
-            width: DevicePixels(1024),
-            height: DevicePixels(1024),
+            width: DevicePixels(512),
+            height: DevicePixels(512),
         };
 
         let size = min_size.max(&DEFAULT_ATLAS_SIZE);

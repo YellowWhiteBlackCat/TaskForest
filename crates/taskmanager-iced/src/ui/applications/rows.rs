@@ -66,7 +66,9 @@ fn tree_node_row(
         .row_key()
         .and_then(|key| key.live_key())
         .is_some_and(|identity| ctx.selected_identities.contains(&identity))
-        || ctx.selected_row.is_some_and(|selected| Some(selected) == row.row_key());
+        || ctx
+            .selected_row
+            .is_some_and(|selected| Some(selected) == row.row_key());
     let row_padding = theme::row_padding(ctx.compact);
     let marker = if *has_children {
         if *collapsed { "▶" } else { "▼" }

@@ -33,7 +33,10 @@ pub const NAV_RAIL_WIDTH: f32 = 144.0;
 /// before a page profile is classified.
 pub const NAVIGATION_HORIZONTAL_INSET: f32 = 12.0;
 const ULTRA_COMPACT_CONTENT_WIDTH: f32 = 840.0;
-const COMPACT_CONTENT_WIDTH: f32 = 1080.0;
+/// Width at or above which a page column admits multi-line prose detail
+/// cards: below this the column wraps prose hard enough that such cards must
+/// degrade to their compact (bar-only) form regardless of height.
+pub const COMPACT_CONTENT_WIDTH: f32 = 1080.0;
 const WIDE_CONTENT_WIDTH: f32 = 1600.0;
 // These thresholds describe the page slot, not the outer window. The root
 // shell spends roughly 50px on navigation before a page sees any height, so a
@@ -137,9 +140,15 @@ impl PerformanceVerticalRunway {
     /// the shared Constrained page threshold; the Core threshold is the
     /// composed core-stack floor (title + header band + headline floor +
     /// summary + gaps).
+    ///
+    /// The Charts threshold is deliberately LOWER than the coarse
+    /// [`VerticalSpace::Constrained`] boundary (640): the rung only admits
+    /// the full inventory — whether a band actually composes is decided by
+    /// the per-page numeric fit checks against `content_height`. A normal
+    /// 1280x720 window (content ~628) must keep its full chart inventory.
     #[must_use]
     pub const fn for_content_height(height: f32) -> Self {
-        if height >= CONSTRAINED_CONTENT_HEIGHT {
+        if height >= PERFORMANCE_RUNWAY_CHARTS_HEIGHT {
             Self::Charts
         } else if height >= PERFORMANCE_RUNWAY_CORE_FLOOR {
             Self::Core
@@ -158,6 +167,12 @@ impl PerformanceVerticalRunway {
 /// Content height the core stack needs: title row + header band + headline
 /// tier floor + summary row + the shared gaps.
 pub const PERFORMANCE_RUNWAY_CORE_FLOOR: f32 = 380.0;
+
+/// Content height at which the full chart inventory is ADMITTED (the rung
+/// gate only). Deliberately below the coarse Constrained boundary (640): a
+/// normal 1280x720 window lands at ~628 content height and must keep its
+/// charts; the per-page numeric fit checks decide actual composition.
+const PERFORMANCE_RUNWAY_CHARTS_HEIGHT: f32 = 520.0;
 
 /// Fold the two typed axes into the one chart-inventory product bit: the
 /// width axis admits the full inventory only from the Compact profile up,
@@ -190,6 +205,13 @@ pub struct PerformancePageBudget {
     /// derived from BOTH axes; this field keeps the height reason typed and
     /// consumable on its own.
     pub vertical: PerformanceVerticalRunway,
+    /// Numeric page-slot content height backing `vertical`. The coarse rung
+    /// gates whether a band MAY render; per-page policies additionally check
+    /// this number against the band's summed minimum heights to decide
+    /// whether it DOES (a band that cannot meet its floors hides whole, it
+    /// never squeezes). `0.0` = unknown (the legacy constructor) — policies
+    /// must fall back to the rung-only behavior then.
+    pub content_height: f32,
     /// Content inset before the pinned details divider. The outer PageFrame
     /// trailing inset remains zero so the pinned rail itself reaches the edge.
     pub main_trailing_inset: f32,
@@ -236,6 +258,7 @@ impl PerformancePageBudget {
             details,
             chart_inventory,
             vertical,
+            content_height: 0.0,
             main_trailing_inset: layout.page_padding,
             sidebar_width: match device_navigation {
                 DeviceNavigationPresentation::Strip => 0.0,
@@ -325,6 +348,7 @@ impl PerformancePageBudget {
             details,
             chart_inventory,
             vertical,
+            content_height: f32::from(frame.content.size.height).max(0.0),
             main_trailing_inset: if details == PerformanceDetailsPresentation::Pinned {
                 inset
             } else {

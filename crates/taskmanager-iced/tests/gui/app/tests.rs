@@ -220,13 +220,9 @@ fn application_aggregate_selection_stays_pidless() {
     let _ = app.update(Message::SelectPage(AppPage::Applications));
     let root_pid = app.shell.visible_processes()[0].pid;
 
-    let root_row_key = app
-        .shell
-        .visible_processes()[0]
+    let root_row_key = app.shell.visible_processes()[0]
         .current_start_token()
-        .and_then(|token| {
-            taskmanager_shell::ProcessRowIdentity::from_parts(root_pid, token)
-        })
+        .and_then(|token| taskmanager_shell::ProcessRowIdentity::from_parts(root_pid, token))
         .map(taskmanager_shell::ProcessRowId::Application);
     let _ = app.update(Message::ToggleGroupExpansion {
         name: format!("app-tree:{root_pid}"),
@@ -399,18 +395,30 @@ fn row_click_branches_on_live_modifier_state() {
     ));
     let _ = app.update(Message::SelectRow(0));
     assert_eq!(app.shell.selected_identities().len(), 1);
-    assert!(app.shell.visible_process_by_pid(pids[0]).is_some_and(|p| app.shell.is_process_selected(p)));
+    assert!(
+        app.shell
+            .visible_process_by_pid(pids[0])
+            .is_some_and(|p| app.shell.is_process_selected(p))
+    );
 
     // Ctrl-click toggles a second, non-adjacent row into the set.
     let _ = app.update(Message::ModifiersChanged(iced::keyboard::Modifiers::CTRL));
     let _ = app.update(Message::SelectRow(2));
     assert_eq!(app.shell.selected_identities().len(), 2);
-    assert!(app.shell.visible_process_by_pid(pids[2]).is_some_and(|p| app.shell.is_process_selected(p)));
+    assert!(
+        app.shell
+            .visible_process_by_pid(pids[2])
+            .is_some_and(|p| app.shell.is_process_selected(p))
+    );
 
     // Shift-click grows the range from anchor (2) to 3, folding in pids 2..=3.
     let _ = app.update(Message::ModifiersChanged(iced::keyboard::Modifiers::SHIFT));
     let _ = app.update(Message::SelectRow(3));
-    assert!(app.shell.visible_process_by_pid(pids[3]).is_some_and(|p| app.shell.is_process_selected(p)));
+    assert!(
+        app.shell
+            .visible_process_by_pid(pids[3])
+            .is_some_and(|p| app.shell.is_process_selected(p))
+    );
     assert!(app.shell.selected_identities().len() >= 3);
 
     // Releasing the modifiers and plain-clicking collapses back to one.
@@ -419,7 +427,11 @@ fn row_click_branches_on_live_modifier_state() {
     ));
     let _ = app.update(Message::SelectRow(1));
     assert_eq!(app.shell.selected_identities().len(), 1);
-    assert!(app.shell.visible_process_by_pid(pids[1]).is_some_and(|p| app.shell.is_process_selected(p)));
+    assert!(
+        app.shell
+            .visible_process_by_pid(pids[1])
+            .is_some_and(|p| app.shell.is_process_selected(p))
+    );
 }
 
 #[test]

@@ -78,7 +78,9 @@ pub(super) fn aggregate_row(
         })
         .unwrap_or_default();
     let selection_key = match &toggle {
-        Toggle::GroupApp(_) => by_pid.get(&group.main_pid).and_then(|root| ProcessRowId::application_of(root)),
+        Toggle::GroupApp(_) => by_pid
+            .get(&group.main_pid)
+            .and_then(|root| ProcessRowId::application_of(root)),
         Toggle::None | Toggle::TreePid(_) | Toggle::GroupCategory(_) => None,
     };
     let mut row = VisibleRow {

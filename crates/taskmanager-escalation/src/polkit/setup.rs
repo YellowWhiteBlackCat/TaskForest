@@ -8,7 +8,7 @@
 use std::io;
 
 #[cfg(target_os = "linux")]
-const SETUP_HELPER_PATH: &str = "/usr/libexec/taskmanager-setup-helper";
+const SETUP_HELPER_PATH: &str = "/usr/libexec/taskforest-setup-helper";
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SetupScriptOperation {

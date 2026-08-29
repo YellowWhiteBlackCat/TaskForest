@@ -66,15 +66,18 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         &battery.id,
         battery.device_generation,
     );
-    let title = if battery.model_name.is_empty() {
-        if battery.display_name.is_empty() {
-            format!("{} {}", i18n::t("common.battery"), index)
-        } else {
-            battery.display_name.clone()
-        }
+    // Title-row doctrine: the LEFT slot is the category, the RIGHT slot is
+    // the specific model — never a chart caption.
+    let model = if battery.model_name.is_empty() {
+        battery
+            .display_name
+            .is_empty()
+            .then(|| format!("{} {}", i18n::t("common.battery"), index))
+            .unwrap_or_else(|| battery.display_name.clone())
     } else {
         battery.model_name.clone()
     };
+    let title = i18n::t("common.battery").to_string();
     let stats = battery_stats(battery);
     // Optional power channel below the charge headline (the shared secondary
     // tier): only when the typed channel holds samples and the chart
@@ -103,7 +106,7 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         theme,
         stats_scroll,
         title,
-        subtitle: i18n::t("battery.charge_graph").to_string(),
+        subtitle: model,
         vital_line: None,
         header_extra: None,
         headline: HeadlineSurface::Charts(vec![ChartSpec::headline(
@@ -205,8 +208,8 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
     perf_page(PerfPageProps {
         theme,
         stats_scroll,
-        title: format!("{} — {}", i18n::t("common.fan"), fan.label()),
-        subtitle: i18n::t("fan.speed_graph").to_string(),
+        title: i18n::t("common.fan").to_string(),
+        subtitle: fan.label().to_owned(),
         vital_line: None,
         header_extra: None,
         headline: HeadlineSurface::Charts(vec![

@@ -17,7 +17,9 @@ use crate::gpui_app::history_samples::{
     storage_temperature_samples, storage_write_rate_samples,
 };
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::root::responsive::{PerformanceChartInventory, PerformancePageBudget};
+use crate::gpui_app::root::responsive::{
+    COMPACT_CONTENT_WIDTH, PerformanceChartInventory, PerformancePageBudget,
+};
 use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_application::i18n;
@@ -51,7 +53,10 @@ use taskmanager_theme::tokens;
 // page shell.
 pub(crate) use layout::{ChartSpec, DualLanes, HeadlineSurface, PerfPageProps, perf_page};
 use layout::{render_chart, stats_panel};
-use memory_composition::composition_block;
+use memory_composition::{
+    MEMORY_DETAIL_COMPACT_MIN_HEIGHT, MEMORY_DETAIL_FULL_MIN_HEIGHT, MemoryDetailMode,
+    composition_block,
+};
 use memory_stats::memory_page_stats;
 use network_stats::{network_link_speed_graph_max, network_stats, network_title};
 use partition_stats::partition_panel;
@@ -62,6 +67,18 @@ use taskmanager_shell::presentation::{
 };
 
 pub(crate) use gpu_page::{GpuChartLayout, GpuRenderState, gpu_percentage_readout, render_gpu};
+
+/// Memory page's fixed chrome above the chart area: the title row and the
+/// main-column gaps. Generous by intent — it only gates a mode change.
+const MEMORY_TITLE_CHROME: f32 = 60.0;
+/// One headline chart's floor: the 180px card plus its summary row.
+const MEMORY_CHART_FLOOR_ONE: f32 = 200.0;
+/// Both headline charts' floors plus the inter-chart gap.
+const MEMORY_CHART_FLOOR_BOTH: f32 = 2.0 * MEMORY_CHART_FLOOR_ONE + 10.0;
+/// Fit-check safety margin: the compact detail's real height drifts a few px
+/// with text metrics. The margin keeps that drift from clipping the swap
+/// chart's tail against the fixed viewport.
+const MEMORY_FIT_SAFETY: f32 = 24.0;
 
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/perf_views/tests.rs"]
@@ -273,6 +290,37 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
     // UI-only frame reuses the last projection via `Rc` deref, and the
     // chart's tail-limit keeps the identity when the window already fits.
     let (mem_history, swap_history) = memory_history.refresh(telemetry);
+    // Vertical page policy (memory's own ladder, 求同存异): the two headline
+    // charts keep their floors for as long as possible; the multi-line
+    // composition detail degrades TEXT-first — Full, then Compact (caption +
+    // composition bar, prose omitted), then gone (the Floor rung drops the
+    // header band wholesale). A swap chart that cannot meet its floor hides
+    // instead of squeezing. The Full prose form additionally requires a wide
+    // column: a narrow main column wraps the prose and the card grows past
+    // any height budget. `content_height == 0.0` is the legacy no-frame
+    // budget: unlimited, today's behavior.
+    let legacy_budget = budget.content_height <= 0.0;
+    let available = if legacy_budget {
+        f32::INFINITY
+    } else {
+        (budget.content_height - MEMORY_TITLE_CHROME).max(0.0)
+    };
+    let width_admits_full_prose = budget.workspace_width >= COMPACT_CONTENT_WIDTH;
+    let keep_swap = memory_stats.has_swap
+        && budget.chart_inventory == PerformanceChartInventory::Full
+        && available
+            >= MEMORY_DETAIL_COMPACT_MIN_HEIGHT + MEMORY_CHART_FLOOR_BOTH + MEMORY_FIT_SAFETY;
+    let charts_floor = if keep_swap {
+        MEMORY_CHART_FLOOR_BOTH
+    } else {
+        MEMORY_CHART_FLOOR_ONE
+    };
+    let detail_mode =
+        if width_admits_full_prose && available >= MEMORY_DETAIL_FULL_MIN_HEIGHT + charts_floor {
+            MemoryDetailMode::Full
+        } else {
+            MemoryDetailMode::Compact
+        };
     let mut charts = vec![ChartSpec::headline(
         "mem-graph",
         "mem-graph",
@@ -285,7 +333,7 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
     // graph. The correlated swap series is a percentage (0..=100) and reuses
     // theme.memory at a lower alpha so it reads as distinct yet
     // memory-adjacent.
-    if memory_stats.has_swap && budget.chart_inventory == PerformanceChartInventory::Full {
+    if keep_swap {
         charts.push(
             ChartSpec::headline(
                 "swap-graph",
@@ -303,9 +351,12 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
         title: i18n::t("common.memory").into(),
         subtitle: format!("{} {}", i18n::t("mem.total"), memory_stats.total_readout),
         vital_line: None,
-        header_extra: Some(composition_block(theme, m, units).into_any_element()),
+        header_extra: None,
         headline: HeadlineSurface::Charts(charts),
-        below: None,
+        // The composition module lives BELOW the two headline charts (the
+        // memory page's own ordering, matching disk: charts carry the page,
+        // the detail module follows and yields first).
+        below: Some(composition_block(theme, m, units, detail_mode).into_any_element()),
         stats: stats_panel(theme, stats),
         stats_footer: None,
         hover_slot,

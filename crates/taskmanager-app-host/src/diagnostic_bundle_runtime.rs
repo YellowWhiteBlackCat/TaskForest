@@ -5,7 +5,7 @@ use std::fs::{self, OpenOptions};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::JoinHandle;
 use std::time::Duration;
 
@@ -48,7 +48,11 @@ struct BundleCommand {
 
 struct DiagnosticBundleRuntimeInner {
     command_tx: Sender<BundleCommand>,
+    start_receivers: Mutex<Option<(Receiver<BundleCommand>, Receiver<()>)>>,
+    executor: DiagnosticBundleExecutor,
+    start_result: OnceLock<Result<(), Arc<str>>>,
     shutdown_tx: Sender<()>,
+    done_tx: Sender<()>,
     done_rx: Receiver<()>,
     /// Published with `Release` only after the worker's last completion send,
     /// so clients can prove no further completion can arrive.
@@ -56,17 +60,63 @@ struct DiagnosticBundleRuntimeInner {
     join: Mutex<Option<JoinHandle<()>>>,
 }
 
+impl DiagnosticBundleRuntimeInner {
+    fn ensure_started(&self) -> Result<(), DiagnosticBundleRuntimeStartError> {
+        let result = self.start_result.get_or_init(|| {
+            let Some((command_rx, shutdown_rx)) = self
+                .start_receivers
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .take()
+            else {
+                return Err(Arc::from(
+                    "diagnostic bundle worker start state was consumed",
+                ));
+            };
+            let executor = Arc::clone(&self.executor);
+            let worker_exited = Arc::clone(&self.worker_exited);
+            let done_tx = self.done_tx.clone();
+            let join = std::thread::Builder::new()
+                .name("taskforest-diagnostic-bundle".into())
+                .stack_size(1024 * 1024)
+                .spawn(move || {
+                    // The thread-boundary catch is the exit-registration
+                    // guarantee: a fault anywhere in the loop still marks the
+                    // lane dead and publishes `done`.
+                    let _ = catch_worker_panic(|| worker_loop(command_rx, shutdown_rx, executor));
+                    worker_exited.store(true, Ordering::Release);
+                    let _ = done_tx.try_send(());
+                })
+                .map_err(|error| Arc::<str>::from(error.to_string()));
+            match join {
+                Ok(join) => {
+                    *self
+                        .join
+                        .lock()
+                        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(join);
+                    Ok(())
+                }
+                Err(error) => Err(error),
+            }
+        });
+        result
+            .clone()
+            .map_err(|detail| DiagnosticBundleRuntimeStartError { detail })
+    }
+}
+
 impl Drop for DiagnosticBundleRuntimeInner {
     fn drop(&mut self) {
-        let _ = self.shutdown_tx.try_send(());
         let join = self.join.get_mut().ok().and_then(Option::take);
-        if self
-            .done_rx
-            .recv_timeout(DIAGNOSTIC_BUNDLE_SHUTDOWN_WAIT)
-            .is_ok()
-            && let Some(join) = join
-        {
-            let _ = join.join();
+        if let Some(join) = join {
+            let _ = self.shutdown_tx.try_send(());
+            if self
+                .done_rx
+                .recv_timeout(DIAGNOSTIC_BUNDLE_SHUTDOWN_WAIT)
+                .is_ok()
+            {
+                let _ = join.join();
+            }
         }
     }
 }
@@ -94,28 +144,17 @@ impl DiagnosticBundleCoordinator {
         let (shutdown_tx, shutdown_rx) = bounded(1);
         let (done_tx, done_rx) = bounded(1);
         let worker_exited = Arc::new(AtomicBool::new(false));
-        let worker_exited_for_thread = Arc::clone(&worker_exited);
-        let join = std::thread::Builder::new()
-            .name("taskforest-diagnostic-bundle".into())
-            .spawn(move || {
-                // The thread-boundary catch is the exit-registration
-                // guarantee: a fault anywhere in the loop still marks the
-                // lane dead and publishes `done`, so the bounded shutdown
-                // seam never waits on a thread that died mid-unwind.
-                let _ = catch_worker_panic(|| worker_loop(command_rx, shutdown_rx, execute));
-                worker_exited_for_thread.store(true, Ordering::Release);
-                let _ = done_tx.try_send(());
-            })
-            .map_err(|error| DiagnosticBundleRuntimeStartError {
-                detail: Arc::from(error.to_string()),
-            })?;
         Ok(Self {
             inner: Arc::new(DiagnosticBundleRuntimeInner {
                 command_tx,
+                start_receivers: Mutex::new(Some((command_rx, shutdown_rx))),
+                executor: execute,
+                start_result: OnceLock::new(),
                 shutdown_tx,
+                done_tx,
                 done_rx,
                 worker_exited,
-                join: Mutex::new(Some(join)),
+                join: Mutex::new(None),
             }),
         })
     }
@@ -174,6 +213,11 @@ impl DiagnosticBundlePort for DiagnosticBundleClient {
         &mut self,
         request: DiagnosticBundleRequest,
     ) -> Result<(), DiagnosticBundleError> {
+        if self.inner.ensure_started().is_err() {
+            return Err(DiagnosticBundleError::new(
+                DiagnosticBundleErrorKind::Unavailable,
+            ));
+        }
         // A dead lane answers with its typed unavailability even while credits
         // stranded by the fault still occupy the completion budget; callers
         // must never mistake a gone worker for transient busyness.

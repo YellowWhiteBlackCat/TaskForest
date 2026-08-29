@@ -2,14 +2,13 @@
 
 ## Role
 
-OS-neutral bounded execution runtime: provider catalog, worker lanes, fair delivery, correlation,
-lifecycle and telemetry integration.
+OS-neutral bounded execution runtime: provider catalog, worker lanes, fair delivery,
+correlation, lifecycle and telemetry integration.
 
 ## Boundary
 
 Runtime schedules and transports work but does not define OS facts, page layout,
-widget state or product copy. Every lane has bounded work, ownership and
-failure delivery.
+widget state or product copy; every lane has bounded work, ownership and failure delivery.
 
 Provider registration may carry one typed composition-time capability status.
 The catalog publishes it before the first request; correlated terminal health
@@ -35,25 +34,21 @@ success payload, because catalog health and terminal state are one transaction.
 
 Every provider lane is created through a named `std::thread::Builder` and is
 owned by one `WorkerRuntime`; startup failure is typed and aborts native
-composition. A partially started composition drops that owner, disconnecting a
-shared shutdown channel so already-started idle lanes exit instead of becoming
-orphans. The completed `PlatformHandle` retains the owner opaquely through its
-last clone.
+composition. Seven dashboard lanes are resident; the remaining typed lanes
+retain their bounded channel and provider state, start on first request, and
+retire after 15 seconds idle. Detail loading is therefore on demand without
+changing request, health, correlation, or failure semantics. A partial
+composition drops the owner and disconnects idle lanes; the completed
+`PlatformHandle` retains it opaquely through its last clone.
 
-Worker admission has both a 64-lane runtime ceiling and a 128-thread process
-ceiling. A process permit lives on the worker thread, not its handle: a provider
-still blocked after runtime drop remains counted, so repeatedly rebuilding a
-runtime cannot grow detached stuck threads without bound. Normal thread exit
-returns the permit. Drop wakes idle workers and joins only threads already
-finished; it never waits for an executing provider. Cooperative shutdown does
-not pretend to cancel blocking OS I/O—native providers must still enforce their
-own I/O timeout or cancellation boundary, and a result returning after shutdown
-is not published.
+Worker admission has a 64-lane runtime ceiling and a 128-thread process ceiling.
+Permits live on worker threads, so detached stuck providers remain bounded.
+Normal exit returns the permit; drop wakes idle workers and joins only finished
+threads. Native providers still own their I/O timeout/cancellation boundary,
+and results returning after shutdown are not published.
 
-Native bounded-command pipe readers follow the same fallible named-thread rule:
-partial reader startup terminates and reaps the child before returning a typed
-spawn failure. Long-running native sampler startup likewise cleans up its child
-when its reader cannot be created.
+Native bounded-command readers follow the same fallible named-thread rule:
+partial startup reaps the child; sampler startup cleans up when its reader fails.
 
 ## ECS runtime boundary
 
@@ -190,12 +185,9 @@ runner is not `Send`, the configured `World` and `Update` schedule are then
 transferred into the worker-safe runtime scheduler. This preserves the existing
 worker/thread contract without `unsafe`.
 
-The headless behavior suite lives under `tests/headless/`, with replay and
-zero-dependency workload fixtures beside it. It exercises typed tick,
-pre-enqueue admission, completion, retry, stale-request rejection, domain
-partitioning, and a fixed-seed lifecycle model covering rollback, wrong request
-IDs, target ceilings, lease renewal, and bounded diagnostic history. They
-provide performance and behavior baselines; they do not authorize moving facts,
+The headless suite under `tests/headless/` exercises typed tick, admission,
+completion, retry, stale requests, domain partitioning, and fixed-seed lifecycle
+models. It provides behavior/performance baselines and does not move facts,
 revisions, process rows, or UI state into ECS.
 
 There is no pre-ECS compatibility path: default and `--no-default-features`
@@ -203,7 +195,6 @@ builds use the same lifecycle authority. Feature selection therefore cannot
 silently remove admission, leases, target bounds, or scheduler diagnostics.
 
 ## Contract and verification
-
 The cross-crate ledger is [`STATE_OWNERSHIP.md`](../../docs/STATE_OWNERSHIP.md). Preserve sequence,
-generation, partial/stale/unavailable outcomes and recovery; verify queue fairness,
-cancellation, timeout, delivery ownership and live drain without host UI.
+generation, partial/stale/unavailable outcomes and recovery; verify queue fairness, cancellation,
+timeout, delivery ownership and live drain without host UI.

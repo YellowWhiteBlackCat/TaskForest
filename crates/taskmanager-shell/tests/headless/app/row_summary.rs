@@ -11,12 +11,15 @@ use taskmanager_core::core::startup::{
 #[test]
 fn applications_summary_is_pid_tab_name() {
     let mut shell = ShellApp::default();
-    shell.data.processes = Some(vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
-            .pid(4242)
-            .name("my_daemon".into())
-            .build(),
-    ]);
+    shell.data.processes = Some(
+        vec![
+            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                .pid(4242)
+                .name("my_daemon".into())
+                .build(),
+        ]
+        .into(),
+    );
     let _ = shell.apply_action(AppAction::SelectPage(AppPage::Applications));
     shell.selected = 0;
     assert_eq!(

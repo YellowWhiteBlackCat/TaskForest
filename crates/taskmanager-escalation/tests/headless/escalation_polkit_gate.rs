@@ -18,8 +18,8 @@ fn stage_fixture() -> (
             .map_or(0, |d| d.as_nanos()),
     ));
     let pkexec = root.join("bin/pkexec");
-    let action = root.join("actions/com.taskforest.net-launcher.policy");
-    let helper = root.join("libexec/taskmanager-net-launcher");
+    let action = root.join("actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy");
+    let helper = root.join("libexec/taskforest-net-launcher");
     for path in [&pkexec, &action, &helper] {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).unwrap_or_else(|error| {

@@ -7,13 +7,13 @@
   one OS-native prompt.
 
   Install paths (see polkit/README.md):
-    this file   -> /usr/share/polkit-1/actions/com.taskforest.perf-helper.policy
-    helper bin  -> /usr/libexec/taskmanager-privilege-helper
+    this file   -> /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy
+    helper bin  -> /usr/libexec/taskforest-privilege-helper
 
   The org.freedesktop.policykit.exec.path annotation below MUST match the program
   path passed to pkexec exactly: polkit resolves the action by that path, so a
   bare binary name would fail to match this action and be denied. The consumer
-  invokes `pkexec /usr/libexec/taskmanager-privilege-helper`.
+  invokes `pkexec /usr/libexec/taskforest-privilege-helper`.
 
   auth_admin_keep on the active session means ONE prompt authorizes the helper
   for the whole session (a short keep-alive), not every single read. A
@@ -21,7 +21,7 @@
   service cannot silently escalate; fully inert sessions are denied.
 -->
 <policyconfig>
-  <action id="com.taskforest.perf-helper">
+  <action id="io.github.YellowWhiteBlackCat.TaskForest.perf-helper">
     <description>Read Intel i915/xe GPU engine utilization via the perf PMU</description>
     <message>TaskForest needs to read the Intel GPU performance-monitoring unit to display per-engine utilization. Authentication is remembered for the session.</message>
     <defaults>
@@ -29,7 +29,7 @@
       <allow_inactive>auth_admin_keep</allow_inactive>
       <allow_active>auth_admin_keep</allow_active>
     </defaults>
-    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/taskmanager-privilege-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/taskforest-privilege-helper</annotate>
     <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
   </action>
 </policyconfig>

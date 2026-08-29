@@ -252,9 +252,7 @@ impl TuiApp {
     fn shell_default(shell: taskmanager_shell::ShellApp) -> Self {
         let tree_identity_by_pid = shell
             .projection()
-            .processes
-            .as_deref()
-            .unwrap_or_default()
+            .processes_slice()
             .iter()
             .map(|process| (process.pid, process.current_start_token()))
             .collect();
