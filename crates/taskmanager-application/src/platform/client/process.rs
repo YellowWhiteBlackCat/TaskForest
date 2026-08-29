@@ -1,6 +1,7 @@
 //! Process-axis request submission on `PlatformClient`: list, control,
 //! five-facet insights under one revision, and affinity/resource control.
 
+use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_platform_contract::{
     CapabilityId, RequestId, SubmissionError, SubmissionErrorKind,
 };
@@ -58,7 +59,7 @@ impl PlatformClient {
     /// projected immediately; already accepted facets remain valid work.
     pub fn submit_process_insights(
         &mut self,
-        target: crate::FrozenProcessIdentity,
+        target: FrozenProcessIdentity,
         submitted_at_ms: u64,
     ) -> Result<ProcessInsightsSubmission, ProcessInsightsSubmissionError> {
         if target.authoritative_start_token().is_none() {
@@ -98,7 +99,7 @@ impl PlatformClient {
 
     fn submit_process_network(
         &mut self,
-        target: &crate::FrozenProcessIdentity,
+        target: &FrozenProcessIdentity,
         revision: crate::ProcessInsightsRevision,
         submitted_at_ms: u64,
     ) -> Result<RequestId, SubmissionError> {
@@ -123,7 +124,7 @@ impl PlatformClient {
 
     fn submit_process_gpu(
         &mut self,
-        target: &crate::FrozenProcessIdentity,
+        target: &FrozenProcessIdentity,
         revision: crate::ProcessInsightsRevision,
         submitted_at_ms: u64,
     ) -> Result<RequestId, SubmissionError> {
@@ -148,7 +149,7 @@ impl PlatformClient {
 
     fn submit_process_resources(
         &mut self,
-        target: &crate::FrozenProcessIdentity,
+        target: &FrozenProcessIdentity,
         revision: crate::ProcessInsightsRevision,
         submitted_at_ms: u64,
     ) -> Result<RequestId, SubmissionError> {
@@ -173,7 +174,7 @@ impl PlatformClient {
 
     fn submit_process_isolation(
         &mut self,
-        target: &crate::FrozenProcessIdentity,
+        target: &FrozenProcessIdentity,
         revision: crate::ProcessInsightsRevision,
         submitted_at_ms: u64,
     ) -> Result<RequestId, SubmissionError> {
@@ -273,7 +274,7 @@ impl PlatformClient {
     fn finish_process_insight_submission(
         &mut self,
         id: RequestId,
-        target: &crate::FrozenProcessIdentity,
+        target: &FrozenProcessIdentity,
         revision: crate::ProcessInsightsRevision,
         facet: ProcessInsightFacet,
         result: Result<(), SubmissionError>,

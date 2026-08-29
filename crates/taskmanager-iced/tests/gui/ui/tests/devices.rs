@@ -13,10 +13,11 @@ use super::{
     CompactDetailViewport, PerfDetail, available_perf_devices, bounded_sidebar_label, chunk_count,
     compact_detail_viewport, perf_detail_kind, performance_sidebar_label,
 };
-use taskmanager_application::{
+use taskmanager_core::core::metrics::{
     DiskMetrics, GpuScalarObservations, GpuThrottleReason, NetworkMetrics, ScalarObservation,
     SystemSnapshot,
 };
+use taskmanager_shell::presentation::bytes;
 
 #[path = "devices/fan.rs"]
 mod fan;
@@ -45,15 +46,15 @@ pub(crate) fn flat(rows: &[taskmanager_shell::viewmodel::StatRow]) -> Vec<(&str,
 #[test]
 fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
     use taskmanager_application::i18n::{Language, set_language};
-    use taskmanager_application::{GpuEngine, GpuEngineKind, GpuMetrics};
+    use taskmanager_core::core::metrics::{GpuEngine, GpuEngineKind, GpuMetrics};
 
     // The shared catalog auto-detects the host locale on first use; pin English
     // so the label assertions are deterministic and independent of the host.
     set_language(Language::En);
 
     let mut gpu = GpuMetrics::new("gpu:pci:0000:03:00.0", "NVIDIA GeForce");
-    gpu.device_state = taskmanager_application::DeviceState {
-        status: taskmanager_application::DeviceStatus::Healthy,
+    gpu.device_state = taskmanager_core::core::device_state::DeviceState {
+        status: taskmanager_core::core::device_state::DeviceStatus::Healthy,
         ..Default::default()
     };
     gpu.driver = Some("nvidia".into());
@@ -128,8 +129,8 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
 
 #[test]
 fn gpu_summary_keeps_honest_dashes_for_unavailable_fields() {
-    use taskmanager_application::GpuMetrics;
     use taskmanager_application::i18n::{Language, set_language};
+    use taskmanager_core::core::metrics::GpuMetrics;
 
     set_language(Language::En);
 
@@ -183,8 +184,8 @@ fn gpu_summary_keeps_honest_dashes_for_unavailable_fields() {
 
 #[test]
 fn gpu_summary_promotes_the_pci_marketing_name_without_losing_the_fact_row() {
-    use taskmanager_application::GpuMetrics;
     use taskmanager_application::i18n::{Language, set_language};
+    use taskmanager_core::core::metrics::GpuMetrics;
 
     set_language(Language::En);
     let mut gpu = GpuMetrics::new("", "Intel Xe Graphics");
@@ -549,8 +550,8 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
         .name("nvme1n1".into())
         .disk_type("SATA SSD".into())
         .mount_point("/".into())
-        .device_state(taskmanager_application::DeviceState {
-            status: taskmanager_application::DeviceStatus::Healthy,
+        .device_state(taskmanager_core::core::device_state::DeviceState {
+            status: taskmanager_core::core::device_state::DeviceStatus::Healthy,
             ..Default::default()
         })
         .current_capacity_bytes(500 * GIB)
@@ -566,11 +567,13 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
         taskmanager_test_support::DiskPartitionFixtureBuilder::new()
             .mount_point("/home".into())
             .name("nvme1n1p2".into())
-            .scalar_observations(taskmanager_application::DiskPartitionScalarObservations {
-                capacity_bytes: ScalarObservation::available(100 * GIB, 1),
-                used_bytes: ScalarObservation::available(70 * GIB, 1),
-                free_bytes: ScalarObservation::available(30 * GIB, 1),
-            })
+            .scalar_observations(
+                taskmanager_core::core::metrics::DiskPartitionScalarObservations {
+                    capacity_bytes: ScalarObservation::available(100 * GIB, 1),
+                    used_bytes: ScalarObservation::available(70 * GIB, 1),
+                    free_bytes: ScalarObservation::available(30 * GIB, 1),
+                },
+            )
             .build(),
     ];
 
@@ -742,17 +745,17 @@ fn network_summary_projects_wireless_ssid_signal_and_utilization() {
         .current_tx_bytes_per_sec(MIB)
         .current_utilization_pct(22.0)
         .link_speed_observation(match Some(866) {
-            Some(value) => taskmanager_application::ScalarObservation::available(value, 1),
-            None => taskmanager_application::ScalarObservation::default(),
+            Some(value) => taskmanager_core::core::metrics::ScalarObservation::available(value, 1),
+            None => taskmanager_core::core::metrics::ScalarObservation::default(),
         })
         .ssid_observation(match Some("TaskForest-5G".into()) {
-            Some(value) => taskmanager_application::OptionalObservation::present(value, 1),
-            None => taskmanager_application::OptionalObservation::default(),
+            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
+            None => taskmanager_core::core::metrics::OptionalObservation::default(),
         })
-        .adapter_type(taskmanager_application::NetworkAdapterType::WiFi)
+        .adapter_type(taskmanager_core::core::metrics::NetworkAdapterType::WiFi)
         .signal_observation(match Some(-47) {
-            Some(value) => taskmanager_application::OptionalObservation::present(value, 1),
-            None => taskmanager_application::OptionalObservation::default(),
+            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
+            None => taskmanager_core::core::metrics::OptionalObservation::default(),
         })
         .ipv4_addr(Some("192.168.1.10".into()))
         .ipv6_addr(Some("fe80::2".into()))

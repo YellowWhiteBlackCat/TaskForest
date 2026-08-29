@@ -49,7 +49,7 @@ fn cpu_spec_rows_format_present_facts() {
 #[test]
 fn cpu_spec_rows_emit_hybrid_rows_in_order() {
     let mut cpu = CpuMetrics::default();
-    cpu.performance_policy = crate::core::metrics::CpuPerformancePolicy {
+    cpu.performance_policy = taskmanager_core::core::metrics::CpuPerformancePolicy {
         frequency_implementation: Some("driver".into()),
         active_policy: Some("governor".into()),
         energy_preference: Some("preference".into()),

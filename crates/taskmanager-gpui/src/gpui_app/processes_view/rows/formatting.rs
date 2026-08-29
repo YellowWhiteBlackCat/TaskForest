@@ -142,7 +142,7 @@ pub(super) fn format_nice(nice: i32) -> String {
 
 pub(super) fn format_start_time(
     seconds: Option<u64>,
-    rules: &taskmanager_application::LocalTimeRulesObservation,
+    rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> String {
     taskmanager_shell::presentation::start_clock_local(seconds, rules)
 }

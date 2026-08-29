@@ -157,7 +157,7 @@ fn diskstats_io_failure(error: &std::io::Error) -> FailureKind {
 
 /// Copy parsed NVMe or ATA/SATA SMART fields onto a disk's `DiskMetrics`. Keeps
 /// the collector loop body free of field-by-field plumbing.
-pub(super) fn apply_smart(d: &mut DiskMetrics, s: &smart::DiskSmart) {
+pub(super) fn apply_smart(d: &mut DiskMetrics, s: &taskmanager_core::core::smart::DiskSmart) {
     d.smart_availability = s.availability;
     d.smart_state = s.state;
     d.smart_provider.clone_from(&s.provider);

@@ -1,8 +1,8 @@
-use crate::core::metrics::{
+use crate::gpui_app::formatting::DisplayUnits;
+use taskmanager_core::core::metrics::{
     GpuMetrics, GpuScalarObservations, NetworkAdapterType, NetworkScalarObservations,
     NetworkWirelessObservations, OptionalObservation, ScalarObservation, SystemSnapshot,
 };
-use crate::gpui_app::formatting::DisplayUnits;
 
 use super::{
     NetworkVisibility, cpu_caption, gpu_caption_line1, gpu_caption_line2, nic_caption_line2,
@@ -55,7 +55,9 @@ fn gpu_caption_uses_only_current_typed_observation_truth() {
     assert_eq!(gpu_caption_line2(&measured), "12%  ·  41 °C");
 
     let failed = GpuMetrics::from_observations(GpuScalarObservations {
-        utilization_pct: ScalarObservation::unavailable(crate::core::FailureKind::PermissionDenied),
+        utilization_pct: ScalarObservation::unavailable(
+            taskmanager_core::core::FailureKind::PermissionDenied,
+        ),
         ..Default::default()
     });
     assert_eq!(gpu_caption_line2(&failed), "—");
@@ -76,10 +78,10 @@ fn vram_captions_follow_current_dedicated_observations() {
 
     let stale_dedicated = GpuMetrics::from_observations(GpuScalarObservations {
         dedicated_vram_used_bytes: ScalarObservation::unavailable(
-            crate::core::FailureKind::PermissionDenied,
+            taskmanager_core::core::FailureKind::PermissionDenied,
         ),
         dedicated_vram_total_bytes: ScalarObservation::unavailable(
-            crate::core::FailureKind::PermissionDenied,
+            taskmanager_core::core::FailureKind::PermissionDenied,
         ),
         ..Default::default()
     });
@@ -91,10 +93,10 @@ fn vram_captions_follow_current_dedicated_observations() {
 #[test]
 fn cpu_caption_renders_dash_when_typed_usage_is_unavailable() {
     let snapshot = SystemSnapshot {
-        cpu: crate::core::metrics::CpuMetrics::from_observations(
-            crate::core::metrics::CpuScalarObservations {
+        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
+            taskmanager_core::core::metrics::CpuScalarObservations {
                 global_usage_pct: ScalarObservation::unavailable(
-                    crate::core::FailureKind::PermissionDenied,
+                    taskmanager_core::core::FailureKind::PermissionDenied,
                 ),
                 ..Default::default()
             },
@@ -104,8 +106,8 @@ fn cpu_caption_renders_dash_when_typed_usage_is_unavailable() {
     assert_eq!(cpu_caption(&snapshot).1, "—");
 
     let measured = SystemSnapshot {
-        cpu: crate::core::metrics::CpuMetrics::from_observations(
-            crate::core::metrics::CpuScalarObservations {
+        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
+            taskmanager_core::core::metrics::CpuScalarObservations {
                 global_usage_pct: ScalarObservation::available(42.0, 9),
                 ..Default::default()
             },
@@ -115,8 +117,8 @@ fn cpu_caption_renders_dash_when_typed_usage_is_unavailable() {
     assert_eq!(cpu_caption(&measured).1, "42%");
 
     let measured_with_temp = SystemSnapshot {
-        cpu: crate::core::metrics::CpuMetrics::from_observations(
-            crate::core::metrics::CpuScalarObservations {
+        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
+            taskmanager_core::core::metrics::CpuScalarObservations {
                 global_usage_pct: ScalarObservation::available(42.0, 9),
                 temperature_c: ScalarObservation::available(55.0, 9),
                 ..Default::default()
@@ -179,8 +181,8 @@ async fn long_device_identity_cannot_expand_the_configured_sidebar_width(
     cx: &mut gpui::TestAppContext,
 ) {
     use crate::gpui_app::root::{RootView, TopPage};
-    use crate::gpui_app::theme::Theme;
     use gpui::{AppContext, Modifiers, MouseButton, VisualTestContext, point, px, size};
+    use taskmanager_theme::Theme;
 
     let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
     cx.simulate_window_resize(*win, size(px(1280.0), px(720.0)));
@@ -188,7 +190,7 @@ async fn long_device_identity_cannot_expand_the_configured_sidebar_width(
         view.mark_telemetry_frame_ready();
         view.page = TopPage::Performance;
         view.resize_sidebar(px(276.0), cx);
-        let mut cpu = crate::core::metrics::CpuMetrics::default();
+        let mut cpu = taskmanager_core::core::metrics::CpuMetrics::default();
         cpu.brand = Some("A deliberately overlong provider CPU identity that must truncate".into());
         view.replace_system_snapshot_for_test(SystemSnapshot {
             cpu,

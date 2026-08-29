@@ -24,3 +24,12 @@ token codec; empty, unknown and future tokens resolve to `Standard`.
 Tokens must cover content, surfaces, borders, focus, selection, hover, warning,
 error, unavailable and disabled states with contrast tests. Keep mode/skin
 serde compatibility and verify all supported combinations.
+
+Toolkit bindings live in cfg'd modules behind optional features: `gpui.rs`
+behind `gpui`, `iced.rs` behind `iced` (free functions over `iced_core`
+types — the single token→value conversion source the iced frontend
+consumes; CORE-07). Platform compensation (font-weight stem darkening) is
+decided once in the neutral `platform` module and projected by BOTH
+bindings; its decision table runs on every host, and the theme-neutrality
+gate checks each frontend's feature direction. The TUI keeps its lossy
+terminal color quantization locally by design (ADR-026).

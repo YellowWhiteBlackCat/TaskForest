@@ -18,7 +18,7 @@
 
 use std::process::Command;
 use std::time::Duration;
-pub use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::session::SessionItem;
 use tracing::{debug, info};
 
 use taskmanager_platform_portable::{BoundedCommandError, BoundedOutput, run_with_timeout};

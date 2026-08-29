@@ -45,6 +45,9 @@ iced = { version = "0.14.0", default-features = false, features = [
     "wayland",
 ] }
 fontdb = { version = "0.23", default-features = true }
+# Byte↔grapheme conversion for the selectable-text selection span (the same
+# crate iced's paragraph layer uses for caret positions).
+unicode-segmentation = "1.13"
 futures-timer = "3.0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -56,11 +59,13 @@ serde_json = "1.0"
 # selects naga's correct NoColor path. See the naga source
 # (src/error.rs DiagnosticBuffer cfg_if).
 naga = { version = "=27.0.3", default-features = false, features = ["termcolor"] }
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-shell = { path = "../taskmanager-shell" }
 taskmanager-icons = { path = "../taskmanager-icons", default-features = false }
-taskmanager-theme = { path = "../taskmanager-theme" }
+taskmanager-theme = { path = "../taskmanager-theme", features = ["iced"] }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 # The bundled font bytes (ADR-026 fonts policy): the composition edge (run.rs)
 # registers Roboto Mono + MiSans VF into iced's font database, the same
@@ -86,6 +91,9 @@ windows = { version = "0.58.0", default-features = false, features = [
 
 [dev-dependencies]
 taskmanager-test-support = { path = "../taskmanager-test-support" }
+# Test fixtures read the live-graph read model directly; production sources
+# consume the shell's trend projections instead (frontend firewall).
+taskmanager-telemetry-store = { path = "../taskmanager-telemetry-store" }
 
 [lib]
 name = "taskmanager_iced"

@@ -143,7 +143,7 @@ impl RenderOnce for Checkbox {
             .size(px(10.0))
             .rounded(palette.xsmall_radius)
             .bg(if checked {
-                crate::styled::on_accent(palette.accent)
+                taskmanager_theme::color::on_accent(palette.accent)
             } else {
                 palette.surface
             });

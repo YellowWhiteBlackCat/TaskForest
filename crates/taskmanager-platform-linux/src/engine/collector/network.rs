@@ -10,6 +10,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use sysinfo::Networks;
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::{
     NetworkAdapterType, NetworkMetrics, NetworkScalarObservations, NetworkWirelessObservations,
 };
@@ -17,7 +18,7 @@ use taskmanager_core::{
     DeviceId, DeviceState, OptionalObservation, ProviderId, ScalarObservation, SourceOutcome,
     SourceStatus,
 };
-use taskmanager_platform_contract::{DeviceSourceSnapshot, FailureKind};
+use taskmanager_platform_contract::DeviceSourceSnapshot;
 
 use crate::engine::hardware::is_virtual_interface;
 

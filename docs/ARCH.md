@@ -39,6 +39,11 @@ OS → platform adapter → runtime → application reducer → cached projectio
 前端不能直接读取 `/proc`、注册表、系统 API 或命令输出；平台 crate 不能拥有 UI 状态；
 `core` 不能执行 I/O。
 
+跨 crate 不建立 forwarding facade：领域事实从 `taskmanager-core` 的 owner module 导入，
+能力、请求、事件和 port 类型从 `taskmanager-platform-contract` 导入，application 只暴露
+application-owned command/reducer/projection。`taskmanager-app-host` 与
+`taskmanager-platform-native` 只承担组合和 adapter 选择；它们不复制或转发这些类型。
+
 ## 3. 层级职责
 
 | 层 | 唯一职责 | 禁止事项 |
@@ -119,10 +124,10 @@ OS → platform adapter → runtime → application reducer → cached projectio
    静默丢弃。
 3. **同一律**：同一事实→显示的折叠全代码库只存在一份，归宿在 shell 折叠层；同一控制
    语义的 label 折叠同理一份。
-4. **语义平价律**：同一投影、同一控制命令在三端三平台渲染与执行的语义必须相同——
+4. **语义平价律**：同一投影、同一控制命令在四端三平台渲染与执行的语义必须相同——
    标签、缺失性、行序、行为后果；像素与交互手势允许不同，语义不同即缺陷。守门：
    `dual_track_policy_parity`、`renderer_fold_boundary`、`control_semantic_parity`。
-5. **折叠律**：渲染入口只回放数据层折叠（"一次折叠，三端渲染"），渲染模块不得重算
+5. **折叠律**：渲染入口只回放数据层折叠（"一次折叠，四端渲染"），渲染模块不得重算
    数据折叠。
 
 ### 8.2 存异边界
@@ -139,9 +144,12 @@ cursor 可并存）、未进入共享命令表的局部按键——属于渲染�
   存量平台词汇或内联折叠在触碰时中性化、下沉（触碰迁移律）。
 - 声称跨前端 parity 的行为必须由行为测试钉住同一矩阵定义；无测试支撑的 parity 注释或
   文档视为缺陷。
-- 修改共享语义必须三端同批落地，或显式登记未落端与原因。
+- 修改共享语义必须四端同批落地，或显式登记未落端与原因。
 - toolkit 特有的窗口、widget、scene 或事件类型必须停留在对应 frontend crate。共享层
   不添加 GPUI、Iced、Ratatui 或 Bevy 类型。
+- 产品用户意图的 owner、生命周期、目标身份和四端表面裁决由
+  `taskmanager-ui-contract` 的 CORE-04 注册表统一声明；新增意图必须让每个目标前端显式
+  选择 shared/local/accepted-difference/typed-unsupported，不能只添加一条表面路径。
 
 ## 9. 安装与发布边界
 

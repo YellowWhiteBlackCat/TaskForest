@@ -69,79 +69,112 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
     }
 }
 
-fn core_value_scene(value: Box<dyn Scene>, samples: &[f32], palette: &UiPalette) -> Box<dyn Scene> {
-    let graph = activity_graph_scene(
-        samples,
-        palette.accent,
-        palette.control_height_px * 1.15,
-        palette,
-    );
-    Box::new(bsn! {
+/// One per-core bar row: identity label over a bounded track whose fill is
+/// the core's live utilization, with the numeric fact as the row's only
+/// mutable text. The bar and the number are two views of the same
+/// observation — the fill width is rewritten by the fold observer through
+/// [`DynBar`], the number through [`DynText`], so a fold repaints both or
+/// neither.
+fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> impl Scene + use<> {
+    let field = CpuField::Core(index);
+    let label = format!("Core {:02}", index + 1);
+    // The fill's FIRST paint comes from the same observation the number
+    // renders — a page without a pending fold still shows bars that agree
+    // with their numeric facts (capture and cold start included).
+    let initial_pct = cpu_metrics(shell)
+        .and_then(|cpu| cpu.current_core_usage_pct(index))
+        .filter(|value| value.is_finite())
+        .map_or(0.0, |value| value.clamp(0.0, 100.0));
+    bsn! {
         Node {
-            width: percent(100),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_2()),
+            width: percent(48.0),
+            min_width: px(palette.control_height_px * 5.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_8()),
+            padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
-            ( { value } ),
-            ( { graph } ),
+            (
+                Node {
+                    width: px(56.0),
+                    flex_shrink: 0.0,
+                    overflow: Overflow::clip_x(),
+                }
+                Children [
+                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) )
+                ]
+            ),
+            (
+                Node {
+                    flex_grow: 1.0,
+                    min_width: px(0.0),
+                    height: px(6.0),
+                    border_radius: BorderRadius::all(Val::Px(space_2())),
+                    overflow: Overflow::clip_x(),
+                }
+                BackgroundColor({ palette.nav_active_bg })
+                Children [
+                    (
+                        Node {
+                            width: percent(initial_pct),
+                            height: percent(100.0),
+                            border_radius: BorderRadius::all(Val::Px(space_2())),
+                        }
+                        BackgroundColor({ palette.accent })
+                        DynBar(field)
+                    ),
+                ]
+            ),
+            (
+                Node {
+                    width: px(52.0),
+                    flex_shrink: 0.0,
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::FlexEnd,
+                    overflow: Overflow::clip_x(),
+                }
+                Children [
+                    (
+                        Text(cpu_field_text(shell, field))
+                        TextRole(Role::Mono)
+                        DynText(DynField::Cpu(field))
+                        template_value(no_wrap_text())
+                    )
+                ]
+            ),
         ]
-    })
+    }
 }
 
 fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
-    let core_history = shell.history.per_core_usage_series();
-    let cells: Vec<Box<dyn Scene>> = cpu_metrics(shell)
-        .map(|cpu| {
-            (0..cpu.current_core_usage_len())
-                .map(|index| {
-                    let field = CpuField::Core(index);
-                    let samples = core_history
-                        .get(index)
-                        .map_or(&[][..], |samples| samples.as_slice());
-                    Box::new(per_core_cell_scene(
-                        format!("Core {:02}", index + 1),
-                        core_value_scene(
-                            marked_text_scene(
-                                cpu_field_text(shell, field),
-                                Role::Mono,
-                                DynField::Cpu(field),
-                            ),
-                            samples,
-                            palette,
-                        ),
-                        palette,
-                    )) as Box<dyn Scene>
-                })
-                .collect()
-        })
-        .unwrap_or_default();
-    let cells = if cells.is_empty() {
-        vec![Box::new(per_core_cell_scene(
-            "Core".to_owned(),
-            core_value_scene(
-                Box::new(bsn! {
-                    Text(missing_value())
-                    TextRole(Role::Mono)
-                }),
-                &[],
-                palette,
-            ),
-            palette,
-        )) as Box<dyn Scene>]
+    let core_count = cpu_metrics(shell)
+        .map(|cpu| cpu.current_core_usage_len())
+        .unwrap_or(0);
+    let rows: Vec<Box<dyn Scene>> = (0..core_count)
+        .map(|index| Box::new(core_bar_row_scene(shell, index, palette)) as Box<dyn Scene>)
+        .collect();
+    // No cores measured yet → one honest empty row, never a fabricated grid.
+    let rows = if rows.is_empty() {
+        vec![Box::new(bsn! {
+            Node { width: percent(100.0) }
+            Children [
+                ( Text(missing_value()) TextRole(Role::Caption) )
+            ]
+        }) as Box<dyn Scene>]
     } else {
-        cells
+        rows
     };
     let body = bsn! {
         Node {
             width: percent(100),
             flex_direction: FlexDirection::Row,
             flex_wrap: FlexWrap::Wrap,
-            column_gap: Val::Px(space_2()),
+            column_gap: Val::Px(space_8()),
             row_gap: Val::Px(space_2()),
         }
         Children [
-            { cells },
+            { rows },
         ]
     };
     graph_card_scene(

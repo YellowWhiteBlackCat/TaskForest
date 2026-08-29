@@ -1,14 +1,14 @@
 use std::collections::BTreeMap;
 
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     CpuMetrics, CpuTelemetryObservation, DeviceId, DeviceLifecycle, DevicePresence, DeviceState,
     FailureKind, GpuTelemetryObservation, HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics,
     MemoryTelemetryObservation, NetworkTelemetryObservation, ScalarObservation,
     StorageTelemetryObservation,
 };
-use taskmanager_platform_contract::{
-    CapabilityId, EventSequence, ProviderId, RequestId, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
 use crate::device_lifecycle::{DeviceLifecyclePartition, DeviceLifecycleProjection};
 use crate::platform::SystemTelemetryDomainOutcome;

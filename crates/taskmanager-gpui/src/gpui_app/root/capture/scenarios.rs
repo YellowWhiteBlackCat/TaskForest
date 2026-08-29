@@ -1,9 +1,10 @@
 //! Strict capture scenario tokens and readiness-marker gates.
 
-use super::{CaptureEvidence, StartupEntry, StartupImpactEvidence, emit_marker};
+use super::{CaptureEvidence, emit_marker};
 use std::path::PathBuf;
+use taskmanager_core::core::startup::{StartupEntry, StartupImpactEvidence};
 
-use taskmanager_application::SetupScriptInfo;
+use taskmanager_core::core::setup::SetupScriptInfo;
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CaptureScenario {
     SmartMissingTool,
@@ -536,7 +537,7 @@ impl CaptureEvidence {
     pub fn mark_startup_failure_evidence_ready(
         &mut self,
         page_ready: bool,
-        evidence: Option<&crate::core::startup::StartupBootEvidenceSnapshot>,
+        evidence: Option<&taskmanager_core::core::startup::StartupBootEvidenceSnapshot>,
     ) {
         if self.scenario == Some(CaptureScenario::StartupFailureEvidence)
             && page_ready

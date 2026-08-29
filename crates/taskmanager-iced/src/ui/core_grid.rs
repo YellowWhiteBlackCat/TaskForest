@@ -128,11 +128,13 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
             container(text(breakdown).size(f32::from(tokens::FONT_10)))
                 .padding([1, 6])
                 .style(move |_| container::Style {
-                    background: Some(iced::Background::Color(theme::color(theme_snapshot.shade))),
+                    background: Some(iced::Background::Color(taskmanager_theme::iced::color(
+                        theme_snapshot.shade,
+                    ))),
                     border: iced::Border {
                         radius: 3.0.into(),
                         width: 1.0,
-                        color: theme::color(theme_snapshot.palette().border),
+                        color: taskmanager_theme::iced::color(theme_snapshot.palette().border),
                     },
                     ..Default::default()
                 })
@@ -161,12 +163,12 @@ fn core_grid_cell(
     index: usize,
     samples: Rc<[f32]>,
     theme_snapshot: &Theme,
-    core_type: Option<taskmanager_application::CpuType>,
+    core_type: Option<taskmanager_core::core::hardware::CpuType>,
 ) -> Elem<'static> {
     let type_suffix = match core_type {
-        Some(taskmanager_application::CpuType::Performance) => " (P)",
-        Some(taskmanager_application::CpuType::Efficient) => " (E)",
-        Some(taskmanager_application::CpuType::LowPower) => " (LP)",
+        Some(taskmanager_core::core::hardware::CpuType::Performance) => " (P)",
+        Some(taskmanager_core::core::hardware::CpuType::Efficient) => " (E)",
+        Some(taskmanager_core::core::hardware::CpuType::LowPower) => " (LP)",
         _ => "",
     };
     let label = format!("C{index:02}{type_suffix}");
@@ -320,7 +322,7 @@ fn tier_color(theme: &Theme, utilization: f32) -> Color {
     } else {
         theme.success
     };
-    theme::color(token)
+    taskmanager_theme::iced::color(token)
 }
 
 #[cfg(test)]

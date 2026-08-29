@@ -20,7 +20,10 @@ use crate::ui::applications::{
     apps_columns, apps_table_width, localized_sort_column_label, sort_arrow,
     trend_header_index_for, visible_apps_columns,
 };
-use taskmanager_application::{HardwareInfo, ServiceAction, ServiceStatus};
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
+use taskmanager_shell::presentation::{bytes, duration};
+
 use taskmanager_shell::page_help;
 use taskmanager_shell::{SortCol, SortDir};
 
@@ -36,9 +39,11 @@ fn byte_and_duration_formatting_matches_the_other_frontends() {
 
 #[test]
 fn npu_view_model_keeps_all_current_facts_and_marks_missing_values() {
-    use taskmanager_application::{
-        DeviceId, FailureKind, NpuDevice, NpuEngineKind, NpuInventorySnapshot, NpuMemoryReport,
-        ScalarObservation,
+    use taskmanager_core::core::failure::FailureKind;
+    use taskmanager_core::core::identity::DeviceId;
+    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskmanager_core::core::npu::{
+        NpuDevice, NpuEngineKind, NpuInventorySnapshot, NpuMemoryReport,
     };
 
     let mut device = NpuDevice {
@@ -96,7 +101,7 @@ fn process_affinity_modal_renders_a_bounded_focusable_cpu_grid() {
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::ProcessAffinity(Some(
             taskmanager_application::ProcessAffinityReady {
-                request_id: taskmanager_application::RequestId::MIN,
+                request_id: taskmanager_platform_contract::RequestId::MIN,
                 target,
                 cpus: vec![0, 3],
             },
@@ -119,12 +124,17 @@ fn process_affinity_modal_renders_a_bounded_focusable_cpu_grid() {
 
 #[test]
 fn memory_unit_preference_switches_bytes_and_bits() {
-    assert_eq!(memory_text(1536, true), "1.5 KiB");
-    assert_eq!(memory_text(1536, false), "12.0 Kib");
-    assert_eq!(memory_text(2 * 1024 * 1024, true), "2.0 MiB");
-    assert_eq!(memory_text(2 * 1024 * 1024, false), "16.0 Mib");
-    assert_eq!(memory_text(3 * 1024 * 1024 * 1024, false), "24.0 Gib");
-    assert_eq!(memory_text(0, false), "0 b");
+    // The bytes/bits ladder rides the full preference entry with the base-2
+    // ladder pinned (the historical two-argument shape).
+    assert_eq!(memory_text_pref(1536, true, true), "1.5 KiB");
+    assert_eq!(memory_text_pref(1536, false, true), "12.0 Kib");
+    assert_eq!(memory_text_pref(2 * 1024 * 1024, true, true), "2.0 MiB");
+    assert_eq!(memory_text_pref(2 * 1024 * 1024, false, true), "16.0 Mib");
+    assert_eq!(
+        memory_text_pref(3 * 1024 * 1024 * 1024, false, true),
+        "24.0 Gib"
+    );
+    assert_eq!(memory_text_pref(0, false, true), "0 b");
 }
 
 #[test]
@@ -138,16 +148,18 @@ fn unit_matrix_preference_switches_bytes_bits_and_base() {
     assert_eq!(quantity_text_pref(1_500_000, true, false), "1.5 MB");
     assert_eq!(quantity_text_pref(1_500_000, false, false), "12.0 Mb");
     assert_eq!(quantity_text_pref(1_500_000, true, true), "1.4 MiB");
-    // base10_bytes: the decimal ladder with the correct case per unit.
-    assert_eq!(base10_bytes(0, false), "0 B");
-    assert_eq!(base10_bytes(1500, true), "12.0 Kb");
-    assert_eq!(base10_bytes(2_000_000_000, false), "2.0 GB");
+    // The decimal ladder keeps the correct case per unit through the same
+    // preference entry (bytes, base-10 / bits, base-10).
+    assert_eq!(quantity_text_pref(0, true, false), "0 B");
+    assert_eq!(quantity_text_pref(1500, false, false), "12.0 Kb");
+    assert_eq!(quantity_text_pref(2_000_000_000, true, false), "2.0 GB");
 }
 
 #[test]
 fn unavailable_performance_metrics_do_not_become_zero_percent() {
     assert_eq!(percent_text("CPU", None), "CPU —");
-    assert_eq!(percent_text("CPU", Some(0.0)), "CPU   0.0%");
+    // GPUI gauge parity: integer percent, space before the unit.
+    assert_eq!(percent_text("CPU", Some(0.0)), "CPU 0 %");
 }
 
 /// The composition-bar segment color is the iced-specific edge of the shared
@@ -160,31 +172,31 @@ fn segment_color_maps_each_kind_to_its_theme_token() {
     let theme = taskmanager_theme::Theme::dark();
     assert_eq!(
         segment_color(MemSegmentKind::Active, &theme),
-        theme::color(theme.memory)
+        taskmanager_theme::iced::color(theme.memory)
     );
     assert_eq!(
         segment_color(MemSegmentKind::InUse, &theme),
-        theme::color(theme.memory)
+        taskmanager_theme::iced::color(theme.memory)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Inactive, &theme),
-        theme::color(theme.accent)
+        taskmanager_theme::iced::color(theme.accent)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Cache, &theme),
-        theme::color(theme.disk)
+        taskmanager_theme::iced::color(theme.disk)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Free, &theme),
-        theme::color(theme.fg_dim)
+        taskmanager_theme::iced::color(theme.fg_dim)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Available, &theme),
-        theme::color(theme.fg_dim)
+        taskmanager_theme::iced::color(theme.fg_dim)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Other, &theme),
-        theme::color(theme.shade)
+        taskmanager_theme::iced::color(theme.shade)
     );
 }
 
@@ -332,11 +344,11 @@ fn applications_header_renders_a_clickable_sort_target_for_every_column() {
 
 #[test]
 fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
-    let mut process = taskmanager_application::ProcessItem::default();
+    let mut process = taskmanager_core::core::process::ProcessItem::default();
     let mut observations = *process.scalar_observations();
     observations.memory_pss_bytes =
-        taskmanager_application::ScalarObservation::available(512 * 1024 * 1024, 1);
-    observations.swap_bytes = taskmanager_application::ScalarObservation::available(0, 1);
+        taskmanager_core::core::metrics::ScalarObservation::available(512 * 1024 * 1024, 1);
+    observations.swap_bytes = taskmanager_core::core::metrics::ScalarObservation::available(0, 1);
     process.apply_scalar_observations(observations);
 
     let cells = crate::ui::process_projection::build_row_cells(&process);
@@ -344,8 +356,8 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
     assert_eq!(cells.swap, "0 B");
 
     let mut observations = *process.scalar_observations();
-    observations.memory_pss_bytes = taskmanager_application::ScalarObservation::default();
-    observations.swap_bytes = taskmanager_application::ScalarObservation::default();
+    observations.memory_pss_bytes = taskmanager_core::core::metrics::ScalarObservation::default();
+    observations.swap_bytes = taskmanager_core::core::metrics::ScalarObservation::default();
     process.apply_scalar_observations(observations);
     let cells = crate::ui::process_projection::build_row_cells(&process);
     assert_eq!(
@@ -394,7 +406,7 @@ fn suggestions_overlay_preserves_typed_insufficient_state_in_iced() {
     app.shell.toggle_suggestions();
 
     let text = overlays::suggestion_text(
-        taskmanager_application::alerts::AlertMetric::CpuUsagePercent,
+        taskmanager_core::core::alerts::AlertMetric::CpuUsagePercent,
         &app.shell,
     );
     assert!(text.contains("Insufficient"));
@@ -475,7 +487,7 @@ fn system_projection_distinguishes_unloaded_and_empty_hardware() {
 
 #[test]
 fn system_projection_keeps_display_identity_and_mode_in_one_row() {
-    use taskmanager_application::DisplayInfo;
+    use taskmanager_core::core::hardware::DisplayInfo;
 
     let hardware = HardwareInfo {
         displays: vec![DisplayInfo {
@@ -639,7 +651,7 @@ fn service_projection_distinguishes_loading_empty_and_missing_description() {
     taskmanager_shell::fixture::seed_projection_fact(
         &mut shell,
         taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
-            taskmanager_application::ServiceItem::from_inventory(
+            taskmanager_core::core::services::ServiceItem::from_inventory(
                 "",
                 "no-description.service",
                 ServiceStatus::Unknown,
@@ -671,7 +683,7 @@ fn search_highlight_segments_flow_from_the_shared_shell_filter() {
         .find(|process| process.name == "rust-analyzer")
         .expect("demo fixture must keep rust-analyzer under query \"a\"");
     assert_eq!(
-        highlight::highlight_segments(&analyzer.name, &shell.query),
+        crate::ui::components::highlight::highlight_segments(&analyzer.name, &shell.query),
         vec![
             ("rust-".to_string(), false),
             ("a".to_string(), true),
@@ -688,7 +700,7 @@ fn search_highlight_segments_flow_from_the_shared_shell_filter() {
         .find(|process| process.name == "NetworkManager")
         .expect("demo fixture keeps NetworkManager under query \"a\"");
     assert_eq!(
-        highlight::highlight_segments(&manager.name, &shell.query),
+        crate::ui::components::highlight::highlight_segments(&manager.name, &shell.query),
         vec![
             ("NetworkM".to_string(), false),
             ("a".to_string(), true),
@@ -776,11 +788,11 @@ fn services_page_projects_rows_and_action_labels_for_every_variant() {
     taskmanager_test_support::pin_english();
 
     for action in [
-        taskmanager_application::ServiceAction::Start,
-        taskmanager_application::ServiceAction::Stop,
-        taskmanager_application::ServiceAction::Restart,
-        taskmanager_application::ServiceAction::Enable,
-        taskmanager_application::ServiceAction::Disable,
+        taskmanager_core::core::services::ServiceAction::Start,
+        taskmanager_core::core::services::ServiceAction::Stop,
+        taskmanager_core::core::services::ServiceAction::Restart,
+        taskmanager_core::core::services::ServiceAction::Enable,
+        taskmanager_core::core::services::ServiceAction::Disable,
     ] {
         let label = service_action_label(action);
         assert!(!label.is_empty());
@@ -865,14 +877,14 @@ fn service_control_bar_replaces_the_action_hint_while_pending() {
     let _ = app.update(crate::app::Message::SelectPage(AppPage::Services));
     let _ = app.update(crate::app::Message::RequestServiceAction {
         index: 0,
-        action: taskmanager_application::ServiceAction::Restart,
+        action: taskmanager_core::core::services::ServiceAction::Restart,
     });
     assert!(app.shell.pending_service_control().is_some());
     assert_eq!(
         app.shell
             .pending_service_control()
             .map(|target| target.action),
-        Some(taskmanager_application::ServiceAction::Restart)
+        Some(taskmanager_core::core::services::ServiceAction::Restart)
     );
     let _view = view(&app);
 }

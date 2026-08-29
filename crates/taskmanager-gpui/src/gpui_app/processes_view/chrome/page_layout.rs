@@ -5,8 +5,8 @@
 //! render code never reconstructs responsive policy from unrelated booleans.
 
 use crate::gpui_app::root::{LayoutProfile, PageLayoutBudget, VerticalSpace};
-use crate::gpui_app::theme::tokens;
 use taskmanager_theme::Length;
+use taskmanager_theme::tokens;
 
 /// Amount of process-page identity information kept in the overview band.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

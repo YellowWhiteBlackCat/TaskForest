@@ -13,9 +13,6 @@ use gpui::{
     Context, Div, Entity, InteractiveElement, MouseButton, ParentElement, Rgba, Styled, div, px,
 };
 
-use crate::core::SystemSnapshot;
-use crate::core::process::ProcessItem;
-use crate::core::units::UnitPreferences;
 use crate::gpui_app::chrome;
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::missing_value;
@@ -23,13 +20,16 @@ use crate::gpui_app::process_insights::{
     ProcessInsightsLabels, ProcessInsightsRenderState, render_process_insights,
 };
 use crate::gpui_app::sidebar::{SelectedDevice, network_category_label};
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Theme, WindowControls, WindowCorner};
-use crate::i18n;
+use taskmanager_application::i18n;
 use taskmanager_application::process_details_vm::{
     DetailValue, ProcessDetailsField, ProcessDetailsRowVm, detail_value,
 };
 use taskmanager_assets::product;
+use taskmanager_core::core::SystemSnapshot;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::units::UnitPreferences;
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Theme, WindowControls, WindowCorner};
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 
 /// The CSD titlebar: drag handle + centered window title + per-platform window
@@ -401,7 +401,7 @@ const COMMAND_FIELDS: [(ProcessDetailsField, &str); 3] = [
 fn vm_rows(
     item: &ProcessItem,
     fields: &[(ProcessDetailsField, &'static str)],
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Vec<(&'static str, String)> {
     let vm = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
         item,
@@ -417,7 +417,7 @@ fn vm_rows(
 fn details_overview(
     t: &Theme,
     item: &ProcessItem,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Div {
     let mut section = div().flex().flex_col().gap(tokens::SPACE_6);
     for (label, value) in vm_rows(item, &OVERVIEW_FIELDS, local_time_rules) {
@@ -430,7 +430,7 @@ fn details_performance(
     t: &Theme,
     item: &ProcessItem,
     histories: &super::ProcessHistories,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Div {
     let prefs = properties_unit_preferences();
     let vm = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
@@ -488,7 +488,7 @@ fn details_performance(
 fn details_command(
     t: &Theme,
     item: &ProcessItem,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Div {
     let mut section = div().flex().flex_col().gap(tokens::SPACE_6);
     for (label, value) in vm_rows(item, &COMMAND_FIELDS, local_time_rules) {
@@ -509,7 +509,7 @@ pub(crate) struct DetailsPanelProps<'a> {
     pub(crate) available_width: f32,
     pub(crate) net_escalation: taskmanager_application::NetworkEscalationState,
     pub(crate) entity: Entity<RootView>,
-    pub(crate) local_time_rules: &'a taskmanager_application::LocalTimeRulesObservation,
+    pub(crate) local_time_rules: &'a taskmanager_core::core::time::LocalTimeRulesObservation,
 }
 
 /// Properties content split into explicit Overview / Performance / Command

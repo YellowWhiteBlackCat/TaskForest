@@ -40,8 +40,9 @@ use bevy::ui::prelude::{
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Checkbox, ValueChange};
-use taskmanager_application::alerts::{Alert, AlertMetric, AlertSeverity};
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
+use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
+
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use crate::app::{FrontendTrack, PageContext, Route, RouteChanged, SharedRuntimeHandle};
@@ -283,7 +284,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         BackgroundColor({ context.palette.content_bg })
         Children [
-            ( Text("Alerts") TextRole(Role::Heading) ),
+            ( Text({ crate::app::Page::Alerts.title() }) TextRole(Role::Heading) ),
             ( Text(summary) TextRole(Role::Caption) ),
             ( Text("Active alerts") TextRole(Role::Caption) ),
             { active_rows },

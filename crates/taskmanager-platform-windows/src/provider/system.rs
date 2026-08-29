@@ -15,13 +15,14 @@ use taskmanager_application::{
     HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
     NetworkTelemetryRequest, NpuInventoryRequest, StorageTelemetryRequest,
 };
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     ContainerRollup, DeviceId, DeviceState, FailureKind, GpuEngineKind, GpuEngineMetric,
     GpuEngineRowsSnapshot, HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics,
     MemoryTelemetryObservation, NpuDevice, NpuInventorySnapshot, NpuMemoryReport, ProviderId,
     ScalarObservation,
 };
-use taskmanager_platform_contract::{ProviderFailure, SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::{
     ContainerRollupProvider, CpuTelemetryProvider, GpuEngineRowsProvider, GpuTelemetryProvider,
     HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider,

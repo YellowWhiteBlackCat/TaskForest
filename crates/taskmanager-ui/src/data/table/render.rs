@@ -5,10 +5,9 @@ use std::rc::Rc;
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    AnyElement, AppContext, Bounds, Context, Div, DragMoveEvent, Empty, EntityId,
-    InteractiveElement, IntoElement, MouseButton, ParentElement, Pixels, Point, Refineable, Render,
-    SharedString, SizeRefinement, Stateful, StatefulInteractiveElement, StyleRefinement, Styled,
-    Window, canvas, div, px,
+    AnyElement, AppContext, Bounds, Context, Div, EntityId, InteractiveElement, IntoElement,
+    MouseButton, ParentElement, Pixels, Refineable, Render, SharedString, SizeRefinement, Stateful,
+    StatefulInteractiveElement, StyleRefinement, Styled, Window, canvas, div, px,
 };
 
 use crate::primitives::scrollbar::rail::ScrollbarRail;
@@ -18,16 +17,7 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_theme::with_alpha;
 
-use super::{
-    ColGroup, ResizeColumn, SortState, TableDelegate, TableEvent, TableRowLayout, TableSelection,
-    TableState,
-};
-
-impl Render for ResizeColumn {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        Empty
-    }
-}
+use super::{ColGroup, SortState, TableDelegate, TableRowLayout, TableSelection, TableState};
 
 /// Drag payload for column moves (typed, absorbed from gc `DragColumn`).
 #[derive(Clone)]
@@ -62,54 +52,6 @@ impl Render for DragColumn {
 }
 
 impl<D: TableDelegate> TableState<D> {
-    pub(crate) fn resize_cols(&mut self, ix: usize, size: Pixels, cx: &mut Context<Self>) {
-        if !self.col_resizable {
-            return;
-        }
-        const MIN_COL_WIDTH: Pixels = px(10.0);
-        const MAX_COL_WIDTH: Pixels = px(1200.0);
-        let Some(col_group) = self.col_groups.get_mut(ix) else {
-            return;
-        };
-        if !col_group.is_resizable() {
-            return;
-        }
-        let size = size.floor();
-        if size < MIN_COL_WIDTH {
-            return;
-        }
-        let old_width = col_group.width;
-        let changed = size - old_width;
-        if changed > px(-1.0) && changed < px(1.0) {
-            return;
-        }
-        col_group.width = size.min(MAX_COL_WIDTH);
-        cx.notify();
-    }
-
-    /// Scroll horizontally while resizing near the table edges.
-    pub(crate) fn scroll_table_by_col_resizing(
-        &mut self,
-        mouse_position: Point<Pixels>,
-        col_group: &ColGroup,
-    ) {
-        if mouse_position.x > self.bounds.right() {
-            return;
-        }
-        let mut offset = self.horizontal_scroll_handle.offset();
-        let col_bounds = col_group.bounds;
-        if mouse_position.x < self.bounds.left()
-            && col_bounds.right() < self.bounds.left() + px(20.0)
-        {
-            offset.x += px(1.0);
-        } else if mouse_position.x > self.bounds.right()
-            && col_bounds.right() > self.bounds.right() - px(20.0)
-        {
-            offset.x -= px(1.0);
-        }
-        self.horizontal_scroll_handle.set_offset(offset);
-    }
-
     pub(crate) fn render_cell(&self, col_ix: usize) -> Div {
         let Some(col_group) = self.col_groups.get(col_ix) else {
             return div();
@@ -300,85 +242,6 @@ impl<D: TableDelegate> TableState<D> {
                 )
                 .into_any_element(),
         )
-    }
-
-    /// The 2px drag handle on the right edge of a resizable column header.
-    pub(crate) fn render_resize_handle(
-        &self,
-        ix: usize,
-        _window: &mut Window,
-        cx: &mut Context<Self>,
-    ) -> AnyElement {
-        const HANDLE_SIZE: Pixels = px(2.0);
-        let resizable = self.col_resizable
-            && self
-                .col_groups
-                .get(ix)
-                .map(ColGroup::is_resizable)
-                .unwrap_or(false);
-        if !resizable {
-            return div().into_any_element();
-        }
-        let palette = self.palette;
-
-        div()
-            .flex()
-            .flex_row()
-            .id(("resizable-handle", ix))
-            .occlude()
-            .cursor_col_resize()
-            .h_full()
-            .w(HANDLE_SIZE)
-            .ml(-HANDLE_SIZE)
-            .justify_end()
-            .items_center()
-            .child(
-                div()
-                    .h_full()
-                    .justify_center()
-                    .bg(palette.border)
-                    .w(px(1.0)),
-            )
-            .on_drag_move(
-                cx.listener(move |view, e: &DragMoveEvent<ResizeColumn>, _window, cx| {
-                    let ResizeColumn((entity_id, drag_ix)) = e.drag(cx);
-                    if cx.entity_id() != *entity_id {
-                        return;
-                    }
-                    let Some(col_group) = view.col_groups.get(*drag_ix).cloned() else {
-                        return;
-                    };
-                    view.resizing_col = Some(*drag_ix);
-                    view.resize_cols(
-                        *drag_ix,
-                        e.event.position.x - HANDLE_SIZE - col_group.bounds.left(),
-                        cx,
-                    );
-                    view.scroll_table_by_col_resizing(e.event.position, &col_group);
-                }),
-            )
-            .on_drag(ResizeColumn((cx.entity_id(), ix)), |drag, _, _, cx| {
-                cx.stop_propagation();
-                cx.new(|_| *drag)
-            })
-            .on_mouse_up_out(
-                MouseButton::Left,
-                cx.listener(|view, _, _, cx| view.finish_col_resize(cx)),
-            )
-            .into_any_element()
-    }
-
-    /// End a column resize: emit the new widths. Also called from the
-    /// window-level `MouseUp` fallback (附录 A-10 fix: releasing outside the
-    /// window may not deliver `on_mouse_up_out`).
-    pub(crate) fn finish_col_resize(&mut self, cx: &mut Context<Self>) {
-        if self.resizing_col.is_none() {
-            return;
-        }
-        self.resizing_col = None;
-        let new_widths = self.col_groups.iter().map(|g| g.width).collect();
-        cx.emit(TableEvent::ColumnWidthsChanged(new_widths));
-        cx.notify();
     }
 
     /// Render the header row: the leading fixed columns outside the scroll

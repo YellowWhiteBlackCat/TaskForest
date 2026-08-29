@@ -10,17 +10,16 @@ use gpui::{
 };
 use taskmanager_ui_contract::IconId;
 
-use crate::core::DirectoryScanStatus;
-use crate::core::DirectoryUsageEntry;
-use crate::core::DirectoryUsageSnapshot;
-use crate::core::metrics::{DiskMetrics, ScalarAvailability};
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{DisplayUnits, UnitKind, missing_value};
-use crate::gpui_app::icons;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::DirectoryScanStatus;
+use taskmanager_core::core::DirectoryUsageEntry;
+use taskmanager_core::core::DirectoryUsageSnapshot;
+use taskmanager_core::core::metrics::{DiskMetrics, ScalarAvailability};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
 /// Maximum entry rows painted before collapsing into a "+N" summary. The
@@ -78,7 +77,7 @@ pub(super) fn directory_usage_panel(
                     .text_size(tokens::FONT_13)
                     .font_weight(tokens::FONT_WEIGHT_BOLD.into())
                     .text_color(theme.fg)
-                    .child(icons::icon(IconId::Search).size(px(14.0)))
+                    .child(taskmanager_icons::icon(IconId::Search).size(px(14.0)))
                     .child(i18n::t("disk.usage_analysis")),
             )
             .child(header_right),

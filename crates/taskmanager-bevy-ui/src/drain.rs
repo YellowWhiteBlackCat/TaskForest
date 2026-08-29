@@ -13,8 +13,11 @@
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use bevy::ecs::event::Event;
-use bevy::ecs::system::{Commands, NonSendMut, Res};
-use taskmanager_application::{CapabilitySnapshot, PlatformClient, PlatformEffect, RefreshRequest};
+use bevy::ecs::resource::Resource;
+use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
+use taskmanager_application::{PlatformClient, PlatformEffect, RefreshRequest};
+use taskmanager_platform_contract::CapabilitySnapshot;
+
 use taskmanager_shell::ShellApp;
 
 use crate::app::{FrontendTrack, SharedRuntimeHandle};
@@ -48,6 +51,17 @@ pub(crate) struct ShellProjectionFolded(
     #[allow(dead_code)]
     pub(crate) usize,
 );
+
+/// Observer event carrying the shell's status/feedback line after it changed.
+/// Control submissions (`queue_effect` reports the honest outcome) and their
+/// async completions both surface here — the Bevy counterpart of the TUI
+/// status bar.
+#[derive(Event)]
+pub(crate) struct FeedbackChanged(pub(crate) String);
+
+/// Last feedback text seen by the drain, for change detection.
+#[derive(Resource, Default)]
+pub(crate) struct FeedbackCache(Option<String>);
 
 /// One frame's drain outcome, consumed by the UI adapter.
 #[derive(Debug, Default, PartialEq, Eq)]
@@ -106,6 +120,12 @@ pub(crate) fn run_drain_cycle(
         taskmanager_shell::queue_effect(shell, client, effect);
         refresh_submitted = true;
     }
+    // The open service-log stream's throttled follow: the shell owns the
+    // 1 Hz cadence and the cursor dedup; the drain only carries the request
+    // across the same queue_effect seam.
+    if let Some(effect) = shell.poll_service_log(now_ms) {
+        taskmanager_shell::queue_effect(shell, client, effect);
+    }
     DrainCycle {
         folded_batches,
         capability_summary: capabilities_changed.then(|| capability_summary_line(&snapshot)),
@@ -124,7 +144,7 @@ pub(crate) fn capability_summary_line(snapshot: &CapabilitySnapshot) -> String {
     let mut other_states = 0;
     let total = snapshot.iter().count();
     for descriptor in snapshot.iter() {
-        use taskmanager_application::CapabilityStatus;
+        use taskmanager_platform_contract::CapabilityStatus;
         match descriptor.status {
             CapabilityStatus::Available => available += 1,
             CapabilityStatus::PermissionRequired => permission_required += 1,
@@ -166,6 +186,8 @@ pub(crate) fn unix_now_ms() -> u64 {
 pub(crate) fn drain_system(
     runtime: Res<SharedRuntimeHandle>,
     mut track: NonSendMut<FrontendTrack>,
+    mut pending: ResMut<crate::input::PendingEffects>,
+    mut feedback_cache: ResMut<FeedbackCache>,
     mut commands: Commands,
 ) {
     let mut client = runtime.shared.lock_client();
@@ -178,11 +200,22 @@ pub(crate) fn drain_system(
         track.initial_refresh_submitted = true;
     }
     let cycle = run_drain_cycle(&mut client, &mut track.shell, unix_now_ms());
+    // Effects produced by the input systems cross to the platform here, the
+    // one place that holds the client lock — the same `queue_effect` seam
+    // every frontend effect uses.
+    for effect in pending.0.drain(..) {
+        taskmanager_shell::queue_effect(&mut track.shell, &mut client, effect);
+    }
     if cycle.folded_batches > 0 {
         commands.trigger(ShellProjectionFolded(cycle.folded_batches));
     }
     if let Some(summary) = cycle.capability_summary {
         commands.trigger(CapabilitySummaryChanged(summary));
+    }
+    let feedback = track.shell.feedback_text().to_owned();
+    if feedback_cache.0.as_deref() != Some(feedback.as_str()) {
+        feedback_cache.0 = Some(feedback.clone());
+        commands.trigger(FeedbackChanged(feedback));
     }
 }
 

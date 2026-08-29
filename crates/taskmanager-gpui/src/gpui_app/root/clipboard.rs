@@ -1,10 +1,10 @@
 //! Clipboard copy feedback and process-failure messaging for the root shell.
 
 use super::RootView;
-use crate::core::process::ProcessItem;
-use crate::i18n;
 use gpui::{ClipboardItem, Context};
-use taskmanager_application::FailureKind;
+use taskmanager_application::i18n;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::ProcessItem;
 
 impl RootView {
     /// Look up the process captured by the menu action and apply `f` to its

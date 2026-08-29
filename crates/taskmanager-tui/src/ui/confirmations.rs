@@ -6,13 +6,38 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 
-use super::{centered, service_menu, session_menu};
+use super::containers::{KeyHint, KeyHintTone, Modal};
+use super::{service_menu, session_menu};
 use crate::TuiApp;
 use crate::TuiTheme;
 
+/// The confirmation family's shared confirm/dismiss hint line: the
+/// black-on-danger `y` chord and the black-on-white `n / Esc` chord over the
+/// default-foreground labels the popups have always painted, routed through
+/// the shared [`KeyHint`] component's typed [`KeyHintTone`] vocabulary.
+fn confirm_hint_line(theme: TuiTheme) -> Line<'static> {
+    KeyHint::line_toned(
+        theme,
+        vec![
+            (
+                KeyHintTone::Danger,
+                " y ",
+                format!(" {}    ", t("common.confirm")),
+            ),
+            (
+                KeyHintTone::Inverse,
+                " n / Esc ",
+                format!(" {}", t("common.cancel")),
+            ),
+        ],
+    )
+}
+
+#[cfg(test)]
+#[allow(dead_code)]
 pub(super) fn render_end_confirmation(
     frame: &mut Frame<'_>,
     _app: &TuiApp,
@@ -21,41 +46,57 @@ pub(super) fn render_end_confirmation(
     pid: u32,
     area: Rect,
 ) {
-    let popup = centered(area, 58, 9);
-    frame.render_widget(Clear, popup);
+    render_end_confirmation_at(
+        frame,
+        _app,
+        theme,
+        name,
+        pid,
+        super::planned_popup(
+            area,
+            crate::TuiInputScope::SharedSurface(
+                taskmanager_application::SurfaceKind::Confirmation(
+                    taskmanager_application::ConfirmationKind::EndTask,
+                ),
+            ),
+        ),
+    );
+}
+
+pub(super) fn render_end_confirmation_at(
+    frame: &mut Frame<'_>,
+    _app: &TuiApp,
+    theme: TuiTheme,
+    name: &str,
+    pid: u32,
+    popup: Rect,
+) {
+    let inner = Modal::alert(theme, theme.danger, t("confirm.process_title")).render(frame, popup);
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(Span::styled(
                 t("confirm.end_headline")
                     .replace("{name}", name)
                     .replace("{pid}", &pid.to_string()),
-                Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::new()
+                    .fg(theme.color(Color::White))
+                    .add_modifier(Modifier::BOLD),
             )),
             Line::from(t("confirm.recheck_body")),
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" y ", Style::new().fg(Color::Black).bg(theme.danger)),
-                Span::raw(format!(" {}    ", t("common.confirm"))),
-                Span::styled(" n / Esc ", Style::new().fg(Color::Black).bg(Color::White)),
-                Span::raw(format!(" {}", t("common.cancel"))),
-            ]),
+            confirm_hint_line(theme),
         ])
         .alignment(Alignment::Center)
-        .block(
-            Block::new()
-                .title(format!(" {} ", t("confirm.process_title")))
-                .borders(Borders::ALL)
-                .border_style(Style::new().fg(theme.danger))
-                .style(Style::new().bg(theme.overlay_bg)),
-        )
         .wrap(Wrap { trim: true }),
-        popup,
+        inner,
     );
 }
 
 /// Shared confirmation overlay for a gated service action (Stop / Restart).
 /// The request is only emitted by `ConfirmServiceControl` (y); n / Esc clear
 /// the pending target without submitting.
+#[cfg(test)]
+#[allow(dead_code)]
 pub(super) fn render_service_control_confirmation(
     frame: &mut Frame<'_>,
     _app: &TuiApp,
@@ -63,8 +104,30 @@ pub(super) fn render_service_control_confirmation(
     pending: &taskmanager_application::ServiceControlTarget,
     area: Rect,
 ) {
-    let popup = centered(area, 60, 9);
-    frame.render_widget(Clear, popup);
+    render_service_control_confirmation_at(
+        frame,
+        _app,
+        theme,
+        pending,
+        super::planned_popup(
+            area,
+            crate::TuiInputScope::SharedSurface(
+                taskmanager_application::SurfaceKind::Confirmation(
+                    taskmanager_application::ConfirmationKind::ServiceControl,
+                ),
+            ),
+        ),
+    );
+}
+
+pub(super) fn render_service_control_confirmation_at(
+    frame: &mut Frame<'_>,
+    _app: &TuiApp,
+    theme: TuiTheme,
+    pending: &taskmanager_application::ServiceControlTarget,
+    popup: Rect,
+) {
+    let inner = Modal::alert(theme, theme.danger, t("confirm.service_title")).render(frame, popup);
     let action_label = service_menu::action_label(pending.action);
     frame.render_widget(
         Paragraph::new(vec![
@@ -72,27 +135,17 @@ pub(super) fn render_service_control_confirmation(
                 t("confirm.action_headline")
                     .replace("{action}", action_label)
                     .replace("{target}", pending.service_id.as_str()),
-                Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::new()
+                    .fg(theme.color(Color::White))
+                    .add_modifier(Modifier::BOLD),
             )),
             Line::from(t("confirm.provider_body")),
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" y ", Style::new().fg(Color::Black).bg(theme.danger)),
-                Span::raw(format!(" {}    ", t("common.confirm"))),
-                Span::styled(" n / Esc ", Style::new().fg(Color::Black).bg(Color::White)),
-                Span::raw(format!(" {}", t("common.cancel"))),
-            ]),
+            confirm_hint_line(theme),
         ])
         .alignment(Alignment::Center)
-        .block(
-            Block::new()
-                .title(format!(" {} ", t("confirm.service_title")))
-                .borders(Borders::ALL)
-                .border_style(Style::new().fg(theme.danger))
-                .style(Style::new().bg(theme.overlay_bg)),
-        )
         .wrap(Wrap { trim: true }),
-        popup,
+        inner,
     );
 }
 
@@ -101,14 +154,36 @@ pub(super) fn render_service_control_confirmation(
 /// (`ShellApp::select_session_control`); the platform request is produced by
 /// `ShellApp::confirm_session_control` only on confirm (y), and n / Esc clear
 /// the pending gate without submitting.
+#[cfg(test)]
+#[allow(dead_code)]
 pub(super) fn render_session_control_confirmation(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
     pending: &taskmanager_application::SessionControlConfirmation,
     area: Rect,
 ) {
-    let popup = centered(area, 60, 9);
-    frame.render_widget(Clear, popup);
+    render_session_control_confirmation_at(
+        frame,
+        theme,
+        pending,
+        super::planned_popup(
+            area,
+            crate::TuiInputScope::SharedSurface(
+                taskmanager_application::SurfaceKind::Confirmation(
+                    taskmanager_application::ConfirmationKind::SessionControl,
+                ),
+            ),
+        ),
+    );
+}
+
+pub(super) fn render_session_control_confirmation_at(
+    frame: &mut Frame<'_>,
+    theme: TuiTheme,
+    pending: &taskmanager_application::SessionControlConfirmation,
+    popup: Rect,
+) {
+    let inner = Modal::alert(theme, theme.danger, t("confirm.session_title")).render(frame, popup);
     let action_label = session_menu::action_label(pending.action);
     frame.render_widget(
         Paragraph::new(vec![
@@ -117,41 +192,53 @@ pub(super) fn render_session_control_confirmation(
                     .replace("{action}", action_label)
                     .replace("{id}", pending.session.id.as_str())
                     .replace("{user}", pending.session.user.as_str()),
-                Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::new()
+                    .fg(theme.color(Color::White))
+                    .add_modifier(Modifier::BOLD),
             )),
             Line::from(t("confirm.provider_body")),
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" y ", Style::new().fg(Color::Black).bg(theme.danger)),
-                Span::raw(format!(" {}    ", t("common.confirm"))),
-                Span::styled(" n / Esc ", Style::new().fg(Color::Black).bg(Color::White)),
-                Span::raw(format!(" {}", t("common.cancel"))),
-            ]),
+            confirm_hint_line(theme),
         ])
         .alignment(Alignment::Center)
-        .block(
-            Block::new()
-                .title(format!(" {} ", t("confirm.session_title")))
-                .borders(Borders::ALL)
-                .border_style(Style::new().fg(theme.danger))
-                .style(Style::new().bg(theme.overlay_bg)),
-        )
         .wrap(Wrap { trim: true }),
-        popup,
+        inner,
     );
 }
 
 /// The gated startup Enable/Disable confirmation overlay. The request is only
 /// emitted by the shell's `confirm_startup_control` (y); n / Esc clear the
 /// pending gate without submitting.
+#[cfg(test)]
+#[allow(dead_code)]
 pub(super) fn render_startup_control_confirmation(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
     pending: &taskmanager_application::StartupControlRequest,
     area: Rect,
 ) {
-    let popup = centered(area, 60, 9);
-    frame.render_widget(Clear, popup);
+    render_startup_control_confirmation_at(
+        frame,
+        theme,
+        pending,
+        super::planned_popup(
+            area,
+            crate::TuiInputScope::SharedSurface(
+                taskmanager_application::SurfaceKind::Confirmation(
+                    taskmanager_application::ConfirmationKind::StartupControl,
+                ),
+            ),
+        ),
+    );
+}
+
+pub(super) fn render_startup_control_confirmation_at(
+    frame: &mut Frame<'_>,
+    theme: TuiTheme,
+    pending: &taskmanager_application::StartupControlRequest,
+    popup: Rect,
+) {
+    let inner = Modal::alert(theme, theme.accent, t("confirm.startup_title")).render(frame, popup);
     let action_label = if pending.enabled {
         t("startup.enable")
     } else {
@@ -163,27 +250,17 @@ pub(super) fn render_startup_control_confirmation(
                 t("confirm.action_headline")
                     .replace("{action}", action_label)
                     .replace("{target}", pending.entry.name.as_str()),
-                Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::new()
+                    .fg(theme.color(Color::White))
+                    .add_modifier(Modifier::BOLD),
             )),
             Line::from(t("confirm.provider_body")),
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" y ", Style::new().fg(Color::Black).bg(theme.danger)),
-                Span::raw(format!(" {}    ", t("common.confirm"))),
-                Span::styled(" n / Esc ", Style::new().fg(Color::Black).bg(Color::White)),
-                Span::raw(format!(" {}", t("common.cancel"))),
-            ]),
+            confirm_hint_line(theme),
         ])
         .alignment(Alignment::Center)
-        .block(
-            Block::new()
-                .title(format!(" {} ", t("confirm.startup_title")))
-                .borders(Borders::ALL)
-                .border_style(Style::new().fg(theme.accent))
-                .style(Style::new().bg(theme.overlay_bg)),
-        )
         .wrap(Wrap { trim: true }),
-        popup,
+        inner,
     );
 }
 
@@ -192,14 +269,36 @@ pub(super) fn render_startup_control_confirmation(
 /// the pending intent without submitting. The target scope shows the full
 /// frozen set so a multi-select Kill reads as "N processes" rather than the
 /// single first row.
+#[cfg(test)]
+#[allow(dead_code)]
 pub(super) fn render_batch_confirmation(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
-    intent: &taskmanager_application::ProcessBatchIntent,
+    intent: &taskmanager_core::core::process::ProcessBatchIntent,
     area: Rect,
 ) {
-    let popup = centered(area, 62, 9);
-    frame.render_widget(Clear, popup);
+    render_batch_confirmation_at(
+        frame,
+        theme,
+        intent,
+        super::planned_popup(
+            area,
+            crate::TuiInputScope::SharedSurface(
+                taskmanager_application::SurfaceKind::Confirmation(
+                    taskmanager_application::ConfirmationKind::ProcessBatch,
+                ),
+            ),
+        ),
+    );
+}
+
+pub(super) fn render_batch_confirmation_at(
+    frame: &mut Frame<'_>,
+    theme: TuiTheme,
+    intent: &taskmanager_core::core::process::ProcessBatchIntent,
+    popup: Rect,
+) {
+    let inner = Modal::alert(theme, theme.danger, t("confirm.batch_title")).render(frame, popup);
     let targets = &intent.targets;
     let scope = if targets.len() <= 1 {
         targets.first().map_or_else(
@@ -215,38 +314,50 @@ pub(super) fn render_batch_confirmation(
                 t("confirm.action_headline")
                     .replace("{action}", t("proc.kill"))
                     .replace("{target}", &scope),
-                Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::new()
+                    .fg(theme.color(Color::White))
+                    .add_modifier(Modifier::BOLD),
             )),
             Line::from(t("confirm.frozen_body")),
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" y ", Style::new().fg(Color::Black).bg(theme.danger)),
-                Span::raw(format!(" {}    ", t("common.confirm"))),
-                Span::styled(" n / Esc ", Style::new().fg(Color::Black).bg(Color::White)),
-                Span::raw(format!(" {}", t("common.cancel"))),
-            ]),
+            confirm_hint_line(theme),
         ])
         .alignment(Alignment::Center)
-        .block(
-            Block::new()
-                .title(format!(" {} ", t("confirm.batch_title")))
-                .borders(Borders::ALL)
-                .border_style(Style::new().fg(theme.danger))
-                .style(Style::new().bg(theme.overlay_bg)),
-        )
         .wrap(Wrap { trim: true }),
-        popup,
+        inner,
     );
 }
 
+#[cfg(test)]
+#[allow(dead_code)]
 pub(super) fn render_smart_self_test_confirmation(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
-    intent: &taskmanager_application::SmartSelfTestIntent,
+    intent: &taskmanager_core::core::system_health::SmartSelfTestIntent,
     area: Rect,
 ) {
-    let popup = centered(area, 62, 9);
-    frame.render_widget(Clear, popup);
+    render_smart_self_test_confirmation_at(
+        frame,
+        theme,
+        intent,
+        super::planned_popup(
+            area,
+            crate::TuiInputScope::SharedSurface(
+                taskmanager_application::SurfaceKind::Confirmation(
+                    taskmanager_application::ConfirmationKind::SmartSelfTest,
+                ),
+            ),
+        ),
+    );
+}
+
+pub(super) fn render_smart_self_test_confirmation_at(
+    frame: &mut Frame<'_>,
+    theme: TuiTheme,
+    intent: &taskmanager_core::core::system_health::SmartSelfTestIntent,
+    popup: Rect,
+) {
+    let inner = Modal::alert(theme, theme.danger, "SMART self-test").render(frame, popup);
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(Span::styled(
@@ -254,26 +365,16 @@ pub(super) fn render_smart_self_test_confirmation(
                     "{:?} SMART self-test · {}",
                     intent.kind, intent.display_name
                 ),
-                Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::new()
+                    .fg(theme.color(Color::White))
+                    .add_modifier(Modifier::BOLD),
             )),
             Line::from(t("confirm.provider_body")),
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" y ", Style::new().fg(Color::Black).bg(theme.danger)),
-                Span::raw(format!(" {}    ", t("common.confirm"))),
-                Span::styled(" n / Esc ", Style::new().fg(Color::Black).bg(Color::White)),
-                Span::raw(format!(" {}", t("common.cancel"))),
-            ]),
+            confirm_hint_line(theme),
         ])
         .alignment(Alignment::Center)
-        .block(
-            Block::new()
-                .title(" SMART self-test ")
-                .borders(Borders::ALL)
-                .border_style(Style::new().fg(theme.danger))
-                .style(Style::new().bg(theme.overlay_bg)),
-        )
         .wrap(Wrap { trim: true }),
-        popup,
+        inner,
     );
 }

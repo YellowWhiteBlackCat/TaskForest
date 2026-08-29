@@ -8,6 +8,9 @@
 use super::process_projection::{ProcessRowFacts, ProjectedRow};
 use super::*;
 use iced::widget::canvas;
+use taskmanager_shell::presentation::{
+    optional_bytes, optional_count, optional_duration, optional_nice,
+};
 use taskmanager_theme::tokens;
 
 /// Render one projected row: the process lookup joins the projection's
@@ -59,7 +62,11 @@ fn tree_node_row(
         return text("").into();
     };
     let theme_snapshot = ctx.theme;
-    let selected = ctx.selected_pids.contains(pid);
+    let selected = row
+        .row_key()
+        .and_then(|key| key.live_key())
+        .is_some_and(|identity| ctx.selected_identities.contains(&identity))
+        || ctx.selected_row.is_some_and(|selected| Some(selected) == row.row_key());
     let row_padding = theme::row_padding(ctx.compact);
     let marker = if *has_children {
         if *collapsed { "▶" } else { "▼" }
@@ -73,7 +80,7 @@ fn tree_node_row(
     };
     let mut name_row = iced::widget::row![
         iced::widget::text(guide_prefix).size(f32::from(taskmanager_theme::tokens::FONT_CAPTION)),
-        highlight::cell(
+        crate::ui::components::highlight::cell(
             &theme_snapshot,
             process.name.as_str(),
             ctx.query.as_str(),
@@ -95,7 +102,9 @@ fn tree_node_row(
             )
             .padding([0, 4])
             .style(move |_| iced::widget::container::Style {
-                background: Some(iced::Background::Color(theme::color(theme_snapshot.shade))),
+                background: Some(iced::Background::Color(taskmanager_theme::iced::color(
+                    theme_snapshot.shade,
+                ))),
                 border: iced::Border {
                     radius: 3.0.into(),
                     ..Default::default()
@@ -202,7 +211,7 @@ fn tree_node_row(
             .padding(0)
             .into()
     } else {
-        focus::selectable_row_with_menu(
+        let row_element = focus::selectable_row_with_menu(
             &theme_snapshot,
             AppPage::Applications,
             *flat_index,
@@ -211,7 +220,17 @@ fn tree_node_row(
                 flat_index: *flat_index,
                 pid: *pid,
             },
-        )
+        );
+        if ctx.open_menu_pid == Some(*pid) {
+            // The open menu floats on its own row: anchored by the popover
+            // primitive, dismissible by an outside press, and never clipped
+            // by the table viewport the way the old inline panel was.
+            let panel = super::process_menu::panel(theme_snapshot, process.name.clone(), *pid);
+            crate::ui::components::Popover::new(row_element, panel, Message::CloseProcessRowMenu)
+                .into()
+        } else {
+            row_element
+        }
     }
 }
 
@@ -229,8 +248,9 @@ pub(crate) struct RowRender {
     pub(crate) ui_size: taskmanager_theme::tokens::UiSize,
     /// The full multi-select target set. A row highlights when its pid is a
     /// member (covers the keyboard anchor AND every Ctrl/Shift-selected row).
-    pub(crate) selected_pids: std::rc::Rc<std::collections::HashSet<u32>>,
-    pub(crate) selected_row: Option<taskmanager_shell::ProcessRowKey>,
+    pub(crate) selected_identities:
+        std::rc::Rc<std::collections::HashSet<taskmanager_shell::ProcessRowIdentity>>,
+    pub(crate) selected_row: Option<taskmanager_shell::ProcessRowId>,
     /// GPUI-parity zero-value policy: when enabled, measured zero resource
     /// values render in the muted foreground instead of their category color
     /// (unavailable values stay dashes and are never dimmed as zero).
@@ -242,6 +262,11 @@ pub(crate) struct RowRender {
     /// resolve through [`Self::resolved_column_width`] — the same
     /// override-or-default source the header cells read.
     pub(crate) column_widths: std::rc::Rc<crate::app::ColumnWidthOverrides>,
+    /// The pid whose process context menu is currently open, if any. The row
+    /// carrying it hosts the floating menu panel; every other row renders
+    /// unchanged. Part of the lazy-body key so opening/closing the menu
+    /// rebuilds exactly the materialized window.
+    pub(crate) open_menu_pid: Option<u32>,
 }
 
 impl RowRender {
@@ -512,7 +537,7 @@ fn process_sparkline_cell(
     if show {
         canvas::Canvas::new(ProcessCpuSparkline::new(
             std::rc::Rc::clone(history),
-            theme::color(theme_snapshot.cpu),
+            taskmanager_theme::iced::color(theme_snapshot.cpu),
             pid,
         ))
         .width(Length::Fixed(PROCESS_SPARK_WIDTH))

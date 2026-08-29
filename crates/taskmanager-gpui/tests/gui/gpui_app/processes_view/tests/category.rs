@@ -194,10 +194,10 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
     assert!(view.read_with(cx, |v, _| {
         v.processes_state.expanded_apps.contains("app-tree:100")
     }));
-    assert!(view.read_with(cx, |v, _| v.selected_pids().is_empty()));
+    assert!(view.read_with(cx, |v, _| v.selected_process_count() == 0));
     assert_eq!(
         view.read_with(cx, |v, _| v.selected_process_row()),
-        Some(taskmanager_shell::ProcessRowKey::Application(100)),
+        Some(application_row_id(100)),
         "the PID-less application aggregate is the selected row identity"
     );
 
@@ -211,4 +211,27 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
         assert_eq!(rows[2].cpu, Some(10.0));
         assert_eq!(rows[3].cpu, Some(3.0));
     });
+}
+
+
+/// The expected row id of one fixture process (token from
+/// `fixture_start_token`, the builder's single source).
+fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
+    taskmanager_shell::ProcessRowId::Process(
+        taskmanager_shell::ProcessRowIdentity::from_parts(
+            pid,
+            taskmanager_test_support::fixture_start_token(pid),
+        )
+        .expect("fixture pid and token are non-zero"),
+    )
+}
+
+fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
+    taskmanager_shell::ProcessRowId::Application(
+        taskmanager_shell::ProcessRowIdentity::from_parts(
+            pid,
+            taskmanager_test_support::fixture_start_token(pid),
+        )
+        .expect("fixture pid and token are non-zero"),
+    )
 }

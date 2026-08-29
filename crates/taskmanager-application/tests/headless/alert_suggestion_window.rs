@@ -1,6 +1,10 @@
 use super::*;
-use crate::alerts::{AlertMetric, InsufficientReason, SUGGESTION_MIN_SAMPLES, SuggestedThreshold};
-use crate::{CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot};
+use taskmanager_core::core::alerts::{
+    AlertMetric, InsufficientReason, SUGGESTION_MIN_SAMPLES, SuggestedThreshold,
+};
+use taskmanager_core::core::metrics::{
+    CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
+};
 
 #[test]
 fn empty_window_is_typed_insufficient() {

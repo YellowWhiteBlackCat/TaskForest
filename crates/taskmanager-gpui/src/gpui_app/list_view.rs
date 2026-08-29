@@ -26,19 +26,19 @@
 //!   * [`feedback_status_line`] — the action bar's status line (feedback text
 //!     when present, else a caller-supplied selection hint).
 
-use crate::core::FailureKind;
-use crate::core::source::SourceStatus;
 use crate::gpui_app::elements;
-use crate::gpui_app::icons;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
 use gpui::{
     AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, Window, div, px,
 };
+use taskmanager_application::i18n;
 use taskmanager_application::{RefreshRequest, SourceStateKind, merge_source_lines};
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
+
 use taskmanager_theme::Palette;
 use taskmanager_ui::inputs::text_input::{TextInput, TextInputState};
 use taskmanager_ui::primitives::button::{Button, ButtonState, ButtonVariant};
@@ -333,7 +333,7 @@ fn filter_pill<F: FilterSpec>(
             .flex()
             .items_center()
             .gap(tokens::SPACE_6)
-            .child(icons::icon(ic).size(px(12.0)))
+            .child(taskmanager_icons::icon(ic).size(px(12.0)))
             .child(pill),
         None => wrapper.child(pill),
     }
@@ -368,7 +368,7 @@ pub fn search_box_sized(
         .gap(tokens::SPACE_8)
         .debug_selector(|| "tm-search-box".to_string())
         .child(
-            icons::icon(IconId::Search)
+            taskmanager_icons::icon(IconId::Search)
                 .size(px(14.0))
                 .text_color(palette.fg_muted),
         )
@@ -632,7 +632,7 @@ pub fn source_notice_with_detail_presentation(
         .border_1()
         .border_color(theme.warning.with_alpha(0.28))
         .child(
-            icons::icon(IconId::TriangleAlert)
+            taskmanager_icons::icon(IconId::TriangleAlert)
                 .size(px(14.0))
                 .text_color(theme.warning),
         )

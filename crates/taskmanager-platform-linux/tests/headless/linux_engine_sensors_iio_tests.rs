@@ -136,7 +136,7 @@ fn fake_iio_tree_collects_scaled_known_and_opaque_raw_channels() {
     use std::os::unix::fs::PermissionsExt;
 
     use taskmanager_core::core::sensors::SensorQuantity;
-    use taskmanager_platform_contract::SourceOutcome;
+    use taskmanager_core::core::source::SourceOutcome;
 
     let root = crate::test_support::repo_temp_dir().join(format!(
         "tm-iio-{}-{}",

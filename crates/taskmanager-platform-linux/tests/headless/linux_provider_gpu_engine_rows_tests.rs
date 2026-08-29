@@ -1,6 +1,6 @@
 use super::*;
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_escalation::polkit::{EngineReading, PerfHelperError, PerfHelperErrorKind};
-use taskmanager_platform_contract::FailureKind;
 
 fn device() -> DeviceId {
     DeviceId::new("gpu:0")

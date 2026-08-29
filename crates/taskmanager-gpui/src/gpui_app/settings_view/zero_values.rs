@@ -11,9 +11,9 @@ use gpui::{Context, Div, Entity, InteractiveElement, ParentElement, Styled, div}
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 /// Render the Apps-page zero-value switch and its explanation.
 pub(super) fn zero_values_row(

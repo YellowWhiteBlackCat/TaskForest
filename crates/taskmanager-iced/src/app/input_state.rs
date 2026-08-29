@@ -10,4 +10,8 @@ pub(crate) struct InputState {
     pub(crate) context_menu: ContextMenuState,
     pub(crate) modal_appear: Option<ModalAppear>,
     pub(crate) warmup_spin: Option<WarmupSpin>,
+    /// The selectable value that owns the window's one active text selection
+    /// (the reference selection-registry rule collapsed to one slot; see
+    /// `components::SelectableText`).
+    pub(crate) text_selection_owner: Option<iced::advanced::widget::Id>,
 }

@@ -2,12 +2,12 @@
 
 use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, uniform_list};
 
-use crate::core::hardware::{CoreBreakdown, HardwareInfo};
-use crate::core::metrics::{CpuMetrics, SystemSnapshot};
 use crate::gpui_app::formatting;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::hardware::{CoreBreakdown, HardwareInfo};
+use taskmanager_core::core::metrics::{CpuMetrics, SystemSnapshot};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 
 use super::{format_uptime, stats::CpuDetailsStats};

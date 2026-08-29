@@ -4,15 +4,17 @@
 //! expiry, supersession, or identity change, and folds per-target issues into
 //! a single batch health verdict.
 
-use taskmanager_application::ProviderFailure;
 use taskmanager_application::{
-    FailureKind, PlatformEvent, SmartControlRequest, SmartEvent, SmartObservationBatch,
-    SmartObservationIssue, SmartObservationRequest, SmartTrackingEnd, SmartTrackingEndReason,
-    StorageDeviceTarget,
+    PlatformEvent, SmartControlRequest, SmartEvent, SmartObservationBatch, SmartObservationIssue,
+    SmartObservationRequest, SmartTrackingEnd, SmartTrackingEndReason,
 };
-use taskmanager_core::{
-    DeviceStatus, SmartSelfTestFailure, SmartSelfTestPhase, SmartSelfTestReport,
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::smart::{
+    SmartSelfTestFailure, SmartSelfTestPhase, SmartSelfTestReport,
 };
+use taskmanager_core::core::storage::StorageDeviceTarget;
+use taskmanager_platform_contract::ProviderFailure;
 
 use super::smart_state::{SharedSmartRuntimeState, SmartCommitStatus, SmartJobSnapshot};
 use super::{SmartControlExecutor, SmartObservationExecutor};

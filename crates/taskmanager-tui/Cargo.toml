@@ -9,6 +9,8 @@ publish = false
 
 [dependencies]
 ratatui = { version = "0.30.2", default-features = false, features = ["crossterm", "layout-cache", "macros", "underline-color", "unstable-rendered-line-info"] }
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 # The neutral theme crate, taken with DEFAULT features — toolkit-free — so
 # this frontend proves the neutral build (ADR-026).
 taskmanager-theme = { path = "../taskmanager-theme" }
@@ -20,6 +22,9 @@ taskmanager-assets = { path = "../taskmanager-assets" }
 
 [dev-dependencies]
 taskmanager-test-support = { path = "../taskmanager-test-support" }
+# Test fixtures read the live-graph read model directly; production sources
+# consume the shell's trend projections instead (frontend firewall).
+taskmanager-telemetry-store = { path = "../taskmanager-telemetry-store" }
 
 [lib]
 name = "taskmanager_tui"

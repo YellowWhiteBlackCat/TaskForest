@@ -2,11 +2,13 @@
 // test module pulls gpui's deeply generic prelude into the test scope and
 // pushes the `#[test]` attribute macro past its recursion limit.
 use super::{ServiceControlConfirmation, requires_service_confirmation};
-use crate::i18n;
-use taskmanager_application::{
-    ServiceAction, ServiceId, StartupControlPolicy, StartupEntry, StartupImpact,
-    StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
+use taskmanager_application::i18n;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::startup::{
+    StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence,
+    StartupImpactUnknownReason, StartupScope, StartupSource,
 };
+use taskmanager_core::core::target::ServiceId;
 
 #[test]
 fn only_destructive_service_actions_require_confirmation() {

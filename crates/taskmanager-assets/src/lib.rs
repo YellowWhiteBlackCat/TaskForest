@@ -238,3 +238,117 @@ pub fn asset_bytes(path: &str) -> Option<&'static [u8]> {
         .find(|asset| asset.path == path)
         .map(|asset| asset.bytes)
 }
+
+/// Edge length in pixels of every checked-in UI icon bitmap. The bitmaps
+/// rasterize at 2x of the largest logical draw size (18px), so 1x-scale
+/// drawing downsamples crisply and 2x-scale drawing is exact.
+pub const UI_ICON_RGBA_SIZE: u32 = 36;
+
+/// Checked-in white RGBA bitmaps keyed by the SAME asset path vocabulary as
+/// [`asset_bytes`] — `domain/cpu.svg`, `icons/chevron-up.svg`, … — so a
+/// frontend resolves one semantic icon through one path string and picks the
+/// SVG (vector renderers) or the bitmap (raster renderers) from the same key.
+/// Derived only by `packaging/regenerate-ui-icons.sh`; never hand-edited.
+const UI_ICON_RGBA: &[(&str, &[u8])] = &[
+    (
+        icon_path::CPU,
+        include_bytes!("../assets/icons-rgba/domain-cpu.rgba"),
+    ),
+    (
+        icon_path::MEMORY,
+        include_bytes!("../assets/icons-rgba/domain-memory.rgba"),
+    ),
+    (
+        icon_path::DISK,
+        include_bytes!("../assets/icons-rgba/domain-disk.rgba"),
+    ),
+    (
+        icon_path::NETWORK,
+        include_bytes!("../assets/icons-rgba/domain-network.rgba"),
+    ),
+    (
+        icon_path::GPU,
+        include_bytes!("../assets/icons-rgba/domain-gpu.rgba"),
+    ),
+    (
+        icon_path::PROCESS,
+        include_bytes!("../assets/icons-rgba/domain-process.rgba"),
+    ),
+    (
+        icon_path::SERVICE,
+        include_bytes!("../assets/icons-rgba/domain-service.rgba"),
+    ),
+    (
+        icon_path::STARTUP,
+        include_bytes!("../assets/icons-rgba/domain-startup.rgba"),
+    ),
+    (
+        icon_path::USER,
+        include_bytes!("../assets/icons-rgba/domain-user.rgba"),
+    ),
+    (
+        icon_path::ALERT,
+        include_bytes!("../assets/icons-rgba/domain-alert.rgba"),
+    ),
+    (
+        icon_path::SEARCH,
+        include_bytes!("../assets/icons-rgba/domain-search.rgba"),
+    ),
+    (
+        icon_path::SETTINGS,
+        include_bytes!("../assets/icons-rgba/domain-settings.rgba"),
+    ),
+    (
+        "icons/chart-pie.svg",
+        include_bytes!("../assets/icons-rgba/icons-chart-pie.rgba"),
+    ),
+    (
+        "icons/info.svg",
+        include_bytes!("../assets/icons-rgba/icons-info.rgba"),
+    ),
+    (
+        "icons/layout-dashboard.svg",
+        include_bytes!("../assets/icons-rgba/icons-layout-dashboard.rgba"),
+    ),
+    (
+        "icons/arrow-up.svg",
+        include_bytes!("../assets/icons-rgba/icons-arrow-up.rgba"),
+    ),
+    (
+        "icons/arrow-down.svg",
+        include_bytes!("../assets/icons-rgba/icons-arrow-down.rgba"),
+    ),
+];
+
+/// Every bitmap key, for registry tests that keep the table and the SVG set
+/// honest against each other.
+pub const UI_ICON_RGBA_PATHS: &[&str] = &[
+    icon_path::CPU,
+    icon_path::MEMORY,
+    icon_path::DISK,
+    icon_path::NETWORK,
+    icon_path::GPU,
+    icon_path::PROCESS,
+    icon_path::SERVICE,
+    icon_path::STARTUP,
+    icon_path::USER,
+    icon_path::ALERT,
+    icon_path::SEARCH,
+    icon_path::SETTINGS,
+    "icons/chart-pie.svg",
+    "icons/info.svg",
+    "icons/layout-dashboard.svg",
+    "icons/arrow-up.svg",
+    "icons/arrow-down.svg",
+];
+
+/// Return the decoded RGBA bytes for a known icon asset path. Bitmaps are
+/// white with alpha, sized [`UI_ICON_RGBA_SIZE`]²; renderers tint at draw
+/// time. `None` is a typed fallback for a path with no bitmap yet — callers
+/// must degrade honestly, never fabricate a placeholder glyph.
+pub fn ui_icon_rgba(path: &str) -> Option<&'static [u8]> {
+    UI_ICON_RGBA
+        .iter()
+        .find(|(key, _)| *key == path)
+        .map(|(_, bytes)| *bytes)
+}

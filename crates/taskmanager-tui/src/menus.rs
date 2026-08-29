@@ -10,8 +10,16 @@ use crate::{
     SessionMenuTarget, TuiApp, TuiSurface, TuiSurfaceKind,
 };
 use taskmanager_application::{
-    AppAction, AppPage, PlatformEffect, ProcessBatchAction, ServiceAction, SessionControlAction,
+    AppAction, AppPage, InteractionEvent, PendingConfirmation, PlatformEffect, SurfaceTransition,
 };
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::SmartAvailability;
+use taskmanager_core::core::process::{ProcessBatchAction, ProcessItem};
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::smart::self_test::SmartSelfTestKind;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_core::core::target::StorageDeviceKey;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 /// The frozen batch-control menu target: the menu cursor plus the count of
@@ -112,6 +120,14 @@ impl TuiApp {
         }
     }
 
+    /// The shell's flat position of the frozen menu row, matched by pid +
+    /// provider start token so a reused PID can never redirect the request.
+    fn flat_index_of_frozen(&self, item: &ProcessItem) -> Option<usize> {
+        self.visible_processes().iter().position(|process| {
+            process.pid == item.pid && process.current_start_token() == item.current_start_token()
+        })
+    }
+
     /// Resolve the chosen process action into a [`PlatformEffect`]. Control
     /// actions (End / End process tree / Suspend / Resume / Kill / priority)
     /// route through the shell's shared batch path — Kill, End-task, and the
@@ -130,9 +146,33 @@ impl TuiApp {
             .copied()
             .unwrap_or(ui::process_menu::ProcessMenuAction::OpenLocation);
         match action {
-            ui::process_menu::ProcessMenuAction::EndTask => self
-                .shell
-                .apply_action(taskmanager_application::AppAction::RequestEndTask),
+            ui::process_menu::ProcessMenuAction::EndTask => {
+                // The frozen menu row — not the shell's flat cursor — is the
+                // target authority: in the grouped tree the shell's flat
+                // `selected` can drift from the TUI's visual cursor, and a
+                // destructive action must never follow that drift. Re-point
+                // the shell cursor at the frozen row's flat position (pid +
+                // provider start token, so a reused PID cannot redirect the
+                // request) before arming the gate; a vanished row fails
+                // closed with an honest notice instead of end-tasking a
+                // neighbor.
+                match self.flat_index_of_frozen(&menu.item) {
+                    Some(flat) => {
+                        self.shell.selected = flat;
+                        self.shell
+                            .apply_action(taskmanager_application::AppAction::RequestEndTask)
+                    }
+                    None => {
+                        self.report_notice(
+                            FeedbackSource::Interaction,
+                            FeedbackSeverity::Warning,
+                            FeedbackLifecycle::SHORT,
+                            "The frozen process is no longer in the list",
+                        );
+                        None
+                    }
+                }
+            }
             ui::process_menu::ProcessMenuAction::EndProcessTree => {
                 self.shell.request_process_tree_end(menu.item.pid)
             }
@@ -151,7 +191,7 @@ impl TuiApp {
                 // priority_tier is total over the priority variants; the
                 // Normal fallback keeps the production tree panic-free.
                 let tier = ui::process_menu::priority_tier(action)
-                    .unwrap_or(taskmanager_application::PriorityTier::Normal);
+                    .unwrap_or(taskmanager_core::core::process::PriorityTier::Normal);
                 self.shell
                     .request_process_batch(ProcessBatchAction::SetPriority(tier))
             }
@@ -183,7 +223,7 @@ impl TuiApp {
         if self.page() != AppPage::Applications {
             return false;
         }
-        let marked_count = self.shell.selected_pids().len();
+        let marked_count = self.shell.selected_identities().len();
         if marked_count == 0 {
             self.report_notice(
                 FeedbackSource::Interaction,
@@ -245,12 +285,12 @@ impl TuiApp {
                 // priority_tier is total over the priority variants; the
                 // Normal fallback keeps the production tree panic-free.
                 let tier = ui::batch_menu::priority_tier(action)
-                    .unwrap_or(taskmanager_application::PriorityTier::Normal);
+                    .unwrap_or(taskmanager_core::core::process::PriorityTier::Normal);
                 self.shell
                     .request_process_batch(ProcessBatchAction::SetPriority(tier))
             }
             ui::batch_menu::BatchMenuAction::Clear => {
-                self.shell.clear_selected_pids();
+                self.shell.clear_selected_rows();
                 self.report_notice(
                     FeedbackSource::Interaction,
                     FeedbackSeverity::Info,
@@ -276,7 +316,8 @@ impl TuiApp {
         let Some(item) = self.selected_detail_process() else {
             return false;
         };
-        let Some(identity) = taskmanager_application::FrozenProcessIdentity::from_process(&item)
+        let Some(identity) =
+            taskmanager_core::core::process::FrozenProcessIdentity::from_process(&item)
         else {
             return false;
         };
@@ -413,4 +454,69 @@ impl TuiApp {
     pub fn confirm_session_control(&mut self) -> Option<PlatformEffect> {
         self.shell.confirm_session_control()
     }
+
+    /// Arm the shared SMART self-test confirmation gate (`t` on the
+    /// Performance·Disk page; the palette row runs the same method under the
+    /// same device guard). Only the application interaction gate opens — the
+    /// platform request is emitted exclusively by the gate's `y`, and the
+    /// runtime routes that effect through the shared `queue_effect` seam,
+    /// which owns the request session (begin → submit → accept/reject).
+    /// Nothing renders as progress before the provider actually accepted the
+    /// request: until then the honest state is "requested", reported through
+    /// the shell's typed footer feedback. Returns whether a gate armed.
+    #[must_use]
+    pub fn arm_smart_self_test(&mut self) -> bool {
+        let Some(intent) = smart_self_test_target(self) else {
+            return false;
+        };
+        let reduction =
+            self.shell
+                .application
+                .interaction
+                .reduce(InteractionEvent::ArmConfirmation(
+                    PendingConfirmation::SmartSelfTest(intent),
+                ));
+        match reduction.transition {
+            SurfaceTransition::Opened(_) | SurfaceTransition::Replaced { .. } => {
+                // The same input-mode reset the shell's own arm path applies
+                // when a shared surface opens.
+                self.shell.reset_input_mode();
+                true
+            }
+            SurfaceTransition::Unchanged
+            | SurfaceTransition::Confirmed(_)
+            | SurfaceTransition::Dismissed { .. } => false,
+        }
+    }
+}
+
+/// Resolve the frozen SMART self-test intent the Performance·Disk surface can
+/// offer, or `None` when the current snapshot has no disk whose provider
+/// reports [`SmartAvailability::Available`] (the exact readiness GPUI's
+/// health view demands before it enables its self-test actions). The TUI disk
+/// view has no per-disk cursor, so the target is the first SMART-capable disk
+/// in snapshot order — the same first-disk fallback GPUI uses when no device
+/// is selected. The intent freezes the full identity (device id, hot-plug
+/// generation, provider locator, display name), so the shared confirmation
+/// names the disk it would act on and `y` can only submit what was displayed.
+/// The Short kind is the terminal entry's single offered test (GPUI also
+/// offers Extended; a terminal menu surface for the second kind stays out of
+/// this crate's current surface vocabulary).
+#[must_use]
+pub(crate) fn smart_self_test_target(app: &TuiApp) -> Option<SmartSelfTestIntent> {
+    let disks = &app.projection().snapshot.as_ref()?.disks;
+    let disk = disks
+        .iter()
+        .find(|disk| disk.smart_availability == SmartAvailability::Available)?;
+    Some(SmartSelfTestIntent {
+        device_id: DeviceId::new(disk.device_id.clone()),
+        device_generation: disk.device_generation,
+        device_key: StorageDeviceKey::new(disk.name.clone()),
+        display_name: if disk.model.is_empty() {
+            disk.name.clone()
+        } else {
+            disk.model.clone()
+        },
+        kind: SmartSelfTestKind::Short,
+    })
 }

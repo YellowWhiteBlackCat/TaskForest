@@ -20,9 +20,14 @@ pub enum FrontendShape {
     Iced,
     /// The Ratatui terminal frontend.
     Tui,
+    /// The Bevy desktop frontend.
+    Bevy,
 }
 
 impl FrontendShape {
+    /// Every frontend shape governed by the shared contract.
+    pub const ALL: [Self; 4] = [Self::Gpui, Self::Iced, Self::Tui, Self::Bevy];
+
     /// Stable report-friendly name for gates and diagnostics.
     #[must_use]
     pub const fn name(self) -> &'static str {
@@ -30,6 +35,7 @@ impl FrontendShape {
             Self::Gpui => "gpui",
             Self::Iced => "iced",
             Self::Tui => "tui",
+            Self::Bevy => "bevy",
         }
     }
 }

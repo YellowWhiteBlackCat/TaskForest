@@ -88,8 +88,11 @@ fn column_menu_toggle_hides_and_reshows_a_column() {
             KeyModifiers::NONE,
         ),
     );
-    assert!(app.hidden_columns.contains(&crate::SortCol::Cpu));
-    assert!(!app.column_visible(crate::SortCol::Cpu));
+    assert!(
+        app.hidden_columns
+            .contains(&taskmanager_shell::SortCol::Cpu)
+    );
+    assert!(!app.column_visible(taskmanager_shell::SortCol::Cpu));
 
     // Enter again on the same row re-shows it.
     let _ = handle_key(
@@ -99,7 +102,7 @@ fn column_menu_toggle_hides_and_reshows_a_column() {
             KeyModifiers::NONE,
         ),
     );
-    assert!(app.column_visible(crate::SortCol::Cpu));
+    assert!(app.column_visible(taskmanager_shell::SortCol::Cpu));
 }
 
 #[test]
@@ -120,11 +123,14 @@ fn hiding_the_active_sort_column_relocates_the_sort_to_a_visible_column() {
             KeyModifiers::NONE,
         ),
     );
-    assert!(app.hidden_columns.contains(&crate::SortCol::Cpu));
+    assert!(
+        app.hidden_columns
+            .contains(&taskmanager_shell::SortCol::Cpu)
+    );
     // The sort must have moved to the first visible column (Memory).
     assert_eq!(
         app.effective_sort_col(),
-        crate::SortCol::Memory,
+        taskmanager_shell::SortCol::Memory,
         "the sort must relocate to the first visible column"
     );
 }
@@ -134,8 +140,9 @@ fn hidden_columns_disappear_from_the_header_and_rows() {
     let mut app = app_on_processes();
     // Hide CPU + DiskRead: the header must lose both labels and the rows must
     // stay aligned (the memory readout still renders, the disk columns do not).
-    app.hidden_columns.insert(crate::SortCol::Cpu);
-    app.hidden_columns.insert(crate::SortCol::DiskRead);
+    app.hidden_columns.insert(taskmanager_shell::SortCol::Cpu);
+    app.hidden_columns
+        .insert(taskmanager_shell::SortCol::DiskRead);
     let text = frame_text(&app, 140, 40);
     assert!(
         !text.contains("CPU%"),
@@ -162,7 +169,7 @@ fn sort_cycle_walks_only_the_visible_columns() {
     // Default sort is CPU; the visible cycle is PID → Name → CPU → Memory →
     // PSS → Swap → User → State (advanced columns hidden). One `s` from CPU
     // lands on Memory.
-    assert_eq!(app.effective_sort_col(), crate::SortCol::Cpu);
+    assert_eq!(app.effective_sort_col(), taskmanager_shell::SortCol::Cpu);
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -170,10 +177,11 @@ fn sort_cycle_walks_only_the_visible_columns() {
             KeyModifiers::NONE,
         ),
     );
-    assert_eq!(app.effective_sort_col(), crate::SortCol::Memory);
+    assert_eq!(app.effective_sort_col(), taskmanager_shell::SortCol::Memory);
 
     // Hide Memory: `s` now skips it (CPU → PSS).
-    app.hidden_columns.insert(crate::SortCol::Memory);
+    app.hidden_columns
+        .insert(taskmanager_shell::SortCol::Memory);
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -181,5 +189,5 @@ fn sort_cycle_walks_only_the_visible_columns() {
             KeyModifiers::NONE,
         ),
     );
-    assert_eq!(app.effective_sort_col(), crate::SortCol::Pss);
+    assert_eq!(app.effective_sort_col(), taskmanager_shell::SortCol::Pss);
 }

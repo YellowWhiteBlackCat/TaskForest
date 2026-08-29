@@ -1,7 +1,7 @@
 //! Pure page-level telemetry projection for root render composition.
 
-use crate::core::metrics::SystemSnapshot;
 use crate::gpui_app::formatting;
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 pub(super) struct ProcessPageMetrics {
     pub swap_total_bytes: Option<u64>,

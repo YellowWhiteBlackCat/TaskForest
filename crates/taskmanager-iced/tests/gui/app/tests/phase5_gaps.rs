@@ -3,9 +3,9 @@
 use crate::IcedApp;
 use crate::app::Message;
 use std::collections::HashSet;
-use taskmanager_application::{
-    AppAction, AppPage, CoreBreakdown, CpuType, HardwareInfo, ServiceItem, ServiceStatus,
-};
+use taskmanager_application::{AppAction, AppPage};
+use taskmanager_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 
 #[test]
 fn test_affinity_presets_select_all_clear_all_invert_and_hetero() {
@@ -190,8 +190,8 @@ fn test_matches_process_query_structured_syntax() {
     let proc = taskmanager_test_support::ProcessItemFixtureBuilder::new()
         .pid(1234)
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("root"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("root"),
                 None,
                 1,
             ),

@@ -1,7 +1,9 @@
 use super::*;
 use crate::AlertRuleImportMode;
 use std::time::Duration;
-use taskmanager_core::alerts::{AlertMetric, AlertRule, AlertSeverity};
+use taskmanager_core::alerts::{
+    AlertEventKind, AlertMetric, AlertRule, AlertSeverity, MAX_ALERT_EVENTS,
+};
 use taskmanager_core::metrics::{
     CpuMetrics, CpuScalarObservations, MemoryMetrics, ScalarObservation,
 };
@@ -59,6 +61,50 @@ fn evaluate_tracks_clear_and_refire() {
     assert!(cleared.active.is_empty());
     let refired = center.evaluate(&snapshot(95.0), 3_000);
     assert_eq!(refired.notifications.len(), 1);
+}
+
+#[test]
+fn event_history_records_only_active_set_transitions() {
+    let mut center = AlertCenter::new([cpu_rule(90.0)]);
+
+    center.evaluate(&snapshot(95.0), 1_000);
+    center.evaluate(&snapshot(96.0), 2_000);
+    center.evaluate(&snapshot(10.0), 3_000);
+
+    let history = center.event_history();
+    assert_eq!(history.len(), 2);
+    assert_eq!(history[0].id, 1);
+    assert_eq!(history[0].kind, AlertEventKind::Activated);
+    assert_eq!(history[1].id, 2);
+    assert_eq!(history[1].kind, AlertEventKind::Cleared);
+    assert_eq!(history[1].alert.instance_id, "cpu-high:system");
+}
+
+#[test]
+fn clearing_event_history_does_not_reset_alert_evaluation() {
+    let mut center = AlertCenter::new([cpu_rule(90.0)]);
+    center.evaluate(&snapshot(95.0), 1_000);
+    assert_eq!(center.event_history().len(), 1);
+
+    center.clear_event_history();
+    assert!(center.event_history().is_empty());
+    assert_eq!(center.evaluate(&snapshot(96.0), 2_000).active.len(), 1);
+    assert!(center.event_history().is_empty());
+}
+
+#[test]
+fn event_history_is_bounded_and_keeps_transition_order() {
+    let mut center = AlertCenter::new([cpu_rule(90.0)]);
+    for index in 0..(MAX_ALERT_EVENTS + 3) {
+        let base = index as u64 * 2_000;
+        center.evaluate(&snapshot(95.0), base + 1_000);
+        center.evaluate(&snapshot(10.0), base + 2_000);
+    }
+
+    let history = center.event_history();
+    assert_eq!(history.len(), MAX_ALERT_EVENTS);
+    assert_eq!(history.last().map(|event| event.id), Some(206));
+    assert!(history.windows(2).all(|events| events[0].id < events[1].id));
 }
 
 #[test]

@@ -17,21 +17,21 @@ use taskmanager_ui::primitives::section_header::SectionHeader;
 
 use self::density::density_row;
 use self::ui_size::ui_size_row;
-use crate::core::config::{
-    STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
-};
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::first_run::{self, FirstRunUiState};
 use crate::gpui_app::formatting::DisplayUnits;
 use crate::gpui_app::graph::GraphSettings;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{
+use taskmanager_application::i18n;
+use taskmanager_core::core::config::{
+    STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
+};
+use taskmanager_theme::tokens;
+use taskmanager_theme::tokens::RowDensity;
+use taskmanager_theme::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontPreference, FontRole, Skin,
     Theme,
-    tokens::{RowDensity, UiSize},
 };
-use crate::i18n;
 
 mod appearance;
 mod density;
@@ -53,6 +53,7 @@ use self::notifications::{notify_row, quiet_hours_rows};
 use self::refresh::refresh_row;
 use self::units::units_group;
 use self::zero_values::zero_values_row;
+use taskmanager_theme::tokens::UiSize;
 
 mod devices;
 pub(crate) mod refresh;

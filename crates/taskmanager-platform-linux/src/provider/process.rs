@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::{
     FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult, ProcessEnvironment,
     ProcessGpuSnapshot, ProcessInsightSnapshot, ProcessIsolation, ProcessItem,
@@ -9,7 +10,7 @@ use taskmanager_core::{
     ProcessThreads, ResourceGroupLimitRequest,
 };
 use taskmanager_escalation::polkit::NetLauncherProcess;
-use taskmanager_platform_contract::{FailureKind, PartialSourceSnapshot, ProviderFailure};
+use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     ProcessAffinityControlProvider, ProcessAffinityProvider, ProcessControlProvider,
     ProcessEnvironmentProvider, ProcessGpuProvider, ProcessIsolationProvider, ProcessListProvider,

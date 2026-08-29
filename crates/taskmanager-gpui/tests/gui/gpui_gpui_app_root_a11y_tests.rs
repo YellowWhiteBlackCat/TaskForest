@@ -1,10 +1,10 @@
 use super::build_snapshot;
-use crate::core::process::{ProcessItem, ProcessScalarObservations};
-use crate::core::{CpuScalarObservations, ScalarObservation};
-use crate::gpui_app::root::termination::ProcessTerminationAction;
 use crate::gpui_app::root::{ProcessDetailsSection, RootView, TopPage};
-use crate::gpui_app::theme::Theme;
 use gpui::{AppContext, Entity, TestAppContext};
+use taskmanager_application::ProcessTerminationAction;
+use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskmanager_core::core::{CpuScalarObservations, ScalarObservation};
+use taskmanager_theme::Theme;
 use taskmanager_ui_contract::{SemanticAction, SemanticNodeId, SemanticRole};
 
 /// Build a bare RootView (no window needed — `build_snapshot` only reads
@@ -47,11 +47,13 @@ async fn apps_page_snapshot_has_expected_roles_and_values(cx: &mut TestAppContex
         view.replace_process_selection([2002], None);
         // Make the graph assertion data-backed; RootView starts with an
         // unobserved snapshot and must not turn that state into 0%.
-        view.replace_system_snapshot_for_test(taskmanager_application::SystemSnapshot {
-            cpu: taskmanager_application::CpuMetrics::from_observations(CpuScalarObservations {
-                global_usage_pct: ScalarObservation::available(31.0, 1),
-                ..Default::default()
-            }),
+        view.replace_system_snapshot_for_test(taskmanager_core::core::metrics::SystemSnapshot {
+            cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
+                CpuScalarObservations {
+                    global_usage_pct: ScalarObservation::available(31.0, 1),
+                    ..Default::default()
+                },
+            ),
             ..Default::default()
         });
     });
@@ -149,11 +151,13 @@ async fn snapshot_stays_well_formed_with_edge_values_and_modal_open(cx: &mut Tes
     // panic and must keep the canonical tree shape.
     root.update(cx, |view, _| {
         view.replace_processes_for_test(vec![process(3, "hog"), process(4, "idle")]);
-        view.replace_system_snapshot_for_test(taskmanager_application::SystemSnapshot {
-            cpu: taskmanager_application::CpuMetrics::from_observations(CpuScalarObservations {
-                global_usage_pct: ScalarObservation::available(88.0, 1),
-                ..Default::default()
-            }),
+        view.replace_system_snapshot_for_test(taskmanager_core::core::metrics::SystemSnapshot {
+            cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
+                CpuScalarObservations {
+                    global_usage_pct: ScalarObservation::available(88.0, 1),
+                    ..Default::default()
+                },
+            ),
             ..Default::default()
         });
         view.show_run_task();

@@ -1,7 +1,10 @@
 //! Platform-neutral control requests and their asynchronous outcomes.
 
-use crate::{FailureKind, SessionControlAction, SessionId, StartupEntry, StartupEntryId};
-use taskmanager_core::{ServiceAction, ServiceId};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::startup::{StartupEntry, StartupEntryId};
+use taskmanager_core::core::target::{ServiceId, SessionId};
 
 /// Correlates an asynchronous control result with the latest UI intent.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

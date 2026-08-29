@@ -9,7 +9,7 @@
 //! surface renderers consume. Frontends never hold a second selection or
 //! re-derive availability (ADR-034 验收约束: “选择态单一权威在 shell”).
 
-use taskmanager_application::GpuMetrics;
+use taskmanager_core::core::metrics::GpuMetrics;
 
 use crate::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricGate, GpuChartMetricProjection,

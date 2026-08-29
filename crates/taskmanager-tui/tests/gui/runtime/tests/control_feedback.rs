@@ -15,12 +15,17 @@ use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::KeyModifiers;
 use taskmanager_application::i18n::{Language, set_language};
 use taskmanager_application::{
-    AppPage, CapabilityCatalog, CapabilitySnapshot, CorrelatedEvent, EventEnvelope, EventPort,
-    EventPortError, EventSequence, FailureKind, FrozenProcessIdentity, OperationFailure,
-    PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle, ProcessBatchAction,
-    ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessControlRequest,
-    ProcessFacets, ProcessListRequest, ProviderFailure, RequestEnvelope, RequestId, RequestPort,
-    SubmissionError,
+    AppPage, CorrelatedEvent, PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle,
+    ProcessControlRequest, ProcessFacets, ProcessListRequest,
+};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult,
+    ProcessBatchTargetResult,
+};
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError, EventSequence,
+    OperationFailure, ProviderFailure, RequestEnvelope, RequestId, RequestPort, SubmissionError,
 };
 
 use crate::render;
@@ -79,7 +84,7 @@ impl<T> Default for RecordingRequests<T> {
     }
 }
 
-impl<T: taskmanager_application::CapabilityRequest> RequestPort for RecordingRequests<T> {
+impl<T: taskmanager_platform_contract::CapabilityRequest> RequestPort for RecordingRequests<T> {
     type Request = T;
 
     fn try_submit(&self, request: RequestEnvelope<T>) -> Result<(), SubmissionError> {
@@ -167,7 +172,7 @@ fn end_task_completion_renders_typed_success_feedback_and_refresh_is_drained() {
     let mut batch = PlatformEventBatch::default();
     batch.process_events.push(CorrelatedEvent {
         request_id: *request_id,
-        capability: taskmanager_application::CapabilityId::PROCESS_CONTROL,
+        capability: taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL,
         provider: None,
         sequence: EventSequence::new(1),
         observed_at_ms: 1_000,
@@ -264,7 +269,7 @@ fn failed_single_control_renders_the_typed_reason_not_debug() {
     let mut batch = PlatformEventBatch::default();
     batch.failures.push(OperationFailure {
         request_id,
-        capability: taskmanager_application::CapabilityId::PROCESS_CONTROL,
+        capability: taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL,
         sequence: EventSequence::new(1),
         kind: FailureKind::PermissionDenied,
         retry: ProviderFailure::from_kind(FailureKind::PermissionDenied).retry(),
@@ -351,7 +356,7 @@ fn batch_completion_renders_per_item_outcomes_with_typed_failure_reason() {
     let mut batch = PlatformEventBatch::default();
     batch.process_events.push(CorrelatedEvent {
         request_id,
-        capability: taskmanager_application::CapabilityId::PROCESS_CONTROL,
+        capability: taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL,
         provider: None,
         sequence: EventSequence::new(1),
         observed_at_ms: 1_000,
@@ -409,7 +414,7 @@ fn fully_applied_batch_renders_success_marker_without_failure_item() {
     let mut batch = PlatformEventBatch::default();
     batch.process_events.push(CorrelatedEvent {
         request_id,
-        capability: taskmanager_application::CapabilityId::PROCESS_CONTROL,
+        capability: taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL,
         provider: None,
         sequence: EventSequence::new(1),
         observed_at_ms: 1_000,

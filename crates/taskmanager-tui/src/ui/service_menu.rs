@@ -12,12 +12,14 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{ServiceAction, ServiceItem};
+use taskmanager_core::core::services::{ServiceAction, ServiceItem};
 use taskmanager_ui_contract::IconId;
 
+use super::containers::{KeyHint, Modal};
 use crate::TuiTheme;
+use crate::bindings::{ACTION_MENU_HINTS, menu_hint_pairs};
 
 /// The action menu's frozen target: the provider-issued service row plus the
 /// menu cursor. Storing the row (not an index) keeps the intent stable while
@@ -37,26 +39,17 @@ pub const MENU_ACTIONS: [ServiceAction; 5] = [
     ServiceAction::Disable,
 ];
 
-/// Render the service-action menu centred over `area`.
-pub fn render_service_menu(
+/// Render the service-action menu from the committed focus plan.  The
+/// highlighted row is the plan's `MenuItem` control when it names this
+/// surface; any other control paints no highlight (fail-closed).
+pub(super) fn render_service_menu_at(
     frame: &mut Frame<'_>,
     menu: &ServiceMenuTarget,
     theme: TuiTheme,
-    area: Rect,
+    focus: super::TuiFocusPlan,
+    popup: Rect,
 ) {
-    let popup = centered(area, 52, 13);
-    frame.render_widget(Clear, popup);
-    let block = Block::new()
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.accent))
-        .style(Style::new().bg(theme.overlay_bg))
-        .title(format!(
-            " {} {} ",
-            crate::icon_glyph(IconId::Service),
-            t("svc.service_actions")
-        ));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let inner = Modal::new(theme, IconId::Service, t("svc.service_actions")).render(frame, popup);
 
     let [body, footer] = Layout::vertical([Constraint::Min(7), Constraint::Length(3)]).areas(inner);
 
@@ -64,7 +57,9 @@ pub fn render_service_menu(
         Span::styled("  ", Style::new().fg(theme.dim)),
         Span::styled(
             menu.service.name.as_str(),
-            Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+            Style::new()
+                .fg(theme.color(Color::White))
+                .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!("  {}", menu.service.status.as_str()),
@@ -72,8 +67,9 @@ pub fn render_service_menu(
         ),
     ])];
     lines.push(Line::from(""));
+    let focused = focus.menu_item(crate::TuiSurfaceKind::ServiceMenu);
     for (index, action) in MENU_ACTIONS.into_iter().enumerate() {
-        let selected = index == menu.selection;
+        let selected = focused == Some(index);
         let label = action_label(action);
         lines.push(Line::from(vec![
             Span::styled(
@@ -83,7 +79,11 @@ pub fn render_service_menu(
             Span::styled(
                 label,
                 Style::new()
-                    .fg(if selected { Color::White } else { theme.dim })
+                    .fg(if selected {
+                        theme.color(Color::White)
+                    } else {
+                        theme.dim
+                    })
                     .add_modifier(if selected {
                         Modifier::BOLD
                     } else {
@@ -97,23 +97,7 @@ pub fn render_service_menu(
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" ↑↓ ", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!(" {} · ", t("menu.word_move")),
-                    Style::new().fg(theme.dim),
-                ),
-                Span::styled("Enter", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!(" {} · ", t("menu.word_select")),
-                    Style::new().fg(theme.dim),
-                ),
-                Span::styled("Esc", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!(" {}", t("menu.word_cancel")),
-                    Style::new().fg(theme.dim),
-                ),
-            ]),
+            KeyHint::line(theme, menu_hint_pairs(&ACTION_MENU_HINTS)),
         ])
         .alignment(Alignment::Center),
         footer,
@@ -137,16 +121,5 @@ fn status_color(status: &str, theme: TuiTheme) -> Color {
         "Active" => theme.good,
         "Failed" => theme.danger,
         _ => theme.dim,
-    }
-}
-
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width.saturating_sub(4));
-    let height = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
     }
 }

@@ -55,11 +55,11 @@ pub struct ProcessesState {
     pub expanded_apps: HashSet<String>,
     pub affinity_editor: ProcessAffinityEditorState,
     /// Columns hidden by the user. Name is never inserted.
-    pub hidden_cols: HashSet<processes_view::SortCol>,
+    pub hidden_cols: HashSet<taskmanager_shell::SortCol>,
     /// User-resized widths for the resizable process columns.
-    pub col_widths: HashMap<processes_view::SortCol, Pixels>,
+    pub col_widths: HashMap<taskmanager_shell::SortCol, Pixels>,
     /// Presentation-only column cursor, independent from sort and selection.
-    pub column_cursor: processes_view::SortCol,
+    pub column_cursor: taskmanager_shell::SortCol,
     /// Cursor anchor retained during an active column resize.
     pub resize_anchor_x: Option<Pixels>,
 }
@@ -71,15 +71,15 @@ impl Default for ProcessesState {
             expanded_apps: processes_view::default_category_expansions(),
             affinity_editor: ProcessAffinityEditorState::default(),
             hidden_cols: HashSet::from([
-                processes_view::SortCol::Threads,
-                processes_view::SortCol::StartTime,
-                processes_view::SortCol::Swap,
-                processes_view::SortCol::CpuTime,
-                processes_view::SortCol::Fds,
-                processes_view::SortCol::Nice,
+                taskmanager_shell::SortCol::Threads,
+                taskmanager_shell::SortCol::StartTime,
+                taskmanager_shell::SortCol::Swap,
+                taskmanager_shell::SortCol::CpuTime,
+                taskmanager_shell::SortCol::Fds,
+                taskmanager_shell::SortCol::Nice,
             ]),
             col_widths: HashMap::new(),
-            column_cursor: processes_view::SortCol::Name,
+            column_cursor: taskmanager_shell::SortCol::Name,
             resize_anchor_x: None,
         }
     }

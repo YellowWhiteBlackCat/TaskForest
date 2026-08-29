@@ -11,10 +11,13 @@ publish = false
 # Fourth frontend (docs/BEVY_UI_FRONTEND.md): renders the shared neutral
 # projections with Bevy 0.19 `bevy_ui` (observer + required-components idioms),
 # peer to the GPUI/Iced/TUI frontends. Dependency whitelist is charter law:
-# application/app-host/shell/theme/ui-contract/assets + locked bevy only — no
-# core, no platform-runtime, no platform crates (they stay behind app-host).
+# application/app-host/shell/theme/ui-contract/assets/icons plus the direct
+# owner crates core/platform-contract and locked bevy only — no platform
+# runtime or OS adapter (those stay behind app-host).
 
 [dependencies]
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-shell = { path = "../taskmanager-shell" }
@@ -23,6 +26,15 @@ taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 # Bundled font bytes (ADR-026 fonts policy): the placeholder window registers
 # the same embedded faces the other frontends use; zero toolkit types cross.
 taskmanager-assets = { path = "../taskmanager-assets" }
+# Semantic icon → embedded asset path resolution (ADR-017). The gpui adapter
+# feature stays off: this frontend consumes only the toolkit-neutral path
+# table plus the checked-in RGBA bitmaps in taskmanager-assets.
+taskmanager-icons = { path = "../taskmanager-icons", default-features = false }
+# AccessKit node/role vocabulary for the semantic row nodes. Must match the
+# version the locked bevy stack (bevy_a11y / accesskit_winit) resolves to —
+# one 0.24.1 across the workspace, same resolution as the accessibility-linux
+# gpui bridge. bevy_a11y no longer re-exports the crate, hence this direct dep.
+accesskit = "0.24.1"
 
 # Base `bevy` declaration with an EMPTY feature set. The per-target tables
 # below own the real feature closure; this entry exists because bevy's derive
@@ -74,7 +86,10 @@ bevy = { version = "=0.19.1", default-features = false }
 # - wayland (Linux only): winit backend selection. Charter law
 #   (docs/BEVY_UI_FRONTEND.md): the Bevy frontend is Wayland-only on Linux;
 #   the `x11` feature stays off and X11 sessions are carried by the existing
-#   three frontends. No X11 compatibility layer is introduced.
+#   four frontends. No X11 compatibility layer is introduced.
+# - accesskit_unix (Linux only): the winit AccessKit bridge over AT-SPI — the
+#   semantic AccessibilityNode components reach screen readers without a
+#   second native adapter. Non-Linux bridges are a later milestone.
 # - default-features off: no audio, no gilrs, no scene/pbr/gltf animation, no
 #   state/log/reflect-auto-register app defaults, no
 #   dynamic linking, no dev-tools. `multi_threaded` stays off for the M0
@@ -93,6 +108,7 @@ bevy = { version = "=0.19.1", default-features = false, features = [
     "bevy_winit",
     "bevy_text",
     "ui_picking",
+    "accesskit_unix",
     "wayland",
 ] }
 

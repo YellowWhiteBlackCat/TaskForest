@@ -9,14 +9,15 @@ use std::collections::HashSet;
 use iced::widget::{container, row, text};
 use iced::{Element, Length};
 use serde::{Deserialize, Serialize};
-use taskmanager_application::ProcessViewPresetConfig;
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::config::ProcessViewPresetConfig;
 use taskmanager_shell::SortCol;
 use taskmanager_theme::tokens;
 
-use crate::app::{FocusTarget, Message, ProcessStatusFilter};
+use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
+use taskmanager_shell::ProcessStatusFilter;
 
 pub const SAVED_VIEW_TRANSFER_FORMAT: &str = "taskmanager.saved-process-views";
 pub const SAVED_VIEW_TRANSFER_VERSION: u64 = 1;
@@ -464,9 +465,9 @@ pub fn presets_ribbon<'a>(
             }
         };
         let color = if is_error {
-            theme::color(theme_snapshot.palette().danger)
+            taskmanager_theme::iced::color(theme_snapshot.palette().danger)
         } else {
-            theme::color(theme_snapshot.palette().accent)
+            taskmanager_theme::iced::color(theme_snapshot.palette().accent)
         };
         items.push(
             text(msg)

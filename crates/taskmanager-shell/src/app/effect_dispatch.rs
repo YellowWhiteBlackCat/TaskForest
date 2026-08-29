@@ -5,8 +5,9 @@
 use super::{ProcessControlKind, ShellApp};
 use taskmanager_application::{
     PlatformClient, PlatformEffect, ProcessControlRequest, ServiceControlRequest,
-    SessionControlRequest, ShellUiActionIntent, SubmissionError, SubmissionErrorKind,
+    SessionControlRequest, ShellUiActionIntent,
 };
+use taskmanager_platform_contract::{RequestId, SubmissionError, SubmissionErrorKind};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 enum SubmissionState {
@@ -20,8 +21,8 @@ impl SubmissionState {
     fn record(
         self,
         app: &mut ShellApp,
-        result: Result<taskmanager_application::RequestId, SubmissionError>,
-        accepted: &mut Vec<taskmanager_application::RequestId>,
+        result: Result<RequestId, SubmissionError>,
+        accepted: &mut Vec<RequestId>,
     ) -> Self {
         match result {
             Ok(request_id) => {
@@ -43,8 +44,8 @@ impl SubmissionState {
         self,
         app: &mut ShellApp,
         effect: &PlatformEffect,
-        accepted: Vec<taskmanager_application::RequestId>,
-    ) -> Result<Vec<taskmanager_application::RequestId>, SubmissionErrorKind> {
+        accepted: Vec<RequestId>,
+    ) -> Result<Vec<RequestId>, SubmissionErrorKind> {
         match self {
             Self::NoSubmission => Ok(accepted),
             Self::Rejected(kind) => Err(kind),
@@ -71,7 +72,7 @@ pub fn queue_effect_result(
     app: &mut ShellApp,
     platform: &mut PlatformClient,
     effect: PlatformEffect,
-) -> Result<Vec<taskmanager_application::RequestId>, SubmissionErrorKind> {
+) -> Result<Vec<RequestId>, SubmissionErrorKind> {
     let now_ms = submission_time_ms();
     let results = match &effect {
         PlatformEffect::Refresh(request) => platform.request_refresh(*request, now_ms),
@@ -252,8 +253,8 @@ pub fn queue_effect_result(
                     Err(error) => {
                         open.lifecycle.reject_attempt(
                             attempt_id,
-                            taskmanager_application::ServiceLogFailure::with_detail(
-                                taskmanager_application::ServiceLogErrorKind::from_failure(
+                            taskmanager_core::core::services::ServiceLogFailure::with_detail(
+                                taskmanager_core::core::services::ServiceLogErrorKind::from_failure(
                                     taskmanager_application::service_submission_failure(error.kind),
                                 ),
                                 "service log request submission failed",

@@ -8,9 +8,10 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
-use crate::gpui_app::processes_view::rows::{SortCol, is_hideable};
-use taskmanager_application::ProcessViewPresetConfig;
+use crate::gpui_app::processes_view::rows::is_hideable;
+use taskmanager_core::core::config::ProcessViewPresetConfig;
 use taskmanager_shell::ProcessStatusFilter;
+use taskmanager_shell::SortCol;
 
 use super::{DashboardState, SavedViewPreset};
 

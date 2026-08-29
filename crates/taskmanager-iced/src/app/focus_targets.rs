@@ -3,12 +3,14 @@
 //! budget. The stable operation IDs (`iced-…`) are the single identity each
 //! focusable widget registers with Iced's focus traversal.
 
-use taskmanager_application::{AppPage, RefreshRequest, ServiceAction};
+use taskmanager_application::{AppPage, RefreshRequest};
+use taskmanager_core::core::services::ServiceAction;
+
 use taskmanager_shell::SortCol;
-use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
 
 use super::DetailsSection;
-use super::selectors::{PerfDevice, ProcessStatusFilter};
+use super::selectors::PerfDevice;
+use taskmanager_shell::ProcessStatusFilter;
 
 /// Focus targets that remain local to the Iced adapter.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -187,10 +189,6 @@ pub enum FocusTarget {
     /// The per-engine GPU utilization session toggle on the GPU device panel
     /// (the typed `telemetry.gpu.engines` lane).
     GpuEngineRowsToggle,
-    /// One GPU headline-chart metric pill (ADR-034): the shared shell
-    /// selection's choice row; unavailable families render inert and never
-    /// register this stop.
-    GpuChartMetricTab(taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric),
     /// Service-log modal controls.
     ServiceLogFollow,
     ServiceLogPause,
@@ -213,7 +211,7 @@ pub enum FocusTarget {
     SavedViewImport,
     /// History replay controls.
     HistoryReplayToggle,
-    HistoryReplayWindow(taskmanager_application::HistoryWindow),
+    HistoryReplayWindow(taskmanager_core::core::history::HistoryWindow),
     HistoryReplayRefresh,
     /// Alert center modal controls.
     AlertCenterClear,
@@ -243,7 +241,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 151] = [
+    pub const ALL: [Self; 143] = [
         Self::ModalClose,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
@@ -351,14 +349,6 @@ impl FocusTarget {
         Self::DirectoryUsageCancel,
         Self::AboutCopyDetails,
         Self::GpuEngineRowsToggle,
-        Self::GpuChartMetricTab(GpuChartMetric::Utilization),
-        Self::GpuChartMetricTab(GpuChartMetric::Power),
-        Self::GpuChartMetricTab(GpuChartMetric::Temperature),
-        Self::GpuChartMetricTab(GpuChartMetric::Frequency),
-        Self::GpuChartMetricTab(GpuChartMetric::Memory),
-        Self::GpuChartMetricTab(GpuChartMetric::DedicatedMemory),
-        Self::GpuChartMetricTab(GpuChartMetric::SharedMemory),
-        Self::GpuChartMetricTab(GpuChartMetric::IdleResidency),
         Self::ServiceLogFollow,
         Self::ServiceLogPause,
         Self::ServiceLogLevel,
@@ -376,7 +366,7 @@ impl FocusTarget {
         Self::SavedViewExport,
         Self::SavedViewImport,
         Self::HistoryReplayToggle,
-        Self::HistoryReplayWindow(taskmanager_application::HistoryWindow::OneHour),
+        Self::HistoryReplayWindow(taskmanager_core::core::history::HistoryWindow::OneHour),
         Self::HistoryReplayRefresh,
         Self::AlertCenterClear,
         Self::AlertCenterExport,

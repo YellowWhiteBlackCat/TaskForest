@@ -1,4 +1,4 @@
-use crate::core::{
+use taskmanager_core::core::{
     DeviceId, DeviceState, FailureKind, FilesystemHealth, FilesystemHealthStatus, SensorDescriptor,
     SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
 };
@@ -106,7 +106,7 @@ fn filesystem_capacity_folds_matching_disk_and_reports_missing_states() {
 
     let mut zeroed = disk.clone();
     let mut observations = *zeroed.scalar_observations();
-    observations.capacity_bytes = crate::core::ScalarObservation::available(0, now);
+    observations.capacity_bytes = taskmanager_core::core::ScalarObservation::available(0, now);
     zeroed.apply_scalar_observations(observations);
     assert_eq!(filesystem_capacity(&filesystem("/"), Some(&zeroed)), None);
 

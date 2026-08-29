@@ -36,7 +36,7 @@ use std::rc::Rc;
 
 use gpui::prelude::FluentBuilder;
 use gpui::{
-    App, Axis, Bounds, Context, Div, Edges, ElementId, Entity, EntityId, EventEmitter, FocusHandle,
+    App, Axis, Bounds, Context, Div, Edges, ElementId, Entity, EventEmitter, FocusHandle,
     Focusable, InteractiveElement, IntoElement, KeyBinding, ListSizingBehavior, MouseUpEvent,
     ParentElement, Pixels, Point, Render, RenderOnce, Size, Stateful, Styled, Subscription, Task,
     UniformListScrollHandle, Window, actions, canvas, div, px, uniform_list,
@@ -54,11 +54,16 @@ mod columns;
 mod interaction;
 mod model;
 mod render;
+mod resize;
 
 pub use columns::{
     ColGroup, SortState, TableColumn, leading_fixed_cols_count, validate_leading_fixed,
 };
 pub use model::{TableEvent, TableSelection, TableVisibleRange};
+pub use resize::{
+    COLUMN_RESIZE_HANDLE_SIZE, COLUMN_RESIZE_MAX_WIDTH, COLUMN_RESIZE_MIN_WIDTH, ColumnResizeDrag,
+    ColumnResizeHandleProps, clamp_column_width, column_resize_handle, width_from_drag,
+};
 /// The table key context (navigation bindings live under it).
 pub const TABLE_CONTEXT: &str = "TaskManagerTable";
 
@@ -341,10 +346,6 @@ struct ContextMenuOpen {
     menu: Entity<PopupMenuState>,
 }
 
-/// Drag payload for column resize (typed, absorbed from gc `ResizeColumn`).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ResizeColumn(pub (EntityId, usize));
-
 pub struct TableState<D: TableDelegate> {
     focus_handle: FocusHandle,
     delegate: D,
@@ -378,6 +379,7 @@ pub struct TableState<D: TableDelegate> {
     fixed_head_cols_bounds: Bounds<Pixels>,
     right_clicked_row: Option<usize>,
     resizing_col: Option<usize>,
+    resize_anchor_x: Option<Pixels>,
     visible_range: TableVisibleRange,
     loading_more: bool,
     context_menu: Option<ContextMenuOpen>,
@@ -408,6 +410,7 @@ impl<D: TableDelegate> TableState<D> {
             fixed_head_cols_bounds: Bounds::default(),
             right_clicked_row: None,
             resizing_col: None,
+            resize_anchor_x: None,
             visible_range: TableVisibleRange::default(),
             loading_more: false,
             context_menu: None,

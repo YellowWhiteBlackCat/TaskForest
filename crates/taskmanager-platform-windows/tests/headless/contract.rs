@@ -27,17 +27,27 @@
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
-    CapabilityId, CapabilityStatus, ContainerRollupEvent, DesktopNotificationRequest,
-    DirectoryUsageRequest, FailureKind, FrozenProcessIdentity, LatestControlRequest,
-    OperationFailure, PlatformClient, PlatformEventBatch, PlatformFacets,
-    ProcessAffinityControlRequest, ProcessControlRequest, ProcessResourceControlRequest,
-    RefreshRequest, ResourceGroupLimitRequest, ResourceRevealRequest, RetryDisposition,
-    ServiceAction, ServiceControlOutcome, ServiceControlRequest, ServiceEvent, ServiceId,
-    ServiceUpdate, SessionControlAction, SessionControlOutcome, SessionControlRequest,
-    SessionEvent, SessionId, SetupScriptAction, SetupScriptRequest, SmartObservationBatch,
-    alerts::AlertSeverity,
+    ContainerRollupEvent, DesktopNotificationRequest, DirectoryUsageRequest, LatestControlRequest,
+    PlatformClient, PlatformEventBatch, PlatformFacets, ProcessAffinityControlRequest,
+    ProcessControlRequest, ProcessResourceControlRequest, RefreshRequest, ResourceRevealRequest,
+    ServiceControlOutcome, ServiceControlRequest, ServiceEvent, ServiceUpdate,
+    SessionControlOutcome, SessionControlRequest, SessionEvent, SetupScriptRequest,
+    SmartObservationBatch,
 };
+use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::{DeviceId, ProviderId};
+use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::setup::SetupScriptAction;
+use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_core::{DeviceStatus, DirectoryScanSpec};
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityStatus, OperationFailure, RetryDisposition,
+};
 use taskmanager_platform_windows::WindowsPlatformRuntime;
 
 const DRAIN_DEADLINE: Duration = Duration::from_secs(5);
@@ -373,7 +383,7 @@ fn complete_standard_surface_composes_with_descriptors_and_facets() {
         );
         assert_eq!(
             descriptor.providers,
-            [taskmanager_application::ProviderId::borrowed(provider)],
+            [ProviderId::borrowed(provider)],
             "{capability} must be owned by its windows.* provider"
         );
         assert!(descriptor.last_success_at_ms.is_none());
@@ -632,7 +642,7 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
         // owns (asserted below).
         client.submit_gpu_engine_rows(
             taskmanager_application::GpuEngineRowsRequest {
-                device_id: taskmanager_application::DeviceId::new("contract-fixture-gpu"),
+                device_id: DeviceId::new("contract-fixture-gpu"),
             },
             1,
         ),
@@ -737,7 +747,7 @@ fn control_surface_accepts_submissions_and_publishes_only_typed_outcomes() {
     // the fixture device id matches no DXGI adapter identity the provider
     // answers with the typed `Unsupported` failure folded into a failure
     // snapshot — never a sibling adapter's rows and never a fabricated row.
-    let engine_rows_snapshots: Vec<&taskmanager_application::GpuEngineRowsSnapshot> = drains
+    let engine_rows_snapshots: Vec<&GpuEngineRowsSnapshot> = drains
         .batches
         .iter()
         .flat_map(|batch| &batch.gpu_engine_rows_events)

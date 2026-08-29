@@ -1,10 +1,11 @@
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
+use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::{DeviceState, FailureKind, StartupBootEvidenceSnapshot, StartupFailedUnit};
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    EventSequence, OperationFailure, ProviderFailure, ProviderId, RequestEnvelope, RequestPort,
+    EventSequence, OperationFailure, ProviderFailure, RequestEnvelope, RequestPort,
     SubmissionError,
 };
 

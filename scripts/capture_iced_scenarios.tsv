@@ -27,3 +27,6 @@ gpu-compact	gpu	720x480
 battery-compact	battery	720x480
 fan-compact	fan	720x480
 service-details-compact	service-details	720x480
+applications-zh	applications	1180x780
+cpu-zh	cpu	1180x780
+services-zh	services	1180x780

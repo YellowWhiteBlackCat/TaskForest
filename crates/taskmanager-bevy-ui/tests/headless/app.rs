@@ -21,10 +21,14 @@ use bevy::ecs::query::With;
 use bevy::input::keyboard::KeyCode;
 use bevy::ui_widgets::Activate;
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, HostTelemetryRequest, PlatformClient, PlatformEvent,
-    PlatformFacets, PlatformHandle, RequestEnvelope, RequestPort, SubmissionError, SystemFacets,
+    HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
+    SystemFacets,
 };
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
+};
+
 use taskmanager_theme::Theme;
 
 use super::{
@@ -159,14 +163,14 @@ fn shared_page_chords_route_chord_for_chord_like_the_tui() {
 }
 
 #[test]
-fn shared_system_chord_remains_unmounted_but_history_is_formal() {
-    // Alt+4 (System) remains intentionally absent; Alt+7 is now the mounted
-    // application-history route.
+fn every_shared_page_chord_routes_and_system_is_formal() {
+    // Alt+4 (System) is now the mounted host-facts route, completing the
+    // shared page set; Alt+7 remains the application-history route.
     let alt = ModifierState {
         alt: true,
         ..ModifierState::default()
     };
-    assert_eq!(route_key_press(KeyCode::Digit4, alt), None);
+    assert_eq!(route_key_press(KeyCode::Digit4, alt), Some(Page::System));
     assert_eq!(
         route_key_press(KeyCode::Digit7, alt),
         Some(Page::AppHistory)
@@ -233,14 +237,24 @@ fn route_transitions_are_idempotent_and_explicit() {
 #[test]
 fn unshared_actions_never_invent_pages() {
     use taskmanager_application::{AppAction, AppPage, RefreshRequest};
-    assert_eq!(
-        page_for_action(AppAction::SelectPage(AppPage::System)),
-        None
-    );
-    assert_eq!(
-        page_for_action(AppAction::SelectPage(AppPage::AppHistory)),
-        Some(Page::AppHistory),
-    );
+
+    // The shared page set maps one-to-one; every shared SelectPage action
+    // must route, and non-page actions must never invent a route.
+    for shared in [
+        AppPage::Applications,
+        AppPage::Performance,
+        AppPage::Services,
+        AppPage::System,
+        AppPage::Startup,
+        AppPage::Users,
+        AppPage::AppHistory,
+    ] {
+        assert_eq!(
+            page_for_action(AppAction::SelectPage(shared)).map(|_| ()),
+            Some(()),
+            "the shared page {shared:?} must route"
+        );
+    }
     assert_eq!(
         page_for_action(AppAction::Refresh(RefreshRequest::All)),
         None,

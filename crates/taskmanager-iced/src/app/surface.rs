@@ -6,9 +6,12 @@
 //! through exhaustive events, so two local modals or two row menus cannot be
 //! represented at the same time.
 
-use taskmanager_application::{
-    FrozenProcessIdentity, ServiceId, ServiceItem, SessionItem, StartupEntry, SurfaceKind,
-};
+use taskmanager_application::SurfaceKind;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::startup::StartupEntry;
+use taskmanager_core::core::target::ServiceId;
 
 /// Stable identity of every Iced-owned primary surface.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -372,7 +375,7 @@ impl IcedApp {
 
     pub(crate) const fn affinity_target(
         &self,
-    ) -> Option<&taskmanager_application::FrozenProcessIdentity> {
+    ) -> Option<&taskmanager_core::core::process::FrozenProcessIdentity> {
         match self.local_surface() {
             Some(LocalSurface::ProcessAffinity { target }) => Some(target),
             _ => None,

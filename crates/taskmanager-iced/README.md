@@ -101,7 +101,9 @@ Iced owns no `TZ`, zoneinfo filesystem or implicit UTC fallback path.
   unavailable progress never renders as a measured zero); `src/ui/components/inputs.rs`
   adds switch/slider/select/search/segmented controls that route keyboard access through
   the focus shell; `src/focus.rs` owns keyboard-reachable activation shells and draws the
-  shared `palette().ring` focus ring; `src/ui/virtual_list.rs` owns bounded table-window
+  shared `palette().ring` focus ring gated by the renderer-local input modality
+  (`src/input_modality.rs`: only keyboard focus paints the ring, the same strict policy
+  the GPUI root tracker applies); `src/ui/virtual_list.rs` owns bounded table-window
   geometry, the sticky-header composition shell and the typed column vocabulary — the
   Applications table derives widths/alignment/hideability from the shared
   `PROCESS_COLUMNS` contract, and Services/Users/Startup keep local typed specs.
@@ -149,14 +151,26 @@ expand directly to real process rows. Legacy grouping tokens are normalized when
 loads. Small/Standard/Large UI size uses the application scale hook on top of compositor DPI;
 density remains a separate table-whitespace preference.
 
-## Performance-page divergence registry (求同存异登记)
+## Capability parity and page-level divergence
 
-Every Iced-only surface on the Performance page hangs on a shared semantic and exists
-because of a real Iced-vs-GPUI architecture difference (ARCH.md §8.2). Anything that
-duplicates GPUI semantics without such a driver was removed or aligned instead.
+Component/surface capability parity is MACHINE-CHECKED (CORE-08):
+`src/capabilities.rs` declares every ui-contract registry capability with an
+explicit decision — `Ported`, `Native`, or a reasoned `Divergent`/
+`Unsupported`. The one registered divergence: Toast (transient feedback
+renders through the shared footer activity line). TextSelection left the
+divergence list when `src/ui/components/selectable_text.rs` ported the
+reference semantics — drag/word/all selection, primary-clipboard on drag
+finish, Ctrl/Cmd-C copy — and the network page's per-field copy buttons were
+retired with it. A silent omission or unexplained difference fails the
+crate gate.
 
-- Copy IP/MAC buttons (network): Iced text widgets have no selection, so buttons are the
-  only channel for GPUI's `selectable_value` copy semantic.
+Below is the complementary PAGE-LEVEL registry: Performance-page skin
+divergences hanging on a shared semantic with a real Iced-vs-GPUI
+architecture driver (ARCH.md §8.2). They are presentation executions of
+shared semantics, not component-capability differences, so they stay prose
+here; anything duplicating GPUI semantics without such a driver was removed
+or aligned instead.
+
 - CPU-page trend strip: the device rail's sparklines are unreachable in Strip frames
   (narrow width or F9); the strip keeps the five shared family trends visible.
 - Inline 60/120/300s graph-points pills: the same shared persisted preference GPUI's
@@ -174,9 +188,10 @@ duplicates GPUI semantics without such a driver was removed or aligned instead.
 - VRAM meters in the left column and the engine-escalation toggle below the card:
   placement differences for facts GPUI pins in its stats-rail footer; the facts, gating,
   and honesty rules are identical.
-- `Message::SelectGpuChartMetric` has no UI emitter (the GPU selector was aligned away —
-  GPUI renders the engine inventory plus every available family simultaneously); the
-  message stays as the behavior-test entry into the shared shell selection state machine.
+- The GPU metric selector stays unaligned by design (ICED-014, 2026-08-29): every
+  measured family renders simultaneously, so the selection surface and its message were
+  deleted outright; the shared shell selection state machine remains reachable through
+  behavior tests.
 
 ## Contract and verification
 

@@ -1,11 +1,11 @@
 //! Sidebar caption projections kept separate from the device-row renderer.
 
-use crate::core::device_state::DeviceStatus;
-use crate::core::metrics::{DiskMetrics, GpuMetrics, NetworkMetrics, SystemSnapshot};
-use crate::core::{BatteryInfo, SensorReading};
 use crate::gpui_app::formatting::{self, DisplayUnits, UnitKind};
 use crate::gpui_app::perf_views::gpu_percentage_readout;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::{DiskMetrics, GpuMetrics, NetworkMetrics, SystemSnapshot};
+use taskmanager_core::core::{BatteryInfo, SensorReading};
 
 pub(super) fn rate_str(units: DisplayUnits, bytes_per_sec: u64) -> String {
     units.format(bytes_per_sec, UnitKind::Network, true)
@@ -146,7 +146,7 @@ pub(super) fn append_status_badge(caption: &mut String, status: DeviceStatus) {
     if status == DeviceStatus::Healthy {
         return;
     }
-    let key = crate::gpui_app::perf_views::device_status_i18n_key(status);
+    let key = taskmanager_shell::presentation::device_status_i18n_key(status);
     if !caption.is_empty() {
         caption.push_str("  ·  ");
     }

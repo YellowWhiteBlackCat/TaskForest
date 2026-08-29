@@ -19,24 +19,5 @@ fn quantity_ladders_are_byte_identical_to_the_core_single_source() {
                 "quantity {value} B ({use_bytes}, {use_base2})"
             );
         }
-        // Historical two-argument and ladder helpers stay on the same
-        // core ladder.
-        assert_eq!(
-            memory_text(value, true),
-            format_quantity_with(value, true, true, false)
-        );
-        assert_eq!(
-            memory_text(value, false),
-            format_quantity_with(value, false, true, false)
-        );
-        assert_eq!(
-            base10_bytes(value, false),
-            format_quantity_with(value, true, false, false)
-        );
-        assert_eq!(
-            base10_bytes(value, true),
-            format_quantity_with(value, false, false, false)
-        );
-        assert_eq!(bits(value), format_quantity_with(value, false, true, false));
     }
 }

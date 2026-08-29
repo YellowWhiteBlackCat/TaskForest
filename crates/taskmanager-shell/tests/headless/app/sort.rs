@@ -1,10 +1,12 @@
 //! Process-table and inventory sort coverage, split out of the main tests
 //! module so the file stays under the source-line ceiling.
 use super::super::*;
-use taskmanager_application::{
-    ProcessScalarObservations, ScalarObservation, ServiceStatus, StartupControlPolicy,
-    StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact, StartupImpactEvidence,
-    StartupImpactUnknownReason, StartupScope, StartupSource,
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_core::core::services::ServiceStatus;
+use taskmanager_core::core::startup::{
+    StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
+    StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
 };
 
 #[test]
@@ -330,7 +332,7 @@ fn indexed_inventory_sorts_preserve_provider_identity_without_pointer_scans() {
 
 #[test]
 fn cycle_info_sort_column_walks_the_tables_own_columns_and_wraps() {
-    use taskmanager_application::ServiceStatus;
+    use taskmanager_core::core::services::ServiceStatus;
     let mut app = crate::demo_app();
     // Provider order: cycle starts at the first column of the table's cycle.
     app.cycle_info_sort_column(InfoTable::Services);

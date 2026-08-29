@@ -1,8 +1,8 @@
 //! Pure numeric projection for the Process Properties performance graphs.
 
-use crate::core::process::ProcessItem;
-use crate::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
 use crate::gpui_app::formatting::missing_value;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
 
 use super::ProcessHistories;
 

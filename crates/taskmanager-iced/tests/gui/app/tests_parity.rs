@@ -30,7 +30,7 @@ fn user_row_menu_opens_selects_and_routes_actions() {
     // A menu action routes through the shared session-control path and closes
     // the menu.
     let _ = app.update(Message::RequestSessionControl(
-        taskmanager_application::SessionControlAction::Disconnect,
+        taskmanager_core::core::session::SessionControlAction::Disconnect,
     ));
     assert_eq!(app.user_menu_row(), None);
     assert!(app.shell.feedback_text().contains("Demo mode"));
@@ -102,7 +102,7 @@ fn process_row_menu_reuses_shared_identity_safe_actions() {
     assert!(app.process_menu_pid().is_none());
     assert_eq!(
         app.shell.pending_batch().map(|intent| intent.action),
-        Some(taskmanager_application::ProcessBatchAction::Kill)
+        Some(taskmanager_core::core::process::ProcessBatchAction::Kill)
     );
     let _ = app.update(Message::DismissOverlay);
 
@@ -110,7 +110,7 @@ fn process_row_menu_reuses_shared_identity_safe_actions() {
     // selected row and still suppressed honestly in demo mode.
     let _ = app.update(Message::OpenProcessRowMenu { flat_index: 1, pid });
     let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::Signal(
-        taskmanager_application::ProcessSignal::Interrupt,
+        taskmanager_core::core::process::ProcessSignal::Interrupt,
     )));
     assert!(app.process_menu_pid().is_none());
     assert!(app.shell.feedback_text().contains("Demo mode"));
@@ -278,29 +278,30 @@ fn graph_unit_and_visibility_preferences_persist_and_apply() {
     // The SHARED history store the chart reads follows the persisted window
     // (G-02: one sanctioned store, sized at the settings edge): shrinking
     // keeps the newest samples, growing never fabricates history.
-    let snapshot = taskmanager_application::SystemSnapshot {
+    let snapshot = taskmanager_core::core::metrics::SystemSnapshot {
         timestamp_ms: 1,
-        cpu: taskmanager_application::CpuMetrics::from_observations(
-            taskmanager_application::CpuScalarObservations {
-                global_usage_pct: taskmanager_application::ScalarObservation::available(30.0, 1),
+        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
+            taskmanager_core::core::metrics::CpuScalarObservations {
+                global_usage_pct: taskmanager_core::core::metrics::ScalarObservation::available(
+                    30.0, 1,
+                ),
                 ..Default::default()
             },
         ),
-        ..taskmanager_application::SystemSnapshot::default()
+        ..taskmanager_core::core::metrics::SystemSnapshot::default()
     };
     taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &snapshot, None, None);
-    let series_before = app
-        .shell
-        .history
-        .series_sample_count(taskmanager_shell::history::MetricSeries::CpuUsagePercent);
+    let series_before = app.shell.history.series_sample_count(
+        taskmanager_telemetry_store::live_graph::MetricSeries::CpuUsagePercent,
+    );
     let _ = app.update(Message::SettingsChanged(SettingsChange::GraphDataPoints(
         10,
     )));
     assert_eq!(app.shell.history.capacity(), 10);
     assert_eq!(
-        app.shell
-            .history
-            .series_sample_count(taskmanager_shell::history::MetricSeries::CpuUsagePercent),
+        app.shell.history.series_sample_count(
+            taskmanager_telemetry_store::live_graph::MetricSeries::CpuUsagePercent
+        ),
         series_before.min(10),
         "samples survive the shrink (bounded at the new window)"
     );
@@ -366,7 +367,10 @@ fn graph_unit_and_visibility_preferences_persist_and_apply() {
     std::fs::remove_dir_all(dir).unwrap();
 }
 
-fn config_device_visible(config: &taskmanager_application::Config, kind: DeviceKind) -> bool {
+fn config_device_visible(
+    config: &taskmanager_core::core::config::Config,
+    kind: DeviceKind,
+) -> bool {
     match kind {
         DeviceKind::Cpu => config.show_cpu,
         DeviceKind::Memory => config.show_memory,
@@ -419,7 +423,7 @@ fn demo_constructor_exposes_shared_fixture_data_without_platform_io() {
     );
 
     let _ = app.update(Message::RequestSessionControl(
-        taskmanager_application::SessionControlAction::Lock,
+        taskmanager_core::core::session::SessionControlAction::Lock,
     ));
     assert!(app.shell.feedback_text().contains("Demo mode"));
 }

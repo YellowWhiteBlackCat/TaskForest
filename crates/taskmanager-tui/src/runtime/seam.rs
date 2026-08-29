@@ -30,8 +30,8 @@ use ratatui::crossterm::event::{Event, KeyEvent, KeyEventKind, KeyModifiers, Mou
 use ratatui::layout::Rect;
 use taskmanager_application::{PlatformClient, PlatformEffect};
 
-use crate::render;
-use crate::{TuiApp, TuiTheme};
+use crate::ui::{TuiFramePlan, TuiHitTarget, render_with_plan};
+use crate::{TuiApp, TuiTerminalProfile, TuiTheme};
 
 use super::{
     DrawCycleInputs, EVENT_DRAIN_BATCH, EVENT_POLL, capture_page_name, drain_process_refresh,
@@ -39,8 +39,10 @@ use super::{
 };
 
 /// The terminal event source seam. Production uses [`CrosstermEventSource`];
-/// tests (and later remote transports) script their own.
-pub(super) trait TerminalEventSource {
+/// tests (and later remote transports) script their own. `pub(crate)` so the
+/// crate's registered test modules can script deterministic sources against
+/// the real production loop without widening the public API.
+pub(crate) trait TerminalEventSource {
     /// Whether an event is ready within `timeout`. Returning `Ok(false)`
     /// means "idle tick" — the loop re-evaluates refresh pacing and draws
     /// only if the cycle was dirty.
@@ -67,7 +69,8 @@ impl TerminalEventSource for CrosstermEventSource {
 /// is `Infallible` (it cannot fail), so its arm is a never-match. Only these
 /// two impls exist on purpose: a future backend with a custom error type
 /// fails to compile here instead of panicking or stringifying at runtime.
-pub(super) trait BackendErrorIntoIo {
+/// `pub(crate)` matches the test-only `run_event_loop` bound that names it.
+pub(crate) trait BackendErrorIntoIo {
     fn into_io(self) -> io::Error;
 }
 
@@ -88,14 +91,14 @@ impl BackendErrorIntoIo for std::convert::Infallible {
 /// value (not side effects on the loop) is what makes every event class
 /// unit-testable without a live terminal.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(super) struct EventReaction {
+pub(crate) struct EventReaction {
     /// The event forces a repaint on the next cycle (any key event or a
     /// resize — the poll runs after the draw decision, so the signal has to
     /// survive into the next cycle).
-    pub(super) dirty: bool,
+    pub(crate) dirty: bool,
     /// A platform effect produced by the event. The caller queues it through
     /// the normal effect seam (with demo-mode suppression).
-    pub(super) effect: Option<PlatformEffect>,
+    pub(crate) effect: Option<PlatformEffect>,
 }
 
 /// Normalize ONE terminal event into app state changes. Key events mirror
@@ -111,7 +114,20 @@ pub(super) struct EventReaction {
 /// like PageDown does). Modified scrolls and unsupported pointer gestures are
 /// explicit no-ops. Focus loss releases the mirrored Ctrl hold so switching
 /// terminals cannot strand telemetry in the hold-to-pause state.
-fn apply_terminal_event(app: &mut TuiApp, event: Event, frame: Rect) -> EventReaction {
+#[cfg(test)]
+pub(crate) fn apply_terminal_event(app: &mut TuiApp, event: Event, frame: Rect) -> EventReaction {
+    let plan = TuiFramePlan::build(app, frame);
+    apply_terminal_event_with_plan(app, event, &plan)
+}
+
+/// Normalize one terminal event against the immutable plan for the frame the
+/// user last saw. Pointer input must not rebuild geometry from an app state
+/// that earlier events in the same burst have already changed.
+pub(crate) fn apply_terminal_event_with_plan(
+    app: &mut TuiApp,
+    event: Event,
+    plan: &TuiFramePlan,
+) -> EventReaction {
     match event {
         Event::FocusGained => EventReaction {
             dirty: true,
@@ -180,35 +196,59 @@ fn apply_terminal_event(app: &mut TuiApp, event: Event, frame: Rect) -> EventRea
                     }
                 }
                 MouseEventKind::Down(MouseButton::Left) => {
-                    // Click-to-select: the hit-test projects the clicked cell
-                    // through the SAME visual row projection the renderer
-                    // painted (`ui::table_hit`) and selects through the
-                    // shell's `select_row` — the keyboard's own entry, with
-                    // the keyboard's own boundary. Clicks while any modal or
-                    // overlay owns the screen, and clicks that land on
-                    // headers/borders/non-table pages, are honest no-ops.
-                    if super::modals::any_pointer_surface_open(app) {
-                        return EventReaction::default();
-                    }
-                    let selected =
-                        match crate::ui::table_hit::row_at(app, frame, mouse.column, mouse.row) {
-                            Some(row) => row,
-                            None => return EventReaction::default(),
-                        };
-                    if app.page() == taskmanager_application::AppPage::Applications {
-                        let rows = app.process_rows_snapshot();
-                        let process = crate::process_view::process_at(&rows, selected).cloned();
-                        let row_key = crate::process_view::row_key_at(&rows, selected);
-                        let _ = app.apply_selection_resolution_with_row(selected, process, row_key);
-                        EventReaction {
-                            dirty: app.selected == selected,
-                            effect: None,
+                    // Click resolution through the committed plan, in paint
+                    // order: an actionable overlay control row first (the
+                    // painted popup owns those cells), then every other popup
+                    // cell as a blocked overlay hit, then the background
+                    // table. Overlay clicks select through the SAME mutators
+                    // and Enter methods the keyboard uses, so a pointer user
+                    // can never reach an action the keyboard cannot, and the
+                    // frozen-target/confirmation gates stay in the path.
+                    match plan.hit_target(mouse.column, mouse.row) {
+                        Some(TuiHitTarget::OverlayControl { surface, index }) => {
+                            apply_overlay_control_click(app, plan, surface, index)
                         }
-                    } else {
-                        EventReaction {
-                            dirty: app.shell.select_row(selected),
-                            effect: None,
+                        Some(TuiHitTarget::Overlay { .. }) => EventReaction::default(),
+                        Some(TuiHitTarget::TableRow { page, index }) => {
+                            // Click-to-select: the hit-test projects the
+                            // clicked cell through the SAME visual row
+                            // projection the renderer painted
+                            // (`ui::table_hit`) and selects through the
+                            // shell's `select_row` — the keyboard's own
+                            // entry, with the keyboard's own boundary.
+                            // Clicks that land on headers/borders/non-table
+                            // pages are honest no-ops.
+                            if super::modals::any_pointer_surface_open(app) {
+                                return EventReaction::default();
+                            }
+                            if page != app.page() || !plan.page_matches(app.page()) {
+                                // The screen has not painted the page selected
+                                // by an earlier event in this burst yet, so a
+                                // coordinate from the previous page cannot
+                                // safely target it.
+                                return EventReaction::default();
+                            }
+                            let selected = index;
+                            if app.page() == taskmanager_application::AppPage::Applications {
+                                let rows = app.process_rows_snapshot();
+                                let process =
+                                    crate::process_view::process_at(&rows, selected).cloned();
+                                let row_key = crate::process_view::row_key_at(&rows, selected);
+                                let _ = app.apply_selection_resolution_with_row(
+                                    selected, process, row_key,
+                                );
+                                EventReaction {
+                                    dirty: app.selected == selected,
+                                    effect: None,
+                                }
+                            } else {
+                                EventReaction {
+                                    dirty: app.shell.select_row(selected),
+                                    effect: None,
+                                }
+                            }
                         }
+                        None => EventReaction::default(),
                     }
                 }
                 // Every remaining crossterm pointer variant is deliberately
@@ -226,6 +266,118 @@ fn apply_terminal_event(app: &mut TuiApp, event: Event, frame: Rect) -> EventRea
             dirty: true,
             effect: None,
         },
+    }
+}
+
+/// Apply one click on a committed plan's `OverlayControl` hit: set the named
+/// surface's selection to the clicked row through the existing `pub(crate)`
+/// mutator, then run the SAME production method the keyboard's Enter runs for
+/// that surface. The pointer can therefore never bypass the frozen-target or
+/// confirmation gates — destructive menu rows land in the shared y/n gate
+/// exactly like keyboard picks.
+///
+/// Fail-closed against a stale committed plan: the surface the plan painted
+/// must still own the keyboard (a surface switch since the last paint turns
+/// the click into a no-op), and a filtered palette must still paint the same
+/// row inventory the click addressed. The mutators re-check the surface
+/// variant, so even a same-kind mismatch cannot misaddress state.
+fn apply_overlay_control_click(
+    app: &mut TuiApp,
+    plan: &TuiFramePlan,
+    surface: crate::TuiSurfaceKind,
+    index: usize,
+) -> EventReaction {
+    if app.local_surface_kind() != Some(surface) {
+        return EventReaction::default();
+    }
+    if surface == crate::TuiSurfaceKind::CommandPalette {
+        let painted = plan
+            .overlay_controls()
+            .map_or(0, |controls| usize::from(controls.count));
+        if painted != app.filtered_palette_rows().len() {
+            return EventReaction::default();
+        }
+    }
+    match surface {
+        crate::TuiSurfaceKind::ServiceMenu => {
+            if let Some(menu) = app.service_menu_mut() {
+                menu.selection = index.min(crate::ui::service_menu::MENU_ACTIONS.len() - 1);
+            }
+            // Enter parity: arms the shared service-control confirmation; the
+            // platform request is only emitted by the y key.
+            app.service_menu_select();
+            EventReaction {
+                dirty: true,
+                effect: None,
+            }
+        }
+        crate::TuiSurfaceKind::ProcessMenu => {
+            if let Some(menu) = app.process_menu_mut() {
+                menu.selection = index.min(crate::ui::process_menu::MENU_ACTIONS.len() - 1);
+            }
+            EventReaction {
+                dirty: true,
+                effect: app.process_menu_select(),
+            }
+        }
+        crate::TuiSurfaceKind::BatchMenu => {
+            if let Some(menu) = app.batch_menu_mut() {
+                menu.selection = index.min(crate::ui::batch_menu::MENU_ACTIONS.len() - 1);
+            }
+            EventReaction {
+                dirty: true,
+                effect: app.batch_menu_select(),
+            }
+        }
+        crate::TuiSurfaceKind::SessionMenu => {
+            if let Some(menu) = app.session_menu_mut() {
+                menu.selection = index.min(crate::ui::session_menu::MENU_ACTIONS.len() - 1);
+            }
+            app.session_menu_select();
+            EventReaction {
+                dirty: true,
+                effect: None,
+            }
+        }
+        crate::TuiSurfaceKind::StartupMenu => {
+            if let Some(menu) = app.startup_menu_mut() {
+                menu.selection = index.min(crate::ui::startup_menu::MENU_ACTIONS.len() - 1);
+            }
+            app.startup_menu_select();
+            EventReaction {
+                dirty: true,
+                effect: None,
+            }
+        }
+        crate::TuiSurfaceKind::ColumnMenu => {
+            if let Some(selection) = app.column_menu_selection_mut() {
+                *selection = index.min(crate::TuiApp::toggleable_columns().len() - 1);
+            }
+            // Enter/Space parity: toggles the clicked column's hidden flag.
+            app.column_menu_toggle();
+            EventReaction {
+                dirty: true,
+                effect: None,
+            }
+        }
+        crate::TuiSurfaceKind::CommandPalette => {
+            if let Some(palette) = app.command_palette_mut() {
+                palette.selection = index;
+            }
+            // Enter parity: runs the selected row's action and closes the
+            // palette (shared action effects return through the normal seam).
+            EventReaction {
+                dirty: true,
+                effect: app.palette_select(),
+            }
+        }
+        // The informational surfaces paint no control rows; `hit_target`
+        // cannot produce this variant for them, so the arm is a defensive
+        // fail-closed no-op, not a modeled path.
+        crate::TuiSurfaceKind::Settings
+        | crate::TuiSurfaceKind::About
+        | crate::TuiSurfaceKind::Health
+        | crate::TuiSurfaceKind::Containers => EventReaction::default(),
     }
 }
 
@@ -260,13 +412,43 @@ impl RefreshPacing {
 /// the full cycle — drain, pacing, draw decision, event application, quit —
 /// is drivable headlessly with a `TestBackend` and a scripted source.
 /// Behavior is identical to the former inline `ratatui::run` closure.
-pub(super) fn run_event_loop<B: Backend, E: TerminalEventSource>(
+/// `pub(crate)` (test-only) so the crate's registered test modules — not only
+/// the runtime module tree — can drive the production loop with a counting
+/// backend and a scripted event source.
+#[cfg(test)]
+pub(crate) fn run_event_loop<B: Backend, E: TerminalEventSource>(
+    terminal: &mut Terminal<B>,
+    app: &mut TuiApp,
+    platform: Option<&mut PlatformClient>,
+    events: E,
+    demo: bool,
+    capture_marker: Option<&OsStr>,
+) -> io::Result<()>
+where
+    B::Error: BackendErrorIntoIo,
+{
+    run_event_loop_with_profile(
+        terminal,
+        app,
+        platform,
+        events,
+        demo,
+        capture_marker,
+        TuiTerminalProfile::default(),
+    )
+}
+
+/// Run the terminal loop with the capability profile resolved by the
+/// composition edge.  The wrapper above keeps existing deterministic tests
+/// on a stable Unicode/true-color profile without touching global env state.
+pub(super) fn run_event_loop_with_profile<B: Backend, E: TerminalEventSource>(
     terminal: &mut Terminal<B>,
     app: &mut TuiApp,
     mut platform: Option<&mut PlatformClient>,
     mut events: E,
     demo: bool,
     capture_marker: Option<&OsStr>,
+    terminal_profile: TuiTerminalProfile,
 ) -> io::Result<()>
 where
     B::Error: BackendErrorIntoIo,
@@ -276,13 +458,15 @@ where
     // The frame area the user currently SEES: captured from every paint and
     // used to project pointer clicks onto the painted rows (a resize updates
     // it on the next paint, which the resize event itself forces).
-    let mut frame_area = {
+    let initial_area = {
         let size = terminal
             .backend()
             .size()
             .map_err(BackendErrorIntoIo::into_io)?;
         Rect::new(0, 0, size.width, size.height)
     };
+    let mut frame_area = initial_area;
+    let mut committed_plan = TuiFramePlan::build(app, initial_area);
     // Dirty-flag carry-over: the initial frame must always paint (otherwise
     // the screen stays blank until the first telemetry tick or keypress), and
     // a key/resize arrives in the poll phase — which runs *after* the draw
@@ -369,13 +553,19 @@ where
             // The terminal palette is rebuilt from the runtime theme
             // parameters on every paint, so a settings change re-skins the
             // TUI on the next draw.
-            let theme = TuiTheme::from_params(app.theme_params);
+            let theme = TuiTheme::from_params_with_profile(app.theme_params, terminal_profile);
+            let mut painted_plan = None;
             terminal
                 .draw(|frame| {
                     frame_area = frame.area();
-                    render(frame, app, theme);
+                    let plan = TuiFramePlan::build(app, frame.area());
+                    render_with_plan(frame, app, theme, &plan);
+                    painted_plan = Some(plan);
                 })
                 .map_err(BackendErrorIntoIo::into_io)?;
+            if let Some(plan) = painted_plan {
+                committed_plan = plan;
+            }
             pending_draw = false;
         }
         if demo
@@ -403,7 +593,7 @@ where
             // unchanged — the blocking poll above still returns false on a
             // quiet terminal.
             for drained in 0..EVENT_DRAIN_BATCH {
-                let reaction = apply_terminal_event(app, events.read()?, frame_area);
+                let reaction = apply_terminal_event_with_plan(app, events.read()?, &committed_plan);
                 pending_draw |= reaction.dirty;
                 if let Some(effect) = reaction.effect {
                     match platform.as_deref_mut() {

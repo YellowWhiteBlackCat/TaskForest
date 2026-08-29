@@ -5,7 +5,7 @@ use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Wi
 use taskmanager_theme::Palette;
 
 use crate::primitives::motion::{hover_bg_transition, hover_state_key};
-use crate::styled::on_accent;
+use taskmanager_theme::color::on_accent;
 use taskmanager_theme::tokens;
 
 /// Pill states; the accent fill family is palette-derived.

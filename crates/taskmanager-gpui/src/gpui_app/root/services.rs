@@ -2,13 +2,18 @@
 
 use super::RootView;
 use crate::gpui_app::services_view;
-use crate::i18n;
+use taskmanager_application::i18n;
 use taskmanager_application::{
-    FailureKind, RefreshRequest, ServiceAction, ServiceControlOutcome, ServiceControlRequest,
-    ServiceDependenciesRequest, ServiceId, ServiceLogErrorKind, ServiceLogFailure,
-    ServiceLogSnapshot, ServiceLogSnapshotRequest, ServiceLogState, ServiceLogStreamRequest,
-    ServiceUpdate, SubmissionErrorKind,
+    RefreshRequest, ServiceControlOutcome, ServiceControlRequest, ServiceDependenciesRequest,
+    ServiceLogSnapshotRequest, ServiceLogStreamRequest, ServiceUpdate,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::services::{
+    ServiceAction, ServiceLogErrorKind, ServiceLogFailure, ServiceLogSnapshot, ServiceLogState,
+};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::SubmissionErrorKind;
+
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 impl RootView {

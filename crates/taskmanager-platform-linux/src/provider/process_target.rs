@@ -1,7 +1,8 @@
 //! Shared Linux policy for revalidating a frozen process target before use.
 
-use taskmanager_core::FrozenProcessIdentity;
-use taskmanager_platform_contract::{ProviderFailure, SourceOutcome};
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::ProviderFailure;
 
 use crate::engine::process::ProcessManager;
 
@@ -29,9 +30,7 @@ pub(super) fn validate_process_identity(
     Ok(())
 }
 
-fn inventory_failure(
-    sources: &[taskmanager_platform_contract::SourceStatus],
-) -> Option<ProviderFailure> {
+fn inventory_failure(sources: &[SourceStatus]) -> Option<ProviderFailure> {
     const INVENTORY_PROVIDER: &str = "linux.process.procfs.inventory";
     match sources
         .iter()
@@ -46,7 +45,7 @@ fn inventory_failure(
     }
 }
 
-fn snapshot_failure(sources: &[taskmanager_platform_contract::SourceStatus]) -> ProviderFailure {
+fn snapshot_failure(sources: &[SourceStatus]) -> ProviderFailure {
     sources
         .iter()
         .filter_map(|source| match source.outcome {

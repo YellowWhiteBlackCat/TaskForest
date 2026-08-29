@@ -1,5 +1,5 @@
-use taskmanager::core::ScalarObservation;
-use taskmanager::core::process::{
+use taskmanager_core::core::ScalarObservation;
+use taskmanager_core::core::process::{
     ProcessApplicationIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchTargetResult,
     ProcessItem, ProcessMetadataObservation, ProcessScalarObservations, ProcessSortKey,
     aggregate_apps, build_process_tree, execute_process_batch_with, fuzzy_filter_processes,
@@ -28,8 +28,8 @@ fn test_process_scan_and_sorting() {
             .current_disk_write_bytes_per_sec(2000)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("root".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("root".to_string()),
                     None,
                     1,
                 ),
@@ -46,8 +46,8 @@ fn test_process_scan_and_sorting() {
             .current_disk_write_bytes_per_sec(100)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("user".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
                     None,
                     1,
                 ),
@@ -64,8 +64,8 @@ fn test_process_scan_and_sorting() {
             .current_disk_write_bytes_per_sec(50)
             .status("Sleeping".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("user".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
                     None,
                     1,
                 ),
@@ -111,8 +111,8 @@ fn test_build_process_tree() {
             .current_disk_write_bytes_per_sec(500)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("root".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("root".to_string()),
                     None,
                     1,
                 ),
@@ -129,8 +129,8 @@ fn test_build_process_tree() {
             .current_disk_write_bytes_per_sec(0)
             .status("Sleeping".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("user".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
                     None,
                     1,
                 ),
@@ -147,8 +147,8 @@ fn test_build_process_tree() {
             .current_disk_write_bytes_per_sec(10000)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("user".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
                     None,
                     1,
                 ),
@@ -165,8 +165,8 @@ fn test_build_process_tree() {
             .current_disk_write_bytes_per_sec(0)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("nobody".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("nobody".to_string()),
                     None,
                     1,
                 ),
@@ -221,8 +221,8 @@ fn test_aggregate_apps() {
             .current_disk_write_bytes_per_sec(200)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("user".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
                     None,
                     1,
                 ),
@@ -239,8 +239,8 @@ fn test_aggregate_apps() {
             .current_disk_write_bytes_per_sec(0)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("user".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
                     None,
                     1,
                 ),
@@ -257,8 +257,8 @@ fn test_aggregate_apps() {
             .current_disk_write_bytes_per_sec(50)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("user".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
                     None,
                     1,
                 ),
@@ -275,8 +275,8 @@ fn test_aggregate_apps() {
             .current_disk_write_bytes_per_sec(0)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("user".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
                     None,
                     1,
                 ),
@@ -293,8 +293,8 @@ fn test_aggregate_apps() {
             .current_disk_write_bytes_per_sec(0)
             .status("Running".to_string())
             .metadata_observations(
-                taskmanager_application::ProcessMetadataObservations::current(
-                    taskmanager_application::ProcessOwner::opaque("user".to_string()),
+                taskmanager_core::core::process::ProcessMetadataObservations::current(
+                    taskmanager_core::core::process::ProcessOwner::opaque("user".to_string()),
                     None,
                     1,
                 ),
@@ -474,6 +474,7 @@ fn process_batch_freeze_excludes_rows_without_exact_identity_authority() {
             .pid(41)
             .name("unknown-identity".to_owned())
             .current_start_time_secs(0)
+            .without_current_start_token()
             .build(),
         taskmanager_test_support::ProcessItemFixtureBuilder::new()
             .pid(42)
@@ -548,8 +549,8 @@ fn mk_filter_item(pid: u32, name: &str, cmdline: &str, user: &str) -> ProcessIte
         .current_disk_write_bytes_per_sec(0)
         .status("Sleeping".to_string())
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque(user.to_string()),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque(user.to_string()),
                 None,
                 1,
             ),

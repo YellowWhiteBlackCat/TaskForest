@@ -84,8 +84,8 @@ fn process_details_rows_read_canonical_observations() {
         .name("token-unavailable".into())
         .pid(4_242)
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("root"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("root"),
                 None,
                 1,
             ),
@@ -141,7 +141,7 @@ fn toolbar_and_service_rows_register_operation_ids_for_keyboard_reachability() {
         crate::app::FocusTarget::CancelServiceControl,
         crate::app::FocusTarget::ServiceAction {
             index: 3,
-            action: taskmanager_application::ServiceAction::Stop,
+            action: taskmanager_core::core::services::ServiceAction::Stop,
         },
         crate::app::FocusTarget::SettingsChoice {
             section: "mode",
@@ -160,7 +160,7 @@ fn toolbar_and_service_rows_register_operation_ids_for_keyboard_reachability() {
     assert_eq!(
         crate::focus::focus_id(crate::app::FocusTarget::ServiceAction {
             index: 3,
-            action: taskmanager_application::ServiceAction::Stop,
+            action: taskmanager_core::core::services::ServiceAction::Stop,
         }),
         "iced-service-action-3-Stop"
     );
@@ -168,7 +168,8 @@ fn toolbar_and_service_rows_register_operation_ids_for_keyboard_reachability() {
 
 #[test]
 fn info_header_sort_message_routes_to_the_shared_shell_sort_slot() {
-    use taskmanager_application::{ServiceItem, ServiceStatus};
+    use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+
     use taskmanager_shell::{InfoSortCol, InfoTable};
 
     let mut app = crate::IcedApp::demo();

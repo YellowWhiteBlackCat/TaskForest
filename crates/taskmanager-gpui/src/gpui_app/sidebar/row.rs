@@ -11,11 +11,11 @@ use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::graph::{GraphOpts, GraphSettings, graph_element};
-use crate::gpui_app::icons;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::{Color, Theme, tokens};
+use taskmanager_theme::{Color, Theme};
 
 use super::SelectedDevice;
+use taskmanager_theme::tokens;
 
 /// Per-device sidebar row inputs (design-debt #1 props consolidation).
 pub(super) struct DeviceRowProps<'a> {
@@ -147,11 +147,11 @@ pub(super) fn device_row(
         .flex()
         .items_center()
         .gap(tokens::SPACE_10)
-        .child(icons::icon(icon).size(px(16.0)).text_color(if is_sel {
-            base
-        } else {
-            theme.fg_dim
-        }))
+        .child(
+            taskmanager_icons::icon(icon)
+                .size(px(16.0))
+                .text_color(if is_sel { base } else { theme.fg_dim }),
+        )
         .child(
             div()
                 .w(px(58.0))
@@ -250,7 +250,7 @@ pub(super) fn device_row(
                     }))
                     .text_color(if visible { theme.accent } else { theme.fg_dim })
                     .child(
-                        icons::icon(if visible {
+                        taskmanager_icons::icon(if visible {
                             IconId::CircleCheck
                         } else {
                             IconId::CircleX

@@ -8,11 +8,13 @@
 use crate::gpui_app::dashboard::DashboardPanel;
 use crate::gpui_app::root::diagnostic_bundle::DiagnosticBundleUiState;
 use taskmanager_application::{
-    ConfirmationKind, FrozenProcessIdentity, InteractionEvent, InteractionReduction,
-    PendingConfirmation, PlatformEffect, ProcessBatchIntent, ProcessTerminationConfirmation,
-    ServiceControlTarget, ServiceId, SmartSelfTestIntent, SurfaceDismissReason, SurfaceKind,
+    ConfirmationKind, InteractionEvent, InteractionReduction, PendingConfirmation, PlatformEffect,
+    ProcessTerminationConfirmation, ServiceControlTarget, SurfaceDismissReason, SurfaceKind,
     SurfaceTransition,
 };
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_core::core::target::ServiceId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WindowSurfaceKind {

@@ -6,7 +6,7 @@ use std::process::Command;
 use std::time::Duration;
 
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-pub use taskmanager_core::core::smart::self_test::{
+use taskmanager_core::core::smart::self_test::{
     SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
 };
 use taskmanager_core::{StorageConnection, StorageInterconnect};

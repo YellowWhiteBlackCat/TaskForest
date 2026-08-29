@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 
 use bevy_ecs::component::Component;
 use bevy_ecs::prelude::{Entity, Query, Res, ResMut};
-use taskmanager_application::{CapabilityId, RequestId, RequestScope};
+use taskmanager_platform_contract::{CapabilityId, RequestId, RequestScope};
 
 use super::{
     CompletionRejection, DEFAULT_IN_FLIGHT_LEASE_MS, EcsAdmissionError, EcsDiagnostics,

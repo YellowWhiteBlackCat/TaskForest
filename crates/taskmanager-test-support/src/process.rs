@@ -10,12 +10,21 @@ use super::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataObservation,
     ProcessMetadataObservations, ProcessScalarObservations,
 };
-use crate::core::{
-    FailureKind, ProcessMetadataFailure, ProcessOwner, ProcessOwnerIdentity, ScalarObservation,
-};
 use crate::{GroupBaseOpen, NamedOverrides};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskmanager_core::core::process::{ProcessMetadataFailure, ProcessOwner, ProcessOwnerIdentity};
 
 const FIXTURE_OBSERVED_AT: u64 = 1;
+
+/// The deterministic provider start token every fixture process carries by
+/// default (CORE-01: a fixture row always has a live identity). Tests that
+/// assert row identities derive the expected value from this one source.
+#[doc(hidden)]
+#[must_use]
+pub const fn fixture_start_token(pid: u32) -> u64 {
+    pid as u64 * 10 + 1
+}
 
 /// Builder used by cross-crate behavior fixtures.
 ///
@@ -132,6 +141,16 @@ impl<ScalarStage, MetadataStage> ProcessItemFixtureBuilder<ScalarStage, Metadata
 
     #[must_use]
     pub fn build(mut self) -> ProcessItem {
+        // CORE-01: a fixture process carries a validated live identity by
+        // default. Tests needing a token-less (unknown-identity) process
+        // install explicit scalar observations instead of relying on the
+        // default.
+        if self.scalars.start_token.availability() == ScalarAvailability::Unknown {
+            self.scalars.start_token = ScalarObservation::available(
+                fixture_start_token(self.item.pid),
+                FIXTURE_OBSERVED_AT,
+            );
+        }
         self.item.apply_scalar_observations(self.scalars);
         self.item
     }
@@ -267,6 +286,17 @@ impl<MetadataStage> ProcessItemFixtureBuilder<NamedOverrides, MetadataStage> {
     #[must_use]
     pub fn current_start_time_secs(mut self, value: u64) -> Self {
         self.scalars.start_time_secs = ScalarObservation::available(value, FIXTURE_OBSERVED_AT);
+        self
+    }
+
+    /// Opt out of the default live identity (CORE-01): the fixture carries
+    /// no current start token, modeling a legacy or provider-opaque row
+    /// whose exact identity is unprovable. Dangerous-action paths must fail
+    /// closed on such rows; tests asserting that rule build them this way.
+    #[must_use]
+    pub fn without_current_start_token(mut self) -> Self {
+        self.scalars.start_token =
+            ScalarObservation::unavailable(taskmanager_core::core::failure::FailureKind::Unsupported);
         self
     }
 

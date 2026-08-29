@@ -1,6 +1,6 @@
 //! Windows Event Log snapshot and stream provider runtime.
 
-use taskmanager_application::ServiceLogQuery;
+use taskmanager_core::core::services::ServiceLogQuery;
 use taskmanager_core::{ServiceId, ServiceLogState, ServiceLogStreamState};
 use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::{ServiceLogSnapshotProvider, ServiceLogStreamProvider};

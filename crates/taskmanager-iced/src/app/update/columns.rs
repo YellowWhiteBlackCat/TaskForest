@@ -24,7 +24,7 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
 use iced::Point;
-use taskmanager_application::ColumnWidthConfig;
+use taskmanager_core::core::config::ColumnWidthConfig;
 use taskmanager_shell::SortCol;
 
 use super::super::{IcedApp, Message};

@@ -9,7 +9,7 @@
 
 use super::{
     RowWindow, SortProjection, header_label, process_columns, row_window, rows_in_viewport,
-    visible_columns,
+    sorted_direction, visible_columns,
 };
 
 #[test]
@@ -107,7 +107,7 @@ fn hidden_columns_drop_but_the_identity_column_stays() {
 }
 
 #[test]
-fn header_labels_mark_only_the_sorted_column() {
+fn the_sort_indicator_rests_on_exactly_one_column_with_a_typed_direction() {
     let columns = process_columns();
     let cpu = columns.iter().find(|spec| spec.id == "CPU").expect("CPU");
     let name = columns.iter().find(|spec| spec.id == "Name").expect("Name");
@@ -115,12 +115,18 @@ fn header_labels_mark_only_the_sorted_column() {
         column: "CPU",
         descending: false,
     };
-    assert_eq!(header_label(cpu, Some(ascending)), "CPU ▲");
-    assert_eq!(header_label(name, Some(ascending)), "Name");
-    assert_eq!(header_label(cpu, None), "CPU");
+    // Labels stay the pure column word — sort state is never spliced into
+    // identity text (the old "CPU ▲" spelling shipped tofu glyphs).
+    assert_eq!(header_label(cpu), "CPU");
+    assert_eq!(header_label(name), "Name");
+    // The sorted column answers with its direction; every other column
+    // answers "no indicator".
+    assert_eq!(sorted_direction(cpu, Some(ascending)), Some(false));
+    assert_eq!(sorted_direction(name, Some(ascending)), None);
     let descending = SortProjection {
         column: "CPU",
         descending: true,
     };
-    assert_eq!(header_label(cpu, Some(descending)), "CPU ▼");
+    assert_eq!(sorted_direction(cpu, Some(descending)), Some(true));
+    assert_eq!(sorted_direction(cpu, None), None);
 }

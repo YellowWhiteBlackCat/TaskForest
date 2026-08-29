@@ -72,7 +72,9 @@ fn device_reinsert_generation_cannot_reuse_previous_samples() {
 fn storage_temperature_projection_is_identity_and_generation_scoped() {
     use std::collections::BTreeMap;
 
-    use crate::core::{DeviceLifecycle, DevicePresence, DeviceState, StorageTelemetryObservation};
+    use taskmanager_core::core::{
+        DeviceLifecycle, DevicePresence, DeviceState, StorageTelemetryObservation,
+    };
     use taskmanager_telemetry_store::TelemetryStore;
 
     let lifecycle = |device_id: &str| {
@@ -93,7 +95,7 @@ fn storage_temperature_projection_is_identity_and_generation_scoped() {
             .device_id(device_id.to_owned())
             .device_generation(DeviceGeneration::new(1))
             .device_state(DeviceState::healthy(10))
-            .smart_availability(crate::core::SmartAvailability::Available)
+            .smart_availability(taskmanager_core::core::SmartAvailability::Available)
             .smart_state(DeviceState::healthy(10))
             .smart_temperature_c(Some(temperature_c))
             .build()
@@ -128,7 +130,7 @@ fn storage_temperature_projection_is_identity_and_generation_scoped() {
 fn engine_projection_keeps_missing_engine_samples_as_gaps() {
     use std::collections::BTreeMap;
 
-    use crate::core::{
+    use taskmanager_core::core::{
         DeviceLifecycle, DevicePresence, DeviceState, GpuEngine, GpuEngineKind,
         GpuTelemetryObservation,
     };

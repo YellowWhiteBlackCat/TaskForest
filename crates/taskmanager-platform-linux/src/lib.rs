@@ -87,11 +87,8 @@ pub use engine::process::telemetry::containers::{
 };
 #[cfg(feature = "test-support")]
 pub use engine::process::telemetry::{
-    ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey, ConnectionState,
-    ConnectionTransport, IsolationKind, LimitValue, NetworkAccountingFailure, NetworkByteCounters,
-    ProcessConnection, ProcessGpuDevice, ProcessGpuRateTracker, ProcessGpuSnapshot,
-    ProcessIdentity, ProcessIsolation, ProcessNetworkAccountingBackend, ProcessNetworkRateTracker,
-    ProcessNetworkSnapshot, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind,
+    NetworkAccountingFailure, NetworkByteCounters, ProcessGpuRateTracker,
+    ProcessNetworkAccountingBackend, ProcessNetworkRateTracker,
 };
 pub use engine::process::telemetry::{
     ProcessEnvironmentCollector, ProcessOpenFilesCollector, ProcessThreadsCollector,
@@ -114,13 +111,8 @@ pub use engine::sensors::trend::{collect_thermal_throttle, collect_thermal_throt
 pub use engine::sensors::{collect_sensor_center, collect_sensor_center_from};
 #[cfg(feature = "test-support")]
 pub use engine::services::{
-    InitSystem, ServiceAction, ServiceDeps, ServiceItem, ServiceLogAvailability, ServiceLogEntries,
-    ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevel,
-    ServiceLogLevelFilter, ServiceLogLines, ServiceLogProviderState, ServiceLogQuery,
-    ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd, ServiceLogStreamRequestError,
-    ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogStreamWorker, ServiceLogTimeFilter,
-    ServiceLogWorker, ServiceManager, ServiceRelationEdge, ServiceRelationGraph,
-    ServiceRelationKind, ServiceStatus, classify_service_log_outcome, parse_openrc_description,
+    InitSystem, ServiceLogCommandOutcome, ServiceLogStreamRequestError, ServiceLogStreamWorker,
+    ServiceLogWorker, ServiceManager, classify_service_log_outcome, parse_openrc_description,
     parse_openrc_status, parse_openrc_update, parse_systemctl_show_deps, parse_unit_description,
 };
 #[cfg(feature = "test-support")]

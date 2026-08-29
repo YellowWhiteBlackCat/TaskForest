@@ -6,16 +6,12 @@ use gpui::{
     div, px,
 };
 
-use crate::core::{Alert, AlertMetric, AlertSeverity, SystemSnapshot};
 use crate::gpui_app::elements;
 use crate::gpui_app::sidebar::SelectedDevice;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
-
-/// Single-source default rules re-exported from core (every frontend starts
-/// from the same baseline; GPUI's rule manager edits a copy at runtime).
-pub use crate::core::alerts::default_rules;
+use taskmanager_application::i18n;
+use taskmanager_core::core::{Alert, AlertMetric, AlertSeverity, SystemSnapshot};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 fn metric_label(metric: AlertMetric) -> &'static str {
     match metric {

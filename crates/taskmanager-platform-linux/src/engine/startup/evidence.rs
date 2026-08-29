@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use taskmanager_core::FailureKind;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-pub use taskmanager_core::core::startup::{
+use taskmanager_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupEvidenceFailure,
     StartupFailedUnit,
 };

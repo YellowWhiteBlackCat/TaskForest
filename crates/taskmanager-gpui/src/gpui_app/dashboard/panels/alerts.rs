@@ -5,14 +5,14 @@ use gpui::{Div, Entity, ParentElement, SharedString, Styled, div, px};
 use std::collections::HashSet;
 use std::time::Duration;
 
-use crate::core::metrics::DiskMetrics;
-use crate::core::{AlertMetric, AlertRule, AlertSeverity};
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit};
+use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_core::core::{AlertMetric, AlertRule, AlertSeverity};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 mod transfer;
 use transfer::render_transfer_actions;

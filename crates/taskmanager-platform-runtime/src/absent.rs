@@ -6,9 +6,9 @@
 
 use std::sync::Arc;
 
-use taskmanager_application::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError, PlatformEvent,
-    PlatformFacets, PlatformHandle,
+use taskmanager_application::{PlatformEvent, PlatformFacets, PlatformHandle};
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
 };
 
 #[derive(Default)]

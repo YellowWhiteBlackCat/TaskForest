@@ -17,7 +17,7 @@
 
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
-use taskmanager_shell::{ProcessRowKey, ShellApp};
+use taskmanager_shell::{ProcessRowId, ShellApp};
 use taskmanager_ui_contract::{
     AlertRuleInput, GraphSummary, ModalInput, ProcessRowInput, SemanticSnapshot,
     SemanticSnapshotBuilder,
@@ -101,11 +101,14 @@ fn base_builder(shell: &ShellApp) -> SemanticSnapshotBuilder {
                 .filter(|value| value.is_finite())
                 .map(|value| f64::from(value.clamp(0.0, 100.0))),
             memory_percent: memory_percentage(process.current_memory_bytes(), memory_total),
-            selected: match shell.selected_process_row {
-                Some(ProcessRowKey::Process(pid)) => pid == process.pid,
-                Some(ProcessRowKey::Application(_) | ProcessRowKey::Category(_)) => false,
+            selected: match shell.selected_row {
+                Some(ProcessRowId::Process(identity)) => {
+                    taskmanager_shell::ProcessRowIdentity::from_process(process)
+                        .is_some_and(|row_identity| row_identity == identity)
+                }
+                Some(ProcessRowId::Application(_) | ProcessRowId::Category(_)) => false,
                 None => index == shell.selected,
-            } || shell.selected_pids().contains(&process.pid),
+            } || shell.is_process_selected(process),
         });
     }
 

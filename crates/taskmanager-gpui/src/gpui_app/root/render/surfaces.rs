@@ -7,12 +7,13 @@ use super::super::{
     perf_views, service_control, services_view, system_health, termination,
 };
 use super::overlays;
-use crate::gpui_app::theme::Theme;
 use gpui::{AnyElement, App, Context, Div, IntoElement, ParentElement, Stateful, Window, px};
 use taskmanager_application::{
     PendingConfirmation, ProcessTerminationAction, ProcessTerminationConfirmation,
     SurfaceDismissReason, SurfaceKind,
 };
+use taskmanager_theme::Theme;
+
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
 
 pub(super) fn compose_active_surface(
@@ -227,7 +228,7 @@ fn render_service_details(
     view: &mut RootView,
     root: Stateful<Div>,
     theme: &Theme,
-    service_id: taskmanager_application::ServiceId,
+    service_id: taskmanager_core::core::target::ServiceId,
     window: &mut Window,
     cx: &mut Context<RootView>,
 ) -> Stateful<Div> {

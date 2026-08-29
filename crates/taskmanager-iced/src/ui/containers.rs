@@ -13,10 +13,10 @@
 
 use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};
-use taskmanager_application::{
-    ContainerRollup, ContainerSummary, DeviceStatus, IsolationKind, ScalarAvailability,
-    ScalarObservation, container_row_window,
-};
+use taskmanager_application::container_row_window;
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskmanager_core::core::process_telemetry::{ContainerRollup, ContainerSummary, IsolationKind};
 
 // Shared locale catalog for the per-container table column headers and the
 // typed source states (the page title and status messages stay on the
@@ -29,7 +29,7 @@ use crate::theme;
 use taskmanager_theme::tokens;
 
 use super::components::message_panel;
-use super::{bytes, missing_value};
+use taskmanager_shell::presentation::{bytes, missing_value};
 
 /// Which branch the page body takes for one rollup projection. Pure seam the
 /// headless tests pin: a typed non-healthy source and a genuinely

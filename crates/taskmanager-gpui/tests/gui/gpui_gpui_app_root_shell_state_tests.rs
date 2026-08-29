@@ -1,9 +1,10 @@
 use super::*;
-use crate::gpui_app::theme::Theme;
 use gpui::AppContext;
-use taskmanager_application::{
-    FailureKind, LatestControlRequest, ServiceAction, ServiceControlOutcome, ServiceId,
-};
+use taskmanager_application::{LatestControlRequest, ServiceControlOutcome};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_theme::Theme;
 
 /// Interaction regression for the write path the Apps-page row handlers
 /// and keyboard router drive: plain click collapses, ctrl-click toggles,
@@ -15,53 +16,74 @@ use taskmanager_application::{
 fn selection_interactions_follow_the_shell_owned_rules(cx: &mut gpui::TestAppContext) {
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     root.update(cx, |view, _| {
+        let fixture = |pid: u32| {
+            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                .pid(pid)
+                .name("worker".to_owned())
+                .status("S".to_owned())
+                .build()
+        };
+        view.replace_processes_for_test(vec![
+            fixture(9),
+            fixture(10),
+            fixture(11),
+            fixture(12),
+            fixture(13),
+        ]);
         let display = [10u32, 11, 12, 13];
 
         // Plain click: single select.
         view.select_process_single(11);
         assert_eq!(view.selected_pid(), Some(11));
-        assert!(view.selected_pids().contains(&11));
-        assert_eq!(view.selected_pids().len(), 1);
+        assert_eq!(view.selected_process_count(), 1);
 
         // Ctrl-click: grow the set, anchor follows.
         view.toggle_process_selection(12);
         assert_eq!(view.selected_pid(), Some(12));
-        assert_eq!(view.selected_pids().len(), 2);
+        assert_eq!(view.selected_process_count(), 2);
         // Ctrl-click the anchor off: anchor falls back to a member.
         view.toggle_process_selection(12);
         assert_eq!(view.selected_pid(), Some(11));
-        assert_eq!(view.selected_pids().len(), 1);
+        assert_eq!(view.selected_process_count(), 1);
 
         // Shift-click: span display order from the anchor.
         view.extend_process_selection(&display, 13);
         assert_eq!(view.selected_pid(), Some(13));
+        let spanned: std::collections::HashSet<u32> = view
+            .selected_process_identities()
+            .iter()
+            .map(|identity| taskmanager_shell::ProcessRowIdentity::pid(*identity))
+            .collect();
         assert_eq!(
-            view.selected_pids(),
-            &HashSet::from([11u32, 12, 13]),
+            spanned,
+            HashSet::from([11u32, 12, 13]),
             "the range spans anchor(11)→13 in display order"
         );
 
         // Keyboard move without modifiers collapses to the new anchor.
         view.move_process_selection(Some(10), false);
         assert_eq!(view.selected_pid(), Some(10));
-        assert_eq!(view.selected_pids().len(), 1);
+        assert_eq!(view.selected_process_count(), 1);
         // Modifier roaming preserves the set.
         view.move_process_selection(Some(11), true);
-        assert_eq!(view.selected_pids().len(), 2);
+        assert_eq!(view.selected_process_count(), 2);
 
         // Batch targets prefer the sorted set; the anchor is the fallback.
         assert_eq!(view.selected_process_pids(), vec![10, 11]);
         view.select_process_single(9);
         assert_eq!(view.selected_process_pids(), vec![9]);
 
-        // A process refresh prunes dead pids and clears a dead anchor.
-        let live = HashSet::from([9u32]);
-        view.shell.selection.retain_live(&live);
+        // A process refresh reconciles by exact identity: the survivor keeps
+        // the anchor, an empty snapshot clears it (CORE-01).
+        view.shell.selection.reconcile(&[fixture(9)]);
         assert_eq!(view.selected_pid(), Some(9));
-        let empty = HashSet::new();
-        view.select_process_single(100);
-        view.shell.selection.retain_live(&empty);
+        view.shell.selection.reconcile(&[]);
         assert_eq!(view.selected_pid(), None, "a dead anchor clears");
+
+        // A pid the live snapshot cannot resolve never becomes selected —
+        // the fail-closed CORE-01 rule for pid reuse.
+        view.select_process_single(100);
+        assert_eq!(view.selected_pid(), None);
     });
 }
 
@@ -108,7 +130,7 @@ fn table_sort_events_map_verbatim_onto_the_shell_sorts(cx: &mut gpui::TestAppCon
 /// provider id), and errors render as copy — never a raw debug blob.
 #[gpui::test]
 fn services_feedback_folds_the_typed_outcome_into_localized_copy(cx: &mut gpui::TestAppContext) {
-    use crate::core::services::{ServiceItem, ServiceStatus};
+    use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     root.update(cx, |view, _| {
         assert!(view.services_feedback().is_none());

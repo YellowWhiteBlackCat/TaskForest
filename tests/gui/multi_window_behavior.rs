@@ -11,7 +11,7 @@ use gpui::{
     AppContext, Entity, Keystroke, TestAppContext, VisualTestContext, WindowHandle, point, px,
 };
 use taskmanager_gpui::gpui_app::root::{RootView, TopPage};
-use taskmanager_gpui::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 #[path = "multi_window_behavior/settings.rs"]
 mod settings;
@@ -473,7 +473,7 @@ async fn services_search_typing_is_isolated_per_window(cx: &mut TestAppContext) 
 /// dismisses after each choice.
 #[gpui::test]
 async fn choose_columns_menu_toggles_hidden_cols(cx: &mut TestAppContext) {
-    use taskmanager_gpui::gpui_app::processes_view::rows::SortCol;
+    use taskmanager_shell::SortCol;
 
     let (win, view) = wrapped_root(cx);
     view.update(cx, |v, cx| {

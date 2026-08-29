@@ -5,7 +5,7 @@
 
 use taskmanager_shell::SystemProjectionStore;
 
-use super::missing_value;
+use taskmanager_shell::presentation::missing_value;
 
 /// Pre-folded summary values for the segment's cards. `None` observations
 /// fold to the shared dash string — never `0` / `0.0%`.

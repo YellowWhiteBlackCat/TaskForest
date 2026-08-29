@@ -20,13 +20,25 @@ graph LR
     GPUI --> STORE[taskmanager-telemetry-store]
     TUI[taskmanager-tui host] --> UI_CONTRACT
     TUI --> APP
+    TUI --> CORE
+    TUI --> PLATFORM_CONTRACT
     TUI --> NATIVE
+    ICED[taskmanager-iced] --> UI_CONTRACT
+    ICED --> APP
+    ICED --> CORE
+    ICED --> PLATFORM_CONTRACT
+    BEVY[taskmanager-bevy-ui] --> UI_CONTRACT
+    BEVY --> APP
+    BEVY --> CORE
+    BEVY --> PLATFORM_CONTRACT
     UI_CONTRACT --> APP
+    UI_CONTRACT --> PLATFORM_CONTRACT
     APP --> PLATFORM_CONTRACT[taskmanager-platform-contract]
     APP --> CORE
     PLATFORM_CONTRACT --> CORE
     RUNTIME[taskmanager-platform-runtime] --> APP
     RUNTIME --> CORE
+    RUNTIME --> PLATFORM_CONTRACT
     PROVIDER[taskmanager-platform-provider] --> PLATFORM_CONTRACT
     PROVIDER --> CORE
     LINUX[taskmanager-platform-linux] --> PROVIDER
@@ -56,9 +68,9 @@ only capability, correlation, provider-failure, snapshot-wrapper and port contra
 
 The core package conventionally owns its implementation under
 `crates/taskmanager-core/src/core.rs` and `crates/taskmanager-core/src/core/`. The root
-package contains no duplicate core tree and re-exports `taskmanager_core::core`, so
-existing `taskmanager::core::*` callers remain source-compatible. Frontends consume
-shared facts through `taskmanager-application::model` instead of depending on core.
+package contains no duplicate core tree and does not forward the core or application
+surface. Every frontend imports shared facts and platform contracts from their actual
+owner crates; no `taskmanager-application::model` compatibility address exists.
 
 ## Responsibility boundaries
 
@@ -71,11 +83,11 @@ shared facts through `taskmanager-application::model` instead of depending on co
   interval, provider, native I/O, or application correlation policy.
 - `taskmanager-platform-contract`: payload-free capability IDs, request/event
   envelopes, provider failures, composite snapshot wrappers, and generic non-blocking
-  port traits. It re-exports core identity/failure/source primitives for port users.
+  port traits. Core identity/failure/source primitives remain imported from core.
 - `taskmanager-application`: semantic commands, shortcut routing, functional state,
   use cases, domain request/event payloads, request correlation, validated
-  `Duration`-based telemetry refresh policy, and the capability facade. It owns
-  what the product does, not how a window or operating system performs it.
+  `Duration`-based telemetry refresh policy, and application-owned projections. It
+  owns what the product does, not how a window or operating system performs it.
 - `taskmanager-platform-provider`: platform-neutral blocking provider SPI, split by
   system/process/service/environment/integration/storage/sensor/power capability
   domains. It owns no OS discovery, command, vendor, frontend, or release-SKU policy.
@@ -88,9 +100,9 @@ shared facts through `taskmanager-application::model` instead of depending on co
 - `taskmanager-platform-macos` / `taskmanager-platform-windows`: physical native
   adapter composition and OS config-path ownership. Until real providers arrive
   they reuse runtime's capability-absent handle instead of manufacturing facts.
-- `taskmanager-platform-native`: target-specific dependency and re-export of exactly
-  one physical native OS adapter for executable hosts; it owns no runtime, config
-  path, hardware, or vendor backend logic.
+- `taskmanager-platform-native`: target-specific selection of exactly one physical
+  native OS adapter for executable hosts; it owns no runtime, config path, hardware,
+  vendor backend logic, or forwarded shared type surface.
 - `taskmanager-ui-contract`: localized message keys, semantic `IconId`, command
   descriptors, and frontend-neutral presentation contracts.
 - `taskmanager-assets`: embedded, tintable GPUI SVGs and their asset source.

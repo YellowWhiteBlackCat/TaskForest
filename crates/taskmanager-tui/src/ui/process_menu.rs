@@ -16,15 +16,17 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
-use taskmanager_application::PriorityTier;
-use taskmanager_application::ProcessItem;
+use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{PlatformEffect, ResourceRevealRequest, UrlOpenRequest};
+use taskmanager_core::core::process::PriorityTier;
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_shell::presentation::search_url_for;
 use taskmanager_ui_contract::IconId;
 
+use super::containers::{KeyHint, Modal};
 use crate::TuiTheme;
+use crate::bindings::{ACTION_MENU_HINTS, menu_hint_pairs};
 
 /// The action menu's frozen target: the process row plus the menu cursor.
 #[derive(Clone, Debug)]
@@ -112,7 +114,7 @@ pub fn resolve_action(target: &ProcessMenuTarget) -> Option<PlatformEffect> {
     match MENU_ACTIONS.get(target.selection).copied() {
         Some(ProcessMenuAction::OpenLocation) => {
             let identity =
-                taskmanager_application::FrozenProcessIdentity::from_process(&target.item)?;
+                taskmanager_core::core::process::FrozenProcessIdentity::from_process(&target.item)?;
             Some(PlatformEffect::RevealResource(ResourceRevealRequest {
                 target: identity,
                 cached_executable: target.item.current_exe_path().map(ToOwned::to_owned),
@@ -142,29 +144,20 @@ pub fn resolve_action(target: &ProcessMenuTarget) -> Option<PlatformEffect> {
     }
 }
 
-/// Render the process-action menu centred over `area`.
-pub fn render_process_menu(
+/// Render the process-action menu from the committed focus plan.  The
+/// highlighted row is the plan's `MenuItem` control when it names this
+/// surface; any other control paints no highlight (fail-closed).
+pub(super) fn render_process_menu_at(
     frame: &mut Frame<'_>,
     menu: &ProcessMenuTarget,
     theme: TuiTheme,
-    area: Rect,
+    focus: super::TuiFocusPlan,
+    popup: Rect,
 ) {
     // 10 actions + the frozen-target row + the footer hint; height adapts so
     // the last action never clips off the overlay (inner height = popup − 2
     // borders − 3 footer).
-    let popup = centered(area, 52, MENU_ACTIONS.len() as u16 + 7);
-    frame.render_widget(Clear, popup);
-    let block = Block::new()
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.accent))
-        .style(Style::new().bg(theme.overlay_bg))
-        .title(format!(
-            " {} {} ",
-            crate::icon_glyph(IconId::Applications),
-            t("proc.actions")
-        ));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let inner = Modal::new(theme, IconId::Applications, t("proc.actions")).render(frame, popup);
 
     let [body, footer] = Layout::vertical([Constraint::Min(5), Constraint::Length(3)]).areas(inner);
 
@@ -172,13 +165,15 @@ pub fn render_process_menu(
         Span::styled("  ", Style::new().fg(theme.dim)),
         Span::styled(
             menu.item.name.as_str(),
-            Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+            Style::new()
+                .fg(theme.color(Color::White))
+                .add_modifier(Modifier::BOLD),
         ),
         Span::styled(format!("  {}", menu.item.pid), Style::new().fg(theme.dim)),
     ])];
     lines.push(Line::from(""));
     for (index, action) in MENU_ACTIONS.into_iter().enumerate() {
-        let selected = index == menu.selection;
+        let selected = focus.menu_item(crate::TuiSurfaceKind::ProcessMenu) == Some(index);
         lines.push(Line::from(vec![
             Span::styled(
                 if selected { "▸ " } else { "  " },
@@ -187,7 +182,11 @@ pub fn render_process_menu(
             Span::styled(
                 action_label(action),
                 Style::new()
-                    .fg(if selected { Color::White } else { theme.dim })
+                    .fg(if selected {
+                        theme.color(Color::White)
+                    } else {
+                        theme.dim
+                    })
                     .add_modifier(if selected {
                         Modifier::BOLD
                     } else {
@@ -201,36 +200,9 @@ pub fn render_process_menu(
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" ↑↓ ", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!(" {} · ", t("menu.word_move")),
-                    Style::new().fg(theme.dim),
-                ),
-                Span::styled("Enter", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!(" {} · ", t("menu.word_select")),
-                    Style::new().fg(theme.dim),
-                ),
-                Span::styled("Esc", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!(" {}", t("menu.word_cancel")),
-                    Style::new().fg(theme.dim),
-                ),
-            ]),
+            KeyHint::line(theme, menu_hint_pairs(&ACTION_MENU_HINTS)),
         ])
         .alignment(Alignment::Center),
         footer,
     );
-}
-
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width.saturating_sub(4));
-    let height = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
-    }
 }

@@ -1,8 +1,7 @@
 use std::collections::BTreeMap;
 
-use taskmanager_application::{
-    CapabilityId, CapabilityStatus, ProviderId, RequestId, SidebandPolicy,
-};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{CapabilityId, CapabilityStatus, RequestId, SidebandPolicy};
 
 use super::*;
 use crate::config::{CapabilityRoute, DeliveryClass, RuntimeDomain};

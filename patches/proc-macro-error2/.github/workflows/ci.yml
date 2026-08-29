@@ -12,7 +12,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - run: rustup toolchain install ${{ matrix.rust-version }}
-      - run: cargo +${{ matrix.rust-version }} test --all
+      - uses: taiki-e/install-action@nextest
+      - run: cargo +${{ matrix.rust-version }} nextest run --workspace --all-targets -j 4
 
   msrv-check:
     runs-on: ubuntu-latest
@@ -25,7 +26,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: RUSTFLAGS='--cfg run_ui_tests' cargo +stable test ui
+      - uses: taiki-e/install-action@nextest
+      - run: RUSTFLAGS='--cfg run_ui_tests' cargo +stable nextest run ui -j 4
 
   test-fmt:
     runs-on: ubuntu-latest

@@ -1,18 +1,20 @@
 //! Small-window policy shared by the production window and headless tests.
 
-use crate::core::config::SidebarDeviceOverrideConfig;
-use crate::core::metrics::SystemSnapshot;
-use crate::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use crate::gpui_app::elements;
 use crate::gpui_app::sidebar::{
     NetworkVisibility, SelectedDevice, ordered_indices, visible_with_override,
 };
-use crate::gpui_app::theme::{Theme, mono_font_with_fallback, tokens};
-use crate::i18n;
+use crate::gpui_app::theme::mono_font_with_fallback;
 use gpui::{
     Context, InteractiveElement, IntoElement, ParentElement, Pixels, Size,
     StatefulInteractiveElement, Styled, div, px, size,
 };
+use taskmanager_application::i18n;
+use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 use super::{NavOrientation, RootView};
 

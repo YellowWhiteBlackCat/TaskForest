@@ -1,6 +1,6 @@
-use crate::core::FailureKind;
-use crate::core::metrics::{MemoryMetrics, OptionalObservation};
 use crate::gpui_app::formatting::DisplayUnits;
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::metrics::{MemoryMetrics, OptionalObservation};
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::{compressed_swap_readout, virtual_memory_commit_readout};
@@ -90,7 +90,7 @@ fn zram_readout_appends_only_a_derivable_compression_ratio() {
         Some(
             format!(
                 "512 MiB / 1.00 GiB · {} 3.0:1",
-                crate::i18n::t("mem.compression_ratio")
+                taskmanager_application::i18n::t("mem.compression_ratio")
             )
             .as_str()
         )

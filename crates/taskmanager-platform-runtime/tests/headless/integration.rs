@@ -2,9 +2,11 @@ use std::thread;
 use std::time::Duration;
 
 use taskmanager_application::{
-    CapabilityId, CommandLaunchRequest, PlatformEvent, ProviderId, RequestEnvelope, RequestId,
-    SetupScriptAction, SetupScriptEvent, SetupScriptRequest, ShellEvent,
+    CommandLaunchRequest, PlatformEvent, SetupScriptRequest, ShellEvent,
 };
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent};
+use taskmanager_platform_contract::{CapabilityId, RequestEnvelope, RequestId};
 
 use super::*;
 use crate::{ProviderBinding, RuntimeConfig, RuntimeProviderBindings};

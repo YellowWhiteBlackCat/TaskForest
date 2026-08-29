@@ -1,9 +1,11 @@
 use std::thread;
 use std::time::Duration;
 
-use taskmanager_application::{
-    CapabilityId, CapabilityStatus, FailureKind, PowerSupplyRequest, ProviderFailure, ProviderId,
-    RequestEnvelope, RequestId,
+use taskmanager_application::PowerSupplyRequest;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityStatus, ProviderFailure, RequestEnvelope, RequestId,
 };
 
 use super::*;

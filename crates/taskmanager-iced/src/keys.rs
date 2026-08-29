@@ -6,6 +6,7 @@
 use iced::keyboard::Key;
 use iced::keyboard::key::Named;
 use taskmanager_application::{KeyCode, Modifiers};
+
 use taskmanager_shell::ShellKeyEvent;
 
 /// The normalized outcome of one iced key press: a fixed key that routes

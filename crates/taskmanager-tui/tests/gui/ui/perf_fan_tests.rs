@@ -1,7 +1,8 @@
 use super::*;
-use taskmanager_application::{
-    DeviceId, SensorCenterSnapshot, SensorDescriptor, SensorMagnitude,
-    SensorMeasurementObservation, SensorScale,
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::sensors::{
+    SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+    SensorScale,
 };
 
 /// Build a fan `SensorReading` from its canonical measurement observation.
@@ -32,7 +33,7 @@ fn fan_trend_line_matches_that_fans_own_history_window() {
         readings: vec![fan_reading("CPU Fan", "hwmon1", 1500)],
         ..SensorCenterSnapshot::default()
     };
-    let system = taskmanager_application::SystemSnapshot {
+    let system = taskmanager_core::core::metrics::SystemSnapshot {
         timestamp_ms: snapshot.timestamp_ms,
         ..Default::default()
     };
@@ -58,7 +59,7 @@ fn fan_trend_line_matches_that_fans_own_history_window() {
     );
 
     // The trend line in fan_lines is line index 1 (right after the header).
-    let known = fan_lines(&snapshot, history, TuiTheme::default(), 60);
+    let known = fan_lines(&snapshot, &shell, TuiTheme::default(), 60);
     let trend_text: String = known[1]
         .spans
         .iter()
@@ -75,7 +76,7 @@ fn fan_trend_line_matches_that_fans_own_history_window() {
         readings: vec![fan_reading("Case Fan", "hwmon9", 800)],
         ..SensorCenterSnapshot::default()
     };
-    let cold_lines = fan_lines(&cold, history, TuiTheme::default(), 60);
+    let cold_lines = fan_lines(&cold, &shell, TuiTheme::default(), 60);
     let cold_trend: String = cold_lines[1]
         .spans
         .iter()

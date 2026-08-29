@@ -11,10 +11,13 @@
 //! existing lanes.
 use super::ShellApp;
 use taskmanager_application::{
-    DeviceId, DirectoryUsageRequest, FrozenProcessIdentity, GpuEngineRowsRequest,
-    NpuInventoryRequest, PlatformEffect, ProcessAffinityControlRequest, ProcessAffinityRequest,
-    ServiceDependenciesRequest, ServiceId, ServiceLogSnapshotRequest, SmartControlRequest,
+    DirectoryUsageRequest, GpuEngineRowsRequest, NpuInventoryRequest, PlatformEffect,
+    ProcessAffinityControlRequest, ProcessAffinityRequest, ServiceDependenciesRequest,
+    ServiceLogSnapshotRequest, SmartControlRequest,
 };
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::target::ServiceId;
 
 impl ShellApp {
     /// Queue a directory-usage scan lifecycle request (start / resume /

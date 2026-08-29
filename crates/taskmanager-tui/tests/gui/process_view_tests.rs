@@ -1,5 +1,16 @@
 use super::*;
 
+fn expected_key(
+    kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId,
+    pid: u32,
+) -> Option<taskmanager_shell::ProcessRowId> {
+    taskmanager_shell::ProcessRowIdentity::from_parts(
+        pid,
+        taskmanager_test_support::fixture_start_token(pid),
+    )
+    .map(kind)
+}
+
 fn proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
     taskmanager_test_support::ProcessItemFixtureBuilder::new()
         .pid(pid)
@@ -10,7 +21,7 @@ fn proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
 }
 
 fn app_proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
-    use taskmanager_application::{ProcessApplicationIdentity, ProcessMetadataObservation};
+    use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
     let identity = ProcessApplicationIdentity::new("org.example.App", name, None)
         .expect("identity fixture needs real values");
     let mut item = proc(pid, name, cpu, mem_mb);
@@ -19,7 +30,7 @@ fn app_proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
 }
 
 fn background_proc(pid: u32, name: &str, cpu: f32, mem_mb: u64) -> ProcessItem {
-    use taskmanager_application::{ProcessApplicationIdentity, ProcessMetadataObservation};
+    use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
     let mut item = proc(pid, name, cpu, mem_mb);
     item.apply_application_identity(
         ProcessMetadataObservation::<ProcessApplicationIdentity>::absent(10),
@@ -86,14 +97,11 @@ fn application_aggregate_is_pidless_but_process_children_keep_identity() {
     ]);
     let projected = rows(&refs, &expanded, &HashSet::new());
 
-    assert!(matches!(
-        projected[1],
-        ProcessRow::Group {
-            row_key: Some(ProcessRowKey::Application(11)),
-            depth: 1,
-            ..
-        }
-    ));
+    assert!(
+        matches!(projected[1], ProcessRow::Group { depth: 1, .. })
+            && crate::process_view::row_key_at(&projected, 1)
+                == expected_key(taskmanager_shell::ProcessRowId::Application, 11)
+    );
     assert!(matches!(
         projected[2],
         ProcessRow::TreeNode {
@@ -104,10 +112,13 @@ fn application_aggregate_is_pidless_but_process_children_keep_identity() {
     ));
     assert_eq!(
         row_key_at(&projected, 1),
-        Some(ProcessRowKey::Application(11))
+        expected_key(taskmanager_shell::ProcessRowId::Application, 11)
     );
     assert_eq!(process_at(&projected, 1), None);
-    assert_eq!(row_key_at(&projected, 2), Some(ProcessRowKey::Process(11)));
+    assert_eq!(
+        row_key_at(&projected, 2),
+        expected_key(taskmanager_shell::ProcessRowId::Process, 11)
+    );
 }
 
 #[test]
@@ -145,4 +156,102 @@ fn collapsing_a_process_node_hides_its_recursive_subtree() {
 #[test]
 fn empty_fact_set_produces_no_structural_rows() {
     assert!(rows(&[], &HashSet::new(), &HashSet::new()).is_empty());
+}
+
+/// The exact owned summary of one row: every field the renderer and the
+/// resolvers consume, with the f32 aggregate pinned at the bit level so even
+/// a summation-order change cannot slip through. The cache-invariant tests
+/// compare materialized rows against the fresh rebuild through this digest.
+fn row_digest(row: &ProcessRow<'_>) -> String {
+    match row {
+        ProcessRow::Group {
+            name,
+            label,
+            depth,
+            count,
+            cpu,
+            memory,
+            expanded,
+            row_key,
+        } => format!(
+            "G|{name}|{label}|{depth}|{count}|{:?}|{memory}|{expanded}|{row_key:?}",
+            cpu.to_bits()
+        ),
+        ProcessRow::TreeNode {
+            process,
+            depth,
+            has_children,
+            collapsed,
+        } => format!(
+            "T|{}|{}|{:?}|{depth}|{has_children}|{collapsed}",
+            process.pid,
+            process.name,
+            process.current_start_token()
+        ),
+    }
+}
+
+fn digests(rows: &[ProcessRow<'_>]) -> Vec<String> {
+    rows.iter().map(row_digest).collect()
+}
+
+/// The owned canonical-id slice must materialize to rows byte-identical to
+/// the reference build, across the expansion/collapse shapes the page can
+/// reach. This is the pure half of the cache-invariant contract; the TuiApp
+/// hit/invalidation half lives with the runtime group-view tests.
+#[test]
+fn owned_id_slice_materializes_exactly_like_the_reference_build() {
+    let mut child = background_proc(2, "child", 2.0, 20);
+    child.parent_pid = Some(1);
+    let mut grandchild = background_proc(3, "grandchild", 3.0, 30);
+    grandchild.parent_pid = Some(2);
+    let processes = [
+        app_proc(11, "editor", 24.8, 2_640),
+        app_proc(12, "helper", 6.0, 800),
+        background_proc(1, "parent", 1.0, 10),
+        child,
+        grandchild,
+        proc(40, "unclassified", 0.4, 8),
+    ];
+    let refs: Vec<_> = processes.iter().collect();
+    let sort = (SortCol::Cpu, SortDir::Desc);
+
+    let shapes: [(&HashSet<String>, &HashSet<u32>); 3] = [
+        (&HashSet::new(), &HashSet::new()),
+        (
+            &HashSet::from([
+                "category:application".to_string(),
+                "category:background".to_string(),
+                "category:uncategorized".to_string(),
+                "app-tree:11".to_string(),
+                "app-tree:1".to_string(),
+            ]),
+            &HashSet::new(),
+        ),
+        (
+            &HashSet::from([
+                "category:application".to_string(),
+                "category:background".to_string(),
+                "app-tree:11".to_string(),
+            ]),
+            &HashSet::from([1u32, 12]),
+        ),
+    ];
+
+    for (expanded, collapsed) in shapes {
+        let fresh = build_process_rows(&refs, expanded, collapsed, sort);
+        let ids = build_canonical_row_ids(&refs, expanded, collapsed, sort);
+        let materialized = materialize_rows(&ids, &refs);
+        assert_eq!(
+            digests(&materialized),
+            digests(&fresh),
+            "materializing the owned ids must reproduce the reference rows \
+             (expanded={expanded:?}, collapsed={collapsed:?})"
+        );
+        // And the pure builder is deterministic per input, so a cache that
+        // stores one emission can never diverge from a later rebuild under
+        // the same key.
+        let rebuilt = build_canonical_row_ids(&refs, expanded, collapsed, sort);
+        assert_eq!(ids, rebuilt, "the id build must be a pure function");
+    }
 }

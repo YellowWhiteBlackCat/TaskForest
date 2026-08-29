@@ -1,5 +1,6 @@
 use super::CaptureScenario;
-use crate::gpui_app::theme::{LightDark, Skin, Theme};
+use taskmanager_theme::Theme;
+use taskmanager_theme::{LightDark, Skin};
 
 pub(super) fn emit_marker(event: &'static str, scenario: Option<CaptureScenario>) {
     tracing::info!(

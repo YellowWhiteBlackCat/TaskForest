@@ -81,18 +81,43 @@ in one quarantined module, `src/gpui.rs`, compiled only under
 - `fade_in()` / `appear()` `Animation` builders over the theme durations.
 
 The gpui-side frontend crates (root `taskmanager` package, `taskmanager-ui`)
-enable `features = ["gpui"]` on the theme dependency. The TUI and any future
-frontend consume the crate with default features off — the theme then has no
-toolkit dependency at all. Non-gpui frontends map colors with their own local
-helpers (`impl`-free conversions are impossible there too; their call-site
-counts are small, e.g. the TUI's single color-mapping module).
+enable `features = ["gpui"]` on the theme dependency. The TUI consumes the
+crate with default features off — the theme then has no toolkit dependency
+at all. The TUI's terminal mapping (ratatui `Color`) stays local to the TUI
+by design: terminal color is a lossy quantization (256-color/RGB probing),
+which is environment policy rather than a value conversion. The iced
+frontend consumes the crate's own `iced` binding instead of a local module
+(see below).
+
+### Iced bindings (optional `iced` feature, free functions)
+
+The iced frontend first shipped with a local conversion module
+(`From`-less helpers in its own `theme.rs`), which became a second
+conversion point and drifted (the Windows font-weight compensation existed
+only on the gpui side). The conversion moved into the theme crate
+(`src/iced.rs` behind the optional `iced` feature, over `iced_core` types):
+free functions — `color`, `ui_font`, `mono_font`, `ui_font_weight`,
+`BUNDLED_UI_FONT`, `font_weight` — because iced's enum weight and
+named-family font targets are not `From`-shaped. The iced frontend's
+`theme.rs` keeps only style assembly (container/button styles), which is
+frontend policy.
+
+Platform compensation is decided ONCE in the neutral `platform` module
+(`effective_weight` over a `WeightCompensationAxis` enum; the cfg seam
+selects the target axis there and nowhere else). Both bindings project the
+same decision, and the decision table runs on every host — a binding may
+never carry its own `#[cfg(target_os)]` compensation again. The iced
+weight ladder quantizes onto iced's enum with ties toward the denser step
+(iced cannot express the fractional 450 body weight; the tie direction is
+a named, tested decision, not an accident).
 
 ### Rules
 
 1. **`taskmanager-theme` has no non-optional toolkit dependency.** A firewall
-   test fails any build that makes `gpui`/`ratatui`/`iced` a required
-   dependency of the theme, or that enables the optional feature from a
-   non-gpui frontend.
+   test fails any build that makes `gpui`/`iced_core` a required dependency
+   of the theme, or that enables a toolkit feature from the wrong frontend
+   (gpui frontends enable `gpui` only; the iced frontend enables `iced`
+   only; the TUI enables neither).
 2. **The skin registry is the single source of colors.** Frontends may not
    hardcode palettes (the TUI's 21 literals are removed in this ADR's
    migration); they convert `Palette`/`Theme` values to their own color
@@ -113,19 +138,21 @@ counts are small, e.g. the TUI's single color-mapping module).
   204 `text_size(tokens::FONT_*)` call sites and the
   `window_chrome_state`/`background_appearance`/font-detect sites only
   change their call shape, not their location.
-- **The theme builds without gpui**: `cargo test -p taskmanager-theme`
+- **The theme builds without gpui**: `cargo nextest run --locked -p taskmanager-theme --all-targets -j 4`
   runs the whole neutral suite with the feature off; the TUI consumes the
   same crate with default features off.
 - **TUI gains the skin system**: dark/light/high-contrast axes and per-skin
   accents replace the hardcoded terminal palette; terminal mapping stays in
   the TUI (ratatui `Color`), never in the theme crate.
-- **iced becomes cheap**: new frontend = a small color-mapping module (its
-  own `From`-shaped helpers, since the orphan rule applies there too) +
-  widget layer + composition edge; the skin tables, detection and
-  application layer are inherited unchanged.
-- **One quarantined gpui module**: all toolkit bindings live in
-  `taskmanager-theme/src/gpui.rs` behind `feature = "gpui"`; the neutral
-  modules never name a toolkit type.
+- **iced stays cheap, and single-sourced**: the frontend consumes the
+  crate's `iced` binding (no local conversion module) + its own widget
+  layer + the composition edge; the skin tables, detection, application
+  layer and platform compensation are inherited unchanged and paired with
+  the gpui side by shared decision-table tests.
+- **One quarantined binding module per toolkit**: all toolkit bindings live
+  in `taskmanager-theme/src/gpui.rs` (`feature = "gpui"`) and
+  `taskmanager-theme/src/iced.rs` (`feature = "iced"`); the neutral modules
+  never name a toolkit type.
 - Current references: `docs/UI_COMPONENT_ARCHITECTURE.md` records the component
   contract; `docs/ARCH.md` records the cross-crate boundary. The superseded
   frontend assessment is private publication material and is not part of the

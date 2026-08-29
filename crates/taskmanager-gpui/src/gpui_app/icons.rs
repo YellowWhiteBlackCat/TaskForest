@@ -1,13 +1,12 @@
 //! GPUI adapter for frontend-neutral semantic icons.
 //!
-//! ADR-017 Phase 2: the implementation moved to the `taskmanager-icons` crate
-//! (gpui-native SVG, no `gpui_component::Icon`); this module is a thin shim so
-//! existing `icons::icon(..)` / `icons::path(..)` call sites keep working.
+//! ADR-017 Phase 2: the `icon`/`path` element builders live in the
+//! `taskmanager-icons` crate (gpui-native SVG, no `gpui_component::Icon`) and
+//! are imported from their owner path directly; this module keeps only the
+//! provider-asset image adapter below.
 
-use crate::core::{ApplicationIconAsset, ApplicationIconFormat};
 use gpui::Img;
-
-pub use taskmanager_icons::{icon, path};
+use taskmanager_core::core::{ApplicationIconAsset, ApplicationIconFormat};
 
 /// Adapt a provider-resolved, toolkit-neutral icon asset to a GPUI image.
 ///

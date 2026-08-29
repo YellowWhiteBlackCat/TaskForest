@@ -2,10 +2,11 @@
 
 use super::ShellApp;
 use taskmanager_application::{
-    ConfirmationKind, PendingConfirmation, PlatformEffect, SessionControlAction,
-    SessionControlConfirmation, SessionControlTarget, SessionItem, StartupControlRequest,
-    StartupEntry,
+    ConfirmationKind, PendingConfirmation, PlatformEffect, SessionControlConfirmation,
+    SessionControlTarget, StartupControlRequest,
 };
+use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::startup::StartupEntry;
 
 impl ShellApp {
     /// Capture the selected provider-issued session identity and produce a

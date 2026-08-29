@@ -5,13 +5,17 @@
 //! removes stale or duplicate terminals before any renderer sees them.
 
 use taskmanager_application::{
-    CapabilityId, DeviceId, FailureKind, FrozenProcessIdentity, GpuEngineRowsEvent,
-    GpuEngineRowsSession, GpuEngineRowsState, NetworkEscalationSession, NetworkEscalationState,
-    PlatformEventBatch, ProcessAffinitySession, ProcessAffinityState, ProcessBatchIntent,
-    ProcessBatchSession, ProcessBatchState, ProcessEvent, RequestAttemptId, RequestId, ShellEvent,
-    ShellUiActionIntent, ShellUiActionSession, ShellUiActionState, SmartSelfTestIntent,
-    SmartSelfTestSession, SmartSelfTestState,
+    GpuEngineRowsEvent, GpuEngineRowsSession, GpuEngineRowsState, NetworkEscalationSession,
+    NetworkEscalationState, PlatformEventBatch, ProcessAffinitySession, ProcessAffinityState,
+    ProcessBatchSession, ProcessBatchState, ProcessEvent, RequestAttemptId, ShellEvent,
+    ShellUiActionIntent, ShellUiActionSession, ShellUiActionState, SmartSelfTestSession,
+    SmartSelfTestState,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_platform_contract::{CapabilityId, RequestId};
 
 use super::{BatchFoldOutput, ShellApp};
 

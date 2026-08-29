@@ -1,6 +1,7 @@
 //! Udev-database memory facts (privilege-free DMI successor; ADR udev design).
 
-use taskmanager_platform_contract::{ProviderId, SourceOutcome, SourceStatus};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 use super::super::memory_sources::{
     DMI_PROVIDER, DMI_SLOTS_TOTAL_FIELD, DMI_SLOTS_USED_FIELD, DMI_SPEED_FIELD,

@@ -293,9 +293,9 @@ fn boot_time_cache_retries_failed_reads_on_the_shorter_interval_and_recovers() {
 ///     end-to-end proof of retain-Available, not just a per-row unit fixture).
 ///
 /// `#[ignore]` because it is host-dependent (reads the live `/proc` tree). Run:
-/// `cargo test -p taskmanager-platform-linux \
-/// fd_source_stays_available_across_decimation_skip_ticks_on_box -- \
-/// --ignored --nocapture`
+/// `cargo nextest run --locked -p taskmanager-platform-linux --all-targets -j 4 \
+/// -E 'test(fd_source_stays_available_across_decimation_skip_ticks_on_box)' \
+/// --run-ignored only --no-capture`
 #[ignore = "host-dependent: drives the live /proc process collector against the test's own pid"]
 #[test]
 fn fd_source_stays_available_across_decimation_skip_ticks_on_box() {

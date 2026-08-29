@@ -14,6 +14,8 @@
 use taskmanager_theme::color::mix;
 use taskmanager_theme::{Color, HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
+use crate::TuiTerminalProfile;
+
 /// Runtime-resolved theme construction parameters (ADR-026): the neutral
 /// skin, the light/dark mode, and the high-contrast axis. The runtime holds
 /// these and rebuilds the terminal palette on every frame, so a settings
@@ -106,6 +108,9 @@ pub struct TuiTheme {
     pub fg_dim: ratatui::style::Color,
     /// Dark reserved fill (bar track / other-reserved segment).
     pub shade: ratatui::style::Color,
+    /// The immutable terminal capability profile used to resolve this
+    /// palette and all semantic glyphs in the frame.
+    pub terminal: TuiTerminalProfile,
 }
 
 impl Default for TuiTheme {
@@ -117,6 +122,13 @@ impl Default for TuiTheme {
 impl TuiTheme {
     /// Resolve the terminal palette from a neutral theme snapshot.
     pub fn from_theme(theme: &Theme) -> Self {
+        Self::from_theme_with_profile(theme, TuiTerminalProfile::default())
+    }
+
+    /// Resolve the neutral skin through an explicit terminal capability
+    /// profile.  Palette quantization happens here at the terminal edge, so
+    /// component renderers only consume already-safe opaque colors.
+    pub fn from_theme_with_profile(theme: &Theme, terminal: TuiTerminalProfile) -> Self {
         let palette = theme.palette();
         // Translucent tints composited over the backdrop for terminal
         // display (terminal colors are opaque).
@@ -124,37 +136,58 @@ impl TuiTheme {
         let overlay = mix(palette.window_backdrop, palette.surface, 0.5);
         let gauge_track = mix(palette.window_backdrop, palette.fg, 0.12);
         Self {
-            accent: rgb(palette.accent),
-            dim: rgb(palette.fg_muted),
-            good: rgb(palette.success),
-            warn: rgb(palette.warning),
-            danger: rgb(palette.danger),
-            bg: rgb(palette.window_backdrop),
-            border: rgb(palette.border),
-            overlay_bg: rgb(overlay),
-            highlight_bg: rgb(highlight),
-            gauge_track_bg: rgb(gauge_track),
+            accent: terminal.color(rgb(palette.accent)),
+            dim: terminal.color(rgb(palette.fg_muted)),
+            good: terminal.color(rgb(palette.success)),
+            warn: terminal.color(rgb(palette.warning)),
+            danger: terminal.color(rgb(palette.danger)),
+            bg: terminal.color(rgb(palette.window_backdrop)),
+            border: terminal.color(rgb(palette.border)),
+            overlay_bg: terminal.color(rgb(overlay)),
+            highlight_bg: terminal.color(rgb(highlight)),
+            gauge_track_bg: terminal.color(rgb(gauge_track)),
             // Per-category graph accents come straight off the neutral theme
             // tokens (not the palette), matching the gpui/iced segment colors.
-            memory: rgb(theme.memory),
-            disk: rgb(theme.disk),
-            network: rgb(theme.network),
-            zfs_arc: rgb(mix(palette.window_backdrop, theme.disk, 0.55)),
-            fg_dim: rgb(theme.fg_dim),
-            shade: rgb(theme.shade),
+            memory: terminal.color(rgb(theme.memory)),
+            disk: terminal.color(rgb(theme.disk)),
+            network: terminal.color(rgb(theme.network)),
+            zfs_arc: terminal.color(rgb(mix(palette.window_backdrop, theme.disk, 0.55))),
+            fg_dim: terminal.color(rgb(theme.fg_dim)),
+            shade: terminal.color(rgb(theme.shade)),
+            terminal,
         }
     }
 
     /// Build the terminal palette from the runtime's construction parameters,
     /// resolving the skin's system fonts exactly like the graphical frontends.
     pub fn from_params(params: ThemeParams) -> Self {
+        Self::from_params_with_profile(params, TuiTerminalProfile::default())
+    }
+
+    /// Build a terminal theme from runtime parameters and the profile
+    /// captured at the composition edge.
+    pub fn from_params_with_profile(params: ThemeParams, terminal: TuiTerminalProfile) -> Self {
         let theme = Theme::build(
             params.skin,
             params.mode,
             params.high_contrast(),
             ResolvedFonts::system_for(params.skin),
         );
-        Self::from_theme(&theme)
+        Self::from_theme_with_profile(&theme, terminal)
+    }
+
+    /// Resolve one ad-hoc Ratatui color through this frame's profile.  This
+    /// keeps legacy semantic colors (white text, black-on-accent hints, and
+    /// graph palette extensions) honest on low-color/no-color terminals too.
+    #[must_use]
+    pub fn color(self, color: ratatui::style::Color) -> ratatui::style::Color {
+        self.terminal.color(color)
+    }
+
+    /// Resolve a semantic icon through this frame's glyph repertoire.
+    #[must_use]
+    pub const fn glyph(self, icon: taskmanager_ui_contract::IconId) -> &'static str {
+        self.terminal.glyph(icon)
     }
 }
 

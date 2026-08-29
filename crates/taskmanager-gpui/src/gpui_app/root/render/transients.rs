@@ -2,11 +2,12 @@
 
 use super::super::{RootView, TelemetryWarmupPhase, elements, i18n};
 use super::overlays;
-use crate::gpui_app::theme::{Theme, tokens};
 use gpui::{
     AnimationExt, Context, Div, InteractiveElement, ParentElement, RenderOnce, Stateful, Styled,
     Window, deferred, div, px,
 };
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui::primitives::spinner::Spinner;
 
 pub(super) fn compose(

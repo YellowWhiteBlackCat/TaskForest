@@ -40,8 +40,8 @@ use iced::widget::canvas::{self, Cache, Geometry};
 use iced::widget::{column, text};
 use iced::{Color, Length, Rectangle};
 use taskmanager_application::i18n::t;
-use taskmanager_shell::history::MetricSeries;
 use taskmanager_shell::presentation::graph_summary;
+use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_theme::{Theme, tokens};
 
 use super::quantity_text_pref;
@@ -51,7 +51,6 @@ use crate::perf_chart::{
     draw_hover_sample_mark, draw_readout_pill, draw_y_axis_ticks, hovered_index, line_path,
     scaled_y, series_point_runs_for, y_axis_tick_values,
 };
-use crate::theme;
 use crate::trend_strip::finite_peak;
 
 /// Primary per-device canvas height. GPUI gives the selected device's main
@@ -507,8 +506,8 @@ fn device_mini_graph_with_length<S: Into<Rc<[f32]>>>(
     let max = prefs
         .max_override
         .unwrap_or_else(|| series_max(scale, &samples));
-    let caption_color = theme::color(theme_snapshot.palette().fg_muted);
-    let grid_color = theme::color(theme_snapshot.palette().border);
+    let caption_color = taskmanager_theme::iced::color(theme_snapshot.palette().fg_muted);
+    let grid_color = taskmanager_theme::iced::color(theme_snapshot.palette().border);
     // The DeviceChart draws nothing for fewer than two points; surface that in
     // the caption so an empty/just-launched window reads as collecting, not as a
     // blank graph. History windows are finite-only, so len == finite count.
@@ -519,8 +518,8 @@ fn device_mini_graph_with_length<S: Into<Rc<[f32]>>>(
     // The hover pill wears the same elevated-surface/foreground pair as the CPU
     // chart's readout (token-derived, never a literal).
     let readout = ReadoutColors {
-        bg: theme::color(theme_snapshot.palette().surface),
-        fg: theme::color(theme_snapshot.palette().fg),
+        bg: taskmanager_theme::iced::color(theme_snapshot.palette().surface),
+        fg: taskmanager_theme::iced::color(theme_snapshot.palette().fg),
     };
     column(vec![
         text(label)

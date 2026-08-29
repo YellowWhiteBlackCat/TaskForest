@@ -29,7 +29,7 @@ fn footer_status_swaps_in_the_quitting_notice_only_after_quit() {
 /// the tone-filled capsule.
 #[test]
 fn alert_badge_tone_keeps_the_severity_palette_mapping() {
-    use taskmanager_application::alerts::AlertSeverity;
+    use taskmanager_core::core::alerts::AlertSeverity;
 
     let app = crate::IcedApp::demo();
     let theme = app.theme();

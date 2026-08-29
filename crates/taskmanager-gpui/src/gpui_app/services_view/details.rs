@@ -5,16 +5,19 @@ use gpui::{ClipboardItem, Context, Div, ParentElement, Styled, div, prelude::Flu
 use taskmanager_ui_contract::IconId;
 
 use super::details_state::{ServiceDetailsSnapshot, ServiceLogCopyFeedback};
-use crate::core::services::ServiceItem;
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use crate::gpui_app::root::{RootView, prop_row};
-use crate::gpui_app::theme::{Theme, mono_font_with_fallback, tokens};
-use crate::i18n;
-use taskmanager_application::{
+use crate::gpui_app::theme::mono_font_with_fallback;
+use taskmanager_application::i18n;
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::services::{
     ServiceDeps, ServiceLogErrorKind, ServiceLogLevelFilter, ServiceLogState, ServiceLogTimeFilter,
     ServiceRelationKind,
 };
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
+
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
 fn log_level_label(filter: ServiceLogLevelFilter) -> &'static str {

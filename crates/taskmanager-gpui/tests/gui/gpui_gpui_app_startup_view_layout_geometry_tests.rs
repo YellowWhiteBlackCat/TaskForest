@@ -1,16 +1,16 @@
 //! Geometry and interaction contracts for the Startup page's primary table.
 
-use crate::core::{
-    FailureKind, ProviderId, SourceOutcome, SourceStatus, StartupBootEvidenceSnapshot,
-    StartupCriticalChainNode,
-};
 use crate::gpui_app::root::{RootView, TopPage};
-use crate::gpui_app::theme::Theme;
 use gpui::{AppContext, Modifiers, TestAppContext, VisualTestContext, WindowHandle, px, size};
-use taskmanager_application::{
+use taskmanager_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupImpact, StartupImpactEvidence, StartupScope,
     StartupSource,
 };
+use taskmanager_core::core::{
+    FailureKind, ProviderId, SourceOutcome, SourceStatus, StartupBootEvidenceSnapshot,
+    StartupCriticalChainNode,
+};
+use taskmanager_theme::Theme;
 
 fn draw(cx: &mut TestAppContext, window: WindowHandle<RootView>) {
     cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())

@@ -5,6 +5,7 @@
 //! diagnostics, while a partial child scan can never confirm device absence.
 
 use super::*;
+use taskmanager_core::core::sensors::ThermalThrottleSnapshot;
 
 const CPU_THROTTLE_PROVIDER: ProviderId = ProviderId::borrowed("linux.sensor.cpu-thermal-throttle");
 
@@ -29,7 +30,7 @@ pub(super) fn collect_sensor_center_source_from_roots(
 fn combine_sensor_sources(
     hwmon: DeviceSourceSnapshot<SensorCenterSnapshot>,
     thermal: thermal::ThermalSourceSnapshot,
-    throttle: trend::ThermalThrottleSnapshot,
+    throttle: ThermalThrottleSnapshot,
     iio: DeviceSourceSnapshot<SensorCenterSnapshot>,
     now_ms: u64,
 ) -> DeviceSourceSnapshot<SensorCenterSnapshot> {
@@ -107,7 +108,7 @@ fn combine_sensor_sources(
     )
 }
 
-fn throttle_source_status(throttle: &trend::ThermalThrottleSnapshot) -> SourceStatus {
+fn throttle_source_status(throttle: &ThermalThrottleSnapshot) -> SourceStatus {
     let fields = [
         throttle.core_events_observation().availability(),
         throttle.package_events_observation().availability(),
@@ -154,7 +155,7 @@ pub(super) fn sensor_center_status(
     has_permission_failure: bool,
     has_any_reading: bool,
     thermal: &thermal::ThermalSourceSnapshot,
-    throttle: &trend::ThermalThrottleSnapshot,
+    throttle: &ThermalThrottleSnapshot,
 ) -> DeviceStatus {
     if matches!(discovery, SourceOutcome::Empty) {
         return DeviceStatus::Healthy;

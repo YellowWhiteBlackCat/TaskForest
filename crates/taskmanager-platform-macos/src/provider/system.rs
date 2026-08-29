@@ -19,6 +19,7 @@ use taskmanager_application::{
     HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
     NetworkTelemetryRequest, NpuInventoryRequest, StorageTelemetryRequest,
 };
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     ComputeTopology, ContainerRollup, CpuMetrics, CpuTelemetryObservation, DeviceId, DeviceState,
     DeviceStatus, FailureKind, FirmwareInfo, GpuEngineRowsSnapshot, HardwareInfo, HostIdentity,
@@ -26,9 +27,7 @@ use taskmanager_core::{
     MemoryTelemetryObservation, NpuInventorySnapshot, ProviderId, ScalarObservation,
     ScalarObservationGroup,
 };
-use taskmanager_platform_contract::{
-    CompositeSourceSnapshot, ProviderFailure, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     ContainerRollupProvider, CpuTelemetryProvider, GpuEngineRowsProvider, GpuTelemetryProvider,
     HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider,

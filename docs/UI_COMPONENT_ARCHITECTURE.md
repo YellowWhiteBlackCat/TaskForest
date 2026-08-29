@@ -1,8 +1,8 @@
 # 自有 UI 组件层总纲
 
 TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primitives。
-`taskmanager-ui` 是 GPUI 的自有组件层；Iced/TUI 各自维护符合自身生命周期的组件层，
-三者只复用语义、资产和 token，不共享会泄漏 toolkit 状态的 widget。
+`taskmanager-ui` 是 GPUI 的自有组件层；Iced、TUI 和 Bevy 各自维护符合自身生命
+周期的组件层，四者只复用语义、资产和 token，不共享会泄漏 toolkit 状态的 widget。
 
 ## 边界
 
@@ -15,6 +15,7 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
 | `taskmanager-ui-contract` | 页面、命令、焦点、语义快照和 icon identity 合同 |
 | `taskmanager-gpui` | RootView、页面投影、窗口状态和 GPUI 绘制 |
 | `taskmanager-iced` | Iced 页面组件、焦点/激活壳、Canvas、虚拟表格和响应式布局 |
+| `taskmanager-bevy-ui` | `bsn!` 场景组合的页面、表格/图表/控件与确认面（`src/widgets.rs`） |
 
 组件层不拥有 provider、业务 reducer、窗口组合或系统路径。慢 I/O、历史查询和权限请求
 必须在更下层完成，组件只呈现 typed projection。
@@ -92,9 +93,11 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
 - 页面特化组件可以拥有自己的字段、图表或危险操作，但必须组合已有 surface、state、row、
   key/value、toolbar 和 scroll primitives；重复第二次的几何/状态语义必须下沉到对应
   toolkit 的组件层：GPUI 进入 `taskmanager-ui`，Iced 进入
-  `taskmanager-iced/src/ui/components.rs`。
+  `taskmanager-iced/src/ui/components.rs`，Bevy 进入 `taskmanager-bevy-ui/src/widgets.rs`
+  （100% `bsn!` 场景适配器，见 [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md)）。
 - 特化不是豁免：新增 wrapper 先说明数据或交互边界，并补窄窗口、焦点和失败态回归；不得用
-  import alias 或改名 re-export 绕过组件边界，聚合 facade 则保持原名或 wildcard surface。
+  import alias、改名 re-export 或跨 crate forwarding facade 绕过组件边界；跨层类型必须从
+  其 owner crate 的显式模块路径导入。
 
 Iced 的 renderer-local 组件入口是 `taskmanager-iced/src/ui/components.rs`；`focus.rs` 负责
 可访问激活壳，`theme.rs` 负责 token 到 Iced style 的映射，`virtual_list.rs` 负责有界表格窗口。

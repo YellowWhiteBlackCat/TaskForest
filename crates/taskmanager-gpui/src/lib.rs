@@ -9,12 +9,6 @@
 #![forbid(unsafe_code)]
 #![deny(clippy::wildcard_imports)]
 
-// Keep the historical `crate::core` and `crate::i18n` paths local to this
-// frontend crate.  This makes the extracted GPUI tree self-contained while
-// preserving the existing module boundaries inside the UI implementation.
-pub use taskmanager_application::i18n;
-pub use taskmanager_core::core;
-
 mod assets;
 pub mod gpui_app;
 mod run;

@@ -4,14 +4,14 @@ use std::collections::HashSet;
 
 use gpui::{AppContext, SharedString, TestAppContext};
 
-use crate::core::config::{
-    COLOR_SCHEME_DARK, STARTUP_PAGE_PROCESSES, SidebarDeviceOverrideConfig, TEXT_RENDERING_SUBPIXEL,
-};
 use crate::gpui_app::dashboard::SavedViewPreset;
 use crate::gpui_app::dashboard::saved_view_transfer::filter_from_token;
-use crate::gpui_app::processes_view::{ProcessStatusFilter, SortCol};
 use crate::gpui_app::root::ProcessesState;
-use crate::gpui_app::theme::{Skin, Theme};
+use taskmanager_core::core::config::{
+    COLOR_SCHEME_DARK, STARTUP_PAGE_PROCESSES, SidebarDeviceOverrideConfig, TEXT_RENDERING_SUBPIXEL,
+};
+use taskmanager_shell::{ProcessStatusFilter, SortCol};
+use taskmanager_theme::{Skin, Theme};
 
 #[gpui::test]
 fn config_projection_persists_window_tokens_and_normalizes_graph_points(cx: &mut TestAppContext) {
@@ -30,7 +30,7 @@ fn config_projection_persists_window_tokens_and_normalizes_graph_points(cx: &mut
     assert_eq!(config.startup_page, STARTUP_PAGE_PROCESSES);
     assert_eq!(
         config.text_rendering,
-        crate::core::config::TEXT_RENDERING_PLATFORM_DEFAULT
+        taskmanager_core::core::config::TEXT_RENDERING_PLATFORM_DEFAULT
     );
     assert_eq!(config.graph_data_points, 600);
 }
@@ -54,7 +54,7 @@ fn config_projection_persists_explicit_language_choice(cx: &mut TestAppContext) 
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     let config = root.update(cx, |view, _cx| {
         let mut presentation = view.presentation_snapshot();
-        presentation.appearance.language = Some(crate::i18n::Language::Zh);
+        presentation.appearance.language = Some(taskmanager_application::i18n::Language::Zh);
         view.replace_presentation(presentation);
         config_from_view(view)
     });
@@ -154,7 +154,7 @@ fn font_tokens_round_trip_system_and_bundled_choices() {
 
 #[test]
 fn density_tokens_round_trip_and_unknown_tokens_are_ignored() {
-    use crate::gpui_app::theme::tokens::RowDensity;
+    use taskmanager_theme::tokens::RowDensity;
 
     // Both densities map to their stable tokens.
     assert_eq!(density_token(RowDensity::Comfortable), DENSITY_COMFORTABLE);
@@ -294,15 +294,15 @@ fn desktop_notification_policy_round_trips_through_config_serialization() {
     assert!(reloaded.notify_enabled);
     assert_eq!(reloaded.notify_quiet_hours, Some((1320, 420)));
 
-    let policy = crate::core::alerts::NotificationPolicy {
+    let policy = taskmanager_core::core::alerts::NotificationPolicy {
         enabled: reloaded.notify_enabled,
         quiet_hours: reloaded.notify_quiet_hours.map(|(start, end)| {
-            crate::core::alerts::QuietHours {
+            taskmanager_core::core::alerts::QuietHours {
                 start_minutes: start,
                 end_minutes: end,
             }
         }),
-        ..crate::core::alerts::NotificationPolicy::default()
+        ..taskmanager_core::core::alerts::NotificationPolicy::default()
     };
     assert!(policy.enabled);
     let hours = policy.quiet_hours.expect("quiet hours restored");

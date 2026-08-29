@@ -22,10 +22,14 @@ use bevy::scene::ScenePlugin;
 use bevy::text::{FontSize, TextColor, TextFont};
 use bevy::ui::widget::Text;
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, HostTelemetryRequest, PlatformClient, PlatformEvent,
-    PlatformFacets, PlatformHandle, RequestEnvelope, RequestPort, SubmissionError, SystemFacets,
+    HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
+    SystemFacets,
 };
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
+};
+
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -46,6 +50,8 @@ impl Plugin for HeadlessFrontendPlugins {
             bevy::input::InputPlugin,
             InputFocusPlugin,
         ));
+        // MinimalPlugins has no ImagePlugin; the icon bridge needs the store.
+        app.init_resource::<bevy::asset::Assets<bevy::image::Image>>();
     }
 }
 
@@ -224,5 +230,39 @@ fn text_role_observer_stamps_palette_typography() {
         ink.0.to_srgba(),
         ui_palette(&Theme::dark()).dim_color.to_srgba(),
         "the observer stamped the dim ink token"
+    );
+}
+
+#[test]
+fn the_accessibility_bridge_resources_are_installed_once() {
+    // The AccessKit bridge (accesskit_unix on Linux) publishes
+    // `AccessibilityNode` components only while these resources exist. The
+    // windowed composition must end with them installed exactly once —
+    // `DefaultPlugins` (bevy_winit) already adds the plugin when the feature
+    // is on, and a second unconditional add panics at startup. This headless
+    // composition lacks `DefaultPlugins`, so the plugin must come from the
+    // frontend composition itself; the double-add guard is what keeps both
+    // compositions alive.
+    let (client, _host_requests) = scripted_client();
+    let cache: &'static RuntimeCache = Box::leak(Box::new(RuntimeCache::new()));
+    let runtime = cache
+        .get_or_init(move || Ok(client))
+        .expect("scripted runtime starts");
+    let mut app = headless_window_app(runtime);
+    app.update();
+    app.update();
+
+    let world = app.world_mut();
+    assert!(
+        world
+            .get_resource::<bevy::a11y::AccessibilityRequested>()
+            .is_some(),
+        "the AT-requests resource must exist after composition"
+    );
+    assert!(
+        world
+            .get_resource::<bevy::a11y::ManageAccessibilityUpdates>()
+            .is_some(),
+        "the update-management resource must exist after composition"
     );
 }

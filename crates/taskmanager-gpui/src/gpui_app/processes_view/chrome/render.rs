@@ -19,15 +19,16 @@ use super::page_chrome::{
 };
 use super::{AffinityOverlayProps, ProcessChromePresentation, affinity_overlay, sort_header_row};
 use crate::gpui_app::processes_view::rows::{
-    ProcRowProps, SortCol, VisibleRow, proc_row_with_layout, process_name_band_width,
+    ProcRowProps, VisibleRow, proc_row_with_layout, process_name_band_width,
     process_table_content_width,
 };
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens::{RowDensity, UiSize};
+use taskmanager_shell::SortCol;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
 
-use crate::i18n;
-use taskmanager_shell::{ProcessRowKey, ProcessStatusFilter};
+use taskmanager_application::i18n;
+use taskmanager_shell::{ProcessRowId, ProcessRowIdentity, ProcessStatusFilter};
 
 /// All straight-through processes-page render inputs (design-debt #1 props
 /// consolidation); `window`/`cx` stay explicit render-lifetime handles.
@@ -39,9 +40,9 @@ pub struct ProcessesViewProps<'a> {
     pub rows: &'a Rc<Vec<VisibleRow>>,
     pub query: &'a str,
     pub selected: Option<u32>,
-    pub selected_row: Option<ProcessRowKey>,
+    pub selected_row: Option<ProcessRowId>,
     pub selected_target_count: usize,
-    pub selected_pids: &'a HashSet<u32>,
+    pub selected_identities: &'a HashSet<ProcessRowIdentity>,
     pub hovered: Option<Hover>,
     pub sort_col: SortCol,
     pub sort_asc: bool,
@@ -139,7 +140,7 @@ pub fn render_processes(
         selected,
         selected_row,
         selected_target_count,
-        selected_pids,
+        selected_identities,
         hovered,
         sort_col,
         sort_asc,
@@ -170,7 +171,7 @@ pub fn render_processes(
     let count = rows.len();
     let affinity_hovered = hovered.clone();
     let col_widths_owned = col_widths.clone();
-    let selected_pids_owned = selected_pids.clone();
+    let selected_identities = selected_identities.clone();
     let hovered_for_rows = hovered.clone();
     let entity_for_rows = entity.clone();
     let viewport_width = viewport_width.max(px(320.0));
@@ -261,9 +262,10 @@ pub fn render_processes(
                     };
                     let selected = row.selection_key.is_some_and(|key| {
                         selected_row == Some(key)
-                            || key.process_pid().is_some_and(|pid| {
-                                selected_pids_owned.contains(&pid)
-                                    || (selected_pids_owned.is_empty() && selected == Some(pid))
+                            || key.live_key().is_some_and(|identity| {
+                                selected_identities.contains(&identity)
+                                    || (selected_identities.is_empty()
+                                        && selected == Some(identity.pid()))
                             })
                     });
                     proc_row_with_layout(
@@ -413,10 +415,9 @@ pub fn render_processes(
             ProcessControlChromeProps {
                 theme: &theme,
                 selected,
-                selected_pids,
+                selected_target_count,
                 application_selected: selected_row
                     .is_some_and(|row| row.application_root().is_some()),
-                selected_target_count,
                 hidden_cols,
                 swap_auto_hidden,
                 hovered: hovered.as_ref(),

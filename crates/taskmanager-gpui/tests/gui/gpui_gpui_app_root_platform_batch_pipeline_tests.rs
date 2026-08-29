@@ -1,14 +1,16 @@
-use crate::core::process::ProcessItem;
-use crate::core::{ContainerRollup, ContainerSummary, DeviceState, IsolationKind};
 use gpui::AppContext;
 use taskmanager_application::{
-    CapabilityId, ContainerRollupEvent, CorrelatedEvent, EventSequence, PlatformEventBatch,
-    PlatformEventContext, ProcessEvent, ProviderId, RequestId, ScalarObservation,
+    ContainerRollupEvent, CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ProcessEvent,
 };
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::{ContainerRollup, ContainerSummary, DeviceState, IsolationKind};
+use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
 use super::RootView;
-use crate::gpui_app::root::ProcessTerminationAction;
-use crate::gpui_app::theme::Theme;
+use taskmanager_application::ProcessTerminationAction;
+use taskmanager_theme::Theme;
 
 fn process(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
     taskmanager_test_support::ProcessItemFixtureBuilder::new()
@@ -16,7 +18,7 @@ fn process(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
         .parent_pid(Some(1))
         .name(name.into())
         .cmdline(format!("{name} --flag"))
-        .scalar_observations(crate::core::process::ProcessScalarObservations {
+        .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
             start_token: ScalarObservation::available(u64::from(pid) + 10_000, 1_000),
             ..Default::default()
         })
@@ -26,8 +28,8 @@ fn process(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
         .current_disk_write_bytes_per_sec(0)
         .status("S".into())
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("root"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("root"),
                 None,
                 1,
             ),

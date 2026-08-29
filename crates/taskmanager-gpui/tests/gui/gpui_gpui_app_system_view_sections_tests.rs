@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::metrics::SystemSnapshot;
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 fn hardware() -> HardwareInfo {
     HardwareInfo {
@@ -60,7 +60,7 @@ fn device_section_surfaces_session_facts_only_when_present() {
 #[test]
 fn device_section_surfaces_edid_display_facts_as_one_compact_row() {
     let rich = HardwareInfo {
-        displays: vec![crate::core::hardware::DisplayInfo {
+        displays: vec![taskmanager_core::core::hardware::DisplayInfo {
             connector: "DP-1".into(),
             manufacturer: Some("DEL".into()),
             model: Some("TaskPanel".into()),
@@ -112,11 +112,11 @@ fn device_section_kernel_facts_stay_conditional() {
 /// non-zero class, and the instruction set becomes chips.
 #[test]
 fn cpu_section_breaks_down_hybrid_topology_and_feature_chips() {
-    use crate::core::hardware::CoreBreakdown;
+    use taskmanager_core::core::hardware::CoreBreakdown;
     let mut hw = hardware();
     hw.instruction_features = vec![
-        crate::core::CpuInstructionFeature::AesNi,
-        crate::core::CpuInstructionFeature::Avx2,
+        taskmanager_core::core::CpuInstructionFeature::AesNi,
+        taskmanager_core::core::CpuInstructionFeature::Avx2,
     ];
     let homogeneous = cpu_section(&hw, &SystemSnapshot::default());
     let p_label = i18n::t("cpu.performance_cores").to_string();
@@ -183,7 +183,7 @@ fn memory_section_uses_static_capacity_and_conditional_rows() {
 /// driver fields change.
 #[test]
 fn graphics_section_omits_live_gpu_facts() {
-    use crate::core::metrics::GpuMetrics;
+    use taskmanager_core::core::metrics::GpuMetrics;
     let mut gpu = GpuMetrics::new("", "Example Arc");
     let bare = graphics_section(
         &SystemSnapshot {
@@ -194,9 +194,9 @@ fn graphics_section_omits_live_gpu_facts() {
     );
     assert_eq!(bare.rows[0].1, "Example Arc");
 
-    gpu.apply_scalar_observations(crate::core::metrics::GpuScalarObservations {
-        utilization_pct: crate::core::metrics::ScalarObservation::available(37.5, 1),
-        temperature_c: crate::core::metrics::ScalarObservation::available(61.0, 1),
+    gpu.apply_scalar_observations(taskmanager_core::core::metrics::GpuScalarObservations {
+        utilization_pct: taskmanager_core::core::metrics::ScalarObservation::available(37.5, 1),
+        temperature_c: taskmanager_core::core::metrics::ScalarObservation::available(61.0, 1),
         ..Default::default()
     });
     gpu.driver = Some("xe".into());
@@ -213,8 +213,8 @@ fn graphics_section_omits_live_gpu_facts() {
 #[test]
 fn mc04_npu_current_case_graphics_section_projects_complete_current_npu_facts_without_fabricating_gaps()
  {
-    use crate::core::metrics::ScalarObservation;
-    use crate::core::{
+    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskmanager_core::core::{
         DeviceId, FailureKind, NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot,
         NpuMemoryReport,
     };

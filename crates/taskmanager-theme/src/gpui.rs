@@ -18,6 +18,7 @@ use gpui::{Animation, WindowBackgroundAppearance, ease_in_out, px, rems};
 
 use crate::color::{Color, FontSize, Length, Ratio, Weight};
 use crate::fonts::FontAvailability;
+use crate::platform::{WeightCompensationAxis, effective_weight};
 use crate::theme::{EdgeTiling, Material, Theme, WindowChromeState};
 use crate::tokens::{DURATION_FAST, DURATION_MEDIUM, MotionPolicy};
 
@@ -90,23 +91,10 @@ impl From<Ratio> for DefiniteLength {
 
 impl From<Weight> for FontWeight {
     fn from(weight: Weight) -> FontWeight {
-        #[cfg(target_os = "windows")]
-        {
-            // Windows DirectWrite lacks Linux FreeType's automatic stem darkening on dark
-            // surfaces, and fractional variable-font weights (e.g. 450.0) without explicit
-            // axis interpolation snap towards 400.0 (Regular). Compensate fractional body
-            // weight to 500.0 (Medium) so visual density matches Linux.
-            let val = if (weight.0 - 450.0).abs() < 1.0 {
-                500.0
-            } else {
-                weight.0
-            };
-            FontWeight(val)
-        }
-        #[cfg(not(target_os = "windows"))]
-        {
-            FontWeight(weight.0)
-        }
+        // Platform compensation is decided in `platform` and shared with the
+        // iced binding (CORE-07); this impl only projects the decision onto
+        // gpui's weight type.
+        FontWeight(effective_weight(weight, WeightCompensationAxis::target()).0)
     }
 }
 

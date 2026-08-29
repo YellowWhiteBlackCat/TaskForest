@@ -5,19 +5,19 @@ use gpui::InteractiveElement;
 use gpui::{Div, ParentElement, Styled, div, px, relative};
 use taskmanager_ui_contract::IconId;
 
-use crate::core::device_state::DeviceStatus;
-use crate::core::metrics::DiskPartition;
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{DisplayUnits, UnitKind};
-use crate::gpui_app::icons;
-use crate::gpui_app::perf_views::device_status_i18n_key;
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::DiskPartition;
+use taskmanager_shell::presentation::device_status_i18n_key;
+use taskmanager_theme::Theme;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui::primitives::tooltip::{Tooltip, TooltipHost};
 
 mod stats;
 use stats::{PartitionUsage, partition_usage};
+use taskmanager_theme::tokens;
 
 pub(super) fn partition_panel(
     theme: &Theme,
@@ -37,7 +37,7 @@ pub(super) fn partition_panel(
                 .text_size(tokens::FONT_13)
                 .font_weight(tokens::FONT_WEIGHT_BOLD.into())
                 .text_color(theme.fg)
-                .child(icons::icon(IconId::Disk).size(px(14.0)))
+                .child(taskmanager_icons::icon(IconId::Disk).size(px(14.0)))
                 .child(i18n::t("disk.partitions")),
         )
         .render()

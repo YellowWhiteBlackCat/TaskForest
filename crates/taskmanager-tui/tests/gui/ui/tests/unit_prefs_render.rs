@@ -4,7 +4,7 @@
 //! rates honor units, fixed sizes do not).
 
 use super::frame_text;
-use taskmanager_application::{
+use taskmanager_core::core::metrics::{
     MemoryCompositionObservations, MemoryOptionalObservations, MemoryScalarObservations,
     OptionalObservation, ScalarObservation,
 };

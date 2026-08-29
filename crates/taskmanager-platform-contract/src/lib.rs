@@ -4,7 +4,7 @@
 //! implementation. It defines runtime capabilities, request correlation,
 //! provider failures, composite snapshots, and non-blocking request/event ports.
 //! Stable identity, completed-operation failure, and source-truth primitives are
-//! owned by `taskmanager-core` and re-exported here for port consumers.
+//! owned by `taskmanager-core`; port consumers import them from that owner.
 
 #![forbid(unsafe_code)]
 
@@ -38,8 +38,5 @@ pub use scheduler::{
 };
 pub use source::{
     CompositeSourceSnapshot, DeviceDiscovery, DeviceSourceSnapshot, PartialSourceSnapshot,
-};
-pub use taskmanager_core::{
-    DeviceGeneration, DeviceId, FailureKind, ProviderId, SourceOutcome, SourceStatus,
 };
 pub use tray::TrayController;

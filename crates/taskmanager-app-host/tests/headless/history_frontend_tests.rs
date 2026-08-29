@@ -50,7 +50,7 @@ fn fixture_host(
         config_path,
         history_root,
         local_time_cache: std::sync::Arc::new(crate::StartupLocalTimeCache::capture(
-            taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+            taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
         )),
         config_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
         history_replay_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),

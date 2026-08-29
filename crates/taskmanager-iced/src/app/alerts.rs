@@ -1,7 +1,7 @@
 //! Frontend-local Alerts-page state and messages (the Iced alerts UI face).
 //!
 //! The shared alert domain (rule set, evaluation, delivery gate) lives in the
-//! shell's [`taskmanager_application::alerts::AlertCenter`] — this module owns
+//! shell's [`taskmanager_core::core::alerts::AlertCenter`] — this module owns
 //! only the Iced-side view state: the frontend-local typed route (the alerts
 //! page is an Iced-local route outside the shared `AppPage` set, mirroring how
 //! GPUI keeps its Containers page renderer-specific). The complete managed
@@ -148,9 +148,9 @@ impl IcedApp {
 // Pure data-layer fact folds live here (ARCH.md §8.1), separating observation
 // reads from the Iced widget tree in `ui/alerts.rs`.
 
-use taskmanager_application::SystemSnapshot;
-use taskmanager_application::alerts::{Alert, AlertMetric, AlertRule, AlertSeverity};
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertRule, AlertSeverity};
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 /// One rendered rule row (pure seam the headless tests assert on).
 #[derive(Clone, Debug, PartialEq)]

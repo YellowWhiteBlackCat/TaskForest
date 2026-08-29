@@ -4,10 +4,10 @@
 
 use super::*;
 
-use crate::core::{
+use std::collections::BTreeMap;
+use taskmanager_core::core::{
     DeviceLifecycle, DevicePresence, DiskScalarObservations, StorageTelemetryObservation,
 };
-use std::collections::BTreeMap;
 
 /// The Disk page's active-time card consumes this disk's OWN generation-scoped
 /// activity ring: with accepted observations the page paints the secondary

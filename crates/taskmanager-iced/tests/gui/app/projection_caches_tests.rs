@@ -60,13 +60,13 @@ fn dual_device_series_is_reused_per_epoch_and_never_crosses_keys() {
     let generation = disk.device_generation.get();
 
     let loads = std::cell::Cell::new(0_u32);
-    let load = |_: &LiveGraphHistory| {
+    let load = |_: &taskmanager_shell::ShellApp| {
         loads.set(loads.get() + 1);
         (vec![1.0, 2.0], vec![3.0, 4.0])
     };
 
     let first = app.projection_caches.dual_device_series(
-        &app.shell.history,
+        &app.shell,
         DualDeviceSeriesFamily::DiskReadWrite,
         &disk_id,
         generation,
@@ -74,7 +74,7 @@ fn dual_device_series_is_reused_per_epoch_and_never_crosses_keys() {
     );
     assert_eq!(loads.get(), 1);
     let second = app.projection_caches.dual_device_series(
-        &app.shell.history,
+        &app.shell,
         DualDeviceSeriesFamily::DiskReadWrite,
         &disk_id,
         generation,
@@ -91,7 +91,7 @@ fn dual_device_series_is_reused_per_epoch_and_never_crosses_keys() {
     // A different family for the same device is a different key: it reloads
     // (the NIC pair never borrows the disk pair's entry).
     let _ = app.projection_caches.dual_device_series(
-        &app.shell.history,
+        &app.shell,
         DualDeviceSeriesFamily::NetworkRxTx,
         &disk_id,
         generation,
@@ -102,7 +102,7 @@ fn dual_device_series_is_reused_per_epoch_and_never_crosses_keys() {
     // A real accepted write moves the history epoch: the disk pair reloads.
     taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &snapshot, None, None);
     let after_write = app.projection_caches.dual_device_series(
-        &app.shell.history,
+        &app.shell,
         DualDeviceSeriesFamily::DiskReadWrite,
         &disk_id,
         generation,
@@ -118,7 +118,7 @@ fn dual_device_series_is_reused_per_epoch_and_never_crosses_keys() {
     // A visible-capacity change also moves the epoch (the read tail changes).
     app.shell.history.set_capacity(32);
     let _ = app.projection_caches.dual_device_series(
-        &app.shell.history,
+        &app.shell,
         DualDeviceSeriesFamily::DiskReadWrite,
         &disk_id,
         generation,
@@ -130,7 +130,7 @@ fn dual_device_series_is_reused_per_epoch_and_never_crosses_keys() {
     // epoch: the previous instance's cached pair must not survive a
     // row/ring generation flip.
     let _ = app.projection_caches.dual_device_series(
-        &app.shell.history,
+        &app.shell,
         DualDeviceSeriesFamily::DiskReadWrite,
         &disk_id,
         generation + 1,

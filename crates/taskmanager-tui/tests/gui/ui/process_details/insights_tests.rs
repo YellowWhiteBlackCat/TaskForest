@@ -3,7 +3,8 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{DeviceState, OpenFileKind, ThreadState};
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::process_telemetry::{OpenFileKind, ThreadState};
 
 /// Pin English and serialize against the language-flipping i18n test, so
 /// the chrome assertions below stay deterministic.

@@ -32,7 +32,7 @@ pub(super) fn apply_process_events(
             }
             ProcessEvent::NetworkCaptureEscalated => {
                 if correlated.capability
-                    == taskmanager_application::CapabilityId::PROCESS_NETWORK_ESCALATION
+                    == taskmanager_platform_contract::CapabilityId::PROCESS_NETWORK_ESCALATION
                 {
                     fold.output
                         .network_capture_escalations

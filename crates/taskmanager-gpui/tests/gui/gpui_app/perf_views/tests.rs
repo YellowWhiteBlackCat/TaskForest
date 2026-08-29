@@ -10,21 +10,21 @@
 use gpui::{AppContext, TestAppContext, VisualTestContext, px, size};
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
-use crate::core::metrics::{
+use crate::gpui_app::root::{RootView, TopPage};
+use crate::gpui_app::sidebar::SelectedDevice;
+use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, DiskPartitionScalarObservations, GpuEngine, GpuEngineKind,
     GpuMetrics, GpuScalarObservations, MemoryCompositionObservations,
     MemoryCompressionObservations, MemoryMetrics, MemoryOptionalObservations,
     MemoryScalarObservations, OptionalObservation, ScalarObservation, ScalarObservationGroup,
     VirtualMemoryCommitObservations,
 };
-use crate::core::{
+use taskmanager_core::core::{
     BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceId, DeviceState,
     PowerSupplySnapshot, SensorCenterSnapshot, SensorDescriptor, SensorMagnitude,
     SensorMeasurementObservation, SensorReading, SensorScale,
 };
-use crate::gpui_app::root::{RootView, TopPage};
-use crate::gpui_app::sidebar::SelectedDevice;
-use crate::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 #[path = "tests/cpu.rs"]
 mod cpu;
@@ -974,7 +974,7 @@ async fn mc04_gpu_layout_case_gpu_page_adapts_complete_engine_inventory_to_avail
         );
     }
     assert_ne!(
-        crate::i18n::t("gpu.vram_total"),
+        taskmanager_application::i18n::t("gpu.vram_total"),
         "gpu.vram_total",
         "the total row must use an existing localized product key"
     );

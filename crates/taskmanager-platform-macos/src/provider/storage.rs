@@ -39,14 +39,13 @@ use std::time::Duration;
 use taskmanager_application::{
     DirectoryUsageRequest, SmartControlRequest, SmartObservationRequest, StorageHealthRequest,
 };
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     DeviceState, DeviceStatus, FailureKind, FilesystemHealth, FilesystemHealthSnapshot,
     FilesystemHealthStatus, ProviderId, SmartSelfTestFailure, SmartSelfTestIntent,
     SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport, StorageDeviceTarget,
 };
-use taskmanager_platform_contract::{
-    CompositeSourceSnapshot, ProviderFailure, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     DirectoryUsageProvider, FilesystemHealthProvider, SmartSelfTestControlProvider,
     SmartSelfTestObservationProvider,

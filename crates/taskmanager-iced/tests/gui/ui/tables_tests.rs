@@ -1,7 +1,7 @@
 use super::super::components::banner_title_key;
 use super::super::tests::filtered_services;
 use super::*;
-use taskmanager_application::SourceStatus;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 /// Unsorted/unfiltered rows carry their provider-order position as
 /// `source_index` (the identity the action messages resolve).
@@ -99,9 +99,9 @@ fn services_name_highlight_follows_the_page_local_query_not_the_shared_one() {
 /// policy, and healthy-only input renders no banner at all.
 #[test]
 fn page_top_banner_agrees_with_the_neutral_merge_for_every_list_page() {
-    use taskmanager_application::{
-        FailureKind, ProviderId, SourceNotice, SourceOutcome, SourceStateKind, merge_source_lines,
-    };
+    use taskmanager_application::{SourceNotice, SourceStateKind, merge_source_lines};
+    use taskmanager_core::core::failure::FailureKind;
+    use taskmanager_core::core::identity::ProviderId;
 
     fn page_source(provider: &'static str, outcome: SourceOutcome, rows: usize) -> SourceStatus {
         SourceStatus {

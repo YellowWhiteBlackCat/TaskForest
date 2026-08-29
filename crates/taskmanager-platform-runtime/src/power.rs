@@ -3,14 +3,12 @@
 use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
-use taskmanager_application::{
-    CapabilityId, DeviceSourceSnapshot, PlatformEvent, PowerSupplyEvent, PowerSupplyRequest,
-    ProviderFailure,
-};
+use taskmanager_application::{PlatformEvent, PowerSupplyEvent, PowerSupplyRequest};
 use taskmanager_core::{
     DEFAULT_DEVICE_ABSENCE_RETENTION_MS, DeviceRefreshOutcome, PowerSupplyLifecycleTracker,
     PowerSupplySnapshot,
 };
+use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, ProviderFailure};
 
 use crate::{
     Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_observation_lane,

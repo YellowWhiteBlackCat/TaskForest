@@ -1,20 +1,15 @@
-//! Skin shim over `taskmanager-theme`: exposes the owned palette/token/`Theme`
-//! types and adapts native appearance facts via [`detect`]. The gc-global bridges
-//! were removed in P6, so this shim is the sole token source (no gpui-component).
-
-// This module is the frontend's intentional theme aggregate; the neutral crate
-// remains the token authority and this shim keeps one stable import path.
-pub use taskmanager_theme::*;
-
-// The gpui bindings (ADR-026) — re-exported here so app code keeps one token
-// source: `appear`/`fade_in` animation builders, the window-surface appearance
-// decision, the live window-chrome snapshot and the font-availability probe.
-pub use taskmanager_theme::gpui::{
-    appear, background_appearance, detect_font_availability, fade_in, window_chrome_state,
-};
+//! Appearance adaptation over `taskmanager-theme`: maps native appearance
+//! facts onto the owned palette/token types via [`detect`] and builds the
+//! CJK-safe font fallbacks. The gc-global bridges were removed in P6; the
+//! neutral crate remains the token authority and is imported from its owner
+//! paths directly (no aggregate facade).
 
 use ::gpui::{Font, FontFallbacks, font};
-use taskmanager_application::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskmanager_theme::{
+    FONT_MISANS_VF, FONT_ROBOTO_MONO, HighContrast, LightDark, NativeAppearance, ResolvedFonts,
+    Skin, Theme,
+};
 
 /// Build the UI font with the product CJK face as an explicit glyph fallback.
 /// The primary family may be bundled, a verified system family, or a user

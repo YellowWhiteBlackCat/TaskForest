@@ -29,15 +29,16 @@ use gpui::{
     Stateful, StatefulInteractiveElement, Styled, Window, div, px,
 };
 
-use crate::core::source::SourceStatus;
 use crate::gpui_app::elements;
-use crate::gpui_app::icons;
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
-use taskmanager_application::{RefreshRequest, SessionControlAction, SessionItem};
+use taskmanager_application::RefreshRequest;
+use taskmanager_application::i18n;
+use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
+
 use taskmanager_shell::InfoSortCol;
 use taskmanager_ui::data::table::{Table, TableColumn, TableDelegate, TableEvent, TableState};
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem, PopupMenuState};
@@ -415,7 +416,7 @@ pub fn render_users(
                 .gap(tokens::SPACE_6)
                 .text_size(tokens::FONT_12)
                 .text_color(theme.fg_dim)
-                .child(icons::icon(IconId::Users).size(px(14.0)))
+                .child(taskmanager_icons::icon(IconId::Users).size(px(14.0)))
                 .child(format!("{} {}", count, i18n::t("users.sessions"))),
         );
     let body = if rows.is_empty() {

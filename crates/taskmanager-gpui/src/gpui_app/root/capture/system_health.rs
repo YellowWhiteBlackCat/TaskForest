@@ -1,12 +1,12 @@
 //! Typed capture preparation for the System > Health surface.
 
-use crate::core::{
-    DeviceGeneration, FilesystemHealthStatus, SensorQuantity, SmartSelfTestKind,
-    SmartSelfTestObservation, SmartSelfTestReport, StorageDeviceKey,
-};
 use crate::gpui_app::dashboard::{DashboardState, SystemSection};
 use crate::gpui_app::root::TopPage;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
+use taskmanager_core::core::{
+    DeviceGeneration, FilesystemHealthStatus, SensorQuantity, SmartSelfTestKind,
+    SmartSelfTestObservation, SmartSelfTestReport, StorageDeviceKey,
+};
 
 use super::{CaptureEvidence, CaptureScenario, SystemHealthCaptureOutcome, emit_marker};
 
@@ -18,9 +18,9 @@ impl CaptureEvidence {
         &mut self,
         page: &mut TopPage,
         dashboard: &mut DashboardState,
-        snapshot: &mut crate::core::metrics::SystemSnapshot,
-        filesystems: &mut crate::core::FilesystemHealthSnapshot,
-        sensors: &mut crate::core::SensorCenterSnapshot,
+        snapshot: &mut taskmanager_core::core::metrics::SystemSnapshot,
+        filesystems: &mut taskmanager_core::core::FilesystemHealthSnapshot,
+        sensors: &mut taskmanager_core::core::SensorCenterSnapshot,
     ) -> SystemHealthCaptureOutcome {
         if !self.enabled
             || !self.telemetry_ready

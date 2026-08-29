@@ -1,6 +1,6 @@
 use super::{binding_declaration, local_binding_rows};
-use crate::gpui_app::theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 use gpui::AppContext;
+use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 use taskmanager_ui_contract::{
     Binding, CoverageStatus, FrontendShape, coverage_report, drift_findings,
 };

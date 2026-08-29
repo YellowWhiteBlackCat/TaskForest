@@ -94,7 +94,7 @@ pub(crate) fn switch<'a>(
         control.on_press(press.clone()).into(),
         press,
         focus_target,
-        crate::theme::color(palette.accent),
+        taskmanager_theme::iced::color(palette.accent),
         SWITCH_TRACK_HEIGHT / 2.0,
         false,
     )
@@ -108,12 +108,14 @@ fn switch_track_fill(theme_snapshot: &Theme, on: bool, status: button::Status) -
     let palette = theme_snapshot.palette();
     let base = if on { palette.accent } else { palette.border };
     match status {
-        button::Status::Disabled => crate::theme::color(mix(base, palette.window_backdrop, 0.5)),
-        button::Status::Hovered => crate::theme::color(mix(base, palette.hover, 0.28)),
-        button::Status::Pressed => {
-            crate::theme::color(mix(base, taskmanager_theme::Color::BLACK, 0.22))
+        button::Status::Disabled => {
+            taskmanager_theme::iced::color(mix(base, palette.window_backdrop, 0.5))
         }
-        _ => crate::theme::color(base),
+        button::Status::Hovered => taskmanager_theme::iced::color(mix(base, palette.hover, 0.28)),
+        button::Status::Pressed => {
+            taskmanager_theme::iced::color(mix(base, taskmanager_theme::Color::BLACK, 0.22))
+        }
+        _ => taskmanager_theme::iced::color(base),
     }
 }
 
@@ -124,7 +126,7 @@ fn switch_track_style(theme_snapshot: &Theme, on: bool, status: button::Status) 
             on,
             status,
         ))),
-        text_color: crate::theme::color(theme_snapshot.palette().fg),
+        text_color: taskmanager_theme::iced::color(theme_snapshot.palette().fg),
         border: Border {
             color: Color::TRANSPARENT,
             width: 0.0,
@@ -142,14 +144,14 @@ fn switch_knob_style(theme_snapshot: &Theme, disabled: bool) -> container::Style
         palette.surface
     };
     container::Style {
-        background: Some(Background::Color(crate::theme::color(fill))),
+        background: Some(Background::Color(taskmanager_theme::iced::color(fill))),
         border: Border {
             color: Color::TRANSPARENT,
             width: 0.0,
             radius: (SWITCH_KNOB_SIZE / 2.0).into(),
         },
         shadow: iced::Shadow {
-            color: crate::theme::color(palette.card_shadow),
+            color: taskmanager_theme::iced::color(palette.card_shadow),
             offset: Vector::new(0.0, 1.0),
             blur_radius: 3.0,
         },
@@ -193,7 +195,7 @@ pub(crate) fn slider<'a>(
             control,
             text(format_value(snapped))
                 .size(f32::from(tokens::FONT_12))
-                .font(crate::theme::mono_font(theme_snapshot))
+                .font(taskmanager_theme::iced::mono_font(theme_snapshot))
         ]
         .spacing(f32::from(tokens::SPACE_8))
         .align_y(iced::Alignment::Center)
@@ -231,8 +233,8 @@ fn slider_style(
     iced::widget::slider::Style {
         rail: iced::widget::slider::Rail {
             backgrounds: (
-                Background::Color(crate::theme::color(palette.accent)),
-                Background::Color(crate::theme::color(palette.border)),
+                Background::Color(taskmanager_theme::iced::color(palette.accent)),
+                Background::Color(taskmanager_theme::iced::color(palette.border)),
             ),
             width: f32::from(tokens::SPACE_4),
             border: Border::default(),
@@ -241,9 +243,9 @@ fn slider_style(
             shape: iced::widget::slider::HandleShape::Circle {
                 radius: f32::from(tokens::SPACE_8),
             },
-            background: Background::Color(crate::theme::color(palette.accent)),
+            background: Background::Color(taskmanager_theme::iced::color(palette.accent)),
             border_width: f32::from(tokens::SPACE_2),
-            border_color: crate::theme::color(palette.surface),
+            border_color: taskmanager_theme::iced::color(palette.surface),
         },
     }
 }
@@ -296,14 +298,16 @@ fn select_style(
 ) -> iced::widget::pick_list::Style {
     let palette = theme_snapshot.palette();
     let border_color = match status {
-        iced::widget::pick_list::Status::Opened { .. } => crate::theme::color(palette.accent),
-        _ => crate::theme::color(palette.border),
+        iced::widget::pick_list::Status::Opened { .. } => {
+            taskmanager_theme::iced::color(palette.accent)
+        }
+        _ => taskmanager_theme::iced::color(palette.border),
     };
     iced::widget::pick_list::Style {
-        text_color: crate::theme::color(palette.fg),
-        placeholder_color: crate::theme::color(palette.fg_muted),
-        handle_color: crate::theme::color(palette.fg_muted),
-        background: Background::Color(crate::theme::color(palette.surface)),
+        text_color: taskmanager_theme::iced::color(palette.fg),
+        placeholder_color: taskmanager_theme::iced::color(palette.fg_muted),
+        handle_color: taskmanager_theme::iced::color(palette.fg_muted),
+        background: Background::Color(taskmanager_theme::iced::color(palette.surface)),
         border: Border {
             color: border_color,
             width: 1.0,
@@ -315,10 +319,12 @@ fn select_style(
 fn select_placeholder_style(theme_snapshot: &Theme) -> container::Style {
     let palette = theme_snapshot.palette();
     container::Style {
-        background: Some(Background::Color(crate::theme::color(palette.surface))),
-        text_color: Some(crate::theme::color(palette.fg_muted)),
+        background: Some(Background::Color(taskmanager_theme::iced::color(
+            palette.surface,
+        ))),
+        text_color: Some(taskmanager_theme::iced::color(palette.fg_muted)),
         border: Border {
-            color: crate::theme::color(palette.border),
+            color: taskmanager_theme::iced::color(palette.border),
             width: 1.0,
             radius: f32::from(palette.control_radius).into(),
         },
@@ -382,20 +388,22 @@ fn search_style(
 ) -> iced::widget::text_input::Style {
     let palette = theme_snapshot.palette();
     let border_color = match status {
-        iced::widget::text_input::Status::Focused { .. } => crate::theme::color(palette.accent),
-        _ => crate::theme::color(palette.border),
+        iced::widget::text_input::Status::Focused { .. } => {
+            taskmanager_theme::iced::color(palette.accent)
+        }
+        _ => taskmanager_theme::iced::color(palette.border),
     };
     iced::widget::text_input::Style {
-        background: Background::Color(crate::theme::color(palette.surface)),
+        background: Background::Color(taskmanager_theme::iced::color(palette.surface)),
         border: Border {
             color: border_color,
             width: 1.0,
             radius: f32::from(palette.control_radius).into(),
         },
-        icon: crate::theme::color(palette.fg_muted),
-        placeholder: crate::theme::color(palette.fg_muted),
-        value: crate::theme::color(palette.fg),
-        selection: crate::theme::color(palette.selection),
+        icon: taskmanager_theme::iced::color(palette.fg_muted),
+        placeholder: taskmanager_theme::iced::color(palette.fg_muted),
+        value: taskmanager_theme::iced::color(palette.fg),
+        selection: taskmanager_theme::iced::color(palette.selection),
     }
 }
 
@@ -450,7 +458,7 @@ pub(crate) fn segmented<'a>(
         choices.to_vec(),
         active,
         focus_target,
-        crate::theme::color(palette.accent),
+        taskmanager_theme::iced::color(palette.accent),
         f32::from(palette.control_radius),
     )
     .into()
@@ -485,10 +493,12 @@ fn segmented_neighbor_index(
 fn segmented_track_style(theme_snapshot: &Theme) -> container::Style {
     let palette = theme_snapshot.palette();
     container::Style {
-        background: Some(Background::Color(crate::theme::color(palette.surface))),
-        text_color: Some(crate::theme::color(palette.fg)),
+        background: Some(Background::Color(taskmanager_theme::iced::color(
+            palette.surface,
+        ))),
+        text_color: Some(taskmanager_theme::iced::color(palette.fg)),
         border: Border {
-            color: crate::theme::color(palette.border),
+            color: taskmanager_theme::iced::color(palette.border),
             width: 1.0,
             radius: f32::from(palette.control_radius).into(),
         },
@@ -518,26 +528,26 @@ fn segment_style(
     };
     let (background, text_color) = if selected {
         (
-            Background::Color(crate::theme::color(palette.accent)),
-            crate::theme::color(theme_snapshot.accent_text),
+            Background::Color(taskmanager_theme::iced::color(palette.accent)),
+            taskmanager_theme::iced::color(theme_snapshot.accent_text),
         )
     } else {
         match status {
             button::Status::Hovered => (
-                Background::Color(crate::theme::color(palette.hover)),
-                crate::theme::color(palette.fg),
+                Background::Color(taskmanager_theme::iced::color(palette.hover)),
+                taskmanager_theme::iced::color(palette.fg),
             ),
             button::Status::Pressed => (
-                Background::Color(crate::theme::color(mix(
+                Background::Color(taskmanager_theme::iced::color(mix(
                     palette.hover,
                     palette.window_backdrop,
                     0.45,
                 ))),
-                crate::theme::color(palette.fg),
+                taskmanager_theme::iced::color(palette.fg),
             ),
             _ => (
                 Background::Color(Color::TRANSPARENT),
-                crate::theme::color(palette.fg),
+                taskmanager_theme::iced::color(palette.fg),
             ),
         }
     };

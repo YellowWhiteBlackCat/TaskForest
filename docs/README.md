@@ -21,7 +21,8 @@ crates/*/README.md         crate 职责、契约和验证方式
 
 以下内容不得进入公开 Git 历史：
 
-- 历史版本文档、变更流水和被替代方案；
+- 历史版本文档、变更流水和被替代方案；面向用户的版本化发布记录是唯一例外，写入
+  根目录 [CHANGELOG.md](../CHANGELOG.md)；
 - TODO、路线图、功能评分、差距账本和内部审计；
 - 用户名、邮箱、主机名、SSID、boot ID、私有地址和绝对用户路径；
 - 真实设备截图、系统快照、进程清单和安装回执；
@@ -39,11 +40,13 @@ crates/*/README.md         crate 职责、契约和验证方式
 | Rust、模块和测试标准 | [STANDARDS.md](STANDARDS.md)、[TEST_LAYOUT.md](TEST_LAYOUT.md) |
 | CI、测试和发布门禁 | [QUALITY_GATES.md](QUALITY_GATES.md) |
 | 发布物和打包格式 | [RELEASE.md](RELEASE.md) |
+| 贡献、安全上报和发布变更记录 | [../CONTRIBUTING.md](../CONTRIBUTING.md)、[../SECURITY.md](../SECURITY.md)、[../CHANGELOG.md](../CHANGELOG.md) |
 | 权限、helper 和 unsafe 边界 | [PERMISSION_MODEL.md](PERMISSION_MODEL.md) |
 | 平台采集策略 | [CROSSPLATFORM_STRATEGY.md](CROSSPLATFORM_STRATEGY.md)、[TELEMETRY_MANIFEST.md](TELEMETRY_MANIFEST.md) |
 | 可用性和失败语义 | [SCALAR_AVAILABILITY.md](SCALAR_AVAILABILITY.md) |
 | Wire 与领域事实边界 | [WIRE_DOMAIN_BOUNDARIES.md](WIRE_DOMAIN_BOUNDARIES.md) |
 | UI 组件 | [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md) |
+| Bevy 前端章程 | [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md) |
 | 产品和桌面身份 | [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md) |
 | 安装文件边界 | [SYSTEM_INSTALL_MANIFEST.md](SYSTEM_INSTALL_MANIFEST.md) |
 | 公开截图政策 | [screenshots/README.md](screenshots/README.md) |

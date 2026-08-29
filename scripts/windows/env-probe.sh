@@ -97,7 +97,7 @@ echo "== cargo subcommands =="
 if cargo nextest --version >/dev/null 2>&1; then
     printf 'OK    cargo-nextest (%s)\n' "$(cargo nextest --version 2>/dev/null | head -1)"
 else
-    printf 'MISS  cargo-nextest — bare `cargo test` is banned in this repository; install cargo-nextest\n'
+    printf 'MISS  cargo-nextest — install cargo-nextest before running the test gates\n'
     failures=$((failures + 1))
 fi
 if cargo deny --version >/dev/null 2>&1; then

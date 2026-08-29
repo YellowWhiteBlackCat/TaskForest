@@ -1,42 +1,40 @@
 //! Iced process-row context menu.
 //!
-//! This deliberately uses Iced's focusable row/button adapter rather than the
-//! GPUI popup implementation. The vocabulary and action semantics match the
-//! product surface; geometry, focus, and pointer routing remain Iced-local.
+//! The vocabulary and action semantics match the product surface; geometry,
+//! focus, and pointer routing remain Iced-local. Since ICED-007 the panel is
+//! a self-owned floating surface mounted by the [`crate::ui::components::
+//! Popover`] primitive on the row that opened it — it is never clipped by
+//! the table viewport and an outside press dismisses it without activating
+//! the surface underneath. A stale pid closes itself by rendering nothing;
+//! the action handler also revalidates before submitting control.
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
-use taskmanager_application::ProcessSignal;
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::process::ProcessSignal;
 use taskmanager_theme::{Theme, tokens};
 
 use crate::app::{FocusTarget, Message, ProcessMenuAction};
-use crate::{IcedApp, focus, theme};
+use crate::{focus, theme};
 
-/// Render the currently open process menu as a bounded action panel below the
-/// process table. A stale pid closes itself by rendering nothing; the action
-/// handler also revalidates before submitting control.
-pub(super) fn render<'a>(
-    app: &'a IcedApp,
-    theme_snapshot: &'a Theme,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let Some(pid) = app.process_menu_pid() else {
-        return column![].into();
-    };
-    let Some(process) = app.shell.visible_process_by_pid(pid) else {
-        return column![].into();
-    };
-
-    let process_name = if process.name.trim().is_empty() {
+/// The floating action panel for one open process menu. Self-owned (the
+/// panel must outlive the frame that built it inside the row's lazy body),
+/// so it takes the resolved theme and the process name by value.
+pub(super) fn panel(
+    theme_snapshot: Theme,
+    process_name: String,
+    pid: u32,
+) -> Element<'static, Message, iced::Theme, iced::Renderer> {
+    let process_name = if process_name.trim().is_empty() {
         t("proc.unknown_process").to_owned()
     } else {
-        process.name.clone()
+        process_name
     };
     let header = row![
         text(t("proc.actions")).size(f32::from(tokens::FONT_13)),
         text(format!("{process_name} · PID {pid}"))
             .size(f32::from(tokens::FONT_12))
-            .color(theme::muted_text_color(theme_snapshot)),
+            .color(theme::muted_text_color(&theme_snapshot)),
     ]
     .spacing(8)
     .align_y(iced::Alignment::Center);
@@ -160,17 +158,17 @@ pub(super) fn render<'a>(
             ProcessMenuAction::CopyCommandLine,
             false,
         ),
-        focus::dynamic_button(
+        focus::dynamic_button_owned(
             theme_snapshot,
             FocusTarget::ProcessMenuCopyTsv,
-            "TSV".to_string(),
+            "TSV".to_owned(),
             Message::CopyProcessTsv,
             false,
         ),
-        focus::dynamic_button(
+        focus::dynamic_button_owned(
             theme_snapshot,
             FocusTarget::ProcessMenuCopyJson,
-            "JSON".to_string(),
+            "JSON".to_owned(),
             Message::CopyProcessJson,
             false,
         ),
@@ -178,7 +176,7 @@ pub(super) fn render<'a>(
     .spacing(6)
     .align_y(iced::Alignment::Center);
 
-    let close = focus::dynamic_button(
+    let close = focus::dynamic_button_owned(
         theme_snapshot,
         FocusTarget::ProcessMenuClose,
         t("common.cancel").to_owned(),
@@ -191,19 +189,19 @@ pub(super) fn render<'a>(
             .spacing(6)
             .padding(8),
     )
-    .style(move |_| theme::panel_style(theme_snapshot))
-    .width(Length::Fill)
+    .style(move |_| theme::panel_style(&theme_snapshot))
+    .width(Length::Shrink)
     .into()
 }
 
-fn action_button<'a>(
-    theme_snapshot: &'a Theme,
+fn action_button(
+    theme_snapshot: Theme,
     target: FocusTarget,
     label: &'static str,
     action: ProcessMenuAction,
     destructive: bool,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    focus::dynamic_button(
+) -> Element<'static, Message, iced::Theme, iced::Renderer> {
+    focus::dynamic_button_owned(
         theme_snapshot,
         target,
         label.to_owned(),

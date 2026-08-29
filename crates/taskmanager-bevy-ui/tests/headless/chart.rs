@@ -41,3 +41,41 @@ fn constant_and_all_unavailable_windows_stay_honest_and_bounded() {
 fn zero_budget_does_not_accidentally_render_a_sample() {
     assert!(line_segments(&[1.0], 10.0, 10.0, 0).is_empty());
 }
+
+// ---- polyline render adapter: segment geometry is the drawn truth --------
+
+#[test]
+fn segment_layout_aims_each_rectangle_from_start_to_end() {
+    // A 45° down-right segment: the rotated 2px rectangle's center sits on
+    // the midpoint, its length is the endpoint distance, and its clockwise
+    // rotation is +45° (screen y grows downward).
+    let diagonal = segment_layout(ChartSegment {
+        start: ChartVertex { x: 0.0, y: 0.0 },
+        end: ChartVertex { x: 40.0, y: 40.0 },
+    });
+    assert!((diagonal.length - 40.0 * std::f32::consts::SQRT_2).abs() < 1e-4);
+    assert!((diagonal.rotation - std::f32::consts::FRAC_PI_4).abs() < 1e-4);
+    let center = (diagonal.left + diagonal.length / 2.0, diagonal.top + 1.0);
+    assert!((center.0 - 20.0).abs() < 1e-4 && (center.1 - 20.0).abs() < 1e-4);
+
+    // A horizontal segment has zero rotation; an upward segment (a rising
+    // sample, screen y shrinking) rotates counter-clockwise (negative).
+    let flat = segment_layout(ChartSegment {
+        start: ChartVertex { x: 5.0, y: 9.0 },
+        end: ChartVertex { x: 25.0, y: 9.0 },
+    });
+    assert!(flat.rotation.abs() < 1e-6);
+    let rising = segment_layout(ChartSegment {
+        start: ChartVertex { x: 0.0, y: 30.0 },
+        end: ChartVertex { x: 10.0, y: 10.0 },
+    });
+    assert!(rising.rotation < 0.0, "rising values rotate upward");
+
+    // Two coincident observations still draw a 1px mark: a real sample pair
+    // is never rendered as nothing.
+    let degenerate = segment_layout(ChartSegment {
+        start: ChartVertex { x: 7.0, y: 7.0 },
+        end: ChartVertex { x: 7.0, y: 7.0 },
+    });
+    assert_eq!(degenerate.length, 1.0);
+}

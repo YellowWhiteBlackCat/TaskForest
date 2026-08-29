@@ -10,14 +10,16 @@ use super::super::tables::ListState;
 use super::super::*;
 
 fn with_battery_scalars(
-    mut battery: taskmanager_application::BatteryInfo,
+    mut battery: taskmanager_core::core::power::BatteryInfo,
     observed_at_ms: u64,
     capacity_pct: Option<u8>,
     voltage_uv: Option<u64>,
     power_w: Option<f32>,
     cycle_count: Option<u32>,
-) -> taskmanager_application::BatteryInfo {
-    use taskmanager_application::{BatteryScalarObservations, ScalarObservation};
+) -> taskmanager_core::core::power::BatteryInfo {
+    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskmanager_core::core::power::BatteryScalarObservations;
+
     battery.apply_scalar_observations(BatteryScalarObservations {
         capacity_pct: capacity_pct.map_or_else(ScalarObservation::default, |value| {
             ScalarObservation::available(value, observed_at_ms)
@@ -38,7 +40,8 @@ fn with_battery_scalars(
 
 #[test]
 fn battery_section_state_distinguishes_loading_empty_and_ready() {
-    use taskmanager_application::{BatteryInfo, DeviceState, PowerSupplySnapshot};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
 
     // No power-supply snapshot observed yet → Loading (the collecting state).
     assert_eq!(battery_section_state(None), ListState::Loading);
@@ -74,7 +77,9 @@ fn battery_section_state_distinguishes_loading_empty_and_ready() {
 #[test]
 fn battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_honest() {
     use taskmanager_application::i18n::{Language, set_language};
-    use taskmanager_application::{BatteryInfo, DeviceState};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::power::BatteryInfo;
+
     set_language(Language::En);
 
     let mut battery = BatteryInfo::new("power-supply:BAT0", DeviceState::healthy(100));
@@ -138,7 +143,8 @@ fn battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_hones
 
 #[test]
 fn battery_panel_renders_honest_states_and_routes_through_the_selector() {
-    use taskmanager_application::{BatteryInfo, DeviceState, PowerSupplySnapshot};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
 
     // The demo fixture carries no power-supply snapshot, so the default frontend
     // reaches the Loading state until the first refresh lands; selecting Battery

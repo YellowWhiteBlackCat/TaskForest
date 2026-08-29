@@ -5,9 +5,9 @@
 
 use taskmanager_shell::memory::MemSegmentKind;
 
-use crate::core::metrics::MemoryMetrics;
 use crate::gpui_app::formatting::{self, DisplayUnits, UnitKind};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::MemoryMetrics;
 
 /// One colorless composition segment with its rendered width share already
 /// folded (bytes / current total).

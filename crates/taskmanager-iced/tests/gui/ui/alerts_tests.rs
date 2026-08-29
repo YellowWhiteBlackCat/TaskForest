@@ -1,7 +1,7 @@
 use super::*;
 use crate::app::Message;
-use taskmanager_application::alerts::{AlertMetric, AlertRule};
 use taskmanager_application::i18n::{Language, set_language};
+use taskmanager_core::core::alerts::{AlertMetric, AlertRule};
 
 fn pin_english() {
     set_language(Language::En);

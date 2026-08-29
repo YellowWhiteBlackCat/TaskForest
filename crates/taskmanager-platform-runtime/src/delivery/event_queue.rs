@@ -4,8 +4,8 @@ use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use taskmanager_application::EventSequence;
-use taskmanager_application::{EventEnvelope, PlatformEvent};
+use taskmanager_application::PlatformEvent;
+use taskmanager_platform_contract::{EventEnvelope, EventSequence};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum EventClass {

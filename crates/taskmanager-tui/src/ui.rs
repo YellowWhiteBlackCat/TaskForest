@@ -10,6 +10,7 @@ mod column_menu;
 mod confirmations;
 mod containers;
 mod footer;
+mod frame_plan;
 mod header;
 mod health;
 mod health_data;
@@ -37,7 +38,15 @@ pub(crate) mod settings;
 mod sparkline;
 pub(crate) mod startup_menu;
 pub(crate) mod table_hit;
+mod text;
 mod units;
+
+#[cfg(test)]
+pub(crate) use frame_plan::planned_popup;
+pub(crate) use frame_plan::{
+    TablePanelProjection, TableWindow, TuiFocusPlan, TuiFramePlan, TuiHitTarget, TuiPageLayout,
+    table_window,
+};
 
 use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
@@ -46,41 +55,60 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{
     Block, Borders, Cell, HighlightSpacing, Paragraph, Row, Table, TableState, Wrap,
 };
-use taskmanager_application::{AppPage, i18n::t};
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::metrics::{GpuMetrics, NetworkAdapterType};
+use taskmanager_core::core::sensors::SensorQuantity;
+use taskmanager_core::core::units::format_quantity_with;
+use taskmanager_shell::presentation::trend;
+use taskmanager_shell::presentation::{gpu_display_identity, missing_value};
 use taskmanager_ui_contract::IconId;
 
 use crate::PerfDevice;
 use crate::TuiApp;
 use crate::TuiTheme;
-use crate::icon_glyph;
 
-use units::observed_percentage;
+use units::{memory_text_pref, observed_percentage};
 
 pub fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme) {
-    let area = frame.area();
+    let plan = TuiFramePlan::build(app, frame.area());
+    render_with_plan(frame, app, theme, &plan);
+}
+
+/// Render a frame from a caller-supplied immutable plan. The runtime uses this
+/// entry after building the plan that becomes the committed pointer/focus
+/// geometry; the public wrapper above keeps existing headless callers simple.
+pub(crate) fn render_with_plan(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    plan: &TuiFramePlan,
+) {
+    let area = plan.area;
+    debug_assert_eq!(frame.area(), area, "frame plan must match the painted area");
+    debug_assert_eq!(
+        plan.focus,
+        TuiFocusPlan::build(app, plan.input_scope),
+        "frame plan focus must match its input scope"
+    );
     frame.render_widget(Block::new().style(Style::new().bg(theme.bg)), area);
     if area.width < 54 || area.height < 16 {
         render_too_small(frame, theme, area);
+        sanitize_ascii_cells(frame, theme);
         return;
     }
 
-    let [header, body, footer] = Layout::vertical([
-        Constraint::Length(4),
-        Constraint::Min(8),
-        Constraint::Length(3),
-    ])
-    .areas(area);
-    header::render(frame, app, theme, header);
+    let chrome = plan.chrome;
+    header::render(frame, app, theme, chrome.header);
     let collecting = app.telemetry_frame_state().is_collecting();
     if collecting {
         // The shared shell has not committed a complete immutable frame yet.
         // Keep chrome stable, but do not let page-local Option fallbacks make
         // a partial platform batch look like a real first frame.
-        render_loading(frame, theme, body, t("common.telemetry_warming_up"));
+        render_loading(frame, theme, chrome.body, t("common.telemetry_warming_up"));
     } else {
-        render_body(frame, app, theme, body);
+        render_body(frame, app, theme, plan);
     }
-    footer::render(frame, app, theme, footer);
+    footer::render(frame, app, theme, chrome.footer);
 
     // Modal z-order: destructive confirmations first, then the TUI-local
     // overlays, then the shared informational overlays. Only one modal is
@@ -89,51 +117,75 @@ pub fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme) {
     // well; otherwise a modal could reveal the same partial state we hide
     // above.
     if !collecting {
-        render_overlays(frame, app, theme, area);
+        render_overlays(frame, app, theme, plan);
+    }
+    sanitize_ascii_cells(frame, theme);
+}
+
+/// Apply the terminal profile after every widget has painted.  Ratatui's
+/// border symbols and shared missing-value text do not all pass through the
+/// semantic icon helper, so the final cell pass is the only complete guard for
+/// an ASCII-only terminal. Each replacement is one cell and therefore cannot
+/// invalidate the already-committed frame geometry.
+fn sanitize_ascii_cells(frame: &mut Frame<'_>, theme: TuiTheme) {
+    if theme.terminal.glyphs != crate::TuiGlyphMode::Ascii {
+        return;
+    }
+    for cell in &mut frame.buffer_mut().content {
+        let symbol = cell.symbol();
+        if !symbol.is_ascii() {
+            cell.set_symbol(crate::TuiTerminalProfile::ascii_cell_symbol(symbol));
+        }
     }
 }
 
-fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    match app.input_scope() {
+fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiFramePlan) {
+    let Some(overlay) = plan.overlay() else {
+        return;
+    };
+    debug_assert_eq!(overlay.scope, plan.input_scope);
+    let input_scope = overlay.scope;
+    let popup = overlay.popup;
+    match input_scope {
         crate::TuiInputScope::SharedSurface(
             taskmanager_application::SurfaceKind::Confirmation(_),
         ) => match app.shell.pending_confirmation() {
             Some(taskmanager_application::PendingConfirmation::EndTask(target)) => {
-                confirmations::render_end_confirmation(
+                confirmations::render_end_confirmation_at(
                     frame,
                     app,
                     theme,
                     target.name.as_str(),
                     target.pid,
-                    area,
+                    popup,
                 );
             }
             Some(taskmanager_application::PendingConfirmation::ProcessTermination(intent)) => {
-                confirmations::render_end_confirmation(
+                confirmations::render_end_confirmation_at(
                     frame,
                     app,
                     theme,
                     intent.root.name.as_str(),
                     intent.root.pid,
-                    area,
+                    popup,
                 );
             }
             Some(taskmanager_application::PendingConfirmation::ProcessBatch(intent)) => {
-                confirmations::render_batch_confirmation(frame, theme, intent, area);
+                confirmations::render_batch_confirmation_at(frame, theme, intent, popup);
             }
             Some(taskmanager_application::PendingConfirmation::ServiceControl(pending)) => {
-                confirmations::render_service_control_confirmation(
-                    frame, app, theme, pending, area,
+                confirmations::render_service_control_confirmation_at(
+                    frame, app, theme, pending, popup,
                 );
             }
             Some(taskmanager_application::PendingConfirmation::StartupControl(pending)) => {
-                confirmations::render_startup_control_confirmation(frame, theme, pending, area);
+                confirmations::render_startup_control_confirmation_at(frame, theme, pending, popup);
             }
             Some(taskmanager_application::PendingConfirmation::SessionControl(pending)) => {
-                confirmations::render_session_control_confirmation(frame, theme, pending, area);
+                confirmations::render_session_control_confirmation_at(frame, theme, pending, popup);
             }
             Some(taskmanager_application::PendingConfirmation::SmartSelfTest(pending)) => {
-                confirmations::render_smart_self_test_confirmation(frame, theme, pending, area);
+                confirmations::render_smart_self_test_confirmation_at(frame, theme, pending, popup);
             }
             None => {}
         },
@@ -141,48 +193,56 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: R
             taskmanager_application::SurfaceKind::ProcessProperties,
         ) => {
             if let Some(target) = app.process_properties() {
-                process_properties::render_process_properties(frame, target, app, theme, area);
+                process_properties::render_process_properties_at(
+                    frame, target, app, theme, plan.focus, popup,
+                );
             }
         }
         crate::TuiInputScope::LocalSurface(_) => match app.local_surface() {
             Some(crate::TuiSurface::Settings) => {
-                settings::render_settings_overlay(frame, &app.settings_form, theme, area);
+                settings::render_settings_overlay_at(
+                    frame,
+                    &app.settings_form,
+                    theme,
+                    plan.focus,
+                    popup,
+                );
             }
             Some(crate::TuiSurface::About) => {
-                about::render_about_overlay(frame, app, theme, area);
+                about::render_about_overlay_at(frame, app, theme, popup);
             }
             Some(crate::TuiSurface::Health) => {
-                health::render_health_overlay(frame, app, theme, area);
+                health::render_health_overlay_at(frame, app, theme, popup);
             }
             Some(crate::TuiSurface::Containers) => {
-                containers::render_containers_overlay(frame, app, theme, area);
+                containers::render_containers_overlay_at(frame, app, theme, popup);
             }
             Some(crate::TuiSurface::ServiceMenu(menu)) => {
-                service_menu::render_service_menu(frame, menu, theme, area);
+                service_menu::render_service_menu_at(frame, menu, theme, plan.focus, popup);
             }
             Some(crate::TuiSurface::ProcessMenu(menu)) => {
-                process_menu::render_process_menu(frame, menu, theme, area);
+                process_menu::render_process_menu_at(frame, menu, theme, plan.focus, popup);
             }
             Some(crate::TuiSurface::BatchMenu(menu)) => {
-                batch_menu::render_batch_menu(frame, menu, theme, area);
+                batch_menu::render_batch_menu_at(frame, menu, theme, plan.focus, popup);
             }
             Some(crate::TuiSurface::SessionMenu(menu)) => {
-                session_menu::render_session_menu(frame, menu, theme, area);
+                session_menu::render_session_menu_at(frame, menu, theme, plan.focus, popup);
             }
             Some(crate::TuiSurface::StartupMenu(menu)) => {
-                startup_menu::render_startup_menu(frame, menu, theme, area);
+                startup_menu::render_startup_menu_at(frame, menu, theme, plan.focus, popup);
             }
             Some(crate::TuiSurface::ColumnMenu { .. }) => {
-                column_menu::render_column_menu(frame, app, theme, area);
+                column_menu::render_column_menu_at(frame, app, theme, plan.focus, popup);
             }
             Some(crate::TuiSurface::CommandPalette(_)) => {
-                help::render_command_palette(frame, app, theme, area);
+                help::render_command_palette_at(frame, app, theme, plan.focus, popup);
             }
             None => {}
         },
-        crate::TuiInputScope::Help => help::render_help_overlay(frame, app, theme, area),
+        crate::TuiInputScope::Help => help::render_help_overlay_at(frame, app, theme, popup),
         crate::TuiInputScope::Suggestions => {
-            alerts::render_suggestions_overlay(frame, app, theme, area);
+            alerts::render_suggestions_overlay_at(frame, app, theme, popup);
         }
         crate::TuiInputScope::ServiceLog
         | crate::TuiInputScope::Search
@@ -191,29 +251,38 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: R
     }
 }
 
-fn render_body(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    match app.page() {
-        AppPage::Performance => render_performance(frame, app, theme, area),
-        AppPage::Applications => render_processes(frame, app, theme, area),
-        AppPage::Services => pages::render_services(frame, app, theme, area),
-        AppPage::System => pages::render_system(frame, app, theme, area),
-        AppPage::Startup => pages::render_startup(frame, app, theme, area),
-        AppPage::Users => pages::render_users(frame, app, theme, area),
-        AppPage::AppHistory => app_history::render_app_history(frame, app, theme, area),
+fn render_body(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiFramePlan) {
+    match plan.page {
+        TuiPageLayout::Performance { .. } => render_performance(frame, app, theme, plan),
+        TuiPageLayout::Applications { process, table } => {
+            process_table::render_processes(frame, app, theme, process, table, plan.focus)
+        }
+        TuiPageLayout::Services { page, table } => {
+            pages::render_services(frame, app, theme, page, table)
+        }
+        TuiPageLayout::System { content } => pages::render_system(frame, app, theme, content),
+        TuiPageLayout::Startup { page, table } => {
+            pages::render_startup(frame, app, theme, page, table)
+        }
+        TuiPageLayout::Users { page, table } => pages::render_users(frame, app, theme, page, table),
+        TuiPageLayout::AppHistory { content } => {
+            app_history::render_app_history(frame, app, theme, content)
+        }
     }
 }
 
-fn render_performance(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+fn render_performance(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &TuiFramePlan) {
+    let TuiPageLayout::Performance { selector, content } = plan.page else {
+        return;
+    };
     let Some(snapshot) = app.projection().snapshot.as_ref() else {
-        render_loading(frame, theme, area, t("common.collecting_telemetry"));
+        render_loading(frame, theme, content, t("common.collecting_telemetry"));
         return;
     };
     // The compact resource selector row sits above the selected resource's
     // detail; the area below shows ONLY that resource, reusing the existing
     // per-resource renderers (gauges + history graph for Cpu/Memory, the
     // dedicated perf_gpu/perf_disks/perf_networks panels for the device views).
-    let [selector, content] =
-        Layout::vertical([Constraint::Length(3), Constraint::Min(1)]).areas(area);
     render_perf_selector(frame, app, theme, selector);
     match app.perf_device {
         PerfDevice::Cpu | PerfDevice::Memory => {
@@ -264,11 +333,54 @@ fn render_performance(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area
 /// highlighted like the page header. The shell router only binds digits with
 /// Alt (the Alt+1..6 page chords), so bare digits 1..6 are free for this
 /// selector and never collide with an existing chord.
+///
+/// Below the tab row (same reserved band, wide terminals only) the selector
+/// paints a live per-instance strip for the ACTIVE resource: one segment per
+/// device (disk / NIC / GPU / battery / fan channel; CPU and memory are
+/// singletons), each carrying the family icon, an inline history sparkline
+/// and the same typed caption fields the gpui device sidebar reads. The
+/// strip is presentation-only — the digit keys still select resource
+/// classes, and no selection semantics are added. When the tab row wraps
+/// (narrow tier) or the active class has no instances, the strip collapses
+/// honestly and the wrapped tab row keeps the band.
 fn render_perf_selector(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+    let spans = selector_tab_spans(app, theme);
+    let block = Block::new()
+        .borders(Borders::BOTTOM)
+        .border_style(Style::new().fg(theme.dim));
+    let inner = block.inner(area);
+    frame.render_widget(block, area);
+    let tab_width: usize = spans
+        .iter()
+        .map(|span| text::cell_width(span.content.as_ref()))
+        .sum();
+    let instances = perf_selector_instances(app, theme);
+    if inner.height < 2 || tab_width > usize::from(inner.width) || instances.is_empty() {
+        // Narrow tier (the tab row wraps onto the whole band) or a resource
+        // with no live instances: the tab row fills the band and the strip
+        // collapses. Byte-for-byte the historical wrapped render.
+        frame.render_widget(
+            Paragraph::new(Line::from(spans)).wrap(Wrap { trim: true }),
+            inner,
+        );
+        return;
+    }
+    let [tabs_area, strip_area] =
+        Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).areas(inner);
+    frame.render_widget(Paragraph::new(Line::from(spans)), tabs_area);
+    let strip = selector_strip_line(instances, usize::from(inner.width));
+    if !strip.is_empty() {
+        frame.render_widget(Paragraph::new(Line::from(strip)), strip_area);
+    }
+}
+
+/// The selector's resource-class tab row: the accent chip, one tab per
+/// resource with its digit shortcut, and the digit-range hint.
+fn selector_tab_spans(app: &TuiApp, theme: TuiTheme) -> Vec<Span<'static>> {
     let mut spans = vec![Span::styled(
         format!(" {} ", t("perf.resource")),
         Style::new()
-            .fg(Color::Black)
+            .fg(theme.color(Color::Black))
             .bg(theme.accent)
             .add_modifier(Modifier::BOLD),
     )];
@@ -279,7 +391,7 @@ fn render_perf_selector(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, ar
             text,
             if active {
                 Style::new()
-                    .fg(Color::White)
+                    .fg(theme.color(Color::White))
                     .bg(theme.highlight_bg)
                     .add_modifier(Modifier::BOLD)
             } else {
@@ -291,20 +403,423 @@ fn render_perf_selector(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, ar
         format!(" {}", t("perf.select_range")),
         Style::new().fg(theme.dim),
     ));
-    frame.render_widget(
-        Paragraph::new(Line::from(spans))
-            .block(
-                Block::new()
-                    .borders(Borders::BOTTOM)
-                    .border_style(Style::new().fg(theme.dim)),
-            )
-            .wrap(Wrap { trim: true }),
-        area,
-    );
+    spans
 }
 
-fn render_processes(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    process_table::render_processes(frame, app, theme, area);
+/// The gap painted between two live instance segments of the strip.
+const SELECTOR_SEGMENT_SEPARATOR: &str = "  │  ";
+
+/// The separator's cell width, kept in lockstep with the text above.
+const SELECTOR_SEGMENT_SEPARATOR_WIDTH: usize = 5;
+
+/// Heading width cap, so a long vendor string cannot starve the caption on
+/// the one strip line the reserved selector band offers.
+const SELECTOR_HEADING_MAX_CELLS: usize = 22;
+
+/// One live per-device instance segment of the selector strip, pre-measured
+/// so the strip can admit whole segments only and never paint past its band.
+struct SelectorInstance {
+    width: usize,
+    spans: Vec<Span<'static>>,
+}
+
+/// Build one strip segment: family icon, truncated heading, the device's own
+/// generation-scoped history sparkline, and the live caption.
+fn selector_instance(
+    icon: IconId,
+    heading: &str,
+    trend: &str,
+    caption: String,
+    theme: TuiTheme,
+) -> SelectorInstance {
+    let heading = text::truncate_cells(heading, SELECTOR_HEADING_MAX_CELLS);
+    let spans = vec![
+        Span::styled(
+            format!(" {} ", theme.glyph(icon)),
+            Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(heading, Style::new().fg(theme.color(Color::White))),
+        Span::raw(" "),
+        Span::styled(trend.to_owned(), Style::new().fg(theme.accent)),
+        Span::raw(" "),
+        Span::styled(caption, Style::new().fg(theme.dim)),
+    ];
+    let width = spans
+        .iter()
+        .map(|span| text::cell_width(span.content.as_ref()))
+        .sum();
+    SelectorInstance { width, spans }
+}
+
+/// Flatten whole instance segments onto one strip line: a segment is admitted
+/// only when it fits entirely, so a crowded class degrades by dropping its
+/// trailing instances (the resource detail below still lists every one)
+/// instead of painting a half-clipped value.
+fn selector_strip_line(instances: Vec<SelectorInstance>, width: usize) -> Vec<Span<'static>> {
+    let mut spans: Vec<Span<'static>> = Vec::new();
+    let mut used = 0usize;
+    for (index, instance) in instances.into_iter().enumerate() {
+        let separator = if index == 0 {
+            0
+        } else {
+            SELECTOR_SEGMENT_SEPARATOR_WIDTH
+        };
+        if used + separator + instance.width > width {
+            break;
+        }
+        if index > 0 {
+            spans.push(Span::styled(
+                SELECTOR_SEGMENT_SEPARATOR,
+                Style::new().fg(Color::DarkGray),
+            ));
+        }
+        used += separator + instance.width;
+        spans.extend(instance.spans);
+    }
+    spans
+}
+
+/// The live per-instance segments for the ACTIVE resource class, read from
+/// the same projection snapshots and the same generation-scoped
+/// `LiveGraphHistory` windows as the device detail below and the gpui device
+/// sidebar (`sidebar.rs` + `sidebar/captions.rs`).
+fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<SelectorInstance> {
+    let Some(snapshot) = app.projection().snapshot.as_ref() else {
+        return Vec::new();
+    };
+    let window = app.prefs.graph_points;
+    let glyphs = theme.terminal.glyphs;
+    match app.perf_device {
+        PerfDevice::Cpu => vec![cpu_selector_instance(app, theme, snapshot, glyphs, window)],
+        PerfDevice::Memory => {
+            vec![memory_selector_instance(
+                app, theme, snapshot, glyphs, window,
+            )]
+        }
+        PerfDevice::Disk => snapshot
+            .disks
+            .iter()
+            .filter(|_| app.prefs.show[2])
+            .map(|disk| {
+                let trend = sparkline::device_trend_in(
+                    glyphs,
+                    &app.history
+                        .disk_active_time_pct_for(&disk.device_id, disk.device_generation.get()),
+                    window,
+                );
+                let active = disk
+                    .current_active_time_pct()
+                    .map_or_else(missing_value, |value| format!("{:.0}%", value.round()));
+                let rate = match (
+                    disk.current_read_bytes_per_sec(),
+                    disk.current_write_bytes_per_sec(),
+                ) {
+                    (Some(read), Some(write)) => format_quantity_with(
+                        read.saturating_add(write),
+                        app.prefs.units[2],
+                        app.prefs.units[3],
+                        true,
+                    ),
+                    _ => missing_value(),
+                };
+                let heading = if disk.model.is_empty() {
+                    disk.name.trim_start_matches("/dev/").to_owned()
+                } else {
+                    disk.model.clone()
+                };
+                selector_instance(
+                    IconId::Disk,
+                    &heading,
+                    &trend,
+                    format!("{active} · {rate}"),
+                    theme,
+                )
+            })
+            .collect(),
+        PerfDevice::Network => snapshot
+            .networks
+            .iter()
+            .filter(|network| selector_network_visible(&app.prefs.show, network.adapter_type()))
+            .map(|network| {
+                let trend = sparkline::device_trend_in(
+                    glyphs,
+                    &app.history.network_bytes_per_sec_for(
+                        &network.device_id,
+                        network.device_generation.get(),
+                    ),
+                    window,
+                );
+                let rate = |bytes_per_sec: Option<u64>| {
+                    bytes_per_sec.map_or_else(missing_value, |value| {
+                        format_quantity_with(value, app.prefs.units[4], app.prefs.units[5], true)
+                    })
+                };
+                let caption = format!(
+                    "{} {} · {} {}",
+                    t("sidebar.send_label"),
+                    rate(network.current_tx_bytes_per_sec()),
+                    t("sidebar.recv_label"),
+                    rate(network.current_rx_bytes_per_sec()),
+                );
+                selector_instance(
+                    IconId::Network,
+                    &network.interface_name,
+                    &trend,
+                    caption,
+                    theme,
+                )
+            })
+            .collect(),
+        PerfDevice::Gpu => snapshot
+            .gpu
+            .iter()
+            .filter(|_| app.prefs.show[9])
+            .map(|gpu| {
+                let trend = sparkline::device_trend_in(
+                    glyphs,
+                    &app.history
+                        .gpu_usage_pct_for(&gpu.device_id, gpu.device_generation.get()),
+                    window,
+                );
+                let heading = gpu_display_identity(gpu)
+                    .headline
+                    .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE);
+                selector_instance(
+                    IconId::Gpu,
+                    heading,
+                    &trend,
+                    gpu_selector_caption(gpu, app.prefs.units[0], app.prefs.units[1]),
+                    theme,
+                )
+            })
+            .collect(),
+        PerfDevice::Battery => app
+            .projection()
+            .power_supplies
+            .as_ref()
+            .map(|power| power.batteries.iter().collect::<Vec<_>>())
+            .unwrap_or_default()
+            .into_iter()
+            .enumerate()
+            .map(|(index, battery)| {
+                let trend = sparkline::device_trend_in(
+                    glyphs,
+                    &app.history.battery_capacity_pct_for(&battery.id),
+                    window,
+                );
+                let heading = if !battery.model_name.is_empty() {
+                    battery.model_name.clone()
+                } else if !battery.display_name.is_empty() {
+                    battery.display_name.clone()
+                } else {
+                    format!("{} {index}", t("common.battery"))
+                };
+                let capacity = battery
+                    .current_capacity_pct()
+                    .map_or_else(missing_value, |value| format!("{value}%"));
+                let status = if battery.status.is_empty() {
+                    missing_value()
+                } else {
+                    battery.status.clone()
+                };
+                selector_instance(
+                    IconId::Health,
+                    &heading,
+                    &trend,
+                    format!("{capacity} · {status}"),
+                    theme,
+                )
+            })
+            .collect(),
+        PerfDevice::Fan => app
+            .projection()
+            .sensors
+            .as_ref()
+            .map(|sensors| sensors.readings.as_slice())
+            .unwrap_or(&[])
+            .iter()
+            .filter(|reading| reading.quantity() == &SensorQuantity::FanSpeed)
+            .enumerate()
+            .map(|(index, reading)| {
+                let trend = sparkline::device_trend_in(
+                    glyphs,
+                    &app.history.fan_rpm_for(reading.id()),
+                    window,
+                );
+                let rpm = reading
+                    .current_number()
+                    .map_or_else(missing_value, |value| format!("{value:.0} RPM"));
+                let label = reading.label();
+                let caption = if label.is_empty() {
+                    rpm
+                } else {
+                    format!("{label} · {rpm}")
+                };
+                selector_instance(
+                    IconId::Health,
+                    &format!("{} {}", t("common.fan"), index + 1),
+                    &trend,
+                    caption,
+                    theme,
+                )
+            })
+            .collect(),
+    }
+}
+
+/// The applied network-subcategory visibility (the same class map the
+/// network detail panel applies), so a hidden NIC class drops out of the
+/// strip too instead of ghosting back beside the filtered panel.
+fn selector_network_visible(show: &[bool; 10], adapter_type: NetworkAdapterType) -> bool {
+    match adapter_type {
+        NetworkAdapterType::Ethernet => show[4],
+        NetworkAdapterType::WiFi => show[5],
+        NetworkAdapterType::Vpn => show[6],
+        NetworkAdapterType::Virtual => show[7],
+        NetworkAdapterType::Unknown | NetworkAdapterType::Loopback | NetworkAdapterType::Other => {
+            show[8]
+        }
+    }
+}
+
+/// The CPU strip segment: brand plus utilization / clock / package
+/// temperature — the gpui `cpu_caption` fields on one line.
+fn cpu_selector_instance(
+    app: &TuiApp,
+    theme: TuiTheme,
+    snapshot: &taskmanager_core::core::metrics::SystemSnapshot,
+    glyphs: crate::TuiGlyphMode,
+    window: usize,
+) -> SelectorInstance {
+    let cpu = &snapshot.cpu;
+    let trend = sparkline::device_trend_in(glyphs, &trend::cpu_usage_percent(&app.history), window);
+    let mut caption = vec![
+        cpu.current_global_usage_pct()
+            .map_or_else(missing_value, |value| format!("{:.0}%", value.round())),
+    ];
+    if let Some(mhz) = cpu.current_frequency_mhz() {
+        caption.push(selector_clock_readout(mhz));
+    }
+    if let Some(temp) = cpu.current_temperature_c() {
+        caption.push(format!("{:.0} °C", temp.round()));
+    }
+    let brand = cpu
+        .brand
+        .as_deref()
+        .map(str::trim)
+        .filter(|brand| !brand.is_empty())
+        .map_or_else(missing_value, str::to_owned);
+    selector_instance(IconId::Cpu, &brand, &trend, caption.join(" · "), theme)
+}
+
+/// The memory strip segment: used / total plus the observed percentage — the
+/// gpui `mem_caption` fields.
+fn memory_selector_instance(
+    app: &TuiApp,
+    theme: TuiTheme,
+    snapshot: &taskmanager_core::core::metrics::SystemSnapshot,
+    glyphs: crate::TuiGlyphMode,
+    window: usize,
+) -> SelectorInstance {
+    let memory = &snapshot.memory;
+    let trend =
+        sparkline::device_trend_in(glyphs, &trend::memory_usage_percent(&app.history), window);
+    let readout = |value: u64| memory_text_pref(value, app.prefs.units[0], app.prefs.units[1]);
+    let used = memory
+        .current_used_bytes()
+        .map_or_else(missing_value, readout);
+    let total = memory
+        .current_total_bytes()
+        .map_or_else(missing_value, readout);
+    let percentage = memory
+        .used_percentage_observed()
+        .map_or_else(missing_value, |value| format!("{value:.0}%"));
+    selector_instance(
+        IconId::Memory,
+        t("common.memory"),
+        &trend,
+        format!("{used} / {total} · {percentage}"),
+        theme,
+    )
+}
+
+/// Caption clock: `{:.2} GHz` at 1000 MHz and above, plain MHz below — the
+/// gpui sidebar caption spelling.
+fn selector_clock_readout(mhz: u64) -> String {
+    if mhz >= 1000 {
+        format!("{:.2} GHz", mhz as f64 / 1000.0)
+    } else {
+        format!("{mhz} MHz")
+    }
+}
+
+/// The GPU strip caption: the absolute-memory-or-clock identity line followed
+/// by utilization / VRAM share / temperature / power — the gpui
+/// `gpu_caption_line1` + `gpu_caption_line2` fields on one line.
+fn gpu_selector_caption(gpu: &GpuMetrics, use_bytes: bool, use_base2: bool) -> String {
+    let readout = |value: u64| memory_text_pref(value, use_bytes, use_base2);
+    // Same cascade as the gpui first caption line: advertised dedicated VRAM
+    // above 512 MiB, then the split-memory aperture, then dedicated clamped
+    // to its own total.
+    let (vram_used, vram_total) = if let (Some(used), Some(total)) = (
+        gpu.current_dedicated_vram_used_bytes(),
+        gpu.current_dedicated_vram_total_bytes(),
+    ) && total > 512 * 1024 * 1024
+    {
+        (Some(used), Some(total))
+    } else if let (Some(used), Some(total)) = (
+        gpu.current_memory_used_bytes(),
+        gpu.current_memory_total_bytes(),
+    ) && total > 0
+    {
+        (Some(used), Some(total))
+    } else if let (Some(used), Some(total)) = (
+        gpu.current_dedicated_vram_used_bytes(),
+        gpu.current_dedicated_vram_total_bytes(),
+    ) && total > 0
+    {
+        (Some(used.min(total)), Some(total))
+    } else {
+        (None, None)
+    };
+    let mut parts = vec![if let (Some(used), Some(total)) = (vram_used, vram_total)
+        && total > 0
+    {
+        format!("VRAM {} / {}", readout(used), readout(total))
+    } else if let Some(total) = vram_total
+        && total > 0
+    {
+        format!("VRAM {}", readout(total))
+    } else {
+        match (gpu.current_frequency_mhz(), gpu.current_max_frequency_mhz()) {
+            (Some(current), Some(max)) if max > 0 => format!("{current} / {max} MHz"),
+            (Some(current), _) => format!("{current} MHz"),
+            _ => gpu
+                .driver
+                .as_deref()
+                .map(str::trim)
+                .filter(|driver| !driver.is_empty())
+                .map_or_else(missing_value, |driver| format!("Driver {driver}")),
+        }
+    }];
+    if let Some(util) = gpu.current_utilization_pct() {
+        parts.push(format!("{util:.0}%"));
+    }
+    if let (Some(used), Some(total)) = (vram_used, vram_total)
+        && total > 0
+    {
+        let pct = (used as f64 / total as f64 * 100.0).clamp(0.0, 100.0);
+        parts.push(format!("VRAM {pct:.0}%"));
+    }
+    if let Some(temp) = gpu.current_temperature_c() {
+        parts.push(format!("{:.0} °C", temp.round()));
+    }
+    if let Some(power) = gpu.current_power_w()
+        && power > 0.0
+    {
+        parts.push(format!("{power:.0} W"));
+    }
+    parts.join(" · ")
 }
 
 /// A typed table with an honest empty state instead of a bare header.
@@ -345,7 +860,7 @@ pub(super) fn render_centered_state(
     let lines = if state_area.height >= 2 {
         vec![
             Line::from(Span::styled(
-                format!("  {}  ", icon_glyph(icon)),
+                format!("  {}  ", theme.glyph(icon)),
                 Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
             )),
             Line::from(Span::styled(message, Style::new().fg(theme.dim))),
@@ -356,7 +871,7 @@ pub(super) fn render_centered_state(
         // diagnostic the user needs.
         vec![Line::from(vec![
             Span::styled(
-                format!("{} ", icon_glyph(icon)),
+                format!("{} ", theme.glyph(icon)),
                 Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
             ),
             Span::styled(message, Style::new().fg(theme.dim)),
@@ -366,43 +881,6 @@ pub(super) fn render_centered_state(
         Paragraph::new(lines).alignment(Alignment::Center),
         state_area,
     );
-}
-
-/// A bounded slice of a table's canonical row order plus the selected index
-/// relative to that slice. Ratatui will clip a Table at paint time, but row
-/// and cell construction happens before that; keeping this window at the
-/// renderer boundary prevents a 10k-row table from materializing 10k widgets.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct TableWindow {
-    pub(super) start: usize,
-    pub(super) end: usize,
-    pub(super) selected: usize,
-}
-
-/// Compute the row window for a bordered table with one header row and the
-/// shared header bottom margin. The selected row follows the viewport so
-/// keyboard navigation remains global/canonical while only the local slice is
-/// handed to Ratatui.
-#[must_use]
-pub(super) fn table_window(total: usize, selected: usize, area: Rect) -> TableWindow {
-    if total == 0 {
-        return TableWindow {
-            start: 0,
-            end: 0,
-            selected: 0,
-        };
-    }
-    let body_rows = usize::from(area.height.saturating_sub(4)).max(1);
-    let visible = body_rows.min(total);
-    let selected = selected.min(total - 1);
-    let start = selected
-        .saturating_sub(visible / 2)
-        .min(total.saturating_sub(visible));
-    TableWindow {
-        start,
-        end: start + visible,
-        selected: selected - start,
-    }
 }
 
 /// Complete geometry and interaction projection for a table render. Callers
@@ -434,8 +912,17 @@ pub(super) fn render_table<'a, const WIDTHS: usize, const HEADERS: usize>(
         sort,
     } = props;
     let table = Table::new(rows, widths)
-        .header(header_row(headers, theme.accent, sort))
-        .row_highlight_style(Style::new().bg(theme.highlight_bg).fg(Color::White))
+        .header(header_row(
+            headers,
+            theme.accent,
+            theme.color(Color::White),
+            sort,
+        ))
+        .row_highlight_style(
+            Style::new()
+                .bg(theme.highlight_bg)
+                .fg(theme.color(Color::White)),
+        )
         // Same two-blank gutter as the process table — column separation is a
         // product-wide readability rule, not a per-table choice.
         .column_spacing(2)
@@ -449,6 +936,7 @@ pub(super) fn render_table<'a, const WIDTHS: usize, const HEADERS: usize>(
 fn header_row<'a, const N: usize>(
     headers: [&'a str; N],
     accent: Color,
+    text_color: Color,
     sort: Option<(usize, taskmanager_shell::SortDir)>,
 ) -> Row<'a> {
     let cells: Vec<Cell> = headers
@@ -464,7 +952,9 @@ fn header_row<'a, const N: usize>(
                     taskmanager_shell::SortDir::Asc => " ▲",
                     taskmanager_shell::SortDir::Desc => " ▼",
                 });
-                style = style.add_modifier(Modifier::UNDERLINED);
+                style = Style::new()
+                    .fg(text_color)
+                    .add_modifier(Modifier::BOLD | Modifier::UNDERLINED);
             }
             Cell::from(text).style(style)
         })
@@ -506,17 +996,20 @@ fn render_too_small(frame: &mut Frame<'_>, theme: TuiTheme, area: Rect) {
 /// Key/value row shared by the System page and the about overlay.
 pub(super) fn kv<'a>(label: &'a str, value: impl Into<String>, theme: TuiTheme) -> Line<'a> {
     Line::from(vec![
-        Span::styled(format!("{label:<18} "), Style::new().fg(theme.dim)),
-        Span::styled(value.into(), Style::new().fg(Color::White)),
+        Span::styled(
+            format!("{} ", text::pad_cells(label, 18)),
+            Style::new().fg(theme.dim),
+        ),
+        Span::styled(value.into(), Style::new().fg(theme.color(Color::White))),
     ])
 }
 
 /// Coarse device-health verdict used by the containers and health overlays.
 ///
-/// The typed `DeviceStatus` enum lives behind the dependency firewall, so the
-/// TUI classifies it through exported constructors/methods only: the healthy
-/// reference state comes from `DeviceState::healthy`, and every non-healthy
-/// status maps to an exported `FailureKind` through `DeviceStatus::failure()`.
+/// The TUI classifies the typed `DeviceStatus` directly through its core
+/// accessors: the healthy reference state comes from `DeviceState::healthy`,
+/// and every non-healthy status maps to `FailureKind` through
+/// `DeviceStatus::failure()`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DeviceHealth {
     Healthy,
@@ -526,8 +1019,11 @@ pub(crate) enum DeviceHealth {
     Unsupported,
 }
 
-pub(crate) fn classify_device_state(state: &taskmanager_application::DeviceState) -> DeviceHealth {
-    use taskmanager_application::{DeviceState, FailureKind};
+pub(crate) fn classify_device_state(
+    state: &taskmanager_core::core::device_state::DeviceState,
+) -> DeviceHealth {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::failure::FailureKind;
     if state.status == DeviceState::healthy(0).status {
         return DeviceHealth::Healthy;
     }
@@ -539,17 +1035,6 @@ pub(crate) fn classify_device_state(state: &taskmanager_application::DeviceState
         // No other failure kind can produce a device status; be honest about
         // an unexpected payload rather than inventing a verdict.
         _ => DeviceHealth::Unsupported,
-    }
-}
-
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width.saturating_sub(4));
-    let height = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
     }
 }
 

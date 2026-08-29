@@ -8,9 +8,9 @@
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
-    RefreshRequest, SourceNotice, SourceStateKind, SourceStatus, merge_source_lines,
-};
+use taskmanager_application::{RefreshRequest, SourceNotice, SourceStateKind, merge_source_lines};
+use taskmanager_core::core::source::SourceStatus;
+
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_theme::{Theme, tokens};
 use taskmanager_ui_contract::IconId;
@@ -18,11 +18,16 @@ use taskmanager_ui_contract::IconId;
 use crate::app::{FocusTarget, Message};
 use crate::theme;
 
+pub(crate) mod highlight;
 pub(crate) mod inputs;
+pub(crate) mod popover;
 pub(crate) mod primitives;
+pub(crate) mod selectable_text;
 
 pub(crate) use inputs::*;
+pub(crate) use popover::Popover;
 pub(crate) use primitives::*;
+pub(crate) use selectable_text::SelectableText;
 
 pub(crate) type IcedElement<'a> = Element<'a, Message, iced::Theme, iced::Renderer>;
 
@@ -147,7 +152,9 @@ pub(crate) fn source_notice_banner<'a>(
             row![
                 text("⚠")
                     .size(f32::from(tokens::FONT_16))
-                    .color(theme::color(theme_snapshot.palette().warning)),
+                    .color(taskmanager_theme::iced::color(
+                        theme_snapshot.palette().warning
+                    )),
                 column![
                     text(title).size(f32::from(tokens::FONT_12)),
                     text(reason).size(f32::from(tokens::FONT_11))
@@ -195,7 +202,7 @@ fn source_notice_action<'a>(
 
 fn source_panel_style(theme_snapshot: &Theme) -> iced::widget::container::Style {
     let mut style = theme::panel_style(theme_snapshot);
-    style.border.color = theme::color(theme_snapshot.palette().warning);
+    style.border.color = taskmanager_theme::iced::color(theme_snapshot.palette().warning);
     style
 }
 

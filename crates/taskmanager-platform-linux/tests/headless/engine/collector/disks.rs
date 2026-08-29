@@ -5,10 +5,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 
 use sysinfo::Disks;
 use taskmanager_core::core::device_state::{DeviceRefreshOutcome, DeviceState, DeviceStatus};
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::{
     StorageIdentityStability, StorageInterconnect, StorageProtocol,
 };
-use taskmanager_platform_contract::{FailureKind, SourceOutcome};
+use taskmanager_core::core::source::SourceOutcome;
 
 use super::inventory::{
     collect_storage_inventory, merge_disk_inventory, reconcile_storage_snapshot_identity,

@@ -346,21 +346,26 @@ fn one_devices_failed_series_never_affects_another_devices_availability() {
 fn chart_metric_utilization_window_matches_the_usage_ring() {
     use std::collections::BTreeMap;
 
-    use taskmanager_application::{
-        DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence, DeviceState, GpuMetrics,
-        GpuScalarObservations, ScalarObservation,
+    use taskmanager_core::core::device_state::{DeviceLifecycle, DevicePresence, DeviceState};
+    use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+    use taskmanager_core::core::metrics::{
+        GpuMetrics, GpuScalarObservations, GpuTelemetryObservation, ScalarObservation,
     };
     use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 
     const DEVICE: &str = "gpu:anchor:utilization";
-    let (history, ingestor) = crate::history::LiveGraphHistory::shared(64);
+    let (history, ingestor) = taskmanager_telemetry_store::live_graph::LiveGraphHistory::shared(64);
 
     let observation = |utilization: Option<f32>, observed_at_ms: u64| {
         let mut gpu = GpuMetrics::new(DEVICE, "Anchor GPU");
         gpu.device_generation = DeviceGeneration::new(1);
         gpu.device_state = DeviceState::healthy(observed_at_ms);
         let utilization = utilization.map_or_else(
-            || ScalarObservation::unavailable(taskmanager_application::FailureKind::Unsupported),
+            || {
+                ScalarObservation::unavailable(
+                    taskmanager_core::core::failure::FailureKind::Unsupported,
+                )
+            },
             |value| ScalarObservation::available(value, observed_at_ms),
         );
         gpu.apply_scalar_observations(GpuScalarObservations {
@@ -378,7 +383,7 @@ fn chart_metric_utilization_window_matches_the_usage_ring() {
                 absent_since_ms: None,
             },
         );
-        taskmanager_application::GpuTelemetryObservation::current(
+        GpuTelemetryObservation::current(
             vec![gpu],
             observed_at_ms,
             Vec::new(),

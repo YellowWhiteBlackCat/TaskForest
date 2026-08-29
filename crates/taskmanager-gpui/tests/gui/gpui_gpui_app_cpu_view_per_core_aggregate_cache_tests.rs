@@ -1,7 +1,7 @@
 use super::CpuHistoryCache;
-use crate::core::CpuTelemetryObservation;
-use crate::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
 use std::rc::Rc;
+use taskmanager_core::core::CpuTelemetryObservation;
+use taskmanager_core::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
 use taskmanager_telemetry_store::TelemetryStore;
 

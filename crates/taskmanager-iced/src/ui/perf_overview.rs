@@ -16,13 +16,17 @@ use crate::theme;
 use iced::Length;
 use iced::widget::{canvas, column, row, text};
 use std::rc::Rc;
-use taskmanager_application::{CpuTemperatureSource, MemoryMetrics};
-use taskmanager_shell::history::MetricSeries;
+use taskmanager_core::core::metrics::{CpuTemperatureSource, MemoryMetrics};
+
 use taskmanager_shell::presentation::missing_value;
+use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
-use super::responsive::{PerformanceChartInventory, PerformancePageBudget};
+use super::responsive::{
+    DeviceNavigationPresentation, PerformanceChartInventory, PerformancePageBudget,
+};
+use taskmanager_shell::presentation::duration;
 
 /// Dispatch the two singleton Performance resources to their named renderers.
 pub(super) fn cpu_memory_detail(
@@ -87,7 +91,14 @@ fn cpu_detail(
     // local compact-flag derivation remains.
     let chart_layout = projection::CpuChartLayout::for_inventory(budget.chart_inventory);
     let extent = perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation);
-    let chart_height = if extent == perf_layout::DetailExtent::Fill {
+    let per_core_composes = chart_layout == projection::CpuChartLayout::AggregateWithPerCore
+        && budget.vertical.carries_core_stack();
+    let chart_height = if per_core_composes {
+        // GPUI's CPU page pins the headline tier to a fixed height so the
+        // per-core matrix composes INSIDE the first viewport (ICED-024-7/8);
+        // a Fill height would push the core grid below the fold forever.
+        Length::Fixed(cpu::HEADLINE_CHART_PRESENCE)
+    } else if extent == perf_layout::DetailExtent::Fill {
         // Fixed-viewport frames hand the headline chart the column's
         // remaining height — it grows like GPUI's flex-1 headline tier.
         Length::Fill
@@ -107,7 +118,19 @@ fn cpu_detail(
     let chart_content = chart_content.height(extent.length());
     let mut left = vec![
         overview_gauges(app),
-        cpu_headline_readouts(&headline, bogomips, temperature_source, theme_snapshot),
+        // The utilization readout is carried by the CPU gauge directly above —
+        // repeating it here made the strip read as two stacked rows for one
+        // fact (ICED-024 S2 gauge-row optimization, ruling 2026-08-29).
+        cpu_headline_readouts(
+            &headline
+                .iter()
+                .filter(|metric| metric.kind != projection::CpuHeadlineKind::Utilization)
+                .cloned()
+                .collect::<Vec<_>>(),
+            bogomips,
+            temperature_source,
+            theme_snapshot,
+        ),
     ];
     let chart_panel = perf_layout::graph_card(theme_snapshot, chart_content.into(), extent);
     match chart_layout {
@@ -119,7 +142,14 @@ fn cpu_detail(
             left.push(chart_panel);
             // The below band renders from the Core rung up (GPUI parity).
             if budget.vertical.carries_core_stack() {
-                left.push(trend_strip_panel(app, theme_snapshot));
+                // The family-trend strip is the Strip-frame carrier of the
+                // rail sparks (its registered driver): at sidebar widths the
+                // rail's own sparks carry the trends, and rendering the strip
+                // here pushed the per-core matrix below the fold
+                // (ICED-024-8).
+                if budget.device_navigation == DeviceNavigationPresentation::Strip {
+                    left.push(trend_strip_panel(app, theme_snapshot));
+                }
                 left.push(core_grid::per_core_grid_panel(app, theme_snapshot));
             }
         }
@@ -198,12 +228,12 @@ fn memory_detail(
         let swap_chart = canvas::Canvas::new(PerfChart::new(
             Rc::clone(&swap_samples),
             swap_samples.clone(),
-            theme::color(theme_snapshot.memory).scale_alpha(0.75),
-            theme::color(theme_snapshot.palette().border),
-            theme::color(theme_snapshot.palette().border),
+            taskmanager_theme::iced::color(theme_snapshot.memory).scale_alpha(0.75),
+            taskmanager_theme::iced::color(theme_snapshot.palette().border),
+            taskmanager_theme::iced::color(theme_snapshot.palette().border),
             crate::perf_chart::ReadoutColors {
-                bg: theme::color(theme_snapshot.palette().surface),
-                fg: theme::color(theme_snapshot.palette().fg),
+                bg: taskmanager_theme::iced::color(theme_snapshot.palette().surface),
+                fg: taskmanager_theme::iced::color(theme_snapshot.palette().fg),
             },
             false,
         ))
@@ -621,45 +651,45 @@ fn trend_strip_panel(
     // so traffic actually moves the line; the three percentage series pin max
     // at 100. Each series wears its own semantic theme color so the five mini
     // polylines read apart at a glance (matching the gpui sidebar).
-    let disk = app.cached_metric_series(MetricSeries::DiskBytesPerSec);
+    let disk = app.cached_metric_series(TrendSeries::DiskBytesPerSec);
     let disk_max = crate::trend_strip::finite_peak(&disk);
-    let net = app.cached_metric_series(MetricSeries::NetworkBytesPerSec);
+    let net = app.cached_metric_series(TrendSeries::NetworkBytesPerSec);
     let net_max = crate::trend_strip::finite_peak(&net);
     let entries = vec![
         crate::trend_strip::TrendEntry {
             caption: "CPU",
-            samples: app.cached_metric_series(MetricSeries::CpuUsagePercent),
-            color: theme::color(theme_snapshot.cpu),
+            samples: app.cached_metric_series(TrendSeries::CpuUsagePercent),
+            color: taskmanager_theme::iced::color(theme_snapshot.cpu),
             max: 100.0,
         },
         crate::trend_strip::TrendEntry {
             caption: "MEM",
-            samples: app.cached_metric_series(MetricSeries::MemoryUsagePercent),
-            color: theme::color(theme_snapshot.memory),
+            samples: app.cached_metric_series(TrendSeries::MemoryUsagePercent),
+            color: taskmanager_theme::iced::color(theme_snapshot.memory),
             max: 100.0,
         },
         crate::trend_strip::TrendEntry {
             caption: "DSK",
             samples: disk,
-            color: theme::color(theme_snapshot.disk),
+            color: taskmanager_theme::iced::color(theme_snapshot.disk),
             max: disk_max,
         },
         crate::trend_strip::TrendEntry {
             caption: "NET",
             samples: net,
-            color: theme::color(theme_snapshot.network),
+            color: taskmanager_theme::iced::color(theme_snapshot.network),
             max: net_max,
         },
         crate::trend_strip::TrendEntry {
             caption: "GPU",
-            samples: app.cached_metric_series(MetricSeries::GpuUsagePercent),
-            color: theme::color(theme_snapshot.gpu),
+            samples: app.cached_metric_series(TrendSeries::GpuUsagePercent),
+            color: taskmanager_theme::iced::color(theme_snapshot.gpu),
             max: 100.0,
         },
     ];
     let strip = crate::trend_strip::TrendStrip::new(
         entries,
-        theme::color(theme_snapshot.palette().fg_muted),
+        taskmanager_theme::iced::color(theme_snapshot.palette().fg_muted),
     );
     canvas::Canvas::new(strip)
         .width(Length::Fill)
@@ -681,8 +711,8 @@ fn performance_chart(
     theme_snapshot: &taskmanager_theme::Theme,
     height: Length,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
-    let cpu = app.cached_metric_series(MetricSeries::CpuUsagePercent);
-    let memory = app.cached_metric_series(MetricSeries::MemoryUsagePercent);
+    let cpu = app.cached_metric_series(TrendSeries::CpuUsagePercent);
+    let memory = app.cached_metric_series(TrendSeries::MemoryUsagePercent);
     if cpu.len() < 2 && memory.len() < 2 {
         // No polyline can be drawn yet; do not invent points.
         return text(t("common.collecting_telemetry"))
@@ -690,17 +720,17 @@ fn performance_chart(
             .into();
     }
     let palette = theme_snapshot.palette();
-    let cpu_color = theme::color(palette.accent);
-    let memory_color = theme::color(palette.success);
+    let cpu_color = taskmanager_theme::iced::color(palette.accent);
+    let memory_color = taskmanager_theme::iced::color(palette.success);
     canvas::Canvas::new(PerfChart::new(
         cpu,
         memory,
         cpu_color,
         memory_color,
-        theme::color(theme_snapshot.palette().border),
+        taskmanager_theme::iced::color(theme_snapshot.palette().border),
         crate::perf_chart::ReadoutColors {
-            bg: theme::color(palette.surface),
-            fg: theme::color(palette.fg),
+            bg: taskmanager_theme::iced::color(palette.surface),
+            fg: taskmanager_theme::iced::color(palette.fg),
         },
         true,
     ))

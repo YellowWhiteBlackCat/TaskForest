@@ -3,28 +3,27 @@
 //! Plus a minimal "focus" view shown when a non-CPU device is selected (full per-device
 //! views — Memory composition, Disk dual-graph, etc. — come in later milestones).
 
-use crate::core::config::SidebarDeviceOverrideConfig;
 use gpui::{
     App, AppContext, Context, Div, DragMoveEvent, Empty, Entity, InteractiveElement, IntoElement,
     MouseButton, ParentElement, Pixels, Render, ScrollHandle, Stateful, StatefulInteractiveElement,
     Styled, Window, div, px,
 };
 use std::rc::Rc;
+use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_ui_contract::IconId;
 
-use crate::core::metrics::SystemSnapshot;
-use crate::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use crate::gpui_app::formatting::{PerformanceSettings, gpu_identity_text};
 use crate::gpui_app::history_samples::{
     battery_capacity_samples, fan_rpm_samples, gpu_usage_samples, network_rate_samples,
     storage_activity_samples,
 };
-use crate::gpui_app::icons;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Theme, WindowCorner};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui::layout::scroll_region_with_overlay_rail;
 
 mod captions;
@@ -42,6 +41,7 @@ pub use network::NetworkVisibility;
 pub(crate) use network::{network_category_label, nic_caption_line2};
 pub(crate) use order::{ordered_indices, visible_with_override};
 use row::{DeviceRowProps, device_row};
+use taskmanager_theme::WindowCorner;
 
 /// Dedicated right-edge hit gutter for sidebar resizing. It is deliberately
 /// outside the scroll viewport so the rail's wheel/click hit layer can never
@@ -219,7 +219,7 @@ pub(crate) fn render_sidebar(
                 .gap(tokens::SPACE_6)
                 .font_weight(tokens::FONT_WEIGHT_STRONG.into())
                 .text_color(theme.fg_dim)
-                .child(icons::icon(IconId::System).size(px(18.0)))
+                .child(taskmanager_icons::icon(IconId::System).size(px(18.0)))
                 .child(div().flex_1().child(i18n::t("sidebar.devices")))
                 .child(edit::edit_button(theme, edit_mode, cx)),
         );
@@ -304,10 +304,10 @@ pub(crate) fn render_sidebar(
             Some(t) if t > 0.0 => format!("{base}  ·  {}  ·  {:.0} °C", d.disk_type, t.round()),
             _ => format!("{base}  ·  {}", d.disk_type),
         };
-        if crate::gpui_app::perf_views::smart_section_visible(d) {
+        if taskmanager_shell::presentation::smart_section_visible(d) {
             append_status_badge(
                 &mut c2,
-                crate::gpui_app::perf_views::effective_smart_status(d),
+                taskmanager_shell::presentation::effective_smart_status(d),
             );
         }
         entries.push((

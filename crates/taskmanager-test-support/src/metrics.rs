@@ -11,11 +11,11 @@ use super::{
     NetworkAdapterType, NetworkMetrics, NetworkScalarObservations, NetworkWirelessObservations,
     OptionalObservation, ScalarObservation, SmartAvailability,
 };
-use crate::core::device_state::DeviceState;
-use crate::core::smart::SmartProviderFailureKind;
-use crate::core::storage::{StorageConnection, StorageIdentityStability};
-use crate::core::{DeviceGeneration, ProviderId};
 use crate::{GroupBaseOpen, NamedOverrides};
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::identity::{DeviceGeneration, ProviderId};
+use taskmanager_core::core::smart::SmartProviderFailureKind;
+use taskmanager_core::core::storage::{StorageConnection, StorageIdentityStability};
 
 const FIXTURE_OBSERVED_AT: u64 = 1;
 

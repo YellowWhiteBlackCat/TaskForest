@@ -6,7 +6,7 @@
 # Linux-only boundary crates). Stage inheritance is deliberate:
 #
 #   quick      identical policy surface: fmt + the pure-Python governance
-#              gates. The install-manager smoke is SKIPPED (it stages a
+#              and test-runner policy gates. The install-manager smoke is SKIPPED (it stages a
 #              usr/lib + polkit-1 tree, a Linux install layout).
 #   standard   clippy, the nextest workspace pass split into core/logic/gui/
 #              perf layers (integration groups compile on Windows since the
@@ -209,7 +209,7 @@ fi
 # (crate-root Linux gating makes them empty elsewhere).
 exclude_platform_adapters="--exclude taskmanager-platform-linux --exclude taskmanager-platform-macos"
 if ! cargo nextest --version >/dev/null 2>&1; then
-    echo "cargo-nextest is unavailable; bare cargo test is banned in this repository" >&2
+    echo "cargo-nextest is unavailable; install it before running the test gates" >&2
     exit 2
 fi
 
@@ -222,6 +222,12 @@ if maybe safety-guard-self; then
 fi
 if maybe safety-guard; then
     run_stage safety-guard quick run_py scripts/quality/automation_safety_guard.py
+fi
+if maybe test-runner-self; then
+    run_stage test-runner-self quick run_py scripts/quality/test_runner_guard.py --self-test
+fi
+if maybe test-runner; then
+    run_stage test-runner quick run_py scripts/quality/test_runner_guard.py
 fi
 if maybe public-repo-self; then
     run_stage public-repo-self quick run_py scripts/quality/public_repo_guard.py --self-test
@@ -241,6 +247,12 @@ fi
 if maybe install-manager-smoke; then
     # The smoke test stages a usr/lib + polkit-1 install tree: Linux layout.
     skip_stage install-manager-smoke quick "Linux-only install layout"
+fi
+if maybe dependency-floor-self; then
+    run_stage dependency-floor-self quick run_py scripts/quality/dependency_floor_guard.py --self-test
+fi
+if maybe dependency-floor; then
+    run_stage dependency-floor quick run_py scripts/quality/dependency_floor_guard.py
 fi
 if maybe line-guard; then
     run_stage line-guard quick run_py scripts/quality/rust_line_guard.py --mode enforce

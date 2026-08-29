@@ -38,23 +38,29 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, template_value};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val,
-    percent, px,
+    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
+    UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
-    ServiceId, ServiceItem, ServiceStatus, SourceNotice, SourceStatus, source_notice,
-};
+use taskmanager_application::{SourceNotice, source_notice};
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::target::ServiceId;
+
 use taskmanager_shell::presentation::control_error_detail;
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, space_2, space_8, space_24};
+use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_24};
+use crate::widgets::controls::sort_indicator_scene;
 use crate::window::{Role, TextRole, WindowPalette};
+
+pub(crate) mod log_panel;
+pub(crate) mod menu;
 
 // ---- pure core: row view model, chips, empty/notice/status copy ----
 
@@ -218,19 +224,18 @@ fn columns() -> Vec<Column> {
     ]
 }
 
-/// Header cell text with the active-sort arrow (`▲`/`▼`), mirroring the
-/// process table's header spelling.
-fn header_label(column: &Column, sort: Option<(InfoSortCol, SortDir)>) -> String {
+/// Header cell's pure label: the column word only. Sort direction renders as
+/// a semantic plate ([`sorted_direction`]), never a text glyph.
+fn header_label(column: &Column) -> String {
+    column.label.clone()
+}
+
+/// The active sort's direction when it rests on this column: `Some(true)`
+/// descending, `Some(false)` ascending, `None` unsorted.
+fn sorted_direction(column: &Column, sort: Option<(InfoSortCol, SortDir)>) -> Option<bool> {
     match (sort, column.sort) {
-        (Some((active, direction)), Some(own)) if active == own => {
-            let arrow = if direction == SortDir::Desc {
-                '▼'
-            } else {
-                '▲'
-            };
-            format!("{} {arrow}", column.label)
-        }
-        _ => column.label.clone(),
+        (Some((active, direction)), Some(own)) if active == own => Some(direction == SortDir::Desc),
+        _ => None,
     }
 }
 
@@ -303,7 +308,7 @@ pub(crate) struct ServiceTargetSelected(#[allow(dead_code)] pub(crate) ServiceId
 /// declarative tree stays structure-only and there is exactly one render
 /// authority for the rows.
 pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
-    let title = Page::Services.title().to_owned();
+    let title = Page::Services.title();
     let waiting = t("common.waiting_inventory").to_owned();
     bsn! {
         Node {
@@ -330,6 +335,17 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
                 }
                 ServicesBody
             ),
+            (
+                // The service-log panel's mount point. The panel is a
+                // page-local surface fed by the shell's log lifecycle; its
+                // painter is fingerprint-gated so idle folds never respawn.
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(space_2()),
+                }
+                log_panel::ServicesLogPanelSlot
+            ),
         ]
     }
 }
@@ -346,7 +362,8 @@ fn services_body_scene(
     let notice = source_notice_text(shell.projection().services_source.as_deref());
     let empty = empty_state_text(shell.projection().services_source.as_deref());
     let children = body_children(&rows, selected, notice, empty, palette);
-    let header = header_scene(shell.services_sort);
+    let header = header_scene(shell.services_sort, palette);
+    let toolbar = log_panel::logs_toolbar_scene(selection.target.is_some(), palette);
     bsn! {
         Node {
             width: percent(100),
@@ -355,6 +372,7 @@ fn services_body_scene(
             row_gap: Val::Px(space_2()),
         }
         Children [
+            ( toolbar ),
             ( header ),
             { children },
         ]
@@ -390,18 +408,27 @@ fn body_children(
 /// Header row: one caption cell per column; every cell carries the
 /// [`ServicesSortHeader`] identity (`Some` on sortable columns) for the
 /// pointer adapter.
-fn header_scene(sort: Option<(InfoSortCol, SortDir)>) -> impl Scene + use<> {
+fn header_scene(sort: Option<(InfoSortCol, SortDir)>, palette: &UiPalette) -> impl Scene + use<> {
     let cells: Vec<Box<dyn Scene>> = columns()
         .into_iter()
         .map(|column| {
-            let label = header_label(&column, sort);
+            let label = header_label(&column);
+            let direction = sorted_direction(&column, sort);
+            let indicator = sort_indicator_scene(direction, palette);
             let width = column.width_px;
             let sort_target = column.sort;
             Box::new(bsn! {
-                Node { width: px(width) }
+                Node {
+                    width: px(width),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(space_4()),
+                    overflow: Overflow::clip_x(),
+                }
                 ServicesSortHeader(sort_target)
                 Children [
-                    ( Text(label) TextRole(Role::Caption) ),
+                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                    { indicator },
                 ]
             }) as Box<dyn Scene>
         })
@@ -592,10 +619,16 @@ fn bind_services_page(mut world: DeferredWorld<'_>, _context: HookContext) {
     commands.insert_resource(ServicesRenderState {
         rendered_revision: None,
     });
+    commands.init_resource::<log_panel::ServicesLogRenderState>();
     commands.add_observer(on_services_projection_folded);
     commands.add_observer(on_services_sort_clicked);
     commands.add_observer(on_services_row_clicked);
     commands.add_observer(on_services_selection_moved);
+    commands.add_observer(log_panel::on_services_logs_requested);
+    commands.add_observer(log_panel::on_log_panel_repaint_required);
+    commands.add_observer(log_panel::on_log_panel_slot_added);
+    commands.add_observer(log_panel::on_services_fold_log_gate);
+    commands.add_observer(log_panel::services_logs_button_activated);
     // The initial paint rides the body's own insertion: the hook runs while
     // the page scene is still spawning (its children apply later in the same
     // command queue), so painting here would find no body yet. The observer
@@ -677,3 +710,11 @@ fn on_services_selection_moved(
 #[cfg(test)]
 #[path = "../../tests/headless/pages/services.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/services_menu.rs"]
+mod services_menu_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/service_logs.rs"]
+mod service_logs_tests;

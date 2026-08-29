@@ -3,10 +3,11 @@
 use std::collections::HashMap;
 use std::sync::Mutex;
 
-use taskmanager_application::{
-    DeviceGeneration, DeviceId, ProviderFailure, SmartSelfTestObservation, SmartStateRevision,
-    StorageDeviceTarget,
-};
+use taskmanager_application::SmartStateRevision;
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::storage::StorageDeviceTarget;
+use taskmanager_core::core::system_health::SmartSelfTestObservation;
+use taskmanager_platform_contract::ProviderFailure;
 
 /// Idle SMART jobs are retained long enough for ordinary refresh jitter while
 /// still allowing abandoned or timed-out tracking state to expire.

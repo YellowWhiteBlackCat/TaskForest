@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use crate::core::{
+use taskmanager_core::core::{
     DeviceId, DeviceLifecycle, DevicePresence, DeviceState, GpuTelemetryObservation,
 };
 use taskmanager_telemetry_store::{

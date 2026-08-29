@@ -1,6 +1,6 @@
 use super::{empty_state_failure, empty_state_icon};
-use crate::core::source::{SourceOutcome, SourceStatus};
-use crate::core::{FailureKind, ProviderId};
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_core::core::{FailureKind, ProviderId};
 use taskmanager_ui_contract::IconId;
 
 fn source(outcome: SourceOutcome) -> SourceStatus {

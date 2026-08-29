@@ -235,16 +235,16 @@ fn battery_and_fan_per_device_windows_resolve_and_render() {
     // that device's own history (never a sibling's, never fabricated). Both
     // sections must then compose for the collecting (<2 samples) and plotted
     // (>=2 samples) states.
-    use taskmanager_application::{
-        BatteryInfo, DeviceState, PowerSupplySnapshot, SensorCenterSnapshot,
-    };
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+    use taskmanager_core::core::sensors::SensorCenterSnapshot;
 
     let mut app = crate::IcedApp::default();
 
     // Battery: record BAT0 at 72% three times.
     let mut battery = BatteryInfo::new("BAT0", DeviceState::healthy(10));
-    battery.apply_scalar_observations(taskmanager_application::BatteryScalarObservations {
-        capacity_pct: taskmanager_application::ScalarObservation::available(72, 10),
+    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
+        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(72, 10),
         ..Default::default()
     });
     let power = PowerSupplySnapshot {
@@ -257,7 +257,7 @@ fn battery_and_fan_per_device_windows_resolve_and_render() {
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(power.clone())),
     );
-    let dynamic_system = taskmanager_application::SystemSnapshot {
+    let dynamic_system = taskmanager_core::core::metrics::SystemSnapshot {
         timestamp_ms: 1_000,
         ..Default::default()
     };
@@ -335,11 +335,12 @@ fn sample_fan_reading(
     label: &str,
     device_id: &str,
     rpm: u32,
-) -> taskmanager_application::SensorReading {
-    use taskmanager_application::{
-        DeviceGeneration, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
-        SensorReading, SensorScale,
+) -> taskmanager_core::core::sensors::SensorReading {
+    use taskmanager_core::core::identity::DeviceGeneration;
+    use taskmanager_core::core::sensors::{
+        SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
     };
+
     SensorReading::from_measurement_observation(
         device_id.into(),
         "fan1".into(),

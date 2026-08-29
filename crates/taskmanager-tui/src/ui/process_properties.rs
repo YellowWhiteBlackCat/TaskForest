@@ -3,8 +3,8 @@
 //! + `details_panel_content`).
 //!
 //! Tabs — Overview / Performance / Command / Insights — consume the SAME shared
-//! projections the inline `process_details` panel already reads, reached through
-//! `taskmanager_application` (ADR-020 firewall: no core import). The modal
+//! projections the inline `process_details` panel already reads, with domain
+//! facts imported directly from `taskmanager-core`. The modal
 //! freezes the selected [`ProcessItem`] at open time so a list refresh cannot
 //! redirect the view; the Insights tab additionally reads the live
 //! `process_insights` projection (last-wins for the frozen target pid),
@@ -21,15 +21,16 @@ use ratatui::Frame;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
-use taskmanager_application::ProcessItem;
+use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::ProcessDetailsField;
-use taskmanager_application::units::UnitPreferences;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_shell::presentation::value_with_peak;
 
+use super::containers::Modal;
+use super::kv;
 use super::process_details::vm_text;
-use super::{centered, kv};
 use crate::TuiApp;
 use crate::TuiTheme;
 
@@ -105,39 +106,64 @@ pub struct ProcessPropertiesTarget {
     pub scroll: usize,
 }
 
-/// Render the Process Properties modal centred over `area`. The modal traps
-/// navigation while open (arrows/Tab switch tabs, Esc closes) — the caller in
-/// `runtime::handle_key` ensures the table cursor never moves while the modal
-/// is open, so the modal is the sole owner of those keys.
+/// Render the Process Properties modal centred over `area`.  Test-only entry:
+/// the caller supplies the committed focus plan so the highlighted tab stays
+/// the plan's decision, not the frozen target state's.
+#[cfg(test)]
 pub fn render_process_properties(
     frame: &mut Frame<'_>,
     target: &ProcessPropertiesTarget,
     app: &TuiApp,
     theme: TuiTheme,
+    focus: super::TuiFocusPlan,
     area: Rect,
 ) {
+    render_process_properties_at(
+        frame,
+        target,
+        app,
+        theme,
+        focus,
+        super::planned_popup(
+            area,
+            crate::TuiInputScope::SharedSurface(
+                taskmanager_application::SurfaceKind::ProcessProperties,
+            ),
+        ),
+    );
+}
+
+/// Render the Process Properties modal from the committed focus plan. The
+/// highlighted tab is the plan's `PropertiesTab` control; any other control
+/// paints every tab dim (fail-closed).
+pub(super) fn render_process_properties_at(
+    frame: &mut Frame<'_>,
+    target: &ProcessPropertiesTarget,
+    app: &TuiApp,
+    theme: TuiTheme,
+    focus: super::TuiFocusPlan,
+    popup: Rect,
+) {
     // Modal geometry: wide enough for the kv rows + command line, tall enough
-    // for the tab row + a bounded body. Clamped by `centered` to the frame so
-    // a small terminal never overflows.
-    let popup = centered(area, 96, 30);
-    frame.render_widget(Clear, popup);
-    let block = Block::new()
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.accent))
-        .style(Style::new().bg(theme.overlay_bg))
-        .title(format!(
-            " {} {} · {} ",
+    // for the tab row + a bounded body. Clamped by the frame plan to the frame so
+    // a small terminal never overflows. The plain-titled Modal host paints the
+    // identity in the title text itself (no icon): "Process details <name> · <pid>".
+    let inner = Modal::plain(
+        theme,
+        theme.accent,
+        &format!(
+            "{} {} · {}",
             t("prop.process_details"),
             target.item.name,
-            target.item.pid,
-        ));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+            target.item.pid
+        ),
+    )
+    .render(frame, popup);
 
     let [tab_row, body] =
         Layout::vertical([Constraint::Length(2), Constraint::Min(1)]).areas(inner);
 
-    frame.render_widget(tab_row_line(target.section, theme), tab_row);
+    frame.render_widget(tab_row_line(focus.properties_tab(), theme), tab_row);
 
     let lines = match target.section {
         ProcessDetailsSection::Overview => {
@@ -170,15 +196,15 @@ pub fn render_process_properties(
 /// The tab selector row. The active tab wears the highlight background + bold;
 /// inactive tabs are dim. A trailing hint documents the switch chords so the
 /// modal is discoverable without the help overlay.
-fn tab_row_line(active: ProcessDetailsSection, theme: TuiTheme) -> Line<'static> {
+fn tab_row_line(active: Option<ProcessDetailsSection>, theme: TuiTheme) -> Line<'static> {
     let mut spans: Vec<Span<'static>> = Vec::new();
     for section in ProcessDetailsSection::ALL {
-        let is_active = section == active;
+        let is_active = active == Some(section);
         spans.push(Span::styled(
             format!(" {} ", t(section.label_key())),
             if is_active {
                 Style::new()
-                    .fg(Color::White)
+                    .fg(theme.color(Color::White))
                     .bg(theme.highlight_bg)
                     .add_modifier(Modifier::BOLD)
             } else {
@@ -200,7 +226,7 @@ fn tab_row_line(active: ProcessDetailsSection, theme: TuiTheme) -> Line<'static>
 /// fabricated value.
 fn overview_pairs(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Vec<(&'static str, String)> {
     let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
         item,
@@ -221,7 +247,7 @@ fn overview_pairs(
 
 fn overview_lines(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
     theme: TuiTheme,
 ) -> Vec<Line<'static>> {
     overview_pairs(item, local_time_rules)
@@ -240,7 +266,7 @@ fn overview_lines(
 /// history renders the shared dash, never a fabricated `0.0`.
 fn performance_pairs(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Vec<(&'static str, String)> {
     let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
         item,
@@ -277,7 +303,7 @@ fn performance_pairs(
 
 fn performance_lines(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
     theme: TuiTheme,
 ) -> Vec<Line<'static>> {
     let mut lines: Vec<Line<'static>> = performance_pairs(item, local_time_rules)
@@ -297,7 +323,7 @@ fn performance_lines(
 /// never a fabricated path.
 fn command_pairs(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Vec<(&'static str, String)> {
     let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
         item,
@@ -314,7 +340,7 @@ fn command_pairs(
 
 fn command_lines(
     item: &ProcessItem,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
     theme: TuiTheme,
 ) -> Vec<Line<'static>> {
     command_pairs(item, local_time_rules)

@@ -1,9 +1,9 @@
 use super::*;
-use taskmanager_application::PriorityTier;
+use taskmanager_core::core::process::PriorityTier;
 
 #[test]
 fn priority_choice_maps_to_typed_priority_tiers_and_localizes() {
-    use taskmanager_application::ProcessBatchAction;
+    use taskmanager_core::core::process::ProcessBatchAction;
     // The typed tier carries the semantics (the adapter owns the
     // native-primitive mapping); the presets must match GPUI's action bar
     // so identically-labeled buttons never diverge.

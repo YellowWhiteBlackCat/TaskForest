@@ -132,13 +132,15 @@ fn binding_accessors_expose_token_and_boundness() {
 
 #[test]
 fn frontend_shape_names_are_distinct_and_stable() {
-    let names = [
-        FrontendShape::Gpui.name(),
-        FrontendShape::Iced.name(),
-        FrontendShape::Tui.name(),
-    ];
+    let names: Vec<_> = FrontendShape::ALL
+        .into_iter()
+        .map(FrontendShape::name)
+        .collect();
     for name in names {
         assert!(!name.is_empty());
     }
-    assert_eq!(names, ["gpui", "iced", "tui"]);
+    assert_eq!(
+        FrontendShape::ALL.map(FrontendShape::name),
+        ["gpui", "iced", "tui", "bevy"]
+    );
 }

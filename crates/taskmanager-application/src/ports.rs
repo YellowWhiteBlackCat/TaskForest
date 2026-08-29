@@ -11,10 +11,11 @@ use crate::platform::{
     ServiceLogSnapshotRequest, ServiceLogStreamRequest, SetupScriptRequest, SmartControlRequest,
     UrlOpenRequest,
 };
-use crate::{
-    ControlRequestId, FrozenProcessIdentity, ProcessBatchIntent, ProcessSignal, RefreshRequest,
-    ServiceAction, ServiceId, SessionControlAction, SessionId, StartupControlRequest,
-};
+use crate::{ControlRequestId, RefreshRequest, StartupControlRequest};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent, ProcessSignal};
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::target::{ServiceId, SessionId};
 
 /// Immutable service-control target captured when a destructive service action
 /// (Stop / Restart / Disable) is requested. The provider-issued id and action

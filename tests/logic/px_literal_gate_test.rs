@@ -41,7 +41,9 @@ const ALLOWED: &[(&str, &[f32])] = &[
     // crates/taskmanager-ui/src/data/table/columns.rs
     &[100.0],
     // crates/taskmanager-ui/src/data/table/render.rs
-    &[-1.0, 0.0, 1.0, 2.0, 10.0, 12.0, 16.0, 20.0, 28.0, 1200.0],
+    &[-1.0, 0.0, 12.0, 28.0],
+    // crates/taskmanager-ui/src/data/table/resize.rs
+    &[-1.0, 1.0, 2.0, 20.0],
     // crates/taskmanager-ui/src/data/tree.rs
     &[4.0, 12.0, 16.0, 24.0],
     // crates/taskmanager-ui/src/data/virtual_list.rs

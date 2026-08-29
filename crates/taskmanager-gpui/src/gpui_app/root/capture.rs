@@ -6,27 +6,25 @@
 //! tokens can also prepare otherwise hard-to-reproduce presentation states;
 //! capture preparation never invokes a destructive action.
 
-use crate::core::metrics::SystemSnapshot;
-use crate::core::process::{
-    ProcessBatchAction, ProcessBatchIntent, ProcessCategory, ProcessItem, aggregate_apps,
-    process_category,
-};
-use crate::core::services::{ServiceItem, ServiceStatus};
-pub(super) use crate::core::startup::{StartupEntry, StartupImpactEvidence};
-use crate::core::{ServiceId, SmartSelfTestObservation};
-use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, SystemSection};
+use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState, SystemSection};
 use crate::gpui_app::process_insights::{ProcessInsightsState, process_insights_capture_fixture};
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
 use crate::gpui_app::timeline::HistoryWindow;
+use taskmanager_application::{ProcessTerminationAction, ProcessTerminationConfirmation};
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::process::{
+    ProcessBatchAction, ProcessBatchIntent, ProcessCategory, ProcessItem, aggregate_apps,
+    process_category,
+};
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::startup::StartupEntry;
+use taskmanager_core::core::{AlertEvent, ServiceId, SmartSelfTestObservation};
 use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor,
 };
 
 use super::termination::snapshot_single_process;
-use super::{
-    ProcessDetailsSection, ProcessTerminationAction, ProcessTerminationConfirmation, TopPage,
-    snapshot_process_tree,
-};
+use super::{ProcessDetailsSection, TopPage, snapshot_process_tree};
 
 mod dashboard_history;
 mod fixtures;
@@ -108,14 +106,17 @@ pub struct CaptureEvidence {
     /// Capture-only comparison evidence. Persistent history runtime is
     /// reader-only; deterministic screenshots must not reintroduce its retired
     /// boot writer/controller state.
-    startup_boot_baseline: Option<crate::core::startup::BootTimeline>,
+    startup_boot_baseline: Option<taskmanager_core::core::startup::BootTimeline>,
     /// Strict-capture-only typed observation. Production reports are borrowed
     /// directly from the shell projection and never copied into this slot.
     system_health_observation: Option<SmartSelfTestObservation>,
+    /// Capture-only handoff for deterministic alert events. The fixture is
+    /// installed into the shared shell authority before the panel is shown.
+    event_history_fixture: Option<Vec<AlertEvent>>,
 }
 
 impl CaptureEvidence {
-    pub fn mark_theme(&self, theme: &crate::gpui_app::theme::Theme) {
+    pub fn mark_theme(&self, theme: &taskmanager_theme::Theme) {
         if self.enabled {
             emit_theme_marker(self.scenario, theme);
         }
@@ -434,7 +435,7 @@ impl CaptureEvidence {
         &mut self,
         startup_updated: bool,
         entries: &mut Vec<StartupEntry>,
-        evidence: &mut Option<crate::core::startup::StartupBootEvidenceSnapshot>,
+        evidence: &mut Option<taskmanager_core::core::startup::StartupBootEvidenceSnapshot>,
     ) -> bool {
         if !self.enabled
             || !startup_updated
@@ -474,7 +475,7 @@ impl CaptureEvidence {
     pub fn restore_startup_fixture(
         &mut self,
         entries: &mut Vec<StartupEntry>,
-        evidence: &mut Option<crate::core::startup::StartupBootEvidenceSnapshot>,
+        evidence: &mut Option<taskmanager_core::core::startup::StartupBootEvidenceSnapshot>,
     ) {
         match self.scenario {
             Some(CaptureScenario::StartupFailureEvidence) => {
@@ -491,11 +492,19 @@ impl CaptureEvidence {
         }
     }
 
-    pub fn startup_boot_baseline(&self) -> Option<&crate::core::startup::BootTimeline> {
+    pub fn startup_boot_baseline(&self) -> Option<&taskmanager_core::core::startup::BootTimeline> {
         self.startup_boot_baseline.as_ref()
     }
 
-    pub fn system_hardware_npu_fixture(&self) -> Option<crate::core::NpuInventorySnapshot> {
+    /// Take the capture-only alert history handoff after the dashboard state
+    /// has requested the Event Center. No renderer-local history is retained.
+    pub fn take_event_history_fixture(&mut self) -> Option<Vec<AlertEvent>> {
+        self.event_history_fixture.take()
+    }
+
+    pub fn system_hardware_npu_fixture(
+        &self,
+    ) -> Option<taskmanager_core::core::NpuInventorySnapshot> {
         self.system_hardware_fixture_requested()
             .then(npu_inventory_fixture)
     }
@@ -608,7 +617,7 @@ impl CaptureEvidence {
             }
             Some(CaptureScenario::EventCenter) => {
                 dashboard.section = SystemSection::Dashboard;
-                dashboard.events.seed_capture_events();
+                self.event_history_fixture = Some(EventCenterState::capture_event_fixture());
                 (true, Some(DashboardPanel::Events))
             }
             Some(CaptureScenario::SavedViewPresets) => {
@@ -639,7 +648,7 @@ impl CaptureEvidence {
     pub fn on_live_dynamic_device_state(
         &mut self,
         page: &mut TopPage,
-        power_supplies: &crate::core::PowerSupplySnapshot,
+        power_supplies: &taskmanager_core::core::PowerSupplySnapshot,
     ) -> bool {
         if !self.enabled || !self.telemetry_ready || !self.ui_data_ready || self.scenario_ready {
             return false;
@@ -664,8 +673,8 @@ impl CaptureEvidence {
     pub fn on_dynamic_device_state(
         &mut self,
         page: &mut TopPage,
-        power_supplies: &mut crate::core::PowerSupplySnapshot,
-        sensors: &mut crate::core::SensorCenterSnapshot,
+        power_supplies: &mut taskmanager_core::core::PowerSupplySnapshot,
+        sensors: &mut taskmanager_core::core::SensorCenterSnapshot,
     ) -> bool {
         if !self.enabled
             || !self.telemetry_ready

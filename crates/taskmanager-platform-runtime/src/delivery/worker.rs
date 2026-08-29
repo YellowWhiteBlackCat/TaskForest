@@ -15,7 +15,8 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::thread::{self, JoinHandle};
 
 use crossbeam_channel::{Receiver, Sender, TryRecvError, select};
-use taskmanager_application::{PlatformEvent, ProviderFailure, RequestId};
+use taskmanager_application::PlatformEvent;
+use taskmanager_platform_contract::{ProviderFailure, RequestId};
 
 use super::catalog::{ProviderPanicContext, ProviderPanicLedger};
 use super::publisher::RuntimeEventPublisher;

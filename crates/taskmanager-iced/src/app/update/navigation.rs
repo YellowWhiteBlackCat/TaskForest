@@ -18,13 +18,13 @@ impl IcedApp {
         &mut self,
         name: String,
         flat_index: usize,
-        row_key: Option<taskmanager_shell::ProcessRowKey>,
+        row_key: Option<taskmanager_shell::ProcessRowId>,
     ) {
         if !self.process_presentation.expanded_groups.remove(&name) {
             self.process_presentation.expanded_groups.insert(name);
         }
-        if let Some(taskmanager_shell::ProcessRowKey::Application(root_pid)) = row_key {
-            let _ = self.shell.select_application_row(root_pid, flat_index);
+        if let Some(taskmanager_shell::ProcessRowId::Application(root)) = row_key {
+            let _ = self.shell.select_application_row(root.pid(), flat_index);
         }
         let row_count = self.shell.table_row_count().unwrap_or(0);
         if self.shell.selected >= row_count {

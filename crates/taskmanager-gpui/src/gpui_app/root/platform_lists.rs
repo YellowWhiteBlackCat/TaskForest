@@ -2,13 +2,15 @@
 
 use super::{RootView, platform_submission_time_ms};
 use crate::gpui_app::list_view::ActionFeedback;
-use crate::i18n;
 use gpui::Context;
+use taskmanager_application::i18n;
 use taskmanager_application::{
-    FailureKind, RefreshRequest, SessionControlAction, SessionControlOutcome,
-    SessionControlRequest, SessionControlTarget, StartupControlOutcome, StartupControlRequest,
-    SubmissionErrorKind,
+    RefreshRequest, SessionControlOutcome, SessionControlRequest, SessionControlTarget,
+    StartupControlOutcome, StartupControlRequest,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_platform_contract::SubmissionErrorKind;
 
 impl RootView {
     pub(crate) fn submit_startup_control_request(&mut self, request: StartupControlRequest) {

@@ -10,11 +10,12 @@
 
 use std::time::Duration;
 
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     DeviceGeneration, DeviceState, FailureKind, GpuMetricField, GpuMetricProvenance, GpuMetrics,
     GpuScalarObservations, GpuTelemetryObservation, ProviderId, ScalarObservation,
 };
-use taskmanager_platform_contract::{ProviderFailure, SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::GpuTelemetryProvider;
 
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};

@@ -2,10 +2,13 @@
 //! main tests module so the file stays under the 800-line source ceiling.
 use super::super::*;
 use taskmanager_application::{
-    CapabilityId, CorrelatedEvent, EventSequence, PlatformEventBatch, PlatformEventContext,
-    RequestId, ServiceEvent, ServiceLogEntry, ServiceLogLevelFilter, ServiceLogQuery,
-    ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter, ServiceUpdate,
+    CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ServiceEvent, ServiceUpdate,
 };
+use taskmanager_core::core::services::{
+    ServiceLogEntry, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogStreamSnapshot,
+    ServiceLogStreamState, ServiceLogTimeFilter,
+};
+use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
 #[test]
 fn service_log_open_poll_follow_and_close_follow_the_shared_state_machine() {
@@ -46,7 +49,7 @@ fn service_log_open_poll_follow_and_close_follow_the_shared_state_machine() {
         cursor: "j:1".into(),
         realtime_timestamp_micros: Some(1_700_000_000_000_000),
         priority: Some(3),
-        level: taskmanager_application::ServiceLogLevel::Error,
+        level: taskmanager_core::core::services::ServiceLogLevel::Error,
         message: "bind failed".into(),
     };
     let batch = ServiceLogStreamSnapshot {

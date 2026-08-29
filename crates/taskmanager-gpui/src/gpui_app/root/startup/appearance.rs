@@ -2,9 +2,11 @@
 
 use std::time::Duration;
 
-use taskmanager_application::{
-    DesktopAppearance, DesktopFamily, OperationFailure, PlatformClient, SourceStatus,
-};
+use taskmanager_application::PlatformClient;
+use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily};
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_platform_contract::OperationFailure;
+
 pub(super) struct StartupAppearanceObservation {
     pub(super) value: DesktopAppearance,
     pub(super) sources: Vec<SourceStatus>,

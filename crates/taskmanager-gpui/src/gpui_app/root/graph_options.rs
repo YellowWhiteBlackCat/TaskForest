@@ -1,7 +1,7 @@
 //! Typed RootView mutation for Mission Center Performance graph preferences.
 
 use super::RootView;
-use crate::core::alerts::{NotificationPolicy, QuietBound, apply_quiet_hour_bound};
+use taskmanager_core::core::alerts::{NotificationPolicy, QuietBound, apply_quiet_hour_bound};
 
 use crate::gpui_app::formatting::PerformanceSettings;
 use crate::gpui_app::graph::GraphSettings;

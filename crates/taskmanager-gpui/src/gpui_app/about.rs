@@ -10,10 +10,10 @@
 use gpui::{App, ClipboardItem, Div, Entity, ParentElement, Styled, Window, div, px};
 
 use crate::gpui_app::elements;
-use crate::gpui_app::icons;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui_contract::IconId;
 
 /// Stable repository URL shown by the About dialog and used by its explicit
@@ -82,7 +82,7 @@ pub fn render_about(theme: &Theme, entity: Entity<RootView>) -> Div {
                 .items_center()
                 .gap(tokens::SPACE_12)
                 .child(
-                    icons::icon(IconId::System)
+                    taskmanager_icons::icon(IconId::System)
                         .size(px(38.0))
                         .text_color(theme.accent),
                 )

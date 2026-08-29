@@ -5,7 +5,7 @@
 //! `current_*` accessors so an unavailable field renders an honest dash instead
 //! of a fabricated zero — mirroring `crates/taskmanager-gpui/src/gpui_app/perf_views/dynamic.rs`
 //! (`render_battery`) and `root/system_health.rs`. Read-only consume of
-//! `taskmanager_application::BatteryInfo`; this crate never mutates the shared
+//! `taskmanager_core::core::power::BatteryInfo`; this crate never mutates the shared
 //! snapshot shape. The accessor names agree with the GPUI frontend so the two
 //! renderers agree on what "unavailable" means for each battery field.
 //!
@@ -22,9 +22,9 @@ use ratatui::style::Style;
 use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
 
-use taskmanager_application::BatteryInfo;
 use taskmanager_application::i18n::t;
-use taskmanager_shell::history::LiveGraphHistory;
+use taskmanager_core::core::power::BatteryInfo;
+use taskmanager_shell::ShellApp;
 
 use crate::TuiApp;
 use crate::TuiTheme;
@@ -40,7 +40,7 @@ pub(super) fn render_battery_section(
     app: &TuiApp,
     theme: TuiTheme,
     area: Rect,
-    power_supplies: Option<&taskmanager_application::PowerSupplySnapshot>,
+    power_supplies: Option<&taskmanager_core::core::power::PowerSupplySnapshot>,
 ) {
     if area.height == 0 {
         return;
@@ -53,12 +53,7 @@ pub(super) fn render_battery_section(
         super::render_empty_panel(frame, theme, area, t("common.battery"), t("battery.empty"));
         return;
     }
-    let lines = battery_lines(
-        &supplies.batteries,
-        &app.history,
-        theme,
-        app.prefs.graph_points,
-    );
+    let lines = battery_lines(&supplies.batteries, &app, theme, app.prefs.graph_points);
     frame.render_widget(
         Paragraph::new(lines)
             .block(super::panel(t("common.battery"), theme))
@@ -78,7 +73,7 @@ pub(super) fn render_battery_section(
 /// dotted "collecting" placeholder instead of a fabricated flat line.
 fn battery_lines(
     batteries: &[BatteryInfo],
-    history: &LiveGraphHistory,
+    shell: &ShellApp,
     theme: TuiTheme,
     graph_window: usize,
 ) -> Vec<ratatui::text::Line<'static>> {
@@ -101,15 +96,16 @@ fn battery_lines(
         // stable id, the same key the recorder uses), so the trend lines up with
         // its row. A constant series renders a flat mid-ramp line; <2 samples
         // renders the dotted "collecting" placeholder — never fabricated.
-        let window = history.battery_capacity_pct_for(&battery.id);
+        let window = shell.history.battery_capacity_pct_for(&battery.id);
         lines.push(ratatui::text::Line::from(vec![
             Span::raw("  "),
             Span::styled(
-                super::sparkline::device_trend_with(&window, graph_window),
+                super::sparkline::device_trend_in(theme.terminal.glyphs, &window, graph_window),
                 Style::new().fg(theme.accent),
             ),
         ]));
-        if let Some(summary) = super::sparkline::device_summary_line(
+        if let Some(summary) = super::sparkline::device_summary_line_in(
+            theme.terminal.glyphs,
             t("battery.capacity"),
             &window,
             super::sparkline::DeviceSummaryUnit::Percent,
@@ -160,16 +156,21 @@ fn battery_lines(
         // when at least two samples exist — a single sample cannot show a
         // SHAPE, so no line at all is the honest absence, never a fabricated
         // flat trend.
-        let power_history = history.battery_power_w_for(&battery.id);
+        let power_history = shell.history.battery_power_w_for(&battery.id);
         if power_history.len() >= 2 {
             lines.push(ratatui::text::Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
-                    super::sparkline::device_trend_with(&power_history, graph_window),
+                    super::sparkline::device_trend_in(
+                        theme.terminal.glyphs,
+                        &power_history,
+                        graph_window,
+                    ),
                     Style::new().fg(theme.accent),
                 ),
             ]));
-            if let Some(summary) = super::sparkline::device_summary_line(
+            if let Some(summary) = super::sparkline::device_summary_line_in(
+                theme.terminal.glyphs,
                 t("battery.power"),
                 &power_history,
                 super::sparkline::DeviceSummaryUnit::Watts,

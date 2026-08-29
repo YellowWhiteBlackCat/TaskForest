@@ -95,7 +95,8 @@ fn dialog_scene_spawns_title_body_and_two_actions() {
 fn table_header_spawns_one_cell_per_contract_column() {
     let columns: Vec<_> = process_columns().iter().collect();
     let mut app = headless_scene_app();
-    let texts = text_census(&mut app, header_scene(&columns, None));
+    let palette = ui_palette(&Theme::dark());
+    let texts = text_census(&mut app, header_scene(&columns, None, &palette));
     assert_eq!(
         texts.len(),
         process_columns().len(),

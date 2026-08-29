@@ -2,10 +2,16 @@ use std::thread;
 use std::time::Duration;
 
 use taskmanager_application::{
-    CapabilityId, DeviceState, EventEnvelope, FailureKind, LatestControlRequest,
-    PartialSourceSnapshot, PlatformEvent, PlatformHandle, ProviderId, RequestEnvelope, RequestId,
-    SessionControlAction, SessionControlRequest, SessionEvent, StartupBootEvidenceSnapshot,
+    LatestControlRequest, PlatformEvent, PlatformHandle, SessionControlRequest, SessionEvent,
     StartupEvent, StartupEvidenceEvent, StartupEvidenceRequest, StartupInventoryRequest,
+};
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_platform_contract::{
+    CapabilityId, EventEnvelope, PartialSourceSnapshot, RequestEnvelope, RequestId,
 };
 
 use super::*;

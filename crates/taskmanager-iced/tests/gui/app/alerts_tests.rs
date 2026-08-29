@@ -1,6 +1,6 @@
 use super::*;
 use crate::app::Message;
-use taskmanager_application::alerts::AlertMetric;
+use taskmanager_core::core::alerts::AlertMetric;
 
 #[test]
 fn opening_the_page_reads_rows_from_the_shared_alert_center() {
@@ -106,6 +106,7 @@ fn selecting_a_shared_page_closes_the_alerts_route() {
 fn escape_closes_the_alerts_route_when_no_modal_is_open() {
     use crate::keys::IcedKey;
     use taskmanager_application::{KeyCode, Modifiers};
+
     use taskmanager_shell::ShellKeyEvent;
 
     let mut app = crate::IcedApp::demo();
@@ -126,6 +127,7 @@ fn escape_still_closes_the_alerts_route_over_a_shell_page() {
     // (nothing to dismiss), and the route stays closed.
     use crate::keys::IcedKey;
     use taskmanager_application::{KeyCode, Modifiers};
+
     use taskmanager_shell::ShellKeyEvent;
 
     let mut app = crate::IcedApp::demo();
@@ -144,6 +146,7 @@ fn escape_still_closes_the_alerts_route_over_a_shell_page() {
 fn alt_eight_opens_the_alerts_route() {
     use crate::keys::IcedKey;
     use taskmanager_application::{KeyCode, Modifiers};
+
     use taskmanager_shell::ShellKeyEvent;
 
     let mut app = crate::IcedApp::demo();
@@ -175,6 +178,7 @@ fn alt_eight_opens_the_alerts_route() {
 fn alt_eight_does_not_open_the_route_beneath_a_modal() {
     use crate::keys::IcedKey;
     use taskmanager_application::{KeyCode, Modifiers};
+
     use taskmanager_shell::ShellKeyEvent;
 
     let mut app = crate::IcedApp::demo();
@@ -197,6 +201,7 @@ fn alt_eight_does_not_open_the_route_beneath_a_modal() {
 fn alt_eight_is_inert_while_search_owns_the_keyboard() {
     use crate::keys::IcedKey;
     use taskmanager_application::{KeyCode, Modifiers};
+
     use taskmanager_shell::ShellKeyEvent;
 
     let mut app = crate::IcedApp::demo();

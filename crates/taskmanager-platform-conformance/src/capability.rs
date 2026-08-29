@@ -2,7 +2,8 @@
 
 use std::collections::BTreeSet;
 
-use taskmanager_application::{CapabilityId, CapabilitySnapshot, CapabilityStatus, ProviderId};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{CapabilityId, CapabilitySnapshot, CapabilityStatus};
 
 /// A freshly spawned runtime must expose exactly the declared surface, with
 /// descriptors that never claim availability before the first observation and

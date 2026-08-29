@@ -23,9 +23,10 @@ use gpui::{
 use taskmanager_ui_contract::{Binding, BindingEntry, FrontendBindingDeclaration, FrontendShape};
 
 use crate::gpui_app::elements;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Theme, mono_font_with_fallback};
-use crate::i18n;
+use crate::gpui_app::theme::mono_font_with_fallback;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
 use taskmanager_ui::primitives::section_header::SectionHeader;
 

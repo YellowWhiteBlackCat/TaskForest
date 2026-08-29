@@ -133,9 +133,6 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::DirectoryUsageCancel => "iced-directory-usage-cancel".to_owned(),
         FocusTarget::DiskSmartOpen { index } => format!("iced-disk-smart-open-{index}"),
         FocusTarget::GpuEngineRowsToggle => "iced-gpu-engine-rows-toggle".to_owned(),
-        FocusTarget::GpuChartMetricTab(metric) => {
-            format!("iced-gpu-chart-metric-{}", metric.id_stem())
-        }
         FocusTarget::AboutCopyDetails => "iced-about-copy-details".to_owned(),
         FocusTarget::ServiceLogFollow => "iced-service-log-follow".to_owned(),
         FocusTarget::ServiceLogPause => "iced-service-log-pause".to_owned(),
@@ -496,7 +493,7 @@ fn selectable_row_base<'a>(
         true,
     )
     .with_right_press(on_right_press)
-    .with_hover(crate::theme::color(palette.hover))
+    .with_hover(taskmanager_theme::iced::color(palette.hover))
     .into()
 }
 

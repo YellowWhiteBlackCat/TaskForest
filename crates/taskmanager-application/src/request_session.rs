@@ -2,10 +2,13 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::{
-    FailureKind, FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult, RequestId,
-    SmartSelfTestIntent, StorageDeviceTarget, SubmissionErrorKind,
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult,
 };
+use taskmanager_core::core::storage::StorageDeviceTarget;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_platform_contract::{RequestId, SubmissionErrorKind};
 
 mod gpu_engine_rows;
 mod network_escalation;

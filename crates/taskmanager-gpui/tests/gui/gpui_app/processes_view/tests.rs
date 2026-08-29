@@ -28,17 +28,39 @@ use gpui::{
 };
 use std::rc::Rc;
 
-use crate::core::process::{
+use crate::gpui_app::root::{RootView, TopPage};
+use taskmanager_core::core::process::{
     ApplicationIconAsset, ApplicationIconFormat, ProcessApplicationIdentity,
     ProcessMetadataObservation,
 };
-use crate::gpui_app::processes_view::rows::SortCol;
-use crate::gpui_app::root::{RootView, TopPage};
-use crate::gpui_app::theme::{
-    Theme,
-    tokens::{RowDensity, UiSize},
-};
-use taskmanager_shell::ProcessRowKey;
+use taskmanager_shell::ProcessRowId;
+
+
+/// The expected row id of one fixture process (token from
+/// `fixture_start_token`, the builder's single source).
+fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
+    taskmanager_shell::ProcessRowId::Process(
+        taskmanager_shell::ProcessRowIdentity::from_parts(
+            pid,
+            taskmanager_test_support::fixture_start_token(pid),
+        )
+        .expect("fixture pid and token are non-zero"),
+    )
+}
+
+fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
+    taskmanager_shell::ProcessRowId::Application(
+        taskmanager_shell::ProcessRowIdentity::from_parts(
+            pid,
+            taskmanager_test_support::fixture_start_token(pid),
+        )
+        .expect("fixture pid and token are non-zero"),
+    )
+}
+
+use taskmanager_shell::SortCol;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
 
 fn wrapped_root(cx: &mut TestAppContext) -> (WindowHandle<RootView>, Entity<RootView>) {
     let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
@@ -307,13 +329,15 @@ async fn compact_apps_action_bar_prioritizes_the_table_without_hiding_commands(
                     taskmanager_test_support::ProcessItemFixtureBuilder::new()
                         .pid(pid)
                         .name(format!("compact-worker-{pid}"))
-                        .scalar_observations(crate::core::process::ProcessScalarObservations {
-                            start_token: crate::core::ScalarObservation::available(
-                                u64::from(pid),
-                                1,
-                            ),
-                            ..Default::default()
-                        })
+                        .scalar_observations(
+                            taskmanager_core::core::process::ProcessScalarObservations {
+                                start_token: taskmanager_core::core::ScalarObservation::available(
+                                    u64::from(pid),
+                                    1,
+                                ),
+                                ..Default::default()
+                            },
+                        )
                         .build()
                 })
                 .collect(),
@@ -400,7 +424,7 @@ async fn compact_apps_action_bar_prioritizes_the_table_without_hiding_commands(
             v.process_termination_confirmation()
                 .map(|intent| intent.action)
         }),
-        Some(crate::gpui_app::root::ProcessTerminationAction::ForceKill),
+        Some(taskmanager_application::ProcessTerminationAction::ForceKill),
         "a secondary destructive command must remain reachable through the real compact menu"
     );
 }
@@ -639,7 +663,7 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
                     is_hov: false,
                     entity: &self.entity,
                     pids: Rc::new(vec![4242]),
-                    row_keys: Rc::new(vec![ProcessRowKey::Process(4242)]),
+                    row_keys: Rc::new(vec![row_id(4242)]),
                     rows: Rc::new(Vec::new()),
                     gray_zero_values: false,
                     density: RowDensity::Comfortable,
@@ -656,7 +680,7 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
         RowHarness {
             row: VisibleRow {
                 name: "important-worker".into(),
-                selection_key: Some(ProcessRowKey::Process(4242)),
+                selection_key: Some(row_id(4242)),
                 process_pid: Some(4242),
                 pid: 4242,
                 application_identity: Some(
@@ -733,7 +757,7 @@ async fn mc03_app_icon_case_verified_application_asset_mounts_as_a_gpui_image(
                     is_hov: false,
                     entity: &self.entity,
                     pids: Rc::new(vec![4243]),
-                    row_keys: Rc::new(vec![ProcessRowKey::Process(4243)]),
+                    row_keys: Rc::new(vec![row_id(4243)]),
                     rows: Rc::new(Vec::new()),
                     gray_zero_values: false,
                     density: RowDensity::Comfortable,
@@ -762,7 +786,7 @@ async fn mc03_app_icon_case_verified_application_asset_mounts_as_a_gpui_image(
         RowHarness {
             row: VisibleRow {
                 name: "image-editor".into(),
-                selection_key: Some(ProcessRowKey::Process(4243)),
+                selection_key: Some(row_id(4243)),
                 process_pid: Some(4243),
                 pid: 4243,
                 application_identity: Some(identity),
@@ -832,7 +856,7 @@ async fn debug_bounds_probe(cx: &mut TestAppContext) {
 #[gpui::test]
 async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext) {
     use crate::gpui_app::processes_view::rows::{ProcRowProps, Toggle, VisibleRow, proc_row};
-    use crate::gpui_app::theme::tokens::SELECTION_RAIL;
+    use taskmanager_theme::tokens::SELECTION_RAIL;
 
     struct SelHarness {
         row: VisibleRow,
@@ -851,7 +875,7 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
                     is_hov: false,
                     entity: &self.entity,
                     pids: Rc::new(vec![4242]),
-                    row_keys: Rc::new(vec![ProcessRowKey::Process(4242)]),
+                    row_keys: Rc::new(vec![row_id(4242)]),
                     rows: Rc::new(Vec::new()),
                     gray_zero_values: false,
                     density: RowDensity::Comfortable,
@@ -865,7 +889,7 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
 
     let row = || VisibleRow {
         name: "rail-worker".into(),
-        selection_key: Some(ProcessRowKey::Process(4242)),
+        selection_key: Some(row_id(4242)),
         process_pid: Some(4242),
         pid: 4242,
         application_identity: None,

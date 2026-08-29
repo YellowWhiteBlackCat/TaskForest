@@ -8,8 +8,8 @@
 //! line when no projection has arrived. The scan lifecycle (start/cancel via
 //! the `d` key) is covered by the runtime tests
 //! (`runtime/tests/directory_usage.rs`). The snapshot types reach this
-//! firewalled crate through the application boundary's public root (ADR-020,
-//! BN-01 vocabulary re-export), so a headless fixture snapshot can be
+//! frontend through the core owner module (BN-01 vocabulary), so a headless
+//! fixture snapshot can be
 //! constructed and asserted against real `TestBackend` output.
 
 use super::frame_text;

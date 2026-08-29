@@ -4,8 +4,9 @@ use std::rc::Rc;
 
 use taskmanager_application::{
     HistoryReplayCompletionDisposition, HistoryReplayController, HistoryReplayRequest,
-    HistoryReplayRequestId, HistorySeriesKey, HistoryWindow,
+    HistoryReplayRequestId,
 };
+use taskmanager_core::core::history::{HistorySeriesKey, HistoryWindow};
 
 use super::IcedApp;
 
@@ -320,7 +321,7 @@ impl IcedHistoryRuntime {
 
     fn record_sink(
         &self,
-    ) -> Option<std::sync::Arc<dyn taskmanager_application::HistoryRecordSink>> {
+    ) -> Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>> {
         match &self.resources {
             IcedHistoryResources::Active(active) => active
                 .persistence

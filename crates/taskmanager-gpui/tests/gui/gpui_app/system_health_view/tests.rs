@@ -2,9 +2,9 @@ use gpui::{
     AppContext, Context, IntoElement, Render, ScrollHandle, TestAppContext, Window, px, size,
 };
 
-use crate::core::SmartSelfTestKind;
 use crate::gpui_app::root::responsive::{PageLayoutBudget, SystemPageBudget};
-use crate::gpui_app::theme::Theme;
+use taskmanager_core::core::SmartSelfTestKind;
+use taskmanager_theme::Theme;
 
 use super::{
     SmartSelfTestConfirmationRequest, SystemHealthCallbacks, SystemHealthCaptureFixture,

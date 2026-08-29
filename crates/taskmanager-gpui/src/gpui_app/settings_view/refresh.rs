@@ -8,9 +8,9 @@ use gpui::{AppContext, Context, Div, Entity, ParentElement, Styled, div};
 use taskmanager_ui::inputs::slider::{Slider, SliderState};
 
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 // The persistent `Entity<SliderState>` for the refresh-interval slider.
 //

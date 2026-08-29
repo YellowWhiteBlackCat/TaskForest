@@ -5,7 +5,9 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
-use taskmanager_application::{ServiceId, ServiceLogAvailability, i18n::t};
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::services::ServiceLogAvailability;
+use taskmanager_core::core::target::ServiceId;
 
 use super::super::panel;
 use crate::{TuiApp, TuiTheme};
@@ -25,13 +27,21 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
     } else {
         String::new()
     };
+    // The control suffix single-sources the panel's four declared protocol
+    // arms (`f p l t`) through the layer-3 hint vocabulary. The leading
+    // "Esc closes" is the structural close copy — deliberately not a protocol
+    // arm (the panel's `q` close stays handwritten at its dispatch site) — so
+    // it keeps its own catalog key here.
     let title = format!(
-        "{} · {} {}{} · {}",
+        "{} · {} {}{} · {} · {}",
         t("svc.logs"),
         open.service_id().map_or("—", ServiceId::as_str),
         follow,
         paused,
-        t("svc.logs_controls"),
+        t("tui.surface.panel_close"),
+        crate::command_palette::surface_hint_run(
+            crate::command_palette::TuiSurfaceScope::ServiceLogPanel
+        ),
     );
     let entries = app
         .shell

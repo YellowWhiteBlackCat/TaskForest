@@ -10,11 +10,13 @@ use std::rc::Rc;
 
 use crate::gpui_app::elements::{self};
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::tokens::{RowDensity, UiSize};
-use crate::gpui_app::theme::{Color, Theme, mono_font_with_fallback, tokens};
-use crate::i18n;
+use crate::gpui_app::theme::mono_font_with_fallback;
+use taskmanager_application::i18n;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
+use taskmanager_theme::{Color, Theme};
 
-use super::rows::{SortCol, is_numeric, sort_col_step, sort_id, visible_sort_cols};
+use super::rows::{is_numeric, sort_col_step, sort_id, visible_sort_cols};
+use taskmanager_shell::SortCol;
 
 mod action_bar;
 mod action_button;
@@ -33,6 +35,7 @@ use overlays::{AffinityOverlayProps, affinity_overlay};
 pub use page_layout::ProcessChromePresentation;
 pub use render::{ProcessesViewProps, render_processes};
 use resize::{header_col_width, mount_resize_handle};
+use taskmanager_theme::tokens;
 
 // ── status-filter segmented control ──────────────────────────────────────────
 

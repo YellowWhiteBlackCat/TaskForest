@@ -23,7 +23,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-pub use taskmanager_core::core::startup::{
+use taskmanager_core::core::startup::{
     StartupControlPolicy, StartupEntry, StartupEntryId, StartupImpact, StartupImpactEvidence,
     StartupImpactUnknownReason, StartupScope, StartupSource,
 };

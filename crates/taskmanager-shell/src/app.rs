@@ -1,21 +1,27 @@
 //! Renderer-independent shell state and shared-command adapter (ADR-027).
 
 use taskmanager_application::{
-    AlertCenter, AlertEvaluation, AppAction, AppPage, AppState, CapabilityId, CapabilitySnapshot,
-    CapabilityStatus, CommandContext, CommandScope, ConfirmationKind, ContainerRollup,
-    ContainerRollupEvent, DesktopNotificationRequest, DeviceLifecycleDiagnosticHistory,
-    DeviceLifecycleProjection, DeviceLifecycleSnapshotRevision, DirectoryUsageEvent,
-    DirectoryUsageSnapshot, FrozenProcessIdentity, HardwareInfo, HardwareInventoryEvent, KeyCode,
-    LatestControlRequest, LatestServiceControlRequest, Modifiers, NpuInventorySnapshot,
-    PendingConfirmation, PlatformEffect, PlatformEventBatch, PowerSupplyEvent, PowerSupplySnapshot,
-    ProcessAffinityEvent, ProcessBatchAction, ProcessBatchIntent, ProcessEvent, ProcessItem,
-    ProcessSignal, ProjectedProcessInsights, ProjectedSystemTelemetry, Reduction, RefreshRequest,
-    SensorCenterSnapshot, SensorEvent, ServiceAction, ServiceControlTarget, ServiceEvent,
-    ServiceItem, ServiceUpdate, SessionControlConfirmation, SessionEvent, SessionItem, SmartEvent,
-    SmartObservationProjection, SmartProjectionApplyResult, SourceStatus,
-    StartupBootEvidenceSnapshot, StartupControlRequest, StartupEntry, StartupEvent,
-    StartupEvidenceUnavailable, StorageHealthEvent, SurfaceKind, SurfaceTransition, SystemSnapshot,
+    AlertCenter, AlertEvaluation, AppAction, AppPage, AppState, CommandContext, CommandScope,
+    ConfirmationKind, ContainerRollupEvent, DesktopNotificationRequest,
+    DeviceLifecycleDiagnosticHistory, DeviceLifecycleProjection, DeviceLifecycleSnapshotRevision,
+    DirectoryUsageEvent, HardwareInventoryEvent, KeyCode, LatestControlRequest,
+    LatestServiceControlRequest, Modifiers, PendingConfirmation, PlatformEffect,
+    PlatformEventBatch, PowerSupplyEvent, ProcessAffinityEvent, ProcessEvent,
+    ProjectedProcessInsights, ProjectedSystemTelemetry, Reduction, RefreshRequest, SensorEvent,
+    ServiceControlTarget, ServiceEvent, ServiceUpdate, SessionControlConfirmation, SessionEvent,
+    SmartEvent, SmartObservationProjection, SmartProjectionApplyResult, StartupControlRequest,
+    StartupEvent, StartupEvidenceUnavailable, StorageHealthEvent, SurfaceKind, SurfaceTransition,
     TelemetryRefreshPolicy, reduce,
+};
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::{
+    ContainerRollup, DirectoryUsageSnapshot, FrozenProcessIdentity, HardwareInfo,
+    NpuInventorySnapshot, PowerSupplySnapshot, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
+    ProcessSignal, SensorCenterSnapshot, ServiceAction, ServiceItem, SessionItem,
+    StartupBootEvidenceSnapshot, StartupEntry, SystemSnapshot,
+};
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilitySnapshot, CapabilityStatus, RequestId,
 };
 
 use crate::{InputDispatch, ProcessStatusFilter, ShellKeyEvent, matches_process_query, route_key};
@@ -37,6 +43,7 @@ mod on_demand;
 mod platform_feedback;
 mod process_control;
 mod process_requests;
+pub mod process_rows;
 mod request_sessions;
 mod row_summary;
 pub mod search_input;
@@ -48,10 +55,10 @@ mod sorting;
 mod system_telemetry;
 
 pub use self::direct_track::{
-    DirectTrackState, InventorySorts, ProcessRowKey, ProcessSelection, ProcessViewing,
-    order_service_rows, order_session_rows, order_startup_rows, pid_range,
+    DirectTrackState, InventorySorts, ProcessSelection, ProcessViewing, identity_range,
+    order_service_rows, order_session_rows, order_startup_rows,
 };
-pub use self::selection::selected_pids_range;
+pub use self::selection::selected_rows_range;
 
 use self::effect_dispatch::{MAX_PENDING_NOTIFICATIONS, submission_time_ms};
 pub use self::effect_dispatch::{queue_effect, queue_effect_result};
@@ -68,6 +75,7 @@ pub use self::lifecycle::{
 };
 pub use self::platform_feedback::process_control_notice_text;
 pub use self::process_control::{ProcessControlFeedback, ProcessControlKind};
+use self::process_rows::{ProcessProjectionGeneration, ProcessRowId, ProcessRowIdentity};
 pub use self::service_log::OpenServiceLog;
 pub use self::sort_axis::{aggregate_sort_key, sort_axis};
 pub use self::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
@@ -101,7 +109,7 @@ pub struct SystemProjectionStore {
     pub hardware: Option<HardwareInfo>,
     /// Source truth paired with the latest hardware inventory snapshot, or
     /// the typed failure that left the last usable value in place.
-    pub hardware_source: Option<Vec<taskmanager_application::SourceStatus>>,
+    pub hardware_source: Option<Vec<SourceStatus>>,
     pub processes: Option<Vec<ProcessItem>>,
     pub services: Option<Vec<ServiceItem>>,
     pub startup_entries: Option<Vec<StartupEntry>>,
@@ -110,16 +118,16 @@ pub struct SystemProjectionStore {
     /// remain usable when one provider is partial, so frontends must render
     /// this beside the rows instead of collapsing the page into a blank
     /// success-looking state.
-    pub services_source: Option<Vec<taskmanager_application::SourceStatus>>,
+    pub services_source: Option<Vec<SourceStatus>>,
     /// Source-status diagnostics for the Startup inventory. This remains
     /// independent from startup boot evidence and startup control outcomes.
-    pub startup_source: Option<Vec<taskmanager_application::SourceStatus>>,
+    pub startup_source: Option<Vec<SourceStatus>>,
     /// Source-status diagnostics for the sessions inventory (which provider
     /// answered, and with what outcome). An empty list from a FAILED source
     /// must not read as "no sessions": frontends render the typed reason
     /// instead (GPUI `empty_state_failure` parity). `None` while no session
     /// snapshot has ever arrived.
-    pub sessions_source: Option<Vec<taskmanager_application::SourceStatus>>,
+    pub sessions_source: Option<Vec<SourceStatus>>,
     /// cgroup-v2 container rollup (typed health + aggregated containers).
     pub containers: Option<ContainerRollup>,
     /// Latest power/battery snapshot (per-battery capacity, charge rate, state).
@@ -162,13 +170,13 @@ pub struct SystemProjectionStore {
     /// the honest no-NPU host; utilization facts stay typed.
     pub npu_inventory: Option<NpuInventorySnapshot>,
     /// Latest filesystem-health facts and their independent provider status.
-    storage_health: Option<taskmanager_application::FilesystemHealthSnapshot>,
+    storage_health: Option<taskmanager_core::core::storage_health::FilesystemHealthSnapshot>,
     storage_health_source: Option<Vec<SourceStatus>>,
     /// Application-owned anti-resurrection projection of the latest SMART
     /// batch. The request id is retained only to resolve the matching control
     /// affordance; renderers consume observations, not raw events.
     smart_observations: SmartObservationProjection,
-    smart_subject: Option<taskmanager_application::StorageDeviceTarget>,
+    smart_subject: Option<taskmanager_core::core::storage::StorageDeviceTarget>,
     /// Latest application-correlated six-domain state. `snapshot` is the
     /// complete render model and changes only when all domains are current.
     pub system_telemetry: Option<ProjectedSystemTelemetry>,
@@ -195,7 +203,7 @@ pub struct SystemProjectionStore {
     /// mirrors the latest evaluation for the in-app surfaces; notifications
     /// accumulate in a bounded queue the frontend drains and submits.
     pub alert_center: AlertCenter,
-    pub alert_active: Vec<taskmanager_application::alerts::Alert>,
+    pub alert_active: Vec<taskmanager_core::core::alerts::Alert>,
     pub(crate) pending_notifications: std::collections::VecDeque<DesktopNotificationRequest>,
     /// Timestamp of the last snapshot folded into the rolling suggestion
     /// window. Used to avoid double-counting a snapshot that did not change
@@ -228,6 +236,14 @@ pub struct SystemProjectionStore {
 }
 
 impl SystemProjectionStore {
+    /// Return the process projection's typed generation token. This is a
+    /// cache/geometry token, not a provider start token or a control request
+    /// id; unrelated domain folds do not change it.
+    #[must_use]
+    pub const fn process_projection_generation(&self) -> ProcessProjectionGeneration {
+        ProcessProjectionGeneration::new(self.process_revision)
+    }
+
     #[must_use]
     pub fn capability_status(&self, id: &CapabilityId) -> Option<CapabilityStatus> {
         self.capabilities
@@ -257,19 +273,22 @@ pub struct ShellApp {
     /// self-tests on the composed shell track.
     request_sessions: self::request_sessions::RequestSessions,
     /// Keyboard anchor index into [`Self::visible_processes`] (single-select
-    /// cursor for the TUI arrow path). The companion [`Self::selected_pids`]
-    /// set carries the true batch target set.
+    /// cursor for the TUI arrow path). Derived state: it follows the
+    /// identity-authoritative [`Self::selected_row`] across reorder and is
+    /// clamped positionally when that row disappears.
     pub selected: usize,
-    /// Multi-select target set for the Applications process table. A plain
-    /// click / bare arrow resets this to exactly the anchor pid (single
-    /// select); Ctrl-click toggles a pid; Shift-click grows a range — mirrors
-    /// the gpui per-row handler (`processes_view/rows.rs`). `request_process_batch`
-    /// freezes the whole set so a batch verb (Kill / Suspend / Resume /
-    /// SetPriority) reaches every selected row.
-    pub selected_pids: std::collections::HashSet<u32>,
+    /// Multi-select target set for the Applications process table, keyed by
+    /// validated live identity (pid + provider start token, CORE-01). A plain
+    /// click / bare arrow resets this to exactly the anchor identity (single
+    /// select); Ctrl-click toggles an identity; Shift-click grows a range —
+    /// mirrors the gpui per-row handler (`processes_view/rows.rs`).
+    /// `request_process_batch` freezes the whole set exactly so a batch verb
+    /// (Kill / Suspend / Resume / SetPriority) reaches every selected row and
+    /// never a pid-reuse impostor.
+    pub selected_rows: std::collections::HashSet<ProcessRowIdentity>,
     /// Semantic primary row. PID-less application aggregates live here
-    /// without being rewritten into the root process pid.
-    pub selected_process_row: Option<ProcessRowKey>,
+    /// without being rewritten into the root process identity.
+    pub selected_row: Option<ProcessRowId>,
     pub query: String,
     /// The active Applications state bucket. The renderer owns the segmented
     /// control; the shell owns the filtered row set consumed by every action
@@ -283,7 +302,7 @@ pub struct ShellApp {
     /// revision, the trimmed query, the sort, and the table length. The filter
     /// and sort run once per process input change instead of per call —
     /// `visible_processes` has about a dozen call sites across the fold and
-    /// all three frontends, several on 10 Hz poll cadences.
+    /// all four frontends, several on 10 Hz poll cadences.
     pub(crate) visible_processes_memo: std::cell::RefCell<Option<VisibleProcessesMemo>>,
     /// Active Services-table sort; `None` keeps provider order until a header
     /// click picks a column. Single source: every frontend projects rows
@@ -295,7 +314,7 @@ pub struct ShellApp {
     pub sessions_sort: Option<(InfoSortCol, SortDir)>,
     /// Single renderer-neutral live graph store. Its private paired writer is
     /// fed only from application-correlated outcomes below.
-    pub history: crate::history::LiveGraphHistory,
+    pub history: taskmanager_telemetry_store::live_graph::LiveGraphHistory,
     /// Bounded evidence for alert-threshold suggestions and the SMART detail
     /// trend. It intentionally owns no general live graph series.
     pub alert_suggestions: taskmanager_application::AlertSuggestionWindow,
@@ -476,7 +495,7 @@ impl ShellApp {
     pub(crate) fn seed_fixture_process_batch_loading(
         &mut self,
         intent: ProcessBatchIntent,
-        request_id: taskmanager_application::RequestId,
+        request_id: RequestId,
     ) {
         let attempt = self.request_sessions.begin_batch(intent);
         let _ = self.request_sessions.accept_batch(attempt, request_id);
@@ -488,17 +507,29 @@ impl ShellApp {
         edit: taskmanager_application::ManagedAlertRuleEdit,
     ) -> Result<
         taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_application::alerts::AlertRuleTransferError,
+        taskmanager_core::core::alerts::AlertRuleTransferError,
     > {
         self.data.alert_center.edit_rules(edit)
     }
 
     /// Replace desktop-notification policy without exposing the alert engine.
-    pub fn set_alert_policy(
-        &mut self,
-        policy: taskmanager_application::alerts::NotificationPolicy,
-    ) {
+    pub fn set_alert_policy(&mut self, policy: taskmanager_core::core::alerts::NotificationPolicy) {
         self.data.alert_center.set_policy(policy);
+    }
+
+    /// Clear the shared alert transition history without changing the active
+    /// evaluator or its notification policy.
+    pub fn clear_alert_event_history(&mut self) {
+        self.data.alert_center.clear_event_history();
+    }
+
+    /// Install deterministic alert transition history through the shared
+    /// fixture/capture seam; live history still comes only from evaluation.
+    pub fn replace_alert_event_history(
+        &mut self,
+        events: Vec<taskmanager_core::core::alerts::AlertEvent>,
+    ) {
+        self.data.alert_center.replace_event_history(events);
     }
 
     #[must_use]
@@ -697,14 +728,26 @@ impl ShellApp {
 
     #[must_use]
     pub fn selected_process_identity(&self) -> Option<FrozenProcessIdentity> {
-        if matches!(
-            self.selected_process_row,
-            Some(ProcessRowKey::Application(_))
-        ) {
-            return None;
+        // Exact-identity freeze (CORE-01): a Process row freezes from its own
+        // validated identity. Application aggregates carry no process target
+        // (never a representative member) and structural rows have none — the
+        // positional fallback applies only when no semantic row is set.
+        match self.selected_row {
+            Some(ProcessRowId::Process(identity)) => {
+                let processes = self.data.processes.as_deref().unwrap_or_default();
+                processes
+                    .iter()
+                    .find(|process| {
+                        process.pid == identity.pid()
+                            && process.current_start_token() == Some(identity.start_token())
+                    })
+                    .and_then(FrozenProcessIdentity::from_process)
+            }
+            Some(ProcessRowId::Application(_)) | Some(ProcessRowId::Category(_)) => None,
+            None => self
+                .visible_process_at(self.selected)
+                .and_then(FrozenProcessIdentity::from_process),
         }
-        self.visible_process_at(self.selected)
-            .and_then(FrozenProcessIdentity::from_process)
     }
 
     fn apply_reduction(&mut self, reduction: Reduction) -> Option<PlatformEffect> {

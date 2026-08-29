@@ -1,9 +1,9 @@
-use crate::core::{
-    DeviceGeneration, DeviceId, SmartSelfTestObservation, SmartSelfTestReport, StorageDeviceKey,
-};
 use taskmanager_application::{
     SmartObservationBatch, SmartObservationProjection, SmartProjectionApplyResult,
     SmartStateRevision,
+};
+use taskmanager_core::core::{
+    DeviceGeneration, DeviceId, SmartSelfTestObservation, SmartSelfTestReport, StorageDeviceKey,
 };
 
 use super::smart_report_for_device;

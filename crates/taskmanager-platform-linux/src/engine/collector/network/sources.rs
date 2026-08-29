@@ -9,9 +9,10 @@ use std::process::Command;
 use std::sync::Arc;
 use std::time::Duration;
 
-use taskmanager_core::ScalarObservation;
 use taskmanager_core::core::device_state::stable_network_id;
-use taskmanager_platform_contract::{FailureKind, SourceOutcome};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::source::SourceOutcome;
 
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 const IW_LINK_TIMEOUT: Duration = Duration::from_secs(2);

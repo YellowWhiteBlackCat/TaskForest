@@ -1,8 +1,8 @@
 //! Pure CPU observation projection consumed by the CPU render tree.
 
-use crate::core::metrics::SystemSnapshot;
 use crate::gpui_app::formatting;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 use super::{
     cpu_frequency_readout_for_source, cpu_temperature_readout_for_source, per_core_cell_label,

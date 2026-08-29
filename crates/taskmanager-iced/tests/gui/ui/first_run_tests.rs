@@ -5,7 +5,8 @@
 
 use super::*;
 use std::path::PathBuf;
-use taskmanager_application::{FailureKind, SetupScriptAction, SetupScriptInfo};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptInfo};
 
 fn info() -> SetupScriptInfo {
     SetupScriptInfo {

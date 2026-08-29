@@ -10,21 +10,21 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_ui_contract::IconId;
 
-use crate::core::SystemSnapshot;
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use crate::gpui_app::graph::{GraphHover, GraphOpts, graph_element_hover, graph_hover};
-use crate::gpui_app::icons;
 use crate::gpui_app::root::responsive::{SystemPageBudget, SystemSurfacePresentation};
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::sidebar::SelectedDevice;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Color, Theme};
 use crate::gpui_app::timeline::{
     HistoryWindow, TimelineMetric, TimelineSelection, TimelineSeries, TimelineStatistic,
 };
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::AlertEvent;
+use taskmanager_core::core::SystemSnapshot;
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryHistory;
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, Theme};
 use taskmanager_ui::layout::scroll_region_with_rail;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
@@ -131,6 +131,7 @@ fn section_pill(
 pub fn render_system_header(
     theme: &Theme,
     state: &DashboardState,
+    events: &[AlertEvent],
     layout: SystemPageBudget,
     entity: Entity<RootView>,
 ) -> Div {
@@ -142,7 +143,7 @@ pub fn render_system_header(
             });
         }
     };
-    let unread = state.events.unread_count();
+    let unread = state.events.unread_count(events);
     div()
         .flex()
         .flex_row()
@@ -243,7 +244,11 @@ fn summary_card(
                         .flex()
                         .items_center()
                         .gap(tokens::SPACE_5)
-                        .child(icons::icon(icon).size(px(14.0)).text_color(color))
+                        .child(
+                            taskmanager_icons::icon(icon)
+                                .size(px(14.0))
+                                .text_color(color),
+                        )
                         .child(label.to_string()),
                 )
                 .child(i18n::t("dashboard.open")),

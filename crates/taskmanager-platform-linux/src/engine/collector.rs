@@ -3,20 +3,22 @@
 //! Declares the compute, disk, network, lifecycle, and host-domain collectors
 //! and owns the cross-tick disk-stats and SMART provider state they share.
 
-use taskmanager_core::DeviceId;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::{DeviceId, ProviderId};
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuPerformancePolicy, DiskMetrics, MemoryCompositionObservations,
     MemoryCompressionObservations, MemoryMetrics, MemoryModuleObservations,
     MemoryOptionalObservations, MemoryScalarObservations, OptionalObservation, ScalarObservation,
     VirtualMemoryCommitObservations,
 };
+use taskmanager_core::core::smart::DiskSmart;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 use crate::engine::smart;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
 use std::time::Instant;
-use taskmanager_platform_contract::{FailureKind, ProviderId, SourceOutcome, SourceStatus};
 
 mod compute;
 mod disks;
@@ -49,7 +51,7 @@ struct DiskStatsState {
 
 struct DiskCollectionState {
     stats: HashMap<String, DiskStatsState>,
-    smart_cache: HashMap<String, smart::DiskSmart>,
+    smart_cache: HashMap<String, DiskSmart>,
     smart_source_cache: HashMap<String, SourceStatus>,
     identity_cache: HashMap<String, DeviceId>,
     smart_providers: smart::SmartProviderRegistry,

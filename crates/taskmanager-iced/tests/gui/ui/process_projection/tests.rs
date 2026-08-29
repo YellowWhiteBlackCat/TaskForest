@@ -1,5 +1,13 @@
 use super::*;
 
+
+/// Expected row id for a fixture process (single source: the fixture
+/// builder's default start token).
+fn expected_row_key(kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId, pid: u32) -> Option<taskmanager_shell::ProcessRowId> {
+    taskmanager_shell::ProcessRowIdentity::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+        .map(kind)
+}
+
 fn proc(pid: u32, name: &str, parent_pid: Option<u32>) -> ProcessItem {
     taskmanager_test_support::ProcessItemFixtureBuilder::new()
         .pid(pid)
@@ -10,7 +18,8 @@ fn proc(pid: u32, name: &str, parent_pid: Option<u32>) -> ProcessItem {
 }
 
 fn app_proc(pid: u32, name: &str) -> ProcessItem {
-    use taskmanager_application::{ProcessApplicationIdentity, ProcessMetadataObservation};
+    use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+
     let identity =
         ProcessApplicationIdentity::new("org.example.App", name, None).expect("identity fixture");
     let mut process = proc(pid, name, None);
@@ -29,13 +38,14 @@ fn project(
         (SortCol::Cpu, SortDir::Desc),
         expanded_groups,
         collapsed,
-        &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     )
 }
 
 #[test]
 fn category_projection_has_one_fixed_bucket_order() {
-    use taskmanager_application::{ProcessApplicationIdentity, ProcessMetadataObservation};
+    use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+
     taskmanager_test_support::pin_english();
     let mut background = proc(20, "daemon", None);
     background.apply_application_identity(
@@ -71,11 +81,11 @@ fn application_total_and_recursive_process_rows_keep_distinct_identity() {
     let projection = project(&items, &expanded, &HashSet::new());
     assert_eq!(
         projection.rows()[1].row_key(),
-        Some(ProcessRowKey::Application(10))
+        expected_row_key(taskmanager_shell::ProcessRowId::Application, 10)
     );
     assert_eq!(
         projection.rows()[2].row_key(),
-        Some(ProcessRowKey::Process(10))
+        expected_row_key(taskmanager_shell::ProcessRowId::Process, 10)
     );
 }
 
@@ -164,8 +174,8 @@ fn row_cells_keep_unavailable_values_honest() {
         .name("missing".into())
         .build();
     let mut observations = *process.scalar_observations();
-    observations.memory_bytes = taskmanager_application::ScalarObservation::unavailable(
-        taskmanager_application::FailureKind::PermissionDenied,
+    observations.memory_bytes = taskmanager_core::core::metrics::ScalarObservation::unavailable(
+        taskmanager_core::core::failure::FailureKind::PermissionDenied,
     );
     process.apply_scalar_observations(observations);
     let cells = build_row_cells(&process);

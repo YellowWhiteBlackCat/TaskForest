@@ -1,12 +1,12 @@
 //! Deterministic hardware fixtures used only by capture scenarios.
 
-use crate::core::device_state::{DeviceState, DeviceStatus};
-use crate::core::metrics::{
+use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::metrics::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, DiskScalarObservations, GpuEngine,
     GpuEngineKind, GpuGraphicsApi, GpuMetrics, GpuScalarObservations, SmartAvailability,
     SystemSnapshot,
 };
-use crate::core::{
+use taskmanager_core::core::{
     BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceId, FailureKind, NpuDevice,
     NpuEngineKind, NpuEngineUsage, NpuInventorySnapshot, NpuMemoryReport, PowerSupplySnapshot,
     ScalarObservation, SensorCenterSnapshot, SensorDescriptor, SensorMagnitude,
@@ -266,7 +266,9 @@ fn capture_partition(
     let observations = if mount_point.is_empty() {
         DiskPartitionScalarObservations {
             capacity_bytes: ScalarObservation::available(total_gib * scale, now),
-            ..DiskPartitionScalarObservations::unavailable(crate::core::FailureKind::Unsupported)
+            ..DiskPartitionScalarObservations::unavailable(
+                taskmanager_core::core::FailureKind::Unsupported,
+            )
         }
     } else {
         DiskPartitionScalarObservations {

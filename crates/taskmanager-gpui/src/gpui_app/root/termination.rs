@@ -11,15 +11,18 @@ use gpui::{
 };
 use std::collections::HashMap;
 
-use crate::core::process::{ProcessItem, descendant_pids};
 use crate::gpui_app::elements;
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
 use taskmanager_application::{
-    ConfirmationKind, FailureKind, FrozenProcessIdentity, PendingConfirmation,
-    SurfaceDismissReason, SurfaceKind,
+    ConfirmationKind, PendingConfirmation, SurfaceDismissReason, SurfaceKind,
 };
-pub use taskmanager_application::{ProcessTerminationAction, ProcessTerminationConfirmation};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{ProcessItem, descendant_pids};
+use taskmanager_theme::Theme;
+
+use taskmanager_application::{ProcessTerminationAction, ProcessTerminationConfirmation};
+use taskmanager_theme::tokens;
 
 fn feedback_action(action: ProcessTerminationAction) -> ProcessControlAction {
     match action {

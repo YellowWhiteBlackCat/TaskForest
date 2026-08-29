@@ -1,11 +1,10 @@
-//! Bevy UI fourth frontend — M0 skeleton, bootstrap spread
+//! Bevy UI fourth frontend — peer surface to the GPUI/Iced/TUI frontends
 //! ([docs/BEVY_UI_FRONTEND.md](../../docs/BEVY_UI_FRONTEND.md)).
 //!
-//! Peer surface to the GPUI/Iced/TUI frontends: this crate renders the same
-//! neutral shell projections with Bevy 0.19's official two-piece UI base —
-//! `bevy_ui` + `bevy_ui_widgets` — composing static structure declaratively
-//! with `bsn!` and binding dynamic state through observers and required
-//! components. It owns these seams:
+//! This crate renders the same neutral shell projections with Bevy 0.19's
+//! official two-piece UI base — `bevy_ui` + `bevy_ui_widgets` — composing
+//! static structure declaratively with `bsn!` and binding dynamic state
+//! through observers and required components. It owns these seams:
 //!
 //! - [`runtime`]: the process-wide platform client, acquired once through the
 //!   app-host `OnceLock` cache pattern (charter boundary 5). A window rebuild
@@ -16,15 +15,23 @@
 //! - [`palette`]: the toolkit-neutral theme tokens mapped onto bevy colors and
 //!   type metrics (boundary 2 — the adapter lives in this crate, never behind
 //!   a `theme` feature).
-//! - [`app`]: the frontend-owned route model (eight pages), keyboard routing
+//! - [`app`]: the frontend-owned route model (nine pages), keyboard routing
 //!   through the shared command router, and the [`app::ShellTrack`] seam
 //!   pages read the folded projection through.
-//! - [`pages`]: the eight page modules — placeholder bodies until their
+//! - [`input`]: the real-input seam (W4) — Bevy keyboard events forwarded
+//!   through the shell's own routers, with the effect bridge to the drain.
+//! - [`confirmation`]: the shell's armed destructive-action gate rendered as
+//!   one modal surface with typed confirm/dismiss paths.
+//! - [`icons`]: the semantic icon bridge — `IconId` → shared RGBA bitmaps →
+//!   tinted `ImageNode`s, with the no-decoration-glyph tofu law.
+//! - [`semantic`]: the accessibility seam — the shared `SemanticSnapshot`
+//!   vocabulary mapped onto bevy's AccessKit nodes.
+//! - [`pages`]: the nine page modules — placeholder bodies until their
 //!   milestones; each page agent fills exactly one file.
 //! - [`widgets`]: the owned component layer (table/sparkline cores + bsn!
 //!   render adapters, menu/dialog skeletons).
-//! - [`window`]: the bsn! app shell (header + nav rail + content slot) and
-//!   the observers that keep it live.
+//! - [`window`]: the bsn! app shell (nav strip + status band + content slot)
+//!   and the observers that keep it live.
 //!
 //! Bevy types never cross this crate's public API: [`run_placeholder_window`]
 //! answers with a plain [`std::process::ExitCode`], and the window module
@@ -39,13 +46,25 @@
 #![allow(rustdoc::private_intra_doc_links)]
 
 pub mod app;
+pub mod bindings;
+pub mod capabilities;
+pub mod confirmation;
 pub mod drain;
+pub mod functional;
+pub mod icons;
+pub mod input;
 pub mod input_contract;
+pub mod menu_modal;
 pub mod pages;
 pub mod palette;
 pub mod runtime;
+pub mod semantic;
 pub mod widgets;
 mod window;
+
+#[cfg(test)]
+#[path = "../tests/headless/visual_parity.rs"]
+mod visual_parity_tests;
 
 use std::process::ExitCode;
 

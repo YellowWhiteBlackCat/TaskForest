@@ -7,15 +7,15 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 
-use crate::core::hardware::HardwareInfo;
-use crate::core::metrics::SystemSnapshot;
-use crate::core::process::ProcessItem;
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 pub struct SystemViewData<'a> {
     pub hardware: &'a HardwareInfo,
@@ -23,7 +23,7 @@ pub struct SystemViewData<'a> {
     /// Latest NPU accelerator inventory (capability `accelerator.npu`). The
     /// section renders only when real devices exist; `None`, an empty list,
     /// and typed failures all leave the page unchanged.
-    pub npu_inventory: Option<&'a taskmanager_application::NpuInventorySnapshot>,
+    pub npu_inventory: Option<&'a taskmanager_core::core::npu::NpuInventorySnapshot>,
     /// Shared by refcount: the render rows borrow it and the export pill's
     /// `'static` closure captures a clone of the handle — no per-frame deep
     /// copy of the process table.
@@ -112,7 +112,7 @@ use sections::{build_sections, build_tiles};
 pub(super) fn graphics_scroll_item(
     hw: &HardwareInfo,
     snap: &SystemSnapshot,
-    npu_inventory: Option<&taskmanager_application::NpuInventorySnapshot>,
+    npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
 ) -> Option<usize> {
     const FIXED_LEADING_ITEMS: usize = 2;
     build_sections(hw, snap, npu_inventory)

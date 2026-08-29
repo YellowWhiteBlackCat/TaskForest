@@ -5,27 +5,27 @@ use iced::{Element, Length};
 // Shared locale catalog for the shared-page body chrome (System / Services /
 // Startup column headers, action labels, confirm/cancel) that was previously
 // hard-coded English.
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::rc::Rc;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
-    AppPage, FrozenProcessIdentity, RefreshRequest, ServiceAction, ServiceStatus,
-};
+use taskmanager_application::{AppPage, RefreshRequest};
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::services::{ServiceAction, ServiceStatus};
+
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 use taskmanager_theme::tokens;
 
 pub(super) use super::components::{
     message_panel, search_input, source_notice_banner, source_state_panel,
 };
-use super::highlight;
 use super::virtual_list::{ColumnWidth, TableColumn};
 use super::{
-    MISSING_VALUE, VIRTUAL_TABLE_HEADER_HEIGHT, VirtualWindow, virtual_table, virtual_table_body,
+    VIRTUAL_TABLE_HEADER_HEIGHT, VirtualWindow, virtual_table, virtual_table_body,
     virtual_table_key, virtual_table_row,
 };
 use crate::app::{FocusTarget, Message};
+use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};
+use taskmanager_shell::presentation::MISSING_VALUE;
 
 mod headings;
 pub(super) use headings::service_heading;
@@ -185,6 +185,9 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
             let query_text = query.to_owned();
             let table_theme = *theme_snapshot;
             let selected = shell.selected;
+            // The open Services-row menu re-hosts its row; its source index is
+            // both the lazy-invalidation marker and the mount condition.
+            let open_menu_service = app.service_menu_index();
             let base_key = inventory_table_key(InventoryTableKey {
                 theme_snapshot,
                 generation: projection_generation,
@@ -195,6 +198,7 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
                 selected,
                 row_count: filtered_indices.len(),
                 compact,
+                open_menu: open_menu_service.map(|index| index.to_string()),
             });
             let body_rows = Rc::clone(&rows);
             let body_indices = Rc::clone(&filtered_indices);
@@ -275,6 +279,24 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
                                     source_index: service.source_index,
                                 },
                             );
+                            let cells = if open_menu_service == Some(service.source_index) {
+                                // The open menu floats on its own row: anchored
+                                // by the popover primitive and dismissed by an
+                                // outside press without touching what's below.
+                                let panel = super::service_menu::panel(
+                                    table_theme,
+                                    service.source_index,
+                                    service.name.clone(),
+                                );
+                                crate::ui::components::Popover::new(
+                                    cells,
+                                    panel,
+                                    Message::CloseServiceRowMenu,
+                                )
+                                .into()
+                            } else {
+                                cells
+                            };
                             let row = row![
                                 cells,
                                 service_action_buttons(table_theme, service.source_index, compact,),
@@ -360,13 +382,11 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
     ))
     .width(Length::Fixed(280.0))
     .into();
-    let row_menu = super::service_menu::render(app, theme_snapshot);
 
     column![
         text(heading).size(f32::from(tokens::FONT_16)),
         search,
         body,
-        row_menu,
         control_bar,
     ]
     .spacing(8)
@@ -542,33 +562,34 @@ pub(super) struct InventoryTableKey<'a> {
     pub(super) selected: usize,
     pub(super) row_count: usize,
     pub(super) compact: bool,
+    /// Stable identity of the row whose context menu is open, if any. The
+    /// open menu re-hosts one materialized row, so opening, moving, or
+    /// closing it must rebuild the lazy body exactly like any other visual
+    /// invalidation.
+    pub(super) open_menu: Option<String>,
 }
 
 pub(super) fn inventory_table_key(input: InventoryTableKey<'_>) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    input.generation.hash(&mut hasher);
-    match input.table {
-        InfoTable::Services => "services",
-        InfoTable::Startup => "startup",
-        InfoTable::Users => "users",
-    }
-    .hash(&mut hasher);
-    input
-        .sort
-        .map(|(column, direction)| (column.label(), direction.label()))
-        .hash(&mut hasher);
-    input.query.hash(&mut hasher);
-    input.search_active.hash(&mut hasher);
-    input.selected.hash(&mut hasher);
-    input.row_count.hash(&mut hasher);
-    input.compact.hash(&mut hasher);
-    input.theme_snapshot.skin.label().hash(&mut hasher);
-    input.theme_snapshot.mode.label().hash(&mut hasher);
-    input.theme_snapshot.dark.hash(&mut hasher);
-    input.theme_snapshot.hc.hash(&mut hasher);
-    input.theme_snapshot.ui_font.hash(&mut hasher);
-    input.theme_snapshot.mono_font.hash(&mut hasher);
-    hasher.finish()
+    super::lazy_key::LazyKey::new("inventory-table")
+        .revision(input.generation)
+        .theme(input.theme_snapshot)
+        .field(match input.table {
+            InfoTable::Services => "services",
+            InfoTable::Startup => "startup",
+            InfoTable::Users => "users",
+        })
+        .field(
+            input
+                .sort
+                .map(|(column, direction)| (column.label(), direction.label())),
+        )
+        .field(input.query)
+        .field(input.search_active)
+        .field(input.selected)
+        .field(input.row_count)
+        .field(input.compact)
+        .field(input.open_menu)
+        .finish()
 }
 
 pub(super) fn service_list_state(shell: &ShellApp) -> ListState {
@@ -641,7 +662,7 @@ pub(super) fn confirm_bar<'a>(
 /// vanished before confirmation, only the cancel affordance renders.
 pub(super) fn confirm_batch_bar<'a>(
     theme_snapshot: &'a taskmanager_theme::Theme,
-    intent: &taskmanager_application::ProcessBatchIntent,
+    intent: &taskmanager_core::core::process::ProcessBatchIntent,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let confirm = focus::button(
         theme_snapshot,
@@ -658,11 +679,11 @@ pub(super) fn confirm_batch_bar<'a>(
         false,
     );
     let action_label = match intent.action {
-        taskmanager_application::ProcessBatchAction::End => t("proc.end_process_tree"),
-        taskmanager_application::ProcessBatchAction::Kill => t("proc.kill"),
-        taskmanager_application::ProcessBatchAction::Suspend => t("proc.suspend"),
-        taskmanager_application::ProcessBatchAction::Resume => t("proc.resume"),
-        taskmanager_application::ProcessBatchAction::SetPriority(_) => t("proc.priority"),
+        taskmanager_core::core::process::ProcessBatchAction::End => t("proc.end_process_tree"),
+        taskmanager_core::core::process::ProcessBatchAction::Kill => t("proc.kill"),
+        taskmanager_core::core::process::ProcessBatchAction::Suspend => t("proc.suspend"),
+        taskmanager_core::core::process::ProcessBatchAction::Resume => t("proc.resume"),
+        taskmanager_core::core::process::ProcessBatchAction::SetPriority(_) => t("proc.priority"),
     };
     // Surface the full target scope so a multi-target destructive action reads
     // as a frozen identity set rather than the single first row (mirrors the

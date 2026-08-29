@@ -1,10 +1,10 @@
 //! Production localization resolver for the isolated system-health surface.
 
-use crate::core::{
+use taskmanager_application::i18n;
+use taskmanager_core::core::{
     DeviceStatus, FilesystemHealthStatus, SmartSelfTestFailure, SmartSelfTestKind,
     SmartSelfTestPhase,
 };
-use crate::i18n;
 
 use super::{SensorGroup, SystemHealthText};
 

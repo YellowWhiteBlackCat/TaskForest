@@ -3,7 +3,10 @@
 use iced::widget::{column, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
-use taskmanager_application::{DisplayInfo, HardwareInfo, NpuInventorySnapshot, SystemSnapshot};
+use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::npu::NpuInventorySnapshot;
+
 use taskmanager_shell::presentation::{duration, missing_value};
 use taskmanager_theme::tokens;
 

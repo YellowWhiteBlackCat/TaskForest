@@ -11,7 +11,6 @@ use gpui::{
 };
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryHistory;
 
-use crate::core::metrics::{GpuMetrics, SystemSnapshot};
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{
     DisplayUnits, GraphUnit, PerformanceSettings, UnitKind, gpu_identity_text, missing_value,
@@ -28,23 +27,24 @@ use crate::gpui_app::perf_views::layout::{
 use crate::gpui_app::perf_views::smart_status::status_footer;
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::PerformanceChartInventory;
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
-use taskmanager_shell::history::LiveGraphHistory;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricAvailability, GpuChartMetricUnit, gpu_chart_metric_history,
 };
+use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
-const VRAM_SUMMARY_LABEL_WIDTH: crate::gpui_app::theme::Length =
-    crate::gpui_app::theme::Length(82.0);
+const VRAM_SUMMARY_LABEL_WIDTH: taskmanager_theme::Length = taskmanager_theme::Length(82.0);
 
 /// Root-owned GPU UI state projected into one render call. The state remains
 /// per-window; this props boundary only prevents the stateless renderer from
 /// growing another independent argument for every GPU control family.
 pub(crate) struct GpuRenderState<'a> {
     pub(crate) engine_session: &'a taskmanager_application::GpuEngineRowsState,
-    pub(crate) engine_capability_status: Option<taskmanager_application::CapabilityStatus>,
-    pub(crate) engine_device_id: taskmanager_application::DeviceId,
+    pub(crate) engine_capability_status: Option<taskmanager_platform_contract::CapabilityStatus>,
+    pub(crate) engine_device_id: taskmanager_core::core::identity::DeviceId,
     pub(crate) chart_layout: GpuChartLayout,
     pub(crate) performance: PerformanceSettings,
     pub(crate) stats_scroll: ScrollHandle,
@@ -172,7 +172,7 @@ fn vram_composition_block(
 
 fn vram_summary_row(
     theme: &Theme,
-    color: crate::gpui_app::theme::Color,
+    color: taskmanager_theme::Color,
     _debug_name: &'static str,
     label: &str,
     used: String,

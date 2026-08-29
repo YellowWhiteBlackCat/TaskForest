@@ -1,7 +1,8 @@
 use super::*;
-use taskmanager_application::{
-    FailureKind, GpuEngineKind, GpuEngineRowsSession, GpuEngineRowsSnapshot, RequestId,
-};
+use taskmanager_application::GpuEngineRowsSession;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineRowsSnapshot};
+use taskmanager_platform_contract::RequestId;
 
 fn device() -> DeviceId {
     DeviceId::new("gpu:0")

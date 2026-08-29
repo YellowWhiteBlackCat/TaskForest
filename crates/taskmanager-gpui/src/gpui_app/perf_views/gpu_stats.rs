@@ -5,8 +5,8 @@
 //! do not exist on this GPU family (power draw, temperature, VRAM pairs,
 //! throttle reason) omit their rows entirely.
 
-use crate::core::metrics::GpuMetrics;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::GpuMetrics;
 
 use crate::gpui_app::formatting::{DisplayUnits, UnitKind};
 use taskmanager_shell::viewmodel::StatRow;

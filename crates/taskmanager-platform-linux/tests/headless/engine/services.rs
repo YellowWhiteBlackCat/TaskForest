@@ -3,6 +3,7 @@
 use super::*;
 use std::thread;
 use std::time::Instant;
+use taskmanager_core::core::services::ServiceRelationEdge;
 
 #[test]
 fn openrc_status_maps_started_stopped_crashed() {

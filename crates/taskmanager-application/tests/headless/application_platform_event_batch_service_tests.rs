@@ -1,6 +1,6 @@
-use taskmanager_platform_contract::{
-    CapabilityId, PartialSourceSnapshot, ProviderId, RequestId, SourceOutcome, SourceStatus,
-};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::{CapabilityId, PartialSourceSnapshot, RequestId};
 
 use super::super::super::{PlatformEvent, ServiceEvent};
 use super::super::{PlatformEventBatch, test_support::test_event_context};

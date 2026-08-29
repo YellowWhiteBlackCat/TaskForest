@@ -1,7 +1,7 @@
 //! Renderer-edge network category labels and visibility classification helpers.
 
-use crate::core::metrics::{NetworkAdapterType, NetworkMetrics};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
 
 /// Per-network-category visibility policy projected from the Settings/RootView
 /// preference state. This is presentation policy only: providers publish all

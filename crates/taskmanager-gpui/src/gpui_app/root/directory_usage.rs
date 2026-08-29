@@ -11,11 +11,11 @@
 
 use taskmanager_application::DirectoryUsageRequest;
 
-use crate::core::{
+use crate::gpui_app::root::RootView;
+use taskmanager_core::core::{
     DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec, DirectoryScanStatus,
     DirectoryUsageSnapshot,
 };
-use crate::gpui_app::root::RootView;
 
 impl RootView {
     /// Start (or resume — starting the same root again supersedes) a bounded

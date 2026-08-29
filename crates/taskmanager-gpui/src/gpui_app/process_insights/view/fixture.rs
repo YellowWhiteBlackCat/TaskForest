@@ -2,16 +2,17 @@
 
 use std::net::SocketAddr;
 
-use taskmanager_application::{
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
     IsolationKind, LimitValue, OpenFileEntry, OpenFileKind, ProcessConnection, ProcessEnvironment,
     ProcessGpuDevice, ProcessGpuSnapshot, ProcessIdentity, ProcessIsolation,
     ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot, ProcessTelemetrySnapshot,
-    ProcessThreadInfo, ProcessThreads, ProviderId, ResourceGroupMembership, ThreadState,
+    ProcessThreadInfo, ProcessThreads, ResourceGroupMembership, ThreadState,
 };
 
-use crate::core::device_state::DeviceState;
-use crate::core::{
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::{
     ProcessGpuEngineUsage, ProcessGpuEngines, ProcessResourceObservations, ResourceObservation,
     ScalarObservation,
 };

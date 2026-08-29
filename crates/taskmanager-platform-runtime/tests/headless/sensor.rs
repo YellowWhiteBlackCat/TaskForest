@@ -1,9 +1,10 @@
 use std::thread;
 use std::time::Duration;
 
-use taskmanager_application::{
-    CapabilityId, CapabilityStatus, DeviceDiscovery, PlatformEvent, ProviderId, RequestEnvelope,
-    RequestId, SensorEvent, SensorRequest,
+use taskmanager_application::{PlatformEvent, SensorEvent, SensorRequest};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityStatus, DeviceDiscovery, RequestEnvelope, RequestId,
 };
 
 use super::*;

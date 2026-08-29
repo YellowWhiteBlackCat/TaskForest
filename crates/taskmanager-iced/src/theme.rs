@@ -1,25 +1,23 @@
-//! The neutral skin registry mapped onto iced colors (ADR-026, ADR-027).
+//! The neutral skin registry assembled onto iced styles (ADR-026, ADR-027,
+//! CORE-07).
 //!
 //! The iced frontend uses the SAME design source as the GPUI shell and the
-//! TUI — `taskmanager-theme`'s skin tables — and converts at this edge.
-//! The iced `Theme` is built via `Theme::custom` with the skin's palette;
-//! widgets that need explicit styling read the neutral `Theme` snapshot
-//! directly through [`color`] and the style helpers, never hardcoding a
-//! terminal/desktop literal.
+//! TUI — `taskmanager-theme`'s skin tables — and converts at this edge
+//! through the theme crate's OWN `iced` binding module (the single
+//! conversion source, CORE-07): call sites import the token→value functions
+//! ([`taskmanager_theme::iced::color`], `ui_font`, `mono_font`,
+//! `ui_font_weight`, `BUNDLED_UI_FONT`) from that owner path directly, and
+//! this module keeps only style ASSEMBLY — the `Theme::custom` palette and
+//! the container/button styles composed from converted values — which is
+//! frontend policy per ADR-026 rule 3. Widgets that need explicit styling
+//! read the neutral `Theme` snapshot through those helpers, never
+//! hardcoding a terminal/desktop literal.
 
-use iced::Font;
-use iced::font::{Family, Weight};
 use iced::widget::{button, container};
 use taskmanager_theme::color::mix;
+use taskmanager_theme::iced::color;
 use taskmanager_theme::tokens::RowDensity;
-use taskmanager_theme::{Color, FONT_MISANS_VF, Theme, tokens};
-
-/// Map one neutral sRGB token onto an iced color (alpha preserved — iced
-/// paints with alpha).
-#[must_use]
-pub fn color(c: Color) -> iced::Color {
-    iced::Color::from_rgba(c.r, c.g, c.b, c.a)
-}
+use taskmanager_theme::{Color, Theme, tokens};
 
 /// The iced theme for one neutral theme snapshot: `Theme::custom` with the
 /// skin's backdrop/text/accent/status tokens. Widget default styles then
@@ -39,42 +37,6 @@ pub fn iced_theme(theme: &Theme) -> iced::Theme {
             danger: color(palette.danger),
         },
     )
-}
-
-/// The bundled UI face as an iced [`Font`]. Used as the application builder's
-/// `default_font` so every `text()` without an explicit font renders the same
-/// MiSans VF face the GPUI shell uses for product UI.
-pub const BUNDLED_UI_FONT: Font = Font::with_name(FONT_MISANS_VF);
-
-/// The iced [`Font`] for the UI role, read from the neutral theme's resolved
-/// family. Honors the persisted System/Bundled UI-font preference for any
-/// `text()` that applies it explicitly. The builder's `default_font`
-/// ([`BUNDLED_UI_FONT`]) covers the bulk of UI text; this is the live,
-/// preference-aware handle for call sites that rebuild with the theme.
-#[must_use]
-pub fn ui_font(theme: &Theme) -> Font {
-    Font::with_name(theme.ui_font)
-}
-
-/// The iced [`Font`] for the monospace role, read from the neutral theme's
-/// resolved family. Applied to tabular numerals — tables, gauges, the per-core
-/// grid, chart labels — so digits align the way GPUI's mono face does. Honors
-/// the persisted mono-font preference.
-#[must_use]
-pub fn mono_font(theme: &Theme) -> Font {
-    Font::with_name(theme.mono_font)
-}
-
-/// The resolved UI family at a specific [`Weight`] — the type-weight hierarchy
-/// GPUI renders for section titles, headings and big readouts (Semibold/Bold).
-/// Only the weight changes; the family stays the resolved UI family.
-#[must_use]
-pub fn ui_font_weight(theme: &Theme, weight: Weight) -> Font {
-    Font {
-        family: Family::Name(theme.ui_font),
-        weight,
-        ..Font::DEFAULT
-    }
 }
 
 /// Panel surface style (dialog/tooltip/card family): the skin's elevated
@@ -250,27 +212,30 @@ pub fn accent_gradient(theme: &Theme, status: button::Status) -> iced::Backgroun
 pub const FOCUS_RING_WIDTH: f32 = 2.0;
 
 /// The focus-ring stroke color for a focused control: the shared ring token
-/// ([`taskmanager_theme::Palette::ring`], the accent-derived focus hue)
-/// rendered fully opaque so the ring keeps its contrast over every skin
-/// surface.
+/// ([`taskmanager_theme::Palette::ring`], the accent-derived focus hue) with
+/// the focus-visible decision applied — the shared palette contract encodes
+/// that decision in the ring's alpha (alpha = 0 → no ring).
 ///
-/// Contrast gap with the GPUI shell, stated honestly: GPUI encodes the
-/// per-frame focus-visible decision in the ring token's alpha (alpha = 0 →
-/// pointer-driven render draws no ring; its strict `InputModality` source
-/// knows which input last moved focus). Iced 0.14 has no focus-visible
-/// source at all — its stock button carries no focused status — so the
-/// focusable wrapper treats EVERY focus as the keyboard-visible case and
-/// forces the alpha opaque. `destructive` controls keep ringing in the
-/// danger token, the same irreversible-action affordance the wrapper has
-/// always drawn.
+/// The visibility source is the renderer-local input modality
+/// ([`crate::input_modality`]): only keyboard input keeps the ring opaque,
+/// the same strict policy the GPUI shell derives from its root input-modality
+/// tracker. `destructive` controls ring in the danger token under the same
+/// visibility rule — the irreversible-action affordance stays, and a
+/// pointer-driven focus draws no ring on it either.
 #[must_use]
 pub fn focus_ring_color(theme: &Theme, destructive: bool) -> iced::Color {
     let palette = theme.palette();
-    if destructive {
-        return color(palette.danger);
-    }
-    let ring = color(palette.ring);
-    iced::Color { a: 1.0, ..ring }
+    let mut ring = if destructive {
+        color(palette.danger)
+    } else {
+        color(palette.ring)
+    };
+    ring.a = if crate::input_modality::focus_visible() {
+        1.0
+    } else {
+        0.0
+    };
+    ring
 }
 
 /// Accent-filled action button with pointer-state variants. The primary

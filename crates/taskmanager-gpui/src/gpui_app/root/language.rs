@@ -3,7 +3,7 @@
 use gpui::Context;
 
 use super::RootView;
-use crate::i18n::{self, Language};
+use taskmanager_application::i18n::{self, Language};
 
 impl RootView {
     /// Apply a user-selected language immediately and retain the preference

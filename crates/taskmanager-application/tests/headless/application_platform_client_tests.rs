@@ -5,12 +5,12 @@ use taskmanager_platform_contract::{
     EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError, SubmissionErrorKind,
 };
 
-use crate::FrozenProcessIdentity;
 use crate::platform::{
     PlatformEvent, PlatformFacets, PlatformHandle, ProcessAffinityControlRequest,
     ProcessAffinityRequest, ProcessControlRequest, ProcessFacets, ProcessInsightFacetState,
     ProcessInsightUnavailable, ProcessNetworkRequest,
 };
+use taskmanager_core::core::process::FrozenProcessIdentity;
 
 use super::PlatformClient;
 

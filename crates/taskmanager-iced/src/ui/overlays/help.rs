@@ -94,7 +94,9 @@ fn help_section_heading<'a>(
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     text(title)
         .size(f32::from(tokens::FONT_13))
-        .color(theme::color(theme_snapshot.palette().accent))
+        .color(taskmanager_theme::iced::color(
+            theme_snapshot.palette().accent,
+        ))
         .into()
 }
 

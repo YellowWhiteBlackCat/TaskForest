@@ -2,13 +2,14 @@ use std::thread;
 use std::time::Duration;
 
 use taskmanager_application::{
-    CapabilityId, ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest,
-    MemoryTelemetryRequest, PlatformEvent, ProviderId, RequestEnvelope, RequestId,
-    StorageTelemetryRequest, SystemTelemetryDomainEvent, SystemTelemetryRevision,
+    ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, MemoryTelemetryRequest,
+    PlatformEvent, StorageTelemetryRequest, SystemTelemetryDomainEvent, SystemTelemetryRevision,
 };
+use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::{
     ContainerRollup, ContainerSummary, FailureKind, IsolationKind, ScalarObservation,
 };
+use taskmanager_platform_contract::{CapabilityId, RequestEnvelope, RequestId};
 
 use super::*;
 use crate::{ProviderBinding, RuntimeConfig, RuntimeProviderBindings};

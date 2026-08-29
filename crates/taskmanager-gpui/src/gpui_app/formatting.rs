@@ -23,9 +23,9 @@
 //! part stays exact far beyond 2^53 and the remainder converts exactly. The
 //! behaviour below 2^53 is identical to the old `as f64 / unit` expressions.
 
-use crate::core::metrics::GpuMetrics;
-use crate::core::units::{self, QuantityFamily, UnitPreferences};
 use crate::gpui_app::graph::GraphSettings;
+use taskmanager_core::core::metrics::GpuMetrics;
+use taskmanager_core::core::units::{self, QuantityFamily, UnitPreferences};
 
 /// 1024³ — bytes in one gibibyte.
 pub const GIB: f64 = 1024.0 * 1024.0 * 1024.0;
@@ -76,7 +76,7 @@ pub fn optional_ghz(mhz: Option<u64>) -> String {
 pub(crate) fn gpu_identity_text(gpu: &GpuMetrics, index: usize) -> (String, String) {
     let identity = taskmanager_shell::presentation::gpu_display_identity(gpu);
     let title = identity.headline.map_or_else(
-        || format!("{} {index}", crate::i18n::t("common.gpu")),
+        || format!("{} {index}", taskmanager_application::i18n::t("common.gpu")),
         str::to_owned,
     );
     let subtitle = identity.qualifier.unwrap_or_default().to_owned();

@@ -5,6 +5,8 @@
 //! the runtime items through `use super::super::*;` (the same items the inline
 //! module used to pull in via `use super::*;`).
 
+#[path = "tests/binding_matrix.rs"]
+mod binding_matrix;
 #[path = "tests/clipboard.rs"]
 mod clipboard;
 #[path = "tests/column_menu.rs"]
@@ -43,7 +45,11 @@ mod service_control;
 mod session_control;
 #[path = "tests/settings_export.rs"]
 mod settings_export;
+#[path = "tests/smart_self_test.rs"]
+mod smart_self_test;
 #[path = "tests/source_recovery.rs"]
 mod source_recovery;
 #[path = "tests/startup_control.rs"]
 mod startup_control;
+#[path = "tests/surface_protocol.rs"]
+mod surface_protocol;

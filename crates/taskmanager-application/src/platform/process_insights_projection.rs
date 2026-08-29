@@ -8,7 +8,9 @@ use taskmanager_core::{
 use taskmanager_platform_contract::SubmissionErrorKind;
 
 use super::{ProcessInsightFacetEvent, ProcessInsightObservation};
-use crate::{FrozenProcessIdentity, ProcessInsightsRevision};
+use taskmanager_core::core::process::FrozenProcessIdentity;
+
+use crate::ProcessInsightsRevision;
 
 mod terminal;
 use terminal::{

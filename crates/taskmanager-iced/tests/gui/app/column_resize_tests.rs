@@ -13,7 +13,9 @@ use std::collections::HashSet;
 use std::time::Instant;
 
 use iced::Point;
-use taskmanager_application::{ColumnWidthConfig, ConfigStore};
+use taskmanager_application::ConfigStore;
+use taskmanager_core::core::config::ColumnWidthConfig;
+
 use taskmanager_shell::SortCol;
 
 use super::{

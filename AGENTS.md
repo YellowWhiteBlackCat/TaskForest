@@ -26,6 +26,9 @@ the lower document layers.
   ports; platform crates own I/O; frontends render projections; composition selects
   adapters.
 - One fact has one authority. A lower layer may expand an upper layer, never redefine it.
+- Cross-crate forwarding facades and type re-exports are forbidden. Consumers import the
+  actual owner module (`taskmanager-core` or `taskmanager-platform-contract`); composition
+  crates select adapters and expose behavior, not a second public address for shared types.
 
 ## Non-negotiable invariants
 
@@ -54,7 +57,8 @@ the lower document layers.
 ## Working protocol
 
 - Preserve unrelated work. Cargo uses `.tmp/`, the shared `target/`, and at most four jobs;
-  use nextest except for doctests.
+  every test execution uses `cargo nextest ... -j 4`, except doctests, which use
+  `cargo test --doc ... -j 4`. The quick test-runner policy gate enforces this rule.
 - Routine work may proceed on `main` until the owner rescinds mainline mode.
 - Before completion, run the quick gate and report pass/fail/skip with relevant evidence.
 - Keep commits focused. Never publish `.private/`, generated host receipts, or live captures.

@@ -10,7 +10,7 @@ Ratatui 0.30.2 with Crossterm 0.29.0, connects live Linux work through
 cargo run --locked -p taskmanager-tui                 # live Linux telemetry
 cargo run --locked -p taskmanager-tui -- --demo       # deterministic, no host actions
 cargo run --locked -p taskmanager-tui -- --snapshot 120 36
-cargo nextest run --locked -p taskmanager-tui
+cargo nextest run --locked -p taskmanager-tui -j 4
 bash scripts/capture-tui.sh                            # real Niri/Alacritty evidence
 ```
 

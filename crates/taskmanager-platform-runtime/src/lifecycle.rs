@@ -3,8 +3,8 @@
 //! Empty and available observations authorize a refresh; partial or unavailable
 //! collection never declares a previously known physical device absent.
 
-use taskmanager_application::{SourceOutcome, SourceStatus};
-use taskmanager_core::{DeviceRefreshOutcome, DeviceStatus};
+use taskmanager_core::core::device_state::{DeviceRefreshOutcome, DeviceStatus};
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 /// Convert aggregate source truth into lifecycle authority.
 ///

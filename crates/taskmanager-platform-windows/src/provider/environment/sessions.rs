@@ -1,9 +1,8 @@
 //! Windows WTS session inventory and session-control providers.
 
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{SessionControlAction, SessionId, SessionItem};
-use taskmanager_platform_contract::{
-    PartialSourceSnapshot, ProviderFailure, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{SessionControlProvider, SessionInventoryProvider};
 use taskmanager_windows_api::{enumerate_sessions, lock_workstation, logoff_session};
 

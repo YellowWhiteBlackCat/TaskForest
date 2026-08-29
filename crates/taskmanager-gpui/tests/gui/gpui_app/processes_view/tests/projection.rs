@@ -7,9 +7,9 @@
 use std::collections::HashSet;
 
 use crate::gpui_app::processes_view::rows::{
-    SortCol, effective_process_hidden_cols, effective_process_sort_col, sort_col_step,
-    visible_sort_cols,
+    effective_process_hidden_cols, effective_process_sort_col, sort_col_step, visible_sort_cols,
 };
+use taskmanager_shell::SortCol;
 
 /// The canonical header order (14 columns) with nothing hidden — the projection
 /// `sort_header_row` renders by default.
@@ -139,14 +139,39 @@ fn sort_col_step_cycles_the_full_default_header() {
 mod canonical_category {
     use std::collections::HashSet;
 
-    use crate::core::process::{
+    use crate::gpui_app::processes_view::rows::{
+        Toggle, VisibleRowsProps, category_tree_rows, visible_rows,
+    };
+    use taskmanager_application::i18n::{self, Language};
+    use taskmanager_application::process_category_projection::category_expansion_key;
+    use taskmanager_core::core::process::{
         ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessMetadataObservation,
     };
-    use crate::gpui_app::processes_view::rows::{
-        SortCol, Toggle, VisibleRowsProps, category_expansion_key, category_tree_rows, visible_rows,
-    };
-    use crate::i18n::{self, Language};
-    use taskmanager_shell::{ProcessRowKey, ProcessStatusFilter};
+    use taskmanager_shell::SortCol;
+    use taskmanager_shell::{ProcessRowId, ProcessStatusFilter};
+
+/// The expected row id of one fixture process (token from
+/// `fixture_start_token`, the builder's single source).
+fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
+    taskmanager_shell::ProcessRowId::Process(
+        taskmanager_shell::ProcessRowIdentity::from_parts(
+            pid,
+            taskmanager_test_support::fixture_start_token(pid),
+        )
+        .expect("fixture pid and token are non-zero"),
+    )
+}
+
+fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
+    taskmanager_shell::ProcessRowId::Application(
+        taskmanager_shell::ProcessRowIdentity::from_parts(
+            pid,
+            taskmanager_test_support::fixture_start_token(pid),
+        )
+        .expect("fixture pid and token are non-zero"),
+    )
+}
+
 
     fn app_item(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
         let identity = ProcessApplicationIdentity::new("org.example.Editor", "Editor", None)
@@ -555,7 +580,7 @@ mod canonical_category {
         use crate::gpui_app::processes_view::rows::projection::{
             StructuralArrow, structural_arrow_action,
         };
-        let parent = Some(ProcessRowKey::Process(100));
+        let parent = Some(row_id(100));
 
         assert_eq!(
             structural_arrow_action(false, parent, false),
@@ -569,7 +594,7 @@ mod canonical_category {
         );
         assert_eq!(
             structural_arrow_action(true, parent, false),
-            Some(StructuralArrow::GotoParent(ProcessRowKey::Process(100))),
+            Some(StructuralArrow::GotoParent(row_id(100))),
             "Left on an already-collapsed row climbs to the parent"
         );
         assert_eq!(
@@ -655,18 +680,18 @@ mod canonical_category {
         );
         assert_eq!(
             rows[2].parent_key,
-            Some(ProcessRowKey::Application(100)),
+            Some(application_row_id(100)),
             "the root process row climbs to the aggregate row above it"
         );
         assert_eq!(
             rows[3].parent_key,
-            Some(ProcessRowKey::Process(100)),
+            Some(row_id(100)),
             "in-tree children climb to their real parent row"
         );
-        assert_eq!(rows[4].parent_key, Some(ProcessRowKey::Process(100)));
+        assert_eq!(rows[4].parent_key, Some(row_id(100)));
         assert_eq!(
             rows[5].parent_key,
-            Some(ProcessRowKey::Process(102)),
+            Some(row_id(102)),
             "deeper rows climb one visible level at a time"
         );
         // Background keeps the direct tree: its root's parent is the
@@ -676,7 +701,7 @@ mod canonical_category {
         assert_eq!(bg_rows[1].parent_key, None);
         assert_eq!(
             bg_rows[2].parent_key,
-            Some(ProcessRowKey::Process(200)),
+            Some(row_id(200)),
             "a category-tree child climbs to its in-tree parent"
         );
         i18n::set_language(prior);

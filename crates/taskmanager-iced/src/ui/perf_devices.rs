@@ -4,10 +4,10 @@
 use super::*;
 use crate::theme;
 use iced::widget::{column, container};
-use taskmanager_application::{
-    BatteryInfo, DeviceStatus, NetworkAdapterType, NetworkMetrics, PowerSupplySnapshot,
-    SystemSnapshot,
-};
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics, SystemSnapshot};
+use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+
 use taskmanager_shell::presentation::{
     device_action_i18n_key, device_status_i18n_key, missing_value,
 };
@@ -63,7 +63,7 @@ pub(crate) fn device_status_footer<'a>(
             ])
             .style(move |_| {
                 use iced::widget::container::Style;
-                let accent = theme::color(theme_snapshot.accent);
+                let accent = taskmanager_theme::iced::color(theme_snapshot.accent);
                 Style {
                     background: Some(iced::Background::Color(iced::Color { a: 0.12, ..accent })),
                     border: iced::Border {
@@ -71,7 +71,7 @@ pub(crate) fn device_status_footer<'a>(
                         width: 0.0,
                         radius: f32::from(palette.control_radius).into(),
                     },
-                    text_color: Some(theme::color(theme_snapshot.fg)),
+                    text_color: Some(taskmanager_theme::iced::color(theme_snapshot.fg)),
                     ..Style::default()
                 }
             })

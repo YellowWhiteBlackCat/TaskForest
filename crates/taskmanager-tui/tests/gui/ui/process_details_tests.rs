@@ -6,7 +6,8 @@ use std::path::PathBuf;
 use taskmanager_application::process_details_vm::{
     DetailValue, detail_value, process_details_rows,
 };
-use taskmanager_application::{ProcessItem, ScalarObservation};
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessItem;
 
 fn fixture() -> ProcessItem {
     let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
@@ -20,8 +21,8 @@ fn fixture() -> ProcessItem {
         .current_disk_write_bytes_per_sec(1024 * 1024)
         .status("S".to_owned())
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("root"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("root"),
                 Some(PathBuf::from("/usr/bin/sample")),
                 42,
             ),
@@ -53,7 +54,7 @@ fn panel_rows_join_neutral_vm_values() {
     let pairs = detail_panel_pairs_with_local_time(
         &fixture(),
         None,
-        &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     );
     assert_eq!(pairs.len(), 14);
     use taskmanager_application::process_details_vm::ProcessDetailsField;
@@ -102,8 +103,8 @@ fn verified_start_wraps_the_vm_timestamp() {
     let pairs = detail_panel_pairs_with_local_time(
         &fixture(),
         None,
-        &taskmanager_application::LocalTimeRulesObservation::current(
-            taskmanager_application::LocalTimeRules::utc(),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
+            taskmanager_core::core::time::LocalTimeRules::utc(),
             0,
         ),
     );
@@ -117,7 +118,7 @@ fn missing_observations_render_dashes_never_fabricated_values() {
     let pairs = detail_panel_pairs_with_local_time(
         &ProcessItem::default(),
         None,
-        &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     );
     assert_eq!(pairs.len(), 14);
     for (index, expected) in [(4, "— / —"), (5, "— / —"), (6, "— / —")] {

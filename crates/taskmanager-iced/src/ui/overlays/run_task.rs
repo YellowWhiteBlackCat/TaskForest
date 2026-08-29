@@ -8,7 +8,6 @@ use taskmanager_theme::tokens;
 use super::modal_overlay;
 use crate::app::{FocusTarget, Message};
 use crate::focus;
-use crate::theme;
 
 /// State backing the Run New Task modal.
 #[derive(Clone, Debug, Default, PartialEq)]
@@ -42,7 +41,7 @@ pub fn run_task_overlay<'a>(
         vec![input.into(), admin_checkbox.into()];
 
     if let Some(err) = &state.error_msg {
-        let danger_color = theme::color(theme_snapshot.palette().danger);
+        let danger_color = taskmanager_theme::iced::color(theme_snapshot.palette().danger);
         body_items.push(
             text(err.clone())
                 .size(f32::from(tokens::FONT_12))

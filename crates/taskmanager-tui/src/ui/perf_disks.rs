@@ -2,7 +2,7 @@
 //!
 //! Reads the live snapshot's `disks` vector through the typed `Option`-returning
 //! accessors so an unavailable field renders an honest dash instead of a
-//! fabricated zero. Read-only consume of `taskmanager_application::DiskMetrics`;
+//! fabricated zero. Read-only consume of `taskmanager_core::core::metrics::DiskMetrics`;
 //! this crate never mutates the shared snapshot shape. The accessor names mirror
 //! `crates/taskmanager-gpui/src/gpui_app/perf_views/disk_stats.rs` so the two frontends agree on what
 //! "unavailable" means for each disk field.
@@ -22,9 +22,9 @@ use ratatui::style::Style;
 use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
 
-use taskmanager_application::DiskMetrics;
 use taskmanager_application::i18n::t;
-use taskmanager_shell::history::LiveGraphHistory;
+use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{
     MISSING_VALUE, device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
     smart_section_visible,
@@ -33,7 +33,6 @@ use taskmanager_ui_contract::IconId;
 
 use crate::TuiApp;
 use crate::TuiTheme;
-use crate::icon_glyph;
 
 /// Render the per-disk detail section into `area`. A zero-height area (the
 /// small-terminal case where no panel was allocated) renders nothing. Each disk
@@ -66,7 +65,7 @@ pub(super) fn render_disk_section(
     }
     let lines = disk_lines(
         disks,
-        &app.history,
+        &app,
         theme,
         app.prefs.units[2],
         app.prefs.units[3],
@@ -102,7 +101,7 @@ const MAX_DIRECTORY_USAGE_INDENT: u32 = 6;
 /// cancel) is toggled by the `d` key on the Disk device in the runtime, which
 /// routes through the `PlatformEffect::DirectoryUsage` seam — not by this
 /// renderer. The `DirectoryUsageSnapshot` / entry / totals types are
-/// re-exported through the application crate root (BN-01 vocabulary) and read
+/// imported directly from the core owner module (BN-01 vocabulary) and read
 /// through their public fields.
 pub(super) fn render_directory_usage(
     frame: &mut Frame<'_>,
@@ -193,7 +192,7 @@ pub(super) fn render_directory_usage(
 /// stay byte-counted (GPUI parity — rates honor units, fixed sizes do not).
 fn disk_lines(
     disks: &[DiskMetrics],
-    history: &LiveGraphHistory,
+    shell: &ShellApp,
     theme: TuiTheme,
     use_bytes: bool,
     use_base2: bool,
@@ -211,10 +210,30 @@ fn disk_lines(
         };
         lines.push(ratatui::text::Line::from(format!(
             "{} {}{}",
-            icon_glyph(IconId::Disk),
+            theme.glyph(IconId::Disk),
             disk.name,
             kind_suffix,
         )));
+        // Device health verdict (GPUI disk_stats first stat; shared
+        // presentation single-source). The typed DeviceStatus vocabulary
+        // carries every state — stale/degraded, permission-denied,
+        // missing-tool, unsupported — which the SMART section's smart_status
+        // variant below cannot express on its own.
+        lines.push(ratatui::text::Line::from(format!(
+            "  {} {}",
+            t("device.status"),
+            t(device_status_i18n_key(disk.device_state.status)),
+        )));
+        // Removable media (GPUI disk_stats tail row). The capability is only
+        // named when the adapter PROVED removable media; an unresolved probe
+        // renders nothing — never a fabricated Yes/No.
+        if disk.media_removable() == Some(true) {
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("disk.removable"),
+                t("common.yes"),
+            )));
+        }
         // Per-disk throughput trend: this disk's own read and write windows
         // (the split-direction companions of the summed series, same stable
         // key the recorder uses) as two label-prefixed rows on ONE shared
@@ -225,17 +244,21 @@ fn disk_lines(
         // finite samples renders the dotted "collecting" placeholder; a
         // missing sample inside a live row renders a gap dot — never a
         // fabricated flat line or baseline block.
-        let read_window =
-            history.disk_read_bytes_per_sec_for(&disk.device_id, disk.device_generation.get());
-        let write_window =
-            history.disk_write_bytes_per_sec_for(&disk.device_id, disk.device_generation.get());
-        let trend =
-            super::sparkline::device_dual_trend_with(&read_window, &write_window, graph_window);
-        let label_width = t("disk.read")
-            .chars()
-            .count()
-            .max(t("disk.write").chars().count())
-            .max(t("disk.active_time").chars().count());
+        let read_window = shell
+            .history
+            .disk_read_bytes_per_sec_for(&disk.device_id, disk.device_generation.get());
+        let write_window = shell
+            .history
+            .disk_write_bytes_per_sec_for(&disk.device_id, disk.device_generation.get());
+        let trend = super::sparkline::device_dual_trend_in(
+            theme.terminal.glyphs,
+            &read_window,
+            &write_window,
+            graph_window,
+        );
+        let label_width = super::text::cell_width(t("disk.read"))
+            .max(super::text::cell_width(t("disk.write")))
+            .max(super::text::cell_width(t("disk.active_time")));
         lines.push(super::sparkline::dual_trend_line(
             t("disk.read"),
             label_width,
@@ -251,8 +274,11 @@ fn disk_lines(
         // The total-throughput summary stays on the summed window: the two
         // direction rows carry the shape, this line carries the read+write
         // total statistics.
-        let window = history.disk_bytes_per_sec_for(&disk.device_id, disk.device_generation.get());
-        if let Some(summary) = super::sparkline::device_summary_line(
+        let window = shell
+            .history
+            .disk_bytes_per_sec_for(&disk.device_id, disk.device_generation.get());
+        if let Some(summary) = super::sparkline::device_summary_line_in(
+            theme.terminal.glyphs,
             t("common.throughput"),
             &window,
             super::sparkline::DeviceSummaryUnit::BytesPerSecond,
@@ -264,15 +290,17 @@ fn disk_lines(
         // curve rides beside (not inside) the throughput pair. Per-row
         // normalization keeps the shared sparkline semantics; the summary line
         // beneath carries the absolute 0-100 percentages.
-        let active_window =
-            history.disk_active_time_pct_for(&disk.device_id, disk.device_generation.get());
+        let active_window = shell
+            .history
+            .disk_active_time_pct_for(&disk.device_id, disk.device_generation.get());
         lines.push(super::sparkline::dual_trend_line(
             t("disk.active_time"),
             label_width,
-            &super::sparkline::device_trend_with(&active_window, graph_window),
+            &super::sparkline::device_trend_in(theme.terminal.glyphs, &active_window, graph_window),
             Style::new().fg(theme.accent),
         ));
-        if let Some(summary) = super::sparkline::device_summary_line(
+        if let Some(summary) = super::sparkline::device_summary_line_in(
+            theme.terminal.glyphs,
             t("disk.active_time"),
             &active_window,
             super::sparkline::DeviceSummaryUnit::Percent,
@@ -366,17 +394,23 @@ fn disk_lines(
             // SMART temperature history for this physical identity only.
             // Telemetry-store scopes it by device generation, so another disk
             // cannot leak into this detail trend after hot-plug or reorder.
-            let temperature_history =
-                history.disk_temperature_c_for(&disk.device_id, disk.device_generation.get());
+            let temperature_history = shell
+                .history
+                .disk_temperature_c_for(&disk.device_id, disk.device_generation.get());
             if !temperature_history.is_empty() {
                 lines.push(ratatui::text::Line::from(vec![
                     Span::raw("  "),
                     Span::styled(
-                        super::sparkline::device_trend_with(&temperature_history, graph_window),
+                        super::sparkline::device_trend_in(
+                            theme.terminal.glyphs,
+                            &temperature_history,
+                            graph_window,
+                        ),
                         Style::new().fg(theme.accent),
                     ),
                 ]));
-                if let Some(summary) = super::sparkline::device_summary_line(
+                if let Some(summary) = super::sparkline::device_summary_line_in(
+                    theme.terminal.glyphs,
                     t("common.temperature"),
                     &temperature_history,
                     super::sparkline::DeviceSummaryUnit::Celsius,
@@ -431,14 +465,15 @@ fn disk_lines(
     lines
 }
 
-/// The number of body lines one disk contributes: header + two direction
-/// trends + throughput summary + active-time trend and summary + rates
-/// (always seven), plus at most the response/IOPS, capacity/free, filesystem,
-/// temperature history and power-on rows, plus the SMART-status verdict when
-/// no SMART readout exists, plus one honest line per reported partition. Kept
-/// as a loose upper bound for the line buffer preallocation.
+/// The number of body lines one disk contributes: header + device status +
+/// removable + two direction trends + throughput summary + active-time trend
+/// and summary + rates (always nine), plus at most the response/IOPS,
+/// capacity/free, filesystem, temperature history and power-on rows, plus the
+/// SMART-status verdict when no SMART readout exists, plus one honest line
+/// per reported partition. Kept as a loose upper bound for the line buffer
+/// preallocation.
 fn disk_body_line_count(disk: &DiskMetrics) -> usize {
-    15 + disk.partitions.len()
+    17 + disk.partitions.len()
 }
 
 /// SMART temperature with an optional critical threshold, matching the no-space

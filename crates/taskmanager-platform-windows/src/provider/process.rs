@@ -16,6 +16,7 @@ use taskmanager_application::{
     ProcessNetworkEscalationRequest, ProcessNetworkRequest, ProcessOpenFilesRequest,
     ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest,
 };
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     DeviceState, FailureKind, FrozenProcessIdentity, PriorityTier, ProcessBatchAction,
     ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessGpuDevice,
@@ -23,7 +24,7 @@ use taskmanager_core::{
     ProcessResourceObservations, ProcessResourceSnapshot, ProcessSignal, ProviderId,
     ResourceObservation,
 };
-use taskmanager_platform_contract::{ProviderFailure, SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::{
     ProcessAffinityControlProvider, ProcessAffinityProvider, ProcessControlProvider,
     ProcessEnvironmentProvider, ProcessGpuProvider, ProcessIsolationProvider, ProcessListProvider,

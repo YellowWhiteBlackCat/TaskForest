@@ -1,16 +1,19 @@
 //! Shared presentation: command/page help metadata, monochrome icon glyphs,
 //! and the single-source byte/duration formatters every frontend renders
-//! (ADR-020 single-source rule; the GPUI, TUI and iced frontends all call
+//! (ADR-020 single-source rule; the GPUI, TUI, iced, and Bevy frontends all call
 //! these — never a per-frontend copy).
 
-use taskmanager_application::{
-    AppPage, CommandId, DeviceStatus, DiskMetrics, FailureKind, GpuMetrics, KeyCode,
-    LocalTimeRulesObservation, Modifiers, PriorityTier, SmartAvailability, default_bindings, i18n,
-};
+use taskmanager_application::{AppPage, CommandId, KeyCode, Modifiers, default_bindings, i18n};
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::{DiskMetrics, GpuMetrics, SmartAvailability};
+use taskmanager_core::core::process::PriorityTier;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_ui_contract::{IconId, MessageKey, descriptor, page_descriptors, page_shortcut};
 
 pub mod gpu_chart_metric;
 pub mod gpu_engine_rows;
+pub mod trend;
 
 /// The single missing-value placeholder every frontend renders for an
 /// uncollected-but-applicable observation (an em dash). "求同": one spelling,

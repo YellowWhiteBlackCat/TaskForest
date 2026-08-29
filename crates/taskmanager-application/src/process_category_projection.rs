@@ -1,6 +1,6 @@
 //! Neutral category-bucket projection shared by every frontend.
 //!
-//! The three frontends (gpui / iced / tui) each render a "Group by category"
+//! The four frontends (gpui / iced / tui / bevy) each render a "Group by category"
 //! process table. Everything they must agree on — bucket order, empty-bucket
 //! omission, member order, the shared aggregate conventions, and the
 //! locale-neutral expansion key — lives here, toolkit-neutral: no colors, no
@@ -26,11 +26,11 @@
 //!   language switch never orphans an expansion) and collision-free with any
 //!   normalized app-group name or type label.
 //!
-//! Frontends reach this module through `taskmanager_application`; the TUI
-//! (firewalled from `taskmanager-core`) also reaches [`ProcessCategory`] /
-//! `core::process::process_category` through the crate-root re-exports, as before.
+//! Frontends reach this projection through `taskmanager-application` and
+//! import the underlying [`ProcessCategory`] facts directly from their owner
+//! module in `taskmanager-core`.
 
-use crate::ProcessCategory;
+use taskmanager_core::core::process::ProcessCategory;
 
 /// Prefix of every category expansion key (see [`category_expansion_key`]).
 pub const CATEGORY_EXPANSION_KEY_PREFIX: &str = "category:";

@@ -8,7 +8,7 @@
 
 pub mod core;
 
-// The domain module owns the explicit aggregate API in `core.rs`. This
-// compatibility facade intentionally forwards that single aggregate surface;
-// the surface guard checks renamed aliases, not this established path.
+// The domain module owns the explicit aggregate API in `core.rs`; this crate
+// root keeps the owner crate's named module tree available to its own public
+// API. Cross-layer consumers must still import the owner module directly.
 pub use core::*;

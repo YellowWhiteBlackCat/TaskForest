@@ -12,7 +12,7 @@ use super::{
 
 pub(super) fn apply_root_persisted_projection(
     view: &mut RootView,
-    cfg: &crate::core::config::Config,
+    cfg: &taskmanager_core::core::config::Config,
 ) {
     let mut next = view.presentation_snapshot();
     next.appearance = view.resolved_persisted_appearance(cfg);
@@ -65,7 +65,7 @@ pub(super) fn apply_root_persisted_projection(
 
 pub(super) fn apply_root_runtime_config(
     view: &mut RootView,
-    cfg: &crate::core::config::Config,
+    cfg: &taskmanager_core::core::config::Config,
     cx: &mut gpui::Context<RootView>,
 ) {
     let history_preference_changed =

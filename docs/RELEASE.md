@@ -53,7 +53,29 @@ CI 在构建后使用 Windows Installer 管理提取验证 MSI 数据库和关�
 - DEB/RPM 的版本字段禁止预发布连字符：`0.1.0-rc.1` 落盘为 `0.1.0~rc.1`
   （~ 排序低于正式版，保证 rc 可被 `0.1.0` 升级覆盖）；
 - MSI ProductVersion 只使用数字段 `X.Y.Z`；
-- 每个平台输出独立 SHA-256 清单。
+- 每个平台输出独立 SHA-256 清单；
+- tag 一经推送不可移动、重打或删除重发；
+- prerelease 编号连续递增，作废编号不回收，缺失原因在根
+  [CHANGELOG.md](../CHANGELOG.md) 中说明。
+
+## 分支与发布线生命周期
+
+- `main` 是唯一开发主线；发布稳定期的收尾工作在 `release/X.Y` 分支进行，经 PR 并回
+  `main` 后由 `main` 打 tag 发布；
+- 发布分支在特性集冻结时创建，只接受修复性 cherry-pick；对应最终 tag 发布后即删除；
+- 已合并的历史分支（RC 分支、修复分支）及时删除，远端只保留 `main` 与活跃发布线；
+- 已推送的分支与 tag 禁止 force-push、重打或移动。
+
+## 预发布（RC）准出
+
+RC 仅在特性集冻结后切出；日常验证使用 `main` 的 CI 构建与手动 Rehearsal，不消耗
+RC 编号。打 RC tag 前必须满足：
+
+1. 对应提交上 Linux 与 Windows 阻塞 CI 为绿，Rehearsal 的 Linux/Windows x64 与
+   arm64 job 全部成功；
+2. 版本号已在根 `Cargo.toml` 提升，并与 tag 同一次推送发布；
+3. 上一 RC 遗留问题在 Release notes 中声明状态；
+4. 打包行为变化已在本文或 Release notes 中说明。
 
 ## Workflow
 
@@ -83,5 +105,7 @@ Release 只把 `contents: write` 授予发布 job。可复用 workflow 只接收
 1. 完成 Git 历史脱敏并通过 `public_repo_guard.py --history`；
 2. 手动运行 Rehearsal，确认 Linux/Windows 的 x64 与 arm64 job 均为绿色；
 3. 在干净 Linux 环境检查 DEB/RPM，在 Windows 环境执行 MSI 安装、升级和卸载；
-4. 推送首个版本 tag，例如 `v0.1.0`；
-5. 核对 GitHub Release 同时包含全部必需架构产物和 SHA-256 清单。
+4. 删除已合并的 RC 分支与修复分支，远端只保留 `main` 与活跃发布线；
+5. 推送首个版本 tag，例如 `v0.1.0`；
+6. 核对 GitHub Release 同时包含全部必需架构产物和 SHA-256 清单，并在
+   [CHANGELOG.md](../CHANGELOG.md) 中定稿 `0.1.0` 条目。

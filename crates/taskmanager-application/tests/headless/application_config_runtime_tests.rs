@@ -4,10 +4,11 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
 use taskmanager_application::{
-    Config, ConfigBootstrap, ConfigClient, ConfigCoordinator, ConfigDrain, ConfigLoadSource,
+    ConfigBootstrap, ConfigClient, ConfigCoordinator, ConfigDrain, ConfigLoadSource,
     ConfigPublication, ConfigPublicationOutcome, ConfigRecoveryNotice, ConfigRuntimeOptions,
     ConfigStore, ConfigSubmissionStatus, ConfigSubmitError,
 };
+use taskmanager_core::core::config::Config;
 
 fn test_path(label: &str) -> PathBuf {
     static NEXT_PATH: AtomicU64 = AtomicU64::new(0);

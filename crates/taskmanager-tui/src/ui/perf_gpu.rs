@@ -12,19 +12,24 @@ use ratatui::symbols::Marker;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Axis, Chart, Dataset, GraphType, Paragraph, Wrap};
 
-use taskmanager_application::{GpuMetrics, i18n::t};
-use taskmanager_shell::history::LiveGraphHistory;
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::metrics::GpuMetrics;
+use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricUnit, gpu_chart_metric_history,
 };
 use taskmanager_shell::presentation::{bytes, gpu_display_identity};
 use taskmanager_ui_contract::IconId;
 
-use crate::{TuiApp, TuiTheme, icon_glyph};
+use crate::{TuiApp, TuiTheme};
 
 const MIN_STANDARD_GRAPH_HEIGHT: u16 = 10;
 const MAX_ENGINE_VIEWPORT_HEIGHT: u16 = 8;
-const STANDARD_LAYOUT_HEIGHT: u16 = 18;
+/// Standard-layout entry height: the fully-observed full fact strip (ten
+/// rows: identity, marketing name, the two proven graphics-API versions,
+/// the clock/power row, two split-VRAM rows, throttle, driver, PCI slot)
+/// plus the minimum primary chart must fit before engines may join.
+const STANDARD_LAYOUT_HEIGHT: u16 = 20;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum GpuFactDensity {
@@ -169,22 +174,16 @@ pub(super) fn render_gpu_section(
         return;
     }
 
-    let compact_facts = gpu_fact_lines(gpus, GpuFactDensity::Compact);
-    let full_facts = gpu_fact_lines(gpus, GpuFactDensity::Full);
-    let engine_rows = taskmanager_application::DeviceId::new(gpus[0].device_id.clone());
+    let compact_facts = gpu_fact_lines_with_theme(gpus, theme, GpuFactDensity::Compact);
+    let full_facts = gpu_fact_lines_with_theme(gpus, theme, GpuFactDensity::Full);
+    let engine_rows = taskmanager_core::core::identity::DeviceId::new(gpus[0].device_id.clone());
     let engine_rows = taskmanager_shell::presentation::gpu_engine_rows::present_gpu_engine_rows(
         app.shell.gpu_engine_rows_state(),
         &engine_rows,
         app.projection()
-            .capability_status(&taskmanager_application::CapabilityId::TELEMETRY_GPU_ENGINES),
+            .capability_status(&taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES),
     );
-    let engine_lines = gpu_engine_lines(
-        gpus,
-        &app.history,
-        theme,
-        app.prefs.graph_points,
-        engine_rows,
-    );
+    let engine_lines = gpu_engine_lines(gpus, &app, theme, app.prefs.graph_points, engine_rows);
     let layout = GpuPanelLayout::resolve(
         area,
         compact_facts.len(),
@@ -207,7 +206,7 @@ pub(super) fn render_gpu_section(
         .shell
         .gpu_chart_metric_projection(&taskmanager_shell::gpu_chart_metric_gate(gpus.first()))
         .selected;
-    render_gpu_metric_chart(frame, gpus, &app.history, theme, layout.graph(), metric);
+    render_gpu_metric_chart(frame, gpus, &app, theme, layout.graph(), metric);
     if let Some(engine_area) = layout.engines() {
         render_gpu_engine_viewport(
             frame,
@@ -219,8 +218,17 @@ pub(super) fn render_gpu_section(
     }
 }
 
+#[cfg(test)]
 fn gpu_fact_lines(gpus: &[GpuMetrics], density: GpuFactDensity) -> Vec<Line<'static>> {
-    let mut lines = Vec::with_capacity(gpus.len().saturating_mul(7));
+    gpu_fact_lines_with_theme(gpus, TuiTheme::default(), density)
+}
+
+fn gpu_fact_lines_with_theme(
+    gpus: &[GpuMetrics],
+    theme: TuiTheme,
+    density: GpuFactDensity,
+) -> Vec<Line<'static>> {
+    let mut lines = Vec::with_capacity(gpus.len().saturating_mul(10));
     for gpu in gpus {
         let data = super::perf_data::gpu_data(gpu);
         let identity = gpu_display_identity(gpu)
@@ -230,7 +238,7 @@ fn gpu_fact_lines(gpus: &[GpuMetrics], density: GpuFactDensity) -> Vec<Line<'sta
             GpuFactDensity::Compact => {
                 lines.push(Line::from(format!(
                     "{} {} · {} {}",
-                    icon_glyph(IconId::Gpu),
+                    theme.glyph(IconId::Gpu),
                     identity,
                     t("common.utilization"),
                     data.utilization,
@@ -252,7 +260,7 @@ fn gpu_fact_lines(gpus: &[GpuMetrics], density: GpuFactDensity) -> Vec<Line<'sta
             GpuFactDensity::Full => {
                 lines.push(Line::from(format!(
                     "{} {} · {} {} · {} {}",
-                    icon_glyph(IconId::Gpu),
+                    theme.glyph(IconId::Gpu),
                     identity,
                     t("common.utilization"),
                     data.utilization,
@@ -269,6 +277,35 @@ fn gpu_fact_lines(gpus: &[GpuMetrics], density: GpuFactDensity) -> Vec<Line<'sta
                         t("gpu.marketing_name"),
                         name,
                     )));
+                }
+                // Proven graphics-API versions (GPUI gpu_stats parity). The
+                // core `GpuGraphicsApi` contract is explicit: a provider may
+                // leave a version absent when the loader/context is
+                // unavailable and consumers must OMIT that row — never render
+                // an inferred or dash placeholder.
+                if let Some(api) = gpu.graphics_api.as_ref() {
+                    if let Some(version) = api
+                        .opengl_version
+                        .as_deref()
+                        .filter(|value| !value.is_empty())
+                    {
+                        lines.push(Line::from(format!(
+                            "  {} {}",
+                            t("gpu.opengl_version"),
+                            version,
+                        )));
+                    }
+                    if let Some(version) = api
+                        .vulkan_version
+                        .as_deref()
+                        .filter(|value| !value.is_empty())
+                    {
+                        lines.push(Line::from(format!(
+                            "  {} {}",
+                            t("gpu.vulkan_version"),
+                            version,
+                        )));
+                    }
                 }
                 let power = data
                     .power
@@ -299,6 +336,15 @@ fn gpu_fact_lines(gpus: &[GpuMetrics], density: GpuFactDensity) -> Vec<Line<'sta
                 if let Some(driver) = gpu.driver.as_deref() {
                     lines.push(Line::from(format!("  {} {}", t("common.driver"), driver,)));
                 }
+                // Raw PCI function identity (GPUI gpu_stats tail row). An
+                // unattached/unprobed GPU omits the row instead of a dash.
+                if let Some(slot) = gpu
+                    .pci_slot
+                    .as_deref()
+                    .filter(|slot| !slot.trim().is_empty())
+                {
+                    lines.push(Line::from(format!("  {} {}", t("gpu.pci_slot"), slot,)));
+                }
             }
         }
     }
@@ -307,7 +353,7 @@ fn gpu_fact_lines(gpus: &[GpuMetrics], density: GpuFactDensity) -> Vec<Line<'sta
 
 fn gpu_engine_lines(
     gpus: &[GpuMetrics],
-    history: &LiveGraphHistory,
+    shell: &ShellApp,
     theme: TuiTheme,
     graph_window: usize,
     engine_rows: taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation<'_>,
@@ -315,7 +361,7 @@ fn gpu_engine_lines(
     let mut lines = Vec::new();
     for (index, gpu) in gpus.iter().enumerate() {
         for engine in &gpu.engines {
-            let window = history.gpu_engine_usage_pct_for(
+            let window = shell.history.gpu_engine_usage_pct_for(
                 &gpu.device_id,
                 gpu.device_generation.get(),
                 &engine.name,
@@ -325,7 +371,7 @@ fn gpu_engine_lines(
                 Span::raw(super::observed_percentage(Some(engine.usage_pct))),
                 Span::raw(" "),
                 Span::styled(
-                    super::sparkline::device_trend_with(&window, graph_window),
+                    super::sparkline::device_trend_in(theme.terminal.glyphs, &window, graph_window),
                     Style::new().fg(theme.warn),
                 ),
             ]));
@@ -365,7 +411,7 @@ fn gpu_engine_lines(
 fn render_gpu_metric_chart(
     frame: &mut Frame<'_>,
     gpus: &[GpuMetrics],
-    history: &LiveGraphHistory,
+    shell: &ShellApp,
     theme: TuiTheme,
     area: Rect,
     metric: GpuChartMetric,
@@ -377,7 +423,12 @@ fn render_gpu_metric_chart(
     let windows: Vec<Vec<f32>> = gpus
         .iter()
         .map(|gpu| {
-            gpu_chart_metric_history(history, &gpu.device_id, gpu.device_generation.get(), metric)
+            gpu_chart_metric_history(
+                &shell.history,
+                &gpu.device_id,
+                gpu.device_generation.get(),
+                metric,
+            )
         })
         .collect();
     if windows
@@ -413,8 +464,8 @@ fn render_gpu_metric_chart(
         theme.accent,
         theme.good,
         theme.danger,
-        Color::Cyan,
-        Color::Magenta,
+        theme.color(Color::Cyan),
+        theme.color(Color::Magenta),
     ];
     let datasets: Vec<Dataset<'_>> = series
         .iter()

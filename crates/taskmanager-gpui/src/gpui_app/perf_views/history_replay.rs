@@ -9,7 +9,6 @@
 
 use std::rc::Rc;
 
-use crate::core::{HistorySeriesKey, HistoryWindow};
 use gpui::{
     AnyElement, App, ElementId, InteractiveElement, IntoElement, ParentElement, SharedString,
     Styled, Window, div, px,
@@ -18,13 +17,15 @@ use taskmanager_application::{
     HistoryReplayCompletion, HistoryReplayCompletionDisposition, HistoryReplayController,
     HistoryReplayRequest, HistoryReplayRequestId,
 };
+use taskmanager_core::core::{HistorySeriesKey, HistoryWindow};
 
 use super::layout::performance_title_row;
 use crate::gpui_app::elements;
 use crate::gpui_app::graph::{GraphOpts, graph_element};
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 /// One replayed series: the stride-downsampled curve plus its fact-only
 /// summary. Gaps stay `NaN` so the graph renders them as holes.
@@ -264,7 +265,7 @@ impl RootView {
 pub(crate) fn render_history_replay(
     theme: &Theme,
     state: &HistoryReplayState,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
     entity: gpui::Entity<RootView>,
 ) -> AnyElement {
     let window = state.window();
@@ -442,33 +443,36 @@ fn format_peak(peak: f64) -> String {
 
 /// Curve color follows the series' device family, mirroring the live
 /// Performance pages' palette (fans use the accent the battery/fan views use).
-fn series_color(theme: &Theme, metric: crate::core::HistoryMetric) -> taskmanager_theme::Color {
+fn series_color(
+    theme: &Theme,
+    metric: taskmanager_core::core::HistoryMetric,
+) -> taskmanager_theme::Color {
     match metric {
-        crate::core::HistoryMetric::CpuUsagePct
-        | crate::core::HistoryMetric::CpuCoreUsagePct
-        | crate::core::HistoryMetric::CpuTemperatureC
-        | crate::core::HistoryMetric::CpuFrequencyMhz
-        | crate::core::HistoryMetric::CpuPowerW
-        | crate::core::HistoryMetric::ApplicationCpuUsagePct => theme.cpu,
-        crate::core::HistoryMetric::MemoryUsedPct
-        | crate::core::HistoryMetric::SwapUsedPct
-        | crate::core::HistoryMetric::ApplicationMemoryBytes => theme.memory,
-        crate::core::HistoryMetric::StorageActivityPct => theme.disk,
-        crate::core::HistoryMetric::NetworkRateBps => theme.network,
-        crate::core::HistoryMetric::GpuUsagePct
-        | crate::core::HistoryMetric::GpuPowerW
-        | crate::core::HistoryMetric::GpuTemperatureC
-        | crate::core::HistoryMetric::GpuFrequencyMhz => theme.gpu,
-        crate::core::HistoryMetric::BatteryCapacityPct
-        | crate::core::HistoryMetric::BatteryPowerW
-        | crate::core::HistoryMetric::BatteryHealthPct => theme.battery,
-        crate::core::HistoryMetric::FanRpm
-        | crate::core::HistoryMetric::FanPwmPct
-        | crate::core::HistoryMetric::FanTemperatureC => theme.accent,
-        crate::core::HistoryMetric::UptimeSecs
-        | crate::core::HistoryMetric::ProcessCount
-        | crate::core::HistoryMetric::ThreadCount
-        | crate::core::HistoryMetric::ApplicationProcessCount => theme.fg,
+        taskmanager_core::core::HistoryMetric::CpuUsagePct
+        | taskmanager_core::core::HistoryMetric::CpuCoreUsagePct
+        | taskmanager_core::core::HistoryMetric::CpuTemperatureC
+        | taskmanager_core::core::HistoryMetric::CpuFrequencyMhz
+        | taskmanager_core::core::HistoryMetric::CpuPowerW
+        | taskmanager_core::core::HistoryMetric::ApplicationCpuUsagePct => theme.cpu,
+        taskmanager_core::core::HistoryMetric::MemoryUsedPct
+        | taskmanager_core::core::HistoryMetric::SwapUsedPct
+        | taskmanager_core::core::HistoryMetric::ApplicationMemoryBytes => theme.memory,
+        taskmanager_core::core::HistoryMetric::StorageActivityPct => theme.disk,
+        taskmanager_core::core::HistoryMetric::NetworkRateBps => theme.network,
+        taskmanager_core::core::HistoryMetric::GpuUsagePct
+        | taskmanager_core::core::HistoryMetric::GpuPowerW
+        | taskmanager_core::core::HistoryMetric::GpuTemperatureC
+        | taskmanager_core::core::HistoryMetric::GpuFrequencyMhz => theme.gpu,
+        taskmanager_core::core::HistoryMetric::BatteryCapacityPct
+        | taskmanager_core::core::HistoryMetric::BatteryPowerW
+        | taskmanager_core::core::HistoryMetric::BatteryHealthPct => theme.battery,
+        taskmanager_core::core::HistoryMetric::FanRpm
+        | taskmanager_core::core::HistoryMetric::FanPwmPct
+        | taskmanager_core::core::HistoryMetric::FanTemperatureC => theme.accent,
+        taskmanager_core::core::HistoryMetric::UptimeSecs
+        | taskmanager_core::core::HistoryMetric::ProcessCount
+        | taskmanager_core::core::HistoryMetric::ThreadCount
+        | taskmanager_core::core::HistoryMetric::ApplicationProcessCount => theme.fg,
     }
 }
 
@@ -477,7 +481,7 @@ fn series_color(theme: &Theme, metric: crate::core::HistoryMetric) -> taskmanage
 /// shared unavailable marker; UTC is never relabeled as local.
 fn format_loaded_at(
     loaded_at_ms: u64,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> String {
     taskmanager_shell::presentation::local_timestamp(loaded_at_ms, local_time_rules)
 }

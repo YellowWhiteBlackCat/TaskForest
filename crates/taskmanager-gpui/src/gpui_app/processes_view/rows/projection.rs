@@ -4,29 +4,27 @@
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
 
-use crate::core::process::{
+use crate::gpui_app::processes_view::rows::groups::aggregate_row;
+use crate::gpui_app::root::RootView;
+use gpui::Entity;
+use taskmanager_application::i18n;
+use taskmanager_application::process_category_projection::category_buckets;
+use taskmanager_application::process_sort::compare_processes;
+use taskmanager_core::core::process::{
     AppGroup, ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessNode,
     application_group_name, build_process_tree, process_category,
 };
-use crate::gpui_app::processes_view::rows::SortCol;
-use crate::gpui_app::processes_view::rows::groups::aggregate_row;
-use crate::gpui_app::processes_view::sort_key::sort_axis;
-use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens::{RowDensity, UiSize};
-use crate::i18n;
-use gpui::Entity;
-use taskmanager_application::process_category_projection::category_buckets;
-use taskmanager_application::process_sort::compare_processes;
-use taskmanager_shell::ProcessRowKey;
+use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::matches_process_query;
+use taskmanager_shell::{SortCol, sort_axis};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::{RowDensity, UiSize};
 
 /// Stable expansion-set key for one category bucket (the shared neutral
 /// implementation): the `category:`-prefixed [`ProcessCategory::stable_key`],
-/// which can never collide with a normalized app-group name. Re-exported so
-/// the `rows` facade and the toggle paths keep one import site.
-pub use taskmanager_application::process_category_projection::category_expansion_key;
+/// which can never collide with a normalized app-group name.
+use taskmanager_application::process_category_projection::category_expansion_key;
 
 /// Seed the canonical category tree expanded on first use. The set is also
 /// used by capture/bootstrap paths, so every surface starts with the same
@@ -211,7 +209,7 @@ impl RowCellText {
             nice: optional_i32_dash(row.nice, format_nice),
             start_time: format_start_time(
                 row.start_time_secs,
-                &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+                &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
             ),
             precomputed: true,
         }
@@ -220,7 +218,7 @@ impl RowCellText {
     fn apply_local_time(
         &mut self,
         start_time_secs: Option<u64>,
-        rules: &taskmanager_application::LocalTimeRulesObservation,
+        rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
     ) {
         self.start_time = super::formatting::format_start_time(start_time_secs, rules);
     }
@@ -263,7 +261,7 @@ pub struct VisibleRow {
     /// Semantic row identity used by selection/focus. Application aggregates
     /// carry their root key while remaining PID-less; category headers have no
     /// selectable key and real process rows carry `Process(pid)`.
-    pub selection_key: Option<ProcessRowKey>,
+    pub selection_key: Option<ProcessRowId>,
     /// The process identity represented by this row. Aggregate rows are
     /// deliberately `None`: their numeric cells are totals, not a
     /// representative process, and they must never participate in process
@@ -328,15 +326,15 @@ pub struct VisibleRow {
     pub has_children: bool,
     pub collapsed: bool,
     /// Nearest visible selectable ancestor row (iced-parity tree keyboard
-    /// navigation). An in-tree parent carries its [`ProcessRowKey::Process`];
+    /// navigation). An in-tree parent carries its [`ProcessRowId::Process`];
     /// a root process row under an application aggregate carries the
-    /// aggregate's [`ProcessRowKey::Application`]. Rows whose parent is a
+    /// aggregate's [`ProcessRowId::Application`]. Rows whose parent is a
     /// structural category header — or that have no visible parent — carry
     /// `None`, so a bare Left on them is a no-op instead of falling through
     /// to column stepping. Computed once per projection rebuild (a Copy
     /// field on the row the recursion already owns); the renderer never
     /// re-derives it.
-    pub parent_key: Option<ProcessRowKey>,
+    pub parent_key: Option<ProcessRowId>,
     /// Small inline annotation (e.g. "×3" instance count on group rows).
     pub badge: Option<String>,
     pub toggle: Toggle,
@@ -371,12 +369,12 @@ fn tree_row_from_node(
     node: &ProcessNode<'_>,
     depth_offset: usize,
     collapsed: &HashSet<u32>,
-    parent_key: Option<ProcessRowKey>,
+    parent_key: Option<ProcessRowId>,
 ) -> VisibleRow {
     let has_children = !node.children.is_empty();
     let mut row = VisibleRow {
         name: node.item.name.clone(),
-        selection_key: Some(ProcessRowKey::Process(node.item.pid)),
+        selection_key: ProcessRowId::from_process(node.item),
         process_pid: Some(node.item.pid),
         pid: node.item.pid,
         application_identity: node.item.current_application_identity().cloned(),
@@ -415,7 +413,7 @@ fn push_tree_rows<'a>(
     depth_offset: usize,
     collapsed: &HashSet<u32>,
     rows: &mut Vec<VisibleRow>,
-    parent_key: Option<ProcessRowKey>,
+    parent_key: Option<ProcessRowId>,
 ) {
     rows.push(tree_row_from_node(
         node,
@@ -433,7 +431,7 @@ fn push_tree_rows<'a>(
                 depth_offset,
                 collapsed,
                 rows,
-                Some(ProcessRowKey::Process(node.item.pid)),
+                ProcessRowId::from_process(node.item),
             );
         }
     }
@@ -453,7 +451,7 @@ pub(crate) enum StructuralArrow {
     Expand,
     /// Left on an already-collapsed row: move the selection up to the nearest
     /// visible selectable ancestor ([`VisibleRow::parent_key`]).
-    GotoParent(ProcessRowKey),
+    GotoParent(ProcessRowId),
 }
 
 /// Resolve one bare structural arrow (the caller has already gated on
@@ -463,7 +461,7 @@ pub(crate) enum StructuralArrow {
 #[must_use]
 pub(crate) fn structural_arrow_action(
     collapsed: bool,
-    parent_key: Option<ProcessRowKey>,
+    parent_key: Option<ProcessRowId>,
     right: bool,
 ) -> Option<StructuralArrow> {
     match (right, collapsed) {
@@ -588,7 +586,7 @@ pub fn category_tree_rows(
                     let expansion_key = format!("app-tree:{}", group.main_pid);
                     let mut app_row =
                         aggregate_row(&group, &by_pid, Toggle::GroupApp(expansion_key.clone()));
-                    app_row.selection_key = Some(ProcessRowKey::Application(group.main_pid));
+                    app_row.selection_key = ProcessRowId::application_of(root.item);
                     app_row.depth = 1;
                     app_row.badge = None;
                     app_row.collapsed = !expanded.contains(&expansion_key);
@@ -601,7 +599,7 @@ pub fn category_tree_rows(
                             2,
                             collapsed,
                             &mut rows,
-                            Some(ProcessRowKey::Application(group.main_pid)),
+                            ProcessRowId::application_of(root.item),
                         );
                     }
                 }
@@ -636,7 +634,7 @@ pub struct ProcRowProps<'a> {
     pub pids: Rc<Vec<u32>>,
     /// Ordered selectable semantic rows. Includes PID-less application roots
     /// and excludes structural category headers.
-    pub row_keys: Rc<Vec<ProcessRowKey>>,
+    pub row_keys: Rc<Vec<ProcessRowId>>,
     /// The full visible-row projection this row belongs to, shared with the
     /// key handlers. Bare Left/Right resolve the LIVE selected row through it
     /// (focus and selection diverge after Home/End/PageUp) so the structural
@@ -669,7 +667,7 @@ pub struct VisibleRowsProps<'a> {
 pub fn visible_rows(props: VisibleRowsProps<'_>) -> Vec<VisibleRow> {
     visible_rows_with_local_time(
         props,
-        &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     )
 }
 
@@ -678,7 +676,7 @@ pub fn visible_rows(props: VisibleRowsProps<'_>) -> Vec<VisibleRow> {
 /// independent by supplying an explicit unsupported observation.
 pub fn visible_rows_with_local_time(
     props: VisibleRowsProps<'_>,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Vec<VisibleRow> {
     let VisibleRowsProps {
         processes,
@@ -709,7 +707,7 @@ pub fn visible_rows_with_local_time(
     for row in &mut rows {
         if !trimmed.is_empty() {
             row.name_highlights =
-                taskmanager_application::text::match_ranges_ascii_ci(&row.name, trimmed);
+                taskmanager_core::core::text::match_ranges_ascii_ci(&row.name, trimmed);
         }
         if !row.cell_text.precomputed {
             row.cell_text = RowCellText::build(row);
@@ -747,7 +745,7 @@ pub struct ProjectionCache {
     pub filter: ProcessStatusFilter,
     pub collapsed: HashSet<u32>,
     pub expanded_apps: HashSet<String>,
-    pub local_time_rules: taskmanager_application::LocalTimeRulesCacheKey,
+    pub local_time_rules: taskmanager_core::core::time::LocalTimeRulesCacheKey,
     pub rows: Rc<Vec<VisibleRow>>,
     pub pids: Rc<Vec<u32>>,
     pub application_count: usize,

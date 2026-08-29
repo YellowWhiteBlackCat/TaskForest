@@ -13,8 +13,9 @@ use ratatui::layout::Rect;
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Paragraph};
+use taskmanager_application::boot_timeline_rows;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{BootTimeline, StartupBootEvidenceSnapshot, boot_timeline_rows};
+use taskmanager_core::core::startup::{BootTimeline, StartupBootEvidenceSnapshot};
 
 use crate::TuiTheme;
 
@@ -114,7 +115,7 @@ pub(super) fn render_boot_timeline(
             let (label_color, detail_color, bar_color) = if row.dim {
                 (theme.dim, theme.dim, theme.dim)
             } else {
-                (Color::White, theme.dim, theme.accent)
+                (theme.color(Color::White), theme.dim, theme.accent)
             };
             let bar: String = if row.bar_cells == 0 {
                 " ".repeat(TIMELINE_BAR_CELLS)
@@ -127,12 +128,12 @@ pub(super) fn render_boot_timeline(
             };
             Line::from(vec![
                 Span::styled(
-                    format!(" {:<UNIT_COLUMN$} ", row.label),
+                    format!(" {} ", super::text::pad_cells(&row.label, UNIT_COLUMN)),
                     Style::new().fg(label_color),
                 ),
                 Span::styled(bar, Style::new().fg(bar_color)),
                 Span::styled(
-                    format!(" {:<9} ", row.detail),
+                    format!(" {} ", super::text::pad_cells(&row.detail, 9)),
                     Style::new().fg(detail_color),
                 ),
             ])

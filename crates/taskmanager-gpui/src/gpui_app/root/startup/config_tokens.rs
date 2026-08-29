@@ -7,17 +7,17 @@
 //! rather than forcing a wrong skin/mode. These are pure functions of the
 //! stored config; [`super::init`] applies them to the theme/RootView.
 
-use crate::core::config::{
+use crate::gpui_app::root::TopPage;
+use taskmanager_assets::product;
+use taskmanager_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM, Config,
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
     TEXT_RENDERING_PLATFORM_DEFAULT,
 };
-use crate::gpui_app::root::TopPage;
-use crate::gpui_app::theme::{
+use taskmanager_theme::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontAvailability, FontChoice, FontPreference, LightDark,
     Skin, Theme,
 };
-use taskmanager_assets::product;
 
 pub(super) const DEFAULT_APP_ID: &str = product::GPUI_APP_ID;
 

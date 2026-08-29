@@ -6,9 +6,10 @@
 //! longer visible.
 
 use taskmanager_application::{
-    DeviceId, GpuEngineRowsRequest, GpuEngineRowsState, SubmissionErrorKind,
-    request_submission_failure,
+    GpuEngineRowsRequest, GpuEngineRowsState, request_submission_failure,
 };
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_platform_contract::SubmissionErrorKind;
 
 use crate::gpui_app::root::RootView;
 

@@ -100,7 +100,7 @@ pub(super) fn submit_process_list(
     ids: &mut RequestIdGenerator,
     capability: CapabilityId,
     payload: ProcessListRequest,
-) -> taskmanager_application::RequestId {
+) -> RequestId {
     let id = ids.next_id();
     handle
         .process_list()
@@ -120,7 +120,7 @@ pub(super) fn submit_process_control(
     ids: &mut RequestIdGenerator,
     capability: CapabilityId,
     payload: ProcessControlRequest,
-) -> taskmanager_application::RequestId {
+) -> RequestId {
     let id = ids.next_id();
     handle
         .process_control()
@@ -140,7 +140,7 @@ pub(super) fn submit_process_affinity_control(
     ids: &mut RequestIdGenerator,
     capability: CapabilityId,
     payload: ProcessAffinityControlRequest,
-) -> taskmanager_application::RequestId {
+) -> RequestId {
     let id = ids.next_id();
     handle
         .process_affinity_control()

@@ -5,11 +5,15 @@
 //! surface or dangerous confirmation may be active, and only an explicit,
 //! branch-matched confirm transition can produce platform work.
 
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
+};
+use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+
 use crate::{
-    ControlRequestId, FrozenProcessIdentity, PlatformEffect, ProcessBatchAction,
-    ProcessBatchIntent, ProcessGroupScope, ServiceControlTarget, SessionControlAction,
-    SessionControlTarget, SessionItem, SmartControlRequest, SmartSelfTestIntent,
-    StartupControlRequest,
+    ControlRequestId, PlatformEffect, ServiceControlTarget, SessionControlTarget,
+    SmartControlRequest, StartupControlRequest,
 };
 
 /// Stable semantic identity of every shared dangerous confirmation branch.

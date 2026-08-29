@@ -1,19 +1,19 @@
 //! Dialog content for dashboard rule, event, and saved-view management.
 
 use super::{DashboardPanel, DashboardState, EventFilter, EventKind};
-use crate::core::{AlertMetric, AlertSeverity};
 use crate::gpui_app::elements;
 use crate::gpui_app::processes_view::rows::header_label;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
 use gpui::{
     AnyElement, App, ClipboardItem, Context, Div, Entity, InteractiveElement, IntoElement,
     ParentElement, ScrollHandle, Styled, Window, div, px,
 };
 use taskmanager_application::ManagedAlertRule;
+use taskmanager_application::i18n;
+use taskmanager_core::core::{AlertEvent, AlertMetric, AlertSeverity};
 use taskmanager_shell::ProcessStatusFilter;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
@@ -28,6 +28,7 @@ pub struct DashboardPanelOverlayProps<'a> {
     pub theme: &'a Theme,
     pub panel: DashboardPanel,
     pub state: &'a DashboardState,
+    pub events: &'a [AlertEvent],
     pub rules: &'a [ManagedAlertRule],
     pub entity: Entity<RootView>,
     pub scroll: ScrollHandle,
@@ -42,6 +43,7 @@ pub fn render_panel_overlay(
         theme,
         panel,
         state,
+        events,
         rules,
         entity,
         scroll,
@@ -63,7 +65,7 @@ pub fn render_panel_overlay(
         ),
         DashboardPanel::Events => (
             i18n::t("events.title"),
-            render_events(theme, state, entity).into_any_element(),
+            render_events(theme, state, events, entity).into_any_element(),
         ),
         DashboardPanel::SavedViews => (
             i18n::t("saved_views.title"),
@@ -101,7 +103,12 @@ pub fn render_panel_overlay(
     .into_any_element()
 }
 
-fn render_events(theme: &Theme, state: &DashboardState, entity: Entity<RootView>) -> Div {
+fn render_events(
+    theme: &Theme,
+    state: &DashboardState,
+    events: &[AlertEvent],
+    entity: Entity<RootView>,
+) -> Div {
     let mut filters = div().flex().flex_row().flex_wrap().gap(tokens::SPACE_4);
     for filter in [EventFilter::All, EventFilter::Active, EventFilter::Cleared] {
         let entity = entity.clone();
@@ -120,7 +127,7 @@ fn render_events(theme: &Theme, state: &DashboardState, entity: Entity<RootView>
             |_, _, _| {},
         ));
     }
-    let visible = state.events.visible_events();
+    let visible = state.events.visible_events(events);
     let mut events = div().flex().flex_col().gap(tokens::SPACE_6);
     if visible.is_empty() {
         events = events.child(
@@ -161,7 +168,7 @@ fn render_events(theme: &Theme, state: &DashboardState, entity: Entity<RootView>
                             div()
                                 .text_size(tokens::FONT_11)
                                 .text_color(theme.fg_dim)
-                                .child(format!("{} ms", event.timestamp_ms)),
+                                .child(format!("{} ms", event.observed_at_ms)),
                         ),
                 )
                 .child(
@@ -205,7 +212,9 @@ fn render_events(theme: &Theme, state: &DashboardState, entity: Entity<RootView>
                             false,
                             move |_window, cx| {
                                 mark.update(cx, |view, cx| {
-                                    view.dashboard.events.mark_all_read();
+                                    view.dashboard.events.mark_all_read(
+                                        view.shell.projection().alert_center.event_history(),
+                                    );
                                     cx.notify();
                                 });
                             },
@@ -220,6 +229,7 @@ fn render_events(theme: &Theme, state: &DashboardState, entity: Entity<RootView>
                             move |_window, cx| {
                                 clear.update(cx, |view, cx| {
                                     view.dashboard.events.clear();
+                                    view.shell.clear_alert_event_history();
                                     cx.notify();
                                 });
                             },

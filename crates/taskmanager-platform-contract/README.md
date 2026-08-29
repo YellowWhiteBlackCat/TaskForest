@@ -8,6 +8,9 @@ Platform-neutral capability, request, event, provider and port contracts.
 
 The crate defines what an adapter may provide and how outcomes are correlated;
 it does not read an OS, spawn workers, own a UI, or implement a vendor API.
+Core identity, failure and source-status facts remain owned by
+`taskmanager-core`; this crate does not forward them through a compatibility
+facade.
 
 ## Contract and verification
 

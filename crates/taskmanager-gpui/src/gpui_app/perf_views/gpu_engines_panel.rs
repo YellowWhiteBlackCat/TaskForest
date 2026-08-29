@@ -33,17 +33,20 @@ use gpui::{
     AnyElement, App, AsyncApp, Context, Div, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, WeakEntity, div, px, relative,
 };
-use taskmanager_application::{
-    CapabilityId, CapabilityStatus, DeviceId, GpuEngineMetric, GpuEngineRowsState,
-};
+use taskmanager_application::GpuEngineRowsState;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::GpuEngineMetric;
+use taskmanager_platform_contract::{CapabilityId, CapabilityStatus};
+
 use taskmanager_shell::presentation::gpu_engine_rows::{
     GpuEngineRowsAction, GpuEngineRowsPresentation, present_gpu_engine_rows,
 };
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::{Color, Theme, tokens, with_alpha};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, Theme, with_alpha};
 
 /// Interval between background refreshes after the first `Success`. The polkit
 /// `.policy` uses `auth_admin_keep`, so once authorized for the session

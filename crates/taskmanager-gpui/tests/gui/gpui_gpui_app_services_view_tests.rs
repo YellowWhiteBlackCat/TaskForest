@@ -1,9 +1,9 @@
 use super::{MenuEntry, build_service_menu};
-use crate::core::services::{ServiceItem, ServiceStatus};
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::TopPage;
-use crate::gpui_app::theme::Theme;
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_theme::Theme;
 use taskmanager_ui::overlays::popup::MenuItem;
 
 /// The row context menu carries the five service actions (Win11 TM
@@ -22,11 +22,11 @@ async fn service_row_context_menu_offers_all_five_actions(cx: &mut gpui::TestApp
     assert_eq!(
         labels,
         vec![
-            crate::i18n::t("svc.start").to_string(),
-            crate::i18n::t("svc.stop").to_string(),
-            crate::i18n::t("svc.restart").to_string(),
-            crate::i18n::t("svc.enable").to_string(),
-            crate::i18n::t("svc.disable").to_string(),
+            taskmanager_application::i18n::t("svc.start").to_string(),
+            taskmanager_application::i18n::t("svc.stop").to_string(),
+            taskmanager_application::i18n::t("svc.restart").to_string(),
+            taskmanager_application::i18n::t("svc.enable").to_string(),
+            taskmanager_application::i18n::t("svc.disable").to_string(),
         ],
         "the context menu must list Start/Stop/Restart/Enable/Disable"
     );

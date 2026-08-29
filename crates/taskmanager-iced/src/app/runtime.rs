@@ -7,9 +7,10 @@
 use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
-use taskmanager_application::{
-    PlatformClient, PlatformEffect, SubmissionErrorKind, tray::TrayEvent,
-};
+use taskmanager_application::{PlatformClient, PlatformEffect};
+use taskmanager_core::core::tray::TrayEvent;
+use taskmanager_platform_contract::SubmissionErrorKind;
+
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use super::IcedApp;
@@ -28,9 +29,9 @@ pub(crate) enum ActivationRequest {
 /// The sole owner of I/O and process-lifetime handles for one Iced app.
 pub(crate) struct IcedRuntime {
     platform: Option<PlatformClient>,
-    instance_guard: Option<Box<dyn taskmanager_app_host::InstanceGuard>>,
-    instance_rx: Option<Receiver<taskmanager_app_host::InstanceEvent>>,
-    tray_controller: Option<Box<dyn taskmanager_app_host::TrayController>>,
+    instance_guard: Option<Box<dyn taskmanager_platform_contract::InstanceGuard>>,
+    instance_rx: Option<Receiver<taskmanager_platform_contract::InstanceEvent>>,
+    tray_controller: Option<Box<dyn taskmanager_platform_contract::TrayController>>,
     tray_events_rx: Option<Receiver<TrayEvent>>,
     activation_request: ActivationRequest,
     last_gpu_engine_rows: Instant,
@@ -61,8 +62,8 @@ impl IcedRuntime {
 
     pub(crate) fn install_instance(
         &mut self,
-        guard: Option<Box<dyn taskmanager_app_host::InstanceGuard>>,
-        receiver: Option<Receiver<taskmanager_app_host::InstanceEvent>>,
+        guard: Option<Box<dyn taskmanager_platform_contract::InstanceGuard>>,
+        receiver: Option<Receiver<taskmanager_platform_contract::InstanceEvent>>,
     ) {
         self.instance_guard = guard;
         self.instance_rx = receiver;
@@ -81,7 +82,7 @@ impl IcedRuntime {
 
     pub(crate) fn install_tray(
         &mut self,
-        controller: Option<Box<dyn taskmanager_app_host::TrayController>>,
+        controller: Option<Box<dyn taskmanager_platform_contract::TrayController>>,
         receiver: Option<Receiver<TrayEvent>>,
     ) {
         self.tray_controller = controller;
@@ -135,7 +136,7 @@ impl IcedRuntime {
         &mut self,
         shell: &mut ShellApp,
         effect: PlatformEffect,
-    ) -> Result<Vec<taskmanager_application::RequestId>, SubmissionErrorKind> {
+    ) -> Result<Vec<taskmanager_platform_contract::RequestId>, SubmissionErrorKind> {
         match self.platform.as_mut() {
             Some(platform) => taskmanager_shell::queue_effect_result(shell, platform, effect),
             None => {
@@ -154,8 +155,8 @@ impl IcedRuntime {
 impl IcedApp {
     pub(crate) fn install_instance_runtime(
         &mut self,
-        guard: Option<Box<dyn taskmanager_app_host::InstanceGuard>>,
-        receiver: Option<Receiver<taskmanager_app_host::InstanceEvent>>,
+        guard: Option<Box<dyn taskmanager_platform_contract::InstanceGuard>>,
+        receiver: Option<Receiver<taskmanager_platform_contract::InstanceEvent>>,
     ) {
         self.runtime.install_instance(guard, receiver);
     }

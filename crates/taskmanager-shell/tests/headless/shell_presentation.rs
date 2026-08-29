@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 
 #[test]
 fn every_command_has_discoverable_help() {
@@ -100,14 +101,11 @@ fn nice_formats_purely_without_a_wall_clock() {
 
 #[test]
 fn local_clock_requires_injected_rules() {
-    let unavailable = taskmanager_application::LocalTimeRulesObservation::unsupported(1);
+    let unavailable = LocalTimeRulesObservation::unsupported(1);
     assert_eq!(start_clock_local(Some(10_921), &unavailable), "—");
     assert_eq!(local_timestamp(10_921_000, &unavailable), "—");
 
-    let utc = taskmanager_application::LocalTimeRulesObservation::current(
-        taskmanager_application::LocalTimeRules::utc(),
-        1,
-    );
+    let utc = LocalTimeRulesObservation::current(LocalTimeRules::utc(), 1);
     assert_eq!(start_clock_local(Some(10_921), &utc), "03:02");
     assert_eq!(local_timestamp(0, &utc), "1970-01-01 00:00:00");
 }

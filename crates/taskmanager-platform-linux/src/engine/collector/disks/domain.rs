@@ -4,8 +4,11 @@ use std::collections::HashMap;
 use std::time::Instant;
 
 use sysinfo::Disks;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::{DiskMetrics, ScalarObservation};
-use taskmanager_platform_contract::{DeviceSourceSnapshot, FailureKind, SourceOutcome};
+use taskmanager_core::core::source::SourceOutcome;
+use taskmanager_platform_contract::DeviceSourceSnapshot;
 
 use super::super::sources::{DiskstatsObservation, apply_smart, parse_proc_diskstats};
 use super::super::{DiskCollectionState, DiskStatsState};
@@ -106,7 +109,7 @@ fn reset_rate_baselines_after_discovery(
 
 fn reset_changed_identity_rate_baselines(
     metrics: &[DiskMetrics],
-    previous_identities: &HashMap<String, taskmanager_platform_contract::DeviceId>,
+    previous_identities: &HashMap<String, DeviceId>,
     stats: &mut HashMap<String, DiskStatsState>,
 ) {
     for disk in metrics {

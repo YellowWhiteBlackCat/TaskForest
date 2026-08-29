@@ -5,7 +5,12 @@
 use super::*;
 use std::path::PathBuf;
 use taskmanager_application::process_details_vm::{DetailValue, ProcessDetailsField, detail_value};
-use taskmanager_application::{ProcessItem, ScalarObservation};
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessItem;
+
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
+use ratatui::layout::Rect;
 
 fn fixture() -> ProcessItem {
     // Every measurement enters through the typed fixture builder or the
@@ -21,8 +26,8 @@ fn fixture() -> ProcessItem {
         .current_disk_write_bytes_per_sec(1024 * 1024)
         .status("S".to_owned())
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("root"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("root"),
                 Some(PathBuf::from("/usr/bin/sample")),
                 42,
             ),
@@ -47,8 +52,8 @@ fn vm(field: ProcessDetailsField) -> String {
     let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
         &fixture(),
         &UnitPreferences::default(),
-        &taskmanager_application::LocalTimeRulesObservation::current(
-            taskmanager_application::LocalTimeRules::utc(),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
+            taskmanager_core::core::time::LocalTimeRules::utc(),
             0,
         ),
     );
@@ -62,8 +67,8 @@ fn vm(field: ProcessDetailsField) -> String {
 fn overview_rows_mirror_the_neutral_vm() {
     let pairs = overview_pairs(
         &fixture(),
-        &taskmanager_application::LocalTimeRulesObservation::current(
-            taskmanager_application::LocalTimeRules::utc(),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
+            taskmanager_core::core::time::LocalTimeRules::utc(),
             0,
         ),
     );
@@ -86,8 +91,8 @@ fn overview_rows_mirror_the_neutral_vm() {
 fn command_rows_mirror_the_neutral_vm() {
     let pairs = command_pairs(
         &fixture(),
-        &taskmanager_application::LocalTimeRulesObservation::current(
-            taskmanager_application::LocalTimeRules::utc(),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
+            taskmanager_core::core::time::LocalTimeRules::utc(),
             0,
         ),
     );
@@ -102,8 +107,8 @@ fn performance_currents_mirror_the_neutral_vm() {
     taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     let pairs = performance_pairs(
         &fixture(),
-        &taskmanager_application::LocalTimeRulesObservation::current(
-            taskmanager_application::LocalTimeRules::utc(),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
+            taskmanager_core::core::time::LocalTimeRules::utc(),
             0,
         ),
     );
@@ -123,4 +128,68 @@ fn performance_currents_mirror_the_neutral_vm() {
             "{field:?} current must come from the VM"
         );
     }
+}
+
+// ── Modal host contract ──────────────────────────────────────────────────────
+
+/// The Properties modal delegates its host to the shared plain-titled `Modal`
+/// component: a complete accent border frame whose title row carries the
+/// frozen identity ("Process details <name> · <pid>", no icon).
+#[test]
+fn properties_modal_host_paints_border_and_identity_title() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    let app = crate::demo_app();
+    let theme = crate::TuiTheme::default();
+    let target = ProcessPropertiesTarget {
+        item: fixture(),
+        section: ProcessDetailsSection::Overview,
+        scroll: 0,
+    };
+    let focus = crate::ui::frame_plan::TuiFocusPlan {
+        target: crate::ui::frame_plan::TuiFocusTarget::SharedSurface(
+            taskmanager_application::SurfaceKind::ProcessProperties,
+        ),
+        order: crate::ui::frame_plan::TuiFocusOrder::None,
+        control: crate::ui::frame_plan::TuiFocusControl::PropertiesTab(
+            ProcessDetailsSection::Overview,
+        ),
+    };
+    let popup = Rect::new(2, 1, 60, 14);
+    let mut terminal = Terminal::new(TestBackend::new(70, 18)).expect("test terminal");
+    terminal
+        .draw(|frame| {
+            super::render_process_properties_at(frame, &target, &app, theme, focus, popup);
+        })
+        .expect("draw");
+
+    let buffer = terminal.backend().buffer();
+    // The full border frame paints the accent tone (the shared Modal host).
+    assert_eq!(buffer[(popup.x, popup.y)].symbol(), "┌");
+    assert_eq!(buffer[(popup.right() - 1, popup.y)].symbol(), "┐");
+    assert_eq!(buffer[(popup.x, popup.bottom() - 1)].symbol(), "└");
+    assert_eq!(
+        buffer[(popup.right() - 1, popup.bottom() - 1)].symbol(),
+        "┘"
+    );
+    assert_eq!(buffer[(popup.x, popup.y)].style().fg, Some(theme.accent));
+
+    // The title row carries the plain padded identity title (no icon glyph).
+    let width = buffer.area.width as usize;
+    let start = popup.y as usize * width;
+    let title_row: String = buffer.content[start..start + width]
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(
+        title_row.contains(&format!(
+            " {} {} · {} ",
+            t("prop.process_details"),
+            "sample",
+            "4242"
+        )),
+        "the title row must carry the frozen identity, got: {title_row:?}"
+    );
 }

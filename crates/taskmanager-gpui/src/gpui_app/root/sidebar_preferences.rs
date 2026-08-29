@@ -3,8 +3,8 @@
 use gpui::Context;
 use std::collections::HashSet;
 
-use crate::core::config::SidebarDeviceOverrideConfig;
 use crate::gpui_app::sidebar::NetworkVisibility;
+use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
 
 use super::RootView;
 

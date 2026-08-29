@@ -203,7 +203,10 @@ impl Widget<Message, Theme, Renderer> for SegmentedTrack<'_> {
             cursor,
             viewport,
         );
-        if tree.state.downcast_ref::<SegmentedState>().focused {
+        let focused = tree.state.downcast_ref::<SegmentedState>().focused;
+        // Same shared focus-visible contract as the focus wrapper: the ring
+        // token's alpha gates the ring, keyboard focus only.
+        if focused && self.focus_color.a > 0.0 {
             advanced::Renderer::fill_quad(
                 renderer,
                 Quad {

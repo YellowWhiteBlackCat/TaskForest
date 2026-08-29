@@ -7,9 +7,9 @@
 
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
 
-use crate::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use crate::gpui_app::root::{RootView, TopPage};
-use crate::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 fn service(ix: usize, status: ServiceStatus) -> ServiceItem {
     ServiceItem::from_inventory(

@@ -7,14 +7,12 @@
 
 use super::*;
 use crate::app::ColumnWidthOverrides;
-use crate::app::ProcessStatusFilter;
 use crate::theme;
 use iced::Length;
 use iced::alignment::Horizontal;
 use iced::widget::{Space, Stack, button, container, mouse_area, row, text};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::rc::Rc;
+use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_ui_contract::ProcessColumnSpec;
 
@@ -45,49 +43,46 @@ pub(crate) fn application_row_height(compact: bool) -> f32 {
     if compact { 24.0 } else { 32.0 }
 }
 
-/// Stable invalidation key for the lazy body. The projection generation covers
-/// process data and view-mode changes; the remaining fields cover renderer-local
-/// row appearance and interaction state. Set members are sorted before hashing
-/// so HashSet iteration order cannot cause spurious rebuilds. Column-width
-/// overrides participate too: a drag must rebuild the materialized rows, and
-/// the empty set keeps the no-drag key identical to the historical one.
+/// Stable invalidation key for the lazy body, composed through the shared
+/// [`lazy_key::LazyKey`] discipline (scope + theme fingerprint + page
+/// fields). The projection generation covers process data and view-mode
+/// changes; the remaining fields cover renderer-local row appearance and
+/// interaction state. Set members are sorted before hashing so HashSet
+/// iteration order cannot cause spurious rebuilds. Column-width overrides
+/// participate too: a drag must rebuild the materialized rows.
 pub(crate) fn applications_table_key(generation: u64, render: &RowRender) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    generation.hash(&mut hasher);
-    render.theme.skin.label().hash(&mut hasher);
-    render.theme.mode.label().hash(&mut hasher);
-    render.theme.dark.hash(&mut hasher);
-    render.theme.hc.hash(&mut hasher);
-    render.theme.ui_font.hash(&mut hasher);
-    render.theme.mono_font.hash(&mut hasher);
-    render.query.hash(&mut hasher);
-    render.search_active.hash(&mut hasher);
-    render.swap_visible.hash(&mut hasher);
-    render.compact.hash(&mut hasher);
-    render.ui_size.hash(&mut hasher);
-    render.gray_zero.hash(&mut hasher);
-    render.selected_row.hash(&mut hasher);
-
-    let mut selected = render.selected_pids.iter().copied().collect::<Vec<_>>();
+    let mut selected: Vec<taskmanager_shell::ProcessRowIdentity> =
+        render.selected_identities.iter().copied().collect();
     selected.sort_unstable();
-    selected.hash(&mut hasher);
-
     let mut hidden = render
         .hidden_columns
         .iter()
         .map(|column| column.label())
         .collect::<Vec<_>>();
     hidden.sort_unstable();
-    hidden.hash(&mut hasher);
-
-    let mut widths = render
+    let widths = render
         .column_widths
         .iter()
         .map(|(column, width)| (sort_col_contract_id(column), width.to_bits()))
         .collect::<Vec<_>>();
-    widths.sort_unstable();
-    widths.hash(&mut hasher);
-    hasher.finish()
+    super::lazy_key::LazyKey::new("applications-table")
+        .revision(generation)
+        .theme(&render.theme)
+        .field(render.query.clone())
+        .field(render.search_active)
+        .field(render.swap_visible)
+        .field(render.compact)
+        .field(render.ui_size)
+        .field(render.gray_zero)
+        .field(render.selected_row)
+        // The open context menu re-hosts one materialized row, so opening or
+        // closing it must rebuild the lazy body exactly like any other visual
+        // invalidation.
+        .field(render.open_menu_pid)
+        .field(selected)
+        .field(hidden)
+        .field(widths)
+        .finish()
 }
 
 /// The Applications-page hierarchy label and its tree-wide actions. The label

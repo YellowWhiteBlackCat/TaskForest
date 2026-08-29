@@ -1,8 +1,9 @@
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use taskmanager_application::{
-    AppAction, AppPage, CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
+use taskmanager_application::{AppAction, AppPage};
+use taskmanager_core::core::metrics::{
+    CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
 };
 
 use crate::demo_app;

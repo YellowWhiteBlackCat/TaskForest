@@ -4,7 +4,7 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use taskmanager_platform_contract::FailureKind;
+use taskmanager_core::core::failure::FailureKind;
 
 use super::{
     DMI_DIMM_SIZE_FIELD, DMI_DIMM_SPEED_FIELD, DMI_EDAC_SIZE_FIELD, DMI_PROVIDER,

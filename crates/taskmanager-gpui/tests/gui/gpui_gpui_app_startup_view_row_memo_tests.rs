@@ -1,16 +1,17 @@
 use super::*;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
-use crate::i18n;
 use gpui::TestAppContext;
 use std::rc::Rc;
-use taskmanager_application::StartupEntry;
+use taskmanager_application::i18n;
+use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_shell::{InfoSortCol, InfoTable, SortDir};
+use taskmanager_theme::Theme;
 
 fn entry(name: &str, enabled: bool) -> StartupEntry {
-    use taskmanager_application::{
+    use taskmanager_core::core::startup::{
         StartupControlPolicy, StartupImpact, StartupScope, StartupSource,
     };
+
     StartupEntry {
         id: format!("desktop:{name}.desktop").into(),
         name: name.to_owned(),
@@ -21,7 +22,7 @@ fn entry(name: &str, enabled: bool) -> StartupEntry {
         control_policy: StartupControlPolicy::Direct,
         locator: format!("{name}.desktop").into(),
         impact: StartupImpact::Low,
-        impact_evidence: taskmanager_application::StartupImpactEvidence::Measured {
+        impact_evidence: taskmanager_core::core::startup::StartupImpactEvidence::Measured {
             duration_ms: 10,
         },
     }
@@ -101,9 +102,11 @@ fn header_sort_click_flows_through_the_shell_slot_and_reorders_the_memo(cx: &mut
 
 #[test]
 fn startup_source_detail_names_the_missing_blame_facet() {
-    let detail = startup_source_detail(&[crate::core::SourceStatus {
-        provider: crate::core::ProviderId::borrowed("linux.startup.systemd-blame"),
-        outcome: crate::core::SourceOutcome::Partial(crate::core::FailureKind::ProviderFault),
+    let detail = startup_source_detail(&[taskmanager_core::core::SourceStatus {
+        provider: taskmanager_core::core::ProviderId::borrowed("linux.startup.systemd-blame"),
+        outcome: taskmanager_core::core::SourceOutcome::Partial(
+            taskmanager_core::core::FailureKind::ProviderFault,
+        ),
         item_count: 3,
     }])
     .expect("failed startup source should explain its scope");
@@ -114,9 +117,11 @@ fn startup_source_detail_names_the_missing_blame_facet() {
 
 #[test]
 fn startup_source_detail_does_not_claim_complete_rows_for_inventory_failure() {
-    let detail = startup_source_detail(&[crate::core::SourceStatus {
-        provider: crate::core::ProviderId::borrowed("linux.startup.systemd-user"),
-        outcome: crate::core::SourceOutcome::Unavailable(crate::core::FailureKind::Rejected),
+    let detail = startup_source_detail(&[taskmanager_core::core::SourceStatus {
+        provider: taskmanager_core::core::ProviderId::borrowed("linux.startup.systemd-user"),
+        outcome: taskmanager_core::core::SourceOutcome::Unavailable(
+            taskmanager_core::core::FailureKind::Rejected,
+        ),
         item_count: 0,
     }])
     .expect("failed startup inventory should explain its scope");

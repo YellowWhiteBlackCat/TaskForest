@@ -1,6 +1,7 @@
 //! Performance sidebar, CPU header, and responsive rail scenes.
 
 use super::*;
+use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
 
 pub(super) mod cpu;
 
@@ -8,7 +9,9 @@ use super::blocks::gpu_block_title;
 use super::chart::chart_grid_scene;
 use cpu::device_button_scene;
 
-/// One label→value line; the value is the rewritable fact.
+/// One label→value line; the value is the rewritable fact. Both columns are
+/// strictly single-line: a long value clips at the rail edge instead of
+/// wrapping the row into an unreadable stack.
 fn fact_row(label: String, value: String, field: DynField) -> impl Scene + use<> {
     bsn! {
         Node {
@@ -21,8 +24,23 @@ fn fact_row(label: String, value: String, field: DynField) -> impl Scene + use<>
             padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
-            ( Node { width: px(100.0) } Children [ ( Text(label) TextRole(Role::Caption) ) ] ),
-            ( Text(value) TextRole(Role::Mono) DynText(field) ),
+            (
+                Node {
+                    min_width: px(100.0),
+                    overflow: Overflow::clip_x(),
+                }
+                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+            ),
+            (
+                Node {
+                    min_width: px(0.0),
+                    flex_shrink: 1.0,
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::FlexEnd,
+                    overflow: Overflow::clip_x(),
+                }
+                Children [ ( Text(value) TextRole(Role::Mono) DynText(field) template_value(no_wrap_text()) ) ]
+            ),
         ]
     }
 }
@@ -32,6 +50,7 @@ fn marked_text_scene(value: String, role: Role, field: DynField) -> Box<dyn Scen
         Text(value)
         TextRole(role)
         DynText(field)
+        template_value(no_wrap_text())
     })
 }
 
@@ -55,6 +74,7 @@ fn cpu_metric_cell_scene(
                 Text(value)
                 TextRole(Role::Mono)
                 DynText(DynField::Cpu(field))
+                template_value(no_wrap_text())
             ),
         ]
     }
@@ -66,18 +86,21 @@ fn cpu_device_caption_scene(shell: &ShellApp) -> Box<dyn Scene> {
             width: percent(100),
             flex_direction: FlexDirection::Row,
             column_gap: Val::Px(space_2()),
+            overflow: Overflow::clip_x(),
         }
         Children [
             (
                 Text(cpu_field_text(shell, CpuField::Usage))
                 TextRole(Role::Mono)
                 DynText(DynField::Cpu(CpuField::Usage))
+                template_value(no_wrap_text())
             ),
             ( Text(" · ") TextRole(Role::Caption) ),
             (
                 Text(cpu_field_text(shell, CpuField::Frequency))
                 TextRole(Role::Mono)
                 DynText(DynField::Cpu(CpuField::Frequency))
+                template_value(no_wrap_text())
             ),
         ]
     })
@@ -85,8 +108,10 @@ fn cpu_device_caption_scene(shell: &ShellApp) -> Box<dyn Scene> {
 
 /// A bounded history graph shared by device rows and per-core cells. It is a
 /// product accessory, not a second chart authority: samples come from the
-/// same shell history window as the hero graph and an empty window remains
-/// visually empty.
+/// same shell history window as the hero graph, projected through the SAME
+/// gap-aware polyline adapter (one visual grammar across the whole page), and
+/// an empty window remains visually empty. The strip is static per sidebar
+/// rebuild — the page refresh recreates it with the folded window.
 fn activity_graph_scene(
     samples: &[f32],
     color: bevy::color::Color,
@@ -94,20 +119,8 @@ fn activity_graph_scene(
     palette: &UiPalette,
 ) -> Box<dyn Scene> {
     let height = height.max(1.0);
-    let fractions = bar_fractions(samples);
-    let start = fractions.len().saturating_sub(14);
-    let bars: Vec<Box<dyn Scene>> = fractions[start..]
-        .iter()
-        .map(|fraction| {
-            Box::new(bsn! {
-                Node {
-                    width: px(space_2_quarter()),
-                    height: px((fraction * height).max(1.0)),
-                }
-                BackgroundColor(color)
-            }) as Box<dyn Scene>
-        })
-        .collect();
+    let width = palette.control_height_px * 2.0;
+    let segments = line_segments(samples, width, height, MAX_CHART_POINTS);
     Box::new(bsn! {
         Node {
             width: percent(100),
@@ -130,12 +143,10 @@ fn activity_graph_scene(
                             position_type: PositionType::Absolute,
                             left: px(0.0),
                             top: px(0.0),
-                            flex_direction: FlexDirection::Row,
-                            align_items: AlignItems::FlexEnd,
-                            column_gap: Val::Px(space_2_quarter()),
+                            overflow: Overflow::clip_x(),
                         }
                         Children [
-                            { bars },
+                            ( { polyline_scene(&segments, color) } ),
                         ]
                     ),
                 ]
@@ -145,7 +156,7 @@ fn activity_graph_scene(
 }
 
 fn sidebar_activity_scene(
-    icon: &'static str,
+    icon: taskmanager_ui_contract::IconId,
     samples: &[f32],
     color: bevy::color::Color,
     palette: &UiPalette,
@@ -161,7 +172,7 @@ fn sidebar_activity_scene(
             column_gap: Val::Px(space_2()),
         }
         Children [
-            ( Text(icon) TextRole(Role::Caption) ),
+            ( { crate::icons::icon_scene(icon, 16.0, palette.dim_color) } ),
             (
                 Node {
                     width: px(palette.control_height_px * 2.0),
@@ -176,7 +187,7 @@ fn sidebar_activity_scene(
 }
 
 fn sidebar_curve_scene(
-    icon: &'static str,
+    icon: taskmanager_ui_contract::IconId,
     curve: SystemCurve,
     shell: &ShellApp,
     palette: &UiPalette,
@@ -215,7 +226,12 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
         PerformanceDeviceTarget::Cpu,
         Box::new(device_row_with_accessory_scene(
             t("common.cpu").to_owned(),
-            sidebar_curve_scene("◔", SystemCurve::Cpu, shell, palette),
+            sidebar_curve_scene(
+                taskmanager_ui_contract::IconId::Cpu,
+                SystemCurve::Cpu,
+                shell,
+                palette,
+            ),
             cpu_device_caption_scene(shell),
             true,
             palette,
@@ -225,7 +241,12 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
         PerformanceDeviceTarget::Memory,
         Box::new(device_row_with_accessory_scene(
             t("common.memory").to_owned(),
-            sidebar_curve_scene("▤", SystemCurve::Memory, shell, palette),
+            sidebar_curve_scene(
+                taskmanager_ui_contract::IconId::Memory,
+                SystemCurve::Memory,
+                shell,
+                palette,
+            ),
             marked_text_scene(
                 summary_value(shell, SummaryField::Memory),
                 Role::Caption,
@@ -249,10 +270,16 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                 PerformanceDeviceTarget::Disk(disk.device_id.clone()),
                 Box::new(device_row_with_accessory_scene(
                     disk_sidebar_title(disk),
-                    sidebar_activity_scene("▤", &samples, palette.accent, palette),
+                    sidebar_activity_scene(
+                        taskmanager_ui_contract::IconId::Disk,
+                        &samples,
+                        palette.accent,
+                        palette,
+                    ),
                     Box::new(bsn! {
                         Text(disk_sidebar_caption(disk))
                         TextRole(Role::Mono)
+                        template_value(no_wrap_text())
                     }),
                     false,
                     palette,
@@ -274,7 +301,12 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                     } else {
                         (*nic.interface_name).to_owned()
                     },
-                    sidebar_activity_scene("⌁", &samples, palette.accent, palette),
+                    sidebar_activity_scene(
+                        taskmanager_ui_contract::IconId::Network,
+                        &samples,
+                        palette.accent,
+                        palette,
+                    ),
                     marked_text_scene(
                         nic_fact_line(nic),
                         Role::Mono,
@@ -299,7 +331,12 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                 PerformanceDeviceTarget::Gpu(key.clone()),
                 Box::new(device_row_with_accessory_scene(
                     gpu_block_title(gpu),
-                    sidebar_activity_scene("◈", &samples, palette.accent, palette),
+                    sidebar_activity_scene(
+                        taskmanager_ui_contract::IconId::Gpu,
+                        &samples,
+                        palette.accent,
+                        palette,
+                    ),
                     marked_text_scene(
                         gpu_fact_line(gpu),
                         Role::Mono,
@@ -375,22 +412,9 @@ pub(super) fn stats_rail_scene(shell: &ShellApp, palette: &UiPalette) -> impl Sc
             )));
         }
     }
-    rows.push(Box::new(stat_row_scene(
-        t("perf.window").to_owned(),
-        Box::new(bsn! {
-            Text("60 seconds")
-            TextRole(Role::Body)
-        }),
-        palette,
-    )));
-    rows.push(Box::new(stat_row_scene(
-        t("health.source").to_owned(),
-        Box::new(bsn! {
-            Text("Live projection")
-            TextRole(Role::Body)
-        }),
-        palette,
-    )));
+    // Rail contents end at the measured facts. The former "window"/"source"
+    // filler rows were hardcoded English constants — fabricated captions,
+    // not facts — and are gone with this cleanup pass.
     let panel = summary_card_scene(rows, palette);
     bsn! {
         Node {

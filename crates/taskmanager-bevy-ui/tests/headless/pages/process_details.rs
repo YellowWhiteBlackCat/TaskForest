@@ -1,7 +1,9 @@
 //! Behavior tests for the Bevy selected-process details projection.
 
 use taskmanager_application::process_details_vm::ProcessDetailsField;
-use taskmanager_application::{ProcessItem, ScalarObservation};
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessItem;
+
 use taskmanager_shell::{ShellApp, fixture};
 
 use super::projection;

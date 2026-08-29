@@ -27,7 +27,7 @@ identity map.
   identities; admission is recomputed per snapshot, while the history store
   alone owns cross-window series retention.
 - `src/application_history_projection.rs` joins persistent replay rows into the
-  one application-history read model consumed by GPUI, Iced and TUI, including
+  one application-history read model consumed by GPUI, Iced, TUI, and Bevy, including
   explicit capability states and timestamp-aware chart gaps.
 - `src/config_store.rs` owns base-aware configuration transactions. Each
   writer merges only top-level fields changed from its last locally observed
@@ -81,14 +81,18 @@ identity map.
   typed toggle/add/update/remove/import reducer. `AlertCenter` derives its
   evaluator from enabled entries only; disabled entries remain canonical and
   visible, while missing stable identities and invalid atomic imports cannot mutate state.
+  Its bounded alert-transition history is the single event-center source for
+  every renderer; clear/export operate on that typed source.
 - `src/platform/client/scheduler.rs` owns the closed automatic cadence/dispatcher registry;
   runtime route construction consumes that same authority.
 - `src/platform/event_batch.rs` owns the frontend batch ordering seam. Runtime
   `EventSequence` is canonical only inside each correlated domain after fair
   control/observation delivery; application projections use typed revision.
   The batch defines no cross-domain last-writer order.
-- `src/lib.rs` is the curated port/model facade; `model` and `platform` are
-  crate-private owners, so their facts have no second public import address.
+- `src/lib.rs` exposes only application-owned commands, reducers, ports,
+  lifecycles and projections. Domain facts and platform contracts are imported
+  from `taskmanager-core` and `taskmanager-platform-contract` at their actual
+  owners; this crate has no model-forwarding facade.
   Cohesive algorithm namespaces (`history_decimation`,
   `process_category_projection`, `process_details_vm`, `process_sort` and
   `snapshot_export`) remain public only through their named module. Adapter

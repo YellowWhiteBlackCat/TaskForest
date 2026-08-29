@@ -1,10 +1,11 @@
 //! Storage-health and SMART provider implementations.
 
+use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::{
     DeviceState, DeviceStatus, FilesystemHealthSnapshot, SmartSelfTestIntent, SmartSelfTestReport,
     StorageDeviceTarget,
 };
-use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure, SourceStatus};
+use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     FilesystemHealthProvider, SmartSelfTestControlProvider, SmartSelfTestObservationProvider,
 };

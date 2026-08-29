@@ -10,16 +10,34 @@ use bevy::color::Color;
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::picking::hover::PickingInteraction;
-use bevy::scene::{Scene, bsn};
+use bevy::scene::{Scene, bsn, template_value};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val,
-    percent, px,
+    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
+    UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 
+use crate::palette::no_wrap_text;
 use crate::palette::{UiPalette, space_2, space_4, space_8, space_12, space_16};
 use crate::window::{Role, TextRole};
+
+/// The sortable-header indicator: a semantic direction plate (arrow-up /
+/// arrow-down) tinted with the dim ink, or empty when the sort rests
+/// elsewhere. The arrow is an image, never a text codepoint — a glyph the
+/// embedded faces do not guarantee is exactly how tofu bugs ship.
+pub(crate) fn sort_indicator_scene(
+    descending: Option<bool>,
+    palette: &UiPalette,
+) -> Vec<Box<dyn Scene>> {
+    use taskmanager_ui_contract::IconId;
+    let icon = match descending {
+        Some(true) => IconId::NavigateDown,
+        Some(false) => IconId::NavigateUp,
+        None => return Vec::new(),
+    };
+    vec![crate::icons::icon_scene(icon, 12.0, palette.dim_color)]
+}
 
 /// Which idle/selected surface a shared interactive control belongs to.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -102,7 +120,8 @@ pub(crate) fn surface_scene(
 }
 
 /// A compact key/value row. The label is caption ink; the value is body ink
-/// and remains the only mutable leaf in the row.
+/// and remains the only mutable leaf in the row. Both columns are strictly
+/// single-line: the value clips at the row edge instead of wrapping the row.
 pub(crate) fn stat_row_scene(
     label: String,
     value: Box<dyn Scene>,
@@ -119,8 +138,24 @@ pub(crate) fn stat_row_scene(
             padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
-            ( Text(label) TextRole(Role::Caption) ),
-            ( { value } ),
+            (
+                Node {
+                    min_width: px(0.0),
+                    flex_shrink: 1.0,
+                    overflow: Overflow::clip_x(),
+                }
+                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+            ),
+            (
+                Node {
+                    min_width: px(0.0),
+                    flex_shrink: 1.0,
+                    flex_direction: FlexDirection::Row,
+                    justify_content: JustifyContent::FlexEnd,
+                    overflow: Overflow::clip_x(),
+                }
+                Children [ ( { value } ) ]
+            ),
         ]
     }
 }
@@ -214,9 +249,10 @@ pub(crate) fn device_row_with_accessory_scene(
                     flex_direction: FlexDirection::Column,
                     justify_content: JustifyContent::Center,
                     row_gap: Val::Px(space_2()),
+                    overflow: Overflow::clip_x(),
                 }
                 Children [
-                    ( Text(title) TextRole(Role::Body) ),
+                    ( Text(title) TextRole(Role::Body) template_value(no_wrap_text()) ),
                     ( { caption } ),
                 ]
             ),
@@ -224,36 +260,10 @@ pub(crate) fn device_row_with_accessory_scene(
     }
 }
 
-/// One bounded per-core cell. The value is a caller-owned Scene so the page
-/// can attach its typed dynamic marker without making this generic control
-/// depend on a page module.
-pub(crate) fn per_core_cell_scene(
-    label: String,
-    value: Box<dyn Scene>,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            flex_grow: 1.0,
-            width: px(palette.control_height_px * 4.5),
-            min_width: px(palette.control_height_px * 4.5),
-            min_height: px(palette.control_height_px * 2.0),
-            flex_direction: FlexDirection::Column,
-            justify_content: JustifyContent::Center,
-            row_gap: Val::Px(space_2()),
-            padding: UiRect::all(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-        }
-        BackgroundColor({ palette.content_bg })
-        Children [
-            ( Text(label) TextRole(Role::Caption) ),
-            ( { value } ),
-        ]
-    }
-}
-
 /// Chrome around one graph body. The graph itself remains a separate Scene so
-/// the chart renderer can evolve without changing the layout contract.
+/// the chart renderer can evolve without changing the layout contract. The
+/// title stays at caption scale — section chrome, not a second page heading;
+/// the page owns exactly one heading.
 pub(crate) fn graph_card_scene(
     title: String,
     subtitle: String,
@@ -270,7 +280,7 @@ pub(crate) fn graph_card_scene(
         }
         BackgroundColor({ surface_fill(SurfaceTone::Content, palette) })
         Children [
-            ( Text(title) TextRole(Role::Heading) ),
+            ( Text(title) TextRole(Role::Caption) template_value(no_wrap_text()) ),
             ( Text(subtitle) TextRole(Role::Caption) ),
             ( { graph } ),
         ]

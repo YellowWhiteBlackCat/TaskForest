@@ -13,19 +13,19 @@
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
-    ServiceAction, ServiceControlRequest, ServiceDependenciesRequest, ServiceInventoryRequest,
+    ServiceControlRequest, ServiceDependenciesRequest, ServiceInventoryRequest,
     ServiceLogSnapshotRequest, ServiceLogStreamRequest,
 };
 #[cfg(windows)]
 use taskmanager_core::ServiceStatus;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{FailureKind, ProviderId, ServiceDeps, ServiceId, ServiceItem};
 #[cfg(any(windows, test))]
 use taskmanager_core::{ServiceLogEntry, ServiceLogLevel};
 #[cfg(windows)]
 use taskmanager_core::{ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind};
-use taskmanager_platform_contract::{
-    PartialSourceSnapshot, ProviderFailure, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     ServiceControlProvider, ServiceDependenciesProvider, ServiceInventoryProvider,
     ServiceLogSnapshotProvider, ServiceLogStreamProvider,

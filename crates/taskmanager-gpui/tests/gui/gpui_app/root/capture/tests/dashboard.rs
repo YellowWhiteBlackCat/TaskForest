@@ -40,7 +40,10 @@ fn dashboard_marker_waits_for_live_readiness_and_prepares_exact_target() {
         evidence.on_dashboard_state(&mut dashboard, &store.system_history, &ingestor, 7_200_000);
     assert!(evidence.scenario_ready);
     assert_eq!(panel, Some(DashboardPanel::Events));
-    assert_eq!(dashboard.events.unread_count(), 2);
+    let events = evidence
+        .take_event_history_fixture()
+        .expect("event-center capture supplies shared history");
+    assert_eq!(dashboard.events.unread_count(&events), 2);
 }
 
 #[test]

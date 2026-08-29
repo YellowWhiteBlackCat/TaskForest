@@ -4,10 +4,12 @@
 //! availability is resolved once here, so paint code never reads a live
 //! `current_*` scalar or recreates dash/zero semantics per widget.
 
-use taskmanager_application::{
-    BatteryInfo, DirectoryUsageEntry, DirectoryUsageSnapshot, DiskMetrics, DiskPartition,
-    GpuMetrics, MemoryMetrics, NetworkAdapterType, NetworkMetrics, i18n::t,
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::directory_usage::{DirectoryUsageEntry, DirectoryUsageSnapshot};
+use taskmanager_core::core::metrics::{
+    DiskMetrics, DiskPartition, GpuMetrics, MemoryMetrics, NetworkAdapterType, NetworkMetrics,
 };
+use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_shell::memory::{self, MemSegment, SwapBreakdown};
 use taskmanager_shell::presentation::{MISSING_VALUE, missing_value, optional_bytes};
 

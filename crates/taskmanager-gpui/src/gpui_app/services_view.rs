@@ -21,15 +21,18 @@ use gpui::{
     Stateful, StatefulInteractiveElement, Styled, Window, div, px,
 };
 
-use crate::core::services::{ServiceItem, ServiceStatus};
-use crate::core::source::SourceStatus;
 use crate::gpui_app::elements;
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
-use taskmanager_application::{RefreshRequest, ServiceAction, ServiceId};
+use taskmanager_application::RefreshRequest;
+use taskmanager_application::i18n;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
+
 use taskmanager_shell::InfoSortCol;
 use taskmanager_ui::data::table::{Table, TableColumn, TableDelegate, TableEvent, TableState};
 use taskmanager_ui::inputs::text_input::TextInputState;

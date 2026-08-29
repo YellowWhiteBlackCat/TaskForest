@@ -7,10 +7,12 @@
 
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
-use taskmanager_application::{
-    ConnectionEndpoint, ConnectionTransport, FailureKind, LimitValue, OpenFileEntry,
-    ProcessInsightUnavailable, ProcessOpenFiles, ProcessThreadInfo, ProcessThreads,
-    ScalarObservation, i18n::t,
+use taskmanager_application::{ProcessInsightUnavailable, i18n::t};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process_telemetry::{
+    ConnectionEndpoint, ConnectionTransport, LimitValue, OpenFileEntry, ProcessOpenFiles,
+    ProcessThreadInfo, ProcessThreads,
 };
 use taskmanager_shell::presentation::{bytes, missing_value};
 
@@ -229,7 +231,7 @@ fn insight_unavailable(
     theme: TuiTheme,
     reason: &ProcessInsightUnavailable,
 ) -> ratatui::text::Line<'static> {
-    use taskmanager_application::SubmissionErrorKind;
+    use taskmanager_platform_contract::SubmissionErrorKind;
     let text = match reason {
         ProcessInsightUnavailable::Provider(
             FailureKind::PermissionDenied | FailureKind::RequiresEscalation,

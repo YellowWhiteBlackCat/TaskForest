@@ -3,8 +3,8 @@
 //! Exactly one `ui-*` feature is enabled per build (enforced by build.rs):
 //! `ui-gpui` (default) compiles the GPUI desktop frontend, `ui-tui` the
 //! ratatui frontend, `ui-iced` the iced frontend. The UI-neutral CLI
-//! (`cli`, `--json`, `--suggest-thresholds`, `--gpu-engines`) and the
-//! re-exported neutral core are compiled in every shape.
+//! (`cli`, `--json`, `--suggest-thresholds`, `--gpu-engines`) is compiled in
+//! every shape.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::wildcard_imports)]
@@ -22,14 +22,6 @@ pub mod cli;
 pub mod cli_gpu_engines;
 pub mod cli_process_gpu;
 pub mod frontend;
-// i18n lives in the shared `taskmanager-application` crate so every frontend
-// (gpui/tui/iced) can consume it; re-exported here so existing `crate::i18n`
-// call sites keep resolving unchanged.
-pub use taskmanager_application::i18n;
-
-pub use taskmanager_core::core;
-pub use taskmanager_core::core::*;
-
 // Mounted for the Linux-only /proc fixture tests that src/*.rs modules pull
 // in through `#[path]` (see cli_process_gpu.rs). The cfg mirrors the one
 // consumer: mounting it on Windows/macOS leaves the scratch helper unused

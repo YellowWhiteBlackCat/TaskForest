@@ -1,20 +1,20 @@
 use super::{ProcessControlAction, process_control_feedback};
-use taskmanager_application::FailureKind;
+use taskmanager_core::core::failure::FailureKind;
 
 #[test]
 fn typed_failures_render_their_semantic_reason() {
     for (kind, expected) in [
         (
             FailureKind::PermissionDenied,
-            crate::i18n::t("feedback.permission_denied"),
+            taskmanager_application::i18n::t("feedback.permission_denied"),
         ),
         (
             FailureKind::IdentityChanged,
-            crate::i18n::t("feedback.process_gone"),
+            taskmanager_application::i18n::t("feedback.process_gone"),
         ),
         (
             FailureKind::Unsupported,
-            crate::i18n::t("feedback.unsupported"),
+            taskmanager_application::i18n::t("feedback.unsupported"),
         ),
         (
             FailureKind::MissingDependency,

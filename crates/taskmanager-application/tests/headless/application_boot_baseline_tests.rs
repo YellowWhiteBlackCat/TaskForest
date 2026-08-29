@@ -3,8 +3,9 @@ use std::sync::Arc;
 use taskmanager_application::{
     BootBaselineCompletion, BootBaselineCompletionDisposition, BootBaselineCompletionOutcome,
     BootBaselineController, BootBaselineError, BootBaselineErrorKind, BootBaselineRecordKind,
-    BootBaselineState, BootBaselineSubmission, BootTimeline, BootTimelineSegment,
+    BootBaselineState, BootBaselineSubmission,
 };
+use taskmanager_core::core::startup::{BootTimeline, BootTimelineSegment};
 
 fn timeline(duration_ms: u64) -> BootTimeline {
     BootTimeline {

@@ -1,4 +1,4 @@
-//! The eight page modules of the Bevy frontend.
+//! The nine page modules of the Bevy frontend.
 //!
 //! **Page-agent contract.** Each page owns exactly one file under `pages/`
 //! and exposes one function:
@@ -37,6 +37,7 @@ pub mod services;
 pub mod sessions;
 pub mod settings;
 pub mod startup;
+pub mod system;
 
 #[cfg(test)]
 #[path = "../tests/headless/pages.rs"]

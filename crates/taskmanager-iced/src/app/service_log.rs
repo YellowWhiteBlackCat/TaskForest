@@ -10,6 +10,7 @@ use taskmanager_application::PlatformEffect;
 use taskmanager_application::{
     DiagnosticBundleSession, DiagnosticBundleTarget, prepare_service_log_bundle,
 };
+
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::{IcedApp, Message};

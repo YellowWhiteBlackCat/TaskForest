@@ -8,9 +8,10 @@
 
 use gpui::{VisualTestContext, px, size};
 use taskmanager_application::{
-    CapabilityId, CorrelatedEvent, EventSequence, PlatformEventBatch, PlatformEventContext,
-    ProcessEvent, ProviderId, RequestId,
+    CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ProcessEvent,
 };
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
 use crate::gpui_app::root::TopPage;
 

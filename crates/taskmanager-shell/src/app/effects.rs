@@ -14,11 +14,11 @@ use super::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, PAGE_STEP, ShellApp, SystemProjectionStore,
 };
 use taskmanager_application::{
-    AppPage, EventPortError, FocusDirection, OperationFailure, PlatformEffect,
-    ProcessInsightsSubmissionError, SelectionDirection, ServiceUpdate, SessionControlOutcome,
-    StartupControlOutcome, SubmissionError, TelemetryInterval, TelemetryRefreshPolicyChange,
-    UiEffect,
+    AppPage, FocusDirection, PlatformEffect, ProcessInsightsSubmissionError, SelectionDirection,
+    ServiceUpdate, SessionControlOutcome, StartupControlOutcome, TelemetryInterval,
+    TelemetryRefreshPolicyChange, UiEffect,
 };
+use taskmanager_platform_contract::{EventPortError, OperationFailure, SubmissionError};
 
 impl SystemProjectionStore {
     /// Accept a correlated session-control outcome. Returns the outcome only

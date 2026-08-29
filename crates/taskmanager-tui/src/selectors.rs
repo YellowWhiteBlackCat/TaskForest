@@ -140,7 +140,7 @@ impl TuiApp {
             .as_ref()
             .is_some_and(|sensors| {
                 sensors.readings.iter().any(|reading| {
-                    reading.quantity() == &taskmanager_application::SensorQuantity::FanSpeed
+                    reading.quantity() == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
                 })
             })
         {

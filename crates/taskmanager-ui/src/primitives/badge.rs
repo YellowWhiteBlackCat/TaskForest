@@ -3,7 +3,7 @@
 use gpui::{App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px};
 use taskmanager_theme::Palette;
 
-use crate::styled::on_accent;
+use taskmanager_theme::color::on_accent;
 use taskmanager_theme::tokens;
 
 /// Badge tones; each maps to a palette semantic color.

@@ -32,7 +32,7 @@ fn unit_matrix_preference_switches_bytes_bits_and_base() {
 
 /// Parity with the neutral core single source: a fixed input × preference
 /// matrix must render byte-identical to calling `taskmanager-core`
-/// directly (the TUI reaches it through the application re-export), so
+/// directly (the TUI reaches it through the core owner module), so
 /// the same data + preference renders the same string in every frontend.
 #[test]
 fn unit_matrix_is_byte_identical_to_the_core_single_source() {

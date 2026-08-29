@@ -1,86 +1,112 @@
 use super::*;
 use taskmanager_application::ServiceControlOutcome;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::target::ServiceId;
+
+/// Deterministic fixture: pid N carries start token N*10, so every identity
+/// is distinct and a "reused pid" is expressible by shifting the token.
+fn live(pid: u32) -> taskmanager_core::core::process::ProcessItem {
+    taskmanager_core::core::process::ProcessItem::new(pid, "worker").with_scalar_observations(
+        ProcessScalarObservations {
+            start_token: ScalarObservation::available(u64::from(pid) * 10, 1),
+            ..ProcessScalarObservations::default()
+        },
+    )
+}
+
+fn id(pid: u32) -> ProcessRowIdentity {
+    ProcessRowIdentity::from_process(&live(pid)).expect("fixture carries a current token")
+}
 
 #[test]
 fn plain_click_collapses_to_the_single_anchor() {
     let mut selection = ProcessSelection::default();
-    selection.select_single(10);
-    selection.toggle(11);
-    selection.select_single(12);
-    assert_eq!(selection.pids(), &HashSet::from([12]));
-    assert_eq!(selection.anchor(), Some(12));
-    assert_eq!(selection.active_row(), Some(ProcessRowKey::Process(12)));
+    selection.select_single(id(10));
+    selection.toggle(id(11));
+    selection.select_single(id(12));
+    assert_eq!(selection.rows(), &HashSet::from([id(12)]));
+    assert_eq!(selection.anchor(), Some(id(12)));
+    assert_eq!(selection.active_row(), Some(ProcessRowId::Process(id(12))));
 }
 
 #[test]
-fn application_aggregate_selection_has_no_representative_pid() {
+fn application_aggregate_selection_has_no_representative_identity() {
     let mut selection = ProcessSelection::default();
-    selection.select_single(10);
-    selection.select_application(42);
-    assert!(selection.pids().is_empty());
+    selection.select_single(id(10));
+    selection.select_application(id(42));
+    assert!(selection.rows().is_empty());
     assert_eq!(selection.anchor(), None);
-    assert_eq!(selection.active_row(), Some(ProcessRowKey::Application(42)));
-    assert_eq!(selection.application_root(), Some(42));
+    assert_eq!(
+        selection.active_row(),
+        Some(ProcessRowId::Application(id(42)))
+    );
+    assert_eq!(selection.application_root(), Some(id(42)));
 }
 
 #[test]
 fn ctrl_toggle_flips_membership_and_tracks_the_anchor() {
     let mut selection = ProcessSelection::default();
-    selection.select_single(10);
-    selection.toggle(11);
-    assert_eq!(selection.pids(), &HashSet::from([10, 11]));
-    assert_eq!(selection.anchor(), Some(11));
-    selection.toggle(11);
-    assert_eq!(selection.pids(), &HashSet::from([10]));
-    assert_eq!(selection.anchor(), Some(10));
+    selection.select_single(id(10));
+    selection.toggle(id(11));
+    assert_eq!(selection.rows(), &HashSet::from([id(10), id(11)]));
+    assert_eq!(selection.anchor(), Some(id(11)));
+    selection.toggle(id(11));
+    assert_eq!(selection.rows(), &HashSet::from([id(10)]));
+    assert_eq!(selection.anchor(), Some(id(10)));
 }
 
 #[test]
 fn shift_click_spans_the_display_order_between_anchor_and_end() {
-    let display = vec![5, 6, 7, 8, 9];
+    let display: Vec<ProcessRowIdentity> = [5, 6, 7, 8, 9].iter().map(|&pid| id(pid)).collect();
     let mut selection = ProcessSelection::default();
-    selection.select_single(6);
-    selection.extend_range(&display, 8);
-    assert_eq!(selection.pids(), &HashSet::from([6, 7, 8]));
-    assert_eq!(selection.anchor(), Some(8));
+    selection.select_single(id(6));
+    selection.extend_range(&display, id(8));
+    assert_eq!(selection.rows(), &HashSet::from([id(6), id(7), id(8)]));
+    assert_eq!(selection.anchor(), Some(id(8)));
 
     // Reverse direction spans the same members.
-    selection.extend_range(&display, 5);
-    assert_eq!(selection.pids(), &HashSet::from([5, 6, 7, 8]));
-    assert_eq!(selection.anchor(), Some(5));
+    selection.extend_range(&display, id(5));
+    assert_eq!(
+        selection.rows(),
+        &HashSet::from([id(5), id(6), id(7), id(8)])
+    );
+    assert_eq!(selection.anchor(), Some(id(5)));
 }
 
 #[test]
 fn a_stale_range_endpoint_inserts_nothing() {
-    let display = vec![5, 6, 7];
+    let display: Vec<ProcessRowIdentity> = [5, 6, 7].iter().map(|&pid| id(pid)).collect();
+    let stale = id(u32::MAX);
     let mut selection = ProcessSelection::default();
-    selection.select_single(6);
-    selection.extend_range(&display, u32::MAX);
-    assert_eq!(selection.pids(), &HashSet::from([6]));
-    assert_eq!(selection.anchor(), Some(u32::MAX));
+    selection.select_single(id(6));
+    selection.extend_range(&display, stale);
+    assert_eq!(selection.rows(), &HashSet::from([id(6)]));
+    assert_eq!(selection.anchor(), Some(stale));
 }
 
 #[test]
 fn keyboard_navigation_collapses_unless_preserving() {
     let mut selection = ProcessSelection::default();
-    selection.select_single(6);
-    selection.move_to(Some(7), false);
-    assert_eq!(selection.pids(), &HashSet::from([7]));
-    selection.select_single(6);
-    selection.move_to(Some(7), true);
-    assert_eq!(selection.pids(), &HashSet::from([6, 7]));
+    selection.select_single(id(6));
+    selection.move_to(Some(id(7)), false);
+    assert_eq!(selection.rows(), &HashSet::from([id(7)]));
+    selection.select_single(id(6));
+    selection.move_to(Some(id(7)), true);
+    assert_eq!(selection.rows(), &HashSet::from([id(6), id(7)]));
     selection.move_to(None, true);
     assert_eq!(selection.anchor(), None);
-    assert_eq!(selection.pids(), &HashSet::from([6, 7]));
+    assert_eq!(selection.rows(), &HashSet::from([id(6), id(7)]));
 }
 
 #[test]
-fn pruning_drops_dead_pids_and_clears_a_dead_anchor() {
+fn reconcile_drops_dead_rows_and_clears_a_dead_anchor() {
     let mut selection = ProcessSelection::default();
-    selection.select_single(6);
-    selection.toggle(7);
-    selection.retain_live(&HashSet::from([6]));
-    assert_eq!(selection.pids(), &HashSet::from([6]));
+    selection.select_single(id(6));
+    selection.toggle(id(7));
+    selection.reconcile(&[live(6)]);
+    assert_eq!(selection.rows(), &HashSet::from([id(6)]));
     assert_eq!(
         selection.anchor(),
         None,
@@ -89,22 +115,31 @@ fn pruning_drops_dead_pids_and_clears_a_dead_anchor() {
 }
 
 #[test]
-fn batch_targets_prefer_the_sorted_set_and_fall_back_to_the_anchor() {
+fn batch_identities_prefer_the_sorted_set_and_fall_back_to_the_anchor() {
     let mut selection = ProcessSelection::default();
-    assert!(selection.batch_targets().is_empty());
-    selection.select_single(9);
-    assert_eq!(selection.batch_targets(), vec![9]);
-    selection.toggle(3);
-    selection.toggle(6);
-    assert_eq!(selection.batch_targets(), vec![3, 6, 9]);
+    assert!(selection.batch_identities().is_empty());
+    selection.select_single(id(9));
+    assert_eq!(selection.batch_identities(), vec![id(9)]);
+    selection.toggle(id(3));
+    selection.toggle(id(6));
+    assert_eq!(selection.batch_identities(), vec![id(3), id(6), id(9)]);
 }
 
 #[test]
-fn pid_range_handles_reversed_and_missing_endpoints() {
-    let display = vec![4, 5, 6];
-    assert_eq!(pid_range(&display, 6, 4), vec![4, 5, 6]);
-    assert_eq!(pid_range(&display, 4, 99), Vec::<u32>::new());
-    assert_eq!(pid_range(&display, 99, 4), Vec::<u32>::new());
+fn identity_range_handles_reversed_and_missing_endpoints() {
+    let display: Vec<ProcessRowIdentity> = [4, 5, 6].iter().map(|&pid| id(pid)).collect();
+    assert_eq!(
+        identity_range(&display, id(6), id(4)),
+        vec![id(4), id(5), id(6)]
+    );
+    assert_eq!(
+        identity_range(&display, id(4), id(99)),
+        Vec::<ProcessRowIdentity>::new()
+    );
+    assert_eq!(
+        identity_range(&display, id(99), id(4)),
+        Vec::<ProcessRowIdentity>::new()
+    );
 }
 
 /// The process-table sort reducers carry the header-click conventions every
@@ -219,7 +254,7 @@ fn services_order_matches_the_shell_track_semantics() {
 
 #[test]
 fn startup_order_is_enabled_first_under_ascending_status() {
-    use taskmanager_application::{
+    use taskmanager_core::core::startup::{
         StartupControlPolicy, StartupEntryId, StartupEntryLocator, StartupImpact,
         StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
     };
@@ -269,7 +304,10 @@ fn session_order_covers_user_session_and_seat() {
 
 #[test]
 fn feedback_slots_are_latest_wins() {
-    use taskmanager_application::{FailureKind, LatestControlRequest, ServiceAction, ServiceId};
+    use taskmanager_application::LatestControlRequest;
+    use taskmanager_core::core::failure::FailureKind;
+    use taskmanager_core::core::services::ServiceAction;
+    use taskmanager_core::core::target::ServiceId;
 
     let mut feedback = crate::FeedbackState::default();
     assert!(feedback.service().is_none());
@@ -296,8 +334,8 @@ fn direct_track_uses_one_state_for_inventory_outcomes_and_runtime_notices() {
     let request_id = taskmanager_application::LatestControlRequest::default().begin();
     let service = ServiceControlOutcome {
         request_id,
-        service_id: taskmanager_application::ServiceId::new("demo.service"),
-        action: taskmanager_application::ServiceAction::Start,
+        service_id: ServiceId::new("demo.service"),
+        action: ServiceAction::Start,
         result: Ok(()),
     };
     state.feedback.record_service(service.clone());

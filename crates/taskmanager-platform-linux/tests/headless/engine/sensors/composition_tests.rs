@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::sensors::ThermalThrottleSnapshot;
 
 #[cfg(target_os = "linux")]
 fn empty_thermal_source() -> thermal::ThermalSourceSnapshot {
@@ -20,7 +21,7 @@ fn empty_thermal_source() -> thermal::ThermalSourceSnapshot {
 #[test]
 fn sensor_center_status_preserves_discovery_and_current_data_truth() {
     let thermal = empty_thermal_source();
-    let throttle = trend::ThermalThrottleSnapshot::default();
+    let throttle = ThermalThrottleSnapshot::default();
     for (discovery, current, denied, any, expected) in [
         (
             SourceOutcome::Empty,

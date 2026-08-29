@@ -61,8 +61,8 @@ build() {
 
 check() {
   cd "$pkgname"
-  cargo nextest run --frozen --workspace --all-targets
-  cargo test --frozen --doc --workspace
+  cargo nextest run --frozen --workspace --all-targets -j 4
+  cargo test --frozen --doc --workspace -j 4
 }
 
 package() {

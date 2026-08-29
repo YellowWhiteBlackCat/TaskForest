@@ -84,7 +84,8 @@ fn scan_all(
 
 /// On-box receipt (host-dependent, ignored by default): proves the portable
 /// scanner produces real aggregates on a real Linux filesystem. Run with:
-/// `cargo test -p taskmanager-platform-portable on_box_scans_real_filesystem -- --ignored --nocapture`
+/// `cargo nextest run --locked -p taskmanager-platform-portable --all-targets -j 4 \
+/// -E 'test(on_box_scans_real_filesystem)' --run-ignored only --no-capture`
 #[test]
 #[ignore = "on-box: scans the real /usr filesystem (host-dependent size)"]
 fn on_box_scans_real_filesystem() {

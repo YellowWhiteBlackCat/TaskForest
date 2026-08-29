@@ -24,7 +24,7 @@ fn details_state_projects_only_the_shared_correlated_dependency_session() {
         dependencies(ServiceRelationKind::Requires, "network.target"),
     ));
     state.apply(ServiceUpdate::Logs(
-        taskmanager_application::ServiceLogSnapshot {
+        taskmanager_core::core::services::ServiceLogSnapshot {
             service_id: service_id.clone(),
             state: ServiceLogState::from_lines(vec!["ready".into()]),
         },
@@ -58,7 +58,7 @@ fn rejected_stream_attempt_becomes_typed_unavailable_state() {
         .expect("targeted attempt starts");
     state.reject_stream(
         attempt_id,
-        taskmanager_application::FailureKind::TemporarilyUnavailable,
+        taskmanager_core::core::failure::FailureKind::TemporarilyUnavailable,
     );
 
     assert!(matches!(
@@ -82,10 +82,10 @@ fn shared_dependency_failure_and_retry_keep_one_typed_authority() {
     assert!(lifecycle.fail(
         RequestId::MIN,
         service_id.clone(),
-        taskmanager_application::FailureKind::Rejected,
+        taskmanager_core::core::failure::FailureKind::Rejected,
     ));
     state.apply(ServiceUpdate::Logs(
-        taskmanager_application::ServiceLogSnapshot {
+        taskmanager_core::core::services::ServiceLogSnapshot {
             service_id: service_id.clone(),
             state: ServiceLogState::Unavailable(ServiceLogFailure::with_detail(
                 ServiceLogErrorKind::ProviderFailed,
@@ -97,7 +97,7 @@ fn shared_dependency_failure_and_retry_keep_one_typed_authority() {
     let snapshot = state.snapshot(&lifecycle);
     assert_eq!(
         snapshot.dependencies.failure(),
-        Some(taskmanager_application::FailureKind::Rejected)
+        Some(taskmanager_core::core::failure::FailureKind::Rejected)
     );
     assert!(matches!(
         snapshot.logs,

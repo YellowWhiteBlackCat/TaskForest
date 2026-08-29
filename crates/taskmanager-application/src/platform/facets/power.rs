@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
+use taskmanager_core::core::power::PowerSupplySnapshot;
 use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, RequestPort};
-
-use crate::PowerSupplySnapshot;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PowerSupplyRequest {

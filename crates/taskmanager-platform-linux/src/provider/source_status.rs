@@ -1,7 +1,9 @@
 //! Shared conversion from device health to typed provider-source outcomes.
 
-use taskmanager_core::DeviceStatus;
-use taskmanager_platform_contract::{FailureKind, ProviderId, SourceOutcome, SourceStatus};
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 pub(super) fn source_status_from_device_state(
     provider: &'static str,

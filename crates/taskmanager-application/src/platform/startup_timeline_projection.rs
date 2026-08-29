@@ -1,10 +1,8 @@
-//! Shared boot-timeline projection for the firewalled frontends (BN-05).
+//! Shared boot-timeline projection for all frontends (BN-05).
 //!
-//! The TUI and the iced frontend may not depend on `taskmanager-core`
-//! (dependency firewall, ADR-020), so the single rows decision every
-//! waterfall renderer needs lives here, beside the startup-evidence
-//! projection it consumes. It performs no I/O and depends on nothing but the
-//! core projection.
+//! The single rows decision every waterfall renderer needs lives here, beside
+//! the startup-evidence projection it consumes. It performs no I/O and
+//! depends on the core projection.
 
 use taskmanager_core::StartupBootEvidenceSnapshot;
 use taskmanager_core::core::startup::{

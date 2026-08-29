@@ -6,6 +6,7 @@ use super::*;
 use crate::app::SettingsChange;
 use crate::test_support::temp_dir;
 use taskmanager_application::{AppPage, ConfigStore};
+
 use taskmanager_shell::ShellKeyEvent;
 use taskmanager_theme::tokens::MotionPolicy;
 
@@ -17,7 +18,7 @@ fn pristine_first_launch_applies_defaults_without_a_recovery_notice() {
 
     assert_eq!(
         app.config_draft(),
-        taskmanager_application::Config::default()
+        taskmanager_core::core::config::Config::default()
     );
     assert!(app.shell.feedback_notice().is_none());
 
@@ -87,7 +88,8 @@ fn graph_data_points_preference_propagates_to_the_shared_history_capacity() {
     // authoritative here.
     assert_eq!(
         app.shell.history.capacity(),
-        usize::try_from(taskmanager_application::Config::default().graph_data_points).unwrap()
+        usize::try_from(taskmanager_core::core::config::Config::default().graph_data_points)
+            .unwrap()
     );
 
     let _ = app.update(Message::SettingsChanged(SettingsChange::GraphDataPoints(
@@ -113,7 +115,7 @@ fn graph_data_points_preference_propagates_to_the_shared_history_capacity() {
     hostile.load_config();
     assert_eq!(
         hostile.shell.history.capacity(),
-        taskmanager_shell::history::MAX_HISTORY_CAPACITY,
+        taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY,
         "a hostile preference clamps to the product ceiling"
     );
 
@@ -381,7 +383,7 @@ fn overlay_open_seeds_the_process_ring_from_provider_history() {
     // demo shell's process shape).
     let mut seeded_observations = *seeded.scalar_observations();
     seeded_observations.start_token =
-        taskmanager_application::ScalarObservation::available(310_001, 1);
+        taskmanager_core::core::metrics::ScalarObservation::available(310_001, 1);
     seeded.apply_scalar_observations(seeded_observations);
     let mut cold = taskmanager_test_support::ProcessItemFixtureBuilder::new()
         .pid(3_101)
@@ -392,7 +394,7 @@ fn overlay_open_seeds_the_process_ring_from_provider_history() {
         .build();
     let mut cold_observations = *cold.scalar_observations();
     cold_observations.start_token =
-        taskmanager_application::ScalarObservation::available(310_002, 1);
+        taskmanager_core::core::metrics::ScalarObservation::available(310_002, 1);
     cold.apply_scalar_observations(cold_observations);
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,

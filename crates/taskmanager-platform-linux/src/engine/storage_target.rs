@@ -11,11 +11,12 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
 use taskmanager_core::core::device_state::stable_disk_id;
+use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::{
     DeviceGeneration, DeviceId, DiskMetrics, FailureKind, SourceOutcome, StorageConnection,
     StorageDeviceKey, StorageDeviceKind, StorageDeviceTarget, StorageIdentityStability,
 };
-use taskmanager_platform_contract::{ProviderFailure, SourceStatus};
+use taskmanager_platform_contract::ProviderFailure;
 
 const STORAGE_IDENTITY_METADATA_PROVIDER: &str = "linux.storage.sysfs.metadata";
 

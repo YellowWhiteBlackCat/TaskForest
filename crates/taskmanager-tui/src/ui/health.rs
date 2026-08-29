@@ -14,14 +14,17 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    FailureKind, ProviderRuntimeState, SourceLineProjection, SourceStateKind, SystemSnapshot,
-    device_source_line, truncate_text,
+    SourceLineProjection, SourceStateKind, device_source_line, truncate_text,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::{ProviderRuntimeState, SystemSnapshot};
 use taskmanager_ui_contract::IconId;
 
+use super::containers::KeyHint;
+use super::containers::Modal;
 use super::health_data::{
     Verdict, cpu_value, cpu_verdict, gpu_value, gpu_verdict, memory_value, memory_verdict,
     network_value, network_verdict, storage_value, storage_verdict,
@@ -32,20 +35,28 @@ use crate::ui::alerts::managed_rule_line;
 use crate::ui::{DeviceHealth, classify_device_state};
 
 /// Render the health overlay centred over `area`.
+#[cfg(test)]
+#[allow(dead_code)]
 pub fn render_health_overlay(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    let popup = centered(area, 84, 30);
-    frame.render_widget(Clear, popup);
-    let block = Block::new()
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.accent))
-        .style(Style::new().bg(theme.overlay_bg))
-        .title(format!(
-            " {} {} ",
-            crate::icon_glyph(IconId::Health),
-            t("health.system_health_alerts")
-        ));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    render_health_overlay_at(
+        frame,
+        app,
+        theme,
+        super::planned_popup(
+            area,
+            crate::TuiInputScope::LocalSurface(crate::TuiSurfaceKind::Health),
+        ),
+    );
+}
+
+pub(super) fn render_health_overlay_at(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    popup: Rect,
+) {
+    let inner =
+        Modal::new(theme, IconId::Health, t("health.system_health_alerts")).render(frame, popup);
 
     let [summary, rules, footer] = Layout::vertical([
         Constraint::Length(12),
@@ -57,19 +68,16 @@ pub fn render_health_overlay(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiThem
     render_device_summary(frame, app, theme, summary);
     render_alert_rules(frame, app, theme, rules);
 
+    let mut hint = KeyHint::spans(
+        theme,
+        crate::command_palette::surface_hint_pairs(
+            crate::command_palette::TuiSurfaceScope::StatusOverlay,
+            crate::command_palette::TuiSurfaceAction::ToggleHealth,
+        ),
+    );
+    hint.push(Span::styled(t("health.t_hint"), Style::new().fg(theme.dim)));
     frame.render_widget(
-        Paragraph::new(vec![
-            Line::from(""),
-            Line::from(vec![
-                Span::styled(" h / Esc ", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!("  {}   ", t("chrome.close")),
-                    Style::new().fg(theme.dim),
-                ),
-                Span::styled(t("health.t_hint"), Style::new().fg(theme.dim)),
-            ]),
-        ])
-        .alignment(Alignment::Center),
+        Paragraph::new(vec![Line::from(""), Line::from(hint)]).alignment(Alignment::Center),
         footer,
     );
 }
@@ -160,8 +168,11 @@ impl Verdict {
 
 fn domain_line(theme: TuiTheme, label: &str, value: String, verdict: Verdict) -> Line<'static> {
     Line::from(vec![
-        Span::styled(format!("  {label:<11}"), Style::new().fg(theme.dim)),
-        Span::styled(value, Style::new().fg(Color::White)),
+        Span::styled(
+            format!("  {}", super::text::pad_cells(label, 11)),
+            Style::new().fg(theme.dim),
+        ),
+        Span::styled(value, Style::new().fg(theme.color(Color::White))),
         Span::styled(
             format!("  {}", verdict_label(verdict)),
             Style::new()
@@ -217,7 +228,10 @@ fn provider_line(
     if providers.is_empty() {
         return Line::from(vec![
             Span::styled(
-                format!("  {:<11}", t("health.domain_providers")),
+                format!(
+                    "  {}",
+                    super::text::pad_cells(t("health.domain_providers"), 11)
+                ),
                 Style::new().fg(theme.dim),
             ),
             Span::styled(
@@ -227,7 +241,10 @@ fn provider_line(
         ]);
     }
     let mut spans = vec![Span::styled(
-        format!("  {:<11}", t("health.domain_providers")),
+        format!(
+            "  {}",
+            super::text::pad_cells(t("health.domain_providers"), 11)
+        ),
         Style::new().fg(theme.dim),
     )];
     for provider in providers {
@@ -235,7 +252,7 @@ fn provider_line(
         // firewall, so re-wrap the provider's typed status into a public
         // `DeviceState`; the application layer's neutral VM owns the
         // status→kind fold — this view only maps kind→tone and token.
-        let runtime = taskmanager_application::DeviceState {
+        let runtime = taskmanager_core::core::device_state::DeviceState {
             status: provider.status,
             last_success_ms: provider.last_success_ms,
         };
@@ -297,17 +314,6 @@ fn render_alert_rules(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area
         .map(|managed| managed_rule_line(managed, theme))
         .collect();
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }), rows);
-}
-
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width.saturating_sub(4));
-    let height = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
-    }
 }
 
 #[cfg(test)]

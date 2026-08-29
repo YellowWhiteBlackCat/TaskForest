@@ -13,11 +13,8 @@
 use gpui::{Hsla, Refineable, StyleRefinement, Styled, transparent_black};
 
 use taskmanager_theme::color::mix;
+use taskmanager_theme::color::relative_luminance;
 use taskmanager_theme::{Color, Palette};
-
-pub use taskmanager_theme::color::contrast_ratio;
-pub use taskmanager_theme::color::on_accent;
-pub use taskmanager_theme::color::relative_luminance;
 
 /// Composite `a` over `b` with `t` in [0, 1] (linear sRGB channels) — the
 /// theme's `mix`, re-exported under the historical component-library name.

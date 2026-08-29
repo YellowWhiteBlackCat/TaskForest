@@ -4,14 +4,15 @@
 use crate::gpui_app::elements::{self};
 use crate::gpui_app::icons;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::{Color, tokens};
-use crate::i18n;
 use gpui::{
     AnyElement, App, InteractiveElement, IntoElement, KeyDownEvent, MouseButton, ParentElement,
     Pixels, StatefulInteractiveElement, Styled, StyledImage, div, px,
 };
 use std::collections::{HashMap, HashSet};
-use taskmanager_shell::ProcessRowKey;
+use taskmanager_application::i18n;
+use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_shell::ProcessRowId;
+use taskmanager_theme::Color;
 use taskmanager_ui_contract::{IconId, ProcessColumnSpec};
 
 mod cells;
@@ -19,20 +20,15 @@ mod formatting;
 mod groups;
 use cells::append_body_cells;
 use projection::{StructuralArrow, structural_arrow_action};
+use taskmanager_shell::SortCol;
+use taskmanager_theme::tokens;
 pub(crate) mod projection;
 pub use projection::{
     ProcRowProps, ProjectionCache, RowCellText, Toggle, VisibleRow, VisibleRowsProps,
-    application_root_count, category_expansion_key, category_tree_rows,
-    default_category_expansions, effective_process_hidden_cols, effective_process_sort_col,
-    sort_col_step, sort_id, visible_rows, visible_rows_with_local_time, visible_sort_cols,
+    application_root_count, category_tree_rows, default_category_expansions,
+    effective_process_hidden_cols, effective_process_sort_col, sort_col_step, sort_id,
+    visible_rows, visible_rows_with_local_time, visible_sort_cols,
 };
-
-// The shell owns the process-table sort vocabulary (`taskmanager-shell`
-// `SortCol`): the flat/tree/group ordering goes through the shell's
-// `sort_axis` translation onto the neutral comparator, and the sort state
-// itself lives in the shell `DirectTrackState` process-viewing slot. This
-// re-export keeps the historical `processes_view::SortCol` import path.
-pub use taskmanager_shell::SortCol;
 
 // ── GPUI column kit over the shell `SortCol` ─────────────────────────────────
 //
@@ -520,7 +516,7 @@ pub fn proc_row_with_layout(
         let app_icon_size: Pixels = ui_size.icon_size().into();
         let icon = identity.icon_asset.as_ref().map_or_else(
             || {
-                icons::icon(IconId::Applications)
+                taskmanager_icons::icon(IconId::Applications)
                     .size(app_icon_size)
                     .into_any_element()
             },
@@ -528,7 +524,7 @@ pub fn proc_row_with_layout(
                 icons::application_image(asset)
                     .size(app_icon_size)
                     .with_fallback(move || {
-                        icons::icon(IconId::Applications)
+                        taskmanager_icons::icon(IconId::Applications)
                             .size(app_icon_size)
                             .into_any_element()
                     })
@@ -596,8 +592,8 @@ pub fn proc_row_with_layout(
                     } else {
                         v.select_process_single(pid);
                     }
-                } else if let Some(ProcessRowKey::Application(root_pid)) = selection_key {
-                    v.select_application_root(root_pid);
+                } else if let Some(ProcessRowId::Application(root)) = selection_key {
+                    v.select_application_root(root.pid());
                 }
                 // Mission Center treats a primary double-click on an aggregate/tree
                 // row as the same expand/collapse operation as its chevron. Keep the

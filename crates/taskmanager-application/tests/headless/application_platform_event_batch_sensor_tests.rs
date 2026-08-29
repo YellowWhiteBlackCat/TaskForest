@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence, DeviceState, SensorCenterSnapshot,
     SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
 };
-use taskmanager_platform_contract::{
-    CapabilityId, DeviceSourceSnapshot, ProviderId, RequestId, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, RequestId};
 
 use super::super::super::{PlatformEvent, SensorEvent};
 use super::super::{PlatformEventBatch, test_support::test_event_context};

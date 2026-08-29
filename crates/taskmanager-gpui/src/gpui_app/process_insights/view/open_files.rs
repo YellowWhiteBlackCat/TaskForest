@@ -16,13 +16,14 @@
 //! threads through.
 
 use gpui::{Div, ParentElement, Styled, div, px};
-use taskmanager_application::{OpenFileEntry, ProcessTelemetrySnapshot};
+use taskmanager_core::core::process_telemetry::{OpenFileEntry, ProcessTelemetrySnapshot};
 
-use crate::core::device_state::DeviceStatus;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Theme, mono_font_with_fallback};
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 use super::ProcessInsightsLabels;
+use crate::gpui_app::theme::mono_font_with_fallback;
 
 /// Render one descriptor as `fd  target`, with the target falling back to the
 /// typed "unreadable" marker when procfs could not resolve the symlink.

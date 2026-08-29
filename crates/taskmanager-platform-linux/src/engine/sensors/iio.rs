@@ -8,12 +8,13 @@
 //! `_scale` file exists; otherwise the channel is retained as an honest opaque
 //! raw reading instead of guessing a scale.
 
-use taskmanager_core::{
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::sensors::{
     SensorDescriptor, SensorMagnitude, SensorQuantity, SensorScale, SensorUnit,
 };
-use taskmanager_platform_contract::{
-    DeviceSourceSnapshot, FailureKind, ProviderId, SourceOutcome, SourceStatus,
-};
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::DeviceSourceSnapshot;
 
 use super::*;
 

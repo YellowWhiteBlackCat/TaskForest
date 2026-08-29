@@ -2,10 +2,13 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use crate::{
-    FailureKind, RequestId, ServiceDeps, ServiceId, ServiceLogFailure, ServiceLogQuery,
-    ServiceLogStreamSnapshot, ServiceLogStreamState, SubmissionErrorKind,
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::services::{
+    ServiceDeps, ServiceLogFailure, ServiceLogQuery, ServiceLogStreamSnapshot,
+    ServiceLogStreamState,
 };
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::{RequestId, SubmissionErrorKind};
 
 /// One mapping for service observation admission across every frontend track.
 #[must_use]

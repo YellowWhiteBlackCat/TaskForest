@@ -2,7 +2,7 @@
 
 use std::path::Path;
 
-pub use taskmanager_core::core::sensors::ThermalThrottleSnapshot;
+use taskmanager_core::core::sensors::ThermalThrottleSnapshot;
 use taskmanager_core::{FailureKind, ScalarObservation};
 
 #[must_use]

@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 
-use super::{SortCol, Toggle, category_expansion_key, category_tree_rows, memory_for_display};
-use crate::core::process::{ProcessCategory, ProcessItem, process_category};
+use super::{SortCol, Toggle, category_tree_rows, memory_for_display};
 use taskmanager_application::process_category_projection::category_buckets;
+use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_core::core::process::{ProcessCategory, ProcessItem, process_category};
 use taskmanager_test_support::{
     category_fixture_with_empty_bucket, mixed_availability_category_fixture,
 };

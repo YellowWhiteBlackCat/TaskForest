@@ -11,6 +11,8 @@
 //! - [`theme`] — the neutral skin registry mapped onto iced colors.
 //! - [`keys`] — iced keyboard events normalized into the shared shell
 //!   key vocabulary.
+//! - [`input_modality`] — the renderer-local input-modality tracker (the
+//!   focus-visible source) and the root pointer-press observer.
 //! - [`focus`] — the real Iced `operation::Focusable` adapter for modal
 //!   controls.
 //! - [`a11y`] — a bounded semantic snapshot projection; no native bridge is
@@ -31,17 +33,21 @@
 pub mod a11y;
 pub mod app;
 pub(crate) mod app_history_chart;
+pub mod capabilities;
 pub(crate) mod capture;
 pub mod export;
 pub mod focus;
 pub(crate) mod font_catalog;
+pub mod functional;
 pub mod i18n;
 pub(crate) mod icons;
+pub(crate) mod input_modality;
 pub mod keys;
 pub(crate) mod perf_chart;
 pub(crate) mod perf_history;
 pub mod run;
 pub mod saved_views;
+pub(crate) mod text_metrics;
 pub mod theme;
 pub(crate) mod tray;
 pub(crate) mod trend_strip;

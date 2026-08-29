@@ -1,7 +1,7 @@
 use super::*;
-use taskmanager_application::{
-    DirectoryScanId, DirectoryScanTotals, FailureKind, ScalarObservation,
-};
+use taskmanager_core::core::directory_usage::{DirectoryScanId, DirectoryScanTotals};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarObservation;
 
 /// A disk whose partition children carry `mount_points`, in order. The
 /// partition type is not re-exported to frontends, so the children are

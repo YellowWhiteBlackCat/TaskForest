@@ -3,10 +3,12 @@ use super::*;
 // ── BN-05 boot timeline ──────────────────────────────────────────────────────
 
 /// A measured critical chain: two timed units plus one untimed node.
-fn timeline_evidence() -> taskmanager_application::StartupBootEvidenceSnapshot {
-    use taskmanager_application::{DeviceState, StartupCriticalChainNode};
+fn timeline_evidence() -> taskmanager_core::core::startup::StartupBootEvidenceSnapshot {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::startup::StartupCriticalChainNode;
+
     let healthy = DeviceState::healthy(1_785_292_800_000);
-    taskmanager_application::StartupBootEvidenceSnapshot {
+    taskmanager_core::core::startup::StartupBootEvidenceSnapshot {
         state: healthy,
         failed_units_state: healthy,
         critical_chain_state: healthy,
@@ -77,7 +79,7 @@ fn startup_timeline_stays_silent_without_evidence_or_on_typed_failure() {
 
     let mut failing = timeline_evidence();
     failing.critical_chain_failure =
-        Some(taskmanager_application::StartupEvidenceFailure::MissingTool);
+        Some(taskmanager_core::core::startup::StartupEvidenceFailure::MissingTool);
     assert!(
         startup_timeline(Some(&failing)).is_none(),
         "a typed failure must suppress the waterfall, never render stale bars"
@@ -87,7 +89,9 @@ fn startup_timeline_stays_silent_without_evidence_or_on_typed_failure() {
 /// A chain beyond the segment cap collapses the tail into a bounded +N row.
 #[test]
 fn startup_timeline_collapses_overflow_into_a_bounded_row() {
-    use taskmanager_application::{DeviceState, StartupCriticalChainNode};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::startup::StartupCriticalChainNode;
+
     let healthy = DeviceState::healthy(1);
     let chain: Vec<StartupCriticalChainNode> = (0..25)
         .map(|i| {
@@ -99,12 +103,12 @@ fn startup_timeline_collapses_overflow_into_a_bounded_row() {
             }
         })
         .collect();
-    let evidence = taskmanager_application::StartupBootEvidenceSnapshot {
+    let evidence = taskmanager_core::core::startup::StartupBootEvidenceSnapshot {
         state: healthy,
         failed_units_state: healthy,
         critical_chain_state: healthy,
         critical_chain: chain,
-        ..taskmanager_application::StartupBootEvidenceSnapshot::default()
+        ..taskmanager_core::core::startup::StartupBootEvidenceSnapshot::default()
     };
     let (_, rows) = startup_timeline(Some(&evidence)).expect("large chain projects");
     assert_eq!(

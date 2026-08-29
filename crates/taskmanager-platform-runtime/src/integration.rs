@@ -5,12 +5,14 @@ use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
 use taskmanager_application::{
-    CapabilityId, CommandLaunchRequest, CompositeSourceSnapshot, DesktopAppearanceEvent,
-    DesktopAppearanceRequest, DesktopNotificationRequest, PlatformEvent, ProviderFailure,
-    ResourceRevealRequest, SetupScriptAction, SetupScriptEvent, SetupScriptRequest, ShellEvent,
-    UrlOpenRequest,
+    CommandLaunchRequest, DesktopAppearanceEvent, DesktopAppearanceRequest,
+    DesktopNotificationRequest, PlatformEvent, ResourceRevealRequest, SetupScriptRequest,
+    ShellEvent, UrlOpenRequest,
 };
-use taskmanager_core::{DesktopAppearance, FrozenProcessIdentity};
+use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent};
+use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
 
 use crate::{
     Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lane,

@@ -2,13 +2,19 @@ use std::thread;
 use std::time::Duration;
 
 use taskmanager_application::{
-    CapabilityId, CapabilityStatus, CompositeSourceSnapshot, EventEnvelope, PlatformEvent,
-    PlatformHandle, ProviderId, RequestEnvelope, RequestId, SmartControlRequest, SmartEvent,
-    SmartObservationRequest, SourceOutcome, SourceStatus, StorageHealthEvent, StorageHealthRequest,
+    PlatformEvent, PlatformHandle, SmartControlRequest, SmartEvent, SmartObservationRequest,
+    StorageHealthEvent, StorageHealthRequest,
 };
-use taskmanager_core::{
-    DeviceGeneration, DeviceId, DeviceState, FilesystemHealthSnapshot, SmartSelfTestIntent,
-    SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport,
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityStatus, CompositeSourceSnapshot, EventEnvelope, RequestEnvelope,
+    RequestId,
 };
 
 use super::*;

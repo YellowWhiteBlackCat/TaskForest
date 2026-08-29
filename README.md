@@ -82,6 +82,7 @@ Rust 版本、平台依赖、包内容和发布规则见[文档中心](docs/READ
 - [权限与信任边界](docs/PERMISSION_MODEL.md)
 - [质量门禁](docs/QUALITY_GATES.md)
 - [发布与打包](docs/RELEASE.md)
+- [贡献指南](CONTRIBUTING.md)、[安全策略](SECURITY.md)、[更新日志](CHANGELOG.md)
 - [开源致谢](docs/ACKNOWLEDGMENTS.md)
 - [各 crate 的职责](crates/README.md)
 

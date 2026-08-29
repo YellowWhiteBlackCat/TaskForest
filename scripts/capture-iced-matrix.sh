@@ -350,6 +350,13 @@ sed -i "s/^nested_output_logical=.*/nested_output_logical=$NIRI_OUTPUT_LOGICAL/"
 
 capture_one() {
   local name="$1" device="$2" window_size="$3"
+  # A "-zh" scenario-name suffix renders the localized surface (ICED-002
+  # geometry evidence): the launch reads XDG_CONFIG_HOME/taskmanager/config.json
+  # (JSON, serde), whose shared language token is "en"/"zh".
+  local locale=""
+  case "$name" in
+  *-zh) locale="zh" ;;
+  esac
   local scenario_dir="$RUN_DIR/$name"
   local log="$scenario_dir/app.log"
   local markers="$scenario_dir/markers.log"
@@ -367,94 +374,118 @@ capture_one() {
   service-details) page=services ;;
   esac
   mkdir -p "$scenario_dir" "$config_home"
-  rm -f "$markers" "$windows" "$windows_tmp" "$windows_error" "$action" "$image"
-  terminate_owned "$APP_PID" "$APP_PGID"
-  APP_PID=""
-  APP_PGID=""
 
-  printf '  start %-13s device=%-7s window=%s\n' "$name" "$device" "$window_size"
-  XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$config_home" \
-    WAYLAND_DISPLAY="$SOCK" TM_ICED_CAPTURE_MARKER_FILE="$markers" \
-    TM_ICED_CAPTURE_DEVICE="$device" TM_ICED_WINDOW_SIZE="$window_size" \
-    LIBGL_ALWAYS_SOFTWARE=1 setsid "$APP" --demo >"$log" 2>&1 &
-  APP_PID=$!
-  APP_PGID="$(process_group "$APP_PID")"
+  # Two attempts per scenario: the nested-Wayland session occasionally shows
+  # late-session resource flakiness (a launch that produces no window and no
+  # log, ICED-002 ledger note). Each attempt tears the previous app down and
+  # starts clean; the manifest and marker receipts are written exactly once
+  # from the final attempt so validation still sees one row per scenario.
+  local attempt=0
+  while [ "$attempt" -lt 2 ]; do
+    attempt=$((attempt + 1))
+    if [ "$attempt" -gt 1 ]; then
+      printf '  retry %-13s (attempt %d/2)\n' "$name" "$attempt"
+    fi
+    rm -f "$markers" "$windows" "$windows_tmp" "$windows_error" "$action" "$image"
+    terminate_owned "$APP_PID" "$APP_PGID"
+    APP_PID=""
+    APP_PGID=""
+    window_id=""
+    window_ready=0
+    marker_ready=0
+    action_status=failed
+    width=0
+    height=0
+    bytes=0
+    hash="-"
 
-  if [ "$APP_PGID" = "$APP_PID" ]; then
-    for _ in $(seq 1 80); do
-      if NIRI_SOCKET="$IPC" timeout 3s niri msg -j windows >"$windows_tmp" 2>"$windows_error" \
-        && jq -e --arg app "$APP_ID" --arg pid "$APP_PID" \
-          'any(.[]; .app_id == $app and ((.pid | tostring) == $pid))' \
-          "$windows_tmp" >/dev/null 2>&1; then
-        mv "$windows_tmp" "$windows"
-        window_id="$(jq -r --arg app "$APP_ID" --arg pid "$APP_PID" \
-          '.[] | select(.app_id == $app and ((.pid | tostring) == $pid)) | .id' \
-          "$windows" | head -1)"
-        window_ready=1
-        break
-      fi
-      sleep 0.25
-    done
+    printf '  start %-13s device=%-7s window=%s\n' "$name" "$device" "$window_size"
+    XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$config_home" \
+      WAYLAND_DISPLAY="$SOCK" TM_ICED_CAPTURE_MARKER_FILE="$markers" \
+      TM_ICED_CAPTURE_DEVICE="$device" TM_ICED_WINDOW_SIZE="$window_size" \
+      TM_ICED_CAPTURE_LOCALE="$locale" \
+      LIBGL_ALWAYS_SOFTWARE=1 setsid "$APP" --demo >"$log" 2>&1 &
+    APP_PID=$!
+    APP_PGID="$(process_group "$APP_PID")"
 
-    for _ in $(seq 1 120); do
-      if grep -q "ICED_CAPTURE_MARKER event=frame_ready mode=demo page=$page" "$markers" 2>/dev/null \
-        && grep -q "ICED_CAPTURE_MARKER event=target_ready mode=demo page=$page device=$device" "$markers" 2>/dev/null; then
-        marker_ready=1
-        break
-      fi
-      kill -0 "$APP_PID" 2>/dev/null || break
-      sleep 0.25
-    done
-    sleep 0.5
-  fi
+    if [ "$APP_PGID" = "$APP_PID" ]; then
+      for _ in $(seq 1 80); do
+        if NIRI_SOCKET="$IPC" timeout 3s niri msg -j windows >"$windows_tmp" 2>"$windows_error" \
+          && jq -e --arg app "$APP_ID" --arg pid "$APP_PID" \
+            'any(.[]; .app_id == $app and ((.pid | tostring) == $pid))' \
+            "$windows_tmp" >/dev/null 2>&1; then
+          mv "$windows_tmp" "$windows"
+          window_id="$(jq -r --arg app "$APP_ID" --arg pid "$APP_PID" \
+            '.[] | select(.app_id == $app and ((.pid | tostring) == $pid)) | .id' \
+            "$windows" | head -1)"
+          window_ready=1
+          break
+        fi
+        sleep 0.25
+      done
 
-  {
-    printf 'app_pid=%s\n' "$APP_PID"
-    printf 'window_id=%s\n' "$window_id"
-    printf 'requested_window=%s\n' "$window_size"
-    printf 'command=niri msg action screenshot-window --id %s --write-to-disk true --path %s\n' \
-      "$window_id" "$image"
-  } >"$action"
+      for _ in $(seq 1 120); do
+        if grep -q "ICED_CAPTURE_MARKER event=frame_ready mode=demo page=$page" "$markers" 2>/dev/null \
+          && grep -q "ICED_CAPTURE_MARKER event=target_ready mode=demo page=$page device=$device" "$markers" 2>/dev/null; then
+          marker_ready=1
+          break
+        fi
+        kill -0 "$APP_PID" 2>/dev/null || break
+        sleep 0.25
+      done
+      sleep 0.5
+    fi
 
-  if [ "$window_ready" -eq 1 ] && [ "$marker_ready" -eq 1 ] \
-    && kill -0 "$APP_PID" 2>/dev/null \
-    && NIRI_SOCKET="$IPC" timeout 3s niri msg -j windows >"$windows_tmp" 2>"$windows_error" \
-    && jq -e --arg app "$APP_ID" --arg pid "$APP_PID" --arg id "$window_id" \
-      'any(.[]; .app_id == $app and ((.pid | tostring) == $pid) and ((.id | tostring) == $id))' \
-      "$windows_tmp" >/dev/null 2>&1; then
-    mv "$windows_tmp" "$windows"
-    for _ in $(seq 1 5); do
-      rm -f "$image"
-      if NIRI_SOCKET="$IPC" timeout 8s niri msg action screenshot-window \
-        --id "$window_id" --write-to-disk true --path "$image" >>"$action" 2>&1; then
-        action_status=ok
-        break
-      fi
-      sleep 0.25
-    done
-  fi
+    {
+      printf 'app_pid=%s\n' "$APP_PID"
+      printf 'window_id=%s\n' "$window_id"
+      printf 'requested_window=%s\n' "$window_size"
+      printf 'command=niri msg action screenshot-window --id %s --write-to-disk true --path %s\n' \
+        "$window_id" "$image"
+    } >"$action"
 
-  if [ "$action_status" = ok ]; then
-    for _ in $(seq 1 20); do
-      if [ -s "$image" ]; then
-        bytes="$(stat -c%s "$image")"
-        [ "$bytes" -gt 5000 ] && break
-      fi
-      sleep 0.1
-    done
-    if [ "$bytes" -gt 5000 ]; then
-      local dimensions
-      dimensions="$(file "$image" | sed -nE 's/.*PNG image data, ([0-9]+) x ([0-9]+).*/\1 \2/p')"
-      read -r width height <<<"$dimensions"
-      if [ -n "$width" ] && [ -n "$height" ]; then
-        hash="$(sha256sum "$image" | cut -d' ' -f1)"
+    if [ "$window_ready" -eq 1 ] && [ "$marker_ready" -eq 1 ] \
+      && kill -0 "$APP_PID" 2>/dev/null \
+      && NIRI_SOCKET="$IPC" timeout 3s niri msg -j windows >"$windows_tmp" 2>"$windows_error" \
+      && jq -e --arg app "$APP_ID" --arg pid "$APP_PID" --arg id "$window_id" \
+        'any(.[]; .app_id == $app and ((.pid | tostring) == $pid) and ((.id | tostring) == $id))' \
+        "$windows_tmp" >/dev/null 2>&1; then
+      mv "$windows_tmp" "$windows"
+      for _ in $(seq 1 5); do
+        rm -f "$image"
+        if NIRI_SOCKET="$IPC" timeout 8s niri msg action screenshot-window \
+          --id "$window_id" --write-to-disk true --path "$image" >>"$action" 2>&1; then
+          action_status=ok
+          break
+        fi
+        sleep 0.25
+      done
+    fi
+
+    if [ "$action_status" = ok ]; then
+      for _ in $(seq 1 20); do
+        if [ -s "$image" ]; then
+          bytes="$(stat -c%s "$image")"
+          [ "$bytes" -gt 5000 ] && break
+        fi
+        sleep 0.1
+      done
+      if [ "$bytes" -gt 5000 ]; then
+        local dimensions
+        dimensions="$(file "$image" | sed -nE 's/.*PNG image data, ([0-9]+) x ([0-9]+).*/\1 \2/p')"
+        read -r width height <<<"$dimensions"
+        if [ -n "$width" ] && [ -n "$height" ]; then
+          hash="$(sha256sum "$image" | cut -d' ' -f1)"
+        else
+          action_status=failed
+        fi
       else
         action_status=failed
       fi
-    else
-      action_status=failed
     fi
-  fi
+
+    [ "$action_status" = ok ] && break
+  done
 
   if [ "$action_status" = ok ]; then
     printf '  pass  %-13s %sx%s %s B\n' "$name" "$width" "$height" "$bytes"

@@ -49,7 +49,6 @@ mod fan;
 pub(crate) mod first_run;
 pub(crate) mod format;
 pub(crate) mod health;
-mod highlight;
 pub(crate) mod history_replay;
 mod insights;
 pub(crate) mod overlays;
@@ -96,8 +95,16 @@ pub(crate) use performance::{
 // update path builds the copy text through the same rows the modal renders.
 pub(crate) use about::about_copy_payload;
 
-/// Build the root element for one render.
+/// Build the root element for one render. The root input observer watches
+/// pointer presses for the focus-visible tracker
+/// ([`crate::input_modality`]) before the tree below handles the same event —
+/// the iced counterpart of the GPUI root's capture-phase listeners.
 pub fn view(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
+    crate::input_modality::Observer::new(view_root(app)).into()
+}
+
+/// The observed root: page scaffold, overlays, and warm-up body for one render.
+fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let shell = &app.shell;
     let theme_snapshot = app.theme();
     let language = app.language();
@@ -362,7 +369,8 @@ fn local_modal(app: &crate::IcedApp) -> Option<Element<'_, Message, iced::Theme,
         }
         LocalSurface::AlertCenter => overlays::alert_center_overlay(
             app.theme(),
-            &app.alert_center,
+            app.shell.projection().alert_center.event_history(),
+            app.shell.projection().alert_center.policy(),
             app.modal_appear_progress(),
         ),
         LocalSurface::FirstRun => {
@@ -396,9 +404,9 @@ fn footer_status(shell: &ShellApp) -> String {
 /// accent. The same palette semantic colors the old inline severity-colored
 /// text pill used; only the presentation moved to the tone-filled capsule.
 fn alert_badge_tone(
-    severity: taskmanager_application::alerts::AlertSeverity,
+    severity: taskmanager_core::core::alerts::AlertSeverity,
 ) -> components::BadgeTone {
-    use taskmanager_application::alerts::AlertSeverity;
+    use taskmanager_core::core::alerts::AlertSeverity;
     match severity {
         AlertSeverity::Critical => components::BadgeTone::Danger,
         AlertSeverity::Warning => components::BadgeTone::Warning,
@@ -406,7 +414,8 @@ fn alert_badge_tone(
     }
 }
 
-pub use format::*;
+pub(crate) use format::*;
+pub(crate) mod lazy_key;
 
 #[cfg(test)]
 #[path = "../tests/gui/ui/tests.rs"]

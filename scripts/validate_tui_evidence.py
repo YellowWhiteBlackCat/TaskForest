@@ -138,8 +138,21 @@ def self_test() -> None:
         try:
             visual_content_receipt(path)
         except EvidenceError:
-            return
-    raise EvidenceError("uniform black TUI frame was accepted")
+            pass
+        else:
+            raise EvidenceError("uniform black TUI frame was accepted")
+
+        evidence_root = Path(temporary) / "target" / "tui-evidence" / "run"
+        evidence_root.mkdir(parents=True)
+        inside = evidence_root / "image.png"
+        assert resolve_evidence_path(inside, evidence_root, "image") == inside
+        outside = Path(temporary) / "outside.png"
+        try:
+            resolve_evidence_path(outside, evidence_root, "image")
+        except EvidenceError:
+            pass
+        else:
+            raise EvidenceError("evidence path outside the run root was accepted")
 
 
 def metadata(path: Path) -> dict[str, str]:
@@ -187,6 +200,18 @@ def validate_source_manifest(path: Path, root: Path) -> None:
             raise EvidenceError(f"source provenance mismatch: {relative}")
 
 
+def resolve_evidence_path(path: Path, evidence_root: Path, label: str) -> Path:
+    """Resolve an evidence path and keep it below target/tui-evidence."""
+    resolved = path.resolve()
+    try:
+        resolved.relative_to(evidence_root)
+    except ValueError as error:
+        raise EvidenceError(
+            f"{label} path escapes target/tui-evidence: {path}"
+        ) from error
+    return resolved
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--image", type=Path)
@@ -208,25 +233,35 @@ def main() -> int:
         required = ("image", "metadata", "markers", "source_manifest", "manifest", "receipt", "repo_root")
         if missing := [name for name in required if getattr(args, name) is None]:
             raise EvidenceError(f"missing required arguments: {', '.join(missing)}")
-        receipt = png_receipt(args.image)
-        visual = visual_content_receipt(args.image)
+        root = args.repo_root.resolve()
+        evidence_root = (root / "target" / "tui-evidence").resolve()
+        image = resolve_evidence_path(args.image, evidence_root, "image")
+        metadata_path = resolve_evidence_path(args.metadata, evidence_root, "metadata")
+        markers_path = resolve_evidence_path(args.markers, evidence_root, "markers")
+        source_manifest = resolve_evidence_path(
+            args.source_manifest, evidence_root, "source manifest"
+        )
+        manifest = resolve_evidence_path(args.manifest, evidence_root, "manifest")
+        receipt_path = resolve_evidence_path(args.receipt, evidence_root, "receipt")
+
+        receipt = png_receipt(image)
+        visual = visual_content_receipt(image)
         if receipt.width < 900 or receipt.height < 500:
             raise EvidenceError(f"TUI image is too small: {receipt.width}x{receipt.height}")
-        values = metadata(args.metadata)
+        values = metadata(metadata_path)
         expected_page = values.get("page", "performance")
-        markers = args.markers.read_text(encoding="utf-8")
+        markers = markers_path.read_text(encoding="utf-8")
         for token in (
             "TUI_CAPTURE_MARKER event=demo_data_ready mode=demo",
             f"TUI_CAPTURE_MARKER event=frame_ready page={expected_page}",
         ):
             if token not in markers:
                 raise EvidenceError(f"missing marker: {token}")
-        root = args.repo_root.resolve()
-        if file_sha256(args.source_manifest) != values["source_manifest_sha256"]:
+        if file_sha256(source_manifest) != values["source_manifest_sha256"]:
             raise EvidenceError("source manifest hash differs from metadata")
         if values["source_scope"] != "tui":
             raise EvidenceError(f"unexpected source scope: {values['source_scope']!r}")
-        validate_source_manifest(args.source_manifest, root)
+        validate_source_manifest(source_manifest, root)
         if args.current_worktree:
             head = current("git", "rev-parse", "--short=12", "HEAD", cwd=root)
             rust = current("rustc", "-V", cwd=root)
@@ -235,10 +270,10 @@ def main() -> int:
                 raise EvidenceError("capture provenance differs from current worktree")
 
         if not args.check_only:
-            with args.manifest.open("a", encoding="utf-8", newline="") as handle:
+            with manifest.open("a", encoding="utf-8", newline="") as handle:
                 writer = csv.writer(handle, delimiter="\t", lineterminator="\n")
                 writer.writerow([
-                    args.image.name,
+                    image.name,
                     receipt.width,
                     receipt.height,
                     receipt.size,
@@ -256,10 +291,10 @@ def main() -> int:
             "stack": values["stack"],
             "source_scope": values["source_scope"],
             "source_manifest_sha256": values["source_manifest_sha256"],
-            "metadata_sha256": file_sha256(args.metadata),
-            "markers_sha256": file_sha256(args.markers),
+            "metadata_sha256": file_sha256(metadata_path),
+            "markers_sha256": file_sha256(markers_path),
             "artifact": {
-                "image": args.image.name,
+                "image": image.name,
                 "width": receipt.width,
                 "height": receipt.height,
                 "bytes": receipt.size,
@@ -270,7 +305,7 @@ def main() -> int:
             },
         }
         if not args.check_only:
-            args.receipt.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
+            receipt_path.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
         print(f"TUI evidence validation: PASS ({receipt.width}x{receipt.height})")
         return 0
     except (EvidenceError, OSError, ValueError, subprocess.CalledProcessError) as error:

@@ -15,8 +15,8 @@ use taskmanager_assets::product;
 use crate::{IcedApp, Message, ui};
 
 type InstanceLease = (
-    Option<Box<dyn taskmanager_app_host::InstanceGuard>>,
-    Option<Receiver<taskmanager_app_host::InstanceEvent>>,
+    Option<Box<dyn taskmanager_platform_contract::InstanceGuard>>,
+    Option<Receiver<taskmanager_platform_contract::InstanceEvent>>,
 );
 
 /// The same two viewport contracts used by the GPUI frontend: a spacious
@@ -66,10 +66,10 @@ fn acquire_instance(demo: bool) -> Option<InstanceLease> {
 
     let (sender, receiver) = channel();
     match taskmanager_app_host::acquire_single_instance(product::ICED_NAME, sender) {
-        Ok(taskmanager_app_host::InstanceRole::Primary(guard)) => {
+        Ok(taskmanager_platform_contract::InstanceRole::Primary(guard)) => {
             Some((Some(guard), Some(receiver)))
         }
-        Ok(taskmanager_app_host::InstanceRole::Secondary) => None,
+        Ok(taskmanager_platform_contract::InstanceRole::Secondary) => None,
         Err(failure) => {
             eprintln!(
                 "taskforest-i: single-instance unavailable ({failure}); continuing without the guard"
@@ -199,7 +199,7 @@ pub fn run(demo: bool) -> iced::Result {
         ..Default::default()
     })
     .window_size(initial_window_size())
-    .default_font(crate::theme::BUNDLED_UI_FONT);
+    .default_font(taskmanager_theme::iced::BUNDLED_UI_FONT);
 
     // Register the same bundled faces GPUI embeds (ADR-026 fonts policy) so the
     // resolved UI/mono families exist in iced's font database: MiSans VF (the

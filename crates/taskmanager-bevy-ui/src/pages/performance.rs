@@ -38,7 +38,7 @@ use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::observer::On;
-use bevy::ecs::query::With;
+use bevy::ecs::query::{With, Without};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, ParamSet, Query, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
@@ -49,15 +49,16 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, ScrollArea};
 use bevy::window::{PrimaryWindow, Window};
+use taskmanager_application::SystemTelemetryDomainState;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
+use taskmanager_core::core::metrics::{
     CpuMetrics, CpuTelemetryObservation, DiskMetrics, GpuMetrics, GpuTelemetryObservation,
     MemoryMetrics, MemoryTelemetryObservation, NetworkMetrics, NetworkTelemetryObservation,
-    SystemTelemetryDomainState,
 };
+
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::history::MetricSeries;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments, swap_breakdown};
+use taskmanager_shell::presentation::trend::{self, TrendSeries};
 use taskmanager_shell::presentation::{
     bytes, gpu_display_identity, graph_summary, megahertz, missing_value, power_w, temperature_c,
 };
@@ -65,23 +66,26 @@ use taskmanager_shell::presentation::{
 use crate::app::{PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_2};
-use crate::widgets::chart::{ChartSurface, MAX_CHART_POINTS, line_segments};
+use crate::widgets::chart::{
+    CHART_LINE_THICKNESS_PX, ChartSurface, MAX_CHART_POINTS, line_segments, polyline_scene,
+    segment_layout,
+};
 use crate::widgets::controls::ControlVisual;
 use crate::widgets::layout::PerformanceLayoutMode;
-use crate::widgets::sparkline::bar_fractions;
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod scene;
 
 mod metrics;
 
+use bevy::math::Rot2;
+use bevy::ui::UiTransform;
 use metrics::{
     cpu_field_text, cpu_metrics, curve_caption, curve_samples, curve_wanted, curve_warm,
     dyn_field_text, gpu_devices, gpu_fact_line, memory_metrics, network_devices, nic_fact_line,
-    section_keys, segment_key, segment_line, strip_fractions, summary_value,
+    section_keys, segment_key, segment_line, summary_value,
 };
 use scene::blocks::block_scene;
-use scene::chart::{bar_height, bar_scene};
 
 // ---- marker components (this page's private dynamic-state vocabulary) ----
 //
@@ -192,6 +196,14 @@ struct RefreshObserverBound;
 #[derive(Component, Clone, Default)]
 pub(crate) struct DynText(pub(crate) DynField);
 
+/// One bar whose fill width is a CPU fact's magnitude (0–100%), keyed like
+/// [`DynText`]. The fold observer rewrites the width from the same folded
+/// projection the row's numeric text reads — two views, one observation.
+/// The `Default` impl only exists for the bsn! template mechanism; the seed
+/// is never a rendered fact.
+#[derive(Component, Clone, Copy, Default)]
+pub(crate) struct DynBar(pub(crate) CpuField);
+
 /// One sparkline bar strip; the observer resizes (or rebuilds) its children
 /// from the same shared projection the strip was spawned with.
 #[derive(Component, Clone, Copy, Default)]
@@ -256,6 +268,14 @@ pub(crate) enum CpuField {
     Core(usize),
 }
 
+impl Default for CpuField {
+    /// Template seed only — the bsn! paren form requires a `Default` value
+    /// that every spawned scene immediately patches with a real field.
+    fn default() -> Self {
+        Self::Usage
+    }
+}
+
 impl Default for DynField {
     fn default() -> Self {
         Self::Summary(SummaryField::Cpu)
@@ -276,12 +296,12 @@ impl SystemCurve {
     /// The strip order; the GPU card is always spawned but display-gated.
     pub(crate) const STRIP: [Self; 4] = [Self::Cpu, Self::Memory, Self::Network, Self::Gpu];
 
-    fn series(self) -> MetricSeries {
+    fn series(self) -> TrendSeries {
         match self {
-            Self::Cpu => MetricSeries::CpuUsagePercent,
-            Self::Memory => MetricSeries::MemoryUsagePercent,
-            Self::Network => MetricSeries::NetworkBytesPerSec,
-            Self::Gpu => MetricSeries::GpuUsagePercent,
+            Self::Cpu => TrendSeries::CpuUsagePercent,
+            Self::Memory => TrendSeries::MemoryUsagePercent,
+            Self::Network => TrendSeries::NetworkBytesPerSec,
+            Self::Gpu => TrendSeries::GpuUsagePercent,
         }
     }
 
@@ -494,20 +514,24 @@ fn refresh_on_fold(
     palette: Res<WindowPalette>,
     focus: Res<PerformanceFocus>,
     mut texts: Query<(&DynText, &mut Text)>,
+    mut bars: Query<(&DynBar, &mut Node), Without<DynText>>,
     mut strips: Query<(Entity, &SparkStrip, &Children, &mut ChartSurface)>,
     gates: Query<(Entity, &CurveGate)>,
     sections: Query<(Entity, &DynSection)>,
     blocks: Query<(Entity, &DynBlock)>,
-    mut nodes: Query<&mut Node>,
+    mut nodes: Query<&mut Node, Without<DynBar>>,
+    mut transforms: Query<&mut UiTransform>,
     mut commands: Commands,
 ) {
     let shell = track.shell();
     rewrite_texts(shell, &mut texts);
+    rewrite_core_bars(shell, &mut bars);
     sync_strips(
         shell,
         &palette.inner,
         &mut strips,
         &mut nodes,
+        &mut transforms,
         &mut commands,
     );
     sync_card_gates(shell, focus.0, &gates, &mut nodes);
@@ -525,33 +549,57 @@ fn rewrite_texts(shell: &ShellApp, texts: &mut Query<(&DynText, &mut Text)>) {
     }
 }
 
-/// Resize each strip's bars from the current window. A matching child count
-/// rewrites heights in place (the warm steady state re-spawns nothing); a
-/// changed count rebuilds the bar list once.
+/// Rewrite each bar's fill width from the same folded observation its row's
+/// numeric text renders. An unavailable observation collapses the fill to
+/// zero — a missing fact is never painted as progress.
+fn rewrite_core_bars(shell: &ShellApp, bars: &mut Query<(&DynBar, &mut Node), Without<DynText>>) {
+    for (field, mut node) in bars.iter_mut() {
+        let pct = match &field.0 {
+            CpuField::Core(index) => cpu_metrics(shell)
+                .and_then(|cpu| cpu.current_core_usage_pct(*index))
+                .filter(|value| value.is_finite())
+                .map_or(0.0, |value| value.clamp(0.0, 100.0)),
+            _ => 0.0,
+        };
+        let wanted = Val::Percent(pct);
+        if node.width != wanted {
+            node.width = wanted;
+        }
+    }
+}
+
+/// Resize each strip's polyline from the current window. A matching segment
+/// count rewrites each segment's geometry in place (the warm steady state
+/// re-spawns nothing); a changed count rebuilds the segment list once through
+/// the bsn! polyline adapter. Gaps are absent segments — never zero-joined.
 fn sync_strips(
     shell: &ShellApp,
     palette: &UiPalette,
     strips: &mut Query<(Entity, &SparkStrip, &Children, &mut ChartSurface)>,
-    nodes: &mut Query<&mut Node>,
+    nodes: &mut Query<&mut Node, Without<DynBar>>,
+    transforms: &mut Query<&mut UiTransform>,
     commands: &mut Commands,
 ) {
+    let strip_height = palette.control_height_px * 3.0;
     for (strip_entity, strip, children, mut chart) in strips.iter_mut() {
-        let segment_count = line_segments(
-            &shell.history.series(strip.0.series()),
-            100.0,
-            palette.control_height_px * 2.0,
+        let segments = line_segments(
+            &trend::window(&shell.history, strip.0.series()),
+            scene::chart::CHART_STRIP_WIDTH_PX,
+            strip_height,
             MAX_CHART_POINTS,
-        )
-        .len();
-        chart.0 = segment_count;
-        let fractions = strip_fractions(shell, strip.0);
-        if children.len() == fractions.len() {
-            for (child, fraction) in children.iter().zip(fractions.iter()) {
-                let height = bar_height(*fraction, palette);
-                if let Ok(mut node) = nodes.get_mut(*child)
-                    && node.height != Val::Px(height)
-                {
-                    node.height = Val::Px(height);
+        );
+        chart.0 = segments.len();
+        if children.len() == segments.len() {
+            for (child, segment) in children.iter().zip(segments.iter()) {
+                let layout = segment_layout(*segment);
+                if let Ok(mut node) = nodes.get_mut(*child) {
+                    node.width = Val::Px(layout.length);
+                    node.height = Val::Px(CHART_LINE_THICKNESS_PX);
+                    node.left = Val::Px(layout.left);
+                    node.top = Val::Px(layout.top);
+                }
+                if let Ok(mut transform) = transforms.get_mut(*child) {
+                    transform.rotation = Rot2::radians(layout.rotation);
                 }
             }
             continue;
@@ -559,17 +607,12 @@ fn sync_strips(
         for child in children.iter() {
             commands.entity(*child).despawn();
         }
-        for fraction in &fractions {
-            let bar = commands
-                .spawn_scene(bar_scene(
-                    bar_height(*fraction, palette),
-                    strip.0.color(palette),
-                ))
-                .id();
-            commands
-                .entity(strip_entity)
-                .add_one_related::<ChildOf>(bar);
-        }
+        let polyline = commands
+            .spawn_scene(polyline_scene(&segments, strip.0.color(palette)))
+            .id();
+        commands
+            .entity(strip_entity)
+            .add_one_related::<ChildOf>(polyline);
     }
 }
 
@@ -579,7 +622,7 @@ fn sync_card_gates(
     shell: &ShellApp,
     focus: SystemCurve,
     gates: &Query<(Entity, &CurveGate)>,
-    nodes: &mut Query<&mut Node>,
+    nodes: &mut Query<&mut Node, Without<DynBar>>,
 ) {
     let active = if curve_wanted(shell, focus) {
         focus

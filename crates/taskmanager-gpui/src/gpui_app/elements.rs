@@ -31,10 +31,10 @@ use taskmanager_ui_contract::IconId;
 use crate::gpui_app::graph::{
     GraphOpts, GraphSampleState, GraphSettings, graph_element, graph_sample_state,
 };
-use crate::gpui_app::icons;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Theme, WindowCorner, appear, fade_in};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::gpui::{appear, fade_in};
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Theme, WindowCorner};
 
 /// A pill / segmented-control segment. Active = accent fill + white text; inactive
 /// picks up a translucent accent overlay on hover. `on_hover` is wired by the caller
@@ -183,7 +183,7 @@ impl Pill {
                 .flex()
                 .items_center()
                 .gap(tokens::SPACE_8)
-                .child(icons::icon(icon).size(px(12.0)))
+                .child(taskmanager_icons::icon(icon).size(px(12.0)))
                 .child(pill),
             None => wrapper.child(pill),
         }
@@ -356,7 +356,7 @@ impl ToolBtn {
                 .flex()
                 .items_center()
                 .gap(tokens::SPACE_6)
-                .child(icons::icon(ic).size(px(13.0)))
+                .child(taskmanager_icons::icon(ic).size(px(13.0)))
                 .child(self.label),
             None => btn.child(self.label),
         };
@@ -514,7 +514,7 @@ pub(crate) fn mini_graph_cell(
     theme: &Theme,
     id: impl Into<ElementId>,
     samples: Rc<[f32]>,
-    color: crate::gpui_app::theme::Color,
+    color: taskmanager_theme::Color,
     label: &str,
     settings: GraphSettings,
 ) -> Div {
@@ -724,7 +724,7 @@ pub fn status_bar(theme: &Theme, left: &[String], right: &[String]) -> Div {
 /// the theme's highlight token (`Theme::highlight_fg`, currently the accent;
 /// kept as a distinct semantic so search legibility cannot drift from the
 /// accent family) — ASCII case-insensitive, non-overlapping, via the SINGLE
-/// shared match engine `taskmanager_application::text::match_ranges_ascii_ci`
+/// shared match engine `taskmanager_core::core::text::match_ranges_ascii_ci`
 /// (ADR-020: GPUI, TUI and iced all render these ranges and never recompute
 /// matches themselves; the `taskmanager-ui` highlighter component remains for
 /// other consumers but is no longer the GPUI search-match source).
@@ -734,7 +734,7 @@ pub fn highlighted_text(text: &str, query: &str, theme: &Theme) -> impl IntoElem
     if query.is_empty() {
         return div().child(text.to_string()).into_any_element();
     }
-    let matches = taskmanager_application::text::match_ranges_ascii_ci(text, query);
+    let matches = taskmanager_core::core::text::match_ranges_ascii_ci(text, query);
     highlighted_text_with_ranges(text, &matches, theme)
 }
 
@@ -1146,7 +1146,7 @@ pub fn tooltip_overlay(t: &Theme, text: &str, anchor: Point<Pixels>) -> impl Int
 /// // page tab label (inherits size/weight/color from the tab div):
 /// div()
 ///     .flex()
-///     .child(icons::icon(icon).size(px(14.0)))
+///     .child(taskmanager_icons::icon(icon).size(px(14.0)))
 ///     .child(elements::truncated_text(label));
 ///
 /// // sidebar caption (own styling + flex_1 to fill the caption column):

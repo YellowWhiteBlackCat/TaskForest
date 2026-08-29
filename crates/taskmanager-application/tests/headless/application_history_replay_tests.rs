@@ -3,9 +3,9 @@ use std::sync::Arc;
 use taskmanager_application::{
     HistoryReplayCompletion, HistoryReplayCompletionDisposition, HistoryReplayCompletionOutcome,
     HistoryReplayController, HistoryReplayError, HistoryReplayErrorKind, HistoryReplayRow,
-    HistoryReplayState, HistorySeriesKey, HistoryWindow,
+    HistoryReplayState,
 };
-use taskmanager_core::HistoryMetric;
+use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 
 fn rows(value: f32) -> Arc<[HistoryReplayRow]> {
     Arc::from([HistoryReplayRow {

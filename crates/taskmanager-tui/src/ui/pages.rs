@@ -5,12 +5,17 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Row, Wrap};
-use taskmanager_application::{SourceNotice, SourceStatus, i18n::t, source_notice};
+use taskmanager_application::{SourceNotice, i18n::t, source_notice};
+use taskmanager_core::core::source::SourceStatus;
 use taskmanager_shell::presentation::MISSING_VALUE;
 
-use super::{TableRenderProps, kv, panel, render_empty_panel, render_table, table_window};
+use super::containers::{
+    WindowedTableOutcome, WindowedTableProps, render_windowed_table, sort_header_row,
+};
+use super::{TablePanelProjection, kv, panel};
 use crate::{TuiApp, TuiTheme};
 
+mod service_details;
 mod service_log;
 mod system_data;
 
@@ -38,6 +43,55 @@ fn source_state_message(
     format!("{}: {reason}{action}", source_title(notice))
 }
 
+/// The source-notice split shared by the renderer and pointer hit-tests. A
+/// source notice consumes four rows only when the area can afford it; otherwise
+/// the page keeps its full area and the caller's empty/state text remains the
+/// honest fallback.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) struct SourceNoticeLayout {
+    pub(super) notice: Option<Rect>,
+    pub(super) content: Rect,
+}
+
+#[must_use]
+pub(super) fn source_notice_layout(
+    area: Rect,
+    sources: Option<&[SourceStatus]>,
+) -> SourceNoticeLayout {
+    let has_notice = sources.and_then(source_notice).is_some() && area.height >= 5;
+    if !has_notice {
+        return SourceNoticeLayout {
+            notice: None,
+            content: area,
+        };
+    }
+    let [notice, content] =
+        Layout::vertical([Constraint::Length(4), Constraint::Min(1)]).areas(area);
+    SourceNoticeLayout {
+        notice: Some(notice),
+        content,
+    }
+}
+
+/// Header index of the shared Name/Status keyboard sort for the pages whose
+/// first column is the name and second the state. Name → header index 0,
+/// Status → index 1; the user-only columns can never land in these sorts (the
+/// shell cycle excludes them), so the fallback is defensive only.
+fn name_status_sort(
+    sort: Option<(taskmanager_shell::InfoSortCol, taskmanager_shell::SortDir)>,
+) -> Option<(usize, taskmanager_shell::SortDir)> {
+    sort.map(|(column, direction)| {
+        (
+            match column {
+                taskmanager_shell::InfoSortCol::Name => 0,
+                taskmanager_shell::InfoSortCol::Status => 1,
+                taskmanager_shell::InfoSortCol::Session | taskmanager_shell::InfoSortCol::Seat => 0,
+            },
+            direction,
+        )
+    })
+}
+
 /// Draw a compact, non-blocking source warning and return the area left for
 /// the table. The TUI uses a keyboard affordance rather than a pointer button,
 /// but the request scope remains the same as Iced/GPUI.
@@ -45,17 +99,15 @@ fn render_source_notice(
     frame: &mut Frame<'_>,
     app: &TuiApp,
     theme: TuiTheme,
-    area: Rect,
+    layout: SourceNoticeLayout,
     sources: Option<&[SourceStatus]>,
 ) -> Rect {
     let Some(notice) = sources.and_then(source_notice) else {
-        return area;
+        return layout.content;
     };
-    if area.height < 5 {
-        return area;
-    }
-    let [notice_area, table_area] =
-        Layout::vertical([Constraint::Length(4), Constraint::Min(1)]).areas(area);
+    let Some(notice_area) = layout.notice else {
+        return layout.content;
+    };
     let retryable = app.source_retry_request().is_some() && notice.is_retryable();
     let message = source_state_message(sources, "", retryable);
     frame.render_widget(
@@ -67,51 +119,170 @@ fn render_source_notice(
         .wrap(Wrap { trim: true }),
         notice_area,
     );
-    table_area
+    layout.content
 }
 
-pub(super) fn render_services(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+/// The Services page's table, the optional selected-service details column
+/// and the optional log band. Source-notice geometry is resolved before the
+/// details and log splits so both the renderer and `table_hit` address the
+/// same table rectangle.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct ServicesPageLayout {
+    pub(super) area: Rect,
+    pub(super) source: SourceNoticeLayout,
+    pub(super) details: Option<Rect>,
+    pub(super) table: Rect,
+    pub(super) log: Option<Rect>,
+}
+
+#[must_use]
+pub(super) fn services_page_layout(app: &TuiApp, area: Rect) -> ServicesPageLayout {
+    let source = source_notice_layout(area, app.projection().services_source.as_deref());
+    // The selected-service details column (GPUI services_view/details
+    // parity) shares the table's row band on the right. It is a pure
+    // addition with one honest rule: a narrow or short terminal, or an empty
+    // inventory, yields the WHOLE column back to the table — the panel never
+    // overlaps it nor squeezes it below its usable width.
+    let (content, details) = service_details::column_split(app, source.content);
+    if app.shell.service_log.is_none() {
+        return ServicesPageLayout {
+            area,
+            source,
+            details,
+            table: content,
+            log: None,
+        };
+    }
+    let log_height = (content.height / 2).clamp(8, 14);
+    let [table, log] =
+        Layout::vertical([Constraint::Min(4), Constraint::Length(log_height)]).areas(content);
+    ServicesPageLayout {
+        area,
+        source,
+        details,
+        table,
+        log: Some(log),
+    }
+}
+
+/// The Startup page's optional timeline and table areas. `table_before_notice`
+/// is retained because an empty source uses the page-level state panel in that
+/// area, while a non-empty source paints its notice and uses `table` below it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct StartupPageLayout {
+    pub(super) timeline: Option<Rect>,
+    pub(super) table_before_notice: Rect,
+    pub(super) source: SourceNoticeLayout,
+    pub(super) table: Rect,
+}
+
+#[must_use]
+pub(super) fn startup_page_layout(
+    area: Rect,
+    timeline_rows: Option<usize>,
+    sources: Option<&[SourceStatus]>,
+) -> StartupPageLayout {
+    let (timeline, table_before_notice) = match timeline_rows {
+        Some(rows) if area.height >= 12 => {
+            let height = rows
+                .saturating_add(2)
+                .min(usize::from(area.height / 2))
+                .min(usize::from(u16::MAX));
+            let [timeline, table] = Layout::vertical([
+                Constraint::Length(u16::try_from(height).unwrap_or(u16::MAX)),
+                Constraint::Min(1),
+            ])
+            .areas(area);
+            (Some(timeline), table)
+        }
+        _ => (None, area),
+    };
+    let source = source_notice_layout(table_before_notice, sources);
+    let table = source.content;
+    StartupPageLayout {
+        timeline,
+        table_before_notice,
+        source,
+        table,
+    }
+}
+
+/// The Users page's feedback band and source-notice/table split.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct UsersPageLayout {
+    pub(super) table_before_notice: Rect,
+    pub(super) source: SourceNoticeLayout,
+    pub(super) table: Rect,
+    pub(super) feedback: Option<Rect>,
+}
+
+#[must_use]
+pub(super) fn users_page_layout(app: &TuiApp, area: Rect) -> UsersPageLayout {
+    let (table_before_notice, feedback) =
+        if app.shell.projection().session_control_feedback.is_some() {
+            let [table, feedback] =
+                Layout::vertical([Constraint::Min(5), Constraint::Length(1)]).areas(area);
+            (table, Some(feedback))
+        } else {
+            (area, None)
+        };
+    let source = source_notice_layout(
+        table_before_notice,
+        app.projection().sessions_source.as_deref(),
+    );
+    let table = source.content;
+    UsersPageLayout {
+        table_before_notice,
+        source,
+        table,
+        feedback,
+    }
+}
+
+pub(super) fn render_services(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    layout: ServicesPageLayout,
+    panel: TablePanelProjection,
+) {
     // Rows project through the shared sort order (provider order until a
     // header click picks a column), so the selection index always maps to the
     // same visible order the Iced frontend renders.
     let sorted_services = app.sorted_services();
-    if sorted_services.is_empty() {
-        let message = source_state_message(
-            app.projection().services_source.as_deref(),
-            t("empty.no_services_reported"),
-            app.source_retry_request().is_some(),
-        );
-        render_empty_panel(frame, theme, area, t("page.services_help"), &message);
-        return;
-    }
-    let area = render_source_notice(
-        frame,
-        app,
-        theme,
-        area,
+    let state_message = source_state_message(
         app.projection().services_source.as_deref(),
+        t("empty.no_services_reported"),
+        app.source_retry_request().is_some(),
     );
-    // The open service-log stream (opened with `o` on the Services page) owns
-    // the bottom band of the page; the table gets the rest. The log panel is
-    // bounded and honest: entries render from the shared feed, an empty or
-    // unavailable stream renders its state instead of fabricating lines.
-    let log_height = if app.shell.service_log.is_some() {
-        (area.height / 2).clamp(8, 14)
-    } else {
-        0
-    };
-    let table_area = if log_height > 0 {
-        let [table, log] =
-            Layout::vertical([Constraint::Min(4), Constraint::Length(log_height)]).areas(area);
-        service_log::render(frame, app, theme, log);
-        table
-    } else {
-        area
-    };
-    let row_window = table_window(sorted_services.len(), app.selected, table_area);
-    let services: Vec<Row<'_>> = sorted_services[row_window.start..row_window.end]
-        .iter()
-        .map(|service| {
+    let painted = render_windowed_table(
+        frame,
+        WindowedTableProps {
+            theme,
+            panel,
+            title: t("page.services_help"),
+            header: sort_header_row(
+                [
+                    t("common.service"),
+                    t("common.status"),
+                    t("common.description"),
+                ],
+                theme,
+                name_status_sort(app.shell.services_sort),
+            ),
+            widths: vec![
+                Constraint::Percentage(38),
+                Constraint::Length(12),
+                Constraint::Min(20),
+            ],
+            column_spacing: 2,
+            // With no rows the honest state panel owns the whole page area,
+            // including the log band's slot below.
+            state_area: layout.area,
+            state_message: &state_message,
+        },
+        |index| {
+            let service = sorted_services[index];
             let color = match service.status.as_str() {
                 "Active" => theme.good,
                 "Failed" => theme.danger,
@@ -122,44 +293,33 @@ pub(super) fn render_services(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiThe
                 Cell::from(service.status.as_str()).style(Style::new().fg(color)),
                 Cell::from(service.description.as_str()),
             ])
-        })
-        .collect();
-    render_table(
-        frame,
-        TableRenderProps {
-            theme,
-            area: table_area,
-            title: t("page.services_help"),
-            rows: services,
-            widths: [
-                Constraint::Percentage(38),
-                Constraint::Length(12),
-                Constraint::Min(20),
-            ],
-            headers: [
-                t("common.service"),
-                t("common.status"),
-                t("common.description"),
-            ],
-            selected: row_window.selected,
-            // The keyboard sort (`s`/`S`) writes the shared slot; the header
-            // marks the active column with ▲/▼. Name → header index 0, Status →
-            // index 1; Description is not sortable. The user-only columns can
-            // never land in a Services sort (the shell cycle excludes them), so
-            // the fallback is defensive only.
-            sort: app.shell.services_sort.map(|(column, direction)| {
-                (
-                    match column {
-                        taskmanager_shell::InfoSortCol::Name => 0,
-                        taskmanager_shell::InfoSortCol::Status => 1,
-                        taskmanager_shell::InfoSortCol::Session
-                        | taskmanager_shell::InfoSortCol::Seat => 0,
-                    },
-                    direction,
-                )
-            }),
         },
     );
+    if painted != WindowedTableOutcome::Table {
+        return;
+    }
+    let _ = render_source_notice(
+        frame,
+        app,
+        theme,
+        layout.source,
+        app.projection().services_source.as_deref(),
+    );
+    // The selected-service details column (GPUI services-view parity): the
+    // state triplet plus the read-only relation rows, following the same
+    // `selected` cursor as the table. Painted only when the table itself
+    // painted rows — an empty or failed inventory leaves the state panel in
+    // charge of the whole page, so the column's slot stays with it.
+    if let Some(details_area) = layout.details {
+        service_details::render(frame, app, theme, details_area);
+    }
+    // The open service-log stream (opened with `o` on the Services page) owns
+    // the bottom band of the page; the table gets the rest. The log panel is
+    // bounded and honest: entries render from the shared feed, an empty or
+    // unavailable stream renders its state instead of fabricating lines.
+    if let Some(log) = layout.log {
+        service_log::render(frame, app, theme, log);
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -226,28 +386,18 @@ pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme
     );
 }
 
-pub(super) fn render_startup(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+pub(super) fn render_startup(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    page_layout: StartupPageLayout,
+    panel: TablePanelProjection,
+) {
     // Boot-timeline waterfall (BN-05): a bounded display-only block above the
     // table. It never joins the selection domain — arrow keys keep moving the
     // table cursor exactly as before the block existed. The block keeps at
     // most half the page height so the table stays usable on small terms.
-    let timeline =
-        super::boot_timeline::project_timeline(app.projection().startup_boot_evidence.as_ref());
-    let (timeline_area, table_area) = match timeline {
-        Some(ref projection) if area.height >= 12 => {
-            let height = (projection.rows.len() + 2)
-                .min(usize::from(area.height / 2))
-                .min(usize::from(u16::MAX));
-            let [timeline, table] = Layout::vertical([
-                Constraint::Length(u16::try_from(height).unwrap_or(u16::MAX)),
-                Constraint::Min(1),
-            ])
-            .areas(area);
-            (Some(timeline), table)
-        }
-        _ => (None, area),
-    };
-    if let Some(timeline_area) = timeline_area {
+    if let Some(timeline_area) = page_layout.timeline {
         super::boot_timeline::render_boot_timeline(
             frame,
             theme,
@@ -259,32 +409,44 @@ pub(super) fn render_startup(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiThem
     // viewport below. Sorting remains complete for keyboard semantics; row
     // and cell construction is bounded by the visible window.
     let sorted_startup = app.sorted_startup_entries();
-    if sorted_startup.is_empty() {
-        let message = source_state_message(
-            app.projection().startup_source.as_deref(),
-            t("empty.no_startup_reported"),
-            app.source_retry_request().is_some(),
-        );
-        render_empty_panel(
-            frame,
-            theme,
-            table_area,
-            t("startup.applications"),
-            &message,
-        );
-        return;
-    }
-    let table_area = render_source_notice(
-        frame,
-        app,
-        theme,
-        table_area,
+    let state_message = source_state_message(
         app.projection().startup_source.as_deref(),
+        t("empty.no_startup_reported"),
+        app.source_retry_request().is_some(),
     );
-    let row_window = table_window(sorted_startup.len(), app.selected, table_area);
-    let rows: Vec<Row<'_>> = sorted_startup[row_window.start..row_window.end]
-        .iter()
-        .map(|entry| {
+    let painted = render_windowed_table(
+        frame,
+        WindowedTableProps {
+            theme,
+            panel,
+            title: t("startup.applications"),
+            header: sort_header_row(
+                [
+                    t("common.name"),
+                    t("common.state"),
+                    t("startup.source"),
+                    t("startup.impact"),
+                    t("startup.command"),
+                ],
+                theme,
+                // The keyboard sort marks the active header column. Name →
+                // index 0, State → index 1; the user-only columns never reach
+                // a Startup sort.
+                name_status_sort(app.shell.startup_sort),
+            ),
+            widths: vec![
+                Constraint::Percentage(24),
+                Constraint::Length(10),
+                Constraint::Length(22),
+                Constraint::Length(16),
+                Constraint::Min(18),
+            ],
+            column_spacing: 2,
+            state_area: page_layout.table_before_notice,
+            state_message: &state_message,
+        },
+        |index| {
+            let entry = sorted_startup[index];
             Row::new([
                 Cell::from(entry.name.as_str()),
                 Cell::from(if entry.enabled {
@@ -296,50 +458,22 @@ pub(super) fn render_startup(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiThem
                 Cell::from(startup_impact_text(entry)),
                 Cell::from(entry.exec.as_str()),
             ])
-        })
-        .collect();
-    render_table(
-        frame,
-        TableRenderProps {
-            theme,
-            area: table_area,
-            title: t("startup.applications"),
-            rows,
-            widths: [
-                Constraint::Percentage(24),
-                Constraint::Length(10),
-                Constraint::Length(22),
-                Constraint::Length(16),
-                Constraint::Min(18),
-            ],
-            headers: [
-                t("common.name"),
-                t("common.state"),
-                t("startup.source"),
-                t("startup.impact"),
-                t("startup.command"),
-            ],
-            selected: row_window.selected,
-            // The keyboard sort marks the active header column. Name → index 0,
-            // State → index 1; the user-only columns never reach a Startup sort.
-            sort: app.shell.startup_sort.map(|(column, direction)| {
-                (
-                    match column {
-                        taskmanager_shell::InfoSortCol::Name => 0,
-                        taskmanager_shell::InfoSortCol::Status => 1,
-                        taskmanager_shell::InfoSortCol::Session
-                        | taskmanager_shell::InfoSortCol::Seat => 0,
-                    },
-                    direction,
-                )
-            }),
         },
     );
+    if painted == WindowedTableOutcome::Table {
+        let _ = render_source_notice(
+            frame,
+            app,
+            theme,
+            page_layout.source,
+            app.projection().startup_source.as_deref(),
+        );
+    }
 }
 
 /// The source column with its scope suffix (GPUI parity: the row reads
 /// `Desktop Entry · User` instead of the bare provider label).
-pub(super) fn startup_source_text(entry: &taskmanager_application::StartupEntry) -> String {
+pub(super) fn startup_source_text(entry: &taskmanager_core::core::startup::StartupEntry) -> String {
     format!(
         "{} · {}",
         entry.source.as_str(),
@@ -347,24 +481,24 @@ pub(super) fn startup_source_text(entry: &taskmanager_application::StartupEntry)
     )
 }
 
-fn startup_scope_text(scope: taskmanager_application::StartupScope) -> &'static str {
+fn startup_scope_text(scope: taskmanager_core::core::startup::StartupScope) -> &'static str {
     match scope {
-        taskmanager_application::StartupScope::User => t("startup.scope_user"),
-        taskmanager_application::StartupScope::System => t("startup.scope_system"),
-        taskmanager_application::StartupScope::Session => t("startup.scope_session"),
-        taskmanager_application::StartupScope::Unknown => t("startup.scope_unknown"),
+        taskmanager_core::core::startup::StartupScope::User => t("startup.scope_user"),
+        taskmanager_core::core::startup::StartupScope::System => t("startup.scope_system"),
+        taskmanager_core::core::startup::StartupScope::Session => t("startup.scope_session"),
+        taskmanager_core::core::startup::StartupScope::Unknown => t("startup.scope_unknown"),
     }
 }
 
 /// The impact column with its evidence (GPUI parity: `Low · 42 ms` for a
 /// measured boot impact, `Low · unmeasured` when the provider could not
 /// instrument it — never a fabricated duration).
-pub(super) fn startup_impact_text(entry: &taskmanager_application::StartupEntry) -> String {
+pub(super) fn startup_impact_text(entry: &taskmanager_core::core::startup::StartupEntry) -> String {
     match entry.impact_evidence {
-        taskmanager_application::StartupImpactEvidence::Measured { duration_ms } => {
+        taskmanager_core::core::startup::StartupImpactEvidence::Measured { duration_ms } => {
             format!("{} · {duration_ms} ms", t(entry.impact.i18n_key()))
         }
-        taskmanager_application::StartupImpactEvidence::Unknown { .. } => {
+        taskmanager_core::core::startup::StartupImpactEvidence::Unknown { .. } => {
             format!(
                 "{} · {}",
                 t(entry.impact.i18n_key()),
@@ -374,79 +508,35 @@ pub(super) fn startup_impact_text(entry: &taskmanager_application::StartupEntry)
     }
 }
 
-pub(super) fn render_users(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+pub(super) fn render_users(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    page_layout: UsersPageLayout,
+    panel: TablePanelProjection,
+) {
     let feedback = session_feedback_line(app, theme);
-    // One row at the bottom carries the last accepted session-control outcome
-    // (GPUI's feedback_status_line parity); the table gets the rest.
-    let (table_area, feedback_area) = match feedback {
-        Some(_) => {
-            let [table_area, feedback_area] =
-                Layout::vertical([Constraint::Min(5), Constraint::Length(1)]).areas(area);
-            (table_area, Some(feedback_area))
-        }
-        None => (area, None),
-    };
+    let feedback_area = page_layout.feedback;
     // Project the canonical order first, then materialize only the terminal
     // viewport below. The selected index remains global and is remapped to
     // the bounded table slice at the render boundary.
     let sorted_sessions = app.sorted_sessions();
-    if sorted_sessions.is_empty() {
-        // An empty list from a FAILED source must not read as "no sessions":
-        // render the typed reason (GPUI empty_state_failure parity).
-        let message = source_state_message(
-            app.projection().sessions_source.as_deref(),
-            t("users.no_sessions"),
-            app.source_retry_request().is_some(),
-        );
-        render_empty_panel(
-            frame,
+    // An empty list from a FAILED source must not read as "no sessions":
+    // the state panel carries the typed reason (GPUI empty_state_failure
+    // parity).
+    let state_message = source_state_message(
+        app.projection().sessions_source.as_deref(),
+        t("users.no_sessions"),
+        app.source_retry_request().is_some(),
+    );
+    let painted = render_windowed_table(
+        frame,
+        WindowedTableProps {
             theme,
-            table_area,
-            t("users.sessions_title"),
-            &message,
-        );
-    } else {
-        let table_area = render_source_notice(
-            frame,
-            app,
-            theme,
-            table_area,
-            app.projection().sessions_source.as_deref(),
-        );
-        let row_window = table_window(sorted_sessions.len(), app.selected, table_area);
-        let rows: Vec<Row<'_>> = sorted_sessions[row_window.start..row_window.end]
-            .iter()
-            .map(|session| {
-                Row::new([
-                    Cell::from(session.id.as_str()),
-                    Cell::from(session.user.as_str()),
-                    Cell::from(session.seat.as_deref().unwrap_or(MISSING_VALUE)),
-                    Cell::from(session.tty.as_deref().unwrap_or(MISSING_VALUE)),
-                    Cell::from(if session.remote {
-                        t("users.remote")
-                    } else {
-                        t("users.local")
-                    }),
-                    Cell::from(session.timestamp.as_deref().unwrap_or(MISSING_VALUE)),
-                ])
-            })
-            .collect();
-        render_table(
-            frame,
-            TableRenderProps {
-                theme,
-                area: table_area,
-                title: t("users.sessions_title"),
-                rows,
-                widths: [
-                    Constraint::Length(8),
-                    Constraint::Percentage(22),
-                    Constraint::Length(10),
-                    Constraint::Length(10),
-                    Constraint::Length(9),
-                    Constraint::Min(16),
-                ],
-                headers: [
+            panel,
+            title: t("users.sessions_title"),
+            header: sort_header_row(
+                [
                     t("users.session"),
                     t("common.user"),
                     t("users.seat"),
@@ -454,11 +544,11 @@ pub(super) fn render_users(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme,
                     t("common.type"),
                     t("users.since"),
                 ],
-                selected: row_window.selected,
+                theme,
                 // The keyboard sort marks the active header column. Session →
                 // index 0, User → index 1, Seat → index 2; the service-only
                 // Status column never reaches a Users sort.
-                sort: app.shell.sessions_sort.map(|(column, direction)| {
+                app.shell.sessions_sort.map(|(column, direction)| {
                     (
                         match column {
                             taskmanager_shell::InfoSortCol::Session => 0,
@@ -469,7 +559,42 @@ pub(super) fn render_users(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme,
                         direction,
                     )
                 }),
-            },
+            ),
+            widths: vec![
+                Constraint::Length(8),
+                Constraint::Percentage(22),
+                Constraint::Length(10),
+                Constraint::Length(10),
+                Constraint::Length(9),
+                Constraint::Min(16),
+            ],
+            column_spacing: 2,
+            state_area: page_layout.table_before_notice,
+            state_message: &state_message,
+        },
+        |index| {
+            let session = sorted_sessions[index];
+            Row::new([
+                Cell::from(session.id.as_str()),
+                Cell::from(session.user.as_str()),
+                Cell::from(session.seat.as_deref().unwrap_or(MISSING_VALUE)),
+                Cell::from(session.tty.as_deref().unwrap_or(MISSING_VALUE)),
+                Cell::from(if session.remote {
+                    t("users.remote")
+                } else {
+                    t("users.local")
+                }),
+                Cell::from(session.timestamp.as_deref().unwrap_or(MISSING_VALUE)),
+            ])
+        },
+    );
+    if painted == WindowedTableOutcome::Table {
+        let _ = render_source_notice(
+            frame,
+            app,
+            theme,
+            page_layout.source,
+            app.projection().sessions_source.as_deref(),
         );
     }
     if let (Some(feedback), Some(feedback_area)) = (feedback, feedback_area) {
@@ -484,8 +609,8 @@ fn session_feedback_line(app: &TuiApp, theme: TuiTheme) -> Option<Line<'static>>
     let outcome = app.shell.projection().session_control_feedback.as_ref()?;
     let target = outcome.session_id.to_string();
     let action = match outcome.action {
-        taskmanager_application::SessionControlAction::Disconnect => t("users.disconnect"),
-        taskmanager_application::SessionControlAction::Lock => t("users.lock"),
+        taskmanager_core::core::session::SessionControlAction::Disconnect => t("users.disconnect"),
+        taskmanager_core::core::session::SessionControlAction::Lock => t("users.lock"),
     };
     match &outcome.result {
         Ok(()) => Some(Line::from(Span::styled(

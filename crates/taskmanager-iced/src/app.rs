@@ -16,11 +16,17 @@
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
-    AppAction, AppPage, Config, ConfigClient, PlatformEffect, ProcessBatchAction, RefreshRequest,
-    ServiceAction, ServiceItem, SessionControlAction, SetupScriptAction, TelemetryInterval,
+    AppAction, AppPage, ConfigClient, PlatformEffect, RefreshRequest, TelemetryInterval,
 };
+use taskmanager_core::core::config::Config;
+use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_core::core::services::{ServiceAction, ServiceItem};
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::setup::SetupScriptAction;
+
 use taskmanager_shell::{
-    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable, ShellApp, SortCol,
+    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable,
+    ProcessStatusFilter, ShellApp, SortCol,
 };
 use taskmanager_theme::{FontChoice, HighContrast, LightDark, Skin, Theme};
 
@@ -42,6 +48,7 @@ mod menus;
 mod motion;
 mod navigation;
 mod performance_state;
+mod pointer_capture;
 mod preferences;
 mod prefs_accessors;
 mod process_menu;
@@ -71,7 +78,7 @@ mod window_time;
 pub(crate) use projection::AppHistoryRowModel;
 use projection_caches::IcedProjectionCaches;
 pub(crate) use scroll::VirtualScrollState;
-pub use selectors::{PerfDevice, ProcessStatusFilter};
+pub use selectors::PerfDevice;
 // The settings/dialog vocabulary and the focus-target registry moved to their
 // own modules to stay under the source-size budget; the historical
 // `crate::app::<Type>` paths stay valid through these re-exports.
@@ -111,6 +118,15 @@ pub enum Message {
     /// click can branch on the modifiers held at click time without the view
     /// needing to inspect the pointer event.
     ModifiersChanged(iced::keyboard::Modifiers),
+    /// A pointer button was pressed anywhere over the root surface. This
+    /// feeds only the renderer-local input-modality tracker (see
+    /// [`crate::input_modality`]) — the iced counterpart of the GPUI root's
+    /// capture-phase mouse-down listener; it never carries surface semantics.
+    PointerPressed,
+    /// One selectable value began a selection and claims the window's single
+    /// active selection (the reference selection-registry rule, routed
+    /// through the shell-free input state).
+    TextSelectionClaimed(iced::advanced::widget::Id),
     /// Backspace pressed while the search field is active.
     SearchBackspace,
     /// A page tab was clicked.
@@ -133,7 +149,7 @@ pub enum Message {
         name: String,
         main_pid: u32,
         flat_index: usize,
-        row_key: Option<taskmanager_shell::ProcessRowKey>,
+        row_key: Option<taskmanager_shell::ProcessRowId>,
     },
     /// A recursive process parent was activated — toggle its subtree AND select the
     /// row in one click. The toggle flips membership in the frontend-local
@@ -387,11 +403,6 @@ pub enum Message {
     /// request for the first GPU (the user-initiated escalation entry), the
     /// tick re-requests on a bounded cadence while the GPU device is visible.
     ToggleGpuEngines,
-    /// Select the GPU headline chart's series family (ADR-034): the shared
-    /// shell selection, availability-gated against the viewed device. A
-    /// message for an unavailable family is a no-op — the same gate that
-    /// renders the pill inert rejects the activation.
-    SelectGpuChartMetric(taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric),
     /// Copy the About modal's system-information lines to the clipboard
     /// (G-16, GPUI about-parity). Served by the iced clipboard task; the
     /// footer feedback mirrors the export line's lifecycle.
@@ -411,7 +422,7 @@ pub enum Message {
     /// Toggle performance history replay panel.
     ToggleHistoryReplay,
     /// Select performance history replay window.
-    SelectHistoryReplayWindow(taskmanager_application::HistoryWindow),
+    SelectHistoryReplayWindow(taskmanager_core::core::history::HistoryWindow),
     /// Refresh history replay query.
     RefreshHistoryReplay,
     /// Open the Alert Center modal.
@@ -454,7 +465,7 @@ pub struct IcedApp {
     pub shell: ShellApp,
     /// Immutable native local-time rules injected by the composition root.
     /// Renderer code never discovers host files or environment state.
-    pub(crate) local_time_rules: taskmanager_application::LocalTimeRulesObservation,
+    pub(crate) local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
     /// Sole owner of the platform client, singleton/tray handles and runtime
     /// cadence. View state cannot dynamically borrow or clone these resources.
     pub(crate) runtime: runtime::IcedRuntime,
@@ -471,8 +482,6 @@ pub struct IcedApp {
     pub(crate) saved_views: Vec<crate::saved_views::SavedViewPreset>,
     pub(crate) next_saved_view_id: u64,
     pub(crate) saved_view_feedback: Option<crate::saved_views::SavedViewTransferFeedback>,
-    /// Alert center state.
-    pub(crate) alert_center: crate::ui::overlays::alerts::AlertCenterState,
     /// Frontend-local Alerts-page route (an Iced-local
     /// route outside the shared `AppPage` set, GPUI Containers-page style).
     pub(crate) alerts_page: alerts::AlertsPageState,
@@ -484,11 +493,11 @@ pub struct IcedApp {
     /// Pending first-run setup-script submissions, correlated by request id
     /// (the drained batch's answers and typed failures consume from here).
     pub(crate) first_run_requests:
-        std::collections::HashMap<taskmanager_application::RequestId, SetupScriptAction>,
+        std::collections::HashMap<taskmanager_platform_contract::RequestId, SetupScriptAction>,
     /// Frontend-local System-page dashboard window selection. The dashboard
     /// segment renderer lives in `ui::system_dashboard`; the pills publish
     /// `Message::SystemDashboard(SelectWindow)` which stores here.
-    pub(crate) system_dashboard_window: taskmanager_application::HistoryWindow,
+    pub(crate) system_dashboard_window: taskmanager_core::core::history::HistoryWindow,
     /// Boot-resolved replay capability plus its application-correlated panel
     /// lifecycle. Runtime config publications cannot change the capability.
     history_runtime: history_replay::IcedHistoryRuntime,

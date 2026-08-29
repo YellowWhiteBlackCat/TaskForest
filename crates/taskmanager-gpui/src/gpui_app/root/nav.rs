@@ -19,19 +19,19 @@
 
 use super::{Hover, RootView, TopPage};
 use crate::gpui_app::elements;
-use crate::gpui_app::icons;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Color, Theme};
-use crate::i18n;
 use gpui::{
     AnimationExt, Context, DefiniteLength, Div, InteractiveElement, IntoElement, Length,
     ParentElement, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
 };
+use taskmanager_application::i18n;
+use taskmanager_theme::Color;
 use taskmanager_theme::color::mix;
+use taskmanager_theme::tokens;
 use taskmanager_ui::primitives::motion::{hover_animation, hover_state_key};
 use taskmanager_ui_contract::IconId;
 
 use super::responsive::NavigationPresentation;
+use taskmanager_theme::Theme;
 
 /// One nav-strip tab. `label` is the **identity** (English) string reused as the
 /// gpui element id, the focus target, and the [`Hover::Static`] identity that
@@ -189,7 +189,7 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
             tokens::FONT_WEIGHT_NORMAL.into()
         })
         .text_color(fg)
-        .child(icons::icon(icon).size(px(18.0)))
+        .child(taskmanager_icons::icon(icon).size(px(18.0)))
         // Label wraps min_w(0)+truncate so it shrinks/ellipses inside the tab's
         // flex row instead of forcing the tab to its natural text width. Text
         // styling is inherited from the tab div above. A hover tooltip (the full
@@ -273,7 +273,7 @@ pub fn gear_btn(
         .items_center()
         .justify_center()
         .child(
-            icons::icon(IconId::Settings)
+            taskmanager_icons::icon(IconId::Settings)
                 .size(px(16.0))
                 .text_color(color),
         )
@@ -340,7 +340,7 @@ pub fn nav_orientation_btn(
         .items_center()
         .justify_center()
         .child(
-            icons::icon(IconId::Sidebar)
+            taskmanager_icons::icon(IconId::Sidebar)
                 .size(px(16.0))
                 .text_color(color),
         )

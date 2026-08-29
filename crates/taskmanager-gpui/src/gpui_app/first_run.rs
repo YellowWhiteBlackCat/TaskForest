@@ -11,12 +11,13 @@ use gpui::{
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{RootView, platform_submission_time_ms};
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
-use taskmanager_application::{
-    CorrelatedSetupScriptEvent, FailureKind, OperationFailure, SetupScriptAction, SetupScriptEvent,
-    SetupScriptInfo, SetupScriptRequest, SubmissionErrorKind,
-};
+use taskmanager_application::i18n;
+use taskmanager_application::{CorrelatedSetupScriptEvent, SetupScriptRequest};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
+use taskmanager_platform_contract::{OperationFailure, SubmissionErrorKind};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 /// The upstream First Run dialog's explicit wiki destination. Opening it still
 /// goes through the ordinary typed URL-open port; this module never launches a
@@ -559,7 +560,7 @@ impl RootView {
         failure: &OperationFailure,
         cx: &mut Context<Self>,
     ) -> bool {
-        if failure.capability != taskmanager_application::CapabilityId::FIRST_RUN_SETUP {
+        if failure.capability != taskmanager_platform_contract::CapabilityId::FIRST_RUN_SETUP {
             return false;
         }
         let Some(action) = self.first_run_requests.remove(&failure.request_id) else {

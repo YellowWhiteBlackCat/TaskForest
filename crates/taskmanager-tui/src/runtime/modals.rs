@@ -11,11 +11,19 @@
 //! [`PlatformEffect`] the modal produced (e.g. palette Enter runs a shared
 //! action). Extracted from `runtime.rs` so no runtime file exceeds the source
 //! line budget; behavior unchanged.
+//!
+//! The action-semantic character chords of the status overlays and the
+//! service-log panel are declared in
+//! [`crate::command_palette::TUI_SURFACE_PROTOCOL`] and resolve through it;
+//! this module owns only their precedence, the structural keys (Esc, the
+//! panel's `q` close, the menus' navigation), and the consumption rule
+//! (full modals swallow every key; the panel is a partial owner).
 
 use ratatui::crossterm::event::{KeyEvent, KeyModifiers};
 use taskmanager_application::AppPage;
 use taskmanager_shell::InputDispatch;
 
+use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
 use crate::{TuiApp, TuiSurfaceKind};
 
 use super::handle_settings_key;
@@ -197,11 +205,19 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 None
             }
             TuiSurfaceKind::About | TuiSurfaceKind::Health | TuiSurfaceKind::Containers => {
+                // Esc stays structural; the toggle chords resolve through the
+                // declared surface protocol. The full modal consumes every
+                // key, so an unmatched character is a silent no-op and can
+                // never double-route a command chord.
                 match key.code {
                     ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),
-                    ratatui::crossterm::event::KeyCode::Char('i') => app.toggle_about(),
-                    ratatui::crossterm::event::KeyCode::Char('h') => app.toggle_health(),
-                    ratatui::crossterm::event::KeyCode::Char('c') => app.toggle_containers(),
+                    ratatui::crossterm::event::KeyCode::Char(character) => {
+                        if let Some(action) =
+                            surface_protocol_action(TuiSurfaceScope::StatusOverlay, character)
+                        {
+                            app.run_surface_protocol_action(action);
+                        }
+                    }
                     _ => {}
                 }
                 None
@@ -212,9 +228,12 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
 
     // The open service-log panel owns its control chords while the Services
     // page shows it: f follow, p pause, l level cycle, t time cycle, q/Esc
-    // close. The shell owns the actual state transitions; these bindings only
-    // call them. Unmatched keys fall THROUGH to the shared key path (the
-    // panel is a partial owner, unlike the full modals above).
+    // close. The `f p l t` action chords are declared in
+    // [`crate::command_palette::TUI_SURFACE_PROTOCOL`]; `q`/Esc stay the
+    // handwritten structural close. The shell owns the actual state
+    // transitions; the protocol executor only calls them. Unclaimed keys
+    // fall THROUGH to the shared key path (the panel is a partial owner,
+    // unlike the full modals above).
     if app.page() == AppPage::Services && app.shell.service_log.is_some() {
         match key.code {
             ratatui::crossterm::event::KeyCode::Esc
@@ -222,21 +241,14 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 app.shell.close_service_log();
                 return InputDispatch::Consumed;
             }
-            ratatui::crossterm::event::KeyCode::Char('f') => {
-                app.shell.toggle_service_log_follow();
-                return InputDispatch::Consumed;
-            }
-            ratatui::crossterm::event::KeyCode::Char('p') => {
-                app.shell.toggle_service_log_paused();
-                return InputDispatch::Consumed;
-            }
-            ratatui::crossterm::event::KeyCode::Char('l') => {
-                app.shell.cycle_service_log_level();
-                return InputDispatch::Consumed;
-            }
-            ratatui::crossterm::event::KeyCode::Char('t') => {
-                app.shell.cycle_service_log_time();
-                return InputDispatch::Consumed;
+            ratatui::crossterm::event::KeyCode::Char(character) => {
+                return match surface_protocol_action(TuiSurfaceScope::ServiceLogPanel, character) {
+                    Some(action) => {
+                        app.run_surface_protocol_action(action);
+                        InputDispatch::Consumed
+                    }
+                    None => InputDispatch::Unhandled,
+                };
             }
             _ => return InputDispatch::Unhandled,
         }

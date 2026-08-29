@@ -10,10 +10,15 @@
 use std::sync::{Arc, Mutex};
 
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, EventSequence, FailureKind, PlatformClient,
-    PlatformEvent, PlatformFacets, PlatformHandle, ProviderId, RequestId, ShellEvent,
+    PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ShellEvent,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, RequestId,
+};
+
 use taskmanager_shell::ShellApp;
 
 use super::{EVENT_DRAIN_BATCH, capability_summary_line, run_drain_cycle};

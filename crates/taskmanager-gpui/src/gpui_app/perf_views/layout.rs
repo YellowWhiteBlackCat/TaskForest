@@ -34,10 +34,11 @@ use crate::gpui_app::root::responsive::{
     PERFORMANCE_STATS_MAX_WIDTH, PerformanceDetailsPresentation, PerformancePageBudget,
     PerformanceVerticalRunway,
 };
-use crate::gpui_app::theme::{Color, Length, Theme, tokens};
 use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_shell::viewmodel::StatRow;
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, Length, Theme};
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 use taskmanager_ui::layout::scroll_region_with_rail;
 

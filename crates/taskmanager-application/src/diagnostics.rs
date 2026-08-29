@@ -2,12 +2,13 @@
 
 use std::path::PathBuf;
 
+use taskmanager_core::core::services::ServiceLogEntry;
 use taskmanager_core::{DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan};
 
 /// Prepare a privacy-safe service-log export using the same diagnostic bundle
 /// redaction contract as the full diagnostics surface.
 pub fn prepare_service_log_bundle(
-    entries: &[crate::ServiceLogEntry],
+    entries: &[ServiceLogEntry],
 ) -> Result<DiagnosticBundlePlan, DiagnosticBundleError> {
     let contents = serde_json::to_string_pretty(entries).map_err(|error| {
         DiagnosticBundleError::with_detail(DiagnosticBundleErrorKind::Encode, error.to_string())

@@ -19,6 +19,7 @@ android-provider = []
 
 [dependencies]
 taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
 
 [lib]

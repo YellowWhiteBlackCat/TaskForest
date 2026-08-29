@@ -10,8 +10,9 @@ use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 
-use taskmanager_core::DisplayInfo;
-use taskmanager_platform_contract::{FailureKind, SourceOutcome};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::hardware::DisplayInfo;
+use taskmanager_core::core::source::SourceOutcome;
 use taskmanager_platform_portable::EdidFacts;
 
 mod wayland;

@@ -3,9 +3,11 @@ use std::sync::Arc;
 use super::*;
 use taskmanager_application::PlatformClient;
 use taskmanager_application::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError, PlatformEvent,
-    PlatformFacets, PlatformHandle, RequestEnvelope, RequestPort, ServiceControlRequest,
-    ServiceFacets, SubmissionError,
+    PlatformEvent, PlatformFacets, PlatformHandle, ServiceControlRequest, ServiceFacets,
+};
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    RequestEnvelope, RequestPort, SubmissionError,
 };
 
 /// Minimal recording service-control port (the same mock shape the shell
@@ -83,9 +85,10 @@ fn directory_usage_client(port: Arc<RecordingDirectoryUsage>) -> PlatformClient 
 /// Cancel by its own scan id.
 #[test]
 fn directory_usage_action_queues_start_then_cancel_through_the_shell_lane() {
-    use taskmanager_application::{
+    use taskmanager_application::DirectoryUsageRequest;
+    use taskmanager_core::core::directory_usage::{
         DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec, DirectoryScanStatus,
-        DirectoryScanTotals, DirectoryUsageRequest, DirectoryUsageSnapshot,
+        DirectoryScanTotals, DirectoryUsageSnapshot,
     };
 
     let recorded = Arc::new(RecordingDirectoryUsage::default());
@@ -191,10 +194,10 @@ fn request_service_action_rejects_rows_without_provider_authority() {
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
-            taskmanager_application::ServiceItem::from_inventory(
+            taskmanager_core::core::services::ServiceItem::from_inventory(
                 "",
                 "read-only.service",
-                taskmanager_application::ServiceStatus::Active,
+                taskmanager_core::core::services::ServiceStatus::Active,
                 "",
                 "",
                 "",
@@ -214,11 +217,12 @@ fn request_service_action_rejects_rows_without_provider_authority() {
 
 // --- Performance chart history (G-02/ADR-028) ---------------------------
 
-use taskmanager_application::{
+use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, MemoryMetrics, MemoryScalarObservations, ScalarObservation,
     SystemSnapshot,
 };
-use taskmanager_shell::history::MetricSeries;
+
+use taskmanager_telemetry_store::live_graph::MetricSeries;
 
 /// Build a snapshot carrying exactly one CPU% and an optional memory%
 /// reading at a given compatibility watermark. Mirrors the shell's own
@@ -308,7 +312,8 @@ fn process_ring_samples_once_per_advancing_snapshot_watermark() {
     // start token the properties overlay refuses to open (fixture mirrors the
     // shared demo shell's process shape).
     let mut observations = *trusted.scalar_observations();
-    observations.start_token = taskmanager_application::ScalarObservation::available(420_001, 1);
+    observations.start_token =
+        taskmanager_core::core::metrics::ScalarObservation::available(420_001, 1);
     trusted.apply_scalar_observations(observations);
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
@@ -349,7 +354,8 @@ fn process_property_series_reuse_until_the_ring_revision_advances() {
         .current_start_time_secs(1_785_290_000)
         .build();
     let mut observations = *trusted.scalar_observations();
-    observations.start_token = taskmanager_application::ScalarObservation::available(420_001, 1);
+    observations.start_token =
+        taskmanager_core::core::metrics::ScalarObservation::available(420_001, 1);
     trusted.apply_scalar_observations(observations);
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,

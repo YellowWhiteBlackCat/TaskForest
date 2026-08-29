@@ -4,40 +4,26 @@
 
 use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};
-use taskmanager_application::alerts::{AlertMetric, AlertSeverity};
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::alerts::{
+    AlertEvent, AlertEventKind, AlertSeverity, NotificationPolicy,
+};
 use taskmanager_theme::tokens;
 
 use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct AlertCenterState {
-    pub quiet_hours_active: bool,
-    pub events: Vec<AlertIncidentItem>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct AlertIncidentItem {
-    pub id: u64,
-    pub timestamp_ms: u64,
-    pub metric: AlertMetric,
-    pub severity: AlertSeverity,
-    pub value: f32,
-    pub threshold: f32,
-    pub message: String,
-}
-
 pub fn alert_center_overlay<'a>(
     theme_snapshot: &'a taskmanager_theme::Theme,
-    state: &'a AlertCenterState,
+    events: &'a [AlertEvent],
+    policy: &NotificationPolicy,
     appear: f32,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
-    let accent = theme::color(theme_snapshot.palette().accent);
+    let accent = taskmanager_theme::iced::color(theme_snapshot.palette().accent);
 
-    let quiet_status = if state.quiet_hours_active {
+    let quiet_status = if policy.quiet_hours.is_some() {
         text(t("common.enabled"))
             .size(f32::from(tokens::FONT_12))
             .color(accent)
@@ -69,32 +55,38 @@ pub fn alert_center_overlay<'a>(
         .spacing(12)
         .align_y(iced::Alignment::Center);
 
-    let events_list: Element<'a, Message, iced::Theme, iced::Renderer> = if state.events.is_empty()
-    {
+    let events_list: Element<'a, Message, iced::Theme, iced::Renderer> = if events.is_empty() {
         text(t("common.none"))
             .size(f32::from(tokens::FONT_12))
             .color(muted)
             .into()
     } else {
         let mut col = column![].spacing(6);
-        for ev in &state.events {
-            let sev_color = match ev.severity {
-                AlertSeverity::Critical => theme::color(theme_snapshot.palette().danger),
-                AlertSeverity::Warning => theme::color(theme_snapshot.palette().warning),
+        for ev in events.iter().rev() {
+            let sev_color = match ev.alert.severity {
+                AlertSeverity::Critical => {
+                    taskmanager_theme::iced::color(theme_snapshot.palette().danger)
+                }
+                AlertSeverity::Warning => {
+                    taskmanager_theme::iced::color(theme_snapshot.palette().warning)
+                }
                 AlertSeverity::Info => accent,
             };
             let item_row = row![
-                text(format!("[{:?}]", ev.severity))
+                text(format!("[{}]", event_kind_label(ev.kind)))
                     .size(f32::from(tokens::FONT_11))
                     .color(sev_color)
                     .width(Length::Fixed(70.0)),
-                text(format!("{:?}", ev.metric))
+                text(format!("{:?}", ev.alert.metric))
                     .size(f32::from(tokens::FONT_12))
                     .width(Length::Fixed(120.0)),
-                text(format!("{:.1} (thresh: {:.1})", ev.value, ev.threshold))
-                    .size(f32::from(tokens::FONT_12))
-                    .width(Length::Fixed(130.0)),
-                text(&ev.message)
+                text(format!(
+                    "{:.1} (thresh: {:.1})",
+                    ev.alert.value, ev.alert.threshold
+                ))
+                .size(f32::from(tokens::FONT_12))
+                .width(Length::Fixed(130.0)),
+                text(&ev.alert.target)
                     .size(f32::from(tokens::FONT_12))
                     .color(muted)
                     .width(Length::Fill),
@@ -119,6 +111,13 @@ pub fn alert_center_overlay<'a>(
         container(body).padding(4).width(Length::Fill).into(),
         appear,
     )
+}
+
+fn event_kind_label(kind: AlertEventKind) -> &'static str {
+    match kind {
+        AlertEventKind::Activated => t("events.activated"),
+        AlertEventKind::Cleared => t("events.cleared"),
+    }
 }
 
 #[cfg(test)]

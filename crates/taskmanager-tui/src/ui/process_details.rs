@@ -8,8 +8,9 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Paragraph, Wrap};
 use taskmanager_application::process_details_vm::{DetailValue, ProcessDetailsField};
-use taskmanager_application::units::UnitPreferences;
-use taskmanager_application::{AppPage, FrozenProcessIdentity, ProcessItem, i18n::t};
+use taskmanager_application::{AppPage, i18n::t};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
+use taskmanager_core::core::units::UnitPreferences;
 
 use super::highlight;
 use super::{kv, panel};
@@ -107,7 +108,7 @@ pub(super) struct ProcessCellInput<'a> {
     pub(super) columns: ColumnVisibility<'a>,
     pub(super) tree_prefix: Option<ProcessTreePrefix>,
     pub(super) gray_zero: bool,
-    pub(super) local_time_rules: &'a taskmanager_application::LocalTimeRulesObservation,
+    pub(super) local_time_rules: &'a taskmanager_core::core::time::LocalTimeRulesObservation,
 }
 
 /// Tree chrome projected for one process cell. The names make the upstream
@@ -231,7 +232,10 @@ pub(super) fn process_cells_with_local_time<'a>(input: ProcessCellInput<'a>) -> 
         let trend = if is_parent {
             Cell::from(MISSING_VALUE)
         } else {
-            Cell::from(super::sparkline::process_cpu_trend(&process.cpu_history))
+            Cell::from(super::sparkline::process_cpu_trend_in(
+                theme.terminal.glyphs,
+                &process.cpu_history,
+            ))
         };
         cells.push(trend);
     }
@@ -418,7 +422,7 @@ pub(crate) fn vm_text(
 fn detail_panel_pairs_with_local_time(
     process: &ProcessItem,
     frozen: Option<&FrozenProcessIdentity>,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Vec<(&'static str, String)> {
     let rows = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
         process,
@@ -478,19 +482,101 @@ fn detail_panel_pairs_with_local_time(
 /// a visual row list that interleaves group headers; a header has no single
 /// process, so the panel surfaces an honest hint instead of fabricating one.
 /// Missing rows (empty list / cursor past the end) render the empty state.
+#[cfg(test)]
 pub(super) fn render_process_details(
     frame: &mut Frame<'_>,
     app: &TuiApp,
     theme: TuiTheme,
     area: Rect,
 ) {
-    let Some(process) = app.selected_detail_process() else {
-        // Distinguish "no processes at all" from "the cursor is on a group
-        // header" so the hint stays honest in the grouped modes.
+    render_process_details_with_focus(
+        frame,
+        app,
+        theme,
+        area,
+        app.focus_panel == crate::FocusPanel::Details,
+    );
+}
+
+/// Render the detail panel with focus supplied by the immutable frame plan.
+/// The compatibility wrapper above remains for isolated headless tests and
+/// direct component callers; the full Applications frame passes the planned
+/// focus owner so paint and input cannot consult different focus facts.
+#[cfg(test)]
+pub(super) fn render_process_details_with_focus(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    area: Rect,
+    focused: bool,
+) {
+    app.with_canonical_rows(|ids, visible| {
+        render_process_details_with_focus_from_canonical(
+            frame, app, theme, area, focused, ids, visible,
+        );
+    });
+}
+
+/// Test-side canonical details entry: the borrowed visible slice the isolated
+/// headless tests resolve through (`with_canonical_rows`). The production
+/// render path consumes the lazy-indexed twin below, which paints the identical
+/// bytes without materializing the O(N) pointer vector.
+#[cfg(test)]
+pub(super) fn render_process_details_with_focus_from_canonical(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    area: Rect,
+    focused: bool,
+    ids: &[crate::process_view::CanonicalRowId],
+    visible: &[&ProcessItem],
+) {
+    let selected = crate::process_view::id_process(ids, visible, app.selected);
+    render_details_for_selection(frame, app, theme, area, focused, ids, selected);
+}
+
+/// The lazy-indexed twin of
+/// [`render_process_details_with_focus_from_canonical`]: the same projection,
+/// with the visible list behind a [`crate::process_view::VisibleProcesses`]
+/// on-demand accessor instead of a borrowed pointer slice. The render path
+/// (`process_table`) consumes this entry so a frame's details panel resolves
+/// its ONE row through the shell's memoized indices and never pays the O(N)
+/// vector allocation. Both twins share the resolved/empty bodies, so the
+/// painted bytes are identical by construction.
+pub(super) fn render_process_details_with_focus_from_canonical_indexed(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    area: Rect,
+    focused: bool,
+    ids: &[crate::process_view::CanonicalRowId],
+    visible: &crate::process_view::VisibleProcesses<'_>,
+) {
+    let selected = visible.id_process(ids, app.selected);
+    render_details_for_selection(frame, app, theme, area, focused, ids, selected);
+}
+
+/// The shared details dispatch: the resolved selected process paints the full
+/// panel; an unresolved selection (empty list, cursor past the end) paints
+/// the honest hint, distinguishing "no processes at all" from "the cursor is
+/// on a group header" so the hint stays honest in the grouped modes.
+fn render_details_for_selection(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    area: Rect,
+    focused: bool,
+    ids: &[crate::process_view::CanonicalRowId],
+    selected: Option<&ProcessItem>,
+) {
+    let Some(process) = selected else {
         let on_group_header = app.page() == AppPage::Applications
             && matches!(
-                app.process_rows_snapshot().get(app.selected),
-                Some(crate::process_view::ProcessRow::Group { .. })
+                ids.get(app.selected),
+                Some(
+                    crate::process_view::CanonicalRowId::Category { .. }
+                        | crate::process_view::CanonicalRowId::AppRoot { .. }
+                )
             );
         let hint = if on_group_header {
             t("tui.details_group_hint").replacen("{label}", t("empty.no_process_selected"), 1)
@@ -504,9 +590,23 @@ pub(super) fn render_process_details(
         );
         return;
     };
+    render_resolved_details(frame, app, theme, area, focused, process);
+}
+
+/// The resolved-selection panel body: frozen identity facts plus the current
+/// row's full field set, the bounded insight cards, and the short-terminal
+/// scroll with its focused-border treatment.
+fn render_resolved_details(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    area: Rect,
+    focused: bool,
+    process: &ProcessItem,
+) {
     let frozen = app.application.selected_process.as_ref();
     let mut lines: Vec<Line<'static>> =
-        detail_panel_pairs_with_local_time(&process, frozen, &app.local_time_rules)
+        detail_panel_pairs_with_local_time(process, frozen, &app.local_time_rules)
             .into_iter()
             .map(|(label, value)| kv(label, value, theme))
             .collect();
@@ -525,7 +625,6 @@ pub(super) fn render_process_details(
     let inner_height = area.height.saturating_sub(2);
     let content_lines = wrapped_content_height(&lines, inner_width);
     let (effective, max) = clamped_scroll(content_lines, inner_height, app.detail_scroll);
-    let focused = app.focus_panel == crate::FocusPanel::Details;
     let scroll_hint = if focused {
         t("tui.scroll_hint_focused")
     } else if max > 0 {

@@ -16,10 +16,16 @@ use iced::widget::{column, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    FailureKind, IsolationKind, LimitValue, OpenFileEntry, ProcessInsightFacetState,
-    ProcessInsightUnavailable, ProcessThreadInfo, ProjectedProcessInsights, ScalarObservation,
-    SubmissionErrorKind, project_process_resources,
+    ProcessInsightFacetState, ProcessInsightUnavailable, ProjectedProcessInsights,
+    project_process_resources,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process_telemetry::{
+    IsolationKind, LimitValue, OpenFileEntry, ProcessThreadInfo,
+};
+use taskmanager_platform_contract::SubmissionErrorKind;
+
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes, missing_value};
 use taskmanager_theme::{Theme, tokens};
@@ -43,7 +49,7 @@ const MAX_FACET_ROWS: usize = 8;
 pub(super) fn insights_block<'a>(
     theme_snapshot: &'a Theme,
     shell: &ShellApp,
-    target: &taskmanager_application::FrozenProcessIdentity,
+    target: &taskmanager_core::core::process::FrozenProcessIdentity,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let projection = shell
         .projection()
@@ -160,15 +166,17 @@ fn escalation_pill<'a>(
 /// family-aware transport naming (TCP6/UDP6), mirroring gpui's
 /// `format_connection` so the local/remote endpoints are never dropped.
 #[must_use]
-fn format_connection(connection: &taskmanager_application::ProcessConnection) -> String {
+fn format_connection(
+    connection: &taskmanager_core::core::process_telemetry::ProcessConnection,
+) -> String {
     let transport = match (&connection.transport, &connection.family) {
         (
-            taskmanager_application::ConnectionTransport::Tcp,
-            taskmanager_application::ConnectionAddressFamily::Ipv6,
+            taskmanager_core::core::process_telemetry::ConnectionTransport::Tcp,
+            taskmanager_core::core::process_telemetry::ConnectionAddressFamily::Ipv6,
         ) => "TCP6".to_string(),
         (
-            taskmanager_application::ConnectionTransport::Udp,
-            taskmanager_application::ConnectionAddressFamily::Ipv6,
+            taskmanager_core::core::process_telemetry::ConnectionTransport::Udp,
+            taskmanager_core::core::process_telemetry::ConnectionAddressFamily::Ipv6,
         ) => "UDP6".to_string(),
         _ => connection.transport.to_string(),
     };
@@ -545,7 +553,9 @@ fn section_title<'a>(
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     text(heading.to_string())
         .size(f32::from(tokens::FONT_13))
-        .color(theme::color(theme_snapshot.palette().accent))
+        .color(taskmanager_theme::iced::color(
+            theme_snapshot.palette().accent,
+        ))
         .into()
 }
 

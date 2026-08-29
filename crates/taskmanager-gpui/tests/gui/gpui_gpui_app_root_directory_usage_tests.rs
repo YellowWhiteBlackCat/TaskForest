@@ -1,7 +1,7 @@
 use gpui::TestAppContext;
 
-use crate::core::DirectoryScanTotals;
-use crate::gpui_app::theme::Theme;
+use taskmanager_core::core::DirectoryScanTotals;
+use taskmanager_theme::Theme;
 
 use super::*;
 

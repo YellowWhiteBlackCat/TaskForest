@@ -14,12 +14,13 @@
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Color, Skin, Theme, WindowControls};
 use gpui::{
     App, Context, Div, InteractiveElement, IntoElement, MouseButton, ParentElement, Rgba,
     StatefulInteractiveElement, Styled, Window, div, px, rgb,
 };
+use taskmanager_theme::WindowControls;
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, Skin, Theme};
 
 /// Per-skin titlebar height (macOS tight, GNOME tall headerbar, KDE/Win medium).
 pub fn titlebar_height(t: &Theme) -> f32 {

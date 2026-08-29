@@ -3,7 +3,10 @@
 //! Provides formatting helpers to export processes as TSV/JSON, and
 //! system information as redacted Markdown suitable for bug reports.
 
-use taskmanager_application::{HardwareInfo, ProcessItem, SystemSnapshot};
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::process::ProcessItem;
+
 use taskmanager_shell::presentation::{bytes, duration, missing_value};
 
 /// Format a single process item as tab-separated values (TSV).

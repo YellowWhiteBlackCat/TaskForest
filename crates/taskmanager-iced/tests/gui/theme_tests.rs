@@ -1,4 +1,6 @@
 use super::*;
+use iced::Font;
+use taskmanager_theme::iced::{BUNDLED_UI_FONT, mono_font, ui_font, ui_font_weight};
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{FONT_MISANS_VF, HighContrast, LightDark, ResolvedFonts, Skin};
 
@@ -20,10 +22,11 @@ fn font_helpers_read_resolved_theme_families() {
     assert_eq!(mono_font(&theme), Font::with_name("Adwaita Mono"));
     // The builder default is the bundled MiSans VF face.
     assert_eq!(BUNDLED_UI_FONT, Font::with_name(FONT_MISANS_VF));
-    // Weighted helper preserves the resolved UI family, changes only weight.
-    let bold = ui_font_weight(&theme, Weight::Bold);
-    assert_eq!(bold.family, Family::Name("Adwaita Sans"));
-    assert_eq!(bold.weight, Weight::Bold);
+    // Weighted helper preserves the resolved UI family, changes only weight;
+    // the neutral weight token quantizes onto iced's ladder (Bold = 700).
+    let bold = ui_font_weight(&theme, tokens::FONT_WEIGHT_BOLD);
+    assert_eq!(bold.family, iced::font::Family::Name("Adwaita Sans"));
+    assert_eq!(bold.weight, iced::font::Weight::Bold);
     assert_eq!(bold.stretch, Font::DEFAULT.stretch);
     assert_eq!(bold.style, Font::DEFAULT.style);
 }
@@ -188,30 +191,49 @@ fn row_padding_maps_the_shared_density_tokens() {
     assert_eq!(row_padding(true), compact);
 }
 
-/// The focused control rings in the shared ring token: the hue is
-/// `palette().ring` (the accent-derived focus color) rendered opaque — iced
-/// has no focus-visible source, so EVERY focus draws the ring, unlike GPUI
-/// where the ring token's alpha encodes the keyboard-vs-pointer decision.
-/// Destructive controls keep the danger ring, and the stroke stays inside the
-/// shared 1.5–2px focus-ring contract.
+/// The focused control rings in the shared ring token, and the ring follows
+/// the shared focus-visible contract: the ring token's alpha encodes the
+/// keyboard-vs-pointer decision, synthesized from the renderer-local input
+/// modality (`crate::input_modality`) — the same strict keyboard-only policy
+/// the GPUI root tracker drives. Destructive controls keep the danger ring
+/// under the same visibility rule, and the stroke stays inside the shared
+/// 1.5–2px focus-ring contract.
 #[test]
-fn focus_ring_consumes_the_shared_ring_token() {
+fn focus_ring_consumes_the_shared_ring_token_and_follows_focus_visible() {
     let theme = Theme::dark();
     let ring = color(theme.palette().ring);
-    // The theme snapshot carries the pointer-focus alpha (0) — the iced
-    // frontend consciously overrides it: focused ⇒ visible ring.
+    // The neutral snapshot carries the pointer-focus alpha (0) — the iced
+    // shell now synthesizes the visibility decision on top of it instead of
+    // forcing every focus opaque.
     assert_eq!(theme.palette().ring.a, 0.0);
-    let stroke = focus_ring_color(&theme, false);
+
+    // Pointer-driven focus draws no ring (alpha 0), hue unchanged.
+    crate::input_modality::observe_pointer();
+    let pointer_stroke = focus_ring_color(&theme, false);
     assert_eq!(
-        (stroke.r, stroke.g, stroke.b),
+        (pointer_stroke.r, pointer_stroke.g, pointer_stroke.b),
         (ring.r, ring.g, ring.b),
         "the ring hue comes from palette().ring"
     );
-    assert_eq!(stroke.a, 1.0, "focused ⇒ ring is drawn opaquely");
+    assert_eq!(pointer_stroke.a, 0.0, "pointer focus ⇒ no ring");
+
+    // A keyboard press makes the next focus paint the ring opaquely.
+    crate::input_modality::observe_keyboard();
+    let stroke = focus_ring_color(&theme, false);
+    assert_eq!((stroke.r, stroke.g, stroke.b), (ring.r, ring.g, ring.b));
+    assert_eq!(stroke.a, 1.0, "keyboard focus ⇒ ring is drawn opaquely");
+
+    // Destructive controls keep the danger hue under the same gate.
+    let danger = color(theme.palette().danger);
+    let destructive = focus_ring_color(&theme, true);
     assert_eq!(
-        focus_ring_color(&theme, true),
-        color(theme.palette().danger)
+        (destructive.r, destructive.g, destructive.b),
+        (danger.r, danger.g, danger.b)
     );
+    assert_eq!(destructive.a, 1.0);
+    crate::input_modality::observe_pointer();
+    assert_eq!(focus_ring_color(&theme, true).a, 0.0);
+
     assert!(
         (1.5..=2.0).contains(&FOCUS_RING_WIDTH),
         "the ring stroke stays inside the shared 1.5-2px contract"

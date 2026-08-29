@@ -3,13 +3,16 @@
 use super::{ProcessInsightsErrorKind, ProcessInsightsRenderState};
 use gpui::{Div, ParentElement, Styled, div, px};
 
-use crate::core::device_state::DeviceStatus;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Color, Theme, mono_font_with_fallback};
-use taskmanager_application::{
+use taskmanager_application::{ProjectedProcessResources, project_process_resources};
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionTransport, IsolationKind, LimitValue, ProcessConnection,
-    ProcessTelemetrySnapshot, ProjectedProcessResources, project_process_resources,
+    ProcessTelemetrySnapshot,
 };
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, Theme};
+
+use crate::gpui_app::theme::mono_font_with_fallback;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
@@ -339,11 +342,11 @@ fn network_card(
 /// event; a rejected submission shows the typed reason.
 fn escalation_row(
     theme: &Theme,
-    network: &crate::core::ProcessNetworkSnapshot,
+    network: &taskmanager_core::core::ProcessNetworkSnapshot,
     net_escalation: taskmanager_application::NetworkEscalationState,
     entity: gpui::Entity<crate::gpui_app::root::RootView>,
 ) -> Div {
-    use crate::core::FailureKind;
+    use taskmanager_core::core::FailureKind;
     let escalatable = network.traffic_failure == Some(FailureKind::RequiresEscalation);
     if !escalatable {
         return div();

@@ -1,22 +1,25 @@
 //! Confirmation and result plumbing for typed multi-process actions.
 
 use super::{RootView, platform_submission_time_ms};
-use crate::core::process::{
-    ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryExportError,
-    ProcessBatchHistoryFormat, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
-    descendant_pids, export_process_batch_history,
-};
 use crate::gpui_app::elements;
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
 use gpui::{
     AnyElement, App, ClipboardItem, Context, Entity, IntoElement, ParentElement, ScrollHandle,
     Styled, Window, div, px,
 };
+use taskmanager_application::i18n;
 use taskmanager_application::{
-    ConfirmationKind, FailureKind, PendingConfirmation, ProcessControlRequest, RefreshRequest,
+    ConfirmationKind, PendingConfirmation, ProcessControlRequest, RefreshRequest,
     SurfaceDismissReason, SurfaceKind,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::{
+    ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryExportError,
+    ProcessBatchHistoryFormat, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
+    descendant_pids, export_process_batch_history,
+};
+use taskmanager_theme::Theme;
+
+use taskmanager_theme::tokens;
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
 
 fn action_label(action: ProcessBatchAction) -> &'static str {
@@ -125,9 +128,20 @@ pub fn export_process_batch_history_with(
 }
 
 impl RootView {
+    /// Batch targets as exact identities (CORE-01 fail-closed freeze): the
+    /// selection resolves pid + start token against the live snapshot, so an
+    /// identity that vanished — or a pid reused by a different process — is
+    /// excluded before the intent is frozen.
     pub fn selected_process_pids(&self) -> Vec<u32> {
         self.selected_application_root().map_or_else(
-            || self.shell.selection.batch_targets(),
+            || {
+                self.shell
+                    .selection
+                    .frozen_targets(self.processes())
+                    .into_iter()
+                    .map(|identity| identity.pid)
+                    .collect()
+            },
             |root| descendant_pids(self.processes(), root),
         )
     }

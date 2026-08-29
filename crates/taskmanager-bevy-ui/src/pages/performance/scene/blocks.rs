@@ -128,10 +128,17 @@ pub(super) fn section_scene(
     palette: &UiPalette,
 ) -> impl Scene + use<> {
     let title = section_title(section).to_owned();
-    let blocks: Vec<Box<dyn Scene>> = section_keys(shell, section)
-        .iter()
-        .filter_map(|key| block_scene(section, key, shell, palette))
-        .collect();
+    let mut children: Vec<Box<dyn Scene>> = Vec::new();
+    if section == Section::MemorySegments
+        && let Some(memory) = memory_metrics(shell)
+    {
+        children.push(Box::new(segment_bar_scene(memory, palette)) as Box<dyn Scene>);
+    }
+    children.extend(
+        section_keys(shell, section)
+            .iter()
+            .filter_map(|key| block_scene(section, key, shell, palette)),
+    );
     bsn! {
         Node {
             width: percent(100),
@@ -143,7 +150,75 @@ pub(super) fn section_scene(
         DynSection(section)
         Children [
             ( Text(title) TextRole(Role::Caption) ),
-            { blocks },
+            { children },
+        ]
+    }
+}
+
+/// One stacked-bar span: byte count plus the resolved fraction of the total.
+/// Pure; headless tests pin the math.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct SegmentSpan {
+    pub(crate) bytes: u64,
+    pub(crate) fraction: f32,
+}
+
+/// Fractions across the composition segments, in shell order. A zero total
+/// (nothing measured yet) yields an empty layout — never NaN widths.
+#[must_use]
+pub(crate) fn segment_bar_layout(segments: &[MemSegment]) -> Vec<SegmentSpan> {
+    let total: u64 = segments.iter().map(|segment| segment.bytes).sum();
+    if total == 0 {
+        return Vec::new();
+    }
+    segments
+        .iter()
+        .map(|segment| SegmentSpan {
+            bytes: segment.bytes,
+            fraction: segment.bytes as f32 / total as f32,
+        })
+        .collect()
+}
+
+/// The semantic token for one segment role. Roles map onto the palette's
+/// semantic surfaces — no literal product colors (the theme owns every ink).
+fn segment_color(kind: MemSegmentKind, palette: &UiPalette) -> bevy::color::Color {
+    match kind {
+        MemSegmentKind::Active | MemSegmentKind::InUse => palette.accent,
+        MemSegmentKind::Cache | MemSegmentKind::ZfsArc => palette.nav_active_bg,
+        MemSegmentKind::Inactive => palette.selection_bg,
+        MemSegmentKind::Free | MemSegmentKind::Available => palette.content_bg,
+        MemSegmentKind::Other => palette.hover_bg,
+    }
+}
+
+/// The stacked composition bar: one flex-weighted span per segment, in shell
+/// order, filling the full width. Zero measured bytes render an empty track.
+pub(crate) fn segment_bar_scene(memory: &MemoryMetrics, palette: &UiPalette) -> impl Scene + use<> {
+    let segments = memory_segments(memory);
+    let spans: Vec<Box<dyn Scene>> = segment_bar_layout(&segments)
+        .iter()
+        .zip(segments.iter())
+        .map(|(span, segment)| {
+            let color = segment_color(segment.kind, palette);
+            Box::new(bsn! {
+                Node {
+                    width: percent(span.fraction * 100.0),
+                    height: px(6.0),
+                }
+                BackgroundColor(color)
+            }) as Box<dyn Scene>
+        })
+        .collect();
+    bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Row,
+            column_gap: Val::Px(0.0),
+            overflow: Overflow::clip_x(),
+        }
+        Children [
+            { spans },
         ]
     }
 }

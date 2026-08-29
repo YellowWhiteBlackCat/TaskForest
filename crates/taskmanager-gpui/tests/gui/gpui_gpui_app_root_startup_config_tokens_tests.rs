@@ -7,11 +7,11 @@ use super::{
     FONT_MISANS_VF, FONT_ROBOTO_MONO, FontChoice, LightDark, Skin, TEXT_RENDERING_PLATFORM_DEFAULT,
     color_scheme_from_token,
 };
-use crate::core::config::{
+use crate::gpui_app::root::navigation::TopPage;
+use taskmanager_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM, Config,
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
 };
-use crate::gpui_app::root::navigation::TopPage;
 
 fn availability() -> FontAvailability {
     FontAvailability::from_installed_families(
@@ -85,7 +85,7 @@ fn color_scheme_tokens_preserve_system_and_legacy_modes() {
 
 #[test]
 fn every_text_rendering_token_falls_back_to_platform_default_until_gpui_supports_it() {
-    use crate::core::config::{TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_SUBPIXEL};
+    use taskmanager_core::core::config::{TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_SUBPIXEL};
     assert_eq!(
         text_rendering_from_token(TEXT_RENDERING_SUBPIXEL),
         TEXT_RENDERING_PLATFORM_DEFAULT

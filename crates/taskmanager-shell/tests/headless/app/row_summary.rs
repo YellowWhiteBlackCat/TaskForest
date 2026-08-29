@@ -1,10 +1,11 @@
 //! `ShellApp::selected_row_summary` — the single Ctrl+C copy payload seam.
 
 use super::*;
-use taskmanager_application::{
-    AppPage, ServiceItem, ServiceStatus, StartupControlPolicy, StartupEntry, StartupEntryId,
-    StartupEntryLocator, StartupImpact, StartupImpactEvidence, StartupImpactUnknownReason,
-    StartupScope, StartupSource,
+use taskmanager_application::AppPage;
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::startup::{
+    StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
+    StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
 };
 
 #[test]

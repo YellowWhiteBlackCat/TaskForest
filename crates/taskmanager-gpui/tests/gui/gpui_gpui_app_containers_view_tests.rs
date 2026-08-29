@@ -4,10 +4,10 @@
 //! materialized — never a discarded render result.
 
 use super::*;
-use crate::core::{DeviceState, FailureKind, ScalarObservation};
 use crate::gpui_app::root::{RootView, TopPage};
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
 use taskmanager_application::MAX_CONTAINER_ROWS;
+use taskmanager_core::core::{DeviceState, FailureKind, ScalarObservation};
 
 fn sample_container(cpu: Option<f32>, mem: Option<u64>) -> ContainerSummary {
     ContainerSummary {

@@ -11,9 +11,11 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+pub mod aggregate;
 mod application;
 mod control;
 mod history;
+pub mod identity;
 mod metadata;
 mod scalars;
 mod wire;

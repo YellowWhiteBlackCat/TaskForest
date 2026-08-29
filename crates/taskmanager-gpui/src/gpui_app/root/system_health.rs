@@ -1,22 +1,24 @@
 //! Root-owned state, confirmation boundary, and dialog for System > Health.
 
-use crate::core::{DeviceGeneration, SmartSelfTestReport};
 use crate::gpui_app::elements;
 use crate::gpui_app::system_health_view::{
     SmartSelfTestConfirmationRequest, SystemHealthText, localized_text,
 };
-use crate::gpui_app::theme::Theme;
-use crate::i18n;
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, relative,
 };
+use taskmanager_application::i18n;
 use taskmanager_application::{
-    ConfirmationKind, FailureKind, PendingConfirmation, SmartControlRequest,
-    SmartObservationProjection, SmartSelfTestIntent, SurfaceDismissReason, SurfaceKind,
+    ConfirmationKind, PendingConfirmation, SmartControlRequest, SmartObservationProjection,
+    SurfaceDismissReason, SurfaceKind,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_core::core::{DeviceGeneration, SmartSelfTestReport};
+use taskmanager_theme::Theme;
 
 use super::RootView;
-use crate::gpui_app::theme::tokens;
+use taskmanager_theme::tokens;
 
 impl RootView {
     /// Store a typed confirmation request only. No platform request is queued.

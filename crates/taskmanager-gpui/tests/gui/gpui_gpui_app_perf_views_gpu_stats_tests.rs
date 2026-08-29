@@ -1,8 +1,8 @@
 use super::gpu_stats;
-use crate::core::metrics::{GpuMetrics, GpuScalarObservations, ScalarObservation};
 use crate::gpui_app::formatting::DisplayUnits;
-use crate::i18n;
+use taskmanager_application::i18n;
 use taskmanager_core::GpuGraphicsApi;
+use taskmanager_core::core::metrics::{GpuMetrics, GpuScalarObservations, ScalarObservation};
 
 /// A default GPU (no sysfs facts at all) keeps only the status row and
 /// the headline utilization row — the utilization stays an honest `None`

@@ -33,18 +33,6 @@ ignore = [
     # are not used by TaskForest, which never drives git2 directly.
     "RUSTSEC-2026-0183",
     "RUSTSEC-2026-0184",
-    # Iced 0.14.0 fixes cryoglyph at 0.1.0, which in turn fixes lru at 0.16.x;
-    # no compatible cryoglyph release is available yet. The application does
-    # not expose that cache, install panicking Drop keys, or use catch_unwind
-    # around it; cryoglyph only evicts its own GPU glyph values. The separate
-    # Ratatui lru edge is kept on the fixed 0.18.2 release in Cargo.lock.
-    # RUSTSEC-2026-0253 is currently lru 0.16.4 via cryoglyph 0.1.0 from
-    # Iced 0.14.0. No compatible cryoglyph release exposes lru >=0.18.2 yet;
-    # the TaskForest application does not construct cryoglyph caches, provide
-    # panicking Drop keys, or use catch_unwind around that transitive cache.
-    # Re-evaluate and remove this exception when Iced/cryoglyph moves to the
-    # fixed lru line.
-    "RUSTSEC-2026-0253",
 ]
 
 # licenses: reject any license expression not explicitly approved below. The

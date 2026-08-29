@@ -12,16 +12,18 @@ use super::{
     Hover, InputModality, RootView, TopPage, WindowCorner, alert_ui, device_label,
     init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
 };
-use crate::core::SystemSnapshot;
 use crate::gpui_app::dashboard;
 use crate::gpui_app::dashboard::SystemSection;
 use crate::gpui_app::system_view;
-use crate::gpui_app::theme::{tokens, ui_font_with_fallback, window_chrome_state};
+use crate::gpui_app::theme::ui_font_with_fallback;
 use crate::window_presentation::GpuiSurfaceRole;
 use gpui::{
     Animation, AnimationExt, Context, Div, InteractiveElement, IntoElement, MouseMoveEvent,
     ParentElement, Render, Stateful, Styled, Window, div, ease_in_out, px,
 };
+use taskmanager_core::core::SystemSnapshot;
+use taskmanager_theme::gpui::window_chrome_state;
+use taskmanager_theme::tokens;
 use taskmanager_ui::{focus::restore_modal, layout::page_viewport};
 mod overlays;
 mod pages;
@@ -461,9 +463,9 @@ impl Render for RootView {
 /// pages, dialogs, and existing responsive policy unchanged.
 fn render_widget_surface(
     view: &mut RootView,
-    theme: &crate::gpui_app::theme::Theme,
+    theme: &taskmanager_theme::Theme,
     snapshot: &SystemSnapshot,
-    ui_size: crate::gpui_app::theme::tokens::UiSize,
+    ui_size: taskmanager_theme::tokens::UiSize,
     _window: &mut Window,
     cx: &mut Context<RootView>,
 ) -> Stateful<Div> {
@@ -473,7 +475,7 @@ fn render_widget_surface(
         .bg(theme.window_bg)
         .text_color(theme.fg)
         .font(crate::gpui_app::theme::ui_font_with_fallback(theme))
-        .font_weight(crate::gpui_app::theme::tokens::FONT_WEIGHT_BODY.into())
+        .font_weight(taskmanager_theme::tokens::FONT_WEIGHT_BODY.into())
         .text_size(ui_size.body_font_size())
         .flex()
         .flex_col()

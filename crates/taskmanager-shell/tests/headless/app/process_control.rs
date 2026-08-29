@@ -7,12 +7,16 @@
 use super::super::*;
 use std::sync::{Arc, Mutex};
 use taskmanager_application::{
-    AppPage, CapabilityCatalog, CapabilityId, CapabilityRequest, CapabilitySnapshot,
-    CorrelatedEvent, EventEnvelope, EventPort, EventPortError, EventSequence, FailureKind, KeyCode,
-    Modifiers, OperationFailure, PlatformClient, PlatformEvent, PlatformEventBatch,
-    PlatformEventContext, PlatformFacets, PlatformHandle, ProcessControlRequest, ProcessEvent,
-    ProcessFacets, ProcessSignal, ProviderFailure, RequestEnvelope, RequestId, RequestPort,
-    SubmissionError,
+    AppPage, CorrelatedEvent, KeyCode, Modifiers, PlatformClient, PlatformEvent,
+    PlatformEventBatch, PlatformEventContext, PlatformFacets, PlatformHandle,
+    ProcessControlRequest, ProcessEvent, ProcessFacets,
+};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessSignal};
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityId, CapabilityRequest, CapabilitySnapshot, EventEnvelope,
+    EventPort, EventPortError, EventSequence, OperationFailure, ProviderFailure, RequestEnvelope,
+    RequestId, RequestPort, SubmissionError,
 };
 
 #[derive(Default)]
@@ -115,7 +119,7 @@ fn recorded_process_control(recorded: &RecordingRequests<ProcessControlRequest>)
     submitted[0].0
 }
 
-fn selected_demo_target(app: &mut ShellApp) -> taskmanager_application::FrozenProcessIdentity {
+fn selected_demo_target(app: &mut ShellApp) -> FrozenProcessIdentity {
     app.application.active_page = AppPage::Applications;
     app.selected = 1;
     app.selected_process_identity()

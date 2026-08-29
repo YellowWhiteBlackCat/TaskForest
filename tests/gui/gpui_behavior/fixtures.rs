@@ -1,5 +1,5 @@
-use taskmanager::core::device_state::DeviceState;
-use taskmanager::core::metrics::{
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, DiskMetrics, DiskScalarObservations, GpuEngineKind,
     GpuMetrics, GpuScalarObservations, GpuThrottleReason, MemoryCompositionObservations,
     MemoryCompressionObservations, MemoryMetrics, MemoryModuleObservations,
@@ -171,12 +171,12 @@ fn rich_gpu() -> GpuMetrics {
     gpu.device_state = DeviceState::healthy(1);
     gpu.brand = "Test GPU".into();
     gpu.engines = vec![
-        taskmanager::core::metrics::GpuEngine {
+        taskmanager_core::core::metrics::GpuEngine {
             name: "3D".into(),
             kind: GpuEngineKind::Unknown,
             usage_pct: 60.0,
         },
-        taskmanager::core::metrics::GpuEngine {
+        taskmanager_core::core::metrics::GpuEngine {
             name: "Compute".into(),
             kind: GpuEngineKind::Compute,
             usage_pct: 10.0,

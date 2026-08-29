@@ -13,8 +13,9 @@ use crate::gpui_app::graph::{
     DEFAULT_GRAPH_DATA_POINTS_CONFIG, GraphSettings, MAX_GRAPH_DATA_POINTS, MIN_GRAPH_DATA_POINTS,
 };
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 pub(crate) fn init_data_points_slider(
     current: usize,

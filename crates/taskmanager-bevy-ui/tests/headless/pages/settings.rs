@@ -28,10 +28,14 @@ use bevy::ui::Checked;
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::{Language, current_language, set_language};
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, HostTelemetryRequest, PlatformClient, PlatformEvent,
-    PlatformFacets, PlatformHandle, RequestPort, SubmissionError, SystemFacets, TelemetryInterval,
+    HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
+    SystemFacets, TelemetryInterval,
 };
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
+};
+
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
@@ -71,7 +75,7 @@ impl RequestPort for QuietRequests {
 
     fn try_submit(
         &self,
-        _request: taskmanager_application::RequestEnvelope<Self::Request>,
+        _request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
     ) -> Result<(), SubmissionError> {
         Ok(())
     }
@@ -276,8 +280,8 @@ fn settings_page_projects_the_live_authorities_into_rows() {
     assert!(
         texts
             .iter()
-            .any(|text| text.contains("in incubation") && text.contains("Settings")),
-        "the remaining-fields placeholder is honest about its state"
+            .any(|text| text.contains("apply live") && text.contains("persistence")),
+        "the placeholder is honest: choices apply live, persistence is incubating"
     );
     // The default selections mirror the authorities: 1 s cadence checked,
     // the other steps unchecked; the store default capacity (64) selects no

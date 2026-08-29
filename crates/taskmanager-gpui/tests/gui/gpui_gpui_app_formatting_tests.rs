@@ -141,14 +141,16 @@ fn drive_and_network_families_are_byte_identical_to_the_core_single_source() {
                     let family = DisplayUnits::family(kind);
                     assert_eq!(
                         units.format(value, kind, per_second),
-                        crate::core::units::format_quantity(value, family, per_second, &prefs),
+                        taskmanager_core::core::units::format_quantity(
+                            value, family, per_second, &prefs
+                        ),
                         "{kind:?} {value} B ({use_bytes}, {use_base2}, {per_second})"
                     );
                 }
             }
             assert_eq!(
                 units.format_pair(value, value * 2, UnitKind::Network, true),
-                crate::core::units::format_quantity_pair(
+                taskmanager_core::core::units::format_quantity_pair(
                     value,
                     value * 2,
                     QuantityFamily::Network,
@@ -161,7 +163,7 @@ fn drive_and_network_families_are_byte_identical_to_the_core_single_source() {
         // the same core ladder.
         assert_eq!(
             units.format_network_graph_megabytes(1.0),
-            crate::core::units::format_quantity_f64(
+            taskmanager_core::core::units::format_quantity_f64(
                 1_000_000.0,
                 QuantityFamily::Network,
                 true,

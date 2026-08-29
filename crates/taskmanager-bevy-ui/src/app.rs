@@ -3,19 +3,20 @@
 //! This module is the composition point the M1+ page agents integrate with.
 //! It owns four things, and nothing else in this crate may:
 //!
-//! 1. **The route model** ([`Page`], [`Route`]): a frontend-owned eight-page
+//! 1. **The route model** ([`Page`], [`Route`]): a frontend-owned nine-page
 //!    surface. The shared application vocabulary (`AppPage`) has no
 //!    Processes/Settings/Alerts *page* shape — `AppAction::OpenAlerts` is
 //!    explicitly "the route itself is frontend-owned" — so this enum is the
 //!    bevy frontend's own navigation authority. It maps onto the shared
 //!    pages where they exist and never redefines a shared page's meaning.
-//! 2. **Keyboard routing** ([`route_key_press`]): bevy keyboard state is
-//!    normalized into the shared `ShellKeyEvent` and routed through the same
-//!    conflict-checked command router every frontend uses — same chord, same
-//!    page semantics as the TUI (Alt+1 Performance, Alt+2 Applications, …,
-//!    Alt+8 Alerts). The Settings surface has no shared chord (the TUI binds
-//!    a frontend-local bare `p`), so it gets the same treatment here: a
-//!    documented frontend-local binding on unmodified `P`.
+//! 2. **Keyboard routing** ([`route_key_press`]): the frontend-local route
+//!    chords (Alt+1..8, bare `P`) resolve here; every other key is forwarded
+//!    through the shell's own routers by [`crate::input`], the real-input
+//!    seam (W4) — same chords, same page semantics as the TUI (Alt+1
+//!    Performance, Alt+2 Applications, …, Alt+8 Alerts). The Settings surface
+//!    has no shared chord (the TUI binds a frontend-local bare `p`), so it
+//!    gets the same treatment here: a documented frontend-local binding on
+//!    unmodified `P`.
 //! 3. **The shell-state seam** ([`FrontendTrack`] + [`ShellTrack`]): the
 //!    drain folds platform batches into one `ShellApp`, which lives in the
 //!    bevy `World` as a non-send resource (it memoizes behind `Rc`/`RefCell`).
@@ -43,25 +44,25 @@ use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, Single, SystemPar
 use bevy::input::ButtonInput;
 use bevy::input::keyboard::KeyCode;
 use bevy::picking::hover::PickingInteraction;
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
 use bevy::text::{TextColor, TextFont};
 use bevy::ui::Pressed;
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val,
-    percent, px,
+    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
+    UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::{
     AppAction, AppPage, ApplicationHistoryProjection, CommandContext, CommandScope,
 };
+
 use taskmanager_shell::{ShellApp, SystemProjectionStore};
 
 use crate::pages::history::HistoryProjectionResource;
-use crate::palette::{UiPalette, space_2, space_8};
+use crate::palette::{UiPalette, no_wrap_text, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlTone, ControlVisual, control_background};
-use crate::widgets::layout::{COMPACT_NAV_WIDTH_PX, WIDE_NAV_WIDTH_PX};
 use crate::window::{Role, TextRole, WindowPalette};
 
 /// `'static` borrow of the process-wide runtime, held in the bevy `World` so
@@ -125,7 +126,7 @@ impl ShellTrack<'_> {
     }
 }
 
-/// One page of the bevy frontend's eight-page surface.
+/// One page of the bevy frontend's nine-page surface.
 ///
 /// Order is single-sourced in [`Page::ALL`] (nav order and the test walk);
 /// keyboard chords are NOT positional — they follow the shared command
@@ -139,6 +140,8 @@ pub(crate) enum Page {
     Performance,
     /// Service inventory (shared page: `Services`).
     Services,
+    /// Host identity/firmware/CPU/session facts (shared page: `System`).
+    System,
     /// Startup entries + boot evidence (shared page: `Startup`).
     Startup,
     /// Login sessions (shared page: `Users`).
@@ -152,12 +155,15 @@ pub(crate) enum Page {
 }
 
 impl Page {
-    /// Single source of nav order; iteration and tests walk this, never a
-    /// second copy of the variant list.
+    /// The full route surface, for the page-signature reservation test walk.
+    /// The rendered strip shows only [`crate::app::NAV_TABS`]; this list keeps
+    /// every route (including Alerts/Settings) under the shared-order law.
+    #[cfg(test)]
     pub(crate) const ALL: &'static [Page] = &[
         Page::Processes,
         Page::Performance,
         Page::Services,
+        Page::System,
         Page::Startup,
         Page::Sessions,
         Page::Alerts,
@@ -165,22 +171,33 @@ impl Page {
         Page::AppHistory,
     ];
 
-    /// Short rail label (nav item).
-    pub(crate) const fn nav_label(self) -> &'static str {
+    /// Rail label through the shared tab vocabulary — the same label fold
+    /// every frontend uses (ARCH §8 semantic-parity law; Processes renders
+    /// the Applications tab word, exactly like GPUI's nav). Locale keys:
+    /// `tab.apps`, `tab.performance`, `tab.services`, `tab.startup`,
+    /// `tab.users`, `tab.alerts`, `tab.settings`, `tab.apphistory`.
+    #[must_use]
+    pub(crate) fn nav_label(self) -> String {
+        taskmanager_application::i18n::t(self.label_key()).to_owned()
+    }
+
+    /// The shared locale key for this page's tab word.
+    pub(crate) const fn label_key(self) -> &'static str {
         match self {
-            Page::Processes => "Processes",
-            Page::Performance => "Performance",
-            Page::Services => "Services",
-            Page::Startup => "Startup",
-            Page::Sessions => "Sessions",
-            Page::Alerts => "Alerts",
-            Page::Settings => "Settings",
-            Page::AppHistory => "App History",
+            Page::Processes => "tab.apps",
+            Page::Performance => "tab.performance",
+            Page::Services => "tab.services",
+            Page::System => "tab.system",
+            Page::Startup => "tab.startup",
+            Page::Sessions => "tab.users",
+            Page::Alerts => "tab.alerts",
+            Page::Settings => "tab.settings",
+            Page::AppHistory => "tab.apphistory",
         }
     }
 
     /// Content-region title.
-    pub(crate) const fn title(self) -> &'static str {
+    pub(crate) fn title(self) -> String {
         self.nav_label()
     }
 }
@@ -266,11 +283,31 @@ pub(crate) fn page_for_action(action: AppAction) -> Option<Page> {
         AppAction::SelectPage(AppPage::Applications) => Some(Page::Processes),
         AppAction::SelectPage(AppPage::Performance) => Some(Page::Performance),
         AppAction::SelectPage(AppPage::Services) => Some(Page::Services),
+        AppAction::SelectPage(AppPage::System) => Some(Page::System),
         AppAction::SelectPage(AppPage::Startup) => Some(Page::Startup),
         AppAction::SelectPage(AppPage::Users) => Some(Page::Sessions),
         AppAction::SelectPage(AppPage::AppHistory) => Some(Page::AppHistory),
         AppAction::OpenAlerts => Some(Page::Alerts),
         _ => None,
+    }
+}
+
+/// Bevy page → shared action: the inverse of the mappable half of
+/// [`page_for_action`]. Applied by the input seam when a route chord fires,
+/// so the shell's page (and therefore its `CommandScope` derivation) follows
+/// the visible page. Alerts moves the shell too (`OpenAlerts` is an
+/// acknowledged shared action); Settings owns no shared page shape.
+pub(crate) fn action_for_page(page: Page) -> Option<AppAction> {
+    match page {
+        Page::Processes => Some(AppAction::SelectPage(AppPage::Applications)),
+        Page::Performance => Some(AppAction::SelectPage(AppPage::Performance)),
+        Page::Services => Some(AppAction::SelectPage(AppPage::Services)),
+        Page::System => Some(AppAction::SelectPage(AppPage::System)),
+        Page::Startup => Some(AppAction::SelectPage(AppPage::Startup)),
+        Page::Sessions => Some(AppAction::SelectPage(AppPage::Users)),
+        Page::Alerts => Some(AppAction::OpenAlerts),
+        Page::AppHistory => Some(AppAction::SelectPage(AppPage::AppHistory)),
+        Page::Settings => None,
     }
 }
 
@@ -303,28 +340,14 @@ pub(crate) fn route_key_press(key: KeyCode, modifiers: ModifierState) -> Option<
     page_for_action(action)
 }
 
-/// `Update` keyboard adapter: route the first just-pressed key that maps to a
-/// page; on an accepted transition update the resource and trigger
-/// [`RouteChanged`].
-fn keyboard_route_system(
-    keys: Res<ButtonInput<KeyCode>>,
-    mut route: ResMut<Route>,
-    mut commands: Commands,
-) {
-    let modifiers = ModifierState {
+/// Capture the chord modifiers from `ButtonInput<KeyCode>` so the routing
+/// decision stays a pure function with no bevy resource in its signature.
+pub(crate) fn modifier_state(keys: &ButtonInput<KeyCode>) -> ModifierState {
+    ModifierState {
         control: keys.pressed(KeyCode::ControlLeft) || keys.pressed(KeyCode::ControlRight),
         alt: keys.pressed(KeyCode::AltLeft) || keys.pressed(KeyCode::AltRight),
         shift: keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight),
         platform: keys.pressed(KeyCode::SuperLeft) || keys.pressed(KeyCode::SuperRight),
-    };
-    let next = keys
-        .get_just_pressed()
-        .find_map(|&key| route_key_press(key, modifiers));
-    if let Some(next) = next
-        && let Some(page) = route.go(next)
-    {
-        route.page = page;
-        commands.trigger(RouteChanged(page));
     }
 }
 
@@ -333,8 +356,19 @@ fn keyboard_route_system(
 // without moving the resource is a protocol violation — the mount system
 // reads the resource, not the payload.
 
+/// The single route-change protocol every transition shares: move the
+/// resource, then trigger [`RouteChanged`]. Idempotent re-routes do neither.
+pub(crate) fn request_route(route: &mut Route, page: Page, commands: &mut Commands) {
+    if let Some(next) = route.go(page) {
+        route.page = next;
+        commands.trigger(RouteChanged(next));
+    }
+}
+
 /// Observer: restyle nav items after a route change. The highlight model is
-/// [`nav_item_background`]; this observer is its only applier.
+/// [`nav_item_background`]; this observer is its only applier. Icon plates
+/// restyle through their [`crate::icons::IconInk`] sibling component — the
+/// icon ink and the label ink always move together.
 #[allow(clippy::type_complexity)]
 fn highlight_nav_items(
     _changed: On<RouteChanged>,
@@ -349,6 +383,8 @@ fn highlight_nav_items(
         &mut BackgroundColor,
     )>,
     mut labels: Query<&mut TextColor, With<NavItemLabel>>,
+    mut inks: Query<&mut crate::icons::IconInk>,
+    mut plates: Query<(&crate::icons::IconPlate, &mut bevy::ui::widget::ImageNode)>,
 ) {
     for (target, children, mut visual, interaction, pressed, mut fill) in &mut items {
         let active = target.0 == route.page;
@@ -368,6 +404,12 @@ fn highlight_nav_items(
             if let Ok(mut color) = labels.get_mut(*child) {
                 color.0 = ink;
             }
+            if let Ok(mut icon_ink) = inks.get_mut(*child) {
+                icon_ink.0 = ink;
+                if let Ok((_, mut node)) = plates.get_mut(*child) {
+                    node.color = ink;
+                }
+            }
         }
     }
 }
@@ -384,11 +426,7 @@ fn nav_button_activated(
     let Ok(target) = targets.get(activate.event().entity) else {
         return;
     };
-    let Some(page) = route.go(target.0) else {
-        return;
-    };
-    route.page = page;
-    commands.trigger(RouteChanged(page));
+    request_route(&mut route, target.0, &mut commands);
 }
 
 /// Observer: despawn the outgoing page content and request a remount. The
@@ -442,6 +480,7 @@ pub(crate) fn page_scene(page: Page, context: &PageContext<'_>) -> Box<dyn Scene
         Page::Processes => Box::new(crate::pages::processes::content(context)),
         Page::Performance => Box::new(crate::pages::performance::scene::content(context)),
         Page::Services => Box::new(crate::pages::services::content(context)),
+        Page::System => Box::new(crate::pages::system::content(context)),
         Page::Startup => Box::new(crate::pages::startup::content(context)),
         Page::Sessions => Box::new(crate::pages::sessions::content(context)),
         Page::Alerts => Box::new(crate::pages::alerts::content(context)),
@@ -497,18 +536,77 @@ impl Plugin for AppShellPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Route>()
             .init_resource::<PageMount>()
+            // The input adapter drives every inventory modal on every key;
+            // all three exist whether or not their pages ever mounted.
+            .init_resource::<crate::menu_modal::MenuModal<
+                crate::pages::services::menu::ServiceMenuCtx,
+            >>()
+            .init_resource::<crate::menu_modal::MenuModal<
+                crate::pages::startup::menu::StartupMenuCtx,
+            >>()
+            .init_resource::<crate::menu_modal::MenuModal<
+                crate::pages::sessions::menu::SessionMenuCtx,
+            >>()
             .add_observer(highlight_nav_items)
             .add_observer(despawn_page_content)
-            .add_systems(Update, (keyboard_route_system, mount_page_system).chain());
+            .add_plugins(crate::input::InputPlugin)
+            .add_systems(
+                Update,
+                (
+                    crate::input::keyboard_dispatch_system,
+                    crate::pages::processes::input::scroll_intent_system,
+                    mount_page_system,
+                )
+                    .chain(),
+            );
     }
 }
 
-/// Build one nav rail item scene (bsn! idiom: structure declarative, identity
-/// via the `NavTarget` template value, ink via the text style observers).
-fn nav_item_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + use<> {
-    let icon = nav_icon(page);
+// ---- product navigation strip ---------------------------------------------
+//
+// GPUI parity shape: one horizontal strip — the shared page tabs followed by
+// trailing route affordances. The tab set is the shared `AppPage::ALL`
+// vocabulary in the shared order (the same order the Alt+1..7 router walks);
+// Alerts and Settings have no shared tab slot, so they ride the strip's
+// trailing icon buttons — the same slot GPUI's gear occupies. Icons resolve
+// through the semantic registry (`IconId`), never through text codepoints.
+
+/// The strip's tab set: exactly the shared pages this frontend implements,
+/// in `AppPage::ALL` order. Tests pin this list against the shared constant.
+pub(crate) const NAV_TABS: &[Page] = &[
+    Page::Performance,
+    Page::Processes,
+    Page::Services,
+    Page::System,
+    Page::Startup,
+    Page::Sessions,
+    Page::AppHistory,
+];
+
+/// The semantic icon identity for a route. Total over `Page` so trailing
+/// affordances (Alerts, Settings) resolve through the same table.
+pub(crate) fn tab_icon(page: Page) -> taskmanager_ui_contract::IconId {
+    use taskmanager_ui_contract::IconId;
+    match page {
+        Page::Performance => IconId::Performance,
+        Page::Processes => IconId::Applications,
+        Page::Services => IconId::Services,
+        Page::System => IconId::System,
+        Page::Startup => IconId::Startup,
+        Page::Sessions => IconId::Users,
+        Page::AppHistory => IconId::History,
+        Page::Alerts => IconId::Alert,
+        Page::Settings => IconId::Settings,
+    }
+}
+
+/// One strip tab: the semantic icon plus the shared tab word, centered in an
+/// evenly divided cell. The label is the only shrinking child (elastic
+/// shrink with NoWrap + clip, GPUI's truncation contract) so a narrow window
+/// ellipses labels instead of pushing the trailing buttons out of the strip.
+fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + use<> {
     let label = page.nav_label().to_owned();
-    let height = palette.control_height_px * 1.25;
+    let height = palette.control_height_px * 1.4;
     let radius = palette.control_radius_px;
     let fill = nav_item_background(active, palette);
     let ink = if active {
@@ -518,12 +616,14 @@ fn nav_item_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene +
     };
     bsn! {
         Node {
-            width: percent(100),
+            flex_grow: 1.0,
+            min_width: px(0.0),
             height: px(height),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
+            justify_content: JustifyContent::Center,
             column_gap: Val::Px(space_8()),
-            padding: UiRect::horizontal(Val::Px(space_8())),
+            padding: UiRect::horizontal(Val::Px(space_12())),
             border_radius: BorderRadius::all(Val::Px(radius)),
         }
         BackgroundColor(fill)
@@ -532,27 +632,26 @@ fn nav_item_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene +
         Button
         on(nav_button_activated)
         Children [
-            ( Text(icon) TextRole(Role::Body) NavItemLabel TextColor(ink) ),
-            ( Text(label) TextRole(Role::Caption) NavItemLabel TextColor(ink) ),
+            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel ),
+            (
+                Node {
+                    min_width: px(0.0),
+                    flex_shrink: 1.0,
+                    overflow: Overflow::clip_x(),
+                }
+                NavItemLabel
+                Children [
+                    ( Text(label) TextRole(Role::Body) NavItemLabel TextColor(ink) template_value(no_wrap_text()) ),
+                ]
+            ),
         ]
     }
 }
 
-pub(crate) fn nav_icon(page: Page) -> &'static str {
-    match page {
-        Page::Processes => "▦",
-        Page::Performance => "◔",
-        Page::Services => "≡",
-        Page::Startup => "↗",
-        Page::Sessions => "♙",
-        Page::Alerts => "!",
-        Page::Settings => "⚙",
-        Page::AppHistory => "◫",
-    }
-}
-
-fn compact_nav_item_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + use<> {
-    let height = palette.control_height_px * 1.25;
+/// Trailing strip affordance for the two frontend-owned routes: a compact
+/// square icon button (Alerts bell, Settings gear) — GPUI's gear slot.
+fn nav_trailing_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + use<> {
+    let height = palette.control_height_px * 1.4;
     let fill = nav_item_background(active, palette);
     let ink = if active {
         palette.nav_active_ink
@@ -561,7 +660,7 @@ fn compact_nav_item_scene(page: Page, active: bool, palette: &UiPalette) -> impl
     };
     bsn! {
         Node {
-            width: percent(100),
+            width: px(height),
             height: px(height),
             align_items: AlignItems::Center,
             justify_content: JustifyContent::Center,
@@ -573,59 +672,35 @@ fn compact_nav_item_scene(page: Page, active: bool, palette: &UiPalette) -> impl
         Button
         on(nav_button_activated)
         Children [
-            ( Text(nav_icon(page)) TextRole(Role::Body) NavItemLabel TextColor(ink) ),
+            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel ),
         ]
     }
 }
 
-fn compact_nav_items(route: Page, palette: &UiPalette) -> Vec<impl Scene + use<>> {
-    Page::ALL
+/// The navigation strip: shared tabs + trailing Alerts/Settings affordances,
+/// on one nav-surface band. The single product chrome every page renders.
+pub(crate) fn nav_strip_scene(route: Page, palette: &UiPalette) -> impl Scene + use<> {
+    let tabs: Vec<Box<dyn Scene>> = NAV_TABS
         .iter()
-        .map(|&page| compact_nav_item_scene(page, page == route, palette))
-        .collect()
-}
-
-/// All rail items, one per [`Page::ALL`] entry. Returned as a scene list so
-/// the rail's bsn! tree embeds it with one expression item.
-fn nav_items(route: Page, palette: &UiPalette) -> Vec<impl Scene + use<>> {
-    Page::ALL
+        .map(|&page| Box::new(nav_tab_scene(page, page == route, palette)) as Box<dyn Scene>)
+        .collect();
+    let trailing: Vec<Box<dyn Scene>> = [Page::Alerts, Page::Settings]
         .iter()
-        .map(|&page| nav_item_scene(page, page == route, palette))
-        .collect()
-}
-
-/// The navigation rail scene: one item per page, newest-route-aware fill.
-pub(crate) fn nav_rail_scene(route: Page, palette: &UiPalette) -> impl Scene + use<> {
+        .map(|&page| Box::new(nav_trailing_scene(page, page == route, palette)) as Box<dyn Scene>)
+        .collect();
     bsn! {
         Node {
-            width: px(WIDE_NAV_WIDTH_PX),
-            height: percent(100),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_2()),
+            width: percent(100),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_8()),
             padding: UiRect::all(Val::Px(space_8())),
         }
         BackgroundColor({ palette.nav_bg })
         Children [
-            { nav_items(route, palette) },
-        ]
-    }
-}
-
-/// Compact Performance navigation: the same route authority and observer
-/// markers as the wide rail, reduced to icon-only controls so the main graph
-/// keeps the usable width promised by the responsive contract.
-pub(crate) fn compact_nav_rail_scene(route: Page, palette: &UiPalette) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            width: px(COMPACT_NAV_WIDTH_PX),
-            height: percent(100),
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_2()),
-            padding: UiRect::all(Val::Px(space_8())),
-        }
-        BackgroundColor({ palette.nav_bg })
-        Children [
-            { compact_nav_items(route, palette) },
+            { tabs },
+            ( Node { flex_grow: 1.0 } ),
+            { trailing },
         ]
     }
 }

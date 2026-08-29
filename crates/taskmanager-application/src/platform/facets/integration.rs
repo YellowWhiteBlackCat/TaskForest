@@ -6,13 +6,13 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_platform_contract::{
     CapabilityId, CapabilityRequest, CompositeSourceSnapshot, RequestPort, RequestScope,
     RequestTracking, RequestTrackingError,
 };
-
-use crate::{DesktopAppearance, FrozenProcessIdentity};
-pub use taskmanager_core::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
 
 #[derive(Clone, Debug)]
 pub enum ShellEvent {
@@ -65,7 +65,7 @@ pub struct DesktopNotificationRequest {
     pub instance_id: String,
     pub title: String,
     pub body: String,
-    pub severity: crate::alerts::AlertSeverity,
+    pub severity: taskmanager_core::core::alerts::AlertSeverity,
     pub target: String,
 }
 

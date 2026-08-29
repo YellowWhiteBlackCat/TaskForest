@@ -9,20 +9,21 @@ use std::{cell::RefCell, rc::Rc};
 use gpui::{Div, ElementId, IntoElement, ParentElement, Styled, div, px};
 use taskmanager_telemetry_store::TelemetryStore;
 
-use super::device_status_i18n_key;
 use super::dynamic_stats::{battery_stats, fan_stats};
 use super::finite_series_peak_floored;
 use super::smart_status::status_footer;
 use super::{ChartSpec, HeadlineSurface, PerfPageProps, perf_page, render_chart, stats_panel};
-use crate::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
 use crate::gpui_app::formatting::{GraphUnit, PerformanceSettings};
 use crate::gpui_app::graph::GraphHover;
 use crate::gpui_app::history_samples::{
     battery_capacity_samples, battery_power_samples, fan_rpm_samples, fan_temperature_samples,
 };
 use crate::gpui_app::root::responsive::{PerformanceChartInventory, PerformancePageBudget};
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::{PowerSupplySnapshot, SensorCenterSnapshot, SensorQuantity};
+use taskmanager_shell::presentation::device_status_i18n_key;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 /// Stateless renderer inputs for one battery detail page.
 pub(crate) struct BatteryViewProps<'a> {
@@ -231,7 +232,7 @@ fn dynamic_device_empty(
     theme: &Theme,
     title: &str,
     message: &str,
-    status: crate::core::DeviceStatus,
+    status: taskmanager_core::core::DeviceStatus,
 ) -> Div {
     div()
         .size_full()

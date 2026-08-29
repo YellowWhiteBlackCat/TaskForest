@@ -10,13 +10,6 @@ use taskmanager_core::{
     ProcessMetadataObservations, ProcessScalarObservations, ScalarObservation, SmartAvailability,
 };
 
-// The shared builder sources name the core module explicitly so their domain
-// imports remain clear while this dev-only crate owns their compilation.
-mod core {
-    pub use taskmanager_core::core::{device_state, smart, storage};
-    pub use taskmanager_core::*;
-}
-
 mod memory;
 mod metrics;
 mod process;
@@ -64,5 +57,6 @@ pub use metrics::{
 };
 pub use process::{
     ProcessItemFixtureBuilder, SortFixtureMetrics, category_fixture_with_empty_bucket,
-    mixed_availability_category_fixture, sort_fixture_row, sort_parity_fixture,
+    fixture_start_token, mixed_availability_category_fixture, sort_fixture_row,
+    sort_parity_fixture,
 };

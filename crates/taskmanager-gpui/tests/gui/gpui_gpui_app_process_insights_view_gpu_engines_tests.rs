@@ -1,10 +1,10 @@
 use super::*;
-use crate::core::device_state::DeviceState;
-use crate::core::{
+use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window};
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::process_telemetry::ProcessGpuSnapshot;
+use taskmanager_core::core::{
     DeviceStatus, FailureKind, ProcessGpuEngineUsage, ProcessGpuEngines, ScalarObservation,
 };
-use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window};
-use taskmanager_application::ProcessGpuSnapshot;
 
 fn labels() -> ProcessInsightsLabels {
     ProcessInsightsLabels::capture_fixture()

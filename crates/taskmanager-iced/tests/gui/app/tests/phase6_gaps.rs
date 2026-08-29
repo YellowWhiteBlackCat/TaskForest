@@ -5,15 +5,16 @@
 //! 4. Visual table navigation with Home and End keys
 //! 5. Shell level Home / End / PageUp / PageDown handling
 
-use taskmanager_application::{
-    AppPage, HardwareInfo, KeyCode, Modifiers, NetworkAdapterType, NetworkMetrics, SystemSnapshot,
-};
+use taskmanager_application::{AppPage, KeyCode, Modifiers};
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics, SystemSnapshot};
+
 use taskmanager_shell::{ShellApp, ShellKeyEvent};
 
 use crate::app::{IcedApp, IcedKey, Message};
 use crate::ui::overlays::process_details::{filtered_environment_rows, working_directory_value};
 use crate::ui::perf_devices::network::{network_summary_lines, network_title};
-use taskmanager_application::ProcessEnvironmentEntry;
+use taskmanager_core::core::process_telemetry::ProcessEnvironmentEntry;
 
 #[test]
 fn test_environment_filter_matches_keys_case_insensitively() {
@@ -48,7 +49,7 @@ fn working_directory_is_collecting_until_the_typed_insight_arrives() {
     use taskmanager_application::i18n::{Language, set_language};
     set_language(Language::En);
     let shell = ShellApp::default();
-    let target = taskmanager_application::FrozenProcessIdentity::from_authoritative_parts(
+    let target = taskmanager_core::core::process::FrozenProcessIdentity::from_authoritative_parts(
         1, "init", 100, 1_000,
     )
     .expect("fixture identity");
@@ -59,14 +60,17 @@ fn working_directory_is_collecting_until_the_typed_insight_arrives() {
 fn test_network_wifi_signal_formatting() {
     let mut nic = NetworkMetrics::default();
     nic.ipv4_addr = Some("192.168.1.100".into());
-    let wireless_observations = taskmanager_application::NetworkWirelessObservations {
-        signal_dbm: taskmanager_application::OptionalObservation::present(-60, 0),
-        ssid: taskmanager_application::OptionalObservation::present("HomeWiFi_5G".into(), 0),
+    let wireless_observations = taskmanager_core::core::metrics::NetworkWirelessObservations {
+        signal_dbm: taskmanager_core::core::metrics::OptionalObservation::present(-60, 0),
+        ssid: taskmanager_core::core::metrics::OptionalObservation::present(
+            "HomeWiFi_5G".into(),
+            0,
+        ),
         ..Default::default()
     };
     nic.apply_observations(
         NetworkAdapterType::WiFi,
-        taskmanager_application::NetworkScalarObservations::default(),
+        taskmanager_core::core::metrics::NetworkScalarObservations::default(),
         wireless_observations,
     );
 

@@ -10,8 +10,8 @@ use std::time::Duration;
 use gpui::AppContext;
 use taskmanager_application::{AppAction, TelemetryInterval, TelemetryRefreshPolicyChange};
 use taskmanager_gpui::gpui_app::root::RootView;
-use taskmanager_gpui::gpui_app::theme::Theme;
 use taskmanager_shell::ShellApp;
+use taskmanager_theme::Theme;
 
 /// Observable refresh-scheduling tuple both owners must agree on: combined
 /// pause, transient Ctrl hold, cadence, and the due decision at three

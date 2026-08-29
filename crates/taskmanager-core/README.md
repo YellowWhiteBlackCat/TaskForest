@@ -25,7 +25,17 @@ the only reuse and change authority.
 - `src/core/metrics/` owns domain measurements and availability joins.
 - `src/core/process/`, `src/core/services/`, `src/core/startup/` and
   `src/core/export/` own typed product facts.
-- `src/core.rs` and `src/lib.rs` expose the neutral facade; pure behavior belongs in nearby tests.
+- `src/core/process/identity.rs` owns the validated `ProcessLiveKey` used to
+  distinguish a provider-issued process incarnation from a reused PID;
+  `src/core/process/aggregate.rs` owns availability-preserving group metric
+  folds while the legacy `AppGroup` shape remains a compatibility surface.
+- `src/core/alerts/` owns alert rules, active-set transitions and the bounded,
+  versioned event export; event history is session-local domain state, not a
+  renderer cache.
+- `src/core.rs` is the owner module index and `src/lib.rs` contains only the
+  core crate's own aggregate API, never a cross-layer forwarding facade;
+  consumers should prefer the explicit domain module that owns each fact.
+  Pure behavior belongs in nearby tests.
 
 ## Contract and verification
 

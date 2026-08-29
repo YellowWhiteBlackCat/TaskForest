@@ -1,7 +1,7 @@
 use super::*;
-use crate::core::device_state::{DeviceState, DeviceStatus};
 use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window};
-use taskmanager_application::{ProcessThreads, ThreadState};
+use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::process_telemetry::{ProcessThreads, ThreadState};
 
 fn labels() -> ProcessInsightsLabels {
     ProcessInsightsLabels::capture_fixture()

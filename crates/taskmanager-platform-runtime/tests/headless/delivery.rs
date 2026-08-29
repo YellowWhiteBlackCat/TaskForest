@@ -4,16 +4,19 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::{Receiver, bounded};
-use taskmanager_application::CapabilityScheduler;
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityId, CapabilityStatus, CpuMetrics, CpuTelemetryObservation,
-    EventPort, EventSequence, FailureKind, PartialSourceSnapshot, PlatformEvent, ProcessEvent,
-    ProviderFailure, ProviderId, RequestId, RequestScope, RequestTracking, SidebandPolicy,
-    SourceOutcome, SourceStatus, SystemTelemetryDomainEvent, SystemTelemetryRevision,
+    PlatformEvent, ProcessEvent, SystemTelemetryDomainEvent, SystemTelemetryRevision,
 };
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
-    DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageSnapshot,
-    FrozenProcessIdentity,
+    CpuMetrics, CpuTelemetryObservation, DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals,
+    DirectoryUsageSnapshot, FailureKind, FrozenProcessIdentity,
+};
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityId, CapabilityScheduler, CapabilityStatus, EventPort,
+    EventSequence, PartialSourceSnapshot, ProviderFailure, RequestId, RequestScope,
+    RequestTracking, SidebandPolicy,
 };
 
 use super::{FairEventPort, LaneFlow, RuntimeCapabilityCatalog, RuntimeEventPublisher};
@@ -708,7 +711,7 @@ fn partial_observation_is_delivered_and_catalogued_as_degraded() {
                     Vec::new(),
                 )),
             }),
-            CapabilityHealth::Degraded(taskmanager_application::FailureKind::PermissionDenied),
+            CapabilityHealth::Degraded(taskmanager_core::FailureKind::PermissionDenied),
         ),
         LaneFlow::Continue
     );
@@ -722,7 +725,7 @@ fn partial_observation_is_delivered_and_catalogued_as_degraded() {
         .expect("telemetry capability");
     assert_eq!(
         descriptor.status,
-        CapabilityStatus::Degraded(taskmanager_application::FailureKind::PermissionDenied)
+        CapabilityStatus::Degraded(taskmanager_core::FailureKind::PermissionDenied)
     );
     assert_eq!(descriptor.last_success_at_ms, Some(fixed_clock()));
 }
@@ -810,7 +813,7 @@ fn failed_publication_retains_the_envelope_sequence_after_detachment() {
     assert_eq!(sequence, EventSequence::new(1));
     assert_eq!(failure.sequence, sequence);
     assert_eq!(failure.request_id, request_id);
-    assert_eq!(failure.kind, taskmanager_application::FailureKind::TimedOut);
+    assert_eq!(failure.kind, taskmanager_core::FailureKind::TimedOut);
 }
 
 #[test]

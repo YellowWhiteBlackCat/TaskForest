@@ -3,9 +3,8 @@ use std::sync::{Arc, Mutex};
 
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityId, CapabilityRequest, CapabilityScheduler, CapabilitySnapshot,
-    EventEnvelope, EventPort, EventPortError, EventSequence, FailureKind, OperationFailure,
-    ProviderFailure, ProviderId, RequestEnvelope, RequestId, RequestPort,
-    RuntimeSchedulingSnapshot, SubmissionError,
+    EventEnvelope, EventPort, EventPortError, EventSequence, OperationFailure, ProviderFailure,
+    RequestEnvelope, RequestId, RequestPort, RuntimeSchedulingSnapshot, SubmissionError,
 };
 
 use super::*;
@@ -15,7 +14,11 @@ use crate::platform::{
     StorageTelemetryRequest, SystemFacets, SystemTelemetryDomain, SystemTelemetryDomainEvent,
     SystemTelemetryDomainOutcome, SystemTelemetryRevision, SystemTelemetryUnavailable,
 };
-use crate::{CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, ScalarObservation};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::metrics::{
+    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, ScalarObservation,
+};
 
 #[derive(Default)]
 struct EmptyCapabilities;

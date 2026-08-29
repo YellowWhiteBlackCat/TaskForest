@@ -1,42 +1,83 @@
 //! Per-core utilization grid for the Performance page's Cpu view.
 //!
-//! Mirrors gpui's per-core mini-graph grid (`crates/taskmanager-gpui/src/gpui_app/cpu_view.rs`): one
-//! cell per logical core, each a compact 0–100% bar colored by load tier
-//! (green / amber / red) so a pinned core pops at a glance — the Win11 Task
-//! Manager / Mission-Center per-core treatment. Samples come from the SHARED
-//! per-core windows in `LiveGraphHistory` (`per_core_usage_series`), so the TUI
-//! keeps no second history. A core with no finite sample yet renders an honest
-//! "—" readout, never a fabricated 0%.
+//! Mirrors gpui's per-core matrix (`crates/taskmanager-gpui/src/gpui_app/cpu_view/per_core_grid.rs`):
+//! when the projection carries a per-logical-CPU type inventory
+//! (`hardware.cpu_types`), cells group under the typed P-cores / E-cores /
+//! LP-E-cores / Cores headers, each header carrying its core count, in that
+//! fixed order. Without that inventory the grid fail-closes to the historical
+//! flat layout — grouping is never guessed from missing data.
+//!
+//! Each cell plots the core's SHARED per-core utilization window
+//! (`per_core_usage_series`) as a mini trend through the one sparkline
+//! component's profile-aware API, so an ASCII profile paints the same trend
+//! on the ASCII ladder at paint time; the trend is tinted by the latest
+//! sample's load tier, so a pinned core still pops at a glance. Beside it a
+//! three-segment readout — utilization · frequency · temperature — reads the
+//! core's current typed observations; a segment whose observation is
+//! unavailable renders the honest "—", never a fabricated zero.
 
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
+use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::hardware::CpuType;
+use taskmanager_core::core::metrics::CpuMetrics;
 use taskmanager_shell::presentation::missing_value;
 
-use crate::{TuiApp, TuiTheme};
+use super::sparkline::{recent_window_with, sparkline_in};
+use crate::{TuiApp, TuiGlyphMode, TuiTheme};
 
-/// Width of one grid cell: three-character core label + space + eight-character
-/// bar + space + four-character percentage + two-character gutter.
-const CELL_WIDTH: u16 = 19;
+/// Width of one grid cell: three-character core label + space + six-character
+/// trend + space + the widest three-segment readout ("100% · 4.94 GHz ·
+/// 100 °C") + two-character gutter.
+const CELL_WIDTH: u16 = 37;
 
-/// Characters in one utilization bar (the 0–100% scale).
-const BAR_CHARS: usize = 8;
-
-/// The horizontal bar characters, empty→full.
-const FILLED: char = '▓';
-const EMPTY: char = '░';
+/// Samples in one cell's mini trend (the most-recent window of the shared
+/// per-core ring), right-aligned so every trend ends at the readout edge.
+const CELL_TREND_CHARS: usize = 6;
 
 /// Load-tier band edges (percent). Below [`WARN_EDGE`] is green, up to
 /// [`DANGER_EDGE`] is amber, above is red.
 const WARN_EDGE: f32 = 60.0;
 const DANGER_EDGE: f32 = 85.0;
 
+/// The typed group presentation order, mirroring gpui's per-core matrix.
+const GROUP_ORDER: [CpuType; 4] = [
+    CpuType::Performance,
+    CpuType::Efficient,
+    CpuType::LowPower,
+    CpuType::Unknown,
+];
+
+/// One typed topology group: a core class and the logical indices in it.
+struct CoreGroup {
+    core_type: CpuType,
+    indices: Vec<usize>,
+}
+
+impl CoreGroup {
+    /// The locale key for the group header label.
+    fn label_key(&self) -> &'static str {
+        match self.core_type {
+            CpuType::Performance => "cpu.performance_cores",
+            CpuType::Efficient => "cpu.efficiency_cores",
+            CpuType::LowPower => "cpu.low_power_cores",
+            CpuType::Unknown => "common.cores",
+        }
+    }
+
+    /// Header line plus the cell rows the group's cores occupy.
+    fn line_count(&self, cols: usize) -> usize {
+        1 + self.indices.len().div_ceil(cols)
+    }
+}
+
 /// The grid's full height for the current core count and terminal width. The
 /// overview uses it when every row fits and otherwise supplies a bounded
-/// viewport; the `+1` is the fixed title/range line.
+/// viewport; the `+1` is the fixed title/range line. Group headers count as
+/// lines so the viewport budget sees the real grouped height.
 #[must_use]
 pub(super) fn grid_height(app: &TuiApp, width: u16) -> u16 {
     let cores = app.history.per_core_usage_series().len();
@@ -44,65 +85,132 @@ pub(super) fn grid_height(app: &TuiApp, width: u16) -> u16 {
         return 0;
     }
     let cols = columns_for(width);
-    cores.div_ceil(cols) as u16 + 1
+    let lines = match topology_groups(app, cores) {
+        Some(groups) => groups.iter().map(|group| group.line_count(cols)).sum(),
+        None => cores.div_ceil(cols),
+    };
+    lines as u16 + 1
+}
+
+/// The typed topology groups for `core_count` lanes, or `None` when the
+/// projection carries no per-logical-CPU type inventory (fail-closed flat
+/// layout). An index past the inventory's end classifies as `Unknown`, so a
+/// history that outgrew a stale inventory still renders — honestly grouped.
+fn topology_groups(app: &TuiApp, core_count: usize) -> Option<Vec<CoreGroup>> {
+    let cpu_types = &app.projection().hardware.as_ref()?.cpu_types;
+    if cpu_types.is_empty() {
+        return None;
+    }
+    let groups: Vec<CoreGroup> = GROUP_ORDER
+        .into_iter()
+        .map(|core_type| CoreGroup {
+            core_type,
+            indices: (0..core_count)
+                .filter(|&index| cpu_types.get(index).copied().unwrap_or_default() == core_type)
+                .collect(),
+        })
+        .filter(|group| !group.indices.is_empty())
+        .collect();
+    Some(groups)
 }
 
 /// Render the per-core grid into `area`. The first line is a fixed title/range
-/// line and the remaining rows are a clamped slice of the canonical topology.
-/// Up/Down and PageUp/PageDown move `cpu_core_scroll`, so a high-core-count
-/// host remains reachable on a short terminal instead of being dropped.
+/// line and the remaining rows are a clamped slice of the content lines (cell
+/// rows, plus group headers when the topology is grouped). Up/Down and
+/// PageUp/PageDown move `cpu_core_scroll`, so a high-core-count host remains
+/// reachable on a short terminal instead of being dropped.
 pub(super) fn render_core_grid(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
     let cores = app.history.per_core_usage_series();
     if cores.is_empty() || area.height == 0 {
         return;
     }
     let cols = columns_for(area.width).max(1);
-    let row_count = cores.len().div_ceil(cols);
+    let mode = theme.terminal.glyphs;
+    let cpu = app.snapshot().map(|snapshot| &snapshot.cpu);
+    let mut lines: Vec<Line<'static>> = Vec::new();
+    match topology_groups(app, cores.len()) {
+        Some(groups) => {
+            for group in &groups {
+                lines.push(group_header(theme, group));
+                push_cell_rows(&mut lines, theme, mode, cpu, &group.indices, &cores, cols);
+            }
+        }
+        None => {
+            let all: Vec<usize> = (0..cores.len()).collect();
+            push_cell_rows(&mut lines, theme, mode, cpu, &all, &cores, cols);
+        }
+    }
+
     let visible_rows = usize::from(area.height.saturating_sub(1));
     let start = app
         .cpu_core_scroll
-        .min(row_count.saturating_sub(visible_rows.max(1)));
-    let end = (start + visible_rows).min(row_count);
+        .min(lines.len().saturating_sub(visible_rows.max(1)));
+    let end = (start + visible_rows).min(lines.len());
     let title = if visible_rows == 0 {
         format!(" {}  ↑↓", t("common.cores"))
-    } else if row_count > visible_rows {
+    } else if lines.len() > visible_rows {
         format!(
             " {}  {}-{}/{}  ↑↓",
             t("common.cores"),
             start + 1,
             end,
-            row_count
+            lines.len()
         )
     } else {
         format!(" {}", t("common.cores"))
     };
-    let mut lines: Vec<Line<'static>> = Vec::with_capacity(end.saturating_sub(start) + 1);
-    lines.push(Line::from(vec![Span::styled(
+    let mut paint: Vec<Line<'static>> = Vec::with_capacity(end.saturating_sub(start) + 1);
+    paint.push(Line::from(vec![Span::styled(
         title,
         Style::new().fg(theme.dim),
     )]));
-    for (row_offset, row) in cores
-        .chunks(cols)
-        .skip(start)
-        .take(visible_rows)
-        .enumerate()
-    {
-        let mut spans: Vec<Span<'static>> = Vec::with_capacity(row.len() * 4);
-        for (offset, samples) in row.iter().enumerate() {
-            let core_index = (start + row_offset) * cols + offset;
-            let cell = core_cell(samples);
+    paint.extend(lines.into_iter().skip(start).take(visible_rows));
+    frame.render_widget(Paragraph::new(paint), area);
+}
+
+/// The group header line: the typed label with its core count, mirroring
+/// gpui's `label + count` header pair.
+fn group_header(theme: TuiTheme, group: &CoreGroup) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(
+            format!(" {}", t(group.label_key())),
+            Style::new().fg(theme.dim).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!(" {}", group.indices.len()),
+            Style::new().fg(theme.fg_dim),
+        ),
+    ])
+}
+
+/// Append one cell row per `cols` slice of `indices`, reading each core's
+/// shared window and current observations.
+fn push_cell_rows(
+    lines: &mut Vec<Line<'static>>,
+    theme: TuiTheme,
+    mode: TuiGlyphMode,
+    cpu: Option<&CpuMetrics>,
+    indices: &[usize],
+    cores: &[Vec<f32>],
+    cols: usize,
+) {
+    for row in indices.chunks(cols) {
+        let mut spans: Vec<Span<'static>> = Vec::with_capacity(row.len() * 5);
+        for &core_index in row {
+            let cell = core_cell(
+                cores.get(core_index).map(Vec::as_slice).unwrap_or_default(),
+                cpu,
+                core_index,
+                mode,
+            );
             spans.push(Span::styled(
                 format!("C{core_index:02}"),
                 Style::new().fg(theme.dim),
             ));
             spans.push(Span::raw(" "));
             spans.push(Span::styled(
-                FILLED.to_string().repeat(cell.filled),
+                format!("{:>1$}", cell.trend, CELL_TREND_CHARS),
                 Style::new().fg(tier_color(theme, cell.utilization)),
-            ));
-            spans.push(Span::styled(
-                EMPTY.to_string().repeat(BAR_CHARS - cell.filled),
-                Style::new().fg(theme.dim),
             ));
             spans.push(Span::raw(" "));
             spans.push(Span::styled(cell.readout, Style::new().fg(theme.dim)));
@@ -110,7 +218,6 @@ pub(super) fn render_core_grid(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTh
         }
         lines.push(Line::from(spans));
     }
-    frame.render_widget(Paragraph::new(lines), area);
 }
 
 /// The number of grid columns that fit `width`, at least one.
@@ -118,30 +225,63 @@ fn columns_for(width: u16) -> usize {
     (width / CELL_WIDTH).max(1) as usize
 }
 
-/// One core cell: the filled-bar length, the percent readout, and the
-/// utilization that drives the tier color. A core with no finite sample yields
-/// zero filled and `None` (renders the empty bar and "—", never a 0%).
-fn core_cell(samples: &[f32]) -> CoreCell {
-    match samples.last().copied() {
-        None => CoreCell {
-            filled: 0,
-            readout: missing_value(),
-            utilization: None,
-        },
-        Some(current) => {
-            let clamped = current.clamp(0.0, 100.0);
-            let filled = (clamped / 100.0 * BAR_CHARS as f32).round() as usize;
-            CoreCell {
-                filled,
-                readout: format!("{clamped:>3.0}%"),
-                utilization: Some(clamped),
-            }
-        }
+/// One core cell: the mini trend, the three-segment readout, and the latest
+/// finite utilization that drives the tier tint. Every readout segment reads
+/// the core's current typed observation and renders the shared dash when
+/// unobserved — a fully-dark core reads "— · — · —", never a fabricated 0.
+fn core_cell(
+    samples: &[f32],
+    cpu: Option<&CpuMetrics>,
+    core_index: usize,
+    mode: TuiGlyphMode,
+) -> CoreCell {
+    let trend = sparkline_in(mode, recent_window_with(samples, CELL_TREND_CHARS));
+    let utilization = samples
+        .iter()
+        .rev()
+        .find(|value| value.is_finite())
+        .map(|value| value.clamp(0.0, 100.0));
+    let readout = [
+        usage_text(cpu.and_then(|cpu| cpu.current_core_usage_pct(core_index))),
+        ghz_text(cpu.and_then(|cpu| cpu.current_core_frequency_mhz(core_index))),
+        celsius_text(cpu.and_then(|cpu| cpu.current_core_temperature_c(core_index))),
+    ]
+    .join(" · ");
+    CoreCell {
+        trend,
+        readout,
+        utilization,
     }
 }
 
-/// The load-tier color for one core's utilization: green below [`WARN_EDGE`],
-/// amber up to [`DANGER_EDGE`], red above — `dim` while no sample is finite.
+/// The utilization segment: whole percent, dash when unobserved.
+fn usage_text(usage: Option<f32>) -> String {
+    usage
+        .filter(|value| value.is_finite())
+        .map_or_else(missing_value, |value| format!("{value:.0}%"))
+}
+
+/// The frequency segment in GHz — the shared per-core cell spelling (mirrors
+/// gpui `formatting::optional_ghz`): two decimals, dash when unobserved, so
+/// an uncollected clock never renders as a fabricated `0.00 GHz`.
+fn ghz_text(frequency_mhz: Option<u64>) -> String {
+    frequency_mhz.map_or_else(missing_value, |mhz| {
+        format!("{:.2} GHz", mhz as f64 / 1000.0)
+    })
+}
+
+/// The temperature segment through the shell's single °C spelling (ADR-020),
+/// dash when unobserved.
+fn celsius_text(temperature_c: Option<f32>) -> String {
+    temperature_c.filter(|value| value.is_finite()).map_or_else(
+        missing_value,
+        taskmanager_shell::presentation::temperature_c,
+    )
+}
+
+/// The load-tier color for one core's latest utilization: green below
+/// [`WARN_EDGE`], amber up to [`DANGER_EDGE`], red above — `dim` while no
+/// sample is finite.
 fn tier_color(theme: TuiTheme, utilization: Option<f32>) -> Color {
     let Some(pct) = utilization else {
         return theme.dim;
@@ -156,9 +296,10 @@ fn tier_color(theme: TuiTheme, utilization: Option<f32>) -> Color {
     }
 }
 
-/// The projection of one core's samples onto its bar cell.
+/// The projection of one core's shared window plus current observations onto
+/// its grid cell.
 struct CoreCell {
-    filled: usize,
+    trend: String,
     readout: String,
     utilization: Option<f32>,
 }

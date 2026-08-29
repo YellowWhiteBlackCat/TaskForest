@@ -2,20 +2,20 @@
 
 use super::super::{Hover, RootView, SelectedDevice, SystemHealthCallbacks, TopPage};
 use super::init_search_entity;
-use crate::core::metrics::SystemSnapshot;
 use crate::gpui_app::app_history_view;
 use crate::gpui_app::dashboard::SystemSection;
 use crate::gpui_app::root::{
     containers_view, cpu_view, dashboard, elements, i18n, perf_views, processes_view, responsive,
     sidebar, system_health_view, system_view,
 };
-use crate::gpui_app::theme::tokens;
 use gpui::{
     AnyElement, AppContext, Context, Div, InteractiveElement, IntoElement, ParentElement, Styled,
     Window, div, px,
 };
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui::layout::{PageFrame, PageScaffold};
 
 mod inventory;
@@ -151,7 +151,7 @@ impl RootView {
                                 perf_views::GpuRenderState {
                                     engine_session: self.shell.gpu_engine_rows_state(),
                                     engine_capability_status: self.projection().capability_status(
-                                        &taskmanager_application::CapabilityId::TELEMETRY_GPU_ENGINES,
+                                        &taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES,
                                     ),
                                     engine_device_id,
                                     chart_layout: perf_views::GpuChartLayout::for_chart_inventory(
@@ -207,7 +207,9 @@ impl RootView {
                             .items_center()
                             .text_size(tokens::FONT_11)
                             .text_color(t.fg_dim)
-                            .child(crate::i18n::t("perf.replay.startup_unavailable"))
+                            .child(taskmanager_application::i18n::t(
+                                "perf.replay.startup_unavailable",
+                            ))
                             .into_any_element(),
                     )
                 } else {
@@ -216,11 +218,13 @@ impl RootView {
                         elements::tool_btn(
                             t,
                             "tm-replay-toggle",
-                            crate::i18n::t(if self.history_replay_state().is_open() {
-                                "perf.replay.back_to_live"
-                            } else {
-                                "perf.replay.toggle"
-                            }),
+                            taskmanager_application::i18n::t(
+                                if self.history_replay_state().is_open() {
+                                    "perf.replay.back_to_live"
+                                } else {
+                                    "perf.replay.toggle"
+                                },
+                            ),
                             true,
                             self.history_replay_state().is_open(),
                             move |_win: &mut gpui::Window, cx: &mut gpui::App| {
@@ -362,8 +366,8 @@ impl RootView {
                             query: &query,
                             selected: sel_pid,
                             selected_row: self.selected_process_row(),
-                            selected_target_count,
-                            selected_pids: self.selected_pids(),
+                            selected_target_count: self.selected_process_count(),
+                            selected_identities: self.selected_process_identities(),
                             hovered: hovered.cloned(),
                             sort_col,
                             sort_asc,
@@ -503,6 +507,7 @@ impl RootView {
                         .child(dashboard::render_system_header(
                             t,
                             &self.dashboard,
+                            self.projection().alert_center.event_history(),
                             system_layout,
                             entity,
                         ))

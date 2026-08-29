@@ -39,7 +39,7 @@ use taskmanager_core::core::metrics::SmartAvailability;
 use taskmanager_core::core::metrics::{
     StorageConnection, StorageDeviceKind, StorageInterconnect, StorageProtocol,
 };
-pub use taskmanager_core::core::smart::DiskSmart;
+use taskmanager_core::core::smart::DiskSmart;
 use taskmanager_core::core::smart::SmartProviderFailureKind;
 
 #[cfg(target_os = "linux")]

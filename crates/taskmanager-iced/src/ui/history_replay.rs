@@ -12,7 +12,8 @@ use std::rc::Rc;
 use iced::widget::{canvas, column, container, row, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
-use taskmanager_application::{HistoryMetric, HistorySeriesKey, HistoryWindow};
+use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
+
 use taskmanager_theme::tokens;
 
 use crate::app::{FocusTarget, Message, history_replay::IcedHistoryReplay};
@@ -67,26 +68,32 @@ fn series_color(theme_snapshot: &taskmanager_theme::Theme, metric: HistoryMetric
         | HistoryMetric::CpuTemperatureC
         | HistoryMetric::CpuFrequencyMhz
         | HistoryMetric::CpuPowerW
-        | HistoryMetric::ApplicationCpuUsagePct => theme::color(theme_snapshot.cpu),
+        | HistoryMetric::ApplicationCpuUsagePct => {
+            taskmanager_theme::iced::color(theme_snapshot.cpu)
+        }
         HistoryMetric::MemoryUsedPct
         | HistoryMetric::SwapUsedPct
-        | HistoryMetric::ApplicationMemoryBytes => theme::color(theme_snapshot.memory),
-        HistoryMetric::StorageActivityPct => theme::color(theme_snapshot.disk),
-        HistoryMetric::NetworkRateBps => theme::color(theme_snapshot.network),
+        | HistoryMetric::ApplicationMemoryBytes => {
+            taskmanager_theme::iced::color(theme_snapshot.memory)
+        }
+        HistoryMetric::StorageActivityPct => taskmanager_theme::iced::color(theme_snapshot.disk),
+        HistoryMetric::NetworkRateBps => taskmanager_theme::iced::color(theme_snapshot.network),
         HistoryMetric::GpuUsagePct
         | HistoryMetric::GpuPowerW
         | HistoryMetric::GpuTemperatureC
-        | HistoryMetric::GpuFrequencyMhz => theme::color(theme_snapshot.gpu),
+        | HistoryMetric::GpuFrequencyMhz => taskmanager_theme::iced::color(theme_snapshot.gpu),
         HistoryMetric::BatteryCapacityPct
         | HistoryMetric::BatteryPowerW
-        | HistoryMetric::BatteryHealthPct => theme::color(theme_snapshot.battery),
+        | HistoryMetric::BatteryHealthPct => taskmanager_theme::iced::color(theme_snapshot.battery),
         HistoryMetric::FanRpm | HistoryMetric::FanPwmPct | HistoryMetric::FanTemperatureC => {
-            theme::color(theme_snapshot.palette().accent)
+            taskmanager_theme::iced::color(theme_snapshot.palette().accent)
         }
         HistoryMetric::UptimeSecs
         | HistoryMetric::ProcessCount
         | HistoryMetric::ThreadCount
-        | HistoryMetric::ApplicationProcessCount => theme::color(theme_snapshot.palette().fg),
+        | HistoryMetric::ApplicationProcessCount => {
+            taskmanager_theme::iced::color(theme_snapshot.palette().fg)
+        }
     }
 }
 
@@ -96,7 +103,7 @@ fn series_color(theme_snapshot: &taskmanager_theme::Theme, metric: HistoryMetric
 pub fn render_history_replay<'a>(
     theme_snapshot: &'a taskmanager_theme::Theme,
     state: &'a IcedHistoryReplay,
-    local_time_rules: &'a taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &'a taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
     let window = state.window();
@@ -133,7 +140,9 @@ pub fn render_history_replay<'a>(
         panel = panel.push(
             text(error.to_string())
                 .size(f32::from(tokens::FONT_12))
-                .color(theme::color(theme_snapshot.palette().danger)),
+                .color(taskmanager_theme::iced::color(
+                    theme_snapshot.palette().danger,
+                )),
         );
         if let Some(last_good_window) = state.rows_window()
             && last_good_window != window
@@ -184,9 +193,9 @@ pub fn render_history_replay<'a>(
 
             let mut summary = row![
                 text(row_heading(&row_item.key)).size(f32::from(tokens::FONT_12)),
-                text(peak_str)
-                    .size(f32::from(tokens::FONT_12))
-                    .color(theme::color(theme_snapshot.palette().accent)),
+                text(peak_str).size(f32::from(tokens::FONT_12)).color(
+                    taskmanager_theme::iced::color(theme_snapshot.palette().accent)
+                ),
                 text(gaps_str).size(f32::from(tokens::FONT_11)).color(muted),
             ]
             .spacing(8);
@@ -201,13 +210,13 @@ pub fn render_history_replay<'a>(
                 samples,
                 color,
                 max,
-                grid_color: theme::color(theme_snapshot.palette().border),
+                grid_color: taskmanager_theme::iced::color(theme_snapshot.palette().border),
                 smooth: true,
                 hover: true,
                 scale: device_chart::DeviceMetricScale::AutoPeak,
                 readout: crate::perf_chart::ReadoutColors {
-                    bg: theme::color(theme_snapshot.palette().surface),
-                    fg: theme::color(theme_snapshot.palette().fg),
+                    bg: taskmanager_theme::iced::color(theme_snapshot.palette().surface),
+                    fg: taskmanager_theme::iced::color(theme_snapshot.palette().fg),
                 },
             })
             .width(Length::Fill)

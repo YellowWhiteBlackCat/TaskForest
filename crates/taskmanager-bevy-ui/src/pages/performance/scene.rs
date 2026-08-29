@@ -5,16 +5,16 @@
 //! with the parent. `content` is the page-agent entry [`crate::app`] calls.
 
 use super::*;
-use crate::palette::{UiPalette, space_2_quarter, space_4, space_8, space_12};
+use crate::palette::{UiPalette, no_wrap_text, space_4, space_8, space_12};
 use crate::widgets::controls::{
     ControlTone, ControlVisual, SurfaceTone, device_row_with_accessory_scene, graph_card_scene,
-    per_core_cell_scene, pill_scene, stat_row_scene, surface_scene,
+    pill_scene, stat_row_scene, surface_scene,
 };
 use crate::widgets::layout::{
     MAIN_GRAPH_MIN_WIDTH_PX, WIDE_DEVICE_SIDEBAR_WIDTH_PX, WIDE_STATS_WIDTH_PX,
 };
 use bevy::color::Alpha;
-use bevy::scene::on;
+use bevy::scene::{on, template_value};
 use bevy::ui::prelude::{BackgroundColor, BorderRadius, FlexWrap, PositionType};
 use bevy::ui_widgets::Button;
 

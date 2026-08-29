@@ -1,7 +1,7 @@
 //! Shared folds for native appearance and health facts consumed by renderers.
 
 use super::*;
-use taskmanager_application::CapabilityId;
+use taskmanager_platform_contract::CapabilityId;
 
 pub(super) fn apply_desktop_appearance(
     events: Vec<taskmanager_application::CorrelatedDesktopAppearanceEvent>,

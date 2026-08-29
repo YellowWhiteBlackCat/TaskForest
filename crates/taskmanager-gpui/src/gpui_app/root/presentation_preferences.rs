@@ -7,17 +7,16 @@
 
 use gpui::{Context, Pixels, SharedString};
 
-use crate::core::config::{
+use crate::gpui_app::formatting::DisplayUnits;
+use crate::gpui_app::graph::DEFAULT_GRAPH_DATA_POINTS_CONFIG;
+use taskmanager_application::i18n;
+use taskmanager_core::core::config::{
     COLOR_SCHEME_SYSTEM, STARTUP_PAGE_REMEMBER, SidebarDeviceOverrideConfig,
     TEXT_RENDERING_PLATFORM_DEFAULT,
 };
-use crate::gpui_app::formatting::DisplayUnits;
-use crate::gpui_app::graph::DEFAULT_GRAPH_DATA_POINTS_CONFIG;
-use crate::gpui_app::theme::{
-    FontPreference, Skin,
-    tokens::{RowDensity, UiSize},
-};
-use crate::i18n;
+use taskmanager_theme::tokens::RowDensity;
+use taskmanager_theme::tokens::UiSize;
+use taskmanager_theme::{FontPreference, Skin};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DevicePreference {

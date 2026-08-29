@@ -6,13 +6,18 @@
 
 use iced::Task;
 use taskmanager_application::{
-    FailureKind, RequestId, ServiceDependenciesLifecycle, ServiceDeps, ServiceId,
-    ServiceLogEntries, ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed,
-    ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogState,
-    ServiceLogStreamLifecycle, ServiceLogStreamRequest, ServiceLogStreamSnapshot,
-    ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationEdge, ServiceRelationGraph,
-    ServiceRelationKind, ServiceUpdate,
+    ServiceDependenciesLifecycle, ServiceLogStreamLifecycle, ServiceLogStreamRequest, ServiceUpdate,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::services::{
+    ServiceDeps, ServiceLogEntries, ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure,
+    ServiceLogFeed, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogState,
+    ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationEdge,
+    ServiceRelationGraph, ServiceRelationKind,
+};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::RequestId;
+
 use taskmanager_shell::app::service_log::{
     SERVICE_LOG_POLL_INTERVAL_MS, next_log_level, next_log_time,
 };
@@ -378,7 +383,7 @@ impl IcedApp {
         self.service_details.select(&service_id);
 
         if self.is_demo() {
-            let request_id = taskmanager_application::RequestId::MIN;
+            let request_id = taskmanager_platform_contract::RequestId::MIN;
             self.shell
                 .service_dependencies
                 .begin(request_id, service_id.clone());
@@ -397,7 +402,7 @@ impl IcedApp {
     pub(super) fn refresh_service_details_effect(&mut self) -> Option<PlatformEffect> {
         let service_id = self.service_details.begin_refresh()?;
         if self.is_demo() {
-            let request_id = taskmanager_application::RequestId::MIN;
+            let request_id = taskmanager_platform_contract::RequestId::MIN;
             self.shell
                 .service_dependencies
                 .begin(request_id, service_id.clone());

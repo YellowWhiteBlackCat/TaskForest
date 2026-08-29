@@ -6,7 +6,8 @@ fn health_cpu_line_relabels_bogomips_instead_of_faking_mhz() {
     let shell = demo_app();
     let snapshot = shell.projection().snapshot.as_ref().expect("demo snapshot");
     let mut bogomips_only = snapshot.clone();
-    bogomips_only.cpu.frequency_source = taskmanager_application::CpuFrequencySource::BogoMips;
+    bogomips_only.cpu.frequency_source =
+        taskmanager_core::core::metrics::CpuFrequencySource::BogoMips;
 
     let rows = health_rows(&bogomips_only);
     // A BogoMIPS-only host must read the BogoMIPS readout, never "MHz".

@@ -11,7 +11,7 @@ use gpui::{
 
 use taskmanager_gpui::gpui_app::elements;
 use taskmanager_gpui::gpui_app::root::{InputModality, RootView, TopPage};
-use taskmanager_gpui::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
 /// The harness window root is our own RootView directly (P4 consumption switch:

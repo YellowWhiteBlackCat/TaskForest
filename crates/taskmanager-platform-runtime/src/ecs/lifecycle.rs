@@ -1,6 +1,6 @@
 //! Capability-level admission, completion, retry, and recovery transitions.
 
-use taskmanager_application::{
+use taskmanager_platform_contract::{
     CapabilityId, CapabilityRecoveryOutcome, CapabilityRecoveryTrigger, RequestId, RequestTracking,
     RetryDisposition,
 };

@@ -1,10 +1,11 @@
 //! Inventory source-status projection for independent page recovery.
 
 use super::SystemProjectionStore;
-use taskmanager_application::{
-    CapabilityId, OperationFailure, PartialSourceSnapshot, ServiceItem, SessionItem, StartupEntry,
-    source_status_from_operation_failure,
-};
+use taskmanager_application::source_status_from_operation_failure;
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::startup::StartupEntry;
+use taskmanager_platform_contract::{CapabilityId, OperationFailure, PartialSourceSnapshot};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub(super) struct InventorySourceChanges {

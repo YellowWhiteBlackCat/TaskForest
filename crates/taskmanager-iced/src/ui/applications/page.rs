@@ -6,8 +6,9 @@ use crate::saved_views::{PresetsRibbonState, presets_ribbon};
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{column, text_input};
 use iced::{Alignment, Element, Length, Renderer, Theme};
-use taskmanager_application::{ProcessBatchAction, descendant_pids};
-use taskmanager_shell::{ProcessRowKey, SortDir};
+use taskmanager_core::core::process::{ProcessBatchAction, descendant_pids};
+
+use taskmanager_shell::SortDir;
 
 /// Owned inputs for the lazy Applications body. The projection owns the
 /// preformatted cells and the process facts/history required by row widgets;
@@ -138,11 +139,12 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         swap_visible,
         compact: app.compact_density(),
         ui_size: app.ui_size(),
-        selected_pids: Rc::new(shell.selected_pids().clone()),
-        selected_row: shell.selected_process_row,
+        selected_identities: Rc::new(shell.selected_identities().clone()),
+        selected_row: shell.selected_row,
         gray_zero: app.preferences().gray_zero_values,
         hidden_columns: Rc::new(app.process_presentation.hidden_columns.clone()),
         column_widths,
+        open_menu_pid: app.process_menu_pid(),
     };
     let row_height = application_row_height(row_context.compact);
     let (scroll_y, viewport_height) = app.applications_virtual_scroll();
@@ -193,8 +195,9 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
             tables::confirm_bar(theme_snapshot, target)
         } else {
             let selected_application_root = shell
-                .selected_process_row
-                .and_then(ProcessRowKey::application_root);
+                .selected_row
+                .and_then(taskmanager_shell::ProcessRowId::application_root)
+                .map(taskmanager_shell::ProcessRowIdentity::pid);
             let selected_target_count = selected_application_root
                 .and_then(|root_pid| {
                     shell
@@ -203,7 +206,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                         .as_deref()
                         .map(|processes| descendant_pids(processes, root_pid).len())
                 })
-                .unwrap_or_else(|| shell.selected_pids().len());
+                .unwrap_or_else(|| shell.selected_identities().len());
             let mut actions: Vec<Element<'_, Message, Theme, Renderer>> = Vec::new();
             if selected_application_root.is_none() {
                 actions.push(focus::button(
@@ -260,13 +263,26 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                     false,
                 ));
             }
-            actions.push(focus::button(
+            let columns_trigger = focus::button(
                 theme_snapshot,
                 FocusTarget::ProcessColumnsTrigger,
                 t("proc.choose_columns"),
                 Message::OpenProcessColumnsMenu,
                 false,
-            ));
+            );
+            // The column chooser floats on its trigger: anchored below the
+            // button and dismissed by an outside press, instead of shoving
+            // the page column down while it is open.
+            actions.push(if app.process_columns_menu_open() {
+                crate::ui::components::Popover::new(
+                    columns_trigger,
+                    super::column_menu::render(app, theme_snapshot),
+                    Message::CloseProcessColumnsMenu,
+                )
+                .into()
+            } else {
+                columns_trigger
+            });
             actions.push(focus::ghost_button(
                 theme_snapshot,
                 FocusTarget::RunTaskOpen,
@@ -325,8 +341,6 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         view_selector,
         status_selector,
         table,
-        process_menu::render(app, theme_snapshot),
-        super::column_menu::render(app, theme_snapshot),
         action_bar,
     ]
     .spacing(8)

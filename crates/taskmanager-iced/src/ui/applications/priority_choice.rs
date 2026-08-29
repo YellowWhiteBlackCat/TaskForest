@@ -4,7 +4,7 @@
 //! calling them unqualified.
 
 use super::*;
-use taskmanager_application::PriorityTier;
+use taskmanager_core::core::process::PriorityTier;
 
 /// The three nice-level presets the Applications action bar offers (mirrors the
 /// GPUI batch `SetPriority` high/normal/low projection). A small `Display` +
@@ -20,8 +20,8 @@ pub(super) enum PriorityChoice {
 impl PriorityChoice {
     pub(super) const ALL: [Self; 3] = [Self::High, Self::Normal, Self::Low];
 
-    pub(super) fn action(self) -> taskmanager_application::ProcessBatchAction {
-        use taskmanager_application::ProcessBatchAction;
+    pub(super) fn action(self) -> taskmanager_core::core::process::ProcessBatchAction {
+        use taskmanager_core::core::process::ProcessBatchAction;
         match self {
             // The typed tier carries the semantics; the platform adapter owns
             // the tier→native-primitive mapping (mirrors GPUI's action bar

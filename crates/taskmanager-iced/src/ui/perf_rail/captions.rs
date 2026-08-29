@@ -1,10 +1,13 @@
 //! Pure text projections for Performance rail cards.
 
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
-    BatteryInfo, CpuMetrics, DeviceStatus, DiskMetrics, GpuMetrics, MemoryMetrics,
-    NetworkAdapterType, NetworkMetrics, SensorReading,
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_core::core::metrics::{
+    CpuMetrics, DiskMetrics, GpuMetrics, MemoryMetrics, NetworkAdapterType, NetworkMetrics,
 };
+use taskmanager_core::core::power::BatteryInfo;
+use taskmanager_core::core::sensors::SensorReading;
+
 use taskmanager_shell::presentation::{
     device_status_i18n_key, effective_smart_status, gpu_display_identity, missing_value,
     smart_section_visible,

@@ -7,9 +7,10 @@
 
 use super::super::*;
 
-use taskmanager_application::{
-    AppAction, AppPage, DirectoryScanBounds, DirectoryScanId, DirectoryScanStatus,
-    DirectoryScanTotals, DirectoryUsageRequest, DirectoryUsageSnapshot,
+use taskmanager_application::{AppAction, AppPage, DirectoryUsageRequest};
+use taskmanager_core::core::directory_usage::{
+    DirectoryScanBounds, DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals,
+    DirectoryUsageSnapshot,
 };
 
 /// Helper: place the app on the Performance page's Disk device.
@@ -118,10 +119,10 @@ fn d_on_cpu_device_yields_nothing() {
 #[test]
 fn directory_scan_round_trips_through_queue_effect_to_the_provider() {
     use std::sync::{Arc, Mutex};
-    use taskmanager_application::{
+    use taskmanager_application::{PlatformEvent, PlatformFacets, PlatformHandle, StorageFacets};
+    use taskmanager_platform_contract::{
         CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-        PlatformEvent, PlatformFacets, PlatformHandle, RequestEnvelope, RequestPort, StorageFacets,
-        SubmissionError,
+        RequestEnvelope, RequestPort, SubmissionError,
     };
 
     #[derive(Default)]

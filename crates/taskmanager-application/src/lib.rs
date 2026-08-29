@@ -28,55 +28,25 @@ pub const fn container_row_window(total: usize) -> (usize, usize) {
 mod alert_suggestion_window;
 mod application_history_projection;
 mod boot_baseline;
-/// Toolkit-neutral history-series decimation kernels (LTTB run selection and
-/// the stride max-envelope) — the single source every frontend's replay and
-/// pixel-budgeted downsampling delegates to.
-pub mod history_decimation;
-mod history_replay;
-mod persistent_app_history;
-/// Frontends reach the alert engine (rules, transfer, and the rolling-statistic
-/// threshold suggestions) only through this facade — the workspace dependency
-/// firewall forbids a direct `taskmanager-core` dependency in any frontend, so
-/// the alert module is re-exported here alongside the rest of the core surface.
-pub use taskmanager_core::core::alerts;
-pub use taskmanager_core::core::hardware::{CoreBreakdown, CpuType};
-pub use taskmanager_core::core::text;
-pub use taskmanager_core::core::{
-    ApplicationHistoryIdentity, DiskPartition, DiskPartitionScalarObservations,
-    DiskScalarObservations, HistoricalSample, HistoryMetric, HistoryRecordSink, HistorySeriesKey,
-    HistoryWindow, LocalDateTime, LocalTimeOffset, LocalTimeRules, LocalTimeRulesCacheKey,
-    LocalTimeRulesChange, LocalTimeRulesError, LocalTimeRulesObservation,
-};
-// Neutral system-tray vocabulary (spec, menu, icon, events) shared by every
-// frontend and OS adapter. Re-exported here because the workspace dependency
-// firewall forbids a direct `taskmanager-core` dep in the TUI.
-pub use taskmanager_core::core::tray;
-// Neutral unit-preference formatting (bytes/bits × base-2/base-10 ladder):
-// the single source the firewalled frontends (TUI/Iced) render quantities
-// through, re-exported here like `alerts`/`text`/`tray` above.
-pub use taskmanager_core::core::units;
-// Per-application grouping primitives shared by the App-history foundation and
-// by frontends that render app rows. Re-exported here because the workspace
-// dependency firewall forbids a direct `taskmanager-core` dep in any frontend.
-pub use taskmanager_core::core::process::{
-    AppGroup, ProcessApplicationIdentity, ProcessCategory, ProcessMetadataObservation,
-    ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity, ProcessScalarObservations,
-    ProcessType, aggregate_apps, aggregate_by_type, application_group_name, classify_process_type,
-    descendant_pids, process_category, process_type_label,
-};
 mod command;
 mod config_runtime;
 mod config_store;
 mod control;
 mod device_lifecycle;
 mod diagnostics;
+/// Toolkit-neutral history-series decimation kernels (LTTB run selection and
+/// the stride max-envelope) — the single source every frontend's replay and
+/// pixel-budgeted downsampling delegates to.
+pub mod history_decimation;
+mod history_replay;
 /// Self-contained i18n (embedded locale catalogs + `t`). Lives in this shared
-/// crate so every frontend (gpui/tui/iced) can consume `taskmanager_application::i18n`;
-/// the root crate re-exports it for existing `crate::i18n` call sites.
+/// crate so every frontend (gpui/tui/iced/bevy) imports the same catalog
+/// directly from `taskmanager_application::i18n`.
 pub mod i18n;
 mod interaction;
 mod managed_alert_rules;
-mod model;
+mod persistent_app_history;
+
 mod platform;
 mod ports;
 /// Neutral category-bucket projection shared by every frontend's canonical
@@ -158,55 +128,6 @@ pub use interaction::{
 pub use managed_alert_rules::{
     AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
 };
-pub use model::{
-    BatteryInfo, BatteryScalarObservations, BootTimeline, BootTimelineSegment, Config,
-    ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey, ConnectionState,
-    ConnectionTransport, ContainerRollup, ContainerSummary, CpuFrequencySource, CpuMetrics,
-    CpuPerformancePolicy, CpuScalarObservations, CpuTelemetryObservation, CpuTemperatureSource,
-    DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED, DesktopAppearance,
-    DesktopFamily, DeviceLifecycle, DevicePresence, DeviceState, DeviceStatus, DirectoryScanBounds,
-    DirectoryScanId, DirectoryScanSpec, DirectoryScanStatus, DirectoryScanTotals,
-    DirectoryUsageEntry, DirectoryUsageSnapshot, DiskMetrics, DisplayInfo, DisplayRuntimeInfo,
-    FilesystemHealthSnapshot, FlatTreeNode, FrozenProcessIdentity, GpuEngine, GpuEngineKind,
-    GpuEngineMetric, GpuEngineMetricPoint, GpuEngineRowsFailure, GpuEngineRowsSnapshot, GpuMetrics,
-    GpuScalarObservations, GpuTelemetryObservation, GpuThrottleReason, HardwareInfo,
-    HostRuntimeFacts, HostRuntimeObservation, IsolationKind, LimitValue,
-    MemoryCompositionObservations, MemoryCompressionObservations, MemoryMetrics,
-    MemoryModuleObservations, MemoryOptionalObservations, MemoryScalarObservations,
-    MemoryTelemetryObservation, NetworkAdapterType, NetworkMetrics, NetworkScalarObservations,
-    NetworkTelemetryObservation, NetworkWirelessObservations, NpuDevice, NpuEngineKind,
-    NpuEngineUsage, NpuInventoryFailure, NpuInventorySnapshot, NpuMemoryReport, OpenFileEntry,
-    OpenFileKind, OptionalObservation, OptionalObservationState, PowerSupplyKind,
-    PowerSupplySnapshot, PreferredColorScheme, PriorityTier, ProcessBatchAction,
-    ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessConnection,
-    ProcessEnvironment, ProcessEnvironmentEntry, ProcessGpuDevice, ProcessGpuSnapshot,
-    ProcessGroupScope, ProcessIdentity, ProcessInsightSnapshot, ProcessIsolation, ProcessItem,
-    ProcessNetworkSnapshot, ProcessNode, ProcessOpenFiles, ProcessResourceSnapshot, ProcessSignal,
-    ProcessSortKey, ProcessTelemetrySnapshot, ProcessThreadInfo, ProcessThreads,
-    ProviderRuntimeState, ResourceGroupCpuLimit, ResourceGroupLimitRequest,
-    ResourceGroupMembership, ResourceLimit, ResourceLimitKind, ScalarAvailability,
-    ScalarObservation, ScalarObservationGroup, ScalarObservationSlot, SensorCenterSnapshot,
-    SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorQuantity, SensorReading,
-    SensorScale, ServiceAction, ServiceDeps, ServiceId, ServiceItem, ServiceLogAvailability,
-    ServiceLogEntries, ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed,
-    ServiceLogLevel, ServiceLogLevelFilter, ServiceLogLines, ServiceLogProviderState,
-    ServiceLogQuery, ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd,
-    ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationEdge,
-    ServiceRelationGraph, ServiceRelationKind, ServiceStatus, SessionControlAction, SessionId,
-    SessionItem, SmartAvailability, SmartSelfTestIntent, SmartSelfTestKind,
-    SmartSelfTestObservation, StartupBootEvidenceSnapshot, StartupControlPolicy,
-    StartupCriticalChainNode, StartupEntry, StartupEntryId, StartupEntryLocator,
-    StartupEvidenceFailure, StartupFailedUnit, StartupImpact, StartupImpactEvidence,
-    StartupImpactUnknownReason, StartupScope, StartupSource, StorageConnection, StorageDeviceKey,
-    StorageDeviceKind, StorageDeviceTarget, StorageIdentityStability, StorageInterconnect,
-    StorageProtocol, StorageTelemetryObservation, SystemHealthSnapshot, SystemObservationState,
-    SystemSnapshot, SystemTelemetryDomains, ThermalControlSnapshot, ThermalCoolingActivity,
-    ThermalCoolingDeviceStatus, ThermalCoolingKind, ThermalPolicy, ThermalThrottleSnapshot,
-    ThermalTripKind, ThermalTripPoint, ThermalTripPointSet, ThermalZoneMode, ThermalZoneStatus,
-    ThreadState, VirtualMemoryCommitObservations, build_process_tree, compare_process_items,
-    flatten_tree_visible, sort_apps, sort_nodes,
-};
-pub use model::{ColumnWidthConfig, ProcessViewPresetConfig};
 pub use persistent_app_history::{
     MAX_PERSISTED_APPLICATION_IDENTITIES, PersistentApplicationHistoryRecorder,
     PersistentApplicationRecordReport,
@@ -252,12 +173,12 @@ pub use platform::{
     ServiceDependenciesRequestPort, ServiceEvent, ServiceFacets, ServiceInventoryRequest,
     ServiceInventoryRequestPort, ServiceLogSnapshotRequest, ServiceLogSnapshotRequestPort,
     ServiceLogStreamRequest, ServiceLogStreamRequestPort, SessionControlRequestPort, SessionEvent,
-    SessionInventoryRequest, SessionInventoryRequestPort, SetupScriptAction, SetupScriptEvent,
-    SetupScriptInfo, SetupScriptRequest, SetupScriptRequestPort, ShellEvent, SmartControlRequest,
-    SmartControlRequestPort, SmartEvent, SmartObservationBatch, SmartObservationIssue,
-    SmartObservationProjection, SmartObservationRequest, SmartObservationRequestPort,
-    SmartProjectionApplyResult, SmartStateRevision, SmartTrackingEnd, SmartTrackingEndReason,
-    StartupControlRequestPort, StartupEvent, StartupEvidenceEvent, StartupEvidenceProjection,
+    SessionInventoryRequest, SessionInventoryRequestPort, SetupScriptRequest,
+    SetupScriptRequestPort, ShellEvent, SmartControlRequest, SmartControlRequestPort, SmartEvent,
+    SmartObservationBatch, SmartObservationIssue, SmartObservationProjection,
+    SmartObservationRequest, SmartObservationRequestPort, SmartProjectionApplyResult,
+    SmartStateRevision, SmartTrackingEnd, SmartTrackingEndReason, StartupControlRequestPort,
+    StartupEvent, StartupEvidenceEvent, StartupEvidenceProjection,
     StartupEvidenceProjectionApplyResult, StartupEvidenceProjectionRejection,
     StartupEvidenceRequest, StartupEvidenceRequestPort, StartupEvidenceRevision,
     StartupEvidenceUnavailable, StartupInventoryRequest, StartupInventoryRequestPort,
@@ -297,19 +218,6 @@ pub use source_status::{
     MergedSourceState, SourceLineProjection, SourceNotice, SourceStateKind, device_source_line,
     merge_source_lines, source_line, source_lines, source_notice,
     source_status_from_operation_failure, truncate_text,
-};
-pub use taskmanager_platform_contract::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilityRecoveryOutcome,
-    CapabilityRecoveryTrigger, CapabilityRequest, CapabilityScheduler, CapabilitySnapshot,
-    CapabilityStatus, CompositeSourceSnapshot, DeviceDiscovery, DeviceGeneration, DeviceId,
-    DeviceSourceSnapshot, DomainSchedulingSnapshot, EventEnvelope, EventPort, EventPortError,
-    EventQueueSchedulingSnapshot, EventSequence, FailureKind, MAX_PROVIDER_PANIC_MESSAGE_CHARS,
-    MAX_PROVIDER_PANIC_NOTES, MAX_RECENT_SCHEDULING_STALLS, MAX_REQUEST_SCOPE_BYTES,
-    OperationFailure, PartialSourceSnapshot, ProviderFailure, ProviderId, ProviderPanicNote,
-    RequestEnvelope, RequestId, RequestIdGenerator, RequestPort, RequestScope, RequestTracking,
-    RequestTrackingError, RetryDisposition, RuntimeSchedulingSnapshot, SchedulingAdmissionSnapshot,
-    SchedulingBudgetSnapshot, SchedulingDomain, SchedulingScope, SchedulingStall, SidebandPolicy,
-    SourceOutcome, SourceStatus, SubmissionError, SubmissionErrorKind,
 };
 pub use telemetry_refresh_policy::{
     MAX_TELEMETRY_INTERVAL, MIN_TELEMETRY_INTERVAL, TelemetryInterval, TelemetryIntervalError,

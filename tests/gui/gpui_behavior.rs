@@ -3,7 +3,7 @@
 //! confirmation, and navigation behavior. Renderer-internal projections and
 //! render-only smoke coverage live in `taskmanager-gpui`'s own test suite.
 
-use taskmanager::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessItem;
 
 #[path = "gpui_behavior/confirmations.rs"]
 mod confirmations;
@@ -18,8 +18,11 @@ fn proc(pid: u32, name: &str) -> ProcessItem {
         .parent_pid(None)
         .name(name.into())
         .cmdline(String::new())
-        .scalar_observations(taskmanager::core::process::ProcessScalarObservations {
-            start_token: taskmanager::core::ScalarObservation::available(u64::from(pid) + 1_000, 1),
+        .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+            start_token: taskmanager_core::core::ScalarObservation::available(
+                u64::from(pid) + 1_000,
+                1,
+            ),
             ..Default::default()
         })
         .current_cpu_percentage(0.0)
@@ -28,8 +31,8 @@ fn proc(pid: u32, name: &str) -> ProcessItem {
         .current_disk_write_bytes_per_sec(0)
         .status("R".into())
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("u"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("u"),
                 None,
                 1,
             ),

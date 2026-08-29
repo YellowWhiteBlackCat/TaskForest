@@ -2,52 +2,16 @@
 
 use super::*;
 
-/// Bar height from a sparkline fraction against the density-scaled strip
-/// height (two standard control heights).
-pub(crate) fn bar_height(fraction: f32, palette: &UiPalette) -> f32 {
-    (fraction * palette.control_height_px * 2.0).max(1.0)
-}
+/// Design width of the curve strip in px. bevy_ui flex cannot report a
+/// computed node width to the fold observer (the same M1 constraint as the
+/// process table's viewport), so the polyline projects against this fixed
+/// design width — sized to the default 1180px window's card interior so the
+/// NEWEST sample stays inside the clip on the primary surface; narrower
+/// windows clip the oldest tail instead of the live edge. The chart contract
+/// pairs it with [`MAX_CHART_POINTS`].
+pub(crate) const CHART_STRIP_WIDTH_PX: f32 = 450.0;
 
-pub(crate) fn bar_scene(height_px: f32, color: bevy::color::Color) -> impl Scene + use<> {
-    let fill = color.with_alpha(0.22);
-    bsn! {
-        Node {
-            flex_grow: 1.0,
-            min_width: px(1.0),
-            width: px(space_2()),
-            height: px(height_px),
-            position_type: PositionType::Relative,
-        }
-        BackgroundColor(fill)
-        Children [
-            (
-                Node {
-                    width: percent(100),
-                    height: px(2.0),
-                    position_type: PositionType::Absolute,
-                    left: px(0.0),
-                    top: px(0.0),
-                }
-                BackgroundColor(color)
-            ),
-        ]
-    }
-}
-
-/// The strip's initial bars, one per warm sample (none while collecting).
-pub(super) fn curve_bars(
-    curve: SystemCurve,
-    fractions: &[f32],
-    palette: &UiPalette,
-) -> Vec<impl Scene + use<>> {
-    let color = curve.color(palette);
-    fractions
-        .iter()
-        .map(|fraction| bar_scene(bar_height(*fraction, palette), color))
-        .collect()
-}
-
-pub(super) fn curve_card_scene(
+pub(crate) fn curve_card_scene(
     curve: SystemCurve,
     shell: &ShellApp,
     palette: &UiPalette,
@@ -56,8 +20,16 @@ pub(super) fn curve_card_scene(
     let caption = curve_caption(shell, curve);
     let strip_height = palette.control_height_px * 3.0;
     let samples = curve_samples(shell, curve);
-    let fractions = if curve_warm(&samples) {
-        bar_fractions(&samples)
+    // The polyline is the only curve render path (M2): the bounded,
+    // gap-aware projection feeds rotated 2px segments — the same visual
+    // grammar as GPUI's graphs, honest gaps included.
+    let segments = if curve_warm(&samples) {
+        line_segments(
+            &taskmanager_shell::presentation::trend::window(&shell.history, curve.series()),
+            CHART_STRIP_WIDTH_PX,
+            strip_height,
+            MAX_CHART_POINTS,
+        )
     } else {
         Vec::new()
     };
@@ -69,16 +41,9 @@ pub(super) fn curve_card_scene(
     } else {
         Display::None
     };
-    let bars = curve_bars(curve, &fractions, palette);
+    let color = curve.color(palette);
     let overlay =
         (!curve_warm(&samples)).then(|| collecting_overlay_scene(caption.clone(), palette));
-    let segment_count = line_segments(
-        &shell.history.series(curve.series()),
-        100.0,
-        strip_height,
-        MAX_CHART_POINTS,
-    )
-    .len();
     bsn! {
         Node {
             flex_grow: 1.0,
@@ -99,24 +64,22 @@ pub(super) fn curve_card_scene(
                     width: percent(100),
                     height: px(strip_height),
                     position_type: PositionType::Relative,
+                    overflow: Overflow::clip_x(),
                 }
                 Children [
                     ( chart_grid_scene(strip_height, palette) ),
                     (
                         Node {
-                            width: percent(100),
+                            width: px(CHART_STRIP_WIDTH_PX),
                             height: percent(100),
                             position_type: PositionType::Absolute,
                             left: px(0.0),
                             top: px(0.0),
-                            flex_direction: FlexDirection::Row,
-                            align_items: AlignItems::FlexEnd,
-                            column_gap: Val::Px(space_2()),
                         }
                         SparkStrip(curve)
-                        ChartSurface({ segment_count })
+                        ChartSurface({ segments.len() })
                         Children [
-                            { bars },
+                            ( { polyline_scene(&segments, color) } ),
                         ]
                     ),
                     ( { overlay } ),

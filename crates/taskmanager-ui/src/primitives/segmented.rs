@@ -29,7 +29,7 @@ use gpui::{
 use taskmanager_theme::Palette;
 use taskmanager_theme::tokens;
 
-use crate::styled::on_accent;
+use taskmanager_theme::color::on_accent;
 
 type ClickHandler = dyn Fn(&mut Window, &mut App);
 type HoverHandler = dyn Fn(&bool, &mut Window, &mut App);

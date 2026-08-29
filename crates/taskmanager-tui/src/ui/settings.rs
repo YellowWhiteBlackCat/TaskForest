@@ -18,8 +18,8 @@ use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
-use taskmanager_application::Config;
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::config::Config;
 use taskmanager_theme::Skin;
 use taskmanager_ui_contract::IconId;
 
@@ -218,12 +218,12 @@ impl SettingsForm {
     /// The notification policy for the current form state (BN-07). Equal
     /// quiet hours mean "no quiet hours".
     #[must_use]
-    pub fn notification_policy(&self) -> taskmanager_application::alerts::NotificationPolicy {
-        taskmanager_application::alerts::NotificationPolicy {
+    pub fn notification_policy(&self) -> taskmanager_core::core::alerts::NotificationPolicy {
+        taskmanager_core::core::alerts::NotificationPolicy {
             enabled: self.notify_enabled,
-            cooldown_ms: taskmanager_application::alerts::NotificationPolicy::default().cooldown_ms,
+            cooldown_ms: taskmanager_core::core::alerts::NotificationPolicy::default().cooldown_ms,
             quiet_hours: (self.quiet_start != self.quiet_end).then(|| {
-                taskmanager_application::alerts::QuietHours {
+                taskmanager_core::core::alerts::QuietHours {
                     start_minutes: u16::from(self.quiet_start) * 60,
                     end_minutes: u16::from(self.quiet_end) * 60,
                 }
@@ -414,15 +414,17 @@ pub fn apply_settings_to_config(
     *theme_params = ThemeParams::from_config_tokens(&config.skin, &config.mode, config.hc);
 }
 
-/// Render the settings overlay centred over `area`. Does nothing if the
-/// terminal is too small for a readable form.
-pub fn render_settings_overlay(
+/// Render the settings overlay from the committed focus plan.  The focused
+/// field is the plan's `SettingsField` control; any other control paints no
+/// focus marker and scrolls to the top (fail-closed).
+pub(super) fn render_settings_overlay_at(
     frame: &mut Frame<'_>,
     form: &SettingsForm,
     theme: TuiTheme,
-    area: Rect,
+    focus: super::TuiFocusPlan,
+    popup: Rect,
 ) {
-    let popup = centered(area, 68, 32);
+    let focused_field = focus.settings_field();
     frame.render_widget(Clear, popup);
     let block = Block::new()
         .borders(Borders::ALL)
@@ -430,7 +432,7 @@ pub fn render_settings_overlay(
         .style(Style::new().bg(theme.overlay_bg))
         .title(format!(
             " {} {} ",
-            crate::icon_glyph(IconId::Settings),
+            theme.glyph(IconId::Settings),
             t("chrome.settings")
         ));
     let inner = block.inner(popup);
@@ -441,21 +443,21 @@ pub fn render_settings_overlay(
 
     let mut lines: Vec<Line<'static>> = Vec::with_capacity(SETTINGS_FIELDS + 1);
     lines.push(field_line(
-        form,
+        focused_field,
         0,
         t("settings.skin"),
         Skin::ALL[form.skin].label(),
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         1,
         t("settings.mode"),
         mode_display_label(form.mode),
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         2,
         t("settings.high_contrast"),
         if form.hc {
@@ -466,35 +468,35 @@ pub fn render_settings_overlay(
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         3,
         t("settings.desktop_ui_font"),
         font_display_label(form.ui_font),
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         4,
         t("settings.desktop_mono_font"),
         font_display_label(form.mono_font),
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         5,
         t("settings.row_density"),
         density_display_label(form.density),
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         6,
         t("settings.language"),
         language_display_label(form.language),
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         7,
         t("settings.refresh_interval"),
         REFRESH_LABELS[form.refresh],
@@ -502,7 +504,7 @@ pub fn render_settings_overlay(
     ));
     for (index, key) in DEVICE_LABEL_KEYS.iter().enumerate() {
         lines.push(field_line(
-            form,
+            focused_field,
             8 + index,
             t(key),
             if form.show[index] {
@@ -517,9 +519,9 @@ pub fn render_settings_overlay(
         let bytes_on = form.units[family_index * 2];
         let base2_on = form.units[family_index * 2 + 1];
         lines.push(field_line(
-            form,
+            focused_field,
             18 + family_index * 2,
-            unit_label_key(family_index, true),
+            t(unit_label_key(family_index, true)),
             if bytes_on {
                 t("settings.bytes")
             } else {
@@ -528,9 +530,9 @@ pub fn render_settings_overlay(
             theme,
         ));
         lines.push(field_line(
-            form,
+            focused_field,
             19 + family_index * 2,
-            unit_label_key(family_index, false),
+            t(unit_label_key(family_index, false)),
             if base2_on {
                 t("settings.base_2")
             } else {
@@ -540,7 +542,7 @@ pub fn render_settings_overlay(
         ));
     }
     lines.push(field_line(
-        form,
+        focused_field,
         24,
         t("settings.gray_zero_values"),
         if form.gray_zero {
@@ -551,14 +553,14 @@ pub fn render_settings_overlay(
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         25,
         t("settings.graph_data_points"),
         GRAPH_LABELS[form.graph_points],
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         26,
         t("settings.desktop_notifications"),
         if form.notify_enabled {
@@ -569,21 +571,21 @@ pub fn render_settings_overlay(
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         27,
         t("settings.quiet_hours_start"),
         &format!("{:02}:00", form.quiet_start),
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         28,
         t("settings.quiet_hours_end"),
         &format!("{:02}:00", form.quiet_end),
         theme,
     ));
     lines.push(field_line(
-        form,
+        focused_field,
         29,
         t("settings.history_persistence"),
         if form.history_persistence {
@@ -597,7 +599,9 @@ pub fn render_settings_overlay(
     // roughly `body.height - 1` rows; a focused field past that window is
     // still reachable via Tab and becomes visible as the offset follows it).
     let visible_rows = body.height.saturating_sub(1) as usize;
-    let scroll = form.field.saturating_sub(visible_rows.saturating_sub(1)) as u16;
+    let scroll = focused_field
+        .unwrap_or(0)
+        .saturating_sub(visible_rows.saturating_sub(1)) as u16;
     frame.render_widget(
         Paragraph::new(lines)
             .wrap(Wrap { trim: true })
@@ -608,7 +612,7 @@ pub fn render_settings_overlay(
     let mut footer_spans: Vec<Span<'static>> = vec![
         Span::styled(
             format!(" {} ", t("tui.settings_move")),
-            Style::new().fg(Color::Black).bg(theme.accent),
+            Style::new().fg(theme.color(Color::Black)).bg(theme.accent),
         ),
         Span::styled(
             format!("  {}", t("tui.settings_save")),
@@ -683,17 +687,17 @@ fn unit_label_key(family_index: usize, bytes: bool) -> &'static str {
 }
 
 fn field_line<'a>(
-    form: &'a SettingsForm,
+    focused_field: Option<usize>,
     field: usize,
     label: &'a str,
     value: &'a str,
     theme: TuiTheme,
 ) -> Line<'static> {
-    let focused = form.field == field;
+    let focused = focused_field == Some(field);
     let marker = if focused { "▸ " } else { "  " };
     Line::from(vec![
         Span::styled(
-            format!("{marker}{label:<16}"),
+            format!("{marker}{}", super::text::pad_cells(label, 16)),
             Style::new()
                 .fg(if focused { theme.accent } else { theme.dim })
                 .add_modifier(if focused {
@@ -704,20 +708,13 @@ fn field_line<'a>(
         ),
         Span::styled(
             value.to_owned(),
-            Style::new().fg(if focused { Color::White } else { theme.dim }),
+            Style::new().fg(if focused {
+                theme.color(Color::White)
+            } else {
+                theme.dim
+            }),
         ),
     ])
-}
-
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width.saturating_sub(4));
-    let height = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
-    }
 }
 
 #[cfg(test)]

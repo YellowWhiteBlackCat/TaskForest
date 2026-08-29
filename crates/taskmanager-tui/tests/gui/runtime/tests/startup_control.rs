@@ -207,7 +207,8 @@ fn boot_timeline_present_arrows_keep_moving_the_table_selection() {
 /// intact: the block is silent but the table contract is unchanged.
 #[test]
 fn boot_timeline_typed_failure_leaves_the_page_keyboard_contract_intact() {
-    use taskmanager_application::{DeviceState, StartupEvidenceFailure};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::startup::StartupEvidenceFailure;
     let mut app = crate::demo_app();
     let healthy = DeviceState::healthy(1);
     let mut evidence = app
@@ -241,19 +242,19 @@ fn boot_timeline_typed_failure_leaves_the_page_keyboard_contract_intact() {
 
 /// One synthetic startup row: the provider-issued id is derived from the
 /// entry locator so the sorted-vs-provider order assertions are unambiguous.
-fn sorted_fixture_entry(id: &str, name: &str) -> taskmanager_application::StartupEntry {
-    taskmanager_application::StartupEntry {
+fn sorted_fixture_entry(id: &str, name: &str) -> taskmanager_core::core::startup::StartupEntry {
+    taskmanager_core::core::startup::StartupEntry {
         id: id.into(),
         name: name.into(),
         exec: "fixture-exec".into(),
         enabled: true,
-        source: taskmanager_application::StartupSource::UserService,
-        scope: taskmanager_application::StartupScope::User,
-        control_policy: taskmanager_application::StartupControlPolicy::Direct,
+        source: taskmanager_core::core::startup::StartupSource::UserService,
+        scope: taskmanager_core::core::startup::StartupScope::User,
+        control_policy: taskmanager_core::core::startup::StartupControlPolicy::Direct,
         locator: id.into(),
-        impact: taskmanager_application::StartupImpact::Low,
-        impact_evidence: taskmanager_application::StartupImpactEvidence::Unknown {
-            reason: taskmanager_application::StartupImpactUnknownReason::NotInstrumented,
+        impact: taskmanager_core::core::startup::StartupImpact::Low,
+        impact_evidence: taskmanager_core::core::startup::StartupImpactEvidence::Unknown {
+            reason: taskmanager_core::core::startup::StartupImpactUnknownReason::NotInstrumented,
         },
     }
 }
@@ -273,6 +274,9 @@ fn menu_targets_the_sorted_startup_row() {
         ])),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Startup));
+    // Select Alpha before sorting so the identity anchor keeps it selected
+    // when Name sort moves it to the first rendered row.
+    app.selected = 1;
     let _ = handle_key(
         &mut app,
         KeyEvent::new(

@@ -1,7 +1,7 @@
 //! source-inspection: static-policy
 //!
-//! Negative architecture gate: no renamed `pub use` re-exports in production
-//! code.
+//! Negative architecture gate: no renamed `pub use` re-exports and no
+//! cross-crate `pub use` forwarding facades in production code.
 //!
 //! A `pub use path::Name as OtherName;` puts one symbol on the public API
 //! under two different names (the origin path and the alias), which is the
@@ -17,6 +17,15 @@
 //! import aliases and the anonymous `as _` form as well. This Rust test keeps
 //! the parser-level public-facade regression check close to the logic test
 //! target; neither check carries a per-file exemption.
+//!
+//! The second test enforces AGENTS.md's architecture rule: a `pub use` whose
+//! first path segment names another crate is a cross-crate forwarding facade —
+//! a second public address for a type the owner crate already exports.
+//! Consumers must import the owner module (`taskmanager-core`,
+//! `taskmanager-platform-contract`, `taskmanager-theme`, …) directly. The one
+//! sanctioned exception is `taskmanager-platform-native`, whose whole purpose
+//! is `cfg`-selecting the OS adapter behind one composition name; that is
+//! adapter selection, not a shared-type second address.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -63,6 +72,120 @@ fn production_code_has_no_renamed_pub_use_reexports() {
         scanned > 100,
         "gate scanned only {scanned} production files; the tree moved"
     );
+}
+
+#[test]
+fn production_code_has_no_cross_crate_pub_use_forwards() {
+    let mut offenders: Vec<String> = Vec::new();
+    let mut scanned = 0usize;
+
+    let crates_dir = Path::new(REPO_ROOT).join("crates");
+    let crate_roots: Vec<PathBuf> = fs::read_dir(&crates_dir)
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir())
+        .collect();
+    for crate_root in &crate_roots {
+        // platform-native is the sanctioned cfg adapter-composition route
+        // (AGENTS.md): its re-exports select an OS adapter behind one name.
+        if crate_root.file_name().and_then(|n| n.to_str()) == Some("taskmanager-platform-native") {
+            continue;
+        }
+        let local_modules = declared_module_names(crate_root);
+        let src_files = rust_files(&crate_root.join("src"));
+        scanned += src_files.len();
+        for path in src_files {
+            let relative = path
+                .strip_prefix(REPO_ROOT)
+                .unwrap_or(&path)
+                .to_string_lossy()
+                .replace('\\', "/");
+            let text = fs::read_to_string(&path).unwrap_or_default();
+            for statement in pub_use_statements(&text) {
+                let Some(head) = statement.split("::").next() else {
+                    continue;
+                };
+                let head = head.trim();
+                if matches!(head, "crate" | "self" | "super")
+                    || local_modules.iter().any(|m| m == head)
+                {
+                    continue;
+                }
+                offenders.push(format!("{relative}: pub use {statement}…"));
+            }
+        }
+    }
+
+    assert!(
+        offenders.is_empty(),
+        "cross-crate `pub use` forwarding facades found (each is a second public \
+         address for another crate's item; import the owner module directly):\n  {}",
+        offenders.join("\n  ")
+    );
+    // The gate must actually see the tree; a silently-empty scan would be a
+    // vacuous pass.
+    assert!(
+        scanned > 100,
+        "gate scanned only {scanned} production files; the tree moved"
+    );
+}
+
+/// All module names declared anywhere in the crate (`mod x;` or `pub mod x;`).
+/// Over-approximates the per-file module scope on purpose: a local module
+/// name never collides with a workspace crate name, so an over-permissive
+/// allowlist cannot hide a real facade.
+fn declared_module_names(crate_root: &Path) -> Vec<String> {
+    let mut names = Vec::new();
+    for path in rust_files(&crate_root.join("src")) {
+        let text = fs::read_to_string(&path).unwrap_or_default();
+        for line in text.lines() {
+            let trimmed = line.trim_start();
+            let rest = trimmed
+                .strip_prefix("pub ")
+                .or_else(|| trimmed.strip_prefix("pub(crate) "))
+                .unwrap_or(trimmed);
+            if let Some(rest) = rest.strip_prefix("mod ") {
+                // both `mod x;` declarations and inline `mod x { … }` bodies
+                // name a crate-local module
+                let name = rest
+                    .split([';', '{'])
+                    .next()
+                    .unwrap_or(rest)
+                    .trim()
+                    .trim_end()
+                    .trim_end_matches('{')
+                    .trim();
+                if name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') && !name.is_empty() {
+                    names.push(name.to_owned());
+                }
+            }
+        }
+    }
+    names
+}
+
+/// Full `pub use …;` statement bodies (path part only, braces joined).
+fn pub_use_statements(text: &str) -> Vec<String> {
+    let lines: Vec<&str> = text.lines().collect();
+    let mut found = Vec::new();
+    let mut index = 0;
+    while index < lines.len() {
+        let trimmed = lines[index].trim_start();
+        if let Some(rest) = trimmed.strip_prefix("pub use ") {
+            let mut statement = rest.to_string();
+            while !statement.contains(';') && index + 1 < lines.len() {
+                index += 1;
+                statement.push(' ');
+                statement.push_str(lines[index].trim());
+            }
+            let statement = statement.split(';').next().unwrap_or(&statement);
+            found.push(statement.to_owned());
+        }
+        index += 1;
+    }
+    found
 }
 
 /// Collect `X as Y` (Y != `_`) bindings inside truly public `pub use`
@@ -151,5 +274,44 @@ mod tests {
     fn parser_scope_ignores_non_public_bindings() {
         let text = "pub use a::B;\npub use c::D as _;\nuse e::F as G;\npub(crate) use h::I as J;\npub(super) use k::L as M;\n";
         assert!(renamed_pub_use_aliases(text).is_empty());
+    }
+
+    #[test]
+    fn cross_crate_heads_are_extracted_from_joined_statements() {
+        let text = "pub use taskmanager_theme::*;\npub use crate::x::Y;\npub use self::z;\npub use local_mod::{A, B};\npub use taskmanager_shell::\n    presentation::{command_help};\n";
+        let heads: Vec<String> = pub_use_statements(text)
+            .iter()
+            .map(|s| s.split("::").next().unwrap_or("").trim().to_owned())
+            .collect();
+        assert_eq!(
+            heads,
+            vec![
+                "taskmanager_theme",
+                "crate",
+                "self",
+                "local_mod",
+                "taskmanager_shell",
+            ]
+        );
+    }
+
+    #[test]
+    fn module_declaration_collector_sees_nested_and_path_modules() {
+        let text = "pub mod alpha;\nmod beta;\n#[path = \"x.rs\"]\npub mod gamma;\nfn f() {}\n";
+        let names: Vec<String> = text
+            .lines()
+            .filter_map(|line| {
+                let trimmed = line.trim_start();
+                let rest = trimmed
+                    .strip_prefix("pub ")
+                    .or_else(|| trimmed.strip_prefix("pub(crate) "))
+                    .unwrap_or(trimmed);
+                rest.strip_prefix("mod ")
+                    .and_then(|r| r.split(';').next())
+                    .map(str::trim)
+                    .map(str::to_owned)
+            })
+            .collect();
+        assert_eq!(names, vec!["alpha", "beta", "gamma"]);
     }
 }

@@ -19,13 +19,13 @@
 //! assertion ("control absent") is meaningful.
 
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
-use taskmanager_application::SetupScriptInfo;
+use taskmanager_core::core::setup::SetupScriptInfo;
 use taskmanager_gpui::gpui_app::dashboard::SystemSection;
 use taskmanager_gpui::gpui_app::first_run::{FirstRunPhase, FirstRunUiState};
 use taskmanager_gpui::gpui_app::root::{RootView, TopPage, UnitFamily, WindowSurfaceKind};
 use taskmanager_gpui::gpui_app::sidebar::SelectedDevice;
-use taskmanager_gpui::gpui_app::theme::Theme;
-use taskmanager_gpui::gpui_app::theme::tokens::RowDensity;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::RowDensity;
 
 /// Open a fresh window, force a decoration mode, drop the cold-start placeholder,
 /// and run one headless draw so `debug_bounds` selectors populate. Returns the
@@ -481,7 +481,7 @@ async fn mc06_first_run_case_first_run_dialog_keeps_setup_actions_typed_and_fail
     assert_eq!(
         win.read_with(cx, |view, _cx| view.first_run.phase.clone())
             .unwrap(),
-        FirstRunPhase::Failed(taskmanager_application::FailureKind::TemporarilyUnavailable),
+        FirstRunPhase::Failed(taskmanager_core::core::failure::FailureKind::TemporarilyUnavailable),
         "a missing typed provider must remain an honest failure"
     );
     assert!(

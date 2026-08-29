@@ -4,8 +4,8 @@
 
 use std::path::Path;
 
-use crate::core::metrics::DiskMetrics;
-use crate::core::{FilesystemHealth, SensorQuantity, SensorReading};
+use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_core::core::{FilesystemHealth, SensorQuantity, SensorReading};
 
 use super::SystemHealthText;
 

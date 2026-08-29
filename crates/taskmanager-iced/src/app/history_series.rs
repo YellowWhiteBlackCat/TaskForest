@@ -11,7 +11,8 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use taskmanager_shell::history::{LiveGraphHistory, MetricSeries};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::trend::{self, TrendSeries};
 
 use super::IcedApp;
 
@@ -88,63 +89,62 @@ pub(crate) struct HistorySeriesCache {
 }
 
 impl HistorySeriesCache {
-    fn slot(series: MetricSeries) -> usize {
+    fn slot(series: TrendSeries) -> usize {
         match series {
-            MetricSeries::CpuUsagePercent => 0,
-            MetricSeries::MemoryUsagePercent => 1,
-            MetricSeries::DiskBytesPerSec => 2,
-            MetricSeries::NetworkBytesPerSec => 3,
-            MetricSeries::GpuUsagePercent => 4,
-            MetricSeries::CpuTemperatureC => 5,
-            MetricSeries::CpuFrequencyMhz => 6,
-            MetricSeries::CpuPowerW => 7,
-            MetricSeries::DiskActiveTimePct => 8,
+            TrendSeries::CpuUsagePercent => 0,
+            TrendSeries::MemoryUsagePercent => 1,
+            TrendSeries::DiskBytesPerSec => 2,
+            TrendSeries::NetworkBytesPerSec => 3,
+            TrendSeries::GpuUsagePercent => 4,
+            TrendSeries::CpuTemperatureC => 5,
+            TrendSeries::CpuFrequencyMhz => 6,
+            TrendSeries::CpuPowerW => 7,
+            TrendSeries::DiskActiveTimePct => 8,
         }
     }
 
     pub(super) fn get(
         &mut self,
-        history: &LiveGraphHistory,
+        shell: &ShellApp,
         revision: u64,
-        series: MetricSeries,
+        series: TrendSeries,
     ) -> Rc<[f32]> {
         let slot = Self::slot(series);
         if let Some(entry) = self.entries.get(slot).and_then(Option::as_ref)
             && entry.revision == revision
-            && entry.capacity == history.capacity()
+            && entry.capacity == shell.history.capacity()
         {
             return Rc::clone(&entry.samples);
         }
 
-        let samples = Rc::from(history.series(series).into_boxed_slice());
+        let samples = Rc::from(trend::window(&shell.history, series).into_boxed_slice());
         if self.entries.len() <= slot {
             self.entries.resize_with(slot + 1, || None);
         }
         self.entries[slot] = Some(Entry {
             revision,
-            capacity: history.capacity(),
+            capacity: shell.history.capacity(),
             samples: Rc::clone(&samples),
         });
         samples
     }
 
-    pub(super) fn core(&mut self, history: &LiveGraphHistory, revision: u64) -> Rc<Vec<Rc<[f32]>>> {
+    pub(super) fn core(&mut self, shell: &ShellApp, revision: u64) -> Rc<Vec<Rc<[f32]>>> {
         if let Some(entry) = &self.core
             && entry.revision == revision
-            && entry.capacity == history.capacity()
+            && entry.capacity == shell.history.capacity()
         {
             return Rc::clone(&entry.samples);
         }
         let samples = Rc::new(
-            history
-                .per_core_usage_series()
+            trend::per_core_usage_percent(&shell.history)
                 .into_iter()
                 .map(|window| Rc::from(window.into_boxed_slice()))
                 .collect(),
         );
         self.core = Some(CoreEntry {
             revision,
-            capacity: history.capacity(),
+            capacity: shell.history.capacity(),
             samples: Rc::clone(&samples),
         });
         samples
@@ -152,10 +152,10 @@ impl HistorySeriesCache {
 
     fn device(
         &mut self,
-        history: &LiveGraphHistory,
+        shell: &ShellApp,
         revision: u64,
         key: DeviceSeriesKey,
-        load: impl FnOnce(&LiveGraphHistory) -> Vec<f32>,
+        load: impl FnOnce(&ShellApp) -> Vec<f32>,
     ) -> Rc<[f32]> {
         if self.device_revision != Some(revision) {
             self.device_revision = Some(revision);
@@ -164,19 +164,19 @@ impl HistorySeriesCache {
         if let Some(samples) = self.device_entries.get(&key) {
             return Rc::clone(samples);
         }
-        let samples = Rc::from(load(history).into_boxed_slice());
+        let samples = Rc::from(load(shell).into_boxed_slice());
         self.device_entries.insert(key, Rc::clone(&samples));
         samples
     }
 
     pub(crate) fn cached_device(
         &mut self,
-        history: &LiveGraphHistory,
+        shell: &ShellApp,
         revision: u64,
         key: DeviceSeriesKey,
-        load: impl FnOnce(&LiveGraphHistory) -> Vec<f32>,
+        load: impl FnOnce(&ShellApp) -> Vec<f32>,
     ) -> Rc<[f32]> {
-        self.device(history, revision, key, load)
+        self.device(shell, revision, key, load)
     }
 }
 
@@ -185,9 +185,8 @@ impl IcedApp {
     /// epoch. Cache hits clone only the `Rc`; the bounded `VecDeque`→slice copy
     /// happens once per metric after a real refresh/capacity change.
     #[must_use]
-    pub(crate) fn cached_metric_series(&self, series: MetricSeries) -> Rc<[f32]> {
-        self.projection_caches
-            .metric_series(&self.shell.history, series)
+    pub(crate) fn cached_metric_series(&self, series: TrendSeries) -> Rc<[f32]> {
+        self.projection_caches.metric_series(&self.shell, series)
     }
 
     /// Shared per-core windows for the CPU detail grid. The outer vector is
@@ -195,7 +194,7 @@ impl IcedApp {
     /// new list of core handles.
     #[must_use]
     pub(crate) fn cached_per_core_usage_series(&self) -> Rc<Vec<Rc<[f32]>>> {
-        self.projection_caches.per_core_series(&self.shell.history)
+        self.projection_caches.per_core_series(&self.shell)
     }
 
     #[must_use]
@@ -207,7 +206,7 @@ impl IcedApp {
                 "",
                 &generation.to_string(),
             ),
-            |history| history.disk_bytes_per_sec_for(device_id, generation),
+            |shell| shell.history.disk_bytes_per_sec_for(device_id, generation),
         )
     }
 
@@ -219,7 +218,7 @@ impl IcedApp {
     pub(crate) fn cached_swap_series(&self) -> Rc<[f32]> {
         self.cached_device_series(
             DeviceSeriesKey::new(DeviceSeriesKind::SwapUsedPct, "host", "", ""),
-            |history| history.swap_usage_pct(),
+            |shell| shell.history.swap_usage_pct(),
         )
     }
 
@@ -239,7 +238,11 @@ impl IcedApp {
                 "",
                 &generation.to_string(),
             ),
-            |history| history.disk_active_time_pct_for(device_id, generation),
+            |shell| {
+                shell
+                    .history
+                    .disk_active_time_pct_for(device_id, generation)
+            },
         )
     }
 
@@ -259,7 +262,7 @@ impl IcedApp {
                 "",
                 &generation.to_string(),
             ),
-            |history| history.disk_temperature_c_for(device_id, generation),
+            |shell| shell.history.disk_temperature_c_for(device_id, generation),
         )
     }
 
@@ -272,7 +275,11 @@ impl IcedApp {
                 "",
                 &generation.to_string(),
             ),
-            |history| history.network_bytes_per_sec_for(device_id, generation),
+            |shell| {
+                shell
+                    .history
+                    .network_bytes_per_sec_for(device_id, generation)
+            },
         )
     }
 
@@ -289,7 +296,7 @@ impl IcedApp {
                 "",
                 &generation.to_string(),
             ),
-            |history| history.gpu_usage_pct_for(device_id, generation),
+            |shell| shell.history.gpu_usage_pct_for(device_id, generation),
         )
     }
 
@@ -313,9 +320,12 @@ impl IcedApp {
                 stem,
                 &generation.to_string(),
             ),
-            |history| {
+            |shell| {
                 taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history(
-                    history, device_id, generation, metric,
+                    &shell.history,
+                    device_id,
+                    generation,
+                    metric,
                 )
             },
         )
@@ -335,7 +345,11 @@ impl IcedApp {
                 engine_name,
                 &generation.to_string(),
             ),
-            |history| history.gpu_engine_usage_pct_for(device_id, generation, engine_name),
+            |shell| {
+                shell
+                    .history
+                    .gpu_engine_usage_pct_for(device_id, generation, engine_name)
+            },
         )
     }
 
@@ -343,7 +357,7 @@ impl IcedApp {
     pub(crate) fn cached_fan_series(&self, channel_id: &str) -> Rc<[f32]> {
         self.cached_device_series(
             DeviceSeriesKey::new(DeviceSeriesKind::FanRpm, channel_id, "", ""),
-            |history| history.fan_rpm_for(channel_id),
+            |shell| shell.history.fan_rpm_for(channel_id),
         )
     }
 
@@ -351,7 +365,7 @@ impl IcedApp {
     pub(crate) fn cached_fan_temperature_series(&self, channel_id: &str) -> Rc<[f32]> {
         self.cached_device_series(
             DeviceSeriesKey::new(DeviceSeriesKind::FanTemperatureC, channel_id, "", ""),
-            |history| history.fan_temperature_c_for(channel_id),
+            |shell| shell.history.fan_temperature_c_for(channel_id),
         )
     }
 
@@ -359,7 +373,7 @@ impl IcedApp {
     pub(crate) fn cached_battery_series(&self, id: &str) -> Rc<[f32]> {
         self.cached_device_series(
             DeviceSeriesKey::new(DeviceSeriesKind::BatteryCapacityPercent, id, "", ""),
-            |history| history.battery_capacity_pct_for(id),
+            |shell| shell.history.battery_capacity_pct_for(id),
         )
     }
 
@@ -367,17 +381,16 @@ impl IcedApp {
     pub(crate) fn cached_battery_power_series(&self, id: &str) -> Rc<[f32]> {
         self.cached_device_series(
             DeviceSeriesKey::new(DeviceSeriesKind::BatteryPowerW, id, "", ""),
-            |history| history.battery_power_w_for(id),
+            |shell| shell.history.battery_power_w_for(id),
         )
     }
 
     fn cached_device_series(
         &self,
         key: DeviceSeriesKey,
-        load: impl FnOnce(&LiveGraphHistory) -> Vec<f32>,
+        load: impl FnOnce(&ShellApp) -> Vec<f32>,
     ) -> Rc<[f32]> {
-        self.projection_caches
-            .device_series(&self.shell.history, key, load)
+        self.projection_caches.device_series(&self.shell, key, load)
     }
 }
 

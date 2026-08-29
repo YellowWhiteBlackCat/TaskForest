@@ -4,17 +4,17 @@ use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
 use taskmanager_application::{
-    CapabilityId, CompositeSourceSnapshot, ContainerRollupEvent, ContainerRollupRequest,
-    CpuTelemetryRequest, GpuEngineRowsEvent, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryEvent, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
-    NetworkTelemetryRequest, NpuInventoryEvent, NpuInventoryRequest, PlatformEvent,
-    ProviderFailure, StorageTelemetryRequest, SystemTelemetryDomainEvent,
+    ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsEvent,
+    GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryEvent, HardwareInventoryRequest,
+    HostTelemetryRequest, MemoryTelemetryRequest, NetworkTelemetryRequest, NpuInventoryEvent,
+    NpuInventoryRequest, PlatformEvent, StorageTelemetryRequest, SystemTelemetryDomainEvent,
 };
 use taskmanager_core::{
     ContainerRollup, CpuTelemetryObservation, GpuEngineRowsSnapshot, GpuTelemetryObservation,
     HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation, NetworkTelemetryObservation,
     NpuInventorySnapshot, StorageTelemetryObservation,
 };
+use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
 
 use crate::health::CapabilityHealth;
 use crate::{

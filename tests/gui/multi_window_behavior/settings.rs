@@ -2,13 +2,13 @@
 //! (refresh slider, Startup-page select, text-rendering pills, switches).
 
 use gpui::{Entity, Keystroke, TestAppContext, VisualTestContext, WindowHandle, point, px};
-use taskmanager::core::config::{
+use taskmanager_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM,
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
     TEXT_RENDERING_PLATFORM_DEFAULT,
 };
 use taskmanager_gpui::gpui_app::root::{DevicePreference, RootView, TopPage};
-use taskmanager_gpui::gpui_app::theme::LightDark;
+use taskmanager_theme::LightDark;
 
 use super::{draw, wrapped_root};
 

@@ -28,12 +28,12 @@ mod tests_inner {
     };
     use super::detail_rows::{battery_detail_rows, thermal_control_rows};
     use super::format_uptime_compact;
-    use crate::core::{
+    use taskmanager_application::i18n;
+    use taskmanager_core::core::{
         BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceState, ScalarObservation,
         SensorCenterSnapshot, ThermalControlSnapshot, ThermalCoolingActivity,
         ThermalCoolingDeviceStatus, ThermalThrottleSnapshot,
     };
-    use crate::i18n;
     #[test]
     fn uptime_compact_formats_days_hours_minutes() {
         // Seconds are truncated (smallest unit is minutes, per the spec). So both
@@ -221,7 +221,10 @@ mod tests_inner {
                     id: "cooling:acpi:channel:fan0".into(),
                     device_id: "cooling:acpi".into(),
                     device_generation: DeviceGeneration::default(),
-                    kind: ScalarObservation::available(crate::core::ThermalCoolingKind::Fan, 10),
+                    kind: ScalarObservation::available(
+                        taskmanager_core::core::ThermalCoolingKind::Fan,
+                        10,
+                    ),
                     current_state: ScalarObservation::available(2, 10),
                     maximum_state: ScalarObservation::available(255, 10),
                     activity: ScalarObservation::available(ThermalCoolingActivity::Active, 10),

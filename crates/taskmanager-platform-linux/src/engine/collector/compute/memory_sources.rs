@@ -11,7 +11,9 @@ use std::io;
 use std::path::Path;
 use std::time::Duration;
 
-use taskmanager_platform_contract::{FailureKind, ProviderId, SourceOutcome, SourceStatus};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 use super::super::parse_meminfo_lines;
 use super::super::{MemoryCompressionObservations, MemoryModuleObservations, OptionalObservation};

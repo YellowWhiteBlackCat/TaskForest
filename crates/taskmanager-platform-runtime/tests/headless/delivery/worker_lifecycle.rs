@@ -3,9 +3,10 @@ use std::thread;
 use std::time::Duration;
 
 use crossbeam_channel::bounded;
-use taskmanager_application::{
-    CapabilityId, CapabilityScheduler, FailureKind, MAX_PROVIDER_PANIC_NOTES, ProviderFailure,
-    ProviderId, RequestId,
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityScheduler, MAX_PROVIDER_PANIC_NOTES, ProviderFailure, RequestId,
 };
 
 use super::fixture;
@@ -181,7 +182,7 @@ fn reserve(
             capability,
             request,
             0,
-            taskmanager_application::RequestTracking::Capability,
+            taskmanager_platform_contract::RequestTracking::Capability,
         )
 }
 

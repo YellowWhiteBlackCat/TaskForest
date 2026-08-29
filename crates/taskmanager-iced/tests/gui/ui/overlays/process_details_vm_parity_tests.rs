@@ -4,7 +4,7 @@
 //! CPU width-6 alignment, and its drop-on-missing row policy.
 use super::*;
 use std::path::PathBuf;
-use taskmanager_application::ProcessItem;
+use taskmanager_core::core::process::ProcessItem;
 
 fn fixture() -> ProcessItem {
     let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
@@ -18,8 +18,8 @@ fn fixture() -> ProcessItem {
         .current_disk_write_bytes_per_sec(1024 * 1024)
         .status("S".to_owned())
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("root"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("root"),
                 Some(PathBuf::from("/usr/bin/sample")),
                 42,
             ),
@@ -31,22 +31,23 @@ fn fixture() -> ProcessItem {
         .current_nice(10)
         .build();
     let mut observations = *item.scalar_observations();
-    observations.start_token = taskmanager_application::ScalarObservation::available(600, 42);
+    observations.start_token =
+        taskmanager_core::core::metrics::ScalarObservation::available(600, 42);
     observations.memory_pss_bytes =
-        taskmanager_application::ScalarObservation::available(50 * 1024 * 1024, 42);
+        taskmanager_core::core::metrics::ScalarObservation::available(50 * 1024 * 1024, 42);
     observations.swap_bytes =
-        taskmanager_application::ScalarObservation::available(2 * 1024 * 1024, 42);
+        taskmanager_core::core::metrics::ScalarObservation::available(2 * 1024 * 1024, 42);
     observations.disk_read_bytes_total =
-        taskmanager_application::ScalarObservation::available(10 * 1024 * 1024, 42);
+        taskmanager_core::core::metrics::ScalarObservation::available(10 * 1024 * 1024, 42);
     observations.disk_write_bytes_total =
-        taskmanager_application::ScalarObservation::available(20 * 1024 * 1024, 42);
+        taskmanager_core::core::metrics::ScalarObservation::available(20 * 1024 * 1024, 42);
     item.apply_scalar_observations(observations);
     item
 }
 
-fn local_time_rules() -> taskmanager_application::LocalTimeRulesObservation {
-    taskmanager_application::LocalTimeRulesObservation::current(
-        taskmanager_application::LocalTimeRules::utc(),
+fn local_time_rules() -> taskmanager_core::core::time::LocalTimeRulesObservation {
+    taskmanager_core::core::time::LocalTimeRulesObservation::current(
+        taskmanager_core::core::time::LocalTimeRules::utc(),
         0,
     )
 }
@@ -54,8 +55,8 @@ fn local_time_rules() -> taskmanager_application::LocalTimeRulesObservation {
 fn vm_value(field: ProcessDetailsField) -> String {
     let rows = details_vm(
         &fixture(),
-        &taskmanager_application::LocalTimeRulesObservation::current(
-            taskmanager_application::LocalTimeRules::utc(),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::current(
+            taskmanager_core::core::time::LocalTimeRules::utc(),
             0,
         ),
     );

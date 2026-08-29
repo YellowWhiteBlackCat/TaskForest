@@ -1,7 +1,7 @@
 //! Inventory-page projections materialized from the shared shell store.
 
 use gpui::{Context, Div, Entity, Window, px};
-use taskmanager_application::ServiceStatus;
+use taskmanager_core::core::services::ServiceStatus;
 use taskmanager_theme::Theme;
 use taskmanager_ui::{layout::PageScaffold, primitives::button::ButtonState};
 

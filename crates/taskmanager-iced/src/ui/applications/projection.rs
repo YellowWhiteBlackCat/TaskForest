@@ -1,6 +1,6 @@
 //! Pure Applications-page facts projected before widget construction.
 
-use taskmanager_application::SystemSnapshot;
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 /// A measured zero swap total confirms that no swap device exists. Unknown
 /// telemetry keeps the column visible so absence is never fabricated.

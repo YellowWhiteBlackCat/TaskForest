@@ -7,11 +7,14 @@
 //! adapter that every frontend drives, so the TUI/Iced/gpui log panels never
 //! drift apart.
 use super::{ShellApp, submission_time_ms};
-use taskmanager_application::{
-    PlatformEffect, ServiceId, ServiceLogEntry, ServiceLogFeed, ServiceLogLevelFilter,
-    ServiceLogProviderState, ServiceLogQuery, ServiceLogState, ServiceLogStreamLifecycle,
-    ServiceLogStreamRequest, ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
+use taskmanager_application::{PlatformEffect, ServiceLogStreamLifecycle, ServiceLogStreamRequest};
+use taskmanager_core::core::services::{
+    ServiceLogEntry, ServiceLogFeed, ServiceLogLevelFilter, ServiceLogProviderState,
+    ServiceLogQuery, ServiceLogState, ServiceLogStreamSnapshot, ServiceLogStreamState,
+    ServiceLogTimeFilter,
 };
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::RequestId;
 
 /// Minimum wall-clock gap between two incremental service-log follow requests.
 /// Mirrors the gpui details panel's 1 Hz throttle; the shell owns the cadence
@@ -221,7 +224,7 @@ impl ShellApp {
                     cursor: format!("snapshot:{index}"),
                     realtime_timestamp_micros: None,
                     priority: None,
-                    level: taskmanager_application::ServiceLogLevel::Unknown,
+                    level: taskmanager_core::core::services::ServiceLogLevel::Unknown,
                     message,
                 })
                 .collect(),
@@ -261,7 +264,7 @@ impl ShellApp {
     /// shell opens exactly one log stream at a time).
     pub(super) fn apply_service_log_update(
         &mut self,
-        request_id: taskmanager_application::RequestId,
+        request_id: RequestId,
         snapshot: ServiceLogStreamSnapshot,
         observed_at_ms: u64,
     ) {

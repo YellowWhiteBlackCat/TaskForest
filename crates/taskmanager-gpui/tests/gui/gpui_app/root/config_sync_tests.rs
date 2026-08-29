@@ -1,10 +1,12 @@
 use super::*;
 
-use crate::core::alerts::{AlertMetric, AlertRule, AlertSeverity, NotificationPolicy};
-use crate::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot};
-use crate::gpui_app::processes_view::rows::SortCol;
 use crate::gpui_app::root::TopPage;
 use gpui::{AppContext, TestAppContext};
+use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity, NotificationPolicy};
+use taskmanager_core::core::metrics::{
+    CpuMetrics, CpuScalarObservations, ScalarObservation, SystemSnapshot,
+};
+use taskmanager_shell::SortCol;
 
 #[test]
 fn presentation_changes_submit_on_the_next_owner_tick_without_duplicate_resubmission() {
@@ -60,7 +62,7 @@ fn pristine_first_launch_has_no_gpui_recovery_feedback() {
 fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
     cx: &mut TestAppContext,
 ) {
-    let root = cx.new(|cx| RootView::new(crate::gpui_app::theme::Theme::dark(), cx));
+    let root = cx.new(|cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
     let snapshot = SystemSnapshot {
         cpu: CpuMetrics::from_observations(CpuScalarObservations {
             global_usage_pct: ScalarObservation::available(95.0, 1_000),
@@ -76,7 +78,7 @@ fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
         std::time::Duration::ZERO,
         0.0,
     );
-    let config = taskmanager_application::Config {
+    let config = taskmanager_core::core::config::Config {
         notify_enabled: true,
         history_persistence: true,
         ui_size: "Large".into(),
@@ -88,7 +90,7 @@ fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
         language: Some("zh".into()),
         process_hidden_columns_configured: true,
         process_hidden_columns: Vec::new(),
-        ..taskmanager_application::Config::default()
+        ..taskmanager_core::core::config::Config::default()
     };
 
     root.update(cx, |view, cx| {
@@ -138,7 +140,10 @@ fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
         assert!(fingerprint_after.graphs() > fingerprint_before.graphs());
         assert!(fingerprint_after.sidebar() > fingerprint_before.sidebar());
         assert!(fingerprint_after.apps() > fingerprint_before.apps());
-        assert_eq!(presentation.language(), Some(crate::i18n::Language::Zh));
+        assert_eq!(
+            presentation.language(),
+            Some(taskmanager_application::i18n::Language::Zh)
+        );
         assert_eq!(
             super::super::super::persistence::config_from_view(view)
                 .language

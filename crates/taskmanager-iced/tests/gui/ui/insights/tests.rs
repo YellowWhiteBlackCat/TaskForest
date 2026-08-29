@@ -13,14 +13,14 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
     let gap = ProcessThreadInfo {
         tid: 4243,
         comm: "reaper".into(),
-        state: taskmanager_application::ThreadState::Running,
+        state: taskmanager_core::core::process_telemetry::ThreadState::Running,
         cpu_time_secs: None,
         cpu_percent: None,
     };
     let warm = ProcessThreadInfo {
         tid: 4242,
         comm: "telemetry-main".into(),
-        state: taskmanager_application::ThreadState::Sleep,
+        state: taskmanager_core::core::process_telemetry::ThreadState::Sleep,
         cpu_time_secs: Some(12.5),
         cpu_percent: Some(18.5),
     };
@@ -37,12 +37,12 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
 fn open_file_row_marks_an_unreadable_target_not_blank() {
     let readable = OpenFileEntry {
         fd: 0,
-        kind: taskmanager_application::OpenFileKind::File,
+        kind: taskmanager_core::core::process_telemetry::OpenFileKind::File,
         target: Some("/dev/null".into()),
     };
     let unreadable = OpenFileEntry {
         fd: 9,
-        kind: taskmanager_application::OpenFileKind::Other,
+        kind: taskmanager_core::core::process_telemetry::OpenFileKind::Other,
         target: None,
     };
     assert!(format_open_file_row(&readable).contains("/dev/null"));
@@ -124,7 +124,7 @@ fn facet_unavailable_text_maps_typed_reasons() {
 #[cfg(test)]
 mod connection_tests {
     use super::*;
-    use taskmanager_application::{
+    use taskmanager_core::core::process_telemetry::{
         ConnectionAddressFamily, ConnectionEndpoint, ConnectionTransport, ProcessConnection,
     };
 
@@ -139,7 +139,7 @@ mod connection_tests {
             family,
             local,
             remote,
-            state: taskmanager_application::ConnectionState::Established,
+            state: taskmanager_core::core::process_telemetry::ConnectionState::Established,
             provider_key: None,
         }
     }

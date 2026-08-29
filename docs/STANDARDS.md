@@ -59,13 +59,13 @@
    - 覆盖页面/皮肤渲染、窗口状态、设置切换与键盘分发。
    - 不依赖真实 Wayland compositor 或 GPU 设备；真实像素证据按前端流程由 [`screenshots/README.md`](screenshots/README.md) 补充。
 3. **统一执行器**:
-   - Unit/integration 测试使用 `cargo nextest run --locked --workspace --all-targets`；
+   - Unit/integration 测试使用 `cargo nextest run --locked --workspace --all-targets -j 4`；
      standard 门禁按 `nextest-core`/`nextest-logic`/`nextest-gui`/`nextest-perf` 四层拆分，
      逐 stage 记录，`--only nextest-core` 可自底向上单独复跑。
-   - Doctest 使用 `cargo test --locked --doc --workspace` 单独执行；nextest 不包含 doctest。
+   - Doctest 使用 `cargo test --locked --doc --workspace -j 4` 单独执行；nextest 不包含 doctest。
    - `live-smoke` 是 standard 独立 stage，只跑真实采集冒烟测试。
 4. **TUI 自动化**:
-   - Ratatui 页面使用 `TestBackend` 覆盖参考尺寸与 54×16 最小尺寸；运行 `cargo nextest run --locked -p taskmanager-tui`。
+   - Ratatui 页面使用 `TestBackend` 覆盖参考尺寸与 54×16 最小尺寸；运行 `cargo nextest run --locked -p taskmanager-tui -j 4`。
    - 真实终端证据运行 `bash scripts/capture-tui.sh`，不得用纯文本 snapshot 代替像素截图。
 5. **测试总原则（八荣八耻 + 五问）**:
    - 总原则：测试的价值，不在于证明代码被写过，而在于以尽可能低的长期成本，稳定地发现
@@ -159,7 +159,7 @@
 
 1. **无头行为测试**：用 unit/logic/GPUI headless test 覆盖成功、失败及取消路径；测试必须断言状态或输出，不能只证明“没有崩溃”。
 2. **可观测埋点**：为目标场景提供结构化 tracing marker、状态转储或等价探针，证明真实应用已经到达待验证状态。埋点须可在 capture/test 模式开启，不记录隐私、命令行机密或用户文件内容。
-3. **真实像素截图**：按前端运行唯一 capture 流程（GPUI `capture-niri.sh`、Iced `capture-iced.sh`、TUI `capture-tui.sh`），截图必须来自本次构建和真实渲染帧；旧图、mock 图及仅构造 GPUI Scene 均不能替代。
+3. **真实像素截图**：按前端运行唯一 capture 流程（GPUI `capture-niri.sh`、Iced `capture-iced.sh`、TUI `capture-tui.sh`、Bevy `capture-bevy.sh`），截图必须来自本次构建和真实渲染帧；旧图、mock 图及仅构造 GPUI Scene 均不能替代。
 4. **截图审查记录**：逐项检查信息层级、密度、间距、对齐、截断、对比度、空白利用、加载/空/错误状态和危险操作文案；按改动风险覆盖亮/暗主题、最小窗口、缩放和键盘路径。
 
 回执新鲜度（提交的 source-manifest 哈希与当前生产源码的比对）只属于 capture /

@@ -1,10 +1,14 @@
 use taskmanager_application::{
-    ConfirmationKind, DeviceGeneration, DeviceId, FrozenProcessIdentity, InteractionEvent,
-    InteractionState, PendingConfirmation, PlatformEffect, ProcessBatchAction, ProcessBatchIntent,
-    ProcessGroupScope, ProcessTerminationAction, ProcessTerminationConfirmation,
-    SmartControlRequest, SmartSelfTestIntent, SurfaceDismissReason, SurfaceKind, SurfaceTransition,
+    ConfirmationKind, InteractionEvent, InteractionState, PendingConfirmation, PlatformEffect,
+    ProcessTerminationAction, ProcessTerminationConfirmation, SmartControlRequest,
+    SurfaceDismissReason, SurfaceKind, SurfaceTransition,
 };
-use taskmanager_core::SmartSelfTestKind;
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
+};
+use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 fn frozen(pid: u32, name: &str) -> FrozenProcessIdentity {
     FrozenProcessIdentity::from_authoritative_parts(pid, name, 10, u64::from(pid) + 100)

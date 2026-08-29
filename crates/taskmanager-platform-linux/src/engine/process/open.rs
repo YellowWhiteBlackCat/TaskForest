@@ -24,7 +24,7 @@ pub fn read_exe_path(pid: u32) -> Option<PathBuf> {
 /// when `path` has no parent (e.g. a bare filename like `kworker` for a kernel
 /// thread, or `/` itself). Pure — no syscall, no spawn — so it is unit-tested
 /// directly (the spawn itself is intentionally NOT tested; it launches a real
-/// file-manager process that has no place in `cargo test`).
+/// file-manager process that has no place in the test harness).
 pub fn parent_dir(path: &Path) -> Option<PathBuf> {
     path.parent().map(Path::to_path_buf)
 }

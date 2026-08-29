@@ -10,7 +10,7 @@ use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem};
 
 use crate::gpui_app::sidebar::SelectedDevice;
 #[cfg(target_os = "linux")]
-use taskmanager_application::ProcessSignal;
+use taskmanager_core::core::process::ProcessSignal;
 
 /// Initial top-level page, overridable via `TM_PAGE` (values: `performance`, `apps`/
 /// `processes`, `services`, `system`, `startup`, `users`, `app-history`). Useful for
@@ -80,35 +80,35 @@ pub fn build_proc_menu(entity: Entity<RootView>, pid: u32) -> Vec<MenuEntry> {
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("proc.end_task"),
+        taskmanager_application::i18n::t("proc.end_task"),
         ProcMenuAction::EndTask,
     );
     item(
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("proc.end_process_tree"),
+        taskmanager_application::i18n::t("proc.end_process_tree"),
         ProcMenuAction::EndProcessTree,
     );
     item(
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("proc.kill"),
+        taskmanager_application::i18n::t("proc.kill"),
         ProcMenuAction::Kill,
     );
     item(
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("proc.suspend"),
+        taskmanager_application::i18n::t("proc.suspend"),
         ProcMenuAction::Suspend,
     );
     item(
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("proc.resume"),
+        taskmanager_application::i18n::t("proc.resume"),
         ProcMenuAction::Resume,
     );
     #[cfg(target_os = "linux")]
@@ -151,46 +151,48 @@ pub fn build_proc_menu(entity: Entity<RootView>, pid: u32) -> Vec<MenuEntry> {
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("proc.open_location"),
+        taskmanager_application::i18n::t("proc.open_location"),
         ProcMenuAction::OpenLocation,
     );
     item(
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("proc.search_online"),
+        taskmanager_application::i18n::t("proc.search_online"),
         ProcMenuAction::SearchOnline,
     );
     item(
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("dialog.properties"),
+        taskmanager_application::i18n::t("dialog.properties"),
         ProcMenuAction::Properties,
     );
     items.push(MenuEntry::Separator);
     // Win11-TM "Copy" group: the own popup layer excludes submenus at compile
     // time for P4, so the submenu is flattened into a label + three items.
-    items.push(MenuEntry::Label(crate::i18n::t("common.copy").into()));
+    items.push(MenuEntry::Label(
+        taskmanager_application::i18n::t("common.copy").into(),
+    ));
     item(
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("menu.copy_name"),
+        taskmanager_application::i18n::t("menu.copy_name"),
         ProcMenuAction::CopyName,
     );
     item(
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("menu.copy_pid"),
+        taskmanager_application::i18n::t("menu.copy_pid"),
         ProcMenuAction::CopyPid,
     );
     item(
         &mut items,
         &entity,
         pid,
-        crate::i18n::t("menu.copy_command_line"),
+        taskmanager_application::i18n::t("menu.copy_command_line"),
         ProcMenuAction::CopyCmdline,
     );
     items

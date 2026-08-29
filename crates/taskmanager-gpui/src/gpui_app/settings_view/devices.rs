@@ -10,9 +10,9 @@ use gpui::{Context, Div, Entity, InteractiveElement, IntoElement, ParentElement,
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
 use crate::gpui_app::root::{DevicePreference, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 /// Devices column: one [`device_toggle`] per sidebar category (CPU / Memory /
 /// Disks / Network / GPUs), with Network owning five typed child toggles.

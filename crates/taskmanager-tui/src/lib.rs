@@ -13,10 +13,12 @@
 #![forbid(unsafe_code)]
 
 mod bindings;
+mod capabilities;
 mod clipboard;
 mod column_prefs;
 mod command_palette;
 mod demo;
+mod functional;
 mod history_runtime;
 mod menus;
 mod preferences;
@@ -27,6 +29,7 @@ mod selectors;
 mod snapshot_export;
 mod startup_control;
 mod surface;
+mod terminal;
 mod theme;
 mod ui;
 
@@ -34,24 +37,18 @@ pub use preferences::AppliedPrefs;
 
 pub use bindings::binding_declaration;
 
-pub use command_palette::{CommandPalette, CommandPaletteRow, PaletteLocalAction};
+pub use capabilities::capability_declaration;
 
-pub use taskmanager_shell::presentation::{
-    CommandHelp, PageHelp, command_help, icon_glyph, page_help,
-};
-// Crate-local terminal vocabulary for the shell types the TUI consumes on
-// every key path. Deliberately NOT a public rename: outside consumers reach
-// these under their original `taskmanager_shell` names, so the alias never
-// escapes the crate (reexport-alias gate).
-pub use taskmanager_shell::{LocalBinding, SortCol, SortDir, route_key};
-pub(crate) use taskmanager_shell::{ShellKeyEvent, shell_local_bindings};
-pub use taskmanager_shell::{history, presentation};
+pub use functional::functional_declaration;
+
+pub use command_palette::{CommandPalette, CommandPaletteRow, PaletteLocalAction};
 
 pub use demo::demo_app;
 pub use menus::BatchMenuTarget;
 pub use runtime::{run_demo, run_live, snapshot_text};
 pub use selectors::{FocusPanel, PerfDevice};
 pub(crate) use surface::{TuiInputScope, TuiSurface, TuiSurfaceKind, TuiSurfaceState};
+pub use terminal::{TuiColorMode, TuiGlyphMode, TuiTerminalProfile};
 pub use theme::{ThemeParams, TuiTheme};
 pub use ui::process_menu::ProcessMenuTarget;
 pub use ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
@@ -65,12 +62,19 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 
 use taskmanager_application::{
-    AppAction, AppPage, Config, ConfigClient, ConfigRevision, DeviceId, DirectoryScanBounds,
-    DirectoryScanSpec, DirectoryScanStatus, DirectoryUsageRequest, FrozenProcessIdentity,
-    GpuMetrics, PlatformEffect, PlatformEventBatch, ProcessItem, RefreshRequest, SystemSnapshot,
-    i18n::t,
+    AppAction, AppPage, ConfigClient, ConfigRevision, DirectoryUsageRequest, PlatformEffect,
+    PlatformEventBatch, RefreshRequest, i18n::t,
 };
-use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InputDispatch};
+use taskmanager_core::core::config::Config;
+use taskmanager_core::core::directory_usage::{
+    DirectoryScanBounds, DirectoryScanSpec, DirectoryScanStatus,
+};
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
+use taskmanager_shell::{
+    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InputDispatch, ShellKeyEvent, SortCol,
+};
 
 /// Inactivity window (micros) after which the Applications-page prefix jump
 /// resets: two consecutive bare characters within the window extend the
@@ -78,7 +82,7 @@ use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, Inp
 pub(crate) const PREFIX_JUMP_WINDOW_MICROS: u64 = 2_000_000;
 
 fn default_category_expansions() -> std::collections::HashSet<String> {
-    taskmanager_application::ProcessCategory::ALL
+    taskmanager_core::core::process::ProcessCategory::ALL
         .iter()
         .copied()
         .map(taskmanager_application::process_category_projection::category_expansion_key)
@@ -92,7 +96,7 @@ pub struct TuiApp {
     /// The renderer-independent shell state machine.
     shell: taskmanager_shell::ShellApp,
     /// Immutable local-time rules supplied by the native composition root.
-    pub(crate) local_time_rules: taskmanager_application::LocalTimeRulesObservation,
+    pub(crate) local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
     /// The sole TUI-local menu/modal. Shared confirmations and Process
     /// Properties remain authoritative in `application.interaction`.
     local_surface: TuiSurfaceState,
@@ -154,6 +158,15 @@ pub struct TuiApp {
     /// an empty set means every node expanded. Toggled by Enter / Right
     /// (expand) and Left (collapse) on a node with children.
     pub collapsed_tree: std::collections::HashSet<u32>,
+    /// Bounded presentation cache for the Applications visual-row count.
+    /// Its key contains every UI input that affects tree shape; it stores no
+    /// borrowed process facts.
+    pub(crate) visual_row_count_cache: std::cell::RefCell<Option<selection::VisualRowCountCache>>,
+    /// The last provider start-token observed for each process PID. This
+    /// TUI-local index prevents a reused PID from inheriting old tree
+    /// presentation state; exact control authority remains
+    /// `FrozenProcessIdentity` in the application layer.
+    tree_identity_by_pid: std::collections::HashMap<u32, Option<u64>>,
     /// The table columns the user HID through the column menu (`C` on the
     /// Applications page). PID and Name are identity columns and can never be
     /// hidden; every other column is toggleable. The renderer (header, cells,
@@ -200,6 +213,13 @@ pub struct TuiApp {
     /// by a successful settings save — an unsaved form edit never leaks into
     /// the frame.
     pub(crate) prefs: AppliedPrefs,
+    /// Per-page selection anchors captured when a navigation leaves a table
+    /// page (`selection::PageRowAnchor`): the selected row's stable identity,
+    /// so an A → B → A round trip restores the same row instead of trusting
+    /// the one shared cursor index across pages whose rows moved meanwhile.
+    /// Keyed by the page the anchor belongs to; consumed on restore. Never
+    /// holds a positional guess — identity-less rows are not anchored.
+    page_row_anchors: std::collections::HashMap<AppPage, selection::PageRowAnchor>,
 }
 
 impl TuiApp {
@@ -230,9 +250,19 @@ impl TuiApp {
     }
 
     fn shell_default(shell: taskmanager_shell::ShellApp) -> Self {
+        let tree_identity_by_pid = shell
+            .projection()
+            .processes
+            .as_deref()
+            .unwrap_or_default()
+            .iter()
+            .map(|process| (process.pid, process.current_start_token()))
+            .collect();
         Self {
             shell,
-            local_time_rules: taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+            local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(
+                0,
+            ),
             local_surface: TuiSurfaceState::default(),
             process_properties_view: None,
             settings_form: SettingsForm::default(),
@@ -251,6 +281,8 @@ impl TuiApp {
             system_scroll: 0,
             expanded_groups: default_category_expansions(),
             collapsed_tree: std::collections::HashSet::new(),
+            visual_row_count_cache: std::cell::RefCell::new(None),
+            tree_identity_by_pid,
             hidden_columns: std::collections::HashSet::new(),
             focus_panel: FocusPanel::Table,
             help_scroll: 0,
@@ -259,6 +291,7 @@ impl TuiApp {
             prefix_jump: String::new(),
             prefix_jump_at_micros: 0,
             prefs: AppliedPrefs::default(),
+            page_row_anchors: std::collections::HashMap::new(),
         }
     }
 
@@ -272,9 +305,27 @@ impl TuiApp {
     /// cannot leak into a later pid reuse.
     pub fn apply_platform_batch(&mut self, batch: PlatformEventBatch) {
         let process_revision_before = self.shell.projection().process_revision;
+        let selected_application_anchor = self.selected_application_row_anchor();
+        let selected_inventory_anchor = self.selected_inventory_row_anchor();
+        let page_before = self.page();
+        let services_revision_before = self.shell.projection().services_revision;
+        let startup_revision_before = self.shell.projection().startup_revision;
+        let sessions_revision_before = self.shell.projection().sessions_revision;
         self.shell.apply_platform_batch(batch);
         if self.shell.projection().process_revision != process_revision_before {
             self.prune_stale_tree_state();
+            self.reconcile_application_row_anchor(selected_application_anchor);
+        }
+        let inventory_revision_changed = match page_before {
+            AppPage::Services => {
+                self.shell.projection().services_revision != services_revision_before
+            }
+            AppPage::Startup => self.shell.projection().startup_revision != startup_revision_before,
+            AppPage::Users => self.shell.projection().sessions_revision != sessions_revision_before,
+            _ => false,
+        };
+        if inventory_revision_changed {
+            self.reconcile_inventory_row_anchor(selected_inventory_anchor);
         }
         // Same-wave fold (ADR-034 stage 2): the shared GPU chart-metric
         // selection reconciles against the batch's fresh GPU facts before
@@ -291,6 +342,12 @@ impl TuiApp {
                 t("tui.status.gpu_series").replacen("{}", t(selected.label_key()), 1),
             );
         }
+        // Same-wave fold for the TUI-local Performance resource selection
+        // (the frontend companion of the shared GPU chart-metric reconcile
+        // above): a device family the batch just made disappear (hot-unplug,
+        // provider going dark) cannot stay selected into the next paint — the
+        // anchor falls back fail-closed to the first still-backed resource.
+        self.reconcile_perf_device_anchor();
     }
 
     pub(crate) fn install_history_frontend_connector(
@@ -318,7 +375,7 @@ impl TuiApp {
 
     pub(crate) fn select_application_history_window(
         &mut self,
-        window: taskmanager_application::HistoryWindow,
+        window: taskmanager_core::core::history::HistoryWindow,
     ) -> bool {
         self.history_runtime.select_window(window)
     }
@@ -373,9 +430,13 @@ impl TuiApp {
     /// return to Applications re-requests for the current row.
     pub fn apply_action(&mut self, action: AppAction) -> Option<PlatformEffect> {
         let page_before = self.page();
+        let leaving_anchor = self.capture_page_row_anchor();
         let effect = self.shell.apply_action(action);
         if self.page() != page_before {
-            self.reconcile_applications_cursor();
+            self.remember_page_row_anchor(page_before, leaving_anchor);
+            if !self.restore_page_row_anchor() {
+                self.reconcile_applications_cursor();
+            }
             self.close_local_overlays();
             self.close_service_log();
             self.last_insights_target = None;
@@ -400,9 +461,13 @@ impl TuiApp {
     pub fn handle_local_key(&mut self, event: ShellKeyEvent) -> InputDispatch {
         let page_before = self.page();
         let query_before = self.query.clone();
+        let leaving_anchor = self.capture_page_row_anchor();
         let effect = self.shell.handle_local_key(event);
         if self.page() != page_before {
-            self.reconcile_applications_cursor();
+            self.remember_page_row_anchor(page_before, leaving_anchor);
+            if !self.restore_page_row_anchor() {
+                self.reconcile_applications_cursor();
+            }
             self.close_local_overlays();
             self.close_service_log();
             self.last_insights_target = None;
@@ -580,10 +645,10 @@ impl TuiApp {
             return None;
         }
         let matches = |process: &ProcessItem| {
-            taskmanager_application::text::contains_ascii_ci(&process.name, &query)
-                || taskmanager_application::text::contains_ascii_ci(&process.cmdline, &query)
+            taskmanager_core::core::text::contains_ascii_ci(&process.name, &query)
+                || taskmanager_core::core::text::contains_ascii_ci(&process.cmdline, &query)
                 || process.current_user().is_some_and(|user| {
-                    taskmanager_application::text::contains_ascii_ci(&user, &query)
+                    taskmanager_core::core::text::contains_ascii_ci(&user, &query)
                 })
                 || (query.bytes().all(|b| b.is_ascii_digit())
                     && process.pid.to_string().contains(&query))
@@ -598,7 +663,7 @@ impl TuiApp {
             .take(rows.len())
             .find(|(_, row)| match row {
                 crate::process_view::ProcessRow::Group { label, .. } => {
-                    taskmanager_application::text::contains_ascii_ci(label, &query)
+                    taskmanager_core::core::text::contains_ascii_ci(label, &query)
                 }
                 crate::process_view::ProcessRow::TreeNode { process, .. } => matches(process),
             })
@@ -683,8 +748,9 @@ impl TuiApp {
         let action = taskmanager_shell::presentation::gpu_engine_rows::present_gpu_engine_rows(
             self.shell.gpu_engine_rows_state(),
             &device_id,
-            self.projection()
-                .capability_status(&taskmanager_application::CapabilityId::TELEMETRY_GPU_ENGINES),
+            self.projection().capability_status(
+                &taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES,
+            ),
         )
         .action();
         match action {
@@ -830,3 +896,7 @@ impl DerefMut for TuiApp {
 #[cfg(test)]
 #[path = "../tests/gui/lib_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/gui/identity_tests.rs"]
+mod identity_tests;

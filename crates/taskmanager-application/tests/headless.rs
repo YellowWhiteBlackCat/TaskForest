@@ -1,4 +1,5 @@
-//! Application integration tests that consume only the public facade.
+//! Application integration tests that consume application-owned public APIs
+//! plus direct owner paths for core facts and platform contracts.
 
 #[path = "headless/application_interaction_tests.rs"]
 mod application_interaction_tests;

@@ -1,5 +1,5 @@
-use crate::core::{BatteryInfo, SensorCenterSnapshot, ThermalCoolingActivity};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::{BatteryInfo, SensorCenterSnapshot, ThermalCoolingActivity};
 
 pub(super) fn battery_detail_rows(battery: &BatteryInfo) -> Vec<(String, String)> {
     let mut rows = Vec::new();

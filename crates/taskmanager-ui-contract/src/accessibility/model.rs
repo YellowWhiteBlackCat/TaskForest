@@ -448,7 +448,7 @@ fn validate_node(node: &SemanticNode) -> Result<(), SemanticSnapshotError> {
     if node.state.selected.is_some()
         && !matches!(
             node.role,
-            SemanticRole::Tab | SemanticRole::Row | SemanticRole::Option
+            SemanticRole::Tab | SemanticRole::Row | SemanticRole::Option | SemanticRole::TreeItem
         )
     {
         return invalid(node, SemanticNodeIssue::SelectedOnUnsupportedRole);

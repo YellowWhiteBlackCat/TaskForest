@@ -50,6 +50,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup, ValueChange};
 use taskmanager_application::i18n::{Language, current_language, set_language};
 use taskmanager_application::{AppAction, TelemetryInterval};
+
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
 use crate::app::{FrontendTrack, PageContext, Route, RouteChanged};
@@ -297,10 +298,10 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
         }
         BackgroundColor({ context.palette.content_bg })
         Children [
-            ( Text("Settings") TextRole(Role::Heading) ),
+            ( Text({ crate::app::Page::Settings.title() }) TextRole(Role::Heading) ),
             { rows },
             (
-                Text("Skin, fonts, density and device visibility — the remaining Settings fields are in incubation until the M3 form surfaces")
+                Text("Choices apply live through the shared shell seams; cross-session persistence is incubating until the config write-back seam lands")
                 TextRole(Role::Caption)
             ),
             { EntityScene(page_observer(request_projection_refresh)) },

@@ -1,10 +1,13 @@
 //! Independent inventory-source failure projections.
 
 use super::super::*;
-use taskmanager_application::{
-    CapabilityId, CorrelatedEvent, EventSequence, FailureKind, OperationFailure,
-    PartialSourceSnapshot, PlatformEventContext, ProviderFailure, ProviderId, RequestId,
-    ServiceEvent, SourceOutcome, SourceStatus,
+use taskmanager_application::{CorrelatedEvent, PlatformEventContext, ServiceEvent};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::{
+    CapabilityId, EventSequence, OperationFailure, PartialSourceSnapshot, ProviderFailure,
+    RequestId,
 };
 
 #[test]

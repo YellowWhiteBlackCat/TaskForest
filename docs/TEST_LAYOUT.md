@@ -16,7 +16,7 @@ crates/<crate>/
     ├── headless.rs       # 无 GUI 测试入口
     ├── headless/          # unit-like/integration/headless behavior tests
     ├── gui.rs            # 需要 GUI/窗口的测试入口
-    └── gui/               # GPUI/Iced/TUI window/render interaction tests
+    └── gui/               # GPUI/Iced/TUI/Bevy window/render interaction tests
 ```
 
 `foo.rs + foo/` 是唯一模块形状；禁止 `mod.rs`。某一类没有测试时可以不创建对应

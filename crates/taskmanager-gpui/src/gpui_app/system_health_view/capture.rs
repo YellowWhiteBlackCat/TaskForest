@@ -1,7 +1,7 @@
 //! Deterministic fixtures and English-only copy for capture/headless wiring.
 
-use crate::core::metrics::{DiskMetrics, DiskScalarObservations, SmartAvailability};
-use crate::core::{
+use taskmanager_core::core::metrics::{DiskMetrics, DiskScalarObservations, SmartAvailability};
+use taskmanager_core::core::{
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, FailureKind, FilesystemHealth,
     FilesystemHealthSnapshot, FilesystemHealthStatus, SensorCenterSnapshot, SensorDescriptor,
     SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
@@ -142,8 +142,14 @@ pub fn capture_fixture() -> SystemHealthCaptureFixture {
             disk.smart_state = DeviceState::healthy(now);
             disk.smart_temperature_c = Some(39.0);
             disk.apply_scalar_observations(DiskScalarObservations {
-                capacity_bytes: crate::core::ScalarObservation::available(2_000_000_000_000, now),
-                available_bytes: crate::core::ScalarObservation::available(625_000_000_000, now),
+                capacity_bytes: taskmanager_core::core::ScalarObservation::available(
+                    2_000_000_000_000,
+                    now,
+                ),
+                available_bytes: taskmanager_core::core::ScalarObservation::available(
+                    625_000_000_000,
+                    now,
+                ),
                 ..Default::default()
             });
             disk

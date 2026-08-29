@@ -20,11 +20,13 @@
 
 use std::collections::HashSet;
 
-use taskmanager::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_gpui::gpui_app::processes_view::{
-    ProcessStatusFilter, SortCol, VisibleRow, category_tree_rows, default_category_expansions,
+    VisibleRow, category_tree_rows, default_category_expansions,
 };
-use taskmanager_shell::{ProcessViewing, SortDir, matches_process_query};
+use taskmanager_shell::{
+    ProcessStatusFilter, ProcessViewing, SortCol, SortDir, matches_process_query,
+};
 
 /// The shell query grammar's flat-list equivalent of the retired local
 /// `filter_processes`: same predicate the Apps projection applies per row.
@@ -95,8 +97,8 @@ fn mk(
         .current_disk_write_bytes_per_sec(dw)
         .status(status.to_string())
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque(user.to_string()),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque(user.to_string()),
                 None,
                 1,
             ),
@@ -313,8 +315,8 @@ fn mk_tree(pid: u32, parent: Option<u32>, name: &str, user: &str) -> ProcessItem
         .parent_pid(parent)
         .name(name.to_string())
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque(user.to_string()),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque(user.to_string()),
                 None,
                 1,
             ),
@@ -498,7 +500,7 @@ fn memory_projection_prefers_current_pss_and_falls_back_to_typed_rss() {
         .scalar_observations(ProcessScalarObservations {
             memory_bytes: ScalarObservation::available(456, 1),
             memory_pss_bytes: ScalarObservation::unavailable(
-                taskmanager::core::FailureKind::TemporarilyUnavailable,
+                taskmanager_core::core::FailureKind::TemporarilyUnavailable,
             ),
             ..ProcessScalarObservations::default()
         })
@@ -634,7 +636,7 @@ fn status_filter_label_id_and_all_constant() {
     // The pill row is rendered from ALL; its length + labels are part of the UI
     // contract, so pin them. Labels are localized through `i18n::t`, so the
     // contract asserts the en catalog (the fallback locale) explicitly.
-    taskmanager::i18n::set_language(taskmanager::i18n::Language::En);
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     assert_eq!(ProcessStatusFilter::All.label(), "All");
     assert_eq!(ProcessStatusFilter::Running.label(), "Running");
     assert_eq!(ProcessStatusFilter::Sleeping.label(), "Sleeping");
@@ -644,7 +646,7 @@ fn status_filter_label_id_and_all_constant() {
 
     // The zh catalog translates every pill label (a missing key falls back to
     // the key literal, which would break the pill row in the zh UI).
-    taskmanager::i18n::set_language(taskmanager::i18n::Language::Zh);
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
     assert_eq!(ProcessStatusFilter::All.label(), "全部");
     assert_eq!(ProcessStatusFilter::Running.label(), "运行中");
     assert_eq!(ProcessStatusFilter::Sleeping.label(), "睡眠");
@@ -730,8 +732,8 @@ fn query_no_match_returns_empty() {
 
 // ── typed observations drive visible rows ─────────────────────────────────
 
-use taskmanager::core::process::ProcessScalarObservations;
-use taskmanager::core::{FailureKind, ScalarObservation};
+use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_core::core::{FailureKind, ScalarObservation};
 
 /// Build a process whose typed observations carry either current values or an
 /// explicit unavailable state.

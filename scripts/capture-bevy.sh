@@ -42,7 +42,13 @@ git rev-parse HEAD >"$RUN_DIR/git-head.txt"
 rustc -V >"$RUN_DIR/rust.txt"
 PYTHONDONTWRITEBYTECODE=1 timeout 60s python3 scripts/frontend_source_manifest.py \
     --frontend bevy --repo-root "$REPO" --output "$SOURCE_MANIFEST"
-timeout --kill-after=10s 20m cargo build --locked -p taskmanager-bevy-ui --bin taskforest-b
+# Lock policy follows the caller (dev-phase fallback: TM_CARGO_LOCK empty
+# runs unlocked while a sibling line holds the shared lock mid-write).
+LOCK_ARGS=(--locked)
+if [[ -n "${TM_CARGO_LOCK+x}" && -z "$TM_CARGO_LOCK" ]]; then
+    LOCK_ARGS=()
+fi
+timeout --kill-after=10s 20m cargo build "${LOCK_ARGS[@]}" -p taskmanager-bevy-ui --bin taskforest-b
 install -Dm755 "$REPO/target/debug/taskforest-b" "$APP"
 BINARY_SHA256="$(sha256sum "$APP" | cut -d' ' -f1)"
 SOURCE_MANIFEST_SHA256="$(sha256sum "$SOURCE_MANIFEST" | cut -d' ' -f1)"

@@ -13,7 +13,7 @@ use super::*;
 mod titlebar_border_tests {
 
     use super::titlebar_border;
-    use crate::gpui_app::theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
+    use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
     /// The active-window look must stay byte-identical to the theme token —
     /// every existing screenshot baseline depends on it. Exercised across all
@@ -61,8 +61,8 @@ mod titlebar_border_tests {
 mod card_shadow_tests {
     use super::card_shadow;
     use crate::gpui_app::elements::CARD_SHADOW_AMBIENT_ALPHA;
-    use crate::gpui_app::theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
     use gpui::Hsla;
+    use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
     /// The card shadow helper returns the Mission Center two-layer pair in
     /// the theme's own ink: an ambient layer that is wider AND weaker than
@@ -184,7 +184,7 @@ mod card_shadow_tests {
 mod highlighted_text_tests {
     use std::ops::Range;
 
-    use taskmanager_application::text::match_ranges_ascii_ci;
+    use taskmanager_core::core::text::match_ranges_ascii_ci;
     use taskmanager_ui::data::highlighter::find_matches;
 
     /// The GPUI search-highlight geometry now comes from the shared
@@ -255,7 +255,7 @@ mod highlighted_text_tests {
 #[cfg(test)]
 mod more_rows_hint_tests {
     use super::more_rows_label;
-    use crate::i18n::{self, Language};
+    use taskmanager_application::i18n::{self, Language};
 
     /// The bounded-list hint must carry the real hidden count into the
     /// localized template, in both shipped locales (pin + restore the global

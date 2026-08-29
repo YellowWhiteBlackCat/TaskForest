@@ -1,4 +1,4 @@
-use taskmanager_application::FailureKind;
+use taskmanager_core::core::failure::FailureKind;
 
 use super::process_failure_message;
 

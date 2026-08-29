@@ -7,13 +7,15 @@ use super::*;
 /// second failure-kind mapping.
 #[test]
 fn engine_rows_failure_keys_cover_every_typed_kind() {
-    use taskmanager_application::CapabilityStatus;
+    use taskmanager_platform_contract::CapabilityStatus;
     use taskmanager_shell::presentation::gpu_engine_rows::{
         GpuEngineRowsPresentation, present_gpu_engine_rows,
     };
     for (status, expected_key) in [
         (
-            CapabilityStatus::Degraded(taskmanager_application::FailureKind::PermissionDenied),
+            CapabilityStatus::Degraded(
+                taskmanager_core::core::failure::FailureKind::PermissionDenied,
+            ),
             "gpu.engines_permission_denied",
         ),
         (
@@ -28,7 +30,7 @@ fn engine_rows_failure_keys_cover_every_typed_kind() {
     ] {
         let presentation = present_gpu_engine_rows(
             &taskmanager_application::GpuEngineRowsState::Closed,
-            &taskmanager_application::DeviceId::new("gpu:0"),
+            &taskmanager_core::core::identity::DeviceId::new("gpu:0"),
             Some(status),
         );
         assert_eq!(presentation.message_key(), Some(expected_key));
@@ -41,7 +43,7 @@ fn engine_rows_failure_keys_cover_every_typed_kind() {
 
 #[test]
 fn gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact() {
-    use taskmanager_application::{GpuEngine, GpuEngineKind, GpuMetrics};
+    use taskmanager_core::core::metrics::{GpuEngine, GpuEngineKind, GpuMetrics};
 
     let mut gpu = GpuMetrics::new("gpu0", "Fixture GPU");
     gpu.engines = vec![
@@ -85,7 +87,8 @@ fn gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact() {
 
 #[test]
 fn compact_gpu_headline_projects_all_four_current_facts_without_a_selector() {
-    use taskmanager_application::{GpuMetrics, GpuScalarObservations, ScalarObservation};
+    use taskmanager_core::core::metrics::{GpuMetrics, GpuScalarObservations, ScalarObservation};
+
     taskmanager_test_support::pin_english();
 
     let mut gpu = GpuMetrics::new("gpu0", "Fixture GPU");
@@ -93,7 +96,9 @@ fn compact_gpu_headline_projects_all_four_current_facts_without_a_selector() {
         utilization_pct: ScalarObservation::available(42.4, 1),
         temperature_c: ScalarObservation::available(57.6, 1),
         frequency_mhz: ScalarObservation::available(1_850, 1),
-        power_w: ScalarObservation::unavailable(taskmanager_application::FailureKind::Unsupported),
+        power_w: ScalarObservation::unavailable(
+            taskmanager_core::core::failure::FailureKind::Unsupported,
+        ),
         ..GpuScalarObservations::default()
     });
     let metrics = projection::gpu_headline_metrics(&gpu);
@@ -141,10 +146,12 @@ fn row_value(rows: &[taskmanager_shell::viewmodel::StatRow], label: &str) -> Str
 #[test]
 fn battery_health_and_estimate_rows_follow_typed_availability() {
     taskmanager_test_support::pin_english();
-    use taskmanager_application::{BatteryInfo, DeviceState, ScalarObservation};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskmanager_core::core::power::BatteryInfo;
 
     let mut battery = BatteryInfo::new("power-supply:BAT0", DeviceState::healthy(1));
-    battery.apply_scalar_observations(taskmanager_application::BatteryScalarObservations {
+    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
         energy_full_uwh: ScalarObservation::available(49_000_000.0, 1),
         energy_full_design_uwh: ScalarObservation::available(56_000_000.0, 1),
         time_to_empty_secs: ScalarObservation::available(3_780.0, 1),
@@ -195,11 +202,20 @@ fn static_quantities_follow_the_resolved_unit_pairs() {
         taskmanager_test_support::DiskPartitionFixtureBuilder::new()
             .mount_point("/".into())
             .name("nvme0n1p2".into())
-            .scalar_observations(taskmanager_application::DiskPartitionScalarObservations {
-                capacity_bytes: taskmanager_application::ScalarObservation::available(2 * GIB, 1),
-                used_bytes: taskmanager_application::ScalarObservation::available(GIB, 1),
-                free_bytes: taskmanager_application::ScalarObservation::available(GIB, 1),
-            })
+            .scalar_observations(
+                taskmanager_core::core::metrics::DiskPartitionScalarObservations {
+                    capacity_bytes: taskmanager_core::core::metrics::ScalarObservation::available(
+                        2 * GIB,
+                        1,
+                    ),
+                    used_bytes: taskmanager_core::core::metrics::ScalarObservation::available(
+                        GIB, 1,
+                    ),
+                    free_bytes: taskmanager_core::core::metrics::ScalarObservation::available(
+                        GIB, 1,
+                    ),
+                },
+            )
             .build(),
     ];
     // The partition census lives ONCE in the vital line (GPUI parity): the
@@ -329,25 +345,30 @@ fn gpu_chart_metric_projection_defaults_to_utilization_and_gates_families() {
     assert_eq!(projection.choices.len(), GpuChartMetric::ALL.len());
 }
 
-/// The pill activation path publishes `Message::SelectGpuChartMetric`; the
-/// shell's availability gate accepts an observed family and silently rejects
-/// an unobserved one, and the chart windows follow the selection — the
-/// unobserved family's window stays honest gaps, never a fabricated zero.
+/// The shell's availability gate (ADR-034) accepts an observed family and
+/// silently rejects an unobserved one; the family windows follow the
+/// selection — the unobserved family's window stays honest gaps, never a
+/// fabricated zero. Driven through the shell seam directly: the Iced surface
+/// renders every measured family simultaneously (engine_graph "no metric
+/// selector" parity), so no Iced message carries a selection.
 #[test]
-fn gpu_chart_metric_messages_select_through_the_shared_gate() {
+fn gpu_chart_metric_selects_through_the_shared_gate() {
     let mut app = gpu_selected_demo();
     let viewed = app.viewed_gpu().expect("demo views its GPU").clone();
     let device_id = viewed.device_id.clone();
     let device_generation = viewed.device_generation.get();
+    let gate = taskmanager_shell::gpu_chart_metric_gate(Some(&viewed));
 
-    let _ = app.update(Message::SelectGpuChartMetric(GpuChartMetric::Power));
+    app.shell
+        .select_gpu_chart_metric(GpuChartMetric::Power, &gate);
     assert_eq!(
         app.shell.gpu_chart_metric_selected(),
         GpuChartMetric::Utilization,
         "an unavailable family is rejected with no state change"
     );
 
-    let _ = app.update(Message::SelectGpuChartMetric(GpuChartMetric::Temperature));
+    app.shell
+        .select_gpu_chart_metric(GpuChartMetric::Temperature, &gate);
     assert_eq!(
         app.shell.gpu_chart_metric_selected(),
         GpuChartMetric::Temperature
@@ -368,10 +389,6 @@ fn gpu_chart_metric_messages_select_through_the_shared_gate() {
         power.iter().all(|value| !value.is_finite()),
         "the unobserved family's window stays explicit gaps"
     );
-    assert!(
-        !power.is_empty() || power.iter().all(|value| !value.is_finite()),
-        "gap honesty holds for the empty pre-first-frame window too"
-    );
 }
 
 /// When even the default family is unobserved, the selection stays on it and
@@ -385,11 +402,11 @@ fn gpu_chart_metric_selected_unavailable_stays_explicit() {
         if let Some(snapshot) = snapshot.as_mut()
             && let Some(gpu) = snapshot.gpu.first_mut()
         {
-            gpu.apply_scalar_observations(taskmanager_application::GpuScalarObservations {
-                utilization_pct: taskmanager_application::ScalarObservation::unavailable(
-                    taskmanager_application::FailureKind::Unsupported,
+            gpu.apply_scalar_observations(taskmanager_core::core::metrics::GpuScalarObservations {
+                utilization_pct: taskmanager_core::core::metrics::ScalarObservation::unavailable(
+                    taskmanager_core::core::failure::FailureKind::Unsupported,
                 ),
-                ..taskmanager_application::GpuScalarObservations::default()
+                ..taskmanager_core::core::metrics::GpuScalarObservations::default()
             });
         }
     });
@@ -404,23 +421,23 @@ fn gpu_chart_metric_selected_unavailable_stays_explicit() {
         GpuChartMetricChoiceState::SelectedUnavailable,
         "the honest degradation keeps the family selected-and-explicit"
     );
-    // The selection cannot move onto any unavailable family.
-    let _ = app.update(Message::SelectGpuChartMetric(GpuChartMetric::Utilization));
-    assert_eq!(
-        app.shell.gpu_chart_metric_selected(),
-        GpuChartMetric::Utilization
-    );
 }
 
-/// The per-tick fold (the `Tick` message every refresh drives): a viewed GPU
-/// whose device generation advanced — a confirmed hot-plug — resets the
-/// selection to the Utilization default in the same tick.
+/// The live per-tick fold (`finish_tick_system`, ADR-034 stage 2): every
+/// tick reconciles the shared selection against the viewed device's fresh
+/// facts, so a generation advance — a confirmed hot-plug — resets the
+/// selection to the Utilization default in the frame that carried the fact.
+/// The selection itself is driven through the shell seam: the Iced surface
+/// renders every measured family simultaneously (the no-selector parity
+/// note in `engine_graph`), so no Iced message carries a selection.
 #[test]
 fn gpu_chart_metric_generation_change_resets_to_the_default() {
-    use taskmanager_application::DeviceGeneration;
+    use taskmanager_core::core::identity::DeviceGeneration;
 
     let mut app = gpu_selected_demo();
-    let _ = app.update(Message::SelectGpuChartMetric(GpuChartMetric::Temperature));
+    let gate = taskmanager_shell::gpu_chart_metric_gate(app.viewed_gpu());
+    app.shell
+        .select_gpu_chart_metric(GpuChartMetric::Temperature, &gate);
     let _ = app.update(Message::Tick);
     assert_eq!(
         app.shell.gpu_chart_metric_selected(),

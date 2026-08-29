@@ -8,13 +8,14 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
+use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
 use taskmanager_shell::presentation::{MISSING_VALUE, duration, missing_value};
 use taskmanager_ui_contract::IconId;
 
 use super::about_data;
+use super::containers::{KeyHint, Modal};
 use crate::TuiTheme;
 use crate::ui::kv;
 
@@ -23,25 +24,32 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Render the about overlay centred over `area`. Reads `app.projection().hardware`
 /// and `app.projection().snapshot`; absent telemetry renders as `—`.
+#[cfg(test)]
+#[allow(dead_code)]
 pub fn render_about_overlay(
     frame: &mut Frame<'_>,
     app: &crate::TuiApp,
     theme: TuiTheme,
     area: Rect,
 ) {
-    let popup = centered(area, 72, 18);
-    frame.render_widget(Clear, popup);
-    let block = Block::new()
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.accent))
-        .style(Style::new().bg(theme.overlay_bg))
-        .title(format!(
-            " {} {} ",
-            crate::icon_glyph(IconId::Settings),
-            t("about.title")
-        ));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    render_about_overlay_at(
+        frame,
+        app,
+        theme,
+        super::planned_popup(
+            area,
+            crate::TuiInputScope::LocalSurface(crate::TuiSurfaceKind::About),
+        ),
+    );
+}
+
+pub(super) fn render_about_overlay_at(
+    frame: &mut Frame<'_>,
+    app: &crate::TuiApp,
+    theme: TuiTheme,
+    popup: Rect,
+) {
+    let inner = Modal::new(theme, IconId::Settings, t("about.title")).render(frame, popup);
 
     let [body, footer] = Layout::vertical([Constraint::Min(8), Constraint::Length(3)]).areas(inner);
 
@@ -51,7 +59,9 @@ pub fn render_about_overlay(
         Line::from(vec![
             Span::styled(
                 format!("{} TUI", product::NAME),
-                Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::new()
+                    .fg(theme.color(Color::White))
+                    .add_modifier(Modifier::BOLD),
             ),
             Span::styled(
                 format!("  v{VERSION}"),
@@ -110,28 +120,17 @@ pub fn render_about_overlay(
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" i / Esc ", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!("  {}", t("chrome.close")),
-                    Style::new().fg(theme.dim),
+            KeyHint::line(
+                theme,
+                crate::command_palette::surface_hint_pairs(
+                    crate::command_palette::TuiSurfaceScope::StatusOverlay,
+                    crate::command_palette::TuiSurfaceAction::ToggleAbout,
                 ),
-            ]),
+            ),
         ])
         .alignment(Alignment::Center),
         footer,
     );
-}
-
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width.saturating_sub(4));
-    let height = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
-    }
 }
 
 #[cfg(test)]

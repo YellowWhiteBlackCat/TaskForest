@@ -1,4 +1,5 @@
-use taskmanager_application::{PlatformClient, SubmissionErrorKind};
+use taskmanager_application::PlatformClient;
+use taskmanager_platform_contract::SubmissionErrorKind;
 
 use super::*;
 

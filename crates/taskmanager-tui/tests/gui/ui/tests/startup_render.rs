@@ -8,8 +8,9 @@ use crate::ui::confirmations::render_startup_control_confirmation;
 use crate::ui::pages::{startup_impact_text, startup_source_text};
 use crate::ui::startup_menu;
 
-use taskmanager_application::{
-    DeviceState, StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupEvidenceFailure,
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::startup::{
+    StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupEvidenceFailure,
 };
 
 /// A measured critical chain: two timed units plus one untimed node (the
@@ -43,12 +44,12 @@ fn evidence_fixture() -> StartupBootEvidenceSnapshot {
     }
 }
 
-fn entry_fixture() -> taskmanager_application::StartupEntry {
-    use taskmanager_application::{
+fn entry_fixture() -> taskmanager_core::core::startup::StartupEntry {
+    use taskmanager_core::core::startup::{
         StartupControlPolicy, StartupImpact, StartupImpactEvidence, StartupScope, StartupSource,
     };
-    taskmanager_application::StartupEntry {
-        id: taskmanager_application::StartupEntryId::new("fixture:demo"),
+    taskmanager_core::core::startup::StartupEntry {
+        id: taskmanager_core::core::startup::StartupEntryId::new("fixture:demo"),
         name: "demo-autostart.desktop".into(),
         exec: "/usr/bin/demo --daemon".into(),
         enabled: true,
@@ -75,8 +76,8 @@ fn startup_impact_and_source_columns_carry_evidence_and_scope() {
     // honest about it — never a fabricated number.
     assert_eq!(startup_impact_text(&entry), "Low · 42 ms");
     let mut unknown = entry.clone();
-    unknown.impact_evidence = taskmanager_application::StartupImpactEvidence::Unknown {
-        reason: taskmanager_application::StartupImpactUnknownReason::NotInstrumented,
+    unknown.impact_evidence = taskmanager_core::core::startup::StartupImpactEvidence::Unknown {
+        reason: taskmanager_core::core::startup::StartupImpactUnknownReason::NotInstrumented,
     };
     assert_eq!(startup_impact_text(&unknown), "Low · unmeasured");
     // The source column carries the scope suffix (GPUI parity).
@@ -99,7 +100,25 @@ fn startup_menu_and_confirmation_render_without_panicking() {
                 entry: entry_fixture(),
                 selection: 0,
             };
-            startup_menu::render_startup_menu(frame, &menu, theme, area);
+            // The test-only entry takes the committed focus plan explicitly:
+            // this fixture mirrors the live StartupMenu surface addressing
+            // item 0, exactly as the frame plan would project it.
+            startup_menu::render_startup_menu(
+                frame,
+                &menu,
+                theme,
+                crate::ui::frame_plan::TuiFocusPlan {
+                    target: crate::ui::frame_plan::TuiFocusTarget::LocalSurface(
+                        crate::TuiSurfaceKind::StartupMenu,
+                    ),
+                    order: crate::ui::frame_plan::TuiFocusOrder::None,
+                    control: crate::ui::frame_plan::TuiFocusControl::MenuItem {
+                        surface: crate::TuiSurfaceKind::StartupMenu,
+                        index: menu.selection,
+                    },
+                },
+                area,
+            );
         })
         .expect("draw");
 
@@ -258,7 +277,8 @@ fn boot_timeline_collapses_overflow_into_a_bounded_row() {
     )
     .expect("large chain projects rows");
     assert!(
-        projection.rows.len() <= taskmanager_application::DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS + 1,
+        projection.rows.len()
+            <= taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS + 1,
         "segment rows are capped plus one collapsed row"
     );
     let collapsed = projection

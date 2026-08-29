@@ -29,12 +29,16 @@ use bevy::scene::WorldSceneExt;
 use bevy::text::Font;
 use bevy::ui::Checked;
 use bevy::ui::widget::Text;
-use taskmanager_application::alerts::{Alert, AlertMetric, AlertSeverity};
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    EventEnvelope, EventPort, EventPortError, HostTelemetryRequest, PlatformClient, PlatformEvent,
-    PlatformFacets, PlatformHandle, RequestPort, SubmissionError, SystemFacets,
+    HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
+    SystemFacets,
 };
+use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, RequestPort, SubmissionError,
+};
+
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::Theme;
 
@@ -72,7 +76,7 @@ impl RequestPort for QuietRequests {
 
     fn try_submit(
         &self,
-        _request: taskmanager_application::RequestEnvelope<Self::Request>,
+        _request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
     ) -> Result<(), SubmissionError> {
         Ok(())
     }
@@ -451,7 +455,7 @@ fn w4_pages_assemble_and_despawn_in_a_bare_scene_world() {
             .map(|text| text.0.clone())
             .collect::<Vec<String>>();
         assert!(
-            texts.iter().any(|text| text == page.title()),
+            texts.iter().any(|text| *text == page.title()),
             "the {} page renders its title bare",
             page.nav_label()
         );

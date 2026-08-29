@@ -7,6 +7,7 @@
 
 use std::collections::HashSet;
 
+use crate::widgets::controls::{ControlTone, ControlVisual};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::hierarchy::{ChildOf, Children};
@@ -14,21 +15,23 @@ use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, Query, Res};
+use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
 use bevy::ecs::world::DeferredWorld;
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
-use bevy::ui::prelude::{AlignItems, Node, UiRect, Val, percent, px};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::ui::prelude::{AlignItems, BorderRadius, Node, UiRect, Val, percent, px};
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::Button;
+use taskmanager_application::i18n::t;
 use taskmanager_application::process_category_projection::{
     category_buckets, category_expansion_key,
 };
-use taskmanager_application::{
+use taskmanager_core::core::process::{
     ProcessCategory, ProcessItem, build_process_tree, flatten_tree_visible, process_category,
 };
-use taskmanager_shell::ProcessRowKey;
 
-use crate::app::PageContext;
-use crate::app::ShellTrack;
+use taskmanager_shell::ProcessRowId;
+
+use crate::app::{FrontendTrack, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
 use crate::input_contract::{SemanticAddress, stable_semantic_address};
 use crate::palette::{UiPalette, space_8};
@@ -93,7 +96,7 @@ impl ProcessTreeExpansion {
 /// aggregate can never be mistaken for an executable target.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ProcessTreeRow<'a> {
-    pub(crate) key: ProcessRowKey,
+    pub(crate) key: ProcessRowId,
     pub(crate) depth: usize,
     pub(crate) label: String,
     pub(crate) member_count: usize,
@@ -130,7 +133,7 @@ pub(crate) fn project_items<'a>(
             .collect();
         let category_expanded = expansion.category_expanded(category);
         rows.push(ProcessTreeRow {
-            key: ProcessRowKey::Category(category),
+            key: ProcessRowId::Category(category),
             depth: 0,
             label: category_label(category),
             member_count,
@@ -147,7 +150,16 @@ pub(crate) fn project_items<'a>(
             for root in roots {
                 let application_expanded = expansion.application_expanded(root.item.pid);
                 rows.push(ProcessTreeRow {
-                    key: ProcessRowKey::Application(root.item.pid),
+                    key: root.item
+                        .current_start_token()
+                        .and_then(|token| {
+                            taskmanager_shell::ProcessRowIdentity::from_parts(
+                                root.item.pid,
+                                token,
+                            )
+                        })
+                        .map(ProcessRowId::Application)
+                        .unwrap_or(ProcessRowId::Category(taskmanager_core::core::process::ProcessCategory::Application)),
                     depth: 1,
                     label: root
                         .item
@@ -174,14 +186,15 @@ pub(crate) fn project_items<'a>(
 }
 
 fn push_process_rows<'a>(
-    root: &taskmanager_application::ProcessNode<'a>,
+    root: &taskmanager_core::core::process::ProcessNode<'a>,
     depth_offset: usize,
     collapsed: &HashSet<u32>,
     rows: &mut Vec<ProcessTreeRow<'a>>,
 ) {
     for flat in flatten_tree_visible(std::slice::from_ref(root), collapsed) {
         rows.push(ProcessTreeRow {
-            key: ProcessRowKey::Process(flat.item.pid),
+            key: ProcessRowId::from_process(flat.item)
+                .unwrap_or(ProcessRowId::Category(taskmanager_core::core::process::ProcessCategory::Uncategorized)),
             depth: depth_offset + flat.depth,
             label: flat.item.name.clone(),
             member_count: 1,
@@ -192,7 +205,7 @@ fn push_process_rows<'a>(
     }
 }
 
-fn tree_size(node: &taskmanager_application::ProcessNode<'_>) -> usize {
+fn tree_size(node: &taskmanager_core::core::process::ProcessNode<'_>) -> usize {
     1 + node.children.iter().map(tree_size).sum::<usize>()
 }
 
@@ -232,11 +245,11 @@ pub(crate) fn row_scene(row: &ProcessTreeRow<'_>, palette: &UiPalette) -> impl S
     }
 }
 
-fn semantic_key(key: ProcessRowKey) -> String {
+fn semantic_key(key: ProcessRowId) -> String {
     match key {
-        ProcessRowKey::Category(category) => format!("category:{category:?}"),
-        ProcessRowKey::Application(pid) => format!("application:{pid}"),
-        ProcessRowKey::Process(pid) => format!("process:{pid}"),
+        ProcessRowId::Category(category) => format!("category:{category:?}"),
+        ProcessRowId::Application(identity) => format!("application:{}", identity.pid()),
+        ProcessRowId::Process(identity) => format!("process:{}", identity.pid()),
     }
 }
 
@@ -259,6 +272,9 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
         .collect();
     let title = format!("Process tree · {} processes", items.len());
     let row_scenes = row_scenes;
+    let end_label = t("proc.end_process_tree").to_owned();
+    let end_height = context.palette.control_height_px;
+    let end_radius = context.palette.control_radius_px;
     bsn! {
         Node {
             width: percent(100),
@@ -270,7 +286,31 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
         ProcessTreeSurface
         ControlSurface
         Children [
-            ( Text(title) ProcessTreeCountLine TextRole(Role::Caption) ),
+            (
+                Node {
+                    width: percent(100),
+                    flex_direction: bevy::ui::prelude::FlexDirection::Row,
+                    justify_content: bevy::ui::prelude::JustifyContent::SpaceBetween,
+                    align_items: bevy::ui::prelude::AlignItems::Center,
+                }
+                Children [
+                    ( Text(title) ProcessTreeCountLine TextRole(Role::Caption) ),
+                    (
+                        Node {
+                            height: px(end_height),
+                            padding: UiRect::horizontal(Val::Px(space_8())),
+                            align_items: bevy::ui::prelude::AlignItems::Center,
+                            border_radius: BorderRadius::all(Val::Px(end_radius)),
+                        }
+                        ControlVisual(ControlTone::Surface, false)
+                        Button
+                        on(on_end_tree_activated)
+                        Children [
+                            ( Text(end_label) TextRole(Role::Caption) ),
+                        ]
+                    ),
+                ]
+            ),
             (
                 Node { flex_direction: bevy::ui::prelude::FlexDirection::Column }
                 ProcessTreeRows
@@ -333,13 +373,33 @@ fn refresh_tree_on_fold(
     }
 }
 
+/// The End-tree affordance: freeze the selected process's tree into the
+/// shared ProcessBatch gate (`request_process_tree_end`). The confirmation
+/// modal the gate arms is the shared one; this button only arms.
+fn on_end_tree_activated(
+    _activate: On<bevy::ui_widgets::Activate>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut commands: Commands,
+) {
+    let shell = &mut track.shell;
+    let Some(process) = shell.visible_process_at(shell.selected) else {
+        return;
+    };
+    let pid = process.pid;
+    let _ = shell.request_process_tree_end(pid);
+    let view = shell
+        .pending_confirmation()
+        .and_then(crate::confirmation::PendingConfirmationView::from_pending);
+    commands.trigger(crate::confirmation::ConfirmationChanged(view));
+}
+
 /// Identity marker for later pointer/keyboard observers.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ProcessTreeRowMarker(pub(crate) ProcessRowKey);
+pub(crate) struct ProcessTreeRowMarker(pub(crate) ProcessRowId);
 
 impl Default for ProcessTreeRowMarker {
     fn default() -> Self {
-        Self(ProcessRowKey::Category(ProcessCategory::Application))
+        Self(ProcessRowId::Category(ProcessCategory::Application))
     }
 }
 

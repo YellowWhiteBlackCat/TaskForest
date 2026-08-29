@@ -11,8 +11,9 @@ use taskmanager_application::{
     ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
     ProcessGpuRequest, ProcessIsolationRequest, ProcessListRequest,
     ProcessNetworkEscalationRequest, ProcessNetworkRequest, ProcessOpenFilesRequest,
-    ProcessResourceControlRequest, ProcessResourcesRequest, ProcessSignal, ProcessThreadsRequest,
+    ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest,
 };
+use taskmanager_core::core::process::ProcessSignal;
 use taskmanager_platform_provider::{
     ProcessAffinityControlProvider, ProcessAffinityProvider, ProcessControlProvider,
     ProcessGpuProvider, ProcessIsolationProvider, ProcessListProvider,

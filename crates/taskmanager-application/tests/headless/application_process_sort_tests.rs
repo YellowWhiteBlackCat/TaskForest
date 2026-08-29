@@ -1,10 +1,11 @@
 use super::{ProcessSortAxis, compare_axis, compare_processes};
 use std::cmp::Ordering;
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_test_support::{SortFixtureMetrics, sort_fixture_row, sort_parity_fixture};
 
 /// Pid order of the fixture sorted directly by the neutral comparator.
-fn neutral_order(items: &[crate::ProcessItem], axis: ProcessSortAxis, ascending: bool) -> Vec<u32> {
-    let mut sorted: Vec<&crate::ProcessItem> = items.iter().collect();
+fn neutral_order(items: &[ProcessItem], axis: ProcessSortAxis, ascending: bool) -> Vec<u32> {
+    let mut sorted: Vec<&ProcessItem> = items.iter().collect();
     sorted.sort_by(|left, right| compare_processes(left, right, axis, ascending));
     sorted.iter().map(|process| process.pid).collect()
 }

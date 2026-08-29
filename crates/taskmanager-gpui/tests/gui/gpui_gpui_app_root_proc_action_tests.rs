@@ -3,10 +3,13 @@ use gpui::AppContext;
 use std::sync::{Arc, Mutex};
 
 use taskmanager_application::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
     PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ProcessControlRequest,
-    ProcessFacets, ProcessSignal, RequestEnvelope, RequestPort, SubmissionError,
-    TelemetryRefreshPolicy,
+    ProcessFacets, TelemetryRefreshPolicy,
+};
+use taskmanager_core::core::process::ProcessSignal;
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    RequestEnvelope, RequestPort, SubmissionError,
 };
 
 struct NoCapabilities;
@@ -40,13 +43,13 @@ impl RequestPort for RecordingControl {
     }
 }
 
-fn fixture_process(pid: u32) -> crate::core::process::ProcessItem {
+fn fixture_process(pid: u32) -> taskmanager_core::core::process::ProcessItem {
     taskmanager_test_support::ProcessItemFixtureBuilder::new()
         .pid(pid)
         .parent_pid(None)
         .name("fixture-worker".into())
-        .scalar_observations(crate::core::process::ProcessScalarObservations {
-            start_token: crate::core::ScalarObservation::available(1_000, 1),
+        .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+            start_token: taskmanager_core::core::ScalarObservation::available(1_000, 1),
             ..Default::default()
         })
         .current_start_time_secs(100)
@@ -55,7 +58,7 @@ fn fixture_process(pid: u32) -> crate::core::process::ProcessItem {
 
 #[test]
 fn menu_control_vocabulary_maps_to_neutral_requests() {
-    let target = crate::core::process::FrozenProcessIdentity::from_authoritative_parts(
+    let target = taskmanager_core::core::process::FrozenProcessIdentity::from_authoritative_parts(
         42,
         "fixture-worker".to_string(),
         100,
@@ -85,7 +88,7 @@ fn menu_control_vocabulary_maps_to_neutral_requests() {
         menu_control_submission(MenuControlRequest::Signal(ProcessSignal::Hangup), target),
         (
             ProcessControlRequest::SendSignal {
-                target: crate::core::process::FrozenProcessIdentity::from_authoritative_parts(
+                target: taskmanager_core::core::process::FrozenProcessIdentity::from_authoritative_parts(
                     42,
                     "fixture-worker".to_string(),
                     100,
@@ -117,7 +120,7 @@ async fn menu_suspend_resume_submit_the_neutral_request(cx: &mut gpui::TestAppCo
         taskmanager_telemetry_store::TelemetryStore::shared_with_correlated_ingestion(60);
     let view = cx.new(|cx| {
         super::RootView::new_with_platform(
-            crate::gpui_app::theme::Theme::dark(),
+            taskmanager_theme::Theme::dark(),
             telemetry,
             ingestor,
             TelemetryRefreshPolicy::default(),
@@ -127,7 +130,7 @@ async fn menu_suspend_resume_submit_the_neutral_request(cx: &mut gpui::TestAppCo
     });
 
     let item = fixture_process(42);
-    let target = crate::core::process::FrozenProcessIdentity::from_process(&item)
+    let target = taskmanager_core::core::process::FrozenProcessIdentity::from_process(&item)
         .expect("fixture carries an authoritative start token");
     let cases = [
         (

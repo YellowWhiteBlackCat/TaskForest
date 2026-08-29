@@ -39,9 +39,11 @@ pub mod tray;
 pub mod units;
 
 pub use alerts::{
-    Alert, AlertEngine, AlertMetric, AlertRule, AlertSeverity, InsufficientReason,
-    RollingStatSnapshot, SUGGESTION_CONFIDENCE_HIGH_MIN_SAMPLES, SUGGESTION_MIN_SAMPLES,
-    SUGGESTION_SIGMA_K, SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
+    ALERT_EVENT_FILE_SCHEMA, ALERT_EVENT_FILE_VERSION, Alert, AlertEngine, AlertEvent,
+    AlertEventExportError, AlertEventKind, AlertMetric, AlertRule, AlertSeverity,
+    InsufficientReason, MAX_ALERT_EVENTS, RollingStatSnapshot,
+    SUGGESTION_CONFIDENCE_HIGH_MIN_SAMPLES, SUGGESTION_MIN_SAMPLES, SUGGESTION_SIGMA_K,
+    SuggestedThreshold, SuggestionBasis, SuggestionConfidence, export_alert_events_json,
 };
 pub use appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
 pub use cpu_features::CpuInstructionFeature;

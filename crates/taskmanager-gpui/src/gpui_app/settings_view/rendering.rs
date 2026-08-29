@@ -7,14 +7,14 @@ use std::collections::HashMap;
 
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
-use crate::core::config::{
-    TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_PLATFORM_DEFAULT, TEXT_RENDERING_SUBPIXEL,
-};
 use crate::gpui_app::elements::Pill;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::config::{
+    TEXT_RENDERING_GRAYSCALE, TEXT_RENDERING_PLATFORM_DEFAULT, TEXT_RENDERING_SUBPIXEL,
+};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 pub(crate) fn text_rendering_row(
     t: &Theme,

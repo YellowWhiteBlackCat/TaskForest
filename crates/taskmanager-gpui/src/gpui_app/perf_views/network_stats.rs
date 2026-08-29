@@ -5,8 +5,8 @@
 //! field that simply does not exist here (no IPv6 address, unknown link
 //! speed) omits its row entirely instead of parking a permanent dash.
 
-use crate::core::metrics::NetworkMetrics;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::NetworkMetrics;
 
 use crate::gpui_app::formatting::{DisplayUnits, UnitKind};
 use taskmanager_shell::viewmodel::StatRow;

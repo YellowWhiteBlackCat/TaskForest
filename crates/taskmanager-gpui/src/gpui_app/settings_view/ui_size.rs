@@ -4,8 +4,9 @@ use gpui::{Context, Div, Entity, ParentElement, Styled, div};
 
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::{Theme, tokens, tokens::UiSize};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::{self, UiSize};
 
 pub(super) fn ui_size_row(
     theme: &Theme,

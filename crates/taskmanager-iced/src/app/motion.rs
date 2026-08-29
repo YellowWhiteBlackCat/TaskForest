@@ -281,8 +281,10 @@ impl crate::IcedApp {
                 {
                     open.lifecycle.reject_attempt(
                         attempt_id,
-                        taskmanager_application::ServiceLogFailure::with_detail(
-                            taskmanager_application::ServiceLogErrorKind::from_failure(failure),
+                        taskmanager_core::core::services::ServiceLogFailure::with_detail(
+                            taskmanager_core::core::services::ServiceLogErrorKind::from_failure(
+                                failure,
+                            ),
                             "service log request submission failed",
                         ),
                     );

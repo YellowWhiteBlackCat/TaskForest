@@ -4,10 +4,10 @@
 
 use iced::widget::{column, row, scrollable, text};
 use iced::{Element, Length};
-use taskmanager_application::HardwareInfo;
-use taskmanager_application::SystemSnapshot;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_theme::tokens;
 
 use crate::app::Message;

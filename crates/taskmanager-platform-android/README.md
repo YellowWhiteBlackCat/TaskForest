@@ -44,7 +44,7 @@ app-host, or a frontend. An Android Activity/Service and APK packaging layer
 must own Android lifecycle and context/path injection before product wiring.
 
 ```text
-cargo test -p taskmanager-platform-android
+cargo nextest run --locked -p taskmanager-platform-android --all-targets -j 4
 cargo check --locked --target aarch64-linux-android \
   -p taskmanager-platform-android --features android-provider
 ```

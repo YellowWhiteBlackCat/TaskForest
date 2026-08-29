@@ -3,11 +3,12 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::core::process::{AppGroup, ProcessItem, sort_apps};
+use taskmanager_core::core::process::{AppGroup, ProcessItem, sort_apps};
 
 use super::projection::memory_for_display;
-use super::{SortCol, Toggle, VisibleRow};
-use taskmanager_shell::ProcessRowKey;
+use super::{Toggle, VisibleRow};
+use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::SortCol;
 
 fn sum_opt_u64(acc: Option<u64>, value: Option<u64>) -> Option<u64> {
     match (acc, value) {
@@ -39,7 +40,7 @@ fn sum_opt_f32(acc: Option<f32>, value: Option<f32>) -> Option<f32> {
 /// Fold one group's members into an aggregate [`VisibleRow`] (summed CPU% /
 /// memory / disk / threads / cpu-time / fds, representative user/status
 /// fields from `main_pid`, `×N` instance badge). Category roots are structural;
-/// application roots carry a PID-less [`ProcessRowKey::Application`].
+/// application roots carry a PID-less [`ProcessRowId::Application`].
 pub(super) fn aggregate_row(
     group: &AppGroup,
     by_pid: &HashMap<u32, &ProcessItem>,
@@ -77,7 +78,7 @@ pub(super) fn aggregate_row(
         })
         .unwrap_or_default();
     let selection_key = match &toggle {
-        Toggle::GroupApp(_) => Some(ProcessRowKey::Application(group.main_pid)),
+        Toggle::GroupApp(_) => by_pid.get(&group.main_pid).and_then(|root| ProcessRowId::application_of(root)),
         Toggle::None | Toggle::TreePid(_) | Toggle::GroupCategory(_) => None,
     };
     let mut row = VisibleRow {

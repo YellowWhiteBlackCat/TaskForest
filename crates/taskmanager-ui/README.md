@@ -6,11 +6,19 @@ TaskForest's own GPUI component layer (ADR-017 Phase 3/4): primitives,
 inputs, and overlays built directly on gpui, taskmanager-theme (`Palette`),
 taskmanager-icons, and taskmanager-ui-contract. No `gpui_component`.
 
+This crate is the SEMANTIC REFERENCE SOURCE for the parallel component
+layers (Iced/TUI/Bevy, GPUI-05): every capability in the ui-contract registry
+names a component here through `ComponentCapability::reference_path`.
+Parallel frontends port these semantics; a gap or bug found while porting
+is written back to this crate (and the contract, if the vocabulary is
+wrong) first — never forked silently. The GPUI capability gate test fails
+if a registry entry points at a component that does not exist.
+
 - `focus` — modal focus trap / restore (absorbed from `crates/taskmanager-gpui/src/gpui_app/modal_focus.rs`)
 - `primitives/` — button, icon_button, label, selectable_text, badge, divider, spinner,
   progress, tooltip, scrollbar, pill, toolbar, state_panel, card_surface
 - `layout.rs` — bounded page viewport/frame/scaffold and scroll-region contracts
-- `data/` — table, virtual list, tree, highlighter, data row, key/value row
+- `data/` — table, column resize, virtual list, tree, highlighter, data row, key/value row
 - `inputs/` — switch, slider, checkbox, text_input, search_input
 - `overlays/` — layer_stack, dialog, popup, context_menu, dropdown_menu, toast
 - `styled.rs` — palette-driven style helpers (no hand-written colors)
@@ -54,4 +62,7 @@ plus Linux primary-selection sync on release. A window-level coordinator makes
 the active selection exclusive, so starting elsewhere clears the previous
 highlight. `KeyValueRow` opts values into it with an explicit semantic ID;
 dense interactive tables remain excluded until their row-selection and
-column-drag arbitration is defined.
+text-selection arbitration is defined. `data/table/resize.rs` is the separate
+`ColumnDragResize` reference surface: it owns the typed GPUI drag payload,
+stable first-motion anchoring, width transition, and outside-release wiring;
+page adapters retain column identity and persistence.

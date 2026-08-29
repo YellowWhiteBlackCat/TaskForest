@@ -3,11 +3,13 @@
 
 use gpui::Context;
 
-use crate::core::process::FrozenProcessIdentity;
 use taskmanager_application::{
-    FailureKind, ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
-    SubmissionError, SubmissionErrorKind,
+    ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_platform_contract::{SubmissionError, SubmissionErrorKind};
+
 use taskmanager_shell::ProcessControlKind;
 
 use super::{

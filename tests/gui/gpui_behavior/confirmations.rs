@@ -3,15 +3,18 @@
 //! interaction state. No renderer projection fixture is mutated here.
 
 use gpui::TestAppContext;
-use taskmanager::core::process::{FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent};
-use taskmanager::core::services::ServiceAction;
-use taskmanager::core::{DeviceGeneration, DeviceId, ServiceId, SmartSelfTestKind};
+use taskmanager_application::ProcessTerminationAction;
 use taskmanager_application::{
     InteractionEvent, PendingConfirmation, ProcessTerminationConfirmation,
 };
-use taskmanager_gpui::gpui_app::root::{ProcessTerminationAction, RootView};
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent,
+};
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::{DeviceGeneration, DeviceId, ServiceId, SmartSelfTestKind};
+use taskmanager_gpui::gpui_app::root::RootView;
 use taskmanager_gpui::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
-use taskmanager_gpui::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 use super::proc;
 
@@ -156,7 +159,7 @@ async fn completed_process_batch_history_exports_to_clipboard(cx: &mut TestAppCo
     win.update(cx, |view, _window, cx| {
         view.process_batch_history.record_result(
             123_456,
-            taskmanager_application::ProcessBatchResult {
+            taskmanager_core::core::process::ProcessBatchResult {
                 intent: ProcessBatchIntent {
                     action: ProcessBatchAction::Suspend,
                     targets: vec![identity.clone()],
@@ -164,7 +167,7 @@ async fn completed_process_batch_history_exports_to_clipboard(cx: &mut TestAppCo
                 },
                 targets: vec![(
                     identity,
-                    taskmanager_application::ProcessBatchTargetResult::Applied,
+                    taskmanager_core::core::process::ProcessBatchTargetResult::Applied,
                 )],
             },
         );

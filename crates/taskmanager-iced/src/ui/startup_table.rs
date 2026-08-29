@@ -8,15 +8,16 @@ use iced::widget::{button, column, container, row, text};
 use iced::{Element, Length};
 use std::rc::Rc;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
-    AppPage, RefreshRequest, StartupBootEvidenceSnapshot, StartupControlPolicy,
-    StartupCriticalChainNode, StartupImpact, StartupImpactEvidence, StartupScope, StartupSource,
+use taskmanager_application::{AppPage, RefreshRequest};
+use taskmanager_core::core::startup::{
+    StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode, StartupImpact,
+    StartupImpactEvidence, StartupScope, StartupSource,
 };
+
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp};
 use taskmanager_theme::tokens;
 
-use super::highlight;
 use super::tables::{
     InventoryTableKey, ListState, info_header_cell, inventory_row_height, inventory_table_key,
     message_panel, plain_header_cell, source_notice_banner, source_state_panel,
@@ -27,6 +28,7 @@ use super::{
     virtual_table_key, virtual_table_row,
 };
 use crate::app::{FocusTarget, Message};
+use crate::ui::components::highlight;
 use crate::{IcedApp, focus, theme};
 
 mod timeline;
@@ -126,6 +128,11 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
             let query = shell.query.clone();
             let search_active = shell.search_active();
             let selected = shell.selected;
+            // The open Startup-row menu re-hosts its row. The stored menu
+            // identity is the provider source index; the visual→source mapping
+            // is the same shared sorted order the rows project through.
+            let open_menu_source = app.startup_menu_index();
+            let sorted_indices = Rc::new(shell.sorted_startup_indices());
             let base_key = inventory_table_key(InventoryTableKey {
                 theme_snapshot,
                 generation: projection_generation,
@@ -136,12 +143,17 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                 selected,
                 row_count: rows.len(),
                 compact,
+                open_menu: open_menu_source.map(|index| index.to_string()),
             });
             let body_rows = Rc::clone(&rows);
+            let body_open_menu = open_menu_source;
+            let body_sorted = Rc::clone(&sorted_indices);
             let body_query = query.clone();
             let columns = startup_columns();
             let table_body = iced::widget::lazy(virtual_table_key(base_key, window), move |_| {
                 let rows = Rc::clone(&body_rows);
+                let open_menu_source = body_open_menu;
+                let sorted_indices = Rc::clone(&body_sorted);
                 let query = body_query.clone();
                 virtual_table_body(window, Length::Fill, move |start, end| {
                     rows.get(start..end)
@@ -183,6 +195,26 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
                                     visual_index: index,
                                 },
                             );
+                            let row = match sorted_indices.get(index).copied() {
+                                Some(source_index) if open_menu_source == Some(source_index) => {
+                                    // The open menu floats on its own row:
+                                    // anchored by the popover primitive and
+                                    // dismissed by an outside press without
+                                    // touching what's below.
+                                    let panel = super::startup_menu::panel(
+                                        table_theme,
+                                        source_index,
+                                        startup.name.clone(),
+                                    );
+                                    crate::ui::components::Popover::new(
+                                        row,
+                                        panel,
+                                        Message::CloseStartupRowMenu,
+                                    )
+                                    .into()
+                                }
+                                _ => row,
+                            };
                             virtual_table_row(row, inventory_row_height(compact))
                         })
                         .collect()
@@ -232,10 +264,7 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
     ) {
         page = page.push(block);
     }
-    let page = page
-        .push(body)
-        .push(super::startup_menu::render(app, theme_snapshot))
-        .height(Length::Fill);
+    let page = page.push(body).height(Length::Fill);
     // The enable/disable action bar renders only when there are entries to act
     // on (gating on selection happens inside the bar). Mirrors the Users
     // session action bar.
@@ -541,11 +570,11 @@ fn boot_evidence_strip<'a>(
     let data = boot_evidence_strip_data(evidence)?;
     let muted = theme::muted_text_color(theme_snapshot);
     let failed_color = if data.failed_units_danger {
-        theme::color(theme_snapshot.danger)
+        taskmanager_theme::iced::color(theme_snapshot.danger)
     } else {
         muted
     };
-    let fg = theme::color(theme_snapshot.fg);
+    let fg = taskmanager_theme::iced::color(theme_snapshot.fg);
     Some(
         row![
             row![

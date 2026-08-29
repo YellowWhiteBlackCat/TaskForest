@@ -3,9 +3,10 @@
 //! The renderer consumes ordered sections and a bounded viewport; observation
 //! availability and NPU engine/memory folds live here instead of paint code.
 
-use taskmanager_application::{
-    DisplayInfo, HardwareInfo, NpuEngineKind, NpuInventorySnapshot, SystemSnapshot, i18n::t,
-};
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
 use taskmanager_shell::presentation::{MISSING_VALUE, duration, missing_value, optional_bytes};
 
 pub(super) struct SystemFact {
@@ -264,9 +265,43 @@ pub(super) fn system_sections(
         }
     }
 
+    // Storage inventory (GPUI `storage_section` parity): one static
+    // identity/capacity row per discovered disk. Field order mirrors the
+    // parity checklist — name, capacity, available, type — and stays
+    // minimal: free-space detail and I/O telemetry remain exclusively on
+    // the Performance disk page. An unobserved byte figure is an honest
+    // dash, never a fabricated zero.
+    let mut storage = SystemFactSection::new("system.section.storage");
+    if let Some(snapshot) = snapshot {
+        let disk_count = snapshot.disks.len();
+        for (index, disk) in snapshot.disks.iter().enumerate() {
+            let label = if disk_count > 1 {
+                format!("{} {}", t("common.disk"), index.saturating_add(1))
+            } else {
+                t("common.disk").to_owned()
+            };
+            let identity = [disk.model.trim(), disk.name.trim()]
+                .into_iter()
+                .find(|value| !value.is_empty())
+                .unwrap_or(MISSING_VALUE)
+                .to_owned();
+            let mut details = vec![identity];
+            details.push(optional_bytes(disk.current_capacity_bytes()));
+            details.push(optional_bytes(disk.current_available_bytes()));
+            let disk_type = disk.disk_type.trim();
+            if !disk_type.is_empty() {
+                details.push(disk_type.to_owned());
+            }
+            storage.push(label, details.join(" · "));
+        }
+    }
+
     let mut sections = vec![device, cpu, memory];
     if !graphics.facts.is_empty() {
         sections.push(graphics);
+    }
+    if !storage.facts.is_empty() {
+        sections.push(storage);
     }
     sections
 }

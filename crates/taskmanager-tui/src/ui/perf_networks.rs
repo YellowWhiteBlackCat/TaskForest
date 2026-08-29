@@ -21,14 +21,13 @@ use ratatui::style::Style;
 use ratatui::widgets::{Paragraph, Wrap};
 
 use taskmanager_application::i18n::t;
-use taskmanager_application::{NetworkAdapterType, NetworkMetrics};
-use taskmanager_shell::history::LiveGraphHistory;
-use taskmanager_shell::presentation::MISSING_VALUE;
+use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::{MISSING_VALUE, device_status_i18n_key};
 use taskmanager_ui_contract::IconId;
 
 use crate::TuiApp;
 use crate::TuiTheme;
-use crate::icon_glyph;
 
 /// Render the per-network-adapter detail section into `area`. A zero-height
 /// area (the small-terminal case where no panel was allocated) renders nothing.
@@ -64,7 +63,7 @@ pub(super) fn render_network_section(
     }
     let lines = network_lines(
         &filtered,
-        &app.history,
+        &app,
         theme,
         app.prefs.units[4],
         app.prefs.units[5],
@@ -120,22 +119,22 @@ struct NetworkClassVisibility {
 }
 
 impl NetworkClassVisibility {
-    fn allows(self, adapter_type: taskmanager_application::NetworkAdapterType) -> bool {
+    fn allows(self, adapter_type: taskmanager_core::core::metrics::NetworkAdapterType) -> bool {
         match adapter_type {
-            taskmanager_application::NetworkAdapterType::Ethernet => self.wired,
-            taskmanager_application::NetworkAdapterType::WiFi => self.wireless,
-            taskmanager_application::NetworkAdapterType::Vpn => self.vpn,
-            taskmanager_application::NetworkAdapterType::Virtual => self.virtual_devices,
-            taskmanager_application::NetworkAdapterType::Unknown
-            | taskmanager_application::NetworkAdapterType::Loopback
-            | taskmanager_application::NetworkAdapterType::Other => self.other,
+            taskmanager_core::core::metrics::NetworkAdapterType::Ethernet => self.wired,
+            taskmanager_core::core::metrics::NetworkAdapterType::WiFi => self.wireless,
+            taskmanager_core::core::metrics::NetworkAdapterType::Vpn => self.vpn,
+            taskmanager_core::core::metrics::NetworkAdapterType::Virtual => self.virtual_devices,
+            taskmanager_core::core::metrics::NetworkAdapterType::Unknown
+            | taskmanager_core::core::metrics::NetworkAdapterType::Loopback
+            | taskmanager_core::core::metrics::NetworkAdapterType::Other => self.other,
         }
     }
 }
 
 fn network_lines(
     networks: &[&NetworkMetrics],
-    history: &LiveGraphHistory,
+    shell: &ShellApp,
     theme: TuiTheme,
     use_bytes: bool,
     use_base2: bool,
@@ -154,9 +153,19 @@ fn network_lines(
         };
         lines.push(ratatui::text::Line::from(format!(
             "{} {} · {}",
-            icon_glyph(IconId::Network),
+            theme.glyph(IconId::Network),
             network.interface_name,
             kind,
+        )));
+        // Device health verdict (GPUI network_stats first stat; shared
+        // presentation single-source). The typed DeviceStatus vocabulary
+        // expresses degraded/stale, permission-denied and missing-tool states
+        // — facts the carrier-based Connected/Disconnected link verdict below
+        // deliberately cannot carry.
+        lines.push(ratatui::text::Line::from(format!(
+            "  {} {}",
+            t("device.status"),
+            t(device_status_i18n_key(network.device_state.status)),
         )));
         // Per-NIC throughput trend: this interface's own receive and transmit
         // windows (the split-direction companions of the summed series, same
@@ -166,15 +175,20 @@ fn network_lines(
         // variant — the TUI counterpart of the iced same-hue lift. A direction
         // with <2 finite samples renders the dotted "collecting"
         // placeholder; a missing sample inside a live row renders a gap dot.
-        let rx_window = history
+        let rx_window = shell
+            .history
             .network_rx_bytes_per_sec_for(&network.device_id, network.device_generation.get());
-        let tx_window = history
+        let tx_window = shell
+            .history
             .network_tx_bytes_per_sec_for(&network.device_id, network.device_generation.get());
-        let trend = super::sparkline::device_dual_trend_with(&rx_window, &tx_window, graph_window);
-        let label_width = t("net.receive")
-            .chars()
-            .count()
-            .max(t("net.send").chars().count());
+        let trend = super::sparkline::device_dual_trend_in(
+            theme.terminal.glyphs,
+            &rx_window,
+            &tx_window,
+            graph_window,
+        );
+        let label_width =
+            super::text::cell_width(t("net.receive")).max(super::text::cell_width(t("net.send")));
         lines.push(super::sparkline::dual_trend_line(
             t("net.receive"),
             label_width,
@@ -190,9 +204,11 @@ fn network_lines(
         // The total-throughput summary stays on the summed window: the two
         // direction rows carry the shape, this line carries the rx+tx total
         // statistics.
-        let window =
-            history.network_bytes_per_sec_for(&network.device_id, network.device_generation.get());
-        if let Some(summary) = super::sparkline::device_summary_line(
+        let window = shell
+            .history
+            .network_bytes_per_sec_for(&network.device_id, network.device_generation.get());
+        if let Some(summary) = super::sparkline::device_summary_line_in(
+            theme.terminal.glyphs,
             t("common.throughput"),
             &window,
             super::sparkline::DeviceSummaryUnit::BytesPerSecond,
@@ -311,16 +327,16 @@ fn network_lines(
     lines
 }
 
-/// The number of body lines one NIC contributes: header + two direction
-/// trends + summary + rates + link (always six), plus at most the address,
-/// totals and driver/adapter rows, plus one honest wireless line for a
-/// wireless adapter. Kept as a loose upper bound for the line buffer
+/// The number of body lines one NIC contributes: header + device status + two
+/// direction trends + summary + rates + link (always seven), plus at most the
+/// address, totals and driver/adapter rows, plus one honest wireless line for
+/// a wireless adapter. Kept as a loose upper bound for the line buffer
 /// preallocation.
 fn network_body_line_count(network: &NetworkMetrics) -> usize {
     if network.adapter_type() == NetworkAdapterType::WiFi {
-        12
+        13
     } else {
-        9
+        10
     }
 }
 

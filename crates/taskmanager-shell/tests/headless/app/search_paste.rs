@@ -4,6 +4,18 @@
 
 use super::*;
 
+#[allow(dead_code)]
+fn identity_of(app: &crate::ShellApp, pid: u32) -> crate::app::process_rows::ProcessRowIdentity {
+    app.data
+        .processes
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .find(|process| process.pid == pid)
+        .and_then(crate::app::process_rows::ProcessRowIdentity::from_process)
+        .expect("demo process carries a current start token")
+}
+
 #[test]
 fn paste_appends_printable_text_and_resets_the_cursor() {
     let mut shell = crate::demo_app();
@@ -83,14 +95,14 @@ fn paste_resets_the_multi_select_anchor_like_typing_does() {
         }
     };
     if let Some((anchor_pid, second_pid)) = pids {
-        shell.toggle_selected_pid(anchor_pid);
-        shell.toggle_selected_pid(second_pid);
+        shell.toggle_selected_identity(identity_of(&shell, anchor_pid));
+        shell.toggle_selected_identity(identity_of(&shell, second_pid));
     }
-    assert!(shell.selected_pids.len() >= 2);
+    assert!(shell.selected_identities().len() >= 2);
     shell.open_search();
     assert!(shell.push_search_text("z"));
     assert_eq!(
-        shell.selected_pids.len(),
+        shell.selected_identities().len(),
         1,
         "a changed query collapses the multi set back to the new anchor"
     );

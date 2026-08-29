@@ -1,7 +1,7 @@
 //! Keyboard-help overlay rendered on top of the live TUI frame.
 //!
 //! The content is derived from the conflict-checked shared command router
-//! (see [`crate::command_help`]) so the overlay can never advertise a binding
+//! (see [`taskmanager_shell::presentation::command_help`]) so the overlay can never advertise a binding
 //! that no frontend actually wires. One shared entry is intentionally dropped
 //! and the terminal-only bindings are appended — see [`help_rows`] for the
 //! honesty rationale.
@@ -10,117 +10,52 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
-use taskmanager_application::CommandId;
+use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::IconId;
 
 use taskmanager_shell::LocalBinding;
 
+use super::containers::{KeyHint, KeyHintTone, Modal};
 use crate::{TuiApp, TuiTheme};
 
-/// TUI-local overlay bindings handled directly in `runtime::handle_key`.
-/// Documented beside the shared router bindings so the overlay advertises
-/// every genuinely-wired chord. `pub(crate)` so the command palette can list
-/// the same rows.
-pub(crate) const TUI_LOCAL_BINDINGS: [LocalBinding; 15] = [
-    LocalBinding {
-        shortcut: "p",
-        label: "Settings",
-    },
-    LocalBinding {
-        shortcut: "i",
-        label: "About / system info",
-    },
-    LocalBinding {
-        shortcut: "h",
-        label: "System health & alerts",
-    },
-    LocalBinding {
-        shortcut: "c",
-        label: "Containers",
-    },
-    LocalBinding {
-        shortcut: "x",
-        label: "Export snapshot",
-    },
-    LocalBinding {
-        shortcut: "Enter",
-        label: "Service actions (Services page)",
-    },
-    LocalBinding {
-        shortcut: "1-7",
-        label: "Performance resource (Performance page)",
-    },
-    LocalBinding {
-        shortcut: "C",
-        label: "Columns (Applications page)",
-    },
-    LocalBinding {
-        shortcut: "m",
-        label: "Mark process for batch control (Applications page)",
-    },
-    LocalBinding {
-        shortcut: "B",
-        label: "Batch actions on marked processes (Applications page)",
-    },
-    LocalBinding {
-        shortcut: "y",
-        label: "Copy selected pid+name to clipboard (Applications page)",
-    },
-    LocalBinding {
-        shortcut: "a",
-        label: "Process actions · open location / search (Applications page)",
-    },
-    LocalBinding {
-        shortcut: "o",
-        label: "Service logs (Services)",
-    },
-    LocalBinding {
-        shortcut: "e",
-        label: "GPU engines (Performance·GPU) · network escalate (process)",
-    },
-    LocalBinding {
-        shortcut: "d",
-        label: "Directory usage scan (Performance·Disk)",
-    },
-];
+use crate::command_palette::TUI_LOCAL_COMMANDS;
 
 /// The honest, TUI-verified keyboard reference.
 ///
 /// Shared commands come straight from the router table
-/// ([`crate::command_help`]). The router's dialog-scope `Confirm` (Enter) is
-/// filtered out because the TUI handles its end-task confirmation locally with
-/// `y` / `n` / `Esc` *before* the router is consulted — listing Enter-as-confirm
-/// would describe a binding this frontend does not wire. `ToggleSidebar` (F9)
-/// is filtered for the same reason: the TUI has no sidebar surface, so a
-/// terminal user must never be promised an F9 chord that toggles nothing. The
-/// terminal-only bindings (declared in [`crate::shell_local_bindings`] and
+/// ([`taskmanager_shell::presentation::command_help`]). Shared commands explicitly absent from the TUI
+/// binding surface are filtered out because the terminal must never advertise
+/// a chord it does not execute: confirmation uses `y` / `n` / `Esc`, the
+/// terminal has a resource selector instead of a sidebar, and Alerts management
+/// is not implemented yet. The terminal-only bindings (declared in [`taskmanager_shell::shell_local_bindings`] and
 /// handled in `runtime::handle_key`) are appended instead, together with the
 /// TUI-local overlay bindings above (localized through
 /// [`localize_tui_binding`]).
 #[must_use]
 pub fn help_rows() -> Vec<LocalBinding> {
-    let mut rows: Vec<LocalBinding> = crate::command_help()
+    let mut rows: Vec<LocalBinding> = taskmanager_shell::presentation::command_help()
         .into_iter()
-        .filter(|help| {
-            help.command != CommandId::Confirm && help.command != CommandId::ToggleSidebar
-        })
+        .filter(|help| !crate::bindings::is_deliberately_unbound(help.command))
         .map(|help| LocalBinding {
             shortcut: help.shortcut,
             label: help.label,
         })
         .collect();
-    rows.extend(crate::shell_local_bindings().iter().copied());
-    rows.extend(TUI_LOCAL_BINDINGS.map(localize_tui_binding));
+    rows.extend(taskmanager_shell::shell_local_bindings().iter().copied());
+    rows.extend(
+        TUI_LOCAL_COMMANDS
+            .into_iter()
+            .map(|command| localize_tui_binding(command.binding)),
+    );
     rows
 }
 
 /// Resolve a TUI-local overlay binding's label through the shared i18n
-/// catalog. [`TUI_LOCAL_BINDINGS`] stays an English-labeled const because the
-/// command palette (owned outside `ui/`) iterates it directly; this fold is
-/// the single shortcut → key mapping, so the overlay and the const can never
-/// drift. Reuses existing catalog keys where the copy already existed
+/// catalog. The registry stays English-labeled because the command palette
+/// and help need one stable row inventory; this fold is the single shortcut →
+/// localized-label mapping, so the overlay and the registry can never drift.
+/// Reuses existing catalog keys where the copy already existed
 /// (`chrome.settings`, `health.system_health_alerts`, `containers.title`,
 /// `system.export_snapshot`). The shared router's own labels stay English
 /// until the shell migrates them; an unknown shortcut keeps its const label.
@@ -141,6 +76,7 @@ fn localize_tui_binding(binding: LocalBinding) -> LocalBinding {
         "o" => "help.binding.service_logs",
         "e" => "help.binding.gpu_engines_escalate",
         "d" => "help.binding.directory_scan",
+        "g" => "help.binding.gpu_chart_metric",
         _ => return binding,
     };
     LocalBinding {
@@ -153,21 +89,26 @@ fn localize_tui_binding(binding: LocalBinding) -> LocalBinding {
 /// is too small for a readable box. The binding list is laid out as two
 /// side-by-side columns and sliced by [`TuiApp::help_scroll`], so a short
 /// terminal (or a growing binding list) scrolls instead of clipping the tail.
+#[cfg(test)]
+#[allow(dead_code)]
 pub fn render_help_overlay(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+    render_help_overlay_at(
+        frame,
+        app,
+        theme,
+        super::planned_popup(area, crate::TuiInputScope::Help),
+    );
+}
+
+pub(super) fn render_help_overlay_at(
+    frame: &mut Frame<'_>,
+    app: &TuiApp,
+    theme: TuiTheme,
+    popup: Rect,
+) {
     let rows = help_rows();
-    let popup = centered(area, 68, 24);
-    frame.render_widget(Clear, popup);
-    let block = Block::new()
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.accent))
-        .style(Style::new().bg(theme.overlay_bg))
-        .title(format!(
-            " {} {} ",
-            crate::icon_glyph(IconId::Settings),
-            t("menu.keyboard_reference")
-        ));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let inner =
+        Modal::new(theme, IconId::Settings, t("menu.keyboard_reference")).render(frame, popup);
 
     let [body, footer] = Layout::vertical([Constraint::Min(6), Constraint::Length(2)]).areas(inner);
 
@@ -207,16 +148,10 @@ pub fn render_help_overlay(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme,
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(""),
-            Line::from(vec![
-                Span::styled(
-                    " F1 / ? / Esc ",
-                    Style::new().fg(Color::Black).bg(theme.accent),
-                ),
-                Span::styled(
-                    format!("  {}", t("help.close_hint")),
-                    Style::new().fg(theme.dim),
-                ),
-            ]),
+            KeyHint::line(
+                theme,
+                vec![(" F1 / ? / Esc ", format!("  {}", t("help.close_hint")))],
+            ),
         ])
         .alignment(Alignment::Center),
         footer,
@@ -226,10 +161,13 @@ pub fn render_help_overlay(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme,
 fn help_line(row: &LocalBinding, theme: TuiTheme) -> Line<'static> {
     Line::from(vec![
         Span::styled(
-            format!("{:<10}", row.shortcut),
+            super::text::pad_cells(row.shortcut, 10),
             Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
         ),
-        Span::styled(row.label.to_owned(), Style::new().fg(Color::White)),
+        Span::styled(
+            row.label.to_owned(),
+            Style::new().fg(theme.color(Color::White)),
+        ),
     ])
 }
 
@@ -240,26 +178,16 @@ fn help_line(row: &LocalBinding, theme: TuiTheme) -> Line<'static> {
 /// filterable and (for shared commands) executable. Takes the crate's
 /// [`crate::TuiApp`] (not the shell alias) because the palette state is
 /// TUI-local (ADR-027).
-pub fn render_command_palette(
+pub(super) fn render_command_palette_at(
     frame: &mut Frame<'_>,
     app: &crate::TuiApp,
     theme: TuiTheme,
-    area: Rect,
+    focus: super::TuiFocusPlan,
+    popup: Rect,
 ) {
     let rows = app.filtered_palette_rows();
-    let popup = centered(area, 72, 26);
-    frame.render_widget(Clear, popup);
-    let block = Block::new()
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.accent))
-        .style(Style::new().bg(theme.overlay_bg))
-        .title(format!(
-            " {} {} ",
-            crate::icon_glyph(IconId::Search),
-            t("menu.keyboard_reference")
-        ));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let inner =
+        Modal::new(theme, IconId::Search, t("menu.keyboard_reference")).render(frame, popup);
 
     let filter = app
         .command_palette()
@@ -275,20 +203,22 @@ pub fn render_command_palette(
             Span::styled(" ▸ ", Style::new().fg(theme.accent)),
             Span::styled(
                 format!("{filter}▌"),
-                Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+                Style::new()
+                    .fg(theme.color(Color::White))
+                    .add_modifier(Modifier::BOLD),
             ),
         ]))
         .style(Style::new().fg(theme.dim)),
         filter_area,
     );
 
-    let selection = app.command_palette().map_or(0, |palette| palette.selection);
+    let selection = focus.palette_item();
     let lines: Vec<Line<'static>> = rows
         .iter()
         .enumerate()
         .map(|(index, row)| {
-            let active = index == selection;
-            let shortcut = format!("{:<10}", row.shortcut);
+            let active = selection == Some(index);
+            let shortcut = super::text::pad_cells(row.shortcut, 10);
             let executable = row.action.is_some();
             let mut spans = vec![
                 Span::styled(
@@ -298,7 +228,7 @@ pub fn render_command_palette(
                 Span::styled(
                     row.label.to_owned(),
                     if executable {
-                        Style::new().fg(Color::White)
+                        Style::new().fg(theme.color(Color::White))
                     } else {
                         Style::new().fg(theme.dim)
                     },
@@ -316,30 +246,17 @@ pub fn render_command_palette(
     frame.render_widget(Paragraph::new(lines), body);
 
     frame.render_widget(
-        Paragraph::new(vec![Line::from(vec![
-            Span::styled(
+        Paragraph::new(vec![KeyHint::line_toned(
+            theme,
+            vec![(
+                KeyHintTone::Accent,
                 format!(" {} ", t("help.palette_type")),
-                Style::new().fg(Color::Black).bg(theme.accent),
-            ),
-            Span::styled(
                 format!(" {}", t("help.palette_footer")),
-                Style::new().fg(theme.dim),
-            ),
-        ])])
+            )],
+        )])
         .alignment(Alignment::Center),
         footer,
     );
-}
-
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width.saturating_sub(4));
-    let height = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
-    }
 }
 
 #[cfg(test)]

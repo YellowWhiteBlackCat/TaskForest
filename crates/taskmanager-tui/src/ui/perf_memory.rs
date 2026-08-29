@@ -13,7 +13,9 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Paragraph};
-use taskmanager_application::{MemoryMetrics, i18n::t};
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::metrics::MemoryMetrics;
+use taskmanager_core::core::units::format_quantity_with;
 use taskmanager_shell::memory::{self, MemSegmentKind, SwapBreakdown};
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_ui_contract::IconId;
@@ -22,6 +24,16 @@ use crate::TuiApp;
 use crate::TuiTheme;
 
 use super::units::memory_text_pref;
+
+/// Bytes in one mebibyte — the signed memory usage rate is published in
+/// MiB/s and rendered through the shared byte ladder.
+const MIB_BYTES: u64 = 1024 * 1024;
+
+/// Below this absolute rate (MiB/s) the usage-rate row reports the shared
+/// dash instead of a sub-tick value, mirroring the gpui row gate
+/// (`memory_stats.rs`): a rate the kernel cannot distinguish from zero is
+/// honest absence, not a fabricated `+0 MiB/s`.
+const USAGE_RATE_NOISE_FLOOR_MIB_PER_SEC: f32 = 0.05;
 
 /// Map a shared segment kind onto the terminal palette color. Every frontend
 /// derives these from the same `taskmanager-theme` tokens, so the bar matches
@@ -39,23 +51,129 @@ fn segment_color(kind: MemSegmentKind, theme: TuiTheme) -> Color {
 }
 
 /// The vertical height the composition block needs for this snapshot — a
-/// header row, the bar row, one legend row per non-zero segment, and an
-/// optional two-row swap bar — or `0` when there is no total memory to break
-/// down. Used by the overview layout to reserve space before rendering.
+/// header row, the bar row, one legend row per non-zero segment, an
+/// optional two-row swap bar, and the labelled memory-stats rows — or the
+/// stats rows alone when there is no total memory to break down. Used by the
+/// overview layout to reserve space before rendering.
 #[must_use]
 pub fn composition_height(memory: &MemoryMetrics) -> u16 {
-    let Some(data) = super::perf_data::memory_composition_data(memory) else {
-        return 0;
+    let base = match super::perf_data::memory_composition_data(memory) {
+        Some(data) => {
+            let nonzero = data.segments.iter().filter(|seg| seg.bytes > 0).count() as u16;
+            let swap = if data.swap.is_some() { 2 } else { 0 };
+            // header(1) + bar(1) + legend(nonzero) + swap(swap)
+            2 + nonzero + swap
+        }
+        // No total to break down: the stats rows still render, so a host the
+        // composition projection cannot describe keeps its labelled facts.
+        None => 0,
     };
-    let nonzero = data.segments.iter().filter(|seg| seg.bytes > 0).count() as u16;
-    let swap = if data.swap.is_some() { 2 } else { 0 };
-    // header(1) + bar(1) + legend(nonzero) + swap(swap)
-    2 + nonzero + swap
+    base + stats_row_count(memory)
+}
+
+/// The number of stats rows this snapshot labels: the six fixed rows
+/// (available, hardware reserved, speed, slots, committed, usage rate) stay
+/// labelled with an honest dash when their fact is unavailable, while the
+/// Buffers row keeps the gpui conditional-row semantics (only when the host
+/// reports the counter).
+fn stats_row_count(memory: &MemoryMetrics) -> u16 {
+    6 + u16::from(memory.current_buffers_bytes().is_some())
+}
+
+/// The signed memory usage-rate readout: an explicit `+`/`-` sign (ASCII, so
+/// every terminal profile keeps one cell per glyph) over the shared byte
+/// ladder formatted as a per-second quantity.
+fn signed_memory_rate_readout(rate_mib_per_sec: f32, use_bytes: bool, use_base2: bool) -> String {
+    let sign = if rate_mib_per_sec < 0.0 { '-' } else { '+' };
+    let magnitude_bytes = (f64::from(rate_mib_per_sec.abs()) * MIB_BYTES as f64).round() as u64;
+    format!(
+        "{sign}{}",
+        format_quantity_with(magnitude_bytes, use_bytes, use_base2, true)
+    )
+}
+
+fn memory_bytes_readout(value: u64, use_bytes: bool, use_base2: bool) -> String {
+    memory_text_pref(value, use_bytes, use_base2)
+}
+
+/// The labelled stats row set (`perf_views/memory_stats.rs` parity): every
+/// value routes through the same typed `MemoryMetrics` accessors the gpui
+/// rows read, so an unavailable observation is the shared dash in both
+/// frontends and a measured value is formatted once by the shared unit
+/// ladder.
+fn memory_stats_lines(
+    memory: &MemoryMetrics,
+    theme: TuiTheme,
+    use_bytes: bool,
+    use_base2: bool,
+) -> Vec<Line<'static>> {
+    let readout = |value: u64| memory_bytes_readout(value, use_bytes, use_base2);
+    let slots = match (memory.current_slots_used(), memory.current_slots_total()) {
+        (Some(used), Some(total)) => format!("{used} / {total}"),
+        _ => missing_value(),
+    };
+    // The gpui committed readout only reports the pair once a real limit
+    // exists; a committed counter without a limit stays a dash.
+    let committed = match (
+        memory.current_committed_bytes(),
+        memory.current_commit_limit_bytes(),
+    ) {
+        (Some(committed), Some(limit)) if limit > 0 => {
+            format!("{} / {}", readout(committed), readout(limit))
+        }
+        _ => missing_value(),
+    };
+    let usage_rate = memory
+        .current_used_rate_mib_per_sec()
+        .filter(|rate| rate.abs() >= USAGE_RATE_NOISE_FLOOR_MIB_PER_SEC)
+        .map_or_else(missing_value, |rate| {
+            signed_memory_rate_readout(rate, use_bytes, use_base2)
+        });
+
+    let mut rows: Vec<(&str, String)> = vec![
+        (
+            t("mem.available"),
+            memory
+                .projected_available_bytes()
+                .map_or_else(missing_value, readout),
+        ),
+        (
+            t("mem.hardware_reserved"),
+            memory
+                .current_hardware_reserved_bytes()
+                .map_or_else(missing_value, readout),
+        ),
+        (
+            t("common.speed"),
+            memory
+                .current_speed_mhz()
+                .map_or_else(missing_value, |speed| format!("{speed} MT/s")),
+        ),
+        (t("mem.slots"), slots),
+        (t("mem.committed"), committed),
+        (t("mem.usage_rate"), usage_rate),
+    ];
+    if let Some(buffers) = memory.current_buffers_bytes() {
+        rows.push((t("mem.buffers"), readout(buffers)));
+    }
+    rows.into_iter()
+        .map(|(label, value)| stats_line(label, value, theme))
+        .collect()
+}
+
+/// One labelled stats row: a dim label plus the bright value, single-spaced
+/// so the row reads as one fact pair at any width.
+fn stats_line(label: &str, value: String, theme: TuiTheme) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(format!("  {label} "), Style::new().fg(theme.dim)),
+        Span::styled(value, Style::new().fg(theme.color(Color::White))),
+    ])
 }
 
 /// Render the memory-composition block (header + stacked bar + legend + swap
-/// bar) into `area`. Called only on the Memory Performance view, and only
-/// when the overview reserved a non-zero [`composition_height`].
+/// bar + labelled stats rows) into `area`. Called only on the Memory
+/// Performance view, and only when the overview reserved a non-zero
+/// [`composition_height`].
 pub fn render_memory_composition(
     frame: &mut Frame<'_>,
     app: &TuiApp,
@@ -63,86 +181,110 @@ pub fn render_memory_composition(
     theme: TuiTheme,
     area: Rect,
 ) {
-    let Some(data) = super::perf_data::memory_composition_data(memory_snapshot) else {
-        return;
-    };
-    let total = data.total;
-    let used = data.used;
-    let segments = data.segments;
-    let nonzero: Vec<_> = segments.iter().copied().filter(|s| s.bytes > 0).collect();
-    let swap = data.swap;
+    let data = super::perf_data::memory_composition_data(memory_snapshot);
     // The applied unit matrix (bytes/bits × base-2/base-10) resolves once at
     // render entry and flows down into every formatted label.
     let use_bytes = app.prefs.units[0];
     let use_base2 = app.prefs.units[1];
+    let stats_rows = stats_row_count(memory_snapshot);
+    let base_height = area.height.saturating_sub(stats_rows);
+    let [base_area, stats_area] = Layout::vertical([
+        Constraint::Length(base_height),
+        Constraint::Length(stats_rows),
+    ])
+    .areas(area);
 
-    // header(1) + bar(1) + legend(nonzero) + swap(0|2)
-    let mut constraints = vec![
-        Constraint::Length(1),
-        Constraint::Length(1),
-        Constraint::Length(nonzero.len() as u16),
-    ];
-    if swap.is_some() {
-        constraints.push(Constraint::Length(2));
-    }
-    let rects = Layout::vertical(&constraints).split(area);
+    if let Some(data) = data {
+        let total = data.total;
+        let used = data.used;
+        let segments = data.segments;
+        let nonzero: Vec<_> = segments.iter().copied().filter(|s| s.bytes > 0).collect();
+        let swap = data.swap;
 
-    // Header: icon + "Composition" on the left, "In use X · Y total" on the
-    // right, expressed as one styled line. A known total does not imply that
-    // the current used counter was also collected.
-    let used_label = used.map_or_else(missing_value, |value| {
-        memory_text_pref(value, use_bytes, use_base2)
-    });
-    let header = Line::from(vec![
-        Span::styled(
-            format!(" {} ", crate::icon_glyph(IconId::Memory)),
-            Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled(
-            t("mem.composition"),
-            Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
-        ),
-        Span::raw("    "),
-        Span::styled(
-            format!("{} {}", t("mem.in_use"), used_label),
-            Style::new().fg(theme.fg_dim),
-        ),
-        Span::raw("  ·  "),
-        Span::styled(
-            format!(
-                "{} {}",
-                memory_text_pref(total, use_bytes, use_base2),
-                t("mem.total")
+        // header(1) + bar(1) + legend(nonzero) + swap(0|2)
+        let mut constraints = vec![
+            Constraint::Length(1),
+            Constraint::Length(1),
+            Constraint::Length(nonzero.len() as u16),
+        ];
+        if swap.is_some() {
+            constraints.push(Constraint::Length(2));
+        }
+        let rects = Layout::vertical(&constraints).split(base_area);
+
+        // Header: icon + "Composition" on the left, "In use X · Y total" on the
+        // right, expressed as one styled line. A known total does not imply that
+        // the current used counter was also collected.
+        let used_label = used.map_or_else(missing_value, |value| {
+            memory_text_pref(value, use_bytes, use_base2)
+        });
+        let header = Line::from(vec![
+            Span::styled(
+                format!(" {} ", theme.glyph(IconId::Memory)),
+                Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
             ),
-            Style::new().fg(theme.fg_dim),
-        ),
-    ]);
-    frame.render_widget(Paragraph::new(header), rects[0]);
+            Span::styled(
+                t("mem.composition"),
+                Style::new()
+                    .fg(theme.color(Color::White))
+                    .add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("    "),
+            Span::styled(
+                format!("{} {}", t("mem.in_use"), used_label),
+                Style::new().fg(theme.fg_dim),
+            ),
+            Span::raw("  ·  "),
+            Span::styled(
+                format!(
+                    "{} {}",
+                    memory_text_pref(total, use_bytes, use_base2),
+                    t("mem.total")
+                ),
+                Style::new().fg(theme.fg_dim),
+            ),
+        ]);
+        frame.render_widget(Paragraph::new(header), rects[0]);
 
-    render_stacked_bar(frame, rects[1], &segments, theme);
+        render_stacked_bar(frame, rects[1], &segments, theme);
 
-    let legend = Paragraph::new(
-        nonzero
-            .iter()
-            .map(|seg| {
-                legend_line(
-                    *seg,
-                    total,
-                    segment_color(seg.kind, theme),
-                    theme,
-                    use_bytes,
-                    use_base2,
-                )
-            })
-            .collect::<Vec<_>>(),
-    );
-    frame.render_widget(legend, rects[2]);
+        let legend = Paragraph::new(
+            nonzero
+                .iter()
+                .map(|seg| {
+                    legend_line(
+                        *seg,
+                        total,
+                        segment_color(seg.kind, theme),
+                        theme,
+                        use_bytes,
+                        use_base2,
+                    )
+                })
+                .collect::<Vec<_>>(),
+        );
+        frame.render_widget(legend, rects[2]);
 
-    if let Some(swap) = swap {
-        let [label_area, bar_area] =
-            Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(rects[3]);
-        render_swap_bar(
-            frame, label_area, bar_area, &swap, theme, use_bytes, use_base2,
+        if let Some(swap) = swap {
+            let [label_area, bar_area] =
+                Layout::vertical([Constraint::Length(1), Constraint::Length(1)]).areas(rects[3]);
+            render_swap_bar(
+                frame, label_area, bar_area, &swap, theme, use_bytes, use_base2,
+            );
+        }
+    }
+
+    // The labelled stats rows render beneath the composition bar (or at the
+    // block's top when no total exists to break down).
+    if stats_area.height > 0 {
+        frame.render_widget(
+            Paragraph::new(memory_stats_lines(
+                memory_snapshot,
+                theme,
+                use_bytes,
+                use_base2,
+            )),
+            stats_area,
         );
     }
 }
@@ -164,7 +306,10 @@ fn legend_line(
     };
     Line::from(vec![
         Span::styled("█ ", Style::new().fg(color)),
-        Span::styled(seg.label.to_string(), Style::new().fg(Color::White)),
+        Span::styled(
+            seg.label.to_string(),
+            Style::new().fg(theme.color(Color::White)),
+        ),
         Span::raw("   "),
         Span::styled(format!("{pct:>4.0}%"), Style::new().fg(theme.fg_dim)),
         Span::raw("  "),

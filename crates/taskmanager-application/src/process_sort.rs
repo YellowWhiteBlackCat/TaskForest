@@ -22,8 +22,8 @@
 
 use std::cmp::Ordering;
 
-use crate::ProcessItem;
-use crate::text::cmp_ascii_ci;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::text::cmp_ascii_ci;
 
 /// One sortable projection of a [`ProcessItem`] — the neutral vocabulary every
 /// frontend's column enum maps onto. Each variant documents the field it reads

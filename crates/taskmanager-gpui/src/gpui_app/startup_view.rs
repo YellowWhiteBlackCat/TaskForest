@@ -29,18 +29,19 @@ use taskmanager_ui::primitives::button::ButtonState;
 use taskmanager_ui::primitives::toolbar::Toolbar;
 use taskmanager_ui_contract::IconId;
 
-use crate::core::source::SourceStatus;
-use crate::core::startup::StartupBootEvidenceSnapshot;
 use crate::gpui_app::elements;
 use crate::gpui_app::list_view::{self, FilterSpec};
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
-use taskmanager_application::{
-    RefreshRequest, StartupControlPolicy, StartupEntry, StartupEntryId, StartupImpact,
-    StartupImpactEvidence,
+use taskmanager_application::RefreshRequest;
+use taskmanager_application::i18n;
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_core::core::startup::{
+    StartupControlPolicy, StartupEntry, StartupEntryId, StartupImpact, StartupImpactEvidence,
 };
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
+
 use taskmanager_shell::{InfoSortCol, SortDir};
 
 pub use crate::gpui_app::list_view::ActionFeedback;
@@ -143,8 +144,8 @@ pub fn filter_startup(
         .filter(|e| {
             filter.matches(e.enabled)
                 && (q.is_empty()
-                    || crate::core::text::contains_ascii_ci(&e.name, q)
-                    || crate::core::text::contains_ascii_ci(&e.exec, q))
+                    || taskmanager_core::core::text::contains_ascii_ci(&e.name, q)
+                    || taskmanager_core::core::text::contains_ascii_ci(&e.exec, q))
         })
         .cloned()
         .collect()
@@ -495,7 +496,7 @@ pub struct StartupViewProps<'a> {
     /// The previous boot's waterfall (opt-in boot history, roadmap #5) —
     /// `None` without persistence or before any comparison exists, in which
     /// case the waterfall renders exactly as before.
-    pub boot_baseline: Option<&'a crate::core::BootTimeline>,
+    pub boot_baseline: Option<&'a taskmanager_core::core::BootTimeline>,
     pub feedback: Option<ActionFeedback>,
     pub search_input: gpui::Entity<taskmanager_ui::inputs::text_input::TextInputState>,
     pub table_entity: Entity<TableState<StartupDelegate>>,

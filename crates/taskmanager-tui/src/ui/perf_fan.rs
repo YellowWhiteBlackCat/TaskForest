@@ -5,7 +5,7 @@
 //! current-value accessors so an unavailable channel renders an honest dash
 //! instead of a fabricated idle RPM — mirroring
 //! `crates/taskmanager-gpui/src/gpui_app/perf_views/dynamic.rs` (`render_fan`). Read-only consume of
-//! `taskmanager_application::SensorReading`; this crate never mutates the
+//! `taskmanager_core::core::sensors::SensorReading`; this crate never mutates the
 //! shared snapshot shape.
 //!
 //! Render contract: the Performance resource selector hands this section the
@@ -23,10 +23,10 @@ use ratatui::text::Span;
 use ratatui::widgets::{Paragraph, Wrap};
 
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
+use taskmanager_core::core::sensors::{
     SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
 };
-use taskmanager_shell::history::LiveGraphHistory;
+use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::missing_value;
 
 use crate::TuiApp;
@@ -61,7 +61,7 @@ pub(super) fn render_fan_section(
         super::render_empty_panel(frame, theme, area, t("common.fan"), t("fan.empty"));
         return;
     }
-    let lines = fan_lines(sensors, &app.history, theme, app.prefs.graph_points);
+    let lines = fan_lines(sensors, &app, theme, app.prefs.graph_points);
     frame.render_widget(
         Paragraph::new(lines)
             .block(super::panel(t("common.fan"), theme))
@@ -78,7 +78,7 @@ pub(super) fn render_fan_section(
 /// the dotted "collecting" placeholder instead of a fabricated flat line.
 fn fan_lines(
     sensors: &SensorCenterSnapshot,
-    history: &LiveGraphHistory,
+    shell: &ShellApp,
     theme: TuiTheme,
     graph_window: usize,
 ) -> Vec<ratatui::text::Line<'static>> {
@@ -100,15 +100,16 @@ fn fan_lines(
         // the same key the recorder uses), so the trend lines up with its row.
         // A constant series renders a flat mid-ramp line; <2 samples renders the
         // dotted "collecting" placeholder — never fabricated.
-        let window = history.fan_rpm_for(fan.id());
+        let window = shell.history.fan_rpm_for(fan.id());
         lines.push(ratatui::text::Line::from(vec![
             Span::raw("  "),
             Span::styled(
-                super::sparkline::device_trend_with(&window, graph_window),
+                super::sparkline::device_trend_in(theme.terminal.glyphs, &window, graph_window),
                 Style::new().fg(theme.accent),
             ),
         ]));
-        if let Some(summary) = super::sparkline::device_summary_line(
+        if let Some(summary) = super::sparkline::device_summary_line_in(
+            theme.terminal.glyphs,
             t("fan.rpm"),
             &window,
             super::sparkline::DeviceSummaryUnit::Rpm,
@@ -158,17 +159,22 @@ fn fan_lines(
                     && reading.quantity() == &SensorQuantity::Temperature
             })
             .map_or_else(Vec::new, |reading| {
-                history.fan_temperature_c_for(reading.id())
+                shell.history.fan_temperature_c_for(reading.id())
             });
         if temperature_history.len() >= 2 {
             lines.push(ratatui::text::Line::from(vec![
                 Span::raw("  "),
                 Span::styled(
-                    super::sparkline::device_trend_with(&temperature_history, graph_window),
+                    super::sparkline::device_trend_in(
+                        theme.terminal.glyphs,
+                        &temperature_history,
+                        graph_window,
+                    ),
                     Style::new().fg(theme.accent),
                 ),
             ]));
-            if let Some(summary) = super::sparkline::device_summary_line(
+            if let Some(summary) = super::sparkline::device_summary_line_in(
+                theme.terminal.glyphs,
                 t("common.temperature"),
                 &temperature_history,
                 super::sparkline::DeviceSummaryUnit::Celsius,

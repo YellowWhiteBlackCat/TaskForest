@@ -7,10 +7,10 @@
 
 use iced::widget::{column, container, opaque, row, scrollable, text};
 use iced::{Element, Length};
-use taskmanager_application::alerts::{
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::alerts::{
     AlertMetric, InsufficientReason, SuggestedThreshold, SuggestionConfidence,
 };
-use taskmanager_application::i18n::t;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{device_status_i18n_key, effective_smart_status};
 use taskmanager_theme::{Theme, tokens};
@@ -89,7 +89,7 @@ pub(super) fn smart_overlay<'a>(
     )
 }
 
-fn smart_rows(disk: &taskmanager_application::DiskMetrics) -> Vec<(String, String)> {
+fn smart_rows(disk: &taskmanager_core::core::metrics::DiskMetrics) -> Vec<(String, String)> {
     let mut rows = vec![(
         t("disk.smart_status").to_owned(),
         t(device_status_i18n_key(effective_smart_status(disk))).to_owned(),

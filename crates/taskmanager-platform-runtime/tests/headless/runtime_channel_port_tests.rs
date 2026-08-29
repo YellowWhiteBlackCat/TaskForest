@@ -1,11 +1,14 @@
-use taskmanager_application::{
-    CapabilityId, CapabilityRequest, CapabilityScheduler, CompositeSourceSnapshot, EventPort,
-    HardwareInventoryEvent, HardwareInventoryRequest, MAX_REQUEST_SCOPE_BYTES, PlatformEvent,
-    ProviderFailure, RequestId, RequestScope, RequestTracking, RequestTrackingError,
-    SidebandPolicy, SourceOutcome, SourceStatus, SubmissionErrorKind,
+use taskmanager_application::DirectoryUsageRequest;
+use taskmanager_application::{HardwareInventoryEvent, HardwareInventoryRequest, PlatformEvent};
+use taskmanager_core::core::directory_usage::{
+    DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec,
 };
-use taskmanager_application::{
-    DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec, DirectoryUsageRequest,
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityRequest, CapabilityScheduler, CompositeSourceSnapshot, EventPort,
+    MAX_REQUEST_SCOPE_BYTES, ProviderFailure, RequestId, RequestScope, RequestTracking,
+    RequestTrackingError, SidebandPolicy, SubmissionErrorKind,
 };
 
 use super::*;
@@ -517,7 +520,7 @@ fn failed_scheduled_submission_cannot_rollback_an_interleaved_explicit_owner() {
                 vec![SourceStatus {
                     provider: ProviderId::borrowed("fixture.runtime"),
                     outcome: SourceOutcome::Unavailable(
-                        taskmanager_application::FailureKind::TemporarilyUnavailable,
+                        taskmanager_core::FailureKind::TemporarilyUnavailable,
                     ),
                     item_count: 0,
                 }],

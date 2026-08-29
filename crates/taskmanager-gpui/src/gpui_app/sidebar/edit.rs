@@ -5,9 +5,9 @@ use gpui::{
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::icons;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::{Theme, tokens};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 /// Compact edit-mode affordance for the Performance sidebar. The wide sidebar
 /// owns this transient toggle; row drag handles and per-device decisions are
@@ -42,5 +42,5 @@ pub(super) fn edit_button(
         .py(tokens::SPACE_2)
         .rounded(tokens::control_radius(theme))
         .text_color(if active { theme.accent } else { theme.fg_dim })
-        .child(icons::icon(IconId::Settings).size(px(14.0)))
+        .child(taskmanager_icons::icon(IconId::Settings).size(px(14.0)))
 }

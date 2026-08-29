@@ -5,9 +5,9 @@
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use taskmanager_application::{
-    AppAction, AppPage, ConfigStore, ProcessMetadataObservations, ProcessOwner, ScalarObservation,
-};
+use taskmanager_application::{AppAction, AppPage, ConfigStore};
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
 use taskmanager_shell::{SortCol, SortDir};
 
 use crate::ui::*;
@@ -160,13 +160,15 @@ fn process_action_menu_opens_for_the_selected_row_and_renders_actions() {
 #[test]
 fn process_menu_resolve_action_routes_through_platform_ports_not_direct_spawn() {
     use crate::ui::process_menu::{ProcessMenuAction, ProcessMenuTarget, resolve_action};
-    use taskmanager_application::{FrozenProcessIdentity, PlatformEffect, ScalarObservation};
+    use taskmanager_application::PlatformEffect;
+    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskmanager_core::core::process::FrozenProcessIdentity;
 
     let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
         .pid(4321)
         .name("my worker".into())
         .build();
-    item.apply_scalar_observations(taskmanager_application::ProcessScalarObservations {
+    item.apply_scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
         start_token: ScalarObservation::available(7, 1),
         ..Default::default()
     });
@@ -257,7 +259,10 @@ fn service_confirmation_overlay_renders_for_a_pending_control_target() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
     let service = app.projection().services.as_ref().expect("demo services")[1].clone();
-    assert!(app.select_service_control(&service, taskmanager_application::ServiceAction::Restart));
+    assert!(app.select_service_control(
+        &service,
+        taskmanager_core::core::services::ServiceAction::Restart
+    ));
     let _ = app.apply_action(AppAction::RequestServiceControl);
 
     let text = frame_text(&app, 100, 30);
@@ -430,25 +435,68 @@ fn empty_tables_render_honest_empty_states() {
 }
 
 #[test]
+fn applications_empty_state_answers_the_search_question() {
+    let mut app = crate::demo_app();
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut app.shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(Vec::new())),
+    );
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+
+    // An empty list with no active query is the honest "nothing reported"
+    // state (the Applications empty state is rendered through the shared
+    // windowed-table primitive's zero-row branch).
+    let text = frame_text(&app, 120, 36);
+    assert!(
+        text.contains(taskmanager_application::i18n::t(
+            "empty.no_processes_reported"
+        )),
+        "no-query empty state must say nothing was reported, got:\n{text}"
+    );
+    assert!(
+        !text.contains(taskmanager_application::i18n::t(
+            "empty.no_processes_match_query"
+        )),
+        "the query-mismatch copy must not paint without a query"
+    );
+
+    // The same empty list under an active query answers the search: the copy
+    // names the query mismatch, never a fabricated source failure.
+    app.query = "zzz".to_string();
+    let text = frame_text(&app, 120, 36);
+    assert!(
+        text.contains(taskmanager_application::i18n::t(
+            "empty.no_processes_match_query"
+        )),
+        "a non-matching query must name the query mismatch, got:\n{text}"
+    );
+    assert!(
+        !text.contains(taskmanager_application::i18n::t(
+            "empty.no_processes_reported"
+        )),
+        "the no-query copy must not paint under an active query"
+    );
+}
+
+#[test]
 fn containers_event_drains_into_tui_state_through_the_batch() {
-    use taskmanager_application::{
-        ContainerRollupEvent, CorrelatedEvent, DeviceState, EventSequence, PlatformEventBatch,
-        RequestId,
-    };
+    use taskmanager_application::{ContainerRollupEvent, CorrelatedEvent, PlatformEventBatch};
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_platform_contract::{EventSequence, RequestId};
 
     let mut app = crate::demo_app();
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::Containers(None),
     );
-    let rollup = taskmanager_application::ContainerRollup {
+    let rollup = taskmanager_core::core::process_telemetry::ContainerRollup {
         state: DeviceState::healthy(1_000),
         containers: Vec::new(),
     };
     let mut batch = PlatformEventBatch::default();
     batch.containers_events.push(CorrelatedEvent {
         request_id: RequestId::new(1).expect("non-zero request id"),
-        capability: taskmanager_application::CapabilityId::CONTAINERS,
+        capability: taskmanager_platform_contract::CapabilityId::CONTAINERS,
         provider: None,
         sequence: EventSequence::new(1),
         observed_at_ms: 1_000,
@@ -460,15 +508,43 @@ fn containers_event_drains_into_tui_state_through_the_batch() {
 
 #[test]
 fn performance_graph_renders_honest_empty_state_before_first_sample() {
-    let app = crate::demo_app();
-    // The graph reads the SHARED `MetricHistory` window (G-02); the demo
-    // fixture seeds exactly one snapshot into it, and one point is not a
-    // trend — the graph must say so honestly.
-    use taskmanager_shell::history::MetricSeries;
+    // CONSCIOUS UPDATE (2026-08-29 fixture seeding): the demo frame now seeds
+    // a full measured-looking history window (see `demo::seed_demo_history`),
+    // so the cold-start shape under test — fewer than two samples — is built
+    // here directly instead of through `demo_app`. The graph reads the SHARED
+    // `MetricHistory` window (G-02); one point is not a trend and the graph
+    // must say so honestly.
+    use taskmanager_application::{AppAction, AppPage};
+    use taskmanager_core::core::metrics::{
+        CpuMetrics, CpuScalarObservations, ScalarObservation, ScalarObservationGroup,
+        SystemSnapshot,
+    };
+    use taskmanager_shell::fixture::{edit_snapshot, record_demo_history_frame};
+    use taskmanager_telemetry_store::live_graph::MetricSeries;
+
+    let mut app = TuiApp::new();
+    let mut snapshot = SystemSnapshot {
+        timestamp_ms: 1_000,
+        ..SystemSnapshot::default()
+    };
+    snapshot.cpu = CpuMetrics::from_observations(CpuScalarObservations {
+        global_usage_pct: ScalarObservation::available(37.4, 1_000),
+        core_usage_group: ScalarObservationGroup::available(vec![52.0], 1_000),
+        ..CpuScalarObservations::default()
+    });
+    edit_snapshot(&mut app.shell, |slot| *slot = Some(snapshot));
+    let seeded = app
+        .projection()
+        .snapshot
+        .clone()
+        .expect("fixture snapshot exists");
+    record_demo_history_frame(&mut app.shell, &seeded, None, None);
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Performance));
+    app.select_perf_device(crate::PerfDevice::Cpu);
     assert_eq!(
         app.history.series(MetricSeries::CpuUsagePercent).len(),
         1,
-        "demo seeds exactly one sample into the shared window"
+        "the fixture seeds exactly one sample into the shared window"
     );
     let text = frame_text(&app, 120, 36);
     assert!(text.contains("CPU Utilization (%)"));
@@ -481,7 +557,7 @@ fn performance_graph_renders_honest_empty_state_before_first_sample() {
 
 #[test]
 fn performance_graph_renders_chart_axes_once_real_samples_are_recorded() {
-    use taskmanager_shell::history::MetricSeries;
+    use taskmanager_telemetry_store::live_graph::MetricSeries;
     let mut app = crate::demo_app();
     // Drive the same record path the shell fold drives on each telemetry
     // tick: `MetricHistory::record_snapshot` on the fresh snapshot (bumping
@@ -491,10 +567,11 @@ fn performance_graph_renders_chart_axes_once_real_samples_are_recorded() {
         let mut snapshot = app.projection().snapshot.clone().expect("demo snapshot");
         snapshot.timestamp_ms = 1_785_292_800_000 + tick;
         let mut observations = snapshot.cpu.scalar_observations().clone();
-        observations.global_usage_pct = taskmanager_application::ScalarObservation::available(
-            30.0 + tick as f32,
-            snapshot.timestamp_ms,
-        );
+        observations.global_usage_pct =
+            taskmanager_core::core::metrics::ScalarObservation::available(
+                30.0 + tick as f32,
+                snapshot.timestamp_ms,
+            );
         snapshot.cpu.apply_scalar_observations(observations);
         taskmanager_shell::fixture::record_demo_history_frame(
             &mut app.shell,
@@ -508,10 +585,16 @@ fn performance_graph_renders_chart_axes_once_real_samples_are_recorded() {
         );
     }
     // The shared window holds exactly the twelve finite ticks we drove plus
-    // the demo's own first sample, with the last CPU reading preserved —
+    // the demo's seeded history depth, with the last CPU reading preserved —
     // proves real values reached the buffer, not a fabricated flat line.
+    // (CONSCIOUS UPDATE: the demo now seeds `DEMO_HISTORY_FRAMES` frames, not
+    // the single cold-start sample.)
     let cpu = app.history.series(MetricSeries::CpuUsagePercent);
-    assert_eq!(cpu.len(), 13, "demo seed + twelve driven ticks");
+    assert_eq!(
+        cpu.len(),
+        crate::demo::DEMO_HISTORY_FRAMES + 12,
+        "demo seeded history + twelve driven ticks"
+    );
     assert_eq!(cpu.last(), Some(&42.0));
 
     let text = frame_text(&app, 120, 36);

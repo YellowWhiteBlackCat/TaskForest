@@ -11,7 +11,10 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
     );
     assert_eq!(
         key_to_terminal(alt_two),
-        Some(crate::ShellKeyEvent::new(KeyCode::Digit2, Modifiers::ALT))
+        Some(taskmanager_shell::ShellKeyEvent::new(
+            KeyCode::Digit2,
+            Modifiers::ALT
+        ))
     );
     let back_tab = KeyEvent::new(
         ratatui::crossterm::event::KeyCode::BackTab,
@@ -19,7 +22,10 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
     );
     assert_eq!(
         key_to_terminal(back_tab),
-        Some(crate::ShellKeyEvent::new(KeyCode::Tab, Modifiers::SHIFT))
+        Some(taskmanager_shell::ShellKeyEvent::new(
+            KeyCode::Tab,
+            Modifiers::SHIFT
+        ))
     );
     // Home / End reach the shared vocabulary so the router's jump bindings
     // fire from the terminal.
@@ -28,14 +34,20 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
             ratatui::crossterm::event::KeyCode::Home,
             KeyModifiers::NONE
         )),
-        Some(crate::ShellKeyEvent::new(KeyCode::Home, Modifiers::NONE))
+        Some(taskmanager_shell::ShellKeyEvent::new(
+            KeyCode::Home,
+            Modifiers::NONE
+        ))
     );
     assert_eq!(
         key_to_terminal(KeyEvent::new(
             ratatui::crossterm::event::KeyCode::End,
             KeyModifiers::NONE
         )),
-        Some(crate::ShellKeyEvent::new(KeyCode::End, Modifiers::NONE))
+        Some(taskmanager_shell::ShellKeyEvent::new(
+            KeyCode::End,
+            Modifiers::NONE
+        ))
     );
     // The full fixed-key surface normalizes onto the shared vocabulary: page
     // keys, refresh, navigation, search/quit/sort chords, dialog keys and the
@@ -123,7 +135,7 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
     for (crossterm, key, shared, crossterm_modifiers) in cases {
         assert_eq!(
             key_to_terminal(KeyEvent::new(crossterm, crossterm_modifiers)),
-            Some(crate::ShellKeyEvent::new(key, shared)),
+            Some(taskmanager_shell::ShellKeyEvent::new(key, shared)),
             "crossterm key {crossterm:?} must normalize to {key:?}"
         );
     }
@@ -135,6 +147,24 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
             KeyModifiers::NONE
         )),
         None
+    );
+}
+
+#[test]
+fn alt_8_is_not_advertised_as_a_live_tui_route_before_alerts_exists() {
+    let mut app = crate::demo_app();
+    let before = app.page();
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('8'),
+            KeyModifiers::ALT,
+        ),
+    );
+    assert_eq!(app.page(), before);
+    assert!(
+        crate::bindings::is_deliberately_unbound(taskmanager_application::CommandId::ShowAlerts),
+        "the TUI must keep the unimplemented Alerts route explicit"
     );
 }
 
@@ -408,7 +438,10 @@ fn f1_toggles_the_help_overlay_like_the_question_mark_binding() {
             ratatui::crossterm::event::KeyCode::F(1),
             KeyModifiers::NONE
         )),
-        Some(crate::ShellKeyEvent::new(KeyCode::F1, Modifiers::NONE))
+        Some(taskmanager_shell::ShellKeyEvent::new(
+            KeyCode::F1,
+            Modifiers::NONE
+        ))
     );
 }
 
@@ -528,21 +561,21 @@ fn performance_digit_keys_select_a_resource_without_colliding_with_pages() {
     // The digit rail follows the VISIBLE devices: seed the demo with a
     // battery and a fan so the full seven-resource rail renders (the same
     // fixture enrichment iced's capture demo does).
-    let mut battery = taskmanager_application::BatteryInfo::new(
+    let mut battery = taskmanager_core::core::power::BatteryInfo::new(
         "battery:demo:BAT0",
-        taskmanager_application::DeviceState::healthy(1),
+        taskmanager_core::core::device_state::DeviceState::healthy(1),
     );
     battery.status = "Discharging".into();
-    battery.apply_scalar_observations(taskmanager_application::BatteryScalarObservations {
-        capacity_pct: taskmanager_application::ScalarObservation::available(80, 1),
-        voltage_uv: taskmanager_application::ScalarObservation::available(12_000_000, 1),
+    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
+        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(80, 1),
+        voltage_uv: taskmanager_core::core::metrics::ScalarObservation::available(12_000_000, 1),
         ..Default::default()
     });
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(
-            taskmanager_application::PowerSupplySnapshot {
-                state: taskmanager_application::DeviceState::healthy(1),
+            taskmanager_core::core::power::PowerSupplySnapshot {
+                state: taskmanager_core::core::device_state::DeviceState::healthy(1),
                 timestamp_ms: 1,
                 batteries: vec![battery],
                 ..Default::default()
@@ -552,19 +585,19 @@ fn performance_digit_keys_select_a_resource_without_colliding_with_pages() {
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(
-            taskmanager_application::SensorCenterSnapshot {
-                state: taskmanager_application::DeviceState::healthy(1),
+            taskmanager_core::core::sensors::SensorCenterSnapshot {
+                state: taskmanager_core::core::device_state::DeviceState::healthy(1),
                 timestamp_ms: 1,
                 readings: vec![
-                    taskmanager_application::SensorReading::from_measurement_observation(
+                    taskmanager_core::core::sensors::SensorReading::from_measurement_observation(
                         "hwmon:demo:cpu".into(),
                         "fan1".into(),
                         "CPU Fan".into(),
-                        taskmanager_application::SensorMeasurementObservation::available(
-                            taskmanager_application::SensorDescriptor::fan_speed(
-                                taskmanager_application::SensorScale::IDENTITY,
+                        taskmanager_core::core::sensors::SensorMeasurementObservation::available(
+                            taskmanager_core::core::sensors::SensorDescriptor::fan_speed(
+                                taskmanager_core::core::sensors::SensorScale::IDENTITY,
                             ),
-                            taskmanager_application::SensorMagnitude::Unsigned(1200),
+                            taskmanager_core::core::sensors::SensorMagnitude::Unsigned(1200),
                             1,
                         )
                         .expect("valid fan fixture"),
@@ -1022,7 +1055,7 @@ fn gpu_page_g_cycles_the_shared_chart_metric_selection() {
 /// live batch drives.
 #[test]
 fn gpu_chart_metric_selection_resets_when_the_generation_advances() {
-    use taskmanager_application::DeviceGeneration;
+    use taskmanager_core::core::identity::DeviceGeneration;
     use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
 
     let mut app = crate::demo_app();

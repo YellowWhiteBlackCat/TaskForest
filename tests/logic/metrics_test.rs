@@ -1,4 +1,4 @@
-use taskmanager::core::metrics::{
+use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, DiskMetrics, GpuMetrics, GpuScalarObservations,
     MemoryCompositionObservations, MemoryMetrics, MemoryModuleObservations,
     MemoryOptionalObservations, MemoryScalarObservations, OptionalObservation, ScalarObservation,
@@ -176,7 +176,7 @@ fn test_system_snapshot_with_gpu() {
 
     let mut cpu = CpuMetrics::from_observations(CpuScalarObservations {
         global_usage_pct: ScalarObservation::available(12.0, 1_000),
-        core_usage_group: taskmanager::core::metrics::ScalarObservationGroup::available(
+        core_usage_group: taskmanager_core::core::metrics::ScalarObservationGroup::available(
             vec![12.0],
             1_000,
         ),
@@ -411,7 +411,7 @@ fn schema_v1_storage_tokens_hydrate_typed_connection_and_round_trip() {
 
 #[test]
 fn test_legacy_disk_transport_derives_new_connection_axes() {
-    use taskmanager::core::metrics::{StorageInterconnect, StorageProtocol};
+    use taskmanager_core::core::metrics::{StorageInterconnect, StorageProtocol};
 
     let disk: DiskMetrics = serde_json::from_value(serde_json::json!({
         "name": "legacy-usb",
@@ -458,7 +458,7 @@ fn test_disk_smart_availability_serializes_as_stable_snake_case() {
 
 #[test]
 fn test_smart_availability_ui_keys_are_exhaustive_and_distinct() {
-    use taskmanager_gpui::gpui_app::perf_views::smart_availability_i18n_key;
+    use taskmanager_shell::presentation::smart_availability_i18n_key;
 
     let keys = [
         smart_availability_i18n_key(SmartAvailability::Available),
@@ -469,14 +469,14 @@ fn test_smart_availability_ui_keys_are_exhaustive_and_distinct() {
     ];
     for (index, key) in keys.iter().enumerate() {
         assert!(keys[..index].iter().all(|prior| prior != key));
-        assert_ne!(taskmanager::i18n::t(key), *key);
+        assert_ne!(taskmanager_application::i18n::t(key), *key);
     }
 }
 
 #[test]
 fn test_smart_status_alone_counts_as_reported_ui_data() {
-    use taskmanager::core::device_state::DeviceStatus;
-    use taskmanager_gpui::gpui_app::perf_views::{effective_smart_status, has_smart_fields};
+    use taskmanager_core::core::device_state::DeviceStatus;
+    use taskmanager_shell::presentation::{effective_smart_status, has_smart_fields};
 
     let status_only = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
         .smart_availability(SmartAvailability::Available)

@@ -2,26 +2,27 @@
 //!
 //! The menu vocabulary follows the GPUI row menu. Activation still publishes
 //! the existing `RequestServiceAction` message, so selection, confirmation and
-//! native service authority stay in the shared shell path.
+//! native service authority stay in the shared shell path. Since ICED-007 the
+//! panel is a self-owned floating surface mounted by the [`crate::ui::
+//! components::Popover`] primitive on the row that opened it.
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
-use taskmanager_application::{ServiceAction, i18n::t};
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::services::ServiceAction;
+
 use taskmanager_theme::{Theme, tokens};
 
 use crate::app::{FocusTarget, Message};
-use crate::{IcedApp, focus, theme};
+use crate::{focus, theme};
 
-pub(super) fn render<'a>(
-    app: &IcedApp,
-    theme_snapshot: &'a Theme,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let Some(index) = app.service_menu_index() else {
-        return column![].into();
-    };
-    let Some(service) = app.service_menu_target() else {
-        return column![].into();
-    };
+/// The floating action panel for one open service menu. Self-owned so the
+/// row's lazy body can retain it across frames.
+pub(super) fn panel(
+    theme_snapshot: Theme,
+    index: usize,
+    service_name: String,
+) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let actions = [
         ServiceAction::Start,
         ServiceAction::Stop,
@@ -29,10 +30,10 @@ pub(super) fn render<'a>(
         ServiceAction::Enable,
         ServiceAction::Disable,
     ];
-    let buttons: Vec<Element<'_, Message, iced::Theme, iced::Renderer>> = actions
+    let buttons: Vec<Element<'static, Message, iced::Theme, iced::Renderer>> = actions
         .into_iter()
         .map(|action| {
-            focus::dynamic_button(
+            focus::dynamic_button_owned(
                 theme_snapshot,
                 FocusTarget::ServiceMenuAction { index, action },
                 t(service_action_key(action)).to_owned(),
@@ -43,7 +44,7 @@ pub(super) fn render<'a>(
                 ),
             )
         })
-        .chain(std::iter::once(focus::dynamic_button(
+        .chain(std::iter::once(focus::dynamic_button_owned(
             theme_snapshot,
             FocusTarget::ServiceMenuClose,
             t("common.cancel").to_owned(),
@@ -53,16 +54,16 @@ pub(super) fn render<'a>(
         .collect();
     container(
         column![
-            text(format!("{} · {}", service.name, t("common.actions")))
+            text(format!("{service_name} · {}", t("common.actions")))
                 .size(f32::from(tokens::FONT_12))
-                .color(theme::muted_text_color(theme_snapshot)),
+                .color(theme::muted_text_color(&theme_snapshot)),
             row(buttons).spacing(6),
         ]
         .spacing(6)
         .padding(8),
     )
-    .style(move |_| theme::panel_style(theme_snapshot))
-    .width(Length::Fill)
+    .style(move |_| theme::panel_style(&theme_snapshot))
+    .width(Length::Shrink)
     .into()
 }
 

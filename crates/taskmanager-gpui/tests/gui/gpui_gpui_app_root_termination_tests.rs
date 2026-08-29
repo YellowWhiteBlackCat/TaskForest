@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use super::{ProcessTerminationAction, snapshot_process_tree};
-use crate::core::ScalarObservation;
-use crate::core::process::{ProcessItem, ProcessScalarObservations};
+use taskmanager_core::core::ScalarObservation;
+use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
 
 fn process(pid: u32, parent_pid: Option<u32>, name: &str, start: u64) -> ProcessItem {
     taskmanager_test_support::ProcessItemFixtureBuilder::new()

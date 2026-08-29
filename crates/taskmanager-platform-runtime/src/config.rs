@@ -7,22 +7,24 @@
 use std::sync::OnceLock;
 use std::time::Instant;
 
-use taskmanager_application::MAX_REQUEST_SCOPE_BYTES;
 use taskmanager_application::{
-    CapabilityId, CapabilityRequest, CapabilityStatus, CommandLaunchRequest,
-    ContainerRollupRequest, CpuTelemetryRequest, DesktopAppearanceRequest,
+    CommandLaunchRequest, ContainerRollupRequest, CpuTelemetryRequest, DesktopAppearanceRequest,
     DesktopNotificationRequest, DirectoryUsageRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
     HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
     NetworkTelemetryRequest, NpuInventoryRequest, PowerSupplyRequest,
     ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
     ProcessEnvironmentRequest, ProcessGpuRequest, ProcessIsolationRequest, ProcessListRequest,
     ProcessNetworkEscalationRequest, ProcessNetworkRequest, ProcessOpenFilesRequest,
-    ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest, ProviderId,
+    ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest,
     ResourceRevealRequest, SensorRequest, ServiceControlRequest, ServiceDependenciesRequest,
     ServiceInventoryRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest,
-    SessionControlRequest, SessionInventoryRequest, SetupScriptRequest, SidebandPolicy,
-    SmartControlRequest, SmartObservationRequest, StartupControlRequest, StartupEvidenceRequest,
+    SessionControlRequest, SessionInventoryRequest, SetupScriptRequest, SmartControlRequest,
+    SmartObservationRequest, StartupControlRequest, StartupEvidenceRequest,
     StartupInventoryRequest, StorageHealthRequest, StorageTelemetryRequest, UrlOpenRequest,
+};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityRequest, CapabilityStatus, MAX_REQUEST_SCOPE_BYTES, SidebandPolicy,
 };
 
 use crate::registration::ProviderBinding;

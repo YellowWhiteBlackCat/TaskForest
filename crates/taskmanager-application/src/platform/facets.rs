@@ -1,5 +1,6 @@
 //! Request and event contracts grouped by independent capability change axis.
 
+use taskmanager_core::core::setup::SetupScriptEvent;
 use taskmanager_platform_contract::{CapabilityId, EventPort};
 
 /// Bind one application request DTO to exactly one platform-neutral

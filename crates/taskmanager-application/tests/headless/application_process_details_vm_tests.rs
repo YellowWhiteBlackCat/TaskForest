@@ -1,11 +1,11 @@
 use super::*;
-use crate::{
-    ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner,
-    ProcessOwnerIdentity,
-};
 use std::path::PathBuf;
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessScalarObservations;
+use taskmanager_core::core::process::{
+    ProcessItem, ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner,
+    ProcessOwnerIdentity, ProcessScalarObservations,
+};
+use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 
 fn process_details_rows(
     item: &ProcessItem,
@@ -14,7 +14,7 @@ fn process_details_rows(
     super::process_details_rows_with_local_time(
         item,
         units,
-        &crate::LocalTimeRulesObservation::current(crate::LocalTimeRules::utc(), 0),
+        &LocalTimeRulesObservation::current(LocalTimeRules::utc(), 0),
     )
 }
 

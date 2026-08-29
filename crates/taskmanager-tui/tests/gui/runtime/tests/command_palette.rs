@@ -194,6 +194,15 @@ fn palette_runs_tui_local_actions_from_the_selected_row() {
         .find(|row| row.shortcut == "q")
         .expect("quit row");
     assert_eq!(quit.local_action, Some(PaletteLocalAction::Quit));
+    let reverse = rows
+        .iter()
+        .find(|row| row.shortcut == "S")
+        .expect("reverse-sort row");
+    assert_eq!(
+        reverse.local_action,
+        Some(PaletteLocalAction::ToggleSortDirection),
+        "uppercase S must not alias the lowercase sort-column action"
+    );
     let copy = rows
         .iter()
         .find(|row| row.shortcut == "y")
@@ -236,6 +245,27 @@ fn palette_runs_tui_local_actions_from_the_selected_row() {
     assert!(
         app.command_palette().is_none(),
         "palette closes after running"
+    );
+
+    // The same local actions also route inventory-page sort semantics instead
+    // of silently doing nothing outside Applications.
+    let mut services = crate::demo_app();
+    let _ = services.apply_action(AppAction::SelectPage(AppPage::Services));
+    services.run_palette_local_action(Some(PaletteLocalAction::CycleSortColumn));
+    assert_eq!(
+        services.shell.services_sort,
+        Some((
+            taskmanager_shell::InfoSortCol::Name,
+            taskmanager_shell::SortDir::Asc
+        ))
+    );
+    services.run_palette_local_action(Some(PaletteLocalAction::ToggleSortDirection));
+    assert_eq!(
+        services.shell.services_sort,
+        Some((
+            taskmanager_shell::InfoSortCol::Name,
+            taskmanager_shell::SortDir::Desc
+        ))
     );
 }
 

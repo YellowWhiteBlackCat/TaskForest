@@ -3,6 +3,20 @@
 //! Each system returns the shared explicit [`InputDispatch`] state. The
 //! registry is the sole precedence authority: the first consumed route wins,
 //! including routes that mutate only local state and emit no platform work.
+//!
+//! # Chord authority (TUI-003)
+//!
+//! The TUI-local command chords (`p i h c x`, `Enter`, `1-7`, `C m B y a`,
+//! `o`, `e`, `d`, `g`) are NOT hand-matched here: every one resolves through
+//! [`crate::command_palette::TUI_LOCAL_COMMANDS`], which declares the chord,
+//! its palette executability, and its direct-dispatch arms (scope + typed
+//! action). This file owns only the two things a registry cannot: the
+//! *precedence order* (which system sees a key first) and the *execution* of
+//! one typed action. The shell-owned characters (`q ? s S T`, executed via
+//! [`shell_character_system`] and the sort/palette refinements) and the
+//! contextual gestures ([`prefix_jump_system`], [`source_retry_system`],
+//! [`app_history_window_system`]) are separate layers and must never appear in
+//! the TUI registry — one chord, one declaring layer.
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use taskmanager_application::{AppPage, Modifiers, PlatformEffect};
@@ -10,6 +24,7 @@ use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoTable, InputDispatch,
 };
 
+use crate::command_palette::{TUI_LOCAL_COMMANDS, TuiDirectAction, TuiDirectArm, TuiDirectScope};
 use crate::{FocusPanel, PerfDevice, TuiApp, TuiInputScope};
 
 use super::{HELP_PAGE_STEP, inline_network_escalation_ready, key_to_terminal, modals, navigation};
@@ -145,17 +160,19 @@ fn character_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
 
 type CharacterSystem = fn(&mut TuiApp, char, Modifiers) -> InputDispatch;
 
-const CHARACTER_SYSTEMS: [CharacterSystem; 11] = [
+/// Shell-owned characters run first (plus their TUI execution refinements);
+/// the TUI-local command registry resolves after them; the contextual prefix
+/// jump is the last character consumer. The registry sits here — not earlier —
+/// because none of the systems above it consume a registry chord, so the
+/// observable precedence of every command is unchanged from the days when
+/// each chord had its own hand-written system.
+const CHARACTER_SYSTEMS: [CharacterSystem; 7] = [
     app_history_window_system,
-    performance_digit_system,
     sort_system,
     palette_system,
     source_retry_system,
     shell_character_system,
-    utility_character_system,
-    application_character_system,
-    service_character_system,
-    performance_character_system,
+    tui_local_command_system,
     prefix_jump_system,
 ];
 
@@ -168,31 +185,12 @@ fn app_history_window_system(
         return InputDispatch::Unhandled;
     }
     let window = match character {
-        '1' => taskmanager_application::HistoryWindow::OneHour,
-        '2' => taskmanager_application::HistoryWindow::TwentyFourHours,
-        '3' => taskmanager_application::HistoryWindow::SevenDays,
+        '1' => taskmanager_core::core::history::HistoryWindow::OneHour,
+        '2' => taskmanager_core::core::history::HistoryWindow::TwentyFourHours,
+        '3' => taskmanager_core::core::history::HistoryWindow::SevenDays,
         _ => return InputDispatch::Unhandled,
     };
     let _ = app.select_application_history_window(window);
-    InputDispatch::Consumed
-}
-
-fn performance_digit_system(
-    app: &mut TuiApp,
-    character: char,
-    modifiers: Modifiers,
-) -> InputDispatch {
-    if app.page() != AppPage::Performance
-        || modifiers.control
-        || modifiers.alt
-        || modifiers.platform
-    {
-        return InputDispatch::Unhandled;
-    }
-    let Some(device) = app.select_perf_device_digit(character) else {
-        return InputDispatch::Unhandled;
-    };
-    app.select_perf_device(device);
     InputDispatch::Consumed
 }
 
@@ -202,9 +200,9 @@ fn sort_system(app: &mut TuiApp, character: char, modifiers: Modifiers) -> Input
     }
     if let Some(table) = info_table_for_page(app.page()) {
         if character == 's' {
-            app.shell.cycle_info_sort_column(table);
+            app.cycle_info_sort_column_preserving_anchor(table);
         } else {
-            app.shell.toggle_info_sort_direction(table);
+            app.toggle_info_sort_direction_preserving_anchor(table);
         }
         return InputDispatch::Consumed;
     }
@@ -246,56 +244,223 @@ fn shell_character_system(
     app.handle_local_char(character, modifiers)
 }
 
-fn utility_character_system(
-    app: &mut TuiApp,
-    character: char,
-    _modifiers: Modifiers,
-) -> InputDispatch {
-    match character {
-        'p' => app.toggle_settings(),
-        'i' => app.toggle_about(),
-        'h' => app.toggle_health(),
-        'c' => app.toggle_containers(),
-        'x' => app.export_snapshot(),
-        _ => return InputDispatch::Unhandled,
-    }
-    InputDispatch::Consumed
-}
-
-fn application_character_system(
+/// Resolve one pressed character through the TUI-local command registry
+/// ([`TUI_LOCAL_COMMANDS`]): the entry whose declared shortcut matches the
+/// chord runs its first armed direct arm. The resource-digit entry declares a
+/// range token rather than one literal character, so bare digits that match no
+/// literal row resolve against it. `Unhandled` keeps the shell/contextual
+/// layers after this system in play (exactly the fall-through each chord had
+/// when it was hand-matched).
+fn tui_local_command_system(
     app: &mut TuiApp,
     character: char,
     modifiers: Modifiers,
 ) -> InputDispatch {
-    if app.page() != AppPage::Applications || modifiers.control || modifiers.alt {
-        return InputDispatch::Unhandled;
-    }
-    match character {
-        'a' => {
-            let _ = app.open_process_menu();
+    let mut buffer = [0u8; 4];
+    let pressed = character.encode_utf8(&mut buffer);
+    let digit = character.is_ascii_digit().then_some(character);
+    for command in TUI_LOCAL_COMMANDS {
+        if command.binding.shortcut == pressed {
+            return run_direct_arms(app, command.direct, digit, modifiers);
         }
-        'C' => app.toggle_column_menu(),
-        'm' => toggle_marked_process(app),
-        'B' => {
+    }
+    if let Some(digit) = digit {
+        return run_registry_shortcut(
+            app,
+            crate::command_palette::RESOURCE_DIGITS_SHORTCUT,
+            Some(digit),
+            modifiers,
+        );
+    }
+    InputDispatch::Unhandled
+}
+
+/// Run the first armed arm of the registry entry declared under `shortcut`.
+/// Used for the two range/key tokens the character scanner cannot match
+/// literally: the Performance resource digits and the row-target `Enter`.
+fn run_registry_shortcut(
+    app: &mut TuiApp,
+    shortcut: &str,
+    digit: Option<char>,
+    modifiers: Modifiers,
+) -> InputDispatch {
+    for command in TUI_LOCAL_COMMANDS {
+        if command.binding.shortcut == shortcut {
+            return run_direct_arms(app, command.direct, digit, modifiers);
+        }
+    }
+    InputDispatch::Unhandled
+}
+
+fn run_direct_arms(
+    app: &mut TuiApp,
+    arms: &[TuiDirectArm],
+    digit: Option<char>,
+    modifiers: Modifiers,
+) -> InputDispatch {
+    for arm in arms {
+        if direct_scope_armed(app, arm.scope, modifiers) {
+            return execute_tui_local_direct(app, digit, arm.action);
+        }
+    }
+    InputDispatch::Unhandled
+}
+
+/// The single guard implementation for every declared [`TuiDirectScope`].
+/// Modifier policy per scope mirrors the historical hand-written systems
+/// exactly (the overlay toggles ignore chords; page commands refuse
+/// Ctrl/Alt; the resource digits also refuse the platform modifier).
+fn direct_scope_armed(app: &TuiApp, scope: TuiDirectScope, modifiers: Modifiers) -> bool {
+    match scope {
+        TuiDirectScope::Anywhere => true,
+        TuiDirectScope::ApplicationsPage => {
+            app.page() == AppPage::Applications && !modifiers.control && !modifiers.alt
+        }
+        TuiDirectScope::ApplicationsEscalationReady => {
+            direct_scope_armed(app, TuiDirectScope::ApplicationsPage, modifiers)
+                && inline_network_escalation_ready(app)
+        }
+        TuiDirectScope::RowTarget(page) => app.page() == page,
+        TuiDirectScope::PerformanceResourceDigit => {
+            app.page() == AppPage::Performance
+                && !modifiers.control
+                && !modifiers.alt
+                && !modifiers.platform
+        }
+        TuiDirectScope::ServicesPageLogClosed => {
+            app.page() == AppPage::Services && app.shell.service_log.is_none()
+        }
+        TuiDirectScope::PerformanceGpuPage => {
+            app.page() == AppPage::Performance
+                && !modifiers.control
+                && !modifiers.alt
+                && app.perf_device == PerfDevice::Gpu
+        }
+        TuiDirectScope::PerformanceDiskPage => {
+            app.page() == AppPage::Performance
+                && !modifiers.control
+                && !modifiers.alt
+                && app.perf_device == PerfDevice::Disk
+        }
+        TuiDirectScope::PerformanceDiskSmartReady => {
+            direct_scope_armed(app, TuiDirectScope::PerformanceDiskPage, modifiers)
+                && crate::menus::smart_self_test_target(app).is_some()
+        }
+    }
+}
+
+/// The single execution site for every declared [`TuiDirectAction`]. Only
+/// [`TuiDirectAction::SelectPerfResource`] consumes the pressed digit.
+fn execute_tui_local_direct(
+    app: &mut TuiApp,
+    digit: Option<char>,
+    action: TuiDirectAction,
+) -> InputDispatch {
+    match action {
+        TuiDirectAction::ToggleSettings => {
+            app.toggle_settings();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::ToggleAbout => {
+            app.toggle_about();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::ToggleHealth => {
+            app.toggle_health();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::ToggleContainers => {
+            app.toggle_containers();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::ExportSnapshot => {
+            app.export_snapshot();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::SelectPerfResource => {
+            let Some(digit) = digit else {
+                return InputDispatch::Unhandled;
+            };
+            let Some(device) = app.select_perf_device_digit(digit) else {
+                return InputDispatch::Unhandled;
+            };
+            app.select_perf_device(device);
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::OpenServiceMenu => {
+            let _ = app.open_service_menu();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::OpenSessionMenu => {
+            let _ = app.open_session_menu();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::OpenStartupMenu => {
+            let _ = app.open_startup_menu();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::OpenProcessProperties => {
+            let _ = app.open_process_properties();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::ToggleColumnMenu => {
+            app.toggle_column_menu();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::ToggleMarkedProcess => {
+            toggle_marked_process(app);
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::ToggleBatchMenu => {
             let _ = app.open_batch_menu();
+            InputDispatch::Consumed
         }
-        'y' if !app.search_active() => app.copy_selected_process(&mut std::io::stdout()),
-        'e' if inline_network_escalation_ready(app) => {
-            return InputDispatch::Effect(Box::new(
-                taskmanager_shell::ShellApp::request_process_network_escalation(),
-            ));
+        TuiDirectAction::CopyClipboard => {
+            // Defensive restatement of the historical inline guard: while a
+            // search owns the input scope its characters never reach this
+            // system, so this only fails closed.
+            if app.search_active() {
+                return InputDispatch::Unhandled;
+            }
+            app.copy_selected_process(&mut std::io::stdout());
+            InputDispatch::Consumed
         }
-        _ => return InputDispatch::Unhandled,
+        TuiDirectAction::OpenProcessMenu => {
+            let _ = app.open_process_menu();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::OpenServiceLog => InputDispatch::consumed(app.shell.open_service_log()),
+        TuiDirectAction::RequestNetworkEscalation => InputDispatch::Effect(Box::new(
+            taskmanager_shell::ShellApp::request_process_network_escalation(),
+        )),
+        TuiDirectAction::ToggleGpuEngineRows => {
+            InputDispatch::consumed(app.toggle_gpu_engine_rows())
+        }
+        TuiDirectAction::CycleGpuChartMetric => {
+            app.cycle_gpu_chart_metric();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::ToggleDirectoryScan => {
+            InputDispatch::consumed(app.toggle_directory_scan())
+        }
+        TuiDirectAction::RequestSmartSelfTest => {
+            // The scope guard already proved a SMART-capable target exists;
+            // the arm re-resolves and freezes it into the shared gate. No
+            // effect returns here — the platform request is emitted only by
+            // the gate's `y`, like every shared confirmation.
+            let _ = app.arm_smart_self_test();
+            InputDispatch::Consumed
+        }
     }
-    InputDispatch::Consumed
 }
 
 fn toggle_marked_process(app: &mut TuiApp) {
     if let Some(process) = app.selected_detail_process() {
-        let pid = process.pid;
-        app.shell.toggle_selected_pid(pid);
+        if let Some(identity) = taskmanager_shell::ProcessRowIdentity::from_process(&process) {
+            app.shell.toggle_selected_identity(identity);
+        }
     }
-    let marked = app.shell.selected_pids().len();
+    let marked = app.shell.selected_identities().len();
     let text = if marked == 0 {
         "Selection cleared".to_owned()
     } else {
@@ -307,41 +472,6 @@ fn toggle_marked_process(app: &mut TuiApp) {
         FeedbackLifecycle::SHORT,
         text,
     );
-}
-
-fn service_character_system(
-    app: &mut TuiApp,
-    character: char,
-    _modifiers: Modifiers,
-) -> InputDispatch {
-    if app.page() != AppPage::Services || character != 'o' || app.shell.service_log.is_some() {
-        return InputDispatch::Unhandled;
-    }
-    InputDispatch::consumed(app.shell.open_service_log())
-}
-
-fn performance_character_system(
-    app: &mut TuiApp,
-    character: char,
-    modifiers: Modifiers,
-) -> InputDispatch {
-    if app.page() != AppPage::Performance || modifiers.control || modifiers.alt {
-        return InputDispatch::Unhandled;
-    }
-    match (character, app.perf_device) {
-        ('e', PerfDevice::Gpu) => InputDispatch::consumed(app.toggle_gpu_engine_rows()),
-        ('d', PerfDevice::Disk) => InputDispatch::consumed(app.toggle_directory_scan()),
-        // GPU headline-chart metric cycle (ADR-034 stage 2): advances the
-        // shared shell selection through the fixed vocabulary order, gated
-        // by the viewed device's typed availability. `g` is free on the
-        // Performance page (the router binds no bare `g` chord) and the
-        // earlier scopes above already returned for search/modal typing.
-        ('g', PerfDevice::Gpu) => {
-            app.cycle_gpu_chart_metric();
-            InputDispatch::Consumed
-        }
-        _ => InputDispatch::Unhandled,
-    }
 }
 
 fn performance_scroll_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
@@ -400,11 +530,13 @@ fn selection_extension_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch
         KeyCode::Up => -1,
         _ => return InputDispatch::Unhandled,
     };
-    let previously_marked = app.shell.selected_pids().clone();
+    let previously_marked = app.shell.selected_identities().clone();
     let effect = app.move_nonflat_selection_oneshot(delta);
-    app.shell.selected_pids.extend(previously_marked);
+    app.shell.selected_rows.extend(previously_marked);
     if let Some(process) = app.selected_detail_process() {
-        app.shell.selected_pids.insert(process.pid);
+        if let Some(identity) = taskmanager_shell::ProcessRowIdentity::from_process(&process) {
+            app.shell.selected_rows.insert(identity);
+        }
     }
     InputDispatch::consumed(effect)
 }
@@ -476,7 +608,12 @@ fn content_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
         }
         KeyCode::Up => move_flat_selection(app, -1),
         KeyCode::Down => move_flat_selection(app, 1),
-        KeyCode::Enter => open_page_target(app),
+        KeyCode::Enter => run_registry_shortcut(
+            app,
+            crate::command_palette::ROW_TARGET_SHORTCUT,
+            None,
+            Modifiers::NONE,
+        ),
         KeyCode::F(1)
             if matches!(
                 app.input_scope(),
@@ -497,27 +634,6 @@ fn move_flat_selection(app: &mut TuiApp, delta: isize) -> InputDispatch {
     app.detail_scroll_reset();
     app.move_selection(delta);
     InputDispatch::consumed(app.refresh_selected_process_insights())
-}
-
-fn open_page_target(app: &mut TuiApp) -> InputDispatch {
-    match app.page() {
-        AppPage::Services => {
-            let _ = app.open_service_menu();
-        }
-        AppPage::Users => {
-            let _ = app.open_session_menu();
-        }
-        AppPage::Startup => {
-            let _ = app.open_startup_menu();
-        }
-        AppPage::Applications => {
-            let _ = app.open_process_properties();
-        }
-        AppPage::Performance | AppPage::System | AppPage::AppHistory => {
-            return InputDispatch::Unhandled;
-        }
-    }
-    InputDispatch::Consumed
 }
 
 fn modifiers(key: &KeyEvent) -> Modifiers {

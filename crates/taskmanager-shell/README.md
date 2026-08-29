@@ -2,7 +2,7 @@
 
 ## Role
 
-Renderer-neutral state machine shared by GPUI, Iced and TUI (ADR-027): page,
+Renderer-neutral state machine shared by GPUI, Iced, TUI, and Bevy (ADR-027): page,
 selection, filtering, sorting, effects and `SystemProjectionStore`. Shell is the
 composition owner that folds correlated telemetry into the single bounded
 `taskmanager-telemetry-store` live graph authority.
@@ -28,7 +28,7 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
   it updates activity, publishes typed failure/control notices, ingests shared
   history and performs selection/service-log hygiene.
 - Each frontend track owns exactly one application dependency lifecycle:
-  `ShellApp` for Iced/TUI and `DirectTrackState` for GPUI. `OpenServiceLog`
+  `ShellApp` for Iced/TUI/Bevy and `DirectTrackState` for GPUI. `OpenServiceLog`
   owns only the feed plus its lifecycle; identity is projected from the
   lifecycle. Effect dispatch begins a typed admission attempt before submission
   and upgrades or rejects that exact attempt.
@@ -51,6 +51,9 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
   track. `ShellApp` and `DirectTrackState` expose only immutable managed rules
   and the same typed edit command; frontends cannot replace engine rules or
   persist enabled-state mirrors.
+- The same `AlertCenter` also owns bounded activated/cleared event history;
+  GPUI's event panel and Iced's event overlay consume its immutable slice,
+  while filter/read state remains renderer-local.
 - Effect submission folds through `NoSubmission | Rejected | Accepted`; partial
   multi-facet success remains accepted while every rejected facet is reported.
 - Inline input ownership is one `ShellInputMode::{Content, Search, Help,
@@ -75,6 +78,11 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
 - `ProcessRowKey` distinguishes structural category rows, PID-less application
   aggregates and real process rows. An application root PID is a live tree
   lookup key; batch submission freezes its exact leaf-first descendant scope.
+- `ProcessRowId`/`ProcessRowAnchor` are the forward-compatible row seam:
+  process-backed rows use the shell-owned `ProcessRowIdentity` wrapper around
+  the core `ProcessIdentity`, while
+  `ProcessProjectionGeneration` rejects stale renderer geometry. The existing
+  `ProcessRowKey` remains as a compatibility adapter until frontend migration.
 - `src/presentation.rs` and `src/viewmodel.rs` expose renderer-neutral projections, including the
   product-first GPU display identity that keeps hardware names separate from driver names.
 - GPU history retains typed utilization/scalar/engine query windows. The shared chart-metric

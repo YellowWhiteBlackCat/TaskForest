@@ -199,7 +199,7 @@ pub(crate) fn network_section(
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let snapshot = app.shell.projection().snapshot.as_ref();
     let theme_snapshot = app.theme();
-    let color = theme::color(theme_snapshot.network);
+    let color = taskmanager_theme::iced::color(theme_snapshot.network);
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let rows = match (network_section_state(snapshot), snapshot) {
         (tables::ListState::Loading, _) => {
@@ -282,42 +282,59 @@ fn network_block<'a>(
         theme_snapshot,
         compact,
     )];
-    let mut copy_actions = Vec::new();
-    if let Some(ipv4) = nic.ipv4_addr.as_deref().filter(|s| !s.is_empty()) {
-        copy_actions.push(focus::dynamic_button(
-            theme_snapshot,
-            FocusTarget::AboutCopyDetails,
-            format!("IPv4: {ipv4}"),
-            Message::CopyTextToClipboard {
-                label: "IPv4".to_string(),
-                text: ipv4.to_string(),
-            },
-            false,
-        ));
+    // Addresses are selectable read-only values (GPUI SelectableText parity):
+    // the user selects an address directly — dragging publishes the primary
+    // clipboard, Ctrl/Cmd-C copies — instead of pressing per-field copy
+    // buttons. The ids keep one stable selection-owner identity per address.
+    let mut address_rows: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
+    for (label, value, id) in [
+        (
+            "IPv4",
+            nic.ipv4_addr.as_deref().filter(|s| !s.is_empty()),
+            "net-ipv4",
+        ),
+        (
+            "IPv6",
+            nic.ipv6_addr.as_deref().filter(|s| !s.is_empty()),
+            "net-ipv6",
+        ),
+        (
+            "MAC",
+            nic.mac_addr.as_deref().filter(|s| !s.is_empty()),
+            "net-mac",
+        ),
+    ] {
+        let Some(value) = value else {
+            continue;
+        };
+        let value_id = iced::advanced::widget::Id::new(id);
+        let is_owner = app.text_selection_owner() == Some(value_id.clone());
+        address_rows.push(
+            row![
+                text(label)
+                    .size(f32::from(tokens::FONT_12))
+                    .color(crate::theme::muted_text_color(theme_snapshot))
+                    .width(iced::Length::Fixed(48.0)),
+                crate::ui::components::SelectableText::new(
+                    value_id,
+                    value.to_owned(),
+                    13.0,
+                    taskmanager_theme::iced::color(theme_snapshot.palette().fg),
+                )
+                .selection_owner(is_owner),
+            ]
+            .spacing(8)
+            .into(),
+        );
     }
-    if let Some(ipv6) = nic.ipv6_addr.as_deref().filter(|s| !s.is_empty()) {
-        copy_actions.push(focus::dynamic_button(
-            theme_snapshot,
-            FocusTarget::AboutCopyDetails,
-            format!("IPv6: {ipv6}"),
-            Message::CopyTextToClipboard {
-                label: "IPv6".to_string(),
-                text: ipv6.to_string(),
-            },
-            false,
-        ));
-    }
-    if let Some(mac) = nic.mac_addr.as_deref().filter(|s| !s.is_empty()) {
-        copy_actions.push(focus::dynamic_button(
-            theme_snapshot,
-            FocusTarget::AboutCopyDetails,
-            format!("MAC: {mac}"),
-            Message::CopyTextToClipboard {
-                label: "MAC".to_string(),
-                text: mac.to_string(),
-            },
-            false,
-        ));
+    if !address_rows.is_empty() {
+        graphs.push(
+            container(column(address_rows).spacing(5))
+                .style(move |_| theme::card_style(theme_snapshot))
+                .padding(8)
+                .width(iced::Length::Fill)
+                .into(),
+        );
     }
     if nic.adapter_type() == NetworkAdapterType::WiFi {
         let mut wifi_items: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
@@ -325,11 +342,11 @@ fn network_block<'a>(
         // disconnected reads muted, degraded/error states read danger.
         let status_color =
             if nic.device_state.status == DeviceStatus::Healthy && network_connected(nic) {
-                theme::color(theme_snapshot.success)
+                taskmanager_theme::iced::color(theme_snapshot.success)
             } else if nic.device_state.status == DeviceStatus::Healthy {
                 crate::theme::muted_text_color(theme_snapshot)
             } else {
-                theme::color(theme_snapshot.gpu)
+                taskmanager_theme::iced::color(theme_snapshot.gpu)
             };
         wifi_items.push(
             text("\u{25CF}")
@@ -375,9 +392,6 @@ fn network_block<'a>(
                     .into(),
             );
         }
-    }
-    if !copy_actions.is_empty() {
-        graphs.push(row(copy_actions).spacing(6).into());
     }
     perf_layout::main_with_stats(
         theme_snapshot,

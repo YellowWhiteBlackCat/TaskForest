@@ -29,7 +29,10 @@ fn about_overlay_renders_hardware_facts_and_version() {
     assert!(text.contains("taskforest-workstation"));
     assert!(text.contains("Arch Linux"));
     assert!(text.contains("6.18.7-arch1-1"));
-    assert!(text.contains("Intel Core Ultra 7 358H"));
+    // The fixture ships the provider-verbatim brand string (Intel reports the
+    // trademark markers); the About overlay paints the fact verbatim, exactly
+    // like the System page — no normalization layer exists or is claimed.
+    assert!(text.contains("Intel(R) Core(TM) Ultra 7 358H"));
     assert!(text.contains("22"));
     assert!(text.contains("32.0 GiB"));
     assert!(text.contains("06h 42m"));

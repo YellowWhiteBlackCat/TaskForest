@@ -9,7 +9,7 @@ use crate::ui::applications::{
     APPLICATION_HEADER_HEIGHT, application_row_height, applications_table_key,
     applications_table_rows_range, process_view_selector,
 };
-use taskmanager_application::ProcessItem;
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_shell::{SortCol, SortDir};
 
 use super::super::process_projection::ProcessProjection;
@@ -33,7 +33,7 @@ fn rendered_row_count(app: &crate::IcedApp) -> usize {
         app.shell.process_sort,
         &app.process_presentation.expanded_groups,
         &app.process_presentation.expanded_tree,
-        &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     );
     let hidden_columns = std::collections::HashSet::new();
     let ctx = RowRender {
@@ -43,11 +43,12 @@ fn rendered_row_count(app: &crate::IcedApp) -> usize {
         swap_visible: true,
         compact: app.compact_density(),
         ui_size: app.ui_size(),
-        selected_pids: std::rc::Rc::new(app.shell.selected_pids().clone()),
-        selected_row: app.shell.selected_process_row,
+        selected_identities: std::rc::Rc::new(app.shell.selected_identities().clone()),
+        selected_row: app.shell.selected_row,
         gray_zero: app.preferences().gray_zero_values,
         hidden_columns: std::rc::Rc::new(hidden_columns),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
+        open_menu_pid: None,
     };
     applications_table_rows(&ctx, &projection).len()
 }
@@ -62,11 +63,12 @@ fn applications_lazy_body_key_tracks_only_visual_invalidations() {
         swap_visible: true,
         compact: false,
         ui_size: taskmanager_theme::tokens::UiSize::Standard,
-        selected_pids: std::rc::Rc::new(std::collections::HashSet::new()),
+        selected_identities: std::rc::Rc::new(std::collections::HashSet::new()),
         selected_row: None,
         gray_zero: false,
         hidden_columns: std::rc::Rc::new(std::collections::HashSet::new()),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
+        open_menu_pid: None,
     };
     let base = applications_table_key(7, &render);
     assert_eq!(base, applications_table_key(7, &render));
@@ -75,15 +77,40 @@ fn applications_lazy_body_key_tracks_only_visual_invalidations() {
     assert_ne!(base, applications_table_key(7, &render));
     render.query.clear();
     let mut selected = std::collections::HashSet::new();
-    selected.insert(1);
-    render.selected_pids = std::rc::Rc::new(selected);
+    selected.insert(
+        taskmanager_shell::ProcessRowIdentity::from_parts(
+            1,
+            taskmanager_test_support::fixture_start_token(1),
+        )
+        .expect("non-zero parts"),
+    );
+    render.selected_identities = std::rc::Rc::new(selected);
     assert_ne!(base, applications_table_key(7, &render));
-    render.selected_pids = std::rc::Rc::new(std::collections::HashSet::new());
+    render.selected_identities = std::rc::Rc::new(std::collections::HashSet::new());
     let mut hidden = std::collections::HashSet::new();
     hidden.insert(SortCol::Fds);
     render.hidden_columns = std::rc::Rc::new(hidden);
     assert_ne!(base, applications_table_key(7, &render));
     assert_ne!(base, applications_table_key(8, &render));
+
+    // Right-clicking a row opens its context menu ON that row: the table
+    // body must rebuild so the row can host the floating panel, and closing
+    // the menu (or switching it to another row) must rebuild again.
+    render.open_menu_pid = Some(4242);
+    let open_on_row = applications_table_key(7, &render);
+    assert_ne!(base, open_on_row);
+    render.open_menu_pid = Some(909);
+    assert_ne!(
+        open_on_row,
+        applications_table_key(7, &render),
+        "moving the open menu to another row re-hosts a different one"
+    );
+    render.open_menu_pid = None;
+    assert_ne!(
+        open_on_row,
+        applications_table_key(7, &render),
+        "closing the menu rebuilds the table body once more"
+    );
 }
 
 #[test]
@@ -143,7 +170,7 @@ fn applications_row_materialization_is_bounded_to_the_virtual_window() {
         (SortCol::Cpu, SortDir::Desc),
         &expanded,
         &std::collections::HashSet::new(),
-        &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     );
     let ctx = RowRender {
         theme: *app.theme(),
@@ -152,11 +179,12 @@ fn applications_row_materialization_is_bounded_to_the_virtual_window() {
         swap_visible: true,
         compact: false,
         ui_size: taskmanager_theme::tokens::UiSize::Standard,
-        selected_pids: std::rc::Rc::new(std::collections::HashSet::new()),
+        selected_identities: std::rc::Rc::new(std::collections::HashSet::new()),
         selected_row: None,
         gray_zero: false,
         hidden_columns: std::rc::Rc::new(std::collections::HashSet::new()),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
+        open_menu_pid: None,
     };
     let window = VirtualWindow::for_rows(
         projection.len(),
@@ -194,8 +222,8 @@ fn grouped_process_fixture(pid: u32, name: &str, cpu: f32, memory_bytes: u64) ->
         .current_cpu_percentage(cpu)
         .current_memory_bytes(memory_bytes)
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("devuser"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("devuser"),
                 None,
                 1,
             ),
@@ -213,7 +241,8 @@ fn canonical_hierarchy_control_composes_without_selector_state() {
 
 #[test]
 fn process_status_filter_selector_is_localized_focusable_and_filters_rows() {
-    use crate::app::{FocusTarget, Message, ProcessStatusFilter};
+    use crate::app::{FocusTarget, Message};
+    use taskmanager_shell::ProcessStatusFilter;
 
     taskmanager_test_support::pin_english();
     for filter in ProcessStatusFilter::ALL {

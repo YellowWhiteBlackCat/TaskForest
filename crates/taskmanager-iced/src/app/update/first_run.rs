@@ -17,10 +17,13 @@
 use std::collections::HashMap;
 
 use taskmanager_application::{
-    CapabilityId, CorrelatedSetupScriptEvent, FailureKind, PlatformEffect, PlatformEventBatch,
-    RequestId, SetupScriptAction, SetupScriptEvent, SetupScriptRequest, SubmissionErrorKind,
+    CorrelatedSetupScriptEvent, PlatformEffect, PlatformEventBatch, SetupScriptRequest,
     UrlOpenRequest,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent};
+use taskmanager_platform_contract::{CapabilityId, RequestId, SubmissionErrorKind};
+
 use taskmanager_shell::QuitReason;
 
 use super::super::{FirstRunMessage, IcedApp, LocalSurface, LocalSurfaceKind, Message};

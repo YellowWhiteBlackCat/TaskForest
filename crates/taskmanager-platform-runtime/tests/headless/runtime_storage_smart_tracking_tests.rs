@@ -1,9 +1,11 @@
 use crate::CapabilityHealth;
-use taskmanager_application::{
-    DeviceGeneration, DeviceId, FailureKind, SmartControlRequest, SmartObservationBatch,
-    SmartObservationIssue, SmartSelfTestIntent, StorageDeviceKey, StorageDeviceTarget,
-};
-use taskmanager_core::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
+use taskmanager_application::{SmartControlRequest, SmartObservationBatch, SmartObservationIssue};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
+use taskmanager_core::core::storage::StorageDeviceTarget;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_core::core::target::StorageDeviceKey;
 
 use super::{batch_health, control};
 use crate::storage::smart_state::SharedSmartRuntimeState;
@@ -39,7 +41,9 @@ fn multi_target_health_is_independent_of_device_or_issue_order() {
     assert_eq!(batch_health(&left, true), batch_health(&right, true));
     assert_eq!(
         batch_health(&left, false),
-        CapabilityHealth::Unavailable(taskmanager_application::ProviderFailure::PermissionDenied)
+        CapabilityHealth::Unavailable(
+            taskmanager_platform_contract::ProviderFailure::PermissionDenied
+        )
     );
 }
 
@@ -78,7 +82,7 @@ fn capacity_rejection_happens_before_the_drive_side_effect() {
             &mut provider,
             1,
         ),
-        Err(taskmanager_application::ProviderFailure::Rejected)
+        Err(taskmanager_platform_contract::ProviderFailure::Rejected)
     ));
     assert_eq!(
         provider_calls.load(Ordering::Relaxed),

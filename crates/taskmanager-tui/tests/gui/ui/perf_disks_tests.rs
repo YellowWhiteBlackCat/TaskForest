@@ -1,5 +1,6 @@
 use super::*;
-use taskmanager_application::SystemSnapshot;
+use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 /// A disk whose throughput history has >=2 samples renders a real sparkline
 /// (a ramp block) on its trend line; a disk with no history renders the
@@ -32,22 +33,23 @@ fn disk_trend_line_matches_that_disks_own_history_window() {
         "constant throughput → flat mid-ramp"
     );
 
-    // The trend line in disk_lines is line index 1 (right after the header).
-    // The row must carry the generation its ring was reset for — a bound
-    // platform row always does; an unbound 0 renders no curve by contract.
+    // The trend line in disk_lines is line index 2 (after the header and the
+    // device-status row). The row must carry the generation its ring was
+    // reset for — a bound platform row always does; an unbound 0 renders no
+    // curve by contract.
     let known = disk_lines(
         &[taskmanager_test_support::DiskMetricsFixtureBuilder::new()
             .device_id("disk:test:sda".into())
             .name("sda".into())
-            .device_generation(taskmanager_application::DeviceGeneration::new(1))
+            .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
             .build()],
-        history,
+        &shell,
         TuiTheme::default(),
         true,
         true,
         60,
     );
-    let trend_text: String = known[1]
+    let trend_text: String = known[2]
         .spans
         .iter()
         .map(|span| span.content.as_ref())
@@ -64,15 +66,15 @@ fn disk_trend_line_matches_that_disks_own_history_window() {
         &[taskmanager_test_support::DiskMetricsFixtureBuilder::new()
             .device_id("disk:test:nvme1".into())
             .name("nvme1n1".into())
-            .device_generation(taskmanager_application::DeviceGeneration::new(1))
+            .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
             .build()],
-        history,
+        &shell,
         TuiTheme::default(),
         true,
         true,
         60,
     );
-    let cold_trend: String = cold[1]
+    let cold_trend: String = cold[2]
         .spans
         .iter()
         .map(|span| span.content.as_ref())
@@ -91,8 +93,10 @@ fn smart_temperature_trend_never_mixes_other_disks_history() {
             taskmanager_test_support::DiskMetricsFixtureBuilder::new()
                 .device_id(device_id.to_owned())
                 .name(name.to_owned())
-                .smart_availability(taskmanager_application::SmartAvailability::Available)
-                .smart_state(taskmanager_application::DeviceState::healthy(timestamp_ms))
+                .smart_availability(taskmanager_core::core::metrics::SmartAvailability::Available)
+                .smart_state(taskmanager_core::core::device_state::DeviceState::healthy(
+                    timestamp_ms,
+                ))
                 .smart_temperature_c(Some(temperature_c))
                 .build()
         };
@@ -114,22 +118,15 @@ fn smart_temperature_trend_never_mixes_other_disks_history() {
     let selected = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:temperature-a".into())
         .name("disk-a".into())
-        .device_generation(taskmanager_application::DeviceGeneration::new(1))
-        .smart_availability(taskmanager_application::SmartAvailability::Available)
+        .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
+        .smart_availability(taskmanager_core::core::metrics::SmartAvailability::Available)
         .smart_temperature_c(Some(33.0))
         .build();
-    let text = disk_lines(
-        &[selected],
-        &shell.history,
-        TuiTheme::default(),
-        true,
-        true,
-        60,
-    )
-    .iter()
-    .flat_map(|line| line.spans.iter())
-    .map(|span| span.content.as_ref())
-    .collect::<String>();
+    let text = disk_lines(&[selected], &shell, TuiTheme::default(), true, true, 60)
+        .iter()
+        .flat_map(|line| line.spans.iter())
+        .map(|span| span.content.as_ref())
+        .collect::<String>();
     assert!(
         text.contains("33°C"),
         "selected disk's latest sample is shown"
@@ -161,7 +158,7 @@ fn rate_disk(read: Option<u64>, write: Option<u64>) -> DiskMetrics {
     let builder = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
         .device_id("disk:test:sda".into())
         .name("sda".into())
-        .device_generation(taskmanager_application::DeviceGeneration::new(1))
+        .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
         .scalar_observations(Default::default());
     let builder = match read {
         Some(value) => builder.current_read_bytes_per_sec(value),
@@ -205,14 +202,16 @@ fn disk_direction_rows_share_one_scale_and_keep_the_summed_summary() {
 
     let lines = disk_lines(
         &[rate_disk(None, None)],
-        &shell.history,
+        &shell,
         TuiTheme::default(),
         true,
         true,
         60,
     );
-    let read_row = line_text(&lines[1]);
-    let write_row = line_text(&lines[2]);
+    // Index 0 is the header and index 1 the device-status row, so the
+    // direction pair starts at index 2.
+    let read_row = line_text(&lines[2]);
+    let write_row = line_text(&lines[3]);
     assert!(
         read_row.contains("Read") && read_row.contains("▁▅█"),
         "read row must label its direction and span the shared ramp: {read_row:?}"
@@ -222,7 +221,7 @@ fn disk_direction_rows_share_one_scale_and_keep_the_summed_summary() {
         "write row must ride the shared maximum, not a per-row mid-ramp: {write_row:?}"
     );
     assert!(
-        line_text(&lines[3]).contains("Throughput"),
+        line_text(&lines[4]).contains("Throughput"),
         "the summed total summary stays under the direction pair"
     );
 }
@@ -244,14 +243,16 @@ fn disk_direction_rows_render_per_direction_gaps() {
 
     let lines = disk_lines(
         &[rate_disk(None, None)],
-        &shell.history,
+        &shell,
         TuiTheme::default(),
         true,
         true,
         60,
     );
-    let read_row = line_text(&lines[1]);
-    let write_row = line_text(&lines[2]);
+    // Index 0 is the header and index 1 the device-status row, so the
+    // direction pair starts at index 2.
+    let read_row = line_text(&lines[2]);
+    let write_row = line_text(&lines[3]);
     assert!(
         read_row.contains("Read") && read_row.contains('·'),
         "read row must show its explicit gaps: {read_row:?}"
@@ -279,7 +280,7 @@ fn disk_active_time_row_trends_its_own_window_with_percent_summary() {
         taskmanager_test_support::DiskMetricsFixtureBuilder::new()
             .device_id("disk:test:sda".into())
             .name("sda".into())
-            .device_generation(taskmanager_application::DeviceGeneration::new(1))
+            .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
             .current_read_bytes_per_sec(1_048_576)
             .current_write_bytes_per_sec(1_048_576)
             .current_active_time_pct(active_pct)
@@ -291,7 +292,7 @@ fn disk_active_time_row_trends_its_own_window_with_percent_summary() {
 
     let known = disk_lines(
         &[active_disk(90.0)],
-        &shell.history,
+        &shell,
         TuiTheme::default(),
         true,
         true,
@@ -321,9 +322,9 @@ fn disk_active_time_row_trends_its_own_window_with_percent_summary() {
         &[taskmanager_test_support::DiskMetricsFixtureBuilder::new()
             .device_id("disk:test:nvme-cold".into())
             .name("nvme-cold".into())
-            .device_generation(taskmanager_application::DeviceGeneration::new(1))
+            .device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1))
             .build()],
-        &shell.history,
+        &shell,
         TuiTheme::default(),
         true,
         true,
@@ -344,4 +345,137 @@ fn disk_active_time_row_trends_its_own_window_with_percent_summary() {
             .any(|text| text.contains("Active time · Latest")),
         "no percent summary without a finite sample"
     );
+}
+
+/// Serialize the En/Zh cycle against the concurrent English-asserting render
+/// tests (the language is a process global; see `LANG_TEST_GUARD`).
+fn with_languages(body: impl FnOnce()) {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    body();
+}
+
+/// One "sda" fixture with the given device health and removability, so the
+/// status rows assert known typed values instead of builder defaults.
+fn health_disk(state: DeviceState, removable: Option<bool>) -> DiskMetrics {
+    taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        .device_id("disk:test:sda".into())
+        .name("sda".into())
+        .device_state(state)
+        .media_removable(removable)
+        .build()
+}
+
+fn disk_line_texts(disk: &DiskMetrics) -> Vec<String> {
+    disk_lines(
+        std::slice::from_ref(disk),
+        &taskmanager_shell::ShellApp::new(),
+        TuiTheme::default(),
+        true,
+        true,
+        60,
+    )
+    .iter()
+    .map(line_text)
+    .collect()
+}
+
+// test-intent: behavior
+/// The device-status row (GPUI disk_stats first stat, §2.3 B-1) carries the
+/// typed DeviceStatus vocabulary — a stale/degraded device renders its own
+/// verdict, a fact the SMART section's smart_status variant cannot express —
+/// and the Removable row (§2.3 B-2) renders only media the adapter PROVED
+/// removable: an unresolved probe renders no row, never a fabricated Yes/No.
+#[test]
+fn disk_status_row_expresses_typed_health_and_proven_removability() {
+    taskmanager_test_support::pin_english();
+
+    // Fixture-known healthy value, plus proven removable media.
+    let healthy = disk_line_texts(&health_disk(DeviceState::healthy(1), Some(true)));
+    let status_row = healthy
+        .iter()
+        .find(|text| text.trim_start().starts_with("Status "))
+        .expect("every disk renders its device-status row");
+    assert!(
+        status_row.contains("Healthy"),
+        "a healthy disk must read Healthy: {status_row:?}"
+    );
+    let removable_row = healthy
+        .iter()
+        .find(|text| text.trim_start().starts_with("Removable "))
+        .expect("proven removable media must render its row");
+    assert!(
+        removable_row.contains("Yes"),
+        "proven removable media must read Yes: {removable_row:?}"
+    );
+
+    // Degraded path: the stale verdict renders its own copy...
+    let stale = disk_line_texts(&health_disk(
+        DeviceState {
+            status: DeviceStatus::Stale,
+            last_success_ms: Some(1),
+        },
+        None,
+    ));
+    let stale_row = stale
+        .iter()
+        .find(|text| text.trim_start().starts_with("Status "))
+        .expect("every disk renders its device-status row");
+    assert!(
+        stale_row.contains("Stale data"),
+        "a stale disk must express its degraded health: {stale_row:?}"
+    );
+    // ...and the unavailable-removability path renders no Removable row.
+    assert!(
+        !stale.iter().any(|text| text.contains("Removable")),
+        "an unproven removability probe must omit the row, never fabricate Yes/No"
+    );
+}
+
+// test-intent: behavior
+/// The status and removable rows resolve through the shared catalog in the
+/// active locale: the same typed facts paint the English copy under En and
+/// the Chinese copy under Zh, each read live through `t()`.
+#[test]
+fn disk_status_rows_render_the_active_locale_copy() {
+    let stale_removable = health_disk(
+        DeviceState {
+            status: DeviceStatus::Stale,
+            last_success_ms: Some(1),
+        },
+        Some(true),
+    );
+    let keys = [
+        "device.status",
+        "device.stale",
+        "disk.removable",
+        "common.yes",
+    ];
+    with_languages(|| {
+        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+        let en_texts = disk_line_texts(&stale_removable);
+        let en_labels: Vec<&'static str> = keys.iter().map(|key| t(key)).collect();
+
+        taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
+        let zh_texts = disk_line_texts(&stale_removable);
+        let zh_labels: Vec<&'static str> = keys.iter().map(|key| t(key)).collect();
+
+        for (key, en, zh) in keys
+            .iter()
+            .zip(en_labels.iter())
+            .zip(zh_labels.iter())
+            .map(|((key, en), zh)| (*key, *en, *zh))
+        {
+            assert_ne!(en, zh, "{key} must translate to distinct En/Zh copy");
+            assert!(
+                en_texts.iter().any(|text| text.contains(en)),
+                "En rows must paint {en:?}:\n{en_texts:?}"
+            );
+            assert!(
+                zh_texts.iter().any(|text| text.contains(zh)),
+                "Zh rows must paint {zh:?}:\n{zh_texts:?}"
+            );
+        }
+    });
 }

@@ -39,7 +39,7 @@ Wayland, Linux procfs helpers, or Linux privilege helpers. The current checks
 are:
 
 ```text
-cargo test -p taskmanager-platform-ohos
+cargo nextest run --locked -p taskmanager-platform-ohos --all-targets -j 4
 cargo check --locked --target aarch64-unknown-linux-ohos -p taskmanager-platform-ohos
 ```
 

@@ -5,7 +5,8 @@
 # environment-dependent checks moved home. This script is the single entry
 # point that reproduces them on this machine, tiered by cost:
 #
-#   quick      seconds-minutes: toolchain/platform preflight, fmt, python policy gates, install-manager
+#   quick      seconds-minutes: toolchain/platform preflight, fmt, dependency-floor,
+#              python policy gates, test-runner policy, install-manager
 #              smoke, line/doc/test-layout/source-inspection/bevy-bsn/headless
 #              side-effect guards, per-crate coverage gate self-test.
 #   standard   ~ the blocking Linux CI surface: quick + cargo deny + clippy + the
@@ -29,7 +30,15 @@
 # Usage:
 #   scripts/quality/local-gates.sh [quick|standard|extended] [--with-gui]
 #     [--with-fuzz-runs] [--skip-release] [--keep-going] [--only <stage>]
+#     [--scope <all|core|bevy|gpui|iced|tui>]
 #   No tier argument runs `quick`.
+#
+# --scope is the parallel-work isolation: a frontend line develops against
+# "core + its dependency closure + its own crate" and never fails on another
+# line's in-flight files. The package set is derived at runtime from
+# `cargo tree` (the frontend crate's workspace closure), never hand-maintained.
+# `all` (default) is the merge-owner surface: every workspace crate, plus the
+# root acceptance layers and release smoke.
 #
 # Environment overrides:
 #   JOBS=<n>                cargo/test parallelism (default 4)
@@ -135,6 +144,7 @@ with_gui=0
 with_fuzz_runs=0
 skip_release=0
 fail_fast=1
+scope="${GATE_SCOPE:-all}"
 [[ "${KEEP_GOING:-0}" == "1" ]] && fail_fast=0
 tier="quick"
 while [[ $# -gt 0 ]]; do
@@ -149,6 +159,10 @@ while [[ $# -gt 0 ]]; do
         ONLY_STAGE="$1"
         only="$1"
         ;;
+    --scope)
+        shift
+        scope="${1:-}"
+        ;;
     *)
         echo "unknown argument '$1'" >&2
         exit 2
@@ -160,7 +174,7 @@ done
 cleanup() {
     local rc=$?
     echo ""
-    echo "=== local-gates summary ($tier, $stages_run stages, $failures failed) ==="
+    echo "=== local-gates summary ($tier, scope=$scope, $stages_run stages, $failures failed) ==="
     if [[ -f "$results_file" ]]; then
         column -t -s $'\t' "$results_file" 2>/dev/null || cat "$results_file"
     fi
@@ -181,6 +195,73 @@ quick | standard | extended) ;;
     exit 2
     ;;
 esac
+
+# ---- scope resolution -------------------------------------------------
+# A frontend scope is the frontend crate's forward workspace dependency
+# closure ("core + the platform chain + that UI") derived from the lockfile —
+# the same set the tier would compile for the crate, and never a hand-copy.
+scope_roots_for() {
+    case "$scope" in
+    core) printf '%s\n' taskmanager-core taskmanager-application taskmanager-shell ;;
+    bevy) printf '%s\n' taskmanager-bevy-ui ;;
+    gpui) printf '%s\n' taskmanager-gpui taskmanager-ui ;;
+    iced) printf '%s\n' taskmanager-iced ;;
+    tui) printf '%s\n' taskmanager-tui ;;
+    esac
+}
+
+SCOPE_PKGS=()
+if [[ "$scope" != "all" ]]; then
+    case "$scope" in
+    all | core | bevy | gpui | iced | tui) ;;
+    *)
+        echo "unknown scope '$scope' (all|core|bevy|gpui|iced|tui)" >&2
+        exit 2
+        ;;
+    esac
+    derived="$(scope_roots_for | while read -r root; do
+        cargo tree --locked -e normal --prefix none -p "$root" 2>/dev/null |
+            awk '{print $1}'
+    done | sort -u | grep '^taskmanager-' || true)"
+    if [[ -z "$derived" ]] && ! cargo metadata --locked --format-version 1 >/dev/null 2>&1; then
+        # Lock churn mid-derivation: retry unlocked so the scope still gets
+        # its full closure (dev-phase fallback; the probe below reports it).
+        derived="$(scope_roots_for | while read -r root; do
+            cargo tree -e normal --prefix none -p "$root" 2>/dev/null |
+                awk '{print $1}'
+        done | sort -u | grep '^taskmanager-' || true)"
+    fi
+    SCOPE_PKGS=($(printf '%s\n%s\n' "$derived" "$(scope_roots_for)" |
+        sort -u | grep '^taskmanager-' || true))
+    if [[ ${#SCOPE_PKGS[@]} -eq 0 ]]; then
+        echo "scope '$scope' derived an empty package set; the lockfile may be stale" >&2
+        exit 2
+    fi
+    echo "scope: $scope -> ${SCOPE_PKGS[*]}"
+fi
+
+scope_pkgs_args() {
+    local pkg
+    for pkg in "${SCOPE_PKGS[@]}"; do
+        printf '%s\n' -p "$pkg"
+    done
+}
+
+# Repo-wide stages that only make sense for the merge-owner surface: a scope
+# records them as SKIP instead of failing on another line's in-flight work.
+scope_skip() {
+    [[ "$scope" != "all" ]] || return 0
+    echo "SKIP $1 (scope=$scope: $2)"
+    record "$1" "$3" "SKIP" 0
+    return 1
+}
+
+# Cargo lock policy: --locked by repo law. The lock-consistency probe below
+# may downgrade this run to unlocked (dev-phase fallback) when a sibling
+# line keeps the shared lock mid-write; child scripts honor the same switch
+# through TM_CARGO_LOCK (set-but-empty = unlocked, unset = --locked).
+LOCK_ARGS=(--locked)
+
 
 preflight() {
     local missing=0
@@ -232,14 +313,65 @@ else
 fi
 
 # ---- quick -----------------------------------------------------------
+if maybe lock-consistency; then
+    # A shared-workspace hazard: another line mid-dependency-change leaves
+    # the lock inconsistent with some member manifest, which fails every
+    # `--locked` cargo stage with an opaque lock error. Probe with a bounded
+    # settle window (two consecutive consistent reads) so a short sibling
+    # lock cycle is absorbed and a sustained one is reported with explicit
+    # attribution instead of failing three stages in with an opaque error.
+    lock_settled=0
+    consistent_streak=0
+    for _ in $(seq 1 6); do
+        if cargo metadata --locked --format-version 1 >/dev/null 2>&1; then
+            consistent_streak=$((consistent_streak + 1))
+        else
+            consistent_streak=0
+        fi
+        [ "$consistent_streak" -ge 2 ] && lock_settled=1 && break
+        sleep 15
+    done
+    if [[ "$lock_settled" == "1" ]]; then
+        run_stage lock-consistency quick true
+    else
+        # Dev-phase fallback (owner-approved): a sibling line keeps the
+        # shared lock mid-write, so this run proceeds WITHOUT --locked
+        # instead of failing on lock churn. Loud, never silent — the
+        # summary records it as FALLBACK, and the merge-owner re-runs the
+        # locked surface before merging.
+        echo "lock stayed inconsistent through the settle window —" >&2
+        echo "DEV-PHASE FALLBACK: cargo stages run UNLOCKED this run" >&2
+        LOCK_ARGS=()
+        export TM_CARGO_LOCK=""
+        record lock-consistency quick FALLBACK 0
+        stages_run=$((stages_run + 1))
+    fi
+fi
+
 if maybe fmt; then
-    run_stage fmt quick cargo fmt --all -- --check
+    if [[ "$scope" == "all" ]]; then
+        run_stage fmt quick cargo fmt --all -- --check
+    else
+        # mapfile -t would be cleaner but is a bash 4 feature the Windows
+        # mirror also relies on; a plain array assignment keeps both in step.
+        SCOPE_FMT_ARGS=()
+        for pkg in "${SCOPE_PKGS[@]}"; do
+            SCOPE_FMT_ARGS+=(-p "$pkg")
+        done
+        run_stage fmt quick cargo fmt "${SCOPE_FMT_ARGS[@]}" -- --check
+    fi
 fi
 if maybe safety-guard-self; then
     run_stage safety-guard-self quick run_py scripts/quality/automation_safety_guard.py --self-test
 fi
 if maybe safety-guard; then
     run_stage safety-guard quick run_py scripts/quality/automation_safety_guard.py
+fi
+if maybe test-runner-self; then
+    run_stage test-runner-self quick run_py scripts/quality/test_runner_guard.py --self-test
+fi
+if maybe test-runner; then
+    run_stage test-runner quick run_py scripts/quality/test_runner_guard.py
 fi
 if maybe public-repo-self; then
     run_stage public-repo-self quick run_py scripts/quality/public_repo_guard.py --self-test
@@ -262,6 +394,12 @@ if [[ "$skip_install_manager_smoke" == "1" ]]; then
 elif maybe install-manager-smoke; then
     run_stage install-manager-smoke quick timeout --kill-after=10s 30s scripts/test-system-install-manager.sh
 fi
+if maybe dependency-floor-self; then
+    run_stage dependency-floor-self quick run_py scripts/quality/dependency_floor_guard.py --self-test
+fi
+if maybe dependency-floor; then
+    run_stage dependency-floor quick run_py scripts/quality/dependency_floor_guard.py
+fi
 if maybe line-guard; then
     run_stage line-guard quick run_py scripts/quality/rust_line_guard.py --mode enforce
 fi
@@ -269,7 +407,15 @@ if maybe rust-surface-guard-self; then
     run_stage rust-surface-guard-self quick run_py scripts/quality/rust_surface_guard.py --self-test
 fi
 if maybe rust-surface-guard; then
-    run_stage rust-surface-guard quick run_py scripts/quality/rust_surface_guard.py --mode enforce
+    if [[ "$scope" == "all" ]]; then
+        run_stage rust-surface-guard quick run_py scripts/quality/rust_surface_guard.py --mode enforce
+    else
+        SCOPE_SURFACE_ARGS=()
+        for pkg in "${SCOPE_PKGS[@]}"; do
+            SCOPE_SURFACE_ARGS+=(--root "crates/$pkg/src" --root "crates/$pkg/tests")
+        done
+        run_stage rust-surface-guard quick run_py scripts/quality/rust_surface_guard.py --mode enforce "${SCOPE_SURFACE_ARGS[@]}"
+    fi
 fi
 if maybe bevy-bsn-guard-self; then
     run_stage bevy-bsn-guard-self quick run_py scripts/quality/bevy_bsn_guard.py --self-test
@@ -281,7 +427,15 @@ if maybe test-layout-self; then
     run_stage test-layout-self quick run_py scripts/quality/test_layout_guard.py --self-test
 fi
 if maybe test-layout-enforce; then
-    run_stage test-layout-enforce quick run_py scripts/quality/test_layout_guard.py --mode enforce
+    if [[ "$scope" == "all" ]]; then
+        run_stage test-layout-enforce quick run_py scripts/quality/test_layout_guard.py --mode enforce
+    else
+        SCOPE_CRATE_ARGS=()
+        for pkg in "${SCOPE_PKGS[@]}"; do
+            SCOPE_CRATE_ARGS+=(--crate "$pkg")
+        done
+        run_stage test-layout-enforce quick run_py scripts/quality/test_layout_guard.py --mode enforce "${SCOPE_CRATE_ARGS[@]}"
+    fi
 fi
 if maybe source-inspection-self; then
     run_stage source-inspection-self quick run_py scripts/quality/source_inspection_guard.py --self-test
@@ -314,10 +468,12 @@ fi
 if maybe ui-route; then
     # This diff-only route is intentionally first: a UI change without the
     # required headless/capture mode should fail before compiling the workspace.
-    if [[ "$with_gui" == "1" ]]; then
-        run_stage ui-route standard bash scripts/quality/ui-evidence-route.sh --with-gui
-    else
-        run_stage ui-route standard bash scripts/quality/ui-evidence-route.sh
+    if scope_skip ui-route "merge-owner diff routing; a scope runs its own interaction gate below" standard; then
+        if [[ "$with_gui" == "1" ]]; then
+            run_stage ui-route standard bash scripts/quality/ui-evidence-route.sh --with-gui
+        else
+            run_stage ui-route standard bash scripts/quality/ui-evidence-route.sh
+        fi
     fi
 fi
 if [[ "$with_gui" == "1" ]]; then
@@ -334,8 +490,19 @@ if maybe clippy; then
     # `test-support` stays DEV-only: it enables gpui's upstream test-support
     # (which hard-wires X11) so headless GPUI tests compile; production
     # builds never enable it (strict Wayland product policy).
-    run_stage clippy standard cargo clippy --locked --workspace --all-targets --features test-support -- \
-        -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
+    if [[ "$scope" == "all" ]]; then
+        run_stage clippy standard cargo clippy "${LOCK_ARGS[@]}" --workspace --all-targets --features test-support -- \
+            -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
+    else
+        SCOPE_CLIPPY_ARGS=()
+        while read -r arg; do SCOPE_CLIPPY_ARGS+=("$arg"); done < <(scope_pkgs_args)
+        SCOPE_FEATURE_ARGS=()
+        if [[ "$scope" == "gpui" ]]; then
+            SCOPE_FEATURE_ARGS+=(--features test-support)
+        fi
+        run_stage clippy standard cargo clippy "${LOCK_ARGS[@]}" "${SCOPE_CLIPPY_ARGS[@]}" --all-targets "${SCOPE_FEATURE_ARGS[@]}" -- \
+            -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
+    fi
 fi
 if maybe nextest-core; then
     # Unit tests across every workspace crate plus non-root integration
@@ -345,42 +512,78 @@ if maybe nextest-core; then
     # nextest 0.9 exposes `-j` and `--test-threads` as aliases for the same
     # option; pass it once so the gate remains valid across the installed
     # runner instead of triggering a duplicate-argument parse failure.
-    run_stage nextest-core standard cargo nextest run --locked --workspace --all-targets --features test-support -j 4 --profile ci -E 'not (binary(throughput) or binary(logic) or binary(gui) or binary(performance))'
+    if [[ "$scope" == "all" ]]; then
+        run_stage nextest-core standard cargo nextest run "${LOCK_ARGS[@]}" --workspace --all-targets --features test-support -j 4 --profile ci -E 'not (binary(throughput) or binary(logic) or binary(gui) or binary(performance))'
+    else
+        SCOPE_NEXTEST_ARGS=()
+        while read -r arg; do SCOPE_NEXTEST_ARGS+=("$arg"); done < <(scope_pkgs_args)
+        SCOPE_FEATURE_ARGS=()
+        if [[ "$scope" == "gpui" ]]; then
+            SCOPE_FEATURE_ARGS+=(--features test-support)
+        fi
+        run_stage nextest-core standard cargo nextest run "${LOCK_ARGS[@]}" "${SCOPE_NEXTEST_ARGS[@]}" --all-targets "${SCOPE_FEATURE_ARGS[@]}" -j 4 --profile ci -E 'not (binary(throughput) or binary(logic) or binary(gui) or binary(performance))'
+    fi
 fi
 if maybe nextest-logic; then
-    run_stage nextest-logic standard cargo nextest run --locked -p taskmanager --test logic --features test-support -j 4 --profile ci
+    if scope_skip nextest-logic "root acceptance layer" standard; then
+        run_stage nextest-logic standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager --test logic --features test-support -j 4 --profile ci
+    fi
 fi
 if maybe nextest-gui; then
-    run_stage nextest-gui standard cargo nextest run --locked -p taskmanager --test gui --features test-support -j 4 --profile ci
+    if scope_skip nextest-gui "root acceptance layer" standard; then
+        run_stage nextest-gui standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager --test gui --features test-support -j 4 --profile ci
+    fi
 fi
 if maybe nextest-perf; then
-    run_stage nextest-perf standard cargo nextest run --locked -p taskmanager --test performance --features test-support -j 4 --profile ci
+    if scope_skip nextest-perf "root acceptance layer" standard; then
+        run_stage nextest-perf standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager --test performance --features test-support -j 4 --profile ci
+    fi
 fi
 if maybe live-smoke; then
-    # One real-collector tick per supported platform (host-neutral invariants
-    # only). Fixtures prove parsers; this stage proves the composition edge.
-    run_stage live-smoke standard cargo nextest run --locked -p taskmanager --test logic --features test-support -j 4 --profile ci -E 'test(live_smoke_)'
+    if scope_skip live-smoke "root acceptance layer" standard; then
+        # One real-collector tick per supported platform (host-neutral invariants
+        # only). Fixtures prove parsers; this stage proves the composition edge.
+        run_stage live-smoke standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager --test logic --features test-support -j 4 --profile ci -E 'test(live_smoke_)'
+    fi
 fi
 if maybe doctests; then
-    run_stage doctests standard cargo test --locked --doc --workspace
+    if [[ "$scope" == "all" ]]; then
+        run_stage doctests standard cargo test "${LOCK_ARGS[@]}" --doc --workspace -j 4
+    else
+        SCOPE_DOC_ARGS=()
+        while read -r arg; do SCOPE_DOC_ARGS+=("$arg"); done < <(scope_pkgs_args)
+        run_stage doctests standard cargo test "${LOCK_ARGS[@]}" --doc "${SCOPE_DOC_ARGS[@]}" -j 4
+    fi
 fi
 if maybe rustdoc; then
-    run_stage rustdoc standard env RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps
+    if [[ "$scope" == "all" ]]; then
+        run_stage rustdoc standard env RUSTDOCFLAGS="-D warnings" cargo doc "${LOCK_ARGS[@]}" --workspace --no-deps
+    else
+        SCOPE_RUSTDOC_ARGS=()
+        while read -r arg; do SCOPE_RUSTDOC_ARGS+=("$arg"); done < <(scope_pkgs_args)
+        run_stage rustdoc standard env RUSTDOCFLAGS="-D warnings" cargo doc "${LOCK_ARGS[@]}" "${SCOPE_RUSTDOC_ARGS[@]}" --no-deps
+    fi
 fi
 if maybe nvidia-fallback; then
-    run_stage nvidia-fallback standard cargo nextest run --locked --workspace --lib --no-default-features --features hardware-all,nvidia,ui-gpui -j 4 --profile ci
+    if scope_skip nvidia-fallback "workspace feature form" standard; then
+        run_stage nvidia-fallback standard cargo nextest run "${LOCK_ARGS[@]}" --workspace --lib --no-default-features --features hardware-all,nvidia,ui-gpui -j 4 --profile ci
+    fi
 fi
 if maybe shape-tui; then
-    run_stage shape-tui standard bash -c \
-        'cargo check --locked --workspace --all-targets --no-default-features --features hardware-all,ui-tui && cargo nextest run --locked --workspace --all-targets --no-default-features --features hardware-all,ui-tui -j 4 --profile ci -E "not binary(throughput)"'
+    if scope_skip shape-tui "workspace feature form" standard; then
+        run_stage shape-tui standard bash -c \
+            'cargo check ${TM_CARGO_LOCK---locked} --workspace --all-targets --no-default-features --features hardware-all,ui-tui && cargo nextest run ${TM_CARGO_LOCK---locked} --workspace --all-targets --no-default-features --features hardware-all,ui-tui -j 4 --profile ci -E "not binary(throughput)"'
+    fi
 fi
 if maybe shape-iced; then
-    run_stage shape-iced standard bash -c \
-        'cargo check --locked --workspace --all-targets --no-default-features --features hardware-all,ui-iced && cargo nextest run --locked --workspace --all-targets --no-default-features --features hardware-all,ui-iced -j 4 --profile ci -E "not binary(throughput)"'
+    if scope_skip shape-iced "workspace feature form" standard; then
+        run_stage shape-iced standard bash -c \
+            'cargo check ${TM_CARGO_LOCK---locked} --workspace --all-targets --no-default-features --features hardware-all,ui-iced && cargo nextest run ${TM_CARGO_LOCK---locked} --workspace --all-targets --no-default-features --features hardware-all,ui-iced -j 4 --profile ci -E "not binary(throughput)"'
+    fi
 fi
 if [[ "$skip_release" == "1" ]]; then
     record release standard SKIP 0
-else
+elif scope_skip release "merge-owner release smoke" standard; then
     if maybe release; then
         # Reuse the same release/package smoke as the blocking Linux CI job.
         # PR-style LTO/codegen overrides keep this local gate fast; extended
@@ -392,41 +595,67 @@ if [[ "$with_gui" == "1" ]]; then
     if maybe gpui-interactions; then
         run_stage gpui-interactions standard timeout --kill-after=10s 2400 bash scripts/accept-gpui-interactions.sh
     fi
+    if maybe bevy-interactions; then
+        # Fourth frontend's headless interaction matrix: same contract as the
+        # gpui stage — the gate discovers every named test in the lib target,
+        # then runs the complete target under the locked workspace.
+        run_stage bevy-interactions standard timeout --kill-after=10s 1200 bash scripts/accept-bevy-interactions.sh
+    fi
+elif [[ "$scope" == "bevy" ]]; then
+    # The Bevy matrix is headless: a scoped Bevy line runs it on every
+    # standard pass, not only --with-gui.
+    if maybe bevy-interactions; then
+        run_stage bevy-interactions standard timeout --kill-after=10s 1200 bash scripts/accept-bevy-interactions.sh
+    fi
 fi
 
 [[ "$tier" == "standard" ]] && exit "$((failures > 0))"
 
 # ---- extended --------------------------------------------------------
 if maybe coverage; then
-    run_stage coverage extended bash -c \
-        'cargo llvm-cov nextest --locked --workspace --all-targets --features test-support --profile ci -E "not binary(throughput)" --lcov --output-path target/lcov.info --fail-under-lines 71 && timeout --kill-after=10s 120 python3 scripts/quality/per_crate_coverage_gate.py --lcov target/lcov.info --check'
+    if scope_skip coverage "workspace-wide measurement" extended; then
+        run_stage coverage extended bash -c \
+            'cargo llvm-cov nextest ${TM_CARGO_LOCK---locked} --workspace --all-targets --features test-support --profile ci -j 4 -E "not binary(throughput)" --lcov --output-path target/lcov.info --fail-under-lines 71 && timeout --kill-after=10s 120 python3 scripts/quality/per_crate_coverage_gate.py --lcov target/lcov.info --check'
+    fi
 fi
 if maybe mutants; then
-    # Decision logic in core/application plus the Linux fixture parsers: all
-    # three are the layers whose silent breakage the behavior gates must catch.
-    run_stage mutants extended scripts/quality/mutants-in-diff.sh --packages taskmanager-core,taskmanager-application,taskmanager-platform-linux --min-score 80
+    if scope_skip mutants "workspace-wide measurement" extended; then
+        # Decision logic in core/application plus the Linux fixture parsers: all
+        # three are the layers whose silent breakage the behavior gates must catch.
+        run_stage mutants extended scripts/quality/mutants-in-diff.sh --packages taskmanager-core,taskmanager-application,taskmanager-platform-linux --min-score 80
+    fi
 fi
 if maybe miri; then
-    run_stage miri extended scripts/quality/miri-boundaries.sh
+    if scope_skip miri "workspace-wide measurement" extended; then
+        run_stage miri extended scripts/quality/miri-boundaries.sh
+    fi
 fi
 if maybe fuzz-build; then
-    # cargo-fuzz 0.13.x rejects --manifest-path: each fuzz workspace is built
-    # from its own directory (they are deliberately not workspace members).
-    run_stage fuzz-build extended bash -c \
-        'cd crates/taskmanager-afpacket/fuzz && cargo +nightly fuzz build && cd ../../taskmanager-platform-linux/fuzz && cargo +nightly fuzz build && cd ../../../crates/taskmanager-fd-bridge/fuzz && cargo +nightly fuzz build'
+    if scope_skip fuzz-build "workspace-wide measurement" extended; then
+        # cargo-fuzz 0.13.x rejects --manifest-path: each fuzz workspace is built
+        # from its own directory (they are deliberately not workspace members).
+        run_stage fuzz-build extended bash -c \
+            'cd crates/taskmanager-afpacket/fuzz && cargo +nightly fuzz build && cd ../../taskmanager-platform-linux/fuzz && cargo +nightly fuzz build && cd ../../../crates/taskmanager-fd-bridge/fuzz && cargo +nightly fuzz build'
+    fi
 fi
 if [[ "$with_fuzz_runs" == "1" ]]; then
     if maybe fuzz-run; then
-        run_stage fuzz-run extended bash -c \
-            'cd crates/taskmanager-afpacket/fuzz && cargo +nightly fuzz run five_tuple -- -runs=2000000 -timeout=5 && cd ../../taskmanager-platform-linux/fuzz && cargo +nightly fuzz run proc_parsers -- -runs=2000000 -timeout=5 && cargo +nightly fuzz run mm_stat -- -runs=2000000 -timeout=5 && cd ../../../crates/taskmanager-fd-bridge/fuzz && cargo +nightly fuzz run scm_rights_walk -- -runs=2000000 -timeout=5'
+        if scope_skip fuzz-run "workspace-wide measurement" extended; then
+            run_stage fuzz-run extended bash -c \
+                'cd crates/taskmanager-afpacket/fuzz && cargo +nightly fuzz run five_tuple -- -runs=2000000 -timeout=5 && cd ../../taskmanager-platform-linux/fuzz && cargo +nightly fuzz run proc_parsers -- -runs=2000000 -timeout=5 && cargo +nightly fuzz run mm_stat -- -runs=2000000 -timeout=5 && cd ../../../crates/taskmanager-fd-bridge/fuzz && cargo +nightly fuzz run scm_rights_walk -- -runs=2000000 -timeout=5'
+        fi
     fi
 fi
 if maybe bloat; then
-    run_stage bloat extended bash -c \
-        'CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 CARGO_PROFILE_RELEASE_STRIP=debuginfo timeout --kill-after=30s 3600 cargo build --locked --release -j 4 -p taskmanager; scripts/quality/trend-gate.sh --metric bloat --current "$(stat -c %s target/release/taskmanager 2>/dev/null || echo 0)" --trend docs/quality/bloat-trend.tsv --limit 5'
+    if scope_skip bloat "workspace-wide measurement" extended; then
+        run_stage bloat extended bash -c \
+            'CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 CARGO_PROFILE_RELEASE_STRIP=debuginfo timeout --kill-after=30s 3600 cargo build ${TM_CARGO_LOCK---locked} --release -j 4 -p taskmanager; scripts/quality/trend-gate.sh --metric bloat --current "$(stat -c %s target/release/taskmanager 2>/dev/null || echo 0)" --trend docs/quality/bloat-trend.tsv --limit 5'
+    fi
 fi
 if maybe benches; then
-    run_stage benches extended scripts/quality/bench-gate.sh
+    if scope_skip benches "workspace-wide measurement" extended; then
+        run_stage benches extended scripts/quality/bench-gate.sh
+    fi
 fi
 
 exit "$((failures > 0))"

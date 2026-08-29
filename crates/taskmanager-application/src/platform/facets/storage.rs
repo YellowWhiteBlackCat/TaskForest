@@ -6,15 +6,16 @@
 
 use std::sync::Arc;
 
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::storage::StorageDeviceTarget;
+use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
+use taskmanager_core::core::system_health::{SmartSelfTestIntent, SmartSelfTestObservation};
 use taskmanager_platform_contract::{
-    CapabilityId, CapabilityRequest, CompositeSourceSnapshot, FailureKind, RequestPort,
-    RequestScope, RequestTracking, RequestTrackingError,
+    CapabilityId, CapabilityRequest, CompositeSourceSnapshot, RequestPort, RequestScope,
+    RequestTracking, RequestTrackingError,
 };
 
-use crate::{
-    DirectoryUsageRequestPort, FilesystemHealthSnapshot, SmartSelfTestIntent,
-    SmartSelfTestObservation, StorageDeviceTarget,
-};
+use crate::DirectoryUsageRequestPort;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum StorageHealthRequest {

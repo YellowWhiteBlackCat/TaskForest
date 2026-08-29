@@ -46,7 +46,6 @@ use crate::perf_chart::{
     series_point_runs_windowed, smooth_area_path, smooth_line_path, vertical_area_gradient,
     y_axis_tick_values,
 };
-use crate::theme;
 use crate::trend_strip::finite_peak;
 
 /// How far the secondary series' color is lifted toward white from the family
@@ -499,8 +498,8 @@ fn device_multi_graph_with_length(
     let max = prefs
         .max_override
         .unwrap_or_else(|| finite_peak(&primary.samples).max(finite_peak(&secondary.samples)));
-    let caption_color = theme::color(theme_snapshot.palette().fg_muted);
-    let grid_color = theme::color(theme_snapshot.palette().border);
+    let caption_color = taskmanager_theme::iced::color(theme_snapshot.palette().fg_muted);
+    let grid_color = taskmanager_theme::iced::color(theme_snapshot.palette().border);
     let label = mini_graph_caption(&caption, primary.samples.len().max(secondary.samples.len()));
     let chart = DeviceMultiChart {
         primary,
@@ -513,8 +512,8 @@ fn device_multi_graph_with_length(
         hover: prefs.hover,
         format_value,
         readout: ReadoutColors {
-            bg: theme::color(theme_snapshot.palette().surface),
-            fg: theme::color(theme_snapshot.palette().fg),
+            bg: taskmanager_theme::iced::color(theme_snapshot.palette().surface),
+            fg: taskmanager_theme::iced::color(theme_snapshot.palette().fg),
         },
         opts: ChartOpts::default(),
     };

@@ -5,6 +5,7 @@
 //! consume the same visible-row projection the renderer draws (ADR-020).
 
 use taskmanager_application::{AppPage, KeyCode, Modifiers, PlatformEffect};
+
 use taskmanager_shell::ShellKeyEvent;
 
 use super::viewport_state::ViewportRegion;
@@ -174,13 +175,13 @@ impl IcedApp {
             return;
         };
         match row_key {
-            Some(taskmanager_shell::ProcessRowKey::Application(root_pid)) => {
-                let _ = self.shell.select_application_row(root_pid, flat_index);
+            Some(taskmanager_shell::ProcessRowId::Application(root)) => {
+                let _ = self.shell.select_application_row(root.pid(), flat_index);
             }
-            Some(taskmanager_shell::ProcessRowKey::Process(_)) => {
+            Some(taskmanager_shell::ProcessRowId::Process(_)) => {
                 let _ = self.shell.select_row(flat_index);
             }
-            Some(taskmanager_shell::ProcessRowKey::Category(_)) | None => {
+            Some(taskmanager_shell::ProcessRowId::Category(_)) | None => {
                 self.shell.clear_process_selection();
             }
         }
@@ -197,7 +198,7 @@ impl IcedApp {
         let visual_cursor = {
             let projection = self.projected_rows();
             self.shell
-                .selected_process_row
+                .selected_row
                 .and_then(|selected| {
                     projection
                         .rows()
@@ -246,8 +247,8 @@ impl IcedApp {
                             .expanded_groups
                             .insert(expansion_key);
                     }
-                    if let Some(taskmanager_shell::ProcessRowKey::Application(root_pid)) = row_key {
-                        let _ = self.shell.select_application_row(root_pid, flat_index);
+                    if let Some(taskmanager_shell::ProcessRowId::Application(root)) = row_key {
+                        let _ = self.shell.select_application_row(root.pid(), flat_index);
                     }
                 }
             }

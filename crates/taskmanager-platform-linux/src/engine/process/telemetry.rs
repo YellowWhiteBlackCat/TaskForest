@@ -9,14 +9,13 @@ use std::path::{Path, PathBuf};
 
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 #[cfg(feature = "test-support")]
-pub use taskmanager_core::{
-    ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey, ConnectionState,
-    ConnectionTransport, IsolationKind, LimitValue, ProcessConnection, ProcessGpuDevice,
-    ProcessGpuEngines, ProcessGpuSnapshot, ProcessIdentity, ProcessIsolation,
-    ProcessNetworkSnapshot, ProcessResourceSnapshot, ResourceLimit, ResourceLimitKind,
+use taskmanager_core::core::process_telemetry::{
+    ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
+    ProcessConnection, ProcessGpuDevice, ProcessGpuEngines, ProcessGpuSnapshot, ProcessIdentity,
+    ProcessNetworkSnapshot,
 };
 #[cfg(not(feature = "test-support"))]
-pub(crate) use taskmanager_core::{
+use taskmanager_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
     ProcessConnection, ProcessGpuDevice, ProcessGpuEngines, ProcessGpuSnapshot, ProcessIdentity,
     ProcessNetworkSnapshot,

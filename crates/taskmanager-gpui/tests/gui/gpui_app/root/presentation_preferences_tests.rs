@@ -58,7 +58,7 @@ fn named_mutations_invalidate_only_their_owned_projection_axis() {
 
     let before = preferences.fingerprint();
     preferences.set_appearance(AppearancePreferences {
-        ui_size: crate::gpui_app::theme::tokens::UiSize::Large,
+        ui_size: taskmanager_theme::tokens::UiSize::Large,
         ..preferences.appearance()
     });
     assert_eq!(

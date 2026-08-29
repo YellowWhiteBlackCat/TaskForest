@@ -207,7 +207,8 @@ pub(crate) fn selection_disconnected(app: &crate::IcedApp) -> bool {
                     .readings
                     .iter()
                     .filter(|reading| {
-                        reading.quantity() == &taskmanager_application::SensorQuantity::FanSpeed
+                        reading.quantity()
+                            == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
                     })
                     .count()
         }),
@@ -224,9 +225,9 @@ fn disconnected_device<'a>(
         column![
             text(t("device.disconnected"))
                 .size(f32::from(tokens::FONT_15))
-                .font(theme::ui_font_weight(
+                .font(taskmanager_theme::iced::ui_font_weight(
                     theme_snapshot,
-                    iced::font::Weight::Semibold,
+                    tokens::FONT_WEIGHT_HEADER,
                 )),
             text(t("device.reconnect_hint"))
                 .size(f32::from(tokens::FONT_12))
@@ -321,7 +322,13 @@ fn performance_sidebar<'a>(
             ))
             .id(app.performance_rail_scroll_id())
             .direction(iced::widget::scrollable::Direction::Vertical(
-                iced::widget::scrollable::Scrollbar::default(),
+                // The nested rail scrollbar is thinned to the stats-rail
+                // gauge (4px): a default-width bar inside the card stack read
+                // as a broken double-segment element against the outer page
+                // scrollbar (ICED-024 目检项 21).
+                iced::widget::scrollable::Scrollbar::new()
+                    .width(4)
+                    .scroller_width(4),
             ))
             .height(iced::Length::Fill)
             .width(iced::Length::Fill)
@@ -462,7 +469,7 @@ pub(crate) fn available_perf_devices(app: &crate::IcedApp) -> Vec<PerfDevice> {
                 .readings
                 .iter()
                 .filter(|reading| {
-                    reading.quantity() == &taskmanager_application::SensorQuantity::FanSpeed
+                    reading.quantity() == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
                 })
                 .enumerate()
                 .map(|(index, _)| PerfDevice::Fan(index)),
@@ -502,15 +509,18 @@ struct NetworkVisibility {
 }
 
 impl NetworkVisibility {
-    const fn allows(self, adapter_type: taskmanager_application::NetworkAdapterType) -> bool {
+    const fn allows(
+        self,
+        adapter_type: taskmanager_core::core::metrics::NetworkAdapterType,
+    ) -> bool {
         match adapter_type {
-            taskmanager_application::NetworkAdapterType::Ethernet => self.wired,
-            taskmanager_application::NetworkAdapterType::WiFi => self.wireless,
-            taskmanager_application::NetworkAdapterType::Vpn => self.vpn,
-            taskmanager_application::NetworkAdapterType::Virtual => self.virtual_devices,
-            taskmanager_application::NetworkAdapterType::Unknown
-            | taskmanager_application::NetworkAdapterType::Loopback
-            | taskmanager_application::NetworkAdapterType::Other => self.other,
+            taskmanager_core::core::metrics::NetworkAdapterType::Ethernet => self.wired,
+            taskmanager_core::core::metrics::NetworkAdapterType::WiFi => self.wireless,
+            taskmanager_core::core::metrics::NetworkAdapterType::Vpn => self.vpn,
+            taskmanager_core::core::metrics::NetworkAdapterType::Virtual => self.virtual_devices,
+            taskmanager_core::core::metrics::NetworkAdapterType::Unknown
+            | taskmanager_core::core::metrics::NetworkAdapterType::Loopback
+            | taskmanager_core::core::metrics::NetworkAdapterType::Other => self.other,
         }
     }
 }

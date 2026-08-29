@@ -15,6 +15,10 @@ use std::sync::{Arc, Mutex, OnceLock};
 use taskmanager_application::{
     ConfigClient, ConfigCoordinator, ConfigRuntimeStartError, PlatformClient,
 };
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_platform_contract::{
+    InstanceEvent, InstanceFailure, InstanceRole, TrayController, TrayFailure,
+};
 use taskmanager_platform_native::{
     NativePlatformRuntime, history_lock_holder_is_gone, native_config_path, native_history_dir,
     native_local_time_rules, native_locale_name,
@@ -55,11 +59,19 @@ pub use process_termination::{ProcessTermination, ProcessTerminationInstallError
 use snapshot_export_runtime::SnapshotExportCoordinator;
 pub use snapshot_export_runtime::{SnapshotExportClient, SnapshotExportRuntimeStartError};
 
-pub use taskmanager_platform_native::TrayFailure;
-pub use taskmanager_platform_native::tray::{TrayController, spawn_tray};
-pub use taskmanager_platform_native::{
-    InstanceEvent, InstanceFailure, InstanceGuard, InstanceRole, acquire_single_instance,
-};
+pub fn spawn_tray(
+    spec: taskmanager_core::core::tray::TraySpec,
+    events: std::sync::mpsc::Sender<taskmanager_core::core::tray::TrayEvent>,
+) -> Result<Box<dyn TrayController>, TrayFailure> {
+    taskmanager_platform_native::tray::spawn_tray(spec, events)
+}
+
+pub fn acquire_single_instance(
+    instance_name: &str,
+    events: std::sync::mpsc::Sender<InstanceEvent>,
+) -> Result<InstanceRole, InstanceFailure> {
+    taskmanager_platform_native::instance::acquire_single_instance(instance_name, events)
+}
 
 /// Invalidation policy for the host-owned local-time rules cache.
 ///
@@ -71,15 +83,15 @@ pub enum LocalTimeCacheInvalidation {
 }
 
 struct StartupLocalTimeCache {
-    observation: taskmanager_application::LocalTimeRulesObservation,
+    observation: LocalTimeRulesObservation,
 }
 
 impl StartupLocalTimeCache {
-    fn capture(observation: taskmanager_application::LocalTimeRulesObservation) -> Self {
+    fn capture(observation: LocalTimeRulesObservation) -> Self {
         Self { observation }
     }
 
-    fn observation(&self) -> taskmanager_application::LocalTimeRulesObservation {
+    fn observation(&self) -> LocalTimeRulesObservation {
         self.observation.clone()
     }
 
@@ -298,7 +310,7 @@ impl NativeAppHost {
     /// validation stay in the selected OS adapter; no filesystem path or
     /// host-reading callback crosses into a frontend.
     #[must_use]
-    pub fn local_time_rules(&self) -> taskmanager_application::LocalTimeRulesObservation {
+    pub fn local_time_rules(&self) -> LocalTimeRulesObservation {
         self.local_time_cache.observation()
     }
 

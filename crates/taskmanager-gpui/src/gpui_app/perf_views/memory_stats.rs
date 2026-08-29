@@ -1,8 +1,8 @@
 //! Pure Memory-page observation projection.
 
-use crate::core::metrics::MemoryMetrics;
 use crate::gpui_app::formatting::{DisplayUnits, UnitKind, missing_value};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::MemoryMetrics;
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::memory_details::{compressed_swap_readout, virtual_memory_commit_readout};

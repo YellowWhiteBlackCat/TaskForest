@@ -1,13 +1,7 @@
-//! Frontend-local selectors for [`super::IcedApp`]: Performance resources and
-//! the shared Applications status filter vocabulary. The Applications row
-//! hierarchy itself is canonical and therefore has no selector state.
-//! Extracted from [`super`] so the state + update module stays the entry point.
-
-// The shell owns the filtered row projection and this frontend owns the
-// segmented control that selects it. Re-export the type at the app boundary so
-// the Iced message/focus vocabulary stays toolkit-local without duplicating the
-// classifier.
-pub use taskmanager_shell::ProcessStatusFilter;
+//! Frontend-local selectors for [`super::IcedApp`]: Performance resources.
+//! The Applications row hierarchy itself is canonical and therefore has no
+//! selector state. Extracted from [`super`] so the state + update module
+//! stays the entry point.
 
 /// The Performance-page resource selector — the MC select-a-device detail
 /// model. Frontend-local state: which resource's detail panel renders. `Cpu`/

@@ -2,7 +2,9 @@
 
 use super::*;
 use crate::ui::first_run::FirstRunEvent;
-use taskmanager_application::{DeviceId, ServiceUpdate};
+use taskmanager_application::ServiceUpdate;
+use taskmanager_core::core::identity::DeviceId;
+
 use taskmanager_shell::{ShellApp, queue_effect};
 
 const GPU_ENGINE_ROWS_REFRESH: std::time::Duration = std::time::Duration::from_millis(2500);
@@ -101,7 +103,7 @@ impl IcedApp {
         } = self;
         let Some(platform) = runtime.platform_mut() else {
             let failure = taskmanager_application::service_submission_failure(
-                taskmanager_application::SubmissionErrorKind::RuntimeStopped,
+                taskmanager_platform_contract::SubmissionErrorKind::RuntimeStopped,
             );
             if let Some(PlatformEffect::ServiceLogStream(request)) = plan.details_log_effect
                 && let Some(attempt_id) =
@@ -116,8 +118,10 @@ impl IcedApp {
             {
                 open.lifecycle.reject_attempt(
                     attempt_id,
-                    taskmanager_application::ServiceLogFailure::with_detail(
-                        taskmanager_application::ServiceLogErrorKind::from_failure(failure),
+                    taskmanager_core::core::services::ServiceLogFailure::with_detail(
+                        taskmanager_core::core::services::ServiceLogErrorKind::from_failure(
+                            failure,
+                        ),
                         "service log runtime is stopped",
                     ),
                 );

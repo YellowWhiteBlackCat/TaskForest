@@ -32,6 +32,26 @@ pub struct ProcessRowInput {
     pub selected: bool,
 }
 
+/// One structural row in the process hierarchy (category or application
+/// aggregate). It is intentionally separate from [`ProcessRowInput`]: a
+/// group has no process CPU/memory facts, but it does have tree state and a
+/// stable presentation identity.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProcessGroupRowInput {
+    /// Stable identity within the semantic process table. Callers should use
+    /// the same identity that keys their visual expansion state.
+    pub id: String,
+    pub name: String,
+    pub expanded: bool,
+    pub selected: bool,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum ProcessTableRowInput {
+    Process(ProcessRowInput),
+    Group(ProcessGroupRowInput),
+}
+
 /// One modal surface exposed by a frontend's semantic tree.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ModalInput {
@@ -112,7 +132,7 @@ const ALERTS_ID: &str = "alerts-rules";
 pub struct SemanticSnapshotBuilder {
     revision: u64,
     application_name: String,
-    rows: Vec<ProcessRowInput>,
+    rows: Vec<ProcessTableRowInput>,
     graph: Option<GraphSummary>,
     status: Option<String>,
     modal: Option<ModalInput>,
@@ -149,13 +169,23 @@ impl SemanticSnapshotBuilder {
 
     #[must_use]
     pub fn process_row(mut self, row: ProcessRowInput) -> Self {
-        self.rows.push(row);
+        self.rows.push(ProcessTableRowInput::Process(row));
         self
     }
 
     #[must_use]
     pub fn process_rows(mut self, rows: impl IntoIterator<Item = ProcessRowInput>) -> Self {
-        self.rows.extend(rows);
+        self.rows
+            .extend(rows.into_iter().map(ProcessTableRowInput::Process));
+        self
+    }
+
+    /// Append one structural category/application row in the exact order it
+    /// appears in the visual process tree. The row is a focusable TreeItem,
+    /// not a fabricated process, and carries only expansion/selection state.
+    #[must_use]
+    pub fn process_group_row(mut self, row: ProcessGroupRowInput) -> Self {
+        self.rows.push(ProcessTableRowInput::Group(row));
         self
     }
 
@@ -230,35 +260,66 @@ impl SemanticSnapshotBuilder {
         let mut table_children: Vec<SemanticNodeId> = vec![col_name, col_cpu, col_memory];
 
         for row in &rows {
-            let row_id = SemanticNodeId::owned(format!("row:{}", row.id));
-            let cell_name = SemanticNodeId::owned(format!("row:{}:cell:name", row.id));
-            let cell_cpu = SemanticNodeId::owned(format!("row:{}:cell:cpu", row.id));
-            let cell_memory = SemanticNodeId::owned(format!("row:{}:cell:memory", row.id));
-            table_children.push(row_id.clone());
+            match row {
+                ProcessTableRowInput::Process(row) => {
+                    let row_id = SemanticNodeId::owned(format!("row:{}", row.id));
+                    let cell_name = SemanticNodeId::owned(format!("row:{}:cell:name", row.id));
+                    let cell_cpu = SemanticNodeId::owned(format!("row:{}:cell:cpu", row.id));
+                    let cell_memory = SemanticNodeId::owned(format!("row:{}:cell:memory", row.id));
+                    table_children.push(row_id.clone());
 
-            nodes.push(
-                SemanticNode::new(row_id.clone(), SemanticRole::Row)
-                    .named(row.name.clone())
-                    .with_state(SemanticState {
-                        focusable: true,
-                        selected: Some(row.selected),
-                        ..SemanticState::default()
-                    })
-                    .with_action(SemanticAction::Focus)
-                    .with_action(SemanticAction::Select)
-                    .with_children([cell_name.clone(), cell_cpu.clone(), cell_memory.clone()]),
-            );
-            nodes.push(
-                SemanticNode::new(cell_name, SemanticRole::Cell).with_value_text(row.name.clone()),
-            );
-            nodes.push(
-                SemanticNode::new(cell_cpu, SemanticRole::Cell)
-                    .with_value_text(format_optional_percent(row.cpu_percent)),
-            );
-            nodes.push(
-                SemanticNode::new(cell_memory, SemanticRole::Cell)
-                    .with_value_text(format_optional_percent(row.memory_percent)),
-            );
+                    nodes.push(
+                        SemanticNode::new(row_id.clone(), SemanticRole::Row)
+                            .named(row.name.clone())
+                            .with_state(SemanticState {
+                                focusable: true,
+                                selected: Some(row.selected),
+                                ..SemanticState::default()
+                            })
+                            .with_action(SemanticAction::Focus)
+                            .with_action(SemanticAction::Select)
+                            .with_children([
+                                cell_name.clone(),
+                                cell_cpu.clone(),
+                                cell_memory.clone(),
+                            ]),
+                    );
+                    nodes.push(
+                        SemanticNode::new(cell_name, SemanticRole::Cell)
+                            .with_value_text(row.name.clone()),
+                    );
+                    nodes.push(
+                        SemanticNode::new(cell_cpu, SemanticRole::Cell)
+                            .with_value_text(format_optional_percent(row.cpu_percent)),
+                    );
+                    nodes.push(
+                        SemanticNode::new(cell_memory, SemanticRole::Cell)
+                            .with_value_text(format_optional_percent(row.memory_percent)),
+                    );
+                }
+                ProcessTableRowInput::Group(row) => {
+                    let row_id = SemanticNodeId::owned(format!("group-row:{}", row.id));
+                    table_children.push(row_id.clone());
+                    let action = if row.expanded {
+                        SemanticAction::Collapse
+                    } else {
+                        SemanticAction::Expand
+                    };
+                    nodes.push(
+                        SemanticNode::new(row_id, SemanticRole::TreeItem)
+                            .named(row.name.clone())
+                            .with_state(SemanticState {
+                                focusable: true,
+                                selected: Some(row.selected),
+                                expanded: Some(row.expanded),
+                                ..SemanticState::default()
+                            })
+                            .with_action(SemanticAction::Focus)
+                            .with_action(SemanticAction::Select)
+                            .with_action(action),
+                    );
+                }
+            }
         }
 
         let mut main_children: Vec<SemanticNodeId> = vec![table.clone()];

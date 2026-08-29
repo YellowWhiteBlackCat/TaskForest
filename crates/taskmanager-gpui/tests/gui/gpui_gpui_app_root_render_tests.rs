@@ -1,5 +1,5 @@
 use super::{CursorRefreshState, should_schedule_cursor_refresh, ui_font_with_fallback};
-use crate::gpui_app::theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, Theme};
+use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, Theme};
 
 #[test]
 fn cursor_refresh_is_coalesced_until_the_next_frame() {
@@ -43,7 +43,7 @@ fn inherited_ui_font_declares_the_bundled_cjk_fallback() {
 
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
 
-use crate::core::metrics::{
+use taskmanager_core::core::metrics::{
     CpuScalarObservations, MemoryOptionalObservations, MemoryScalarObservations, ScalarObservation,
 };
 
@@ -60,7 +60,7 @@ async fn desktop_widget_surface_paints_metric_cards_from_the_snapshot(cx: &mut T
             global_usage_pct: ScalarObservation::available(42.5, 10),
             ..CpuScalarObservations::default()
         });
-        snap.memory = crate::core::metrics::MemoryMetrics::from_observations(
+        snap.memory = taskmanager_core::core::metrics::MemoryMetrics::from_observations(
             MemoryScalarObservations {
                 total_bytes: ScalarObservation::available(gib(16), 10),
                 used_bytes: ScalarObservation::available(gib(6), 10),

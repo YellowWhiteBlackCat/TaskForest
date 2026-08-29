@@ -14,11 +14,13 @@
 //!
 //! [`SemanticSnapshot`]: taskmanager_ui_contract::SemanticSnapshot
 
-use taskmanager_application::ProcessItem;
+use taskmanager_application::AppPage;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_ui_contract::{
-    GraphSummary, ModalInput, ProcessRowInput, SemanticSnapshot, SemanticSnapshotBuilder,
+    GraphSummary, ModalInput, ProcessGroupRowInput, ProcessRowInput, SemanticSnapshot,
+    SemanticSnapshotBuilder,
 };
 
 use crate::TuiApp;
@@ -27,6 +29,23 @@ use crate::TuiApp;
 /// parity): a screen reader reads the tree top-down, so the bounded prefix
 /// of the shell's active ordering is the useful slice.
 const MAX_PUBLISHED_ROWS: usize = 64;
+
+/// Owned semantic rows in the exact order of the TUI's visual Applications
+/// projection. Structural groups stay structural; they are never rewritten as
+/// fake processes merely to fit the old builder API.
+#[derive(Clone, Debug)]
+enum TuiSemanticRow {
+    Process {
+        process: Box<ProcessItem>,
+        selected: bool,
+    },
+    Group {
+        id: String,
+        name: String,
+        expanded: bool,
+        selected: bool,
+    },
+}
 
 impl TuiApp {
     /// Build the current TUI semantic tree without performing terminal I/O.
@@ -65,33 +84,39 @@ impl TuiApp {
             .snapshot
             .as_ref()
             .and_then(|snapshot| snapshot.memory.current_total_bytes());
-        // The cursor's process resolves through the category tree (a structural
-        // header honestly yields None), and the shell's marked-pid set
-        // is the batch-selection tint — both are real selection semantics of
-        // the terminal table, so a published row is `selected` when it is the
-        // cursor row OR a marked row.
-        let cursor_pid = self.selected_detail_process().map(|process| process.pid);
-        for process in self
-            .visible_processes()
-            .into_iter()
-            .take(MAX_PUBLISHED_ROWS)
-        {
-            let name = if process.name.trim().is_empty() {
-                String::from("Unnamed process")
-            } else {
-                process.name.clone()
-            };
-            builder = builder.process_row(ProcessRowInput {
-                id: process.pid.to_string(),
-                name,
-                cpu_percent: semantic_cpu_percent(process),
-                memory_percent: semantic_memory_percent(
-                    process.current_memory_bytes(),
-                    memory_total,
-                ),
-                selected: Some(process.pid) == cursor_pid
-                    || self.shell.selected_pids.contains(&process.pid),
-            });
+        for row in self.semantic_rows().into_iter().take(MAX_PUBLISHED_ROWS) {
+            match row {
+                TuiSemanticRow::Process { process, selected } => {
+                    let name = if process.name.trim().is_empty() {
+                        String::from("Unnamed process")
+                    } else {
+                        process.name.clone()
+                    };
+                    builder = builder.process_row(ProcessRowInput {
+                        id: process.pid.to_string(),
+                        name,
+                        cpu_percent: semantic_cpu_percent(&process),
+                        memory_percent: semantic_memory_percent(
+                            process.current_memory_bytes(),
+                            memory_total,
+                        ),
+                        selected,
+                    });
+                }
+                TuiSemanticRow::Group {
+                    id,
+                    name,
+                    expanded,
+                    selected,
+                } => {
+                    builder = builder.process_group_row(ProcessGroupRowInput {
+                        id,
+                        name,
+                        expanded,
+                        selected,
+                    });
+                }
+            }
         }
 
         if let Some(modal) = self.semantic_active_modal() {
@@ -99,6 +124,58 @@ impl TuiApp {
         }
 
         builder.build().ok()
+    }
+
+    /// The semantic row sequence follows the visual Applications tree so
+    /// collapsed process rows and structural category/application rows remain
+    /// in the same order and visibility contract as the renderer. The rows
+    /// are materialized from the TUI's cached owned canonical-id slice — the
+    /// exact same projection the renderer paints — so semantics and visuals
+    /// share one source by construction. Only the bounded publication prefix
+    /// (the rows a reader can actually consume) is materialized.
+    #[must_use]
+    fn semantic_rows(&self) -> Vec<TuiSemanticRow> {
+        if self.page() != AppPage::Applications {
+            return self
+                .visible_processes()
+                .into_iter()
+                .enumerate()
+                .map(|(index, process)| TuiSemanticRow::Process {
+                    process: Box::new(process.clone()),
+                    selected: index == self.selected || self.shell.is_process_selected(process),
+                })
+                .collect();
+        }
+        self.with_canonical_rows_indexed(|ids, visible| {
+            ids.iter()
+                .enumerate()
+                .take(MAX_PUBLISHED_ROWS)
+                .filter_map(|(index, _)| {
+                    visible.materialize_row(ids, index).map(|row| (index, row))
+                })
+                .map(|(index, row)| match row {
+                    crate::process_view::ProcessRow::Group {
+                        name,
+                        label,
+                        count,
+                        expanded,
+                        ..
+                    } => TuiSemanticRow::Group {
+                        id: name,
+                        name: format!("{label} ({count})"),
+                        expanded,
+                        selected: index == self.selected,
+                    },
+                    crate::process_view::ProcessRow::TreeNode { process, .. } => {
+                        TuiSemanticRow::Process {
+                            process: Box::new(process.clone()),
+                            selected: index == self.selected
+                                || self.shell.is_process_selected(process),
+                        }
+                    }
+                })
+                .collect()
+        })
     }
 
     /// The polite live-region text: the footer status line when the shell set

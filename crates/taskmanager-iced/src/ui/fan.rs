@@ -8,7 +8,7 @@
 //! carries its OWN per-device RPM mini-graph (auto-scaled to that fan's finite
 //! peak, floored at 1000 RPM — GPUI parity) read from
 //! `LiveGraphHistory::fan_rpm_for`. Read-only consume of
-//! `taskmanager_application::SensorReading`; this crate never mutates the
+//! `taskmanager_core::core::sensors::SensorReading`; this crate never mutates the
 //! shared snapshot shape.
 
 use std::rc::Rc;
@@ -16,9 +16,10 @@ use std::rc::Rc;
 use iced::Element;
 use iced::widget::container;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
+use taskmanager_core::core::sensors::{
     SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
 };
+
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::device_chart;
@@ -50,7 +51,7 @@ pub(super) fn fan_section(
     let sensors = app.shell.projection().sensors.as_ref();
     let theme_snapshot = app.theme();
     // GPUI parity: the fan family strokes with the CPU token.
-    let color = theme::color(theme_snapshot.cpu);
+    let color = taskmanager_theme::iced::color(theme_snapshot.cpu);
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let rows = match (fan_section_state(sensors), sensors) {
         (tables::ListState::Loading, _) => {

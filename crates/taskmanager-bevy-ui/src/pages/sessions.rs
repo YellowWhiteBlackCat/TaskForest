@@ -32,24 +32,27 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, template_value};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val,
-    percent, px,
+    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
+    UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
-    SessionControlAction, SessionControlOutcome, SessionItem, SourceNotice, SourceStatus,
-    source_notice,
-};
+use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
+use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::source::SourceStatus;
+
 use taskmanager_shell::presentation::{MISSING_VALUE, control_error_detail};
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, space_2, space_8, space_24};
+use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_24};
+use crate::widgets::controls::sort_indicator_scene;
 use crate::window::{Role, TextRole, WindowPalette};
+
+pub(crate) mod menu;
 
 // ---- pure core: row view model, seat/tty summary, copy ----
 
@@ -229,17 +232,18 @@ fn columns() -> Vec<Column> {
 }
 
 /// Header cell text with the active-sort arrow.
-fn header_label(column: &Column, sort: Option<(InfoSortCol, SortDir)>) -> String {
+/// Header cell's pure label: the column word only. Sort direction renders as
+/// a semantic plate ([`sorted_direction`]), never a text glyph.
+fn header_label(column: &Column) -> String {
+    column.label.clone()
+}
+
+/// The active sort's direction when it rests on this column: `Some(true)`
+/// descending, `Some(false)` ascending, `None` unsorted.
+fn sorted_direction(column: &Column, sort: Option<(InfoSortCol, SortDir)>) -> Option<bool> {
     match (sort, column.sort) {
-        (Some((active, direction)), Some(own)) if active == own => {
-            let arrow = if direction == SortDir::Desc {
-                '▼'
-            } else {
-                '▲'
-            };
-            format!("{} {arrow}", column.label)
-        }
-        _ => column.label.clone(),
+        (Some((active, direction)), Some(own)) if active == own => Some(direction == SortDir::Desc),
+        _ => None,
     }
 }
 
@@ -292,7 +296,7 @@ pub(crate) struct SessionTargetSelected(#[allow(dead_code)] pub(crate) String);
 /// Content-region scene for the Sessions page. The body's dynamic content is
 /// painted by [`paint_sessions`] — the single render authority for the rows.
 pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
-    let title = Page::Sessions.title().to_owned();
+    let title = Page::Sessions.title();
     let waiting = t("common.waiting_inventory").to_owned();
     bsn! {
         Node {
@@ -339,7 +343,7 @@ fn sessions_body_scene(
         .as_ref()
         .map(feedback_line_text);
     let children = body_children(&rows, selected, notice, feedback, empty, palette);
-    let header = header_scene(shell.sessions_sort);
+    let header = header_scene(shell.sessions_sort, palette);
     bsn! {
         Node {
             width: percent(100),
@@ -386,18 +390,27 @@ fn body_children(
 
 /// Header row: one caption cell per column; every cell carries the
 /// [`SessionsSortHeader`] identity for the pointer adapter.
-fn header_scene(sort: Option<(InfoSortCol, SortDir)>) -> impl Scene + use<> {
+fn header_scene(sort: Option<(InfoSortCol, SortDir)>, palette: &UiPalette) -> impl Scene + use<> {
     let cells: Vec<Box<dyn Scene>> = columns()
         .into_iter()
         .map(|column| {
-            let label = header_label(&column, sort);
+            let label = header_label(&column);
+            let direction = sorted_direction(&column, sort);
+            let indicator = sort_indicator_scene(direction, palette);
             let width = column.width_px;
             let sort_target = column.sort;
             Box::new(bsn! {
-                Node { width: px(width) }
+                Node {
+                    width: px(width),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    column_gap: Val::Px(space_4()),
+                    overflow: Overflow::clip_x(),
+                }
                 SessionsSortHeader(sort_target)
                 Children [
-                    ( Text(label) TextRole(Role::Caption) ),
+                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+                    { indicator },
                 ]
             }) as Box<dyn Scene>
         })

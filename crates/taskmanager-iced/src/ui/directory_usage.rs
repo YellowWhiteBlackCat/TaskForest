@@ -16,18 +16,21 @@
 
 use iced::widget::{column, container, row, text};
 use iced::{Element, Length};
+use taskmanager_application::DirectoryUsageRequest;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
+use taskmanager_core::core::directory_usage::{
     DirectoryScanBounds, DirectoryScanSpec, DirectoryScanStatus, DirectoryUsageEntry,
-    DirectoryUsageRequest, DirectoryUsageSnapshot, DiskMetrics, ScalarAvailability,
+    DirectoryUsageSnapshot,
 };
+use taskmanager_core::core::metrics::{DiskMetrics, ScalarAvailability};
+
 use taskmanager_theme::tokens;
 
 use crate::app::Message;
 use crate::focus;
 use crate::theme;
 
-use super::{bytes, missing_value};
+use taskmanager_shell::presentation::{bytes, missing_value};
 
 /// Maximum entry rows rendered before collapsing into a "+N more" line. The
 /// snapshot itself is already bounded (`max_reported`); this is the panel's
@@ -304,9 +307,9 @@ pub(super) fn usage_panel<'a>(
     {
         let danger = entry_is_unreadable(entry);
         let size_color = if danger {
-            theme::color(theme_snapshot.danger)
+            taskmanager_theme::iced::color(theme_snapshot.danger)
         } else {
-            theme::color(theme_snapshot.palette().fg)
+            taskmanager_theme::iced::color(theme_snapshot.palette().fg)
         };
         let indent = Length::Fixed(12.0 * entry.depth.min(MAX_INDENT_DEPTH) as f32);
         list.push(

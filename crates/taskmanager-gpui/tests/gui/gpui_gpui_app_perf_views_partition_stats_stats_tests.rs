@@ -1,6 +1,6 @@
-use crate::core::FailureKind;
-use crate::core::device_state::{DeviceState, DeviceStatus};
-use crate::core::metrics::{DiskPartitionScalarObservations, ScalarObservation};
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::metrics::{DiskPartitionScalarObservations, ScalarObservation};
 
 use super::{PartitionUsage, partition_usage};
 

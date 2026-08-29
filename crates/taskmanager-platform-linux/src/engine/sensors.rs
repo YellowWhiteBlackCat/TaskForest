@@ -14,15 +14,15 @@ mod composition_tests;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::DeviceId;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::{DeviceId, ProviderId};
 use taskmanager_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
     SensorReading, ThermalControlSnapshot,
 };
-use taskmanager_platform_contract::{
-    DeviceSourceSnapshot, FailureKind, ProviderId, SourceOutcome, SourceStatus,
-};
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::DeviceSourceSnapshot;
 
 const HWMON_DISCOVERY_PROVIDER: ProviderId = ProviderId::borrowed("linux.sensor.hwmon.discovery");
 const HWMON_READING_PROVIDER: ProviderId = ProviderId::borrowed("linux.sensor.hwmon.readings");

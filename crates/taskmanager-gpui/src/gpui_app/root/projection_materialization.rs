@@ -7,12 +7,20 @@
 
 use std::rc::Rc;
 
-use crate::core::Alert;
-use taskmanager_application::{
-    ContainerRollup, DirectoryUsageSnapshot, HardwareInfo, NpuInventorySnapshot,
-    PowerSupplySnapshot, ProcessItem, SensorCenterSnapshot, ServiceItem, SessionItem, SourceStatus,
-    StartupBootEvidenceSnapshot, StartupEntry, StartupEvidenceUnavailable, SystemSnapshot,
-};
+use taskmanager_application::StartupEvidenceUnavailable;
+use taskmanager_core::core::Alert;
+use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskmanager_core::core::power::PowerSupplySnapshot;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process_telemetry::ContainerRollup;
+use taskmanager_core::core::sensors::SensorCenterSnapshot;
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
 
 #[derive(Clone, Debug, Default, PartialEq)]
 struct StartupEvidenceProjection {
@@ -93,7 +101,8 @@ pub(super) struct ProjectionMaterialization {
     directory_usage: Materialized<Option<Rc<DirectoryUsageSnapshot>>>,
     npu_inventory: Materialized<Option<Rc<NpuInventorySnapshot>>>,
     active_alerts: Materialized<Rc<Vec<Alert>>>,
-    storage_health: SourcedMaterialized<Rc<taskmanager_application::FilesystemHealthSnapshot>>,
+    storage_health:
+        SourcedMaterialized<Rc<taskmanager_core::core::storage_health::FilesystemHealthSnapshot>>,
 }
 
 impl ProjectionMaterialization {
@@ -212,7 +221,7 @@ impl ProjectionMaterialization {
     pub(super) fn replace_storage_health(
         &mut self,
         revision: u64,
-        filesystems: taskmanager_application::FilesystemHealthSnapshot,
+        filesystems: taskmanager_core::core::storage_health::FilesystemHealthSnapshot,
         sources: Vec<SourceStatus>,
     ) {
         let _ = self
@@ -360,7 +369,9 @@ impl ProjectionMaterialization {
         self.active_alerts.value.as_slice()
     }
 
-    pub(super) fn storage_health(&self) -> &taskmanager_application::FilesystemHealthSnapshot {
+    pub(super) fn storage_health(
+        &self,
+    ) -> &taskmanager_core::core::storage_health::FilesystemHealthSnapshot {
         self.storage_health.materialized.value.as_ref()
     }
 
@@ -560,7 +571,9 @@ impl super::RootView {
     }
 
     #[must_use]
-    pub fn storage_health(&self) -> &taskmanager_application::FilesystemHealthSnapshot {
+    pub fn storage_health(
+        &self,
+    ) -> &taskmanager_core::core::storage_health::FilesystemHealthSnapshot {
         self.materialized.storage_health()
     }
 
@@ -606,7 +619,7 @@ impl super::RootView {
     pub(super) fn sync_capture_service_system(
         &mut self,
         services_updated: bool,
-    ) -> Option<taskmanager_application::ServiceId> {
+    ) -> Option<taskmanager_core::core::target::ServiceId> {
         let (capture_evidence, materialized) = (&mut self.capture_evidence, &mut self.materialized);
         capture_evidence.on_services_update(
             services_updated,

@@ -11,13 +11,14 @@ use super::action_bar::{ProcessActionBarProps, action_bar};
 use super::page_layout::{
     ProcessChromePresentation, ProcessControlPresentation, ProcessOverviewPresentation,
 };
-use super::{SortCol, hierarchy_summary, status_filter_row};
+use super::{hierarchy_summary, status_filter_row};
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::tokens::UiSize;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_shell::SortCol;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
+use taskmanager_theme::tokens::UiSize;
 
 pub(super) struct ProcessOverviewProps<'a> {
     pub theme: &'a Theme,
@@ -90,7 +91,6 @@ pub(super) fn process_overview(props: ProcessOverviewProps<'_>) -> Div {
 pub(super) struct ProcessControlChromeProps<'a> {
     pub theme: &'a Theme,
     pub selected: Option<u32>,
-    pub selected_pids: &'a HashSet<u32>,
     pub application_selected: bool,
     pub selected_target_count: usize,
     pub hidden_cols: &'a HashSet<SortCol>,
@@ -110,7 +110,6 @@ pub(super) fn process_control_chrome(
     let ProcessControlChromeProps {
         theme,
         selected,
-        selected_pids,
         application_selected,
         selected_target_count,
         hidden_cols,
@@ -126,7 +125,6 @@ pub(super) fn process_control_chrome(
         ProcessActionBarProps {
             theme,
             selected,
-            selected_pids,
             application_selected,
             selected_target_count,
             hidden_cols,

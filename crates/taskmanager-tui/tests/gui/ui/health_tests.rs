@@ -1,7 +1,7 @@
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use taskmanager_application::{MemoryScalarObservations, ScalarObservation};
+use taskmanager_core::core::metrics::{MemoryScalarObservations, ScalarObservation};
 
 use crate::demo_app;
 
@@ -101,9 +101,9 @@ fn health_overlay_keeps_a_disabled_canonical_rule_visible() {
 /// token through the kind reroute.
 #[test]
 fn provider_line_tokens_follow_the_neutral_kind() {
-    use taskmanager_application::{
-        DeviceState, DeviceStatus, ProviderId, SourceStateKind, device_source_line,
-    };
+    use taskmanager_application::{SourceStateKind, device_source_line};
+    use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+    use taskmanager_core::core::identity::ProviderId;
 
     let cases = [
         (DeviceStatus::Healthy, "ok", SourceStateKind::Ok),
@@ -139,7 +139,8 @@ fn provider_line_tokens_follow_the_neutral_kind() {
 
 #[test]
 fn health_overlay_renders_provider_diagnostics_tokens() {
-    use taskmanager_application::{DeviceStatus, ProviderId};
+    use taskmanager_core::core::device_state::DeviceStatus;
+    use taskmanager_core::core::identity::ProviderId;
 
     let mut app = TuiApp::new();
     let snapshot = SystemSnapshot {

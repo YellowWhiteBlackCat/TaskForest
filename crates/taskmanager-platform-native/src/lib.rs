@@ -114,15 +114,9 @@ pub mod tray;
 
 pub use tray::spawn_tray;
 
-pub use taskmanager_platform_contract::{TrayController, TrayFailure};
-
 pub mod instance;
 
 pub use instance::acquire_single_instance;
-
-pub use taskmanager_platform_contract::{
-    InstanceEvent, InstanceFailure, InstanceGuard, InstanceRole,
-};
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 compile_error!(

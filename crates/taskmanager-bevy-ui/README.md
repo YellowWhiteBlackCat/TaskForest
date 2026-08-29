@@ -9,27 +9,40 @@ production UI tree, including dynamic children and state surfaces, is composed
 as a `Scene` and mounted with `spawn_scene`; observers and required components
 bind state to that tree but never create a second imperative UI hierarchy. Peer
 surface to GPUI, Iced and the TUI. The public architecture contract lives in
-[`docs/ARCH.md`](../../docs/ARCH.md), and the frontend identity is registered
-in [`docs/PRODUCT_IDENTITY.md`](../../docs/PRODUCT_IDENTITY.md).
-M1 (all eight routed pages on the widget substrate) has shipped: the crate is
-registered in `docs/PRODUCT_IDENTITY.md` as `TaskForestB`. M1.5 now contains
-five independently tested
-foundation slices (process tree, bounded chart, frozen-target controls,
-input/IME/a11y and application history), all mounted into the formal route or
-its page-owned surface. The history page consumes the app-host read-only
-connector; the chart and tree anchors are part of the live Performance and
-Applications routes; the demo window shares the production composition and is
-used by the Wayland capture matrix. The M2 chart families and M3 input/a11y
-milestones remain open, and the menu/dialog widgets still await their first
-in-page destructive-verb wiring. Feathers (the official skin system) is not
+[`docs/ARCH.md`](../../docs/ARCH.md), the frontend charter in
+[`docs/BEVY_UI_FRONTEND.md`](../../docs/BEVY_UI_FRONTEND.md), and the frontend
+identity is registered in
+[`docs/PRODUCT_IDENTITY.md`](../../docs/PRODUCT_IDENTITY.md).
+
+All nine routed pages are mounted on the widget substrate (the shared page
+set is complete, System included), and the structural seams are live: real
+input (keyboard through the shell's own routers, pointer picking and wheel
+scroll through typed page seams), destructive verbs (EndTask/ProcessBatch/
+ServiceControl through the shared gate — a typed action menu per inventory,
+one confirmation modal, typed effects), the polyline chart family (hero
+curves, sidebar mini-graphs, and the memory composition bar through one
+gap-aware adapter), and the semantic accessibility channel (ui-contract
+`SemanticSnapshot` plus `bevy_a11y` nodes published through the
+`accesskit_unix` bridge on Linux). Remaining open surface is declared, never
+hidden: the GPU-engine detail cards, service log streaming, startup/session
+control verbs, settings persistence across sessions, the tray seam, and
+multi-window composition. Feathers (the official skin system) is not
 adopted — theme tokens are the only skin authority.
 
 ## Layout
 
-- `src/app.rs` — the frontend-owned route model (eight pages), keyboard
-  routing through the shared conflict-checked command router, the nav rail,
+- `src/app.rs` — the frontend-owned route model (eight pages), the nav rail,
   page mounting, and `ShellTrack`: the SystemParam every page reads the
   folded projection through (the page-agent data entry).
+- `src/input.rs` — the real-input seam (W4): Bevy keyboard events forwarded
+  through the shell's own routers (`handle_local_key`/`handle_local_char`),
+  the frontend-owned route chords, the Dialog-scope Enter mapping, the
+  `PendingEffects` effect bridge to the drain, and the one-shot quit forward.
+- `src/confirmation.rs` — the shell's armed destructive-action gate rendered
+  as one modal under the app shell root, with typed confirm/dismiss paths
+  and republished gate transitions.
+- `src/semantic.rs` — the accessibility seam: the ui-contract
+  `SemanticSnapshot` (revision-keyed) plus `bevy_a11y` row nodes.
 - `src/window.rs` — the bsn! app shell (route-aware shell + nav rail + content slot),
   including the shared MiSans VF UI and Roboto Mono telemetry font roles.
   and its observers; the bsn! idiom reference for this crate.
@@ -55,12 +68,13 @@ adopted — theme tokens are the only skin authority.
 ## Boundary
 
 Dependency whitelist is charter law: `taskmanager-application`,
-`taskmanager-app-host`, `taskmanager-shell`, `taskmanager-theme`,
-`taskmanager-ui-contract`, `taskmanager-assets` and exactly-locked `bevy
-=0.19.1` (features `bevy_ui`, `bevy_ui_widgets`, `bevy_scene` — the bsn!
-macro — plus the render/asset/window closure; Linux adds `wayland` only) —
-never `core`, `platform-runtime` or a platform crate. Bevy types never cross
-this crate's public API. The two Worlds never merge: the platform client is
+`taskmanager-app-host`, `taskmanager-core`, `taskmanager-platform-contract`,
+`taskmanager-shell`, `taskmanager-theme`, `taskmanager-ui-contract`,
+`taskmanager-assets` and exactly-locked `bevy =0.19.1` (features `bevy_ui`,
+`bevy_ui_widgets`, `bevy_scene` — the bsn! macro — plus the
+render/asset/window closure; Linux adds `wayland` only) — never
+`platform-runtime` or a platform crate. Bevy types never cross this crate's
+public API. The two Worlds never merge: the platform client is
 acquired once per process through the app-host `OnceLock` cache pattern
 (`src/runtime.rs`) and every frame's `PreUpdate` drain (`src/drain.rs`)
 talks to it through non-blocking `try_recv` batches with the TUI-seam-shaped

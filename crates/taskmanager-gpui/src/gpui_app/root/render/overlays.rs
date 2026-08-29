@@ -6,12 +6,12 @@ use super::super::{
 use crate::gpui_app::help_overlay;
 use crate::gpui_app::root::window_surface::WindowSurface;
 use crate::gpui_app::system_about;
-use crate::gpui_app::theme::tokens;
 use crate::gpui_app::{about, first_run};
 use gpui::{
     AnyElement, App, AppContext, Context, Div, IntoElement, ParentElement, Stateful, Styled,
     Window, div, px,
 };
+use taskmanager_theme::tokens;
 use taskmanager_ui::inputs::switch::SwitchState;
 use taskmanager_ui::inputs::text_input::TextInput;
 use taskmanager_ui::layout::{
@@ -35,6 +35,7 @@ pub(super) fn compose_primary_dialogs(
                 theme,
                 panel: *panel,
                 state: &view.dashboard,
+                events: view.projection().alert_center.event_history(),
                 rules: view.projection().alert_center.managed_rules(),
                 entity: close_entity.clone(),
                 scroll: view.dialog_scroll.dashboard_panel.clone(),
@@ -451,7 +452,9 @@ pub(super) fn cold_start_placeholder(
             .text_color(theme.fg_dim)
             .text_size(tokens::FONT_13)
             .child(Spinner::new(theme.palette()).size(16.0))
-            .child(crate::i18n::t("common.collecting_telemetry")),
+            .child(taskmanager_application::i18n::t(
+                "common.collecting_telemetry",
+            )),
     )
 }
 

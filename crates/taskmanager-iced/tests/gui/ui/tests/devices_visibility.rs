@@ -79,7 +79,7 @@ fn device_visibility_preferences_filter_the_selector_rail() {
 #[test]
 fn network_subcategory_toggles_filter_by_adapter_type() {
     use crate::app::{DeviceKind, Message, SettingsChange};
-    use taskmanager_application::NetworkAdapterType;
+    use taskmanager_core::core::metrics::NetworkAdapterType;
     let (mut app, dir) = visibility_test_app("visibility-network");
 
     // Give the fixture a VPN and a loopback interface alongside the demo NIC.
@@ -95,7 +95,7 @@ fn network_subcategory_toggles_filter_by_adapter_type() {
     wired.apply_observations(
         NetworkAdapterType::Ethernet,
         wired_scalars,
-        taskmanager_application::NetworkWirelessObservations::not_applicable(1),
+        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
     );
     snapshot.networks[0] = wired;
     let mut vpn = snapshot.networks[0].clone();
@@ -104,7 +104,7 @@ fn network_subcategory_toggles_filter_by_adapter_type() {
     vpn.apply_observations(
         NetworkAdapterType::Vpn,
         vpn_scalars,
-        taskmanager_application::NetworkWirelessObservations::not_applicable(1),
+        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
     );
     let mut loopback = snapshot.networks[0].clone();
     loopback.interface_name = "lo".into();
@@ -112,7 +112,7 @@ fn network_subcategory_toggles_filter_by_adapter_type() {
     loopback.apply_observations(
         NetworkAdapterType::Loopback,
         loopback_scalars,
-        taskmanager_application::NetworkWirelessObservations::not_applicable(1),
+        taskmanager_core::core::metrics::NetworkWirelessObservations::not_applicable(1),
     );
     snapshot.networks.push(vpn);
     snapshot.networks.push(loopback);

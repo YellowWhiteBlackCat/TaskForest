@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_application::ScalarObservation;
+use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_ui_contract::{SemanticAction, SemanticNodeId, SemanticRole};
 
 use crate::app::{AlertsMessage, Message};
@@ -80,12 +80,12 @@ fn a_disabled_rule_publishes_as_unchecked_and_a_firing_rule_names_itself() {
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::ActiveAlerts(vec![
-            taskmanager_application::alerts::Alert {
+            taskmanager_core::core::alerts::Alert {
                 instance_id: format!("{memory_rule_id}:"),
                 rule_id: memory_rule_id.clone(),
                 target: String::new(),
-                metric: taskmanager_application::alerts::AlertMetric::MemoryUsagePercent,
-                severity: taskmanager_application::alerts::AlertSeverity::Warning,
+                metric: taskmanager_core::core::alerts::AlertMetric::MemoryUsagePercent,
+                severity: taskmanager_core::core::alerts::AlertSeverity::Warning,
                 value: 91.0,
                 threshold: 90.0,
                 active_since_ms: 0,
@@ -142,9 +142,12 @@ fn demo_shell_projects_process_rows_graph_and_selection() {
 fn application_aggregate_never_fabricates_a_selected_process_semantic() {
     let mut shell = taskmanager_shell::demo_app();
     shell.selected = 1;
-    let root_pid = shell.visible_processes()[1].pid;
-    shell.selected_process_row = Some(taskmanager_shell::ProcessRowKey::Application(root_pid));
-    shell.selected_pids.clear();
+    let root = shell.visible_processes()[1];
+    shell.selected_row = root
+        .current_start_token()
+        .and_then(|token| taskmanager_shell::ProcessRowIdentity::from_parts(root.pid, token))
+        .map(taskmanager_shell::ProcessRowId::Application);
+    shell.selected_rows.clear();
 
     let snapshot = semantic_snapshot(&shell).expect("semantic tree must build");
     assert!(
@@ -163,8 +166,9 @@ fn first_loading_frame_omits_unobserved_graph_and_keeps_row_scalars_honest() {
         .name(String::from("unobserved"))
         .build();
     let mut observations = *process.scalar_observations();
-    observations.cpu_percentage =
-        ScalarObservation::unavailable(taskmanager_application::FailureKind::PermissionDenied);
+    observations.cpu_percentage = ScalarObservation::unavailable(
+        taskmanager_core::core::failure::FailureKind::PermissionDenied,
+    );
     process.apply_scalar_observations(observations);
     taskmanager_shell::fixture::seed_projection_fact(
         &mut shell,
@@ -215,7 +219,10 @@ fn active_iced_modal_is_exposed_as_dismissible_dialog_semantics() {
 fn service_control_confirmation_is_a_dismissible_dialog_in_semantics() {
     let mut shell = taskmanager_shell::demo_app();
     let service = shell.projection().services.as_ref().expect("demo services")[0].clone();
-    assert!(shell.select_service_control(&service, taskmanager_application::ServiceAction::Stop));
+    assert!(shell.select_service_control(
+        &service,
+        taskmanager_core::core::services::ServiceAction::Stop
+    ));
     let _ = shell.apply_action(taskmanager_application::AppAction::RequestServiceControl);
     let snapshot = semantic_snapshot(&shell).expect("modal semantic tree must build");
     let modal = snapshot
@@ -230,7 +237,7 @@ fn service_control_confirmation_is_a_dismissible_dialog_in_semantics() {
 #[test]
 fn process_properties_modal_is_a_dismissible_dialog_in_semantics() {
     let mut shell = taskmanager_shell::demo_app();
-    let target = taskmanager_application::FrozenProcessIdentity::from_authoritative_parts(
+    let target = taskmanager_core::core::process::FrozenProcessIdentity::from_authoritative_parts(
         4242,
         "worker.exe",
         7_500,
@@ -254,8 +261,9 @@ fn process_properties_modal_is_a_dismissible_dialog_in_semantics() {
 #[test]
 fn service_log_modal_is_a_dismissible_dialog_in_semantics() {
     let mut shell = taskmanager_shell::demo_app();
-    let _ =
-        shell.open_service_log_for(taskmanager_application::ServiceId::from("systemd-journald"));
+    let _ = shell.open_service_log_for(taskmanager_core::core::target::ServiceId::from(
+        "systemd-journald",
+    ));
     let snapshot = semantic_snapshot(&shell).expect("service log modal semantic tree must build");
     let modal = snapshot
         .get(&SemanticNodeId::owned("modal:service-log-modal"))

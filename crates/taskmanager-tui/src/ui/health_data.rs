@@ -3,7 +3,8 @@
 //! Observation reads stay here so the Ratatui renderer consumes display-ready
 //! values and verdicts instead of redefining typed availability at paint time.
 
-use taskmanager_application::{SystemSnapshot, i18n::t};
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 #[derive(Clone, Copy, Debug)]

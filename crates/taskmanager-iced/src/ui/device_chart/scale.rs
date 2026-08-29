@@ -45,22 +45,22 @@ pub(crate) enum DeviceMetricScale {
     Megahertz,
 }
 
-impl From<MetricSeries> for DeviceMetricScale {
-    fn from(series: MetricSeries) -> Self {
+impl From<TrendSeries> for DeviceMetricScale {
+    fn from(series: TrendSeries) -> Self {
         match series {
-            MetricSeries::CpuUsagePercent
-            | MetricSeries::MemoryUsagePercent
-            | MetricSeries::GpuUsagePercent
-            | MetricSeries::DiskActiveTimePct => Self::Percent,
-            MetricSeries::DiskBytesPerSec | MetricSeries::NetworkBytesPerSec => {
+            TrendSeries::CpuUsagePercent
+            | TrendSeries::MemoryUsagePercent
+            | TrendSeries::GpuUsagePercent
+            | TrendSeries::DiskActiveTimePct => Self::Percent,
+            TrendSeries::DiskBytesPerSec | TrendSeries::NetworkBytesPerSec => {
                 Self::BytesPerSecond {
                     use_bytes: true,
                     use_base2: true,
                 }
             }
-            MetricSeries::CpuTemperatureC => Self::Celsius,
-            MetricSeries::CpuFrequencyMhz => Self::Megahertz,
-            MetricSeries::CpuPowerW => Self::Watts,
+            TrendSeries::CpuTemperatureC => Self::Celsius,
+            TrendSeries::CpuFrequencyMhz => Self::Megahertz,
+            TrendSeries::CpuPowerW => Self::Watts,
         }
     }
 }

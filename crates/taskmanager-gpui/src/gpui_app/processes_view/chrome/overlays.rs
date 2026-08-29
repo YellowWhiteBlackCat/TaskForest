@@ -6,9 +6,9 @@ use std::collections::HashSet;
 use super::{ActionBtnProps, action_btn};
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 pub(super) fn logical_cpu_count() -> usize {
     std::thread::available_parallelism()
@@ -76,7 +76,7 @@ pub(super) fn affinity_overlay(
 fn affinity_status_content(
     theme: &Theme,
     pid: u32,
-    failure: Option<taskmanager_application::FailureKind>,
+    failure: Option<taskmanager_core::core::failure::FailureKind>,
     hovered: Option<&Hover>,
     cx: &mut Context<RootView>,
 ) -> Div {

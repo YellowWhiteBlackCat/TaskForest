@@ -7,11 +7,12 @@ use gpui::{
 use std::collections::HashSet;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::processes_view::rows::{SortCol, columns, header_label, is_hideable};
+use crate::gpui_app::processes_view::rows::{columns, header_label, is_hideable};
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_shell::SortCol;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 pub fn columns_dropdown(
     theme: &Theme,

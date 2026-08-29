@@ -1,5 +1,7 @@
 use taskmanager_core::FailureKind;
-use taskmanager_platform_contract::{ProviderFailure, ProviderId, SourceOutcome, SourceStatus};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::ProviderFailure;
 
 use super::{inventory_failure, snapshot_failure};
 

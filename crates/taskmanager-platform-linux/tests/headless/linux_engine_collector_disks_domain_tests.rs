@@ -4,8 +4,9 @@ use std::time::Duration;
 use super::*;
 use crate::engine::collector::sources::parse_diskstats_observation;
 use taskmanager_core::ScalarAvailability;
+use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_platform_contract::SourceOutcome;
+use taskmanager_core::core::source::SourceOutcome;
 
 fn diskstats(
     name: &str,
@@ -215,7 +216,7 @@ fn unsupported_smart_enrichment_never_hides_a_discovered_disk() {
 
 #[test]
 fn same_kernel_slot_with_new_stable_identity_resets_rate_generation() {
-    let old_identity = taskmanager_platform_contract::DeviceId::new("disk:wwid:old");
+    let old_identity = DeviceId::new("disk:wwid:old");
     let previous_identities = HashMap::from([("sda".to_string(), old_identity)]);
     let mut stats = HashMap::from([(
         "sda".to_string(),

@@ -6,12 +6,14 @@
 
 use std::sync::Arc;
 
+use taskmanager_core::core::services::{ServiceAction, ServiceItem, ServiceLogQuery};
+use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::{
     CapabilityId, CapabilityRequest, PartialSourceSnapshot, RequestPort, RequestTracking,
     RequestTrackingError,
 };
 
-use crate::{ServiceAction, ServiceId, ServiceItem, ServiceLogQuery, ServiceUpdate};
+use crate::ServiceUpdate;
 
 #[derive(Clone, Debug)]
 pub enum ServiceEvent {

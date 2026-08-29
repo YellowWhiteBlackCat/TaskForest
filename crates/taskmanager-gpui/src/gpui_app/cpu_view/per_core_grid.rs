@@ -4,13 +4,14 @@ use std::rc::Rc;
 
 use gpui::{Div, InteractiveElement, ParentElement, Styled, div, px};
 
-use crate::core::hardware::{CpuType, HardwareInfo};
 use crate::gpui_app::elements;
 use crate::gpui_app::graph::{GraphSettings, compute_column_count};
-use crate::gpui_app::theme::{Theme, tokens};
+use taskmanager_core::core::hardware::{CpuType, HardwareInfo};
+use taskmanager_theme::Theme;
 
 use super::per_core::PerCoreSeries;
 use super::stats::CpuLiveStats;
+use taskmanager_theme::tokens;
 
 pub(super) fn render(
     theme: &Theme,

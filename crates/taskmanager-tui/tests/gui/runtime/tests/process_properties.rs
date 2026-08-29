@@ -232,9 +232,12 @@ fn insights_tab_shows_collecting_when_no_projection_is_seeded() {
 #[test]
 fn insights_tab_renders_thread_list_when_projection_is_present() {
     use taskmanager_application::{
-        DeviceState, ProcessIdentity, ProcessInsightFacetEvent, ProcessInsightObservation,
-        ProcessInsightSnapshot, ProcessInsightsProjection, ProcessInsightsRevision,
-        ProcessThreadInfo, ProcessThreads, ThreadState,
+        ProcessInsightFacetEvent, ProcessInsightObservation, ProcessInsightsProjection,
+        ProcessInsightsRevision,
+    };
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::process_telemetry::{
+        ProcessIdentity, ProcessInsightSnapshot, ProcessThreadInfo, ProcessThreads, ThreadState,
     };
 
     let mut app = app_on_processes();
@@ -445,9 +448,10 @@ fn esc_closes_modal_and_restores_table_navigation() {
 fn seed_requires_escalation_network(app: &mut TuiApp) -> u32 {
     use taskmanager_application::i18n::set_language;
     use taskmanager_application::{
-        FailureKind, ProcessInsightFacet, ProcessInsightUnavailable, ProcessInsightsProjection,
+        ProcessInsightFacet, ProcessInsightUnavailable, ProcessInsightsProjection,
         ProcessInsightsRevision,
     };
+    use taskmanager_core::core::failure::FailureKind;
     let _guard = crate::ui::test_support::LANG_TEST_GUARD
         .lock()
         .expect("lang test guard");
@@ -556,9 +560,10 @@ fn e_without_the_requires_escalation_facet_produces_no_effect() {
         .clone()
         .expect("selected row has a frozen identity");
     use taskmanager_application::{
-        FailureKind, ProcessInsightFacet, ProcessInsightUnavailable, ProcessInsightsProjection,
+        ProcessInsightFacet, ProcessInsightUnavailable, ProcessInsightsProjection,
         ProcessInsightsRevision,
     };
+    use taskmanager_core::core::failure::FailureKind;
     let revision = ProcessInsightsRevision::new(1);
     let mut tracker = ProcessInsightsProjection::default();
     tracker.begin(target.clone(), revision);

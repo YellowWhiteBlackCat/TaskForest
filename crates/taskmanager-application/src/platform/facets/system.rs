@@ -6,14 +6,14 @@
 
 use std::sync::Arc;
 
-use taskmanager_core::ContainerRollup;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::metrics::{
+    CpuTelemetryObservation, GpuTelemetryObservation, HostRuntimeObservation,
+    MemoryTelemetryObservation, NetworkTelemetryObservation, StorageTelemetryObservation,
+};
+use taskmanager_core::core::process_telemetry::ContainerRollup;
 use taskmanager_platform_contract::{
     CapabilityId, CompositeSourceSnapshot, RequestId, RequestPort, SubmissionError,
-};
-
-use crate::{
-    CpuTelemetryObservation, GpuTelemetryObservation, HardwareInfo, HostRuntimeObservation,
-    MemoryTelemetryObservation, NetworkTelemetryObservation, StorageTelemetryObservation,
 };
 
 use super::gpu_engine_rows::GpuEngineRowsRequestPort;

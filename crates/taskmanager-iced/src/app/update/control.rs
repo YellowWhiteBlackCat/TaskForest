@@ -1,6 +1,7 @@
 //! Platform refresh and typed control-intent message reducer.
 
 use taskmanager_application::{AppAction, PlatformEffect};
+
 use taskmanager_shell::ShellApp;
 
 use super::super::{ContextMenuKind, IcedApp, Message};

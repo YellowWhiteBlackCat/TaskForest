@@ -12,6 +12,7 @@ bevy_ecs = { version = "0.19", default-features = false, features = ["std", "mul
 crossbeam-channel = "0.5"
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 
 [lib]
 name = "taskmanager_platform_runtime"

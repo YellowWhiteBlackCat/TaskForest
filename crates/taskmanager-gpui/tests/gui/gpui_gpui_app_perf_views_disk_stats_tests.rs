@@ -1,6 +1,6 @@
 use super::{disk_stats, temperature_trend_value};
-use crate::core::metrics::DiskMetrics;
 use crate::gpui_app::formatting::DisplayUnits;
+use taskmanager_core::core::metrics::DiskMetrics;
 
 /// An empty or all-gap window renders no trend row — absence stays
 /// absence instead of becoming a fabricated "0 °C" summary.
@@ -21,9 +21,9 @@ fn temperature_trend_summarizes_latest_average_and_peak() {
         trend,
         format!(
             "{} 40 °C · {} 34 °C · {} 40 °C",
-            crate::i18n::t("common.latest"),
-            crate::i18n::t("common.avg"),
-            crate::i18n::t("common.peak"),
+            taskmanager_application::i18n::t("common.latest"),
+            taskmanager_application::i18n::t("common.avg"),
+            taskmanager_application::i18n::t("common.peak"),
         )
     );
 }
@@ -40,18 +40,18 @@ fn removable_and_power_on_rows_use_locale_catalog_entries() {
     let rows = disk_stats(&disk, DisplayUnits::default(), &[]);
     let find = |key: &'static str| {
         rows.iter()
-            .find(|row| row.label() == crate::i18n::t(key))
+            .find(|row| row.label() == taskmanager_application::i18n::t(key))
             .unwrap_or_else(|| panic!("{key} row must exist"))
     };
     assert_eq!(
         find("disk.removable").value(),
-        Some(crate::i18n::t("common.yes")),
+        Some(taskmanager_application::i18n::t("common.yes")),
         "removable row must use the locale label, not hardcoded English"
     );
     assert_eq!(
         find("disk.power_on").value().map(str::to_owned),
         Some(
-            crate::i18n::t("disk.power_on_format")
+            taskmanager_application::i18n::t("disk.power_on_format")
                 .replace("{hours}", "72")
                 .replace("{days}", "3")
         )
@@ -65,7 +65,7 @@ fn first_sample_rate_rows_are_none_not_fabricated_zeros() {
     let rows = disk_stats(&DiskMetrics::default(), DisplayUnits::default(), &[]);
     let find = |key: &'static str| {
         rows.iter()
-            .find(|row| row.label() == crate::i18n::t(key))
+            .find(|row| row.label() == taskmanager_application::i18n::t(key))
             .unwrap_or_else(|| panic!("{key} row must exist"))
     };
     assert_eq!(find("disk.read").value(), None);

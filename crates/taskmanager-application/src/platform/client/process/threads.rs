@@ -1,5 +1,6 @@
 //! Submission helper for the independently scheduled Threads insight facet.
 
+use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_platform_contract::{RequestId, SubmissionError};
 
 use crate::platform::{ProcessInsightFacet, ProcessThreadsRequest};
@@ -9,7 +10,7 @@ use super::super::{PlatformClient, submit_request};
 impl PlatformClient {
     pub(super) fn submit_process_threads(
         &mut self,
-        target: &crate::FrozenProcessIdentity,
+        target: &FrozenProcessIdentity,
         revision: crate::ProcessInsightsRevision,
         submitted_at_ms: u64,
     ) -> Result<RequestId, SubmissionError> {

@@ -4,7 +4,7 @@
 //! before it can drift.
 
 use super::*;
-use crate::core::metrics::SystemSnapshot;
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 /// The shared chrome every device page must paint: the semantic title row and
 /// the ONE fixed main viewport. No page may mount its own scrolling main
@@ -202,7 +202,7 @@ async fn vertical_runway_degrades_in_order_before_the_headline_floor(cx: &mut Te
         for (revision, usage) in [(1_u64, 40.0_f32), (2, 42.0)] {
             let stamp = CorrelatedTelemetryStamp::from_accepted_event(revision, revision * 10 + 1)
                 .expect("fixture revision is non-zero");
-            let observation = crate::core::CpuTelemetryObservation::current(
+            let observation = taskmanager_core::core::CpuTelemetryObservation::current(
                 CpuMetrics::from_observations(CpuScalarObservations {
                     global_usage_pct: ScalarObservation::available(usage, revision * 10),
                     ..Default::default()

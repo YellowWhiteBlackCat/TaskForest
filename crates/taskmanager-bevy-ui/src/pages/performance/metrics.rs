@@ -212,7 +212,7 @@ pub(super) fn network_rate(
 }
 
 pub(super) fn curve_samples(shell: &ShellApp, curve: SystemCurve) -> Vec<f32> {
-    shell.history.series(curve.series())
+    taskmanager_shell::presentation::trend::window(&shell.history, curve.series())
 }
 
 /// TUI parity: a window under two samples is still collecting — the curve
@@ -267,18 +267,6 @@ pub(super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
             .map(power_w)
             .unwrap_or_else(missing_value),
         CpuField::Core(index) => observed_percentage(cpu.current_core_usage_pct(index)),
-    }
-}
-
-/// Bar fractions for one strip: the shared sparkline projection, emptied
-/// while the window is not warm (the strip renders nothing rather than a
-/// fake line).
-pub(crate) fn strip_fractions(shell: &ShellApp, curve: SystemCurve) -> Vec<f32> {
-    let samples = curve_samples(shell, curve);
-    if curve_warm(&samples) {
-        bar_fractions(&samples)
-    } else {
-        Vec::new()
     }
 }
 

@@ -2,8 +2,8 @@
 
 ## Role
 
-Compile-time selection and re-export of the native OS adapter consumed by the
-application host and frontend entrypoints.
+Compile-time selection of the native OS adapter consumed by the application
+host and frontend entrypoints.
 
 ## Boundary
 
@@ -13,11 +13,13 @@ parallel provider registry.
 
 ## Contract and verification
 
-Every target must expose the same typed platform facade with honest fallbacks.
+Every target must expose the same typed platform surface with honest fallbacks;
+shared contract types remain owned by `taskmanager-platform-contract` and are
+not forwarded through this selector.
 OS-specific process liveness and native path knowledge remain in the selected
 adapter; the application host receives only safe probes and owned paths.
 Linux currently provides validated local-time rules. macOS and Windows return
-typed `Unsupported` until their native time-zone adapters exist; the facade
+typed `Unsupported` until their native time-zone adapters exist; the selector
 never substitutes UTC for an unavailable local zone.
 Verify cfg edges, feature closure and reverse dependency firewalls whenever an
 adapter or composition dependency changes.

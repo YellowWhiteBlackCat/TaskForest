@@ -1,7 +1,8 @@
 //! Pure projection of discovered NPU facts for the System page.
 
 use taskmanager_application::i18n::t;
-use taskmanager_application::{NpuDevice, NpuEngineKind, NpuInventorySnapshot};
+use taskmanager_core::core::npu::{NpuDevice, NpuEngineKind, NpuInventorySnapshot};
+
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use super::SystemInfoRow;

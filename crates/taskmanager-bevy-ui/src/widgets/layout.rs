@@ -8,10 +8,9 @@
 /// device-detail layout: icon rail + device pills + one main graph.
 pub(crate) const COMPACT_BREAKPOINT_PX: f32 = 860.0;
 
-/// Wide-layout rail widths. The main column owns the remaining width and is
-/// always allowed to shrink to zero before a child is permitted to overflow.
-pub(crate) const WIDE_NAV_WIDTH_PX: f32 = 152.0;
-pub(crate) const COMPACT_NAV_WIDTH_PX: f32 = 64.0;
+/// Wide-layout column widths. The main column owns the remaining width and
+/// is always allowed to shrink to zero before a child is permitted to
+/// overflow.
 pub(crate) const WIDE_DEVICE_SIDEBAR_WIDTH_PX: f32 = 256.0;
 pub(crate) const WIDE_STATS_WIDTH_PX: f32 = 280.0;
 

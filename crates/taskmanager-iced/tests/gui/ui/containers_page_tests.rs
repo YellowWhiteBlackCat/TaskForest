@@ -5,9 +5,10 @@
 //! surface.
 
 use super::*;
-use taskmanager_application::{
-    ContainerSummary, DeviceState, DeviceStatus, FailureKind, IsolationKind, ScalarObservation,
-};
+use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process_telemetry::{ContainerSummary, IsolationKind};
 
 fn populated_rollup() -> ContainerRollup {
     let mut rollup = ContainerRollup::empty_healthy(1_000);

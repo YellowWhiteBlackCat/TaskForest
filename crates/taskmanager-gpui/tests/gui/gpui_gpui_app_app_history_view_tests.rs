@@ -3,9 +3,10 @@ use std::sync::Arc;
 
 use gpui::AppContext;
 use taskmanager_application::{
-    ApplicationHistoryIdentity, ApplicationHistoryMetricSeries, ApplicationHistoryProjection,
-    ApplicationHistoryRow, ApplicationHistoryStatus, HistoryWindow,
+    ApplicationHistoryMetricSeries, ApplicationHistoryProjection, ApplicationHistoryRow,
+    ApplicationHistoryStatus,
 };
+use taskmanager_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};
 
 use super::*;
 
@@ -78,8 +79,8 @@ fn renderer_projection_preserves_durable_identity_peaks_and_downtime_gap() {
 
 #[gpui::test]
 fn renderer_projection_cache_is_keyed_by_durable_rows_publication(cx: &mut gpui::TestAppContext) {
-    let root = cx
-        .new(|cx| crate::gpui_app::root::RootView::new(crate::gpui_app::theme::Theme::dark(), cx));
+    let root =
+        cx.new(|cx| crate::gpui_app::root::RootView::new(taskmanager_theme::Theme::dark(), cx));
     root.update(cx, |view, _cx| {
         let first_projection = projection(Arc::from([durable_row("org.example.Editor", true)]));
         let first = view.app_history_rows(&first_projection);

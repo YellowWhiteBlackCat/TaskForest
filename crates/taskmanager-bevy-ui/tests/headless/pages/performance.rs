@@ -33,16 +33,24 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    CorrelatedSystemTelemetryOutcome, CpuMetrics, CpuScalarObservations, CpuTelemetryObservation,
-    EventEnvelope, EventPort, EventPortError, EventSequence, HostTelemetryRequest, MemoryMetrics,
-    MemoryScalarObservations, MemoryTelemetryObservation, NetworkAdapterType, NetworkMetrics,
-    NetworkScalarObservations, NetworkTelemetryObservation, NetworkWirelessObservations,
-    PlatformClient, PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle,
-    ProjectedSystemTelemetry, RequestId, RequestPort, ScalarObservation, ScalarObservationGroup,
-    SubmissionError, SystemFacets, SystemTelemetryDomainEvent, SystemTelemetryDomainOutcome,
-    SystemTelemetryDomainState, SystemTelemetryRevision,
+    CorrelatedSystemTelemetryOutcome, HostTelemetryRequest, PlatformClient, PlatformEvent,
+    PlatformEventBatch, PlatformFacets, PlatformHandle, ProjectedSystemTelemetry, SystemFacets,
+    SystemTelemetryDomainEvent, SystemTelemetryDomainOutcome, SystemTelemetryDomainState,
+    SystemTelemetryRevision,
 };
+use taskmanager_core::core::metrics::MemoryTelemetryObservation;
+use taskmanager_core::core::metrics::{
+    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, MemoryMetrics,
+    MemoryScalarObservations, NetworkAdapterType, NetworkMetrics, NetworkScalarObservations,
+    NetworkTelemetryObservation, NetworkWirelessObservations, ScalarObservation,
+    ScalarObservationGroup,
+};
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, RequestId, RequestPort,
+    SubmissionError,
+};
+
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::{ShellApp, demo_app};
 use taskmanager_theme::Theme;
@@ -52,16 +60,31 @@ use super::{
     CurveCard, CurveGate, DynBlock, DynField, DynText, PerformanceDeviceButton,
     PerformanceDeviceFocus, PerformanceDeviceTarget, PerformanceFocus, PerformanceFocusButton,
     Section, SparkStrip, SummaryField, SystemCurve, curve_caption, curve_wanted, section_keys,
-    strip_fractions, summary_value,
+    summary_value,
 };
 use crate::app::{FrontendTrack, Page, PageContext, Route, RouteChanged};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
+use crate::widgets::chart::{MAX_CHART_POINTS, line_segments};
 use crate::window::FrontendWindowPlugin;
 use crate::window::tests::HeadlessFrontendPlugins;
 
 const GIB: u64 = 1024 * 1024 * 1024;
+
+/// The strip's polyline projection over the shell's series — the same
+/// bounded, gap-aware call the render path makes (design strip geometry).
+fn curve_segments(
+    shell: &taskmanager_shell::ShellApp,
+    curve: SystemCurve,
+) -> Vec<crate::widgets::chart::ChartSegment> {
+    line_segments(
+        &taskmanager_shell::presentation::trend::window(&shell.history, curve.series()),
+        super::scene::chart::CHART_STRIP_WIDTH_PX,
+        34.0 * 3.0,
+        MAX_CHART_POINTS,
+    )
+}
 
 // ---- typed telemetry fixtures (real application shapes, no mocks) ----
 
@@ -266,8 +289,8 @@ fn empty_shell_renders_dashes_and_collecting_not_zeros() {
             "a cold curve window is the honest collecting state"
         );
         assert!(
-            strip_fractions(shell, curve).is_empty(),
-            "a cold strip renders no bars, not a fake flat line"
+            curve_segments(shell, curve).is_empty(),
+            "a cold strip draws no segments, not a fake flat line"
         );
     }
     assert!(section_keys(shell, Section::Gpu).is_empty());
@@ -306,14 +329,14 @@ fn partial_projection_keeps_missing_domains_on_dashes() {
     assert_eq!(section_keys(shell, Section::MemorySegments).len(), 2);
 }
 
-// ---- curve wiring: two-sample warm rule + shared sparkline projection ----
+// ---- curve wiring: two-sample warm rule + shared polyline projection ----
 
 #[test]
 fn curve_warms_at_two_samples_like_the_tui() {
     let mut folded = Folded::new();
     fold_host(&mut folded, 10.0, Vec::new());
     assert!(
-        strip_fractions(&folded.shell, SystemCurve::Cpu).is_empty(),
+        curve_segments(&folded.shell, SystemCurve::Cpu).is_empty(),
         "one sample is still collecting (TUI parity: no fabricated line)"
     );
     assert_eq!(
@@ -323,14 +346,17 @@ fn curve_warms_at_two_samples_like_the_tui() {
 
     fold_host(&mut folded, 50.0, Vec::new());
     fold_host(&mut folded, 90.0, Vec::new());
-    let fractions = strip_fractions(&folded.shell, SystemCurve::Cpu);
-    assert_eq!(fractions.len(), 3, "one bar per warm sample");
-    // The shared projection maps min→shortest bar, max→tallest: an ascending
-    // window must render ascending bars, never a flat or inverted strip.
-    assert!(
-        fractions[0] < fractions[1] && fractions[1] < fractions[2],
-        "ascending samples render ascending bars: {fractions:?}"
-    );
+    let segments = curve_segments(&folded.shell, SystemCurve::Cpu);
+    assert_eq!(segments.len(), 2, "one connecting segment per sample pair");
+    // Screen y grows downward: an ascending sample window must render an
+    // ascending polyline (each segment ends higher than it starts), never a
+    // flat or inverted line.
+    for segment in &segments {
+        assert!(
+            segment.end.y < segment.start.y,
+            "ascending samples draw an ascending line: {segments:?}"
+        );
+    }
     let caption = curve_caption(&folded.shell, SystemCurve::Cpu);
     assert!(
         caption.contains("90%"),
@@ -366,7 +392,7 @@ impl RequestPort for QuietRequests {
 
     fn try_submit(
         &self,
-        _request: taskmanager_application::RequestEnvelope<Self::Request>,
+        _request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
     ) -> Result<(), SubmissionError> {
         Ok(())
     }
@@ -499,9 +525,21 @@ fn content_spawns_from_a_cold_context_with_strip_markers() {
             .iter(world)
             .find(|(marker, _)| marker.0 == curve)
             .unwrap_or_else(|| panic!("the {curve:?} strip is mounted with its marker"));
-        assert!(
-            strip.1.is_empty(),
-            "a cold strip spawns zero bars, never a fabricated line"
+        assert_eq!(
+            strip.1.len(),
+            1,
+            "a cold strip mounts exactly its polyline layer"
+        );
+        let segments = strip
+            .1
+            .iter()
+            .next()
+            .and_then(|polyline| world.get::<bevy::ecs::hierarchy::Children>(*polyline))
+            .map(|segments| segments.len())
+            .unwrap_or(usize::MAX);
+        assert_eq!(
+            segments, 0,
+            "a cold strip draws zero segments, never a fabricated line"
         );
     }
     assert!(world.despawn(root), "the cold page scene despawns cleanly");
@@ -753,22 +791,28 @@ fn folded_projection_rewrites_the_mounted_page() {
     );
     // The curve samples come from the HISTORY ingest, a different seam than
     // the summary's projection: one fold left the strip still collecting.
-    fn strip_bars(app: &mut App) -> usize {
+    fn strip_segments(app: &mut App) -> usize {
         let world = app.world_mut();
         let mut strips = world.query::<(&SparkStrip, &bevy::ecs::hierarchy::Children)>();
         strips
             .iter(world)
             .find(|(marker, _)| marker.0 == SystemCurve::Cpu)
-            .map(|(_, children)| children.len())
-            .unwrap_or(usize::MAX)
+            .and_then(|(_, children)| {
+                children
+                    .iter()
+                    .next()
+                    .and_then(|polyline| world.get::<bevy::ecs::hierarchy::Children>(*polyline))
+            })
+            .map(|segments| segments.len())
+            .unwrap_or(0)
     }
     assert_eq!(
-        strip_bars(&mut app),
+        strip_segments(&mut app),
         0,
-        "one sample is still the collecting window: no bars yet"
+        "one sample is still the collecting window: no segments yet"
     );
     // Two more folds warm the window; the observer must rebuild the strip's
-    // bars to follow the sample count.
+    // polyline to follow the sample count (one segment per adjacent pair).
     fold_and_trigger(
         &mut app,
         host_batch(2, 43.0, vec![nic("eth0", "eth0", 1_200, 1024, 512)]),
@@ -777,7 +821,11 @@ fn folded_projection_rewrites_the_mounted_page() {
         &mut app,
         host_batch(3, 44.0, vec![nic("eth0", "eth0", 1_300, 1024, 512)]),
     );
-    assert_eq!(strip_bars(&mut app), 3, "one bar per warm sample");
+    assert_eq!(
+        strip_segments(&mut app),
+        2,
+        "one connecting segment per adjacent sample pair"
+    );
 }
 
 #[test]
@@ -885,4 +933,32 @@ fn gpu_curve_card_is_gated_on_gpu_data_existence() {
         bevy::ui::Display::None,
         "non-GPU facts must not open the GPU card gate"
     );
+}
+
+// ---- memory composition bar: pure layout math -----------------------------
+
+#[test]
+fn composition_bar_fractions_sum_to_one_and_zero_total_is_empty() {
+    use crate::pages::performance::scene::blocks::segment_bar_layout;
+    use taskmanager_shell::memory::memory_segments;
+
+    let memory = memory_metrics(1, 4 * GIB, 16 * GIB, 12 * GIB, (GIB, 4 * GIB));
+    let segments = memory_segments(&memory);
+    let layout = segment_bar_layout(&segments);
+    assert_eq!(layout.len(), segments.len(), "one span per segment");
+    let total: f32 = layout.iter().map(|span| span.fraction).sum();
+    assert!(
+        (total - 1.0).abs() < 1e-4,
+        "the spans tile the full width: {total}"
+    );
+    for span in &layout {
+        assert!(
+            span.fraction.is_finite() && span.fraction >= 0.0,
+            "a span width is a real share, never NaN"
+        );
+    }
+
+    // Nothing measured yet: an empty layout, never NaN widths.
+    let zero = taskmanager_core::core::metrics::MemoryMetrics::default();
+    assert!(segment_bar_layout(&memory_segments(&zero)).is_empty());
 }

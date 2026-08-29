@@ -1,4 +1,5 @@
-use taskmanager_application::{CapabilityId, ProviderId};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::CapabilityId;
 
 use crate::{ProviderBinding, RuntimeBudgets};
 
@@ -119,7 +120,7 @@ fn construction_rejects_route_growth_above_the_explicit_limit() {
         active_target_limit: 1,
         active_target_limit_per_capability: 1,
         active_target_limit_per_domain: 1,
-        target_scope_byte_limit: taskmanager_application::MAX_REQUEST_SCOPE_BYTES,
+        target_scope_byte_limit: taskmanager_platform_contract::MAX_REQUEST_SCOPE_BYTES,
         pending_delivery_limit: 3,
         control_delivery_reserve: 1,
         max_stalled_lifetime_ms: RuntimeBudgets::DEFAULT.max_stalled_lifetime_ms,

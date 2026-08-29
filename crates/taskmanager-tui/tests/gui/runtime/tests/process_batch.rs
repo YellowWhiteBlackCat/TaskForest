@@ -6,8 +6,8 @@ use super::super::*;
 
 use crate::ui::process_menu::ProcessMenuAction;
 use taskmanager_application::AppAction;
-use taskmanager_application::PriorityTier;
-use taskmanager_application::ProcessBatchAction;
+use taskmanager_core::core::process::PriorityTier;
+use taskmanager_core::core::process::ProcessBatchAction;
 
 fn open_process_menu(app: &mut TuiApp) {
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
@@ -255,7 +255,7 @@ fn batch_confirmation_n_dismisses_without_an_effect() {
 fn mark_key_toggles_the_multi_select_set_and_status() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
-    assert!(app.shell.selected_pids().is_empty());
+    assert!(app.shell.selected_identities().is_empty());
 
     // Mark the anchor row.
     let _ = handle_key(
@@ -265,7 +265,7 @@ fn mark_key_toggles_the_multi_select_set_and_status() {
             KeyModifiers::NONE,
         ),
     );
-    assert_eq!(app.shell.selected_pids().len(), 1);
+    assert_eq!(app.shell.selected_identities().len(), 1);
     assert!(app.shell.feedback_text().contains("1 processes marked"));
 
     // Unmark it (toggle off) clears the set and the status.
@@ -276,7 +276,7 @@ fn mark_key_toggles_the_multi_select_set_and_status() {
             KeyModifiers::NONE,
         ),
     );
-    assert_eq!(app.shell.selected_pids().len(), 0);
+    assert_eq!(app.shell.selected_identities().len(), 0);
     assert!(app.shell.feedback_text().contains("Selection cleared"));
 }
 
@@ -289,11 +289,13 @@ fn mark_key_resolves_the_visual_row_pid_in_the_category_tree() {
         .iter()
         .position(|row| matches!(row, crate::process_view::ProcessRow::TreeNode { .. }))
         .expect("category tree exposes a process row");
-    let expected = app
+    let expected_item = app
         .selected_detail_process()
-        .expect("grouped row resolves to a process")
-        .pid;
-    assert!(app.shell.selected_pids().is_empty());
+        .expect("grouped row resolves to a process");
+    let expected = expected_item.pid;
+    let expected_identity = taskmanager_shell::ProcessRowIdentity::from_process(&expected_item)
+        .expect("demo row carries a live identity");
+    assert!(app.shell.selected_identities().is_empty());
 
     let _ = handle_key(
         &mut app,
@@ -303,7 +305,7 @@ fn mark_key_resolves_the_visual_row_pid_in_the_category_tree() {
         ),
     );
     assert!(
-        app.shell.selected_pids().contains(&expected),
+        app.shell.selected_identities().contains(&expected_identity),
         "m must mark the pid under the grouped cursor ({expected})"
     );
     // A second m on the same row unmarks it.
@@ -314,7 +316,15 @@ fn mark_key_resolves_the_visual_row_pid_in_the_category_tree() {
             KeyModifiers::NONE,
         ),
     );
-    assert!(!app.shell.selected_pids().contains(&expected));
+    assert!(
+        !app.shell.selected_identities().contains(
+            &taskmanager_shell::ProcessRowIdentity::from_parts(
+                expected,
+                taskmanager_test_support::fixture_start_token(expected)
+            )
+            .expect("non-zero parts")
+        )
+    );
 }
 
 #[test]
@@ -336,7 +346,7 @@ fn shift_arrows_extend_the_marked_range_in_the_category_tree() {
             KeyModifiers::NONE,
         ),
     );
-    let marked_after_first = app.shell.selected_pids().len();
+    let marked_after_first = app.shell.selected_identities().len();
     assert_eq!(marked_after_first, 1);
 
     let _ = handle_key(
@@ -347,7 +357,7 @@ fn shift_arrows_extend_the_marked_range_in_the_category_tree() {
         ),
     );
     assert!(
-        app.shell.selected_pids().len() >= 2,
+        app.shell.selected_identities().len() >= 2,
         "Shift+Down must extend the marked set in the category tree"
     );
     let _ = handle_key(
@@ -358,7 +368,7 @@ fn shift_arrows_extend_the_marked_range_in_the_category_tree() {
         ),
     );
     assert!(
-        app.shell.selected_pids().len() >= 3,
+        app.shell.selected_identities().len() >= 3,
         "repeated Shift+Down keeps extending"
     );
 }
@@ -382,7 +392,7 @@ fn shift_arrows_extend_the_marked_range_and_batches_freeze_the_set() {
         ),
     );
     assert_eq!(
-        app.shell.selected_pids().len(),
+        app.shell.selected_identities().len(),
         2,
         "Shift+Down extends the marked range"
     );
@@ -393,7 +403,7 @@ fn shift_arrows_extend_the_marked_range_and_batches_freeze_the_set() {
             KeyModifiers::SHIFT,
         ),
     );
-    assert_eq!(app.shell.selected_pids().len(), 3);
+    assert_eq!(app.shell.selected_identities().len(), 3);
 
     // A bare arrow collapses back to the anchor (shared semantics).
     let _ = handle_key(
@@ -401,7 +411,7 @@ fn shift_arrows_extend_the_marked_range_and_batches_freeze_the_set() {
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Down, KeyModifiers::NONE),
     );
     assert_eq!(
-        app.shell.selected_pids().len(),
+        app.shell.selected_identities().len(),
         1,
         "bare arrow collapses to the anchor"
     );
@@ -414,7 +424,7 @@ fn shift_arrows_extend_the_marked_range_and_batches_freeze_the_set() {
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Up, KeyModifiers::SHIFT),
     );
     assert_eq!(
-        app.shell.selected_pids().len(),
+        app.shell.selected_identities().len(),
         2,
         "Shift+Up must extend the marked range backward"
     );
@@ -425,7 +435,7 @@ fn shift_arrows_extend_the_marked_range_and_batches_freeze_the_set() {
         &mut app,
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Down, KeyModifiers::NONE),
     );
-    assert_eq!(app.shell.selected_pids().len(), 1);
+    assert_eq!(app.shell.selected_identities().len(), 1);
 
     // A destructive batch over the marked set freezes every target.
     let effect = app.shell.request_process_batch(ProcessBatchAction::Kill);
@@ -473,7 +483,7 @@ fn b_key_opens_the_batch_menu_over_the_marked_set() {
             KeyModifiers::SHIFT,
         ),
     );
-    assert_eq!(app.shell.selected_pids().len(), 2);
+    assert_eq!(app.shell.selected_identities().len(), 2);
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -681,8 +691,44 @@ fn batch_menu_clear_empties_the_marked_set() {
     );
     assert!(effect.is_none(), "Clear emits no platform effect");
     assert_eq!(
-        app.shell.selected_pids().len(),
+        app.shell.selected_identities().len(),
         0,
         "Clear empties the marked set"
     );
+}
+
+/// The armed End-task gate must target the FROZEN menu row. In the grouped
+/// tree the shell's flat `selected` cursor can point at a different process
+/// than the TUI's visual cursor (group headers shift the two), so a
+/// destructive request that re-reads the shell state end-tasks a neighbor.
+/// The regression: arm from the menu's frozen row and assert the pending
+/// gate names exactly that row.
+#[test]
+fn end_task_arms_the_frozen_menu_row_not_the_flat_neighbor() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+    assert!(
+        app.open_process_menu(),
+        "demo fixture exposes a process menu"
+    );
+
+    let frozen = match app.process_menu() {
+        Some(menu) => (menu.item.name.clone(), menu.item.pid),
+        None => panic!("the process menu must be open"),
+    };
+
+    // Row 0 is the gated End-task action; its Option effect is the platform
+    // emission, which the pending-gate assertion below is the oracle for.
+    let _ = app.process_menu_select();
+    match app.shell.pending_confirmation() {
+        Some(taskmanager_application::PendingConfirmation::EndTask(target)) => {
+            assert_eq!(
+                (target.name.as_str(), target.pid),
+                (frozen.0.as_str(), frozen.1),
+                "the armed End-task gate must target the frozen menu row, \
+                 not the flat cursor's neighbor"
+            );
+        }
+        other => panic!("an end-task confirmation must be pending, got {other:?}"),
+    }
 }

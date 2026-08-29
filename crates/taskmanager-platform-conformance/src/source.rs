@@ -1,6 +1,6 @@
 //! Shared discovery-authority coherence contract.
 
-use taskmanager_core::SourceOutcome;
+use taskmanager_core::core::source::SourceOutcome;
 use taskmanager_platform_contract::DeviceSourceSnapshot;
 
 /// Verify that discovery outcome, stable IDs and item count tell one coherent

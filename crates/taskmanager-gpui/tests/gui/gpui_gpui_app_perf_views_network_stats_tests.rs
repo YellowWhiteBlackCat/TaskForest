@@ -1,7 +1,7 @@
 use super::network_stats;
-use crate::core::metrics::NetworkMetrics;
 use crate::gpui_app::formatting::DisplayUnits;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::NetworkMetrics;
 
 fn labels_of(metrics: &NetworkMetrics) -> Vec<String> {
     network_stats(metrics, false, DisplayUnits::default())
@@ -36,7 +36,7 @@ fn absent_address_and_link_facts_omit_their_rows() {
 /// panel renders the shared dash), and existing facts render with values.
 #[test]
 fn rate_rows_keep_none_for_first_sample_gaps() {
-    use crate::core::metrics::{NetworkScalarObservations, ScalarObservation};
+    use taskmanager_core::core::metrics::{NetworkScalarObservations, ScalarObservation};
     let scalar_observations = NetworkScalarObservations {
         link_speed_mbps: ScalarObservation::available(1_000, 0),
         ..NetworkScalarObservations::default()

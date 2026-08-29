@@ -387,9 +387,16 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         ),
         (
             "taskmanager-platform-runtime",
-            &["taskmanager-application", "taskmanager-core"][..],
+            &[
+                "taskmanager-application",
+                "taskmanager-core",
+                "taskmanager-platform-contract",
+            ][..],
         ),
-        ("taskmanager-ui-contract", &["taskmanager-application"][..]),
+        (
+            "taskmanager-ui-contract",
+            &["taskmanager-application", "taskmanager-platform-contract"][..],
+        ),
         (
             "taskmanager-accessibility-linux",
             &["taskmanager-ui-contract"][..],
@@ -406,7 +413,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         (
             "taskmanager-shell",
             &[
+                "taskmanager-core",
                 "taskmanager-application",
+                "taskmanager-platform-contract",
                 "taskmanager-telemetry-store",
                 "taskmanager-ui-contract",
             ][..],
@@ -458,6 +467,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-application",
                 "taskmanager-core",
                 "taskmanager-history-store",
+                "taskmanager-platform-contract",
                 "taskmanager-platform-native",
                 "taskmanager-platform-runtime",
             ][..],
@@ -486,6 +496,8 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-app-host",
                 "taskmanager-application",
                 "taskmanager-assets",
+                "taskmanager-core",
+                "taskmanager-platform-contract",
                 "taskmanager-shell",
                 // The neutral design system (ADR-026): the TUI takes the theme
                 // with default features, so this edge links zero toolkit.
@@ -501,6 +513,8 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 // ADR-026 fonts policy: run.rs registers the bundled font bytes
                 // into iced's font database — the same pure leaf GPUI embeds.
                 "taskmanager-assets",
+                "taskmanager-core",
+                "taskmanager-platform-contract",
                 // The registry half of taskmanager-icons is toolkit-neutral;
                 // taskmanager-iced disables its optional GPUI adapter feature.
                 "taskmanager-icons",
@@ -518,10 +532,25 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-assets",
                 "taskmanager-core",
                 "taskmanager-icons",
+                "taskmanager-platform-contract",
                 "taskmanager-shell",
                 "taskmanager-telemetry-store",
                 "taskmanager-theme",
                 "taskmanager-ui",
+                "taskmanager-ui-contract",
+            ][..],
+        ),
+        (
+            "taskmanager-bevy-ui",
+            &[
+                "taskmanager-app-host",
+                "taskmanager-application",
+                "taskmanager-assets",
+                "taskmanager-core",
+                "taskmanager-icons",
+                "taskmanager-platform-contract",
+                "taskmanager-shell",
+                "taskmanager-theme",
                 "taskmanager-ui-contract",
             ][..],
         ),
@@ -541,6 +570,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-assets",
                 "taskmanager-shell",
                 "taskmanager-telemetry-store",
+                // ADR-026: integration tests read skins/tokens from the
+                // neutral theme authority directly (never a frontend facade).
+                "taskmanager-theme",
                 // Root GPUI integration tests use the owned component layer
                 // directly. It is optional and activated only by ui-gpui;
                 // the resolved all-target closure gate proves it is absent
@@ -654,7 +686,6 @@ fn gpui_frontend_never_reaches_platform_adapter_crates() {
         "taskmanager_platform_native",
         "taskmanager_platform_runtime",
         "taskmanager_platform_provider",
-        "taskmanager_platform_contract",
         "taskmanager_ebpf_",
     ] {
         assert!(

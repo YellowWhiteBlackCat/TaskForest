@@ -19,15 +19,13 @@ display filtering:
   TUI processes, services/startup filters).
 
 Rule: a utility with more than one prospective caller lives in ONE place —
-`taskmanager-core` (the shared floor) — with unit tests. Frontends whose
-dependency firewall forbids a direct `taskmanager-core` edge (the TUI) reach it
-through `taskmanager-application` re-exports, never through a private copy.
+`taskmanager-core` (the shared floor) — with unit tests. Every frontend imports
+that owner directly; no application model facade or private copy is used.
 Display filters are allowed to stay in the frontend layer but must share the
 core matcher, not re-implement matching.
 
-Concrete homes: `core/text.rs` (`contains_ascii_ci`, `cmp_ascii_ci`),
-`core/time.rs` (`unix_now_ms`, `unix_now_micros`), `application` re-exports
-`core::text`.
+Concrete homes: `core/text.rs` (`contains_ascii_ci`, `cmp_ascii_ci`) and
+`core/time.rs` (`unix_now_ms`, `unix_now_micros`).
 
 Lesson recorded: promoting a helper to shared code must preserve its exact
 semantics — the promotion of `contains_ascii_ci` initially lost the needle
@@ -83,7 +81,7 @@ never diverge from pixels.
 
 ## Verification
 
-- `cargo nextest run --locked --workspace --all-targets` (1786 pass)
+- `cargo nextest run --locked --workspace --all-targets -j 4` (1786 pass)
 - `cargo clippy --locked --workspace --all-targets -- -D warnings` (0)
-- `cargo test --locked --doc --workspace` (22 crates ok)
+- `cargo test --locked --doc --workspace -j 4` (22 crates ok)
 - Windows target clippy 0; TUI evidence re-signed

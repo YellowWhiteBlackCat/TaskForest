@@ -2,14 +2,15 @@
 //! menu action fan-out (signals, termination, open-file, properties).
 
 use gpui::{AppContext, Context, Entity};
-use taskmanager_application::{ProcessControlRequest, ProcessSignal};
+use taskmanager_application::ProcessControlRequest;
+use taskmanager_core::core::process::ProcessSignal;
 
-use crate::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::FrozenProcessIdentity;
 
 use super::{Hover, ProcMenuAction, ProcessDetailsSection, RootView};
 use crate::gpui_app::root::dispatch::apply_search_online;
 use crate::gpui_app::root::process_feedback::ProcessControlAction;
-use crate::gpui_app::root::termination::ProcessTerminationAction;
+use taskmanager_application::ProcessTerminationAction;
 
 /// A single-target control intent extracted from a process-menu action.
 /// `Suspend`/`Resume` route through the neutral request vocabulary

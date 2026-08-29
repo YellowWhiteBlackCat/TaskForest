@@ -2,9 +2,12 @@ use super::{
     ProcessInsightsErrorKind, ProcessInsightsLifecycle, process_insights_submission_error,
 };
 use taskmanager_application::{
-    FailureKind, FrozenProcessIdentity, ProcessInsightFacetState, ProcessInsightUnavailable,
-    ProcessInsightsProjection, ProcessInsightsRevision, SubmissionErrorKind,
+    ProcessInsightFacetState, ProcessInsightUnavailable, ProcessInsightsProjection,
+    ProcessInsightsRevision,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_platform_contract::SubmissionErrorKind;
 
 fn target(pid: u32, start_token: u64) -> FrozenProcessIdentity {
     FrozenProcessIdentity::from_authoritative_parts(pid, format!("process-{pid}"), 10, start_token)

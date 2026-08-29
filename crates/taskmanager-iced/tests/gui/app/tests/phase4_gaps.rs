@@ -2,11 +2,15 @@
 
 use crate::IcedApp;
 use crate::app::{FocusTarget, Message};
-use taskmanager_application::{
-    CoreBreakdown, CpuScalarObservations, CpuType, GpuMetrics, GpuScalarObservations, HardwareInfo,
-    MemoryCompressionObservations, MemoryMetrics, MemoryOptionalObservations, OptionalObservation,
-    ScalarObservation, ServiceDeps, ServiceItem, ServiceRelationEdge, ServiceRelationGraph,
-    ServiceRelationKind, ServiceStatus, SystemSnapshot,
+use taskmanager_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
+use taskmanager_core::core::metrics::{
+    CpuScalarObservations, GpuMetrics, GpuScalarObservations, MemoryCompressionObservations,
+    MemoryMetrics, MemoryOptionalObservations, OptionalObservation, ScalarObservation,
+    SystemSnapshot,
+};
+use taskmanager_core::core::services::{
+    ServiceDeps, ServiceItem, ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind,
+    ServiceStatus,
 };
 
 #[test]
@@ -129,10 +133,17 @@ fn test_service_details_interactive_dependency_links() {
         ServiceRelationEdge::new(ServiceRelationKind::After, "network.target"),
     ]));
 
-    let service_id = taskmanager_application::ServiceId::new("systemd:demo.service");
+    let service_id = taskmanager_core::core::target::ServiceId::new("systemd:demo.service");
     let mut lifecycle = taskmanager_application::ServiceDependenciesLifecycle::default();
-    lifecycle.begin(taskmanager_application::RequestId::MIN, service_id.clone());
-    lifecycle.resolve(taskmanager_application::RequestId::MIN, service_id, deps);
+    lifecycle.begin(
+        taskmanager_platform_contract::RequestId::MIN,
+        service_id.clone(),
+    );
+    lifecycle.resolve(
+        taskmanager_platform_contract::RequestId::MIN,
+        service_id,
+        deps,
+    );
     let panel = crate::ui::service_details::dependency_panel(&app, &lifecycle);
     drop(panel);
 }
@@ -141,10 +152,12 @@ fn test_service_details_interactive_dependency_links() {
 fn test_thermal_heatmap_and_sensor_badges() {
     let app = IcedApp::demo();
     let mut snapshot = SystemSnapshot {
-        cpu: taskmanager_application::CpuMetrics::from_observations(CpuScalarObservations {
-            temperature_c: ScalarObservation::available(65.0, 1),
-            ..Default::default()
-        }),
+        cpu: taskmanager_core::core::metrics::CpuMetrics::from_observations(
+            CpuScalarObservations {
+                temperature_c: ScalarObservation::available(65.0, 1),
+                ..Default::default()
+            },
+        ),
         ..Default::default()
     };
 

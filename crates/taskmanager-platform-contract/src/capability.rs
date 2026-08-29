@@ -9,7 +9,7 @@ use std::collections::BTreeMap;
 use std::fmt;
 use std::sync::Arc;
 
-use crate::{FailureKind, ProviderId};
+use taskmanager_core::{FailureKind, ProviderId};
 
 /// Extensible stable capability identifier.
 ///

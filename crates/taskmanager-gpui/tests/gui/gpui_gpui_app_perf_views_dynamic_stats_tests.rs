@@ -1,5 +1,7 @@
 use super::battery_stats;
-use crate::core::{BatteryInfo, BatteryScalarObservations, DeviceState, ScalarObservation};
+use taskmanager_core::core::{
+    BatteryInfo, BatteryScalarObservations, DeviceState, ScalarObservation,
+};
 
 fn battery_with_scalars(scalars: BatteryScalarObservations) -> BatteryInfo {
     let mut battery = BatteryInfo::new("power-supply:BAT0", DeviceState::healthy(10));
@@ -9,7 +11,7 @@ fn battery_with_scalars(scalars: BatteryScalarObservations) -> BatteryInfo {
 
 fn row_value(rows: &[taskmanager_shell::viewmodel::StatRow], key: &'static str) -> Option<String> {
     rows.iter()
-        .find(|row| row.label() == crate::i18n::t(key))
+        .find(|row| row.label() == taskmanager_application::i18n::t(key))
         .and_then(|row| row.value().map(str::to_owned))
 }
 

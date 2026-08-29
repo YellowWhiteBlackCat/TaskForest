@@ -1,16 +1,17 @@
 //! GPUI adapter for the toolkit-neutral command router.
 
 use super::{
-    ProcessDetailsSection, ProcessTerminationAction, RefreshRequest, RootView, TopPage,
-    services_view, startup_view,
+    ProcessDetailsSection, RefreshRequest, RootView, TopPage, services_view, startup_view,
 };
 use gpui::{App, Context, KeyDownEvent, ModifiersChangedEvent, Window};
 use std::sync::OnceLock;
 
 use taskmanager_application::{
     AppAction, CommandContext, CommandRouter, CommandScope, ConfirmationKind, FocusDirection,
-    KeyChord, KeyCode, Modifiers, SelectionDirection, SurfaceKind, default_router,
+    KeyChord, KeyCode, Modifiers, ProcessTerminationAction, SelectionDirection, SurfaceKind,
+    default_router,
 };
+
 use taskmanager_ui::focus::restore_modal;
 
 const PROCESS_PAGE_ROWS: usize = 10;
@@ -257,7 +258,9 @@ fn apply_app_action(
         AppAction::Refresh(_) => view.request_refresh(RefreshRequest::Processes),
         AppAction::RequestEndTask => {
             if view.selected_application_root().is_some() {
-                view.request_process_batch(taskmanager_application::ProcessBatchAction::End);
+                view.request_process_batch(
+                    taskmanager_core::core::process::ProcessBatchAction::End,
+                );
             } else if let Some(pid) = view.selected_pid() {
                 view.request_process_termination(ProcessTerminationAction::EndTask, pid);
             }

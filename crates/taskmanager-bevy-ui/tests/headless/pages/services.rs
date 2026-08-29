@@ -24,19 +24,27 @@ use bevy::ecs::query::With;
 use bevy::ui::BackgroundColor;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    CorrelatedServiceEvent, EventEnvelope, EventPort, EventPortError, EventSequence, FailureKind,
-    HostTelemetryRequest, PartialSourceSnapshot, PlatformClient, PlatformEvent, PlatformFacets,
-    PlatformHandle, ProviderId, RequestEnvelope, RequestId, RequestPort, ServiceEvent, ServiceId,
-    ServiceItem, ServiceStatus, SourceOutcome, SourceStatus, SubmissionError, SystemFacets,
+    CorrelatedServiceEvent, HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets,
+    PlatformHandle, ServiceEvent, SystemFacets,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
+    RequestEnvelope, RequestId, RequestPort, SubmissionError,
+};
+
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 use taskmanager_theme::Theme;
 
 use super::{
     ServiceRowClicked, ServiceSelection, ServiceSelectionMoved, ServiceSortClicked,
     ServicesRowMarker, ServicesStatusLine, StatusChip, chip_fill, empty_state_text, header_label,
-    moved_row, selected_row, service_chip, service_rows, status_line_text,
+    moved_row, selected_row, service_chip, service_rows, sorted_direction, status_line_text,
 };
 use crate::app::{FrontendTrack, Page, Route, RouteChanged};
 use crate::palette::ui_palette;
@@ -100,7 +108,7 @@ impl CapabilityCatalog for FixedCapabilities {
 /// Scripted event port: the test pushes service snapshots, the drain pops
 /// them; an empty queue is the idle case.
 #[derive(Default)]
-struct ScriptedEvents(Mutex<VecDeque<EventEnvelope<PlatformEvent>>>);
+pub(crate) struct ScriptedEvents(Mutex<VecDeque<EventEnvelope<PlatformEvent>>>);
 
 impl EventPort for ScriptedEvents {
     type Event = PlatformEvent;
@@ -130,7 +138,7 @@ fn descriptor(id: CapabilityId, status: CapabilityStatus) -> CapabilityDescripto
     }
 }
 
-fn headless_services_app() -> (App, Arc<ScriptedEvents>) {
+pub(crate) fn headless_services_app() -> (App, Arc<ScriptedEvents>) {
     let events = Arc::new(ScriptedEvents::default());
     let snapshot = CapabilitySnapshot::from_descriptors([descriptor(
         CapabilityId::SERVICES,
@@ -158,7 +166,7 @@ fn headless_services_app() -> (App, Arc<ScriptedEvents>) {
     (app, events)
 }
 
-fn push_services(events: &ScriptedEvents, items: Vec<ServiceItem>) {
+pub(crate) fn push_services(events: &ScriptedEvents, items: Vec<ServiceItem>) {
     events
         .0
         .lock()
@@ -182,7 +190,7 @@ fn push_services(events: &ScriptedEvents, items: Vec<ServiceItem>) {
 /// frame 1 — the test never mounts the Processes default route (a sibling
 /// page's in-flight work is out of scope here, and unmounted pages register
 /// nothing).
-fn route_to_services(app: &mut App) {
+pub(crate) fn route_to_services(app: &mut App) {
     app.world_mut().resource_mut::<Route>().page = Page::Services;
     app.world_mut()
         .commands()
@@ -376,26 +384,25 @@ fn status_line_and_header_spell_the_active_sort() {
             SortDir::Asc.label()
         )
     );
-    let header = header_label(
-        &super::Column {
-            sort: Some(InfoSortCol::Name),
-            label: t("common.service").to_owned(),
-            width_px: 260.0,
-        },
-        shell.services_sort,
-    );
-    assert_eq!(header, format!("{} ▲", t("common.service")));
-    // A descending sort flips the arrow; other columns stay bare.
+    // The header label stays the pure column word; the sort rides a typed
+    // direction (the render layer turns it into the semantic arrow plate).
+    let column = super::Column {
+        sort: Some(InfoSortCol::Name),
+        label: t("common.service").to_owned(),
+        width_px: 260.0,
+    };
+    assert_eq!(header_label(&column), t("common.service"));
+    assert_eq!(sorted_direction(&column, shell.services_sort), Some(false));
+    // A descending sort flips the direction; an unsorted column stays bare.
+    // Clicking the active column again toggles its direction (shell law).
     shell.set_info_sort(InfoTable::Services, InfoSortCol::Name);
-    let flipped = header_label(
-        &super::Column {
-            sort: Some(InfoSortCol::Name),
-            label: t("common.service").to_owned(),
-            width_px: 260.0,
-        },
-        shell.services_sort,
-    );
-    assert_eq!(flipped, format!("{} ▼", t("common.service")));
+    assert_eq!(sorted_direction(&column, shell.services_sort), Some(true));
+    let other = super::Column {
+        sort: Some(InfoSortCol::Status),
+        label: t("common.service").to_owned(),
+        width_px: 260.0,
+    };
+    assert_eq!(sorted_direction(&other, shell.services_sort), None);
 }
 
 // ---- wired: fold → rows, sort click, row/keyboard selection, idle ----

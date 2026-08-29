@@ -7,7 +7,7 @@ runtime services, platform clients and the selected product frontend.
 
 ## Boundary
 
-This crate is the executable composition edge: it selects the native facade and
+This crate is the executable composition edge: it selects the native adapter and
 owns the resulting paths and safe callbacks, but does not inspect OS files,
 define domain rules, provider semantics, page state, or toolkit widgets.
 

@@ -1,9 +1,8 @@
 //! Canonical category-tree render tests.
 
 use super::frame_text;
-use taskmanager_application::{
-    AppAction, AppPage, ProcessApplicationIdentity, ProcessMetadataObservation,
-};
+use taskmanager_application::{AppAction, AppPage};
+use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
 
 fn category_app() -> crate::TuiApp {
     let identity = ProcessApplicationIdentity::new("org.example.Editor", "Editor", None)

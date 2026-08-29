@@ -1,5 +1,5 @@
 use super::*;
-use crate::core::{GpuScalarObservations, GpuTelemetryObservation, ScalarObservation};
+use taskmanager_core::core::{GpuScalarObservations, GpuTelemetryObservation, ScalarObservation};
 use taskmanager_telemetry_store::{CorrelatedTelemetryStamp, TelemetryStore};
 
 fn stamp(revision: u64) -> CorrelatedTelemetryStamp {
@@ -22,9 +22,9 @@ fn gpu_observation(utilization: Option<f32>) -> GpuTelemetryObservation {
         Vec::new(),
         std::collections::BTreeMap::from([(
             DeviceId::new("gpu:cache".to_owned()),
-            crate::core::DeviceLifecycle {
-                presence: crate::core::DevicePresence::Present,
-                state: crate::core::DeviceState::healthy(1),
+            taskmanager_core::core::DeviceLifecycle {
+                presence: taskmanager_core::core::DevicePresence::Present,
+                state: taskmanager_core::core::DeviceState::healthy(1),
                 generation: 1,
                 first_seen_ms: Some(1),
                 last_seen_ms: Some(1),
@@ -61,11 +61,11 @@ fn device_sample_cache_reuses_until_the_ring_advances() {
 
 // ── split-direction throughput families (read/write, rx/tx) ────────────────
 
-use crate::core::{
+use std::collections::BTreeMap;
+use taskmanager_core::core::{
     DevicePresence, DiskScalarObservations, NetworkScalarObservations, NetworkTelemetryObservation,
     StorageTelemetryObservation,
 };
-use std::collections::BTreeMap;
 
 fn split_disk(
     device_id: &str,
@@ -77,7 +77,7 @@ fn split_disk(
     let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
         .device_id(device_id.to_owned())
         .device_generation(DeviceGeneration::new(generation))
-        .device_state(crate::core::DeviceState::healthy(observed_at_ms))
+        .device_state(taskmanager_core::core::DeviceState::healthy(observed_at_ms))
         .scalar_observations(DiskScalarObservations {
             read_bytes_per_sec: read,
             write_bytes_per_sec: write,
@@ -103,7 +103,7 @@ fn split_network(
     let network = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
         .device_id(std::sync::Arc::from(device_id))
         .device_generation(DeviceGeneration::new(generation))
-        .device_state(crate::core::DeviceState::healthy(observed_at_ms))
+        .device_state(taskmanager_core::core::DeviceState::healthy(observed_at_ms))
         .scalar_observations(NetworkScalarObservations {
             rx_bytes_per_sec: rx,
             tx_bytes_per_sec: tx,
@@ -123,12 +123,12 @@ fn split_lifecycles(
     device_id: &str,
     generation: u64,
     observed_at_ms: u64,
-) -> BTreeMap<DeviceId, crate::core::DeviceLifecycle> {
+) -> BTreeMap<DeviceId, taskmanager_core::core::DeviceLifecycle> {
     BTreeMap::from([(
         DeviceId::new(device_id),
-        crate::core::DeviceLifecycle {
+        taskmanager_core::core::DeviceLifecycle {
             presence: DevicePresence::Present,
-            state: crate::core::DeviceState::healthy(observed_at_ms),
+            state: taskmanager_core::core::DeviceState::healthy(observed_at_ms),
             generation,
             first_seen_ms: Some(observed_at_ms),
             last_seen_ms: Some(observed_at_ms),

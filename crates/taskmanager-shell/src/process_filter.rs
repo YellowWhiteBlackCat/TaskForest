@@ -5,6 +5,7 @@
 //! keyboard navigation, actions, and rendered rows all consume the same list.
 
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::process::ProcessItem;
 
 /// The six process-state buckets exposed by the Applications filter.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -87,7 +88,7 @@ impl ProcessStatusFilter {
 /// Match a process against a query string, supporting structured prefix selectors
 /// (`pid:`, `user:`, `status:`, `cmd:`, `name:`) or general multi-field search.
 #[must_use]
-pub fn matches_process_query(process: &taskmanager_application::ProcessItem, query: &str) -> bool {
+pub fn matches_process_query(process: &ProcessItem, query: &str) -> bool {
     let q = query.trim();
     if q.is_empty() {
         return true;
@@ -101,17 +102,17 @@ pub fn matches_process_query(process: &taskmanager_application::ProcessItem, que
             let val = val.trim();
             let matched = match prefix.to_ascii_lowercase().as_str() {
                 "pid" => process.pid.to_string().contains(val),
-                "user" => taskmanager_application::text::contains_ascii_ci(&user, val),
-                "status" => taskmanager_application::text::contains_ascii_ci(&process.status, val),
+                "user" => taskmanager_core::core::text::contains_ascii_ci(&user, val),
+                "status" => taskmanager_core::core::text::contains_ascii_ci(&process.status, val),
                 "cmd" | "cmdline" => {
-                    taskmanager_application::text::contains_ascii_ci(&process.cmdline, val)
+                    taskmanager_core::core::text::contains_ascii_ci(&process.cmdline, val)
                 }
-                "name" => taskmanager_application::text::contains_ascii_ci(&process.name, val),
+                "name" => taskmanager_core::core::text::contains_ascii_ci(&process.name, val),
                 _ => {
-                    taskmanager_application::text::contains_ascii_ci(&process.name, token)
+                    taskmanager_core::core::text::contains_ascii_ci(&process.name, token)
                         || process.pid.to_string().contains(token)
-                        || taskmanager_application::text::contains_ascii_ci(&user, token)
-                        || taskmanager_application::text::contains_ascii_ci(&process.cmdline, token)
+                        || taskmanager_core::core::text::contains_ascii_ci(&user, token)
+                        || taskmanager_core::core::text::contains_ascii_ci(&process.cmdline, token)
                 }
             };
             if !matched {
@@ -123,10 +124,10 @@ pub fn matches_process_query(process: &taskmanager_application::ProcessItem, que
         return true;
     }
     let digit_query = q.bytes().all(|b| b.is_ascii_digit());
-    taskmanager_application::text::contains_ascii_ci(&process.name, q)
+    taskmanager_core::core::text::contains_ascii_ci(&process.name, q)
         || (digit_query && process.pid.to_string().contains(q))
-        || taskmanager_application::text::contains_ascii_ci(&user, q)
-        || taskmanager_application::text::contains_ascii_ci(&process.cmdline, q)
+        || taskmanager_core::core::text::contains_ascii_ci(&user, q)
+        || taskmanager_core::core::text::contains_ascii_ci(&process.cmdline, q)
 }
 
 #[cfg(test)]

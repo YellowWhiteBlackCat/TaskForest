@@ -10,13 +10,14 @@ use std::io;
 use std::path::{Path, PathBuf};
 
 use sysinfo::System;
-use taskmanager_core::CpuInstructionFeature;
+use taskmanager_core::core::cpu_features::CpuInstructionFeature;
+use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::hardware::{
     ComputeTopology, CoreBreakdown, CpuType, FirmwareInfo, HardwareInfo, HostIdentity, KernelInfo,
 };
-use taskmanager_platform_contract::{
-    CompositeSourceSnapshot, FailureKind, ProviderId, SourceOutcome, SourceStatus,
-};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::CompositeSourceSnapshot;
 
 use super::display;
 use super::{

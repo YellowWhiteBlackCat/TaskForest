@@ -1,6 +1,6 @@
 //! Platform-neutral threshold alerting over [`SystemSnapshot`].
 //!
-//! The engine owns only rule state. It performs no I/O and has no GPUI dependency,
+//! The engine owns only rule state and its bounded transition history. It performs no I/O and has no GPUI dependency,
 //! so collectors, a status bar, or a notification adapter can all evaluate the
 //! same snapshot deterministically.
 
@@ -21,6 +21,12 @@ pub use transfer::{
 mod notification;
 pub use notification::{
     NotificationGate, NotificationPolicy, QuietBound, QuietHours, apply_quiet_hour_bound,
+};
+
+mod events;
+pub use events::{
+    ALERT_EVENT_FILE_SCHEMA, ALERT_EVENT_FILE_VERSION, AlertEventExportError,
+    export_alert_events_json,
 };
 
 /// Product default alert rules, single-sourced here so every frontend
@@ -171,6 +177,33 @@ pub struct Alert {
     pub threshold: f32,
     pub active_since_ms: u64,
 }
+
+/// The transition recorded when an alert instance enters or leaves the
+/// active set. This is domain history, not a renderer notification: every
+/// frontend consumes the same transition stream and may choose its own
+/// presentation (panel, banner, or status line).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AlertEventKind {
+    Activated,
+    Cleared,
+}
+
+/// One bounded alert transition retained by the shared alert authority.
+///
+/// The `alert` payload is the observed alert at the transition boundary. For
+/// a clear event it is the last active value, so a frontend can explain what
+/// cleared without retaining a second previous-active snapshot.
+#[derive(Debug, Clone, PartialEq)]
+pub struct AlertEvent {
+    pub id: u64,
+    pub kind: AlertEventKind,
+    pub alert: Alert,
+    pub observed_at_ms: u64,
+}
+
+/// Maximum number of alert transitions retained in one application track.
+/// The history is session-local and bounded; it is not a persistence format.
+pub const MAX_ALERT_EVENTS: usize = 100;
 
 #[derive(Debug, Clone, Copy, Default)]
 struct RuleState {

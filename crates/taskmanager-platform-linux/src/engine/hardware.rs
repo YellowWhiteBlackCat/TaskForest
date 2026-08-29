@@ -8,8 +8,9 @@ mod display;
 mod display {
     use std::path::Path;
 
-    use taskmanager_core::DisplayInfo;
-    use taskmanager_platform_contract::{FailureKind, SourceOutcome};
+    use taskmanager_core::core::failure::FailureKind;
+    use taskmanager_core::core::hardware::DisplayInfo;
+    use taskmanager_core::core::source::SourceOutcome;
 
     #[derive(Debug, Default)]
     pub(super) struct WaylandSessionFacts {

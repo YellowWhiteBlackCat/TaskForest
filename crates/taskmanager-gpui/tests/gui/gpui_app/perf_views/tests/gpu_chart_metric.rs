@@ -8,7 +8,7 @@ use super::*;
 fn chart_metric_gpu(device_id: &str, utilization: f32, temperature_c: f32) -> GpuMetrics {
     let mut gpu = GpuMetrics::new(device_id, "Fixture GPU");
     gpu.device_generation = DeviceGeneration::new(1);
-    gpu.device_state = crate::core::DeviceState::healthy(10);
+    gpu.device_state = taskmanager_core::core::DeviceState::healthy(10);
     gpu.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(utilization, 1),
         temperature_c: ScalarObservation::available(temperature_c, 1),
@@ -23,19 +23,19 @@ fn chart_metric_gpu(device_id: &str, utilization: f32, temperature_c: f32) -> Gp
 fn chart_metric_observation(
     gpu: GpuMetrics,
     observed_at_ms: u64,
-) -> crate::core::GpuTelemetryObservation {
+) -> taskmanager_core::core::GpuTelemetryObservation {
     let lifecycle = (
-        crate::core::DeviceId::new(gpu.device_id.clone()),
-        crate::core::DeviceLifecycle {
-            presence: crate::core::DevicePresence::Present,
-            state: crate::core::DeviceState::healthy(observed_at_ms),
+        taskmanager_core::core::DeviceId::new(gpu.device_id.clone()),
+        taskmanager_core::core::DeviceLifecycle {
+            presence: taskmanager_core::core::DevicePresence::Present,
+            state: taskmanager_core::core::DeviceState::healthy(observed_at_ms),
             generation: 1,
             first_seen_ms: Some(observed_at_ms),
             last_seen_ms: Some(observed_at_ms),
             absent_since_ms: None,
         },
     );
-    crate::core::GpuTelemetryObservation::current(
+    taskmanager_core::core::GpuTelemetryObservation::current(
         vec![gpu],
         observed_at_ms,
         Vec::new(),
@@ -150,7 +150,7 @@ async fn mc04_gpu_metric_families_case_gpu_page_renders_every_measured_family_wi
 
 use std::collections::BTreeMap;
 
-use taskmanager_shell::history::LiveGraphHistory;
+use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 use taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY;
 
 const TRACKS_DEVICE_ID: &str = "gpu:tracks:probe";
@@ -161,7 +161,7 @@ const MIB: u64 = 1024 * 1024;
 fn fully_observed_gpu(utilization: f32) -> GpuMetrics {
     let mut gpu = GpuMetrics::new(TRACKS_DEVICE_ID, "Probe GPU");
     gpu.device_generation = DeviceGeneration::new(1);
-    gpu.device_state = crate::core::DeviceState::healthy(10);
+    gpu.device_state = taskmanager_core::core::DeviceState::healthy(10);
     gpu.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(utilization, 1),
         temperature_c: ScalarObservation::available(61.0, 1),
@@ -187,10 +187,10 @@ fn seed_tracks_frames(
         let revision = u64::try_from(index + 1).expect("small revision");
         let observed_at_ms = revision * 10;
         let lifecycle = (
-            crate::core::DeviceId::new(TRACKS_DEVICE_ID.to_owned()),
-            crate::core::DeviceLifecycle {
-                presence: crate::core::DevicePresence::Present,
-                state: crate::core::DeviceState::healthy(observed_at_ms),
+            taskmanager_core::core::DeviceId::new(TRACKS_DEVICE_ID.to_owned()),
+            taskmanager_core::core::DeviceLifecycle {
+                presence: taskmanager_core::core::DevicePresence::Present,
+                state: taskmanager_core::core::DeviceState::healthy(observed_at_ms),
                 generation: 1,
                 first_seen_ms: Some(observed_at_ms),
                 last_seen_ms: Some(observed_at_ms),
@@ -201,7 +201,7 @@ fn seed_tracks_frames(
             .ingest_correlated_gpu(
                 CorrelatedTelemetryStamp::from_accepted_event(revision, observed_at_ms + 1)
                     .expect("tracks fixture revision is non-zero"),
-                &crate::core::GpuTelemetryObservation::current(
+                &taskmanager_core::core::GpuTelemetryObservation::current(
                     vec![gpu.clone()],
                     observed_at_ms,
                     Vec::new(),
@@ -239,10 +239,10 @@ fn mc04_gpu_metric_track_case_gpu_chart_metric_sampling_is_one_track_across_view
     // measured — the Utilization family alone must gap there.
     let mut gap_frame = GpuMetrics::new(TRACKS_DEVICE_ID, "Probe GPU");
     gap_frame.device_generation = DeviceGeneration::new(1);
-    gap_frame.device_state = crate::core::DeviceState::healthy(10);
+    gap_frame.device_state = taskmanager_core::core::DeviceState::healthy(10);
     gap_frame.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::unavailable(
-            crate::core::FailureKind::TemporarilyUnavailable,
+            taskmanager_core::core::FailureKind::TemporarilyUnavailable,
         ),
         temperature_c: ScalarObservation::available(61.0, 1),
         power_w: ScalarObservation::available(88.5, 1),

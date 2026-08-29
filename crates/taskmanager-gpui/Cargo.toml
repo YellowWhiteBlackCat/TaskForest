@@ -20,6 +20,7 @@ serde_json = "1.0"
 tracing = "0.1"
 
 taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-assets = { path = "../taskmanager-assets" }

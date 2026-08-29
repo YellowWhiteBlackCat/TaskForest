@@ -6,17 +6,15 @@ use super::{
     ConfigClient, Duration, PlatformClient, RefreshRequest, RootView, TelemetryStore, Theme,
     TopPage, apply_process_config, config_from_view, i18n, platform_submission_time_ms, responsive,
 };
-use crate::gpui_app::processes_view;
-use crate::gpui_app::theme::{
-    HighContrast, background_appearance, detect, detect_font_availability, forced_skin_from_env,
-    resolve_fonts,
-};
+use crate::gpui_app::theme::{detect, forced_skin_from_env};
 use gpui::{
     AnyWindowHandle, App, AppContext, AsyncApp, Bounds, Entity, SharedString, Timer,
     TitlebarOptions, WeakEntity, WindowBounds, WindowDecorations, WindowOptions, point, px, size,
 };
 use taskmanager_assets::product;
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
+use taskmanager_theme::gpui::{background_appearance, detect_font_availability};
+use taskmanager_theme::{HighContrast, resolve_fonts};
 use tracing::{error, warn};
 
 mod appearance;
@@ -51,8 +49,8 @@ fn requested_window_decorations() -> WindowDecorations {
 
 enum InstanceStartup {
     Continue {
-        guard: Option<Box<dyn taskmanager_app_host::InstanceGuard>>,
-        events: std::sync::mpsc::Receiver<taskmanager_app_host::InstanceEvent>,
+        guard: Option<Box<dyn taskmanager_platform_contract::InstanceGuard>>,
+        events: std::sync::mpsc::Receiver<taskmanager_platform_contract::InstanceEvent>,
     },
     Secondary,
 }
@@ -66,11 +64,13 @@ fn acquire_instance(capture_mode: bool) -> InstanceStartup {
         };
     }
     match taskmanager_app_host::acquire_single_instance(product::GPUI_NAME, events_tx) {
-        Ok(taskmanager_app_host::InstanceRole::Primary(guard)) => InstanceStartup::Continue {
-            guard: Some(guard),
-            events,
-        },
-        Ok(taskmanager_app_host::InstanceRole::Secondary) => InstanceStartup::Secondary,
+        Ok(taskmanager_platform_contract::InstanceRole::Primary(guard)) => {
+            InstanceStartup::Continue {
+                guard: Some(guard),
+                events,
+            }
+        }
+        Ok(taskmanager_platform_contract::InstanceRole::Secondary) => InstanceStartup::Secondary,
         Err(failure) => {
             warn!(
                 ?failure,
@@ -90,16 +90,16 @@ struct RootStartupFacts {
         taskmanager_app_host::HistoryFrontendConnectorStartError,
     >,
     appearance: appearance::StartupAppearanceObservation,
-    font_pref: crate::gpui_app::theme::FontPreference,
-    skin_preference: Option<crate::gpui_app::theme::Skin>,
+    font_pref: taskmanager_theme::FontPreference,
+    skin_preference: Option<taskmanager_theme::Skin>,
     language_preference: Option<i18n::Language>,
-    font_availability: crate::gpui_app::theme::FontAvailability,
-    local_time_rules: taskmanager_application::LocalTimeRulesObservation,
+    font_availability: taskmanager_theme::FontAvailability,
+    local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
 }
 
 fn apply_root_startup_config(
     view: &mut RootView,
-    cfg: &crate::core::config::Config,
+    cfg: &taskmanager_core::core::config::Config,
     facts: RootStartupFacts,
     has_explicit_page_override: bool,
     cx: &mut gpui::Context<RootView>,
@@ -137,7 +137,7 @@ fn apply_root_startup_config(
         view.page = TopPage::Apps;
         view.set_gray_zero_values(true, cx);
         view.set_process_sort(
-            processes_view::SortCol::Name,
+            taskmanager_shell::SortCol::Name,
             taskmanager_shell::SortDir::Asc,
         );
         view.set_process_query("capture-");
@@ -269,7 +269,7 @@ pub struct StartupRuntime {
 
 pub struct StartupEnvironment {
     pub native_locale_name: Option<String>,
-    pub local_time_rules: taskmanager_application::LocalTimeRulesObservation,
+    pub local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
     pub custom_app_id: Option<String>,
     pub presentation: taskmanager_app_host::WindowPresentation,
 }

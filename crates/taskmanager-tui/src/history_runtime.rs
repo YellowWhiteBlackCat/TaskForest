@@ -5,8 +5,9 @@ use taskmanager_app_host::{
 };
 use taskmanager_application::{
     ApplicationHistoryCapability, ApplicationHistoryProjection, HistoryReplayController,
-    HistoryReplayRequest, HistoryWindow,
+    HistoryReplayRequest,
 };
+use taskmanager_core::core::history::HistoryWindow;
 
 enum HistoryResources {
     Disabled,
@@ -153,7 +154,7 @@ impl TuiHistoryRuntime {
 
     pub(crate) fn record_sink(
         &self,
-    ) -> Option<std::sync::Arc<dyn taskmanager_application::HistoryRecordSink>> {
+    ) -> Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>> {
         match &self.resources {
             HistoryResources::Active(session) => Some(session.persistence.record_sink.clone()),
             HistoryResources::Disabled

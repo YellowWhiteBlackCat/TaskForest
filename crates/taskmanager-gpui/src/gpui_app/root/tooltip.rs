@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use crate::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessItem;
 
 use super::RootView;
 

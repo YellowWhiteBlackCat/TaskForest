@@ -12,7 +12,7 @@ use taskmanager_core::{
     HistorySeriesKey,
 };
 
-use crate::{AppGroup, ProcessItem, aggregate_apps};
+use taskmanager_core::{AppGroup, ProcessItem, aggregate_apps};
 
 /// Leaves room inside the history store's global series ceiling for system,
 /// device and per-core facts. Each admitted application currently owns three

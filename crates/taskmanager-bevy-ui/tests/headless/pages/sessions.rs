@@ -19,13 +19,21 @@ use bevy::ecs::query::With;
 use bevy::ui::BackgroundColor;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    CorrelatedSessionEvent, EventEnvelope, EventPort, EventPortError, EventSequence, FailureKind,
-    HostTelemetryRequest, LatestControlRequest, PartialSourceSnapshot, PlatformClient,
-    PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle, ProviderId, RequestEnvelope,
-    RequestId, RequestPort, SessionControlAction, SessionControlOutcome, SessionEvent, SessionId,
-    SessionItem, SourceOutcome, SourceStatus, SubmissionError, SystemFacets,
+    CorrelatedSessionEvent, HostTelemetryRequest, LatestControlRequest, PlatformClient,
+    PlatformEvent, PlatformEventBatch, PlatformFacets, PlatformHandle, SessionControlOutcome,
+    SessionEvent, SystemFacets,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_core::core::target::SessionId;
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
+    RequestEnvelope, RequestId, RequestPort, SubmissionError,
+};
+
 use taskmanager_shell::presentation::MISSING_VALUE;
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 use taskmanager_theme::Theme;

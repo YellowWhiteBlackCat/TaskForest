@@ -1,7 +1,11 @@
 use taskmanager_application::{
-    CapabilityId, CorrelatedEvent, DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals,
-    DirectoryUsageEvent, DirectoryUsageSnapshot, EventSequence, PartialSourceSnapshot,
-    PlatformEventBatch, PlatformEventContext, RequestId, ServiceEvent,
+    CorrelatedEvent, DirectoryUsageEvent, PlatformEventBatch, PlatformEventContext, ServiceEvent,
+};
+use taskmanager_core::core::directory_usage::{
+    DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageSnapshot,
+};
+use taskmanager_platform_contract::{
+    CapabilityId, EventSequence, PartialSourceSnapshot, RequestId,
 };
 
 use super::*;

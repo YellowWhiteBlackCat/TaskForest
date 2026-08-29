@@ -66,7 +66,7 @@ fn canonical_process_nodes_carry_hierarchy_depth() {
         (SortCol::Cpu, SortDir::Desc),
         &HashSet::from(["category:uncategorized".to_string()]),
         &HashSet::new(),
-        &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     );
     let depths: Vec<_> = projection
         .rows()

@@ -1,7 +1,7 @@
 //! Typed ViewModel contract for telemetry stat panels (ARCH.md §8.1
-//! "一次折叠，三端渲染", phase 2).
+//! "一次折叠，四端渲染", phase 2).
 //!
-//! One fold, three renderers: producers hand the frontend an
+//! One fold, four renderers: producers hand the frontend an
 //! already-folded [`StatRow`] list — label plus value with typed
 //! presentation semantics — and each renderer consumes it without
 //! re-deriving observations from metrics. The GPUI producers fold here

@@ -19,8 +19,10 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use taskmanager_app_host::NativeAppHost;
 use taskmanager_application::{
-    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
     HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
+};
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
     RequestEnvelope, RequestPort, SubmissionError,
 };
 

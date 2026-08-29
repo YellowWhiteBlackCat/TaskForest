@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use crate::core::config::SidebarDeviceOverrideConfig;
+use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
 
 /// Resolve a persisted order against the currently discovered device keys.
 /// Unknown/stale keys are ignored, duplicate persisted keys are applied once,

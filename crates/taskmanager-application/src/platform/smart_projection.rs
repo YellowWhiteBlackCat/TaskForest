@@ -5,7 +5,8 @@
 
 use std::collections::HashSet;
 
-use crate::{DeviceGeneration, DeviceId, SmartSelfTestObservation};
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::system_health::SmartSelfTestObservation;
 
 use super::{SmartObservationBatch, SmartStateRevision};
 

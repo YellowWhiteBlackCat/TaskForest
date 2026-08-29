@@ -1,7 +1,7 @@
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
 
 use crate::gpui_app::root::{RootView, TopPage};
-use crate::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 fn root(cx: &mut TestAppContext) -> WindowHandle<RootView> {
     let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
@@ -138,7 +138,7 @@ async fn question_is_suppressed_while_a_text_input_is_focused(cx: &mut TestAppCo
         view.page = TopPage::Apps;
         view.replace_processes_for_test(vec![
             taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-                crate::core::process::ProcessItem::default(),
+                taskmanager_core::core::process::ProcessItem::default(),
             )
             .pid(42)
             .name("searchable".into())
@@ -182,17 +182,17 @@ async fn question_is_suppressed_while_a_text_input_is_focused(cx: &mut TestAppCo
 /// modal on top of the new page.
 #[gpui::test]
 async fn page_navigation_closes_help_and_pending_confirmations(cx: &mut TestAppContext) {
-    use crate::gpui_app::root::ProcessTerminationAction;
+    use taskmanager_application::ProcessTerminationAction;
     let win = root(cx);
     win.update(cx, |view, _window, cx| {
         view.replace_processes_for_test(vec![
             taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-                crate::core::process::ProcessItem::default(),
+                taskmanager_core::core::process::ProcessItem::default(),
             )
             .pid(42)
             .name("target".into())
-            .scalar_observations(crate::core::process::ProcessScalarObservations {
-                start_token: crate::core::ScalarObservation::available(4_200, 1),
+            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+                start_token: taskmanager_core::core::ScalarObservation::available(4_200, 1),
                 ..Default::default()
             })
             .build(),

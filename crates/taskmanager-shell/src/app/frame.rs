@@ -3,9 +3,11 @@
 use taskmanager_application::{
     CorrelatedDesktopAppearanceEvent, CorrelatedPowerSupplyEvent, CorrelatedProcessEvent,
     CorrelatedSensorEvent, CorrelatedSetupScriptEvent, CorrelatedShellEvent,
-    CorrelatedSystemTelemetryOutcome, FrozenProcessIdentity, OperationFailure, ProcessBatchResult,
-    RequestId, ServiceUpdate, SessionControlOutcome, StartupControlOutcome, StorageDeviceTarget,
+    CorrelatedSystemTelemetryOutcome, ServiceUpdate, SessionControlOutcome, StartupControlOutcome,
 };
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchResult};
+use taskmanager_core::core::storage::StorageDeviceTarget;
+use taskmanager_platform_contract::{OperationFailure, RequestId};
 
 use super::ProcessControlFeedback;
 
@@ -155,7 +157,7 @@ pub struct BatchFoldOutput {
     pub service_updates: Vec<ServiceUpdate>,
     pub process_feedback: Option<ProcessControlFeedback>,
     pub process_affinity_results: Vec<ProcessAffinityResult>,
-    pub batch_results: Vec<(taskmanager_application::RequestId, ProcessBatchResult)>,
+    pub batch_results: Vec<(RequestId, ProcessBatchResult)>,
     pub smart_self_test_results: Vec<SmartSelfTestResult>,
     pub startup_control_outcomes: Vec<StartupControlOutcome>,
     pub session_control_outcomes: Vec<SessionControlOutcome>,

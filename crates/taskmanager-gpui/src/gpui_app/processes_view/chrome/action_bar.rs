@@ -8,17 +8,17 @@ use gpui::{
 };
 use taskmanager_ui_contract::IconId;
 
-use crate::core::process::{PriorityTier, ProcessBatchAction};
-use crate::gpui_app::icons;
-use crate::gpui_app::root::{Hover, ProcessTerminationAction, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens::{self, UiSize};
-use crate::i18n;
+use crate::gpui_app::root::{Hover, RootView};
+use taskmanager_application::ProcessTerminationAction;
+use taskmanager_application::i18n;
+use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::{self, UiSize};
 
-use super::SortCol;
 use super::action_button::{ActionBtnProps, action_btn};
 use super::columns::columns_dropdown;
 use super::page_layout::{ProcessActionPresentation, ProcessActionSurface};
+use taskmanager_shell::SortCol;
 
 /// Inputs for the process action strip. The caller supplies the already
 /// projected column visibility, including the provider-confirmed no-swap
@@ -26,9 +26,8 @@ use super::page_layout::{ProcessActionPresentation, ProcessActionSurface};
 pub(super) struct ProcessActionBarProps<'a> {
     pub(super) theme: &'a Theme,
     pub(super) selected: Option<u32>,
-    pub(super) selected_pids: &'a HashSet<u32>,
-    pub(super) application_selected: bool,
     pub(super) selected_target_count: usize,
+    pub(super) application_selected: bool,
     pub(super) hidden_cols: &'a HashSet<SortCol>,
     pub(super) swap_auto_hidden: bool,
     pub(super) hovered: Option<&'a Hover>,
@@ -250,7 +249,7 @@ fn actions_dropdown(
         .on_hover(cx.listener(move |view, is_hovered: &bool, _, cx| {
             view.set_hover(is_hovered.then_some(Hover::Static(label)), cx);
         }))
-        .child(icons::icon(IconId::More).size(ui_size.icon_size()))
+        .child(taskmanager_icons::icon(IconId::More).size(ui_size.icon_size()))
         .child(label);
     let entity = cx.entity();
     DropdownMenu::new(
@@ -318,9 +317,8 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     let ProcessActionBarProps {
         theme,
         selected,
-        selected_pids,
-        application_selected,
         selected_target_count,
+        application_selected,
         hidden_cols,
         swap_auto_hidden,
         hovered,
@@ -331,10 +329,10 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     } = props;
     let selected_count = if application_selected {
         selected_target_count
-    } else if selected_pids.is_empty() {
+    } else if selected_target_count == 0 {
         usize::from(selected.is_some())
     } else {
-        selected_pids.len()
+        selected_target_count
     };
     let hint = if selected_count > 1 {
         i18n::t("proc.batch_selected").replace("{count}", &selected_count.to_string())

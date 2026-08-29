@@ -67,8 +67,11 @@
 //!   `0`, `0.0%`, or empty string. A whitespace-only `Cmdline`
 //!   is missing (the majority TUI/Iced dash-on-empty semantics).
 
-use crate::model::ProcessItem;
-use crate::units::{QuantityFamily, UnitPreferences, format_memory, format_quantity};
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_core::core::units::{
+    QuantityFamily, UnitPreferences, format_memory, format_quantity,
+};
 
 /// One pre-folded properties row: the vocabulary field plus its folded value.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -225,11 +228,7 @@ pub fn process_details_rows(
     item: &ProcessItem,
     units: &UnitPreferences,
 ) -> Vec<ProcessDetailsRowVm> {
-    process_details_rows_with_local_time(
-        item,
-        units,
-        &crate::LocalTimeRulesObservation::unsupported(0),
-    )
+    process_details_rows_with_local_time(item, units, &LocalTimeRulesObservation::unsupported(0))
 }
 
 /// Fold process details with a composition-injected local-time snapshot.
@@ -237,7 +236,7 @@ pub fn process_details_rows(
 pub fn process_details_rows_with_local_time(
     item: &ProcessItem,
     units: &UnitPreferences,
-    local_time_rules: &crate::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<ProcessDetailsRowVm> {
     let text = |value: Option<String>| value.map_or(DetailValue::Missing, DetailValue::Text);
     vec![
@@ -399,7 +398,7 @@ fn format_duration_hm(seconds: u64) -> String {
 #[must_use]
 pub fn format_local_timestamp_seconds(
     seconds: u64,
-    rules: &crate::LocalTimeRulesObservation,
+    rules: &LocalTimeRulesObservation,
 ) -> Option<String> {
     let seconds = i64::try_from(seconds).ok()?;
     let local = rules.date_time_at(seconds)?;

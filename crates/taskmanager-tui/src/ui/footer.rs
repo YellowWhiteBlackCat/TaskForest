@@ -18,7 +18,7 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
     let style = if app.paused() { theme.warn } else { theme.good };
     let state_span = Span::styled(
         format!(" {state} "),
-        Style::new().fg(Color::Black).bg(style),
+        Style::new().fg(theme.color(Color::Black)).bg(style),
     );
     let alert_span: Option<Span<'static>> =
         (!app.shell.projection().alert_active.is_empty()).then(|| {
@@ -30,29 +30,31 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
                 .iter()
                 .map(|alert| alert.severity)
                 .max()
-                .unwrap_or(taskmanager_application::alerts::AlertSeverity::Info);
+                .unwrap_or(taskmanager_core::core::alerts::AlertSeverity::Info);
             let color = match worst {
-                taskmanager_application::alerts::AlertSeverity::Critical => theme.danger,
-                taskmanager_application::alerts::AlertSeverity::Warning => theme.warn,
-                taskmanager_application::alerts::AlertSeverity::Info => theme.good,
+                taskmanager_core::core::alerts::AlertSeverity::Critical => theme.danger,
+                taskmanager_core::core::alerts::AlertSeverity::Warning => theme.warn,
+                taskmanager_core::core::alerts::AlertSeverity::Info => theme.good,
             };
             Span::styled(
                 format!(
                     " {} ",
                     t("alerts.active").replacen("{}", &count.to_string(), 1)
                 ),
-                Style::new().fg(Color::Black).bg(color),
+                Style::new().fg(theme.color(Color::Black)).bg(color),
             )
         });
     let shortcut_span = Span::styled(t("footer.shortcuts"), Style::new().fg(theme.dim));
     let (marker, feedback_color) =
         app.shell
             .feedback_notice()
-            .map_or(("", Color::White), |notice| match notice.severity() {
-                taskmanager_shell::FeedbackSeverity::Info => ("", Color::White),
-                taskmanager_shell::FeedbackSeverity::Success => ("\u{2713} ", theme.good),
-                taskmanager_shell::FeedbackSeverity::Warning => ("\u{26a0} ", theme.warn),
-                taskmanager_shell::FeedbackSeverity::Error => ("\u{26a0} ", theme.danger),
+            .map_or(("", theme.color(Color::White)), |notice| {
+                match notice.severity() {
+                    taskmanager_shell::FeedbackSeverity::Info => ("", theme.color(Color::White)),
+                    taskmanager_shell::FeedbackSeverity::Success => ("\u{2713} ", theme.good),
+                    taskmanager_shell::FeedbackSeverity::Warning => ("\u{26a0} ", theme.warn),
+                    taskmanager_shell::FeedbackSeverity::Error => ("\u{26a0} ", theme.danger),
+                }
             });
     let feedback_width = usize::from(area.width.saturating_sub(30)).max(12);
     let feedback = if app
@@ -87,14 +89,5 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
 }
 
 fn compact_feedback(value: &str, max_chars: usize) -> String {
-    let max_chars = max_chars.max(3);
-    let chars: Vec<char> = value.chars().collect();
-    if chars.len() <= max_chars {
-        return value.to_owned();
-    }
-    let tail_len = max_chars.saturating_sub(1);
-    let tail: String = chars[chars.len().saturating_sub(tail_len)..]
-        .iter()
-        .collect();
-    format!("…{tail}")
+    super::text::truncate_tail_cells(value, max_chars.max(3))
 }

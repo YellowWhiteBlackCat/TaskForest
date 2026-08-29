@@ -6,7 +6,7 @@
 //!
 //! Three production performance areas are covered:
 //! - **Shared data algorithms** (filter / fuzzy / sort / tree): the pure-logic
-//!   helpers under `taskmanager::core::process` plus the UI's substring filter.
+//!   helpers under `taskmanager_core::core::process` plus the UI's substring filter.
 //! - **Hot collect path**: the per-tick `/proc/{pid}/{stat,status,io}` parse that
 //!   drives the process table. A quadratic parser rewrite gets its own
 //!   `Instant`-timed gate below.
@@ -24,23 +24,23 @@ use std::alloc::{GlobalAlloc, Layout, System};
 #[cfg(target_os = "linux")]
 use std::sync::atomic::{AtomicUsize, Ordering};
 #[cfg(target_os = "linux")]
-use taskmanager::core::CpuTelemetryObservation;
+use taskmanager_core::core::CpuTelemetryObservation;
 #[cfg(target_os = "linux")]
-use taskmanager::core::MemoryTelemetryObservation;
-use taskmanager::core::process::{
+use taskmanager_core::core::MemoryTelemetryObservation;
+use taskmanager_core::core::process::{
     ProcessItem, ProcessSortKey, build_process_tree, flatten_tree_visible, fuzzy_filter_processes,
     sort_processes,
 };
 #[cfg(target_os = "linux")]
-use taskmanager::core::{
+use taskmanager_core::core::{
     CpuMetrics, CpuScalarObservations, MemoryMetrics, MemoryScalarObservations, ScalarObservation,
     ScalarObservationGroup,
 };
 // Imports consumed only by the Linux-gated `/proc` collect-path tests below.
 #[cfg(target_os = "linux")]
-use taskmanager::core::HostRuntimeFacts;
+use taskmanager_core::core::HostRuntimeFacts;
 #[cfg(target_os = "linux")]
-use taskmanager::core::HostRuntimeObservation;
+use taskmanager_core::core::HostRuntimeObservation;
 use taskmanager_shell::matches_process_query;
 #[cfg(target_os = "linux")]
 use taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor;
@@ -124,8 +124,8 @@ fn synthetic_processes(count: usize) -> Vec<ProcessItem> {
                     "Sleeping".into()
                 })
                 .metadata_observations(
-                    taskmanager_application::ProcessMetadataObservations::current(
-                        taskmanager_application::ProcessOwner::opaque(format!(
+                    taskmanager_core::core::process::ProcessMetadataObservations::current(
+                        taskmanager_core::core::process::ProcessOwner::opaque(format!(
                             "user-{}",
                             index % 16
                         )),

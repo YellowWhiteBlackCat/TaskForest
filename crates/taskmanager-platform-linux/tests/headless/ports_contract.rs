@@ -4,21 +4,21 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
-    CapabilityId, CapabilityStatus, CommandLaunchRequest, CompositeSourceSnapshot,
-    CpuTelemetryRequest, DesktopAppearanceEvent, DesktopAppearanceRequest, DeviceSourceSnapshot,
-    EventEnvelope, FailureKind, HardwareInventoryRequest, LatestControlRequest,
-    PartialSourceSnapshot, PlatformEvent, PlatformHandle, PowerSupplyEvent, PowerSupplyRequest,
-    ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest, ProcessEvent,
-    ProcessGpuRequest, ProcessInsightFacetEvent, ProcessInsightsRevision, ProcessListRequest,
-    ProcessNetworkRequest, ProviderFailure, ProviderId, RequestEnvelope, RequestIdGenerator,
-    ResourceRevealRequest, SensorEvent, SensorRequest, ServiceControlRequest,
-    ServiceDependenciesRequest, ServiceEvent, ServiceInventoryRequest, ServiceLogSnapshotRequest,
-    ServiceLogStreamRequest, ServiceUpdate, SessionControlAction, SessionControlRequest,
-    ShellEvent, SmartControlRequest, SmartEvent, SmartObservationRequest, SmartTrackingEndReason,
-    SourceOutcome, SourceStatus, StartupControlRequest, StartupEvidenceRequest,
-    StartupInventoryRequest, StorageHealthEvent, StorageHealthRequest, SubmissionErrorKind,
-    SystemTelemetryRevision, UrlOpenRequest,
+    CommandLaunchRequest, CpuTelemetryRequest, DesktopAppearanceEvent, DesktopAppearanceRequest,
+    HardwareInventoryRequest, LatestControlRequest, PlatformEvent, PlatformHandle,
+    PowerSupplyEvent, PowerSupplyRequest, ProcessAffinityControlRequest, ProcessAffinityRequest,
+    ProcessControlRequest, ProcessEvent, ProcessGpuRequest, ProcessInsightFacetEvent,
+    ProcessInsightsRevision, ProcessListRequest, ProcessNetworkRequest, ResourceRevealRequest,
+    SensorEvent, SensorRequest, ServiceControlRequest, ServiceDependenciesRequest, ServiceEvent,
+    ServiceInventoryRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest, ServiceUpdate,
+    SessionControlRequest, ShellEvent, SmartControlRequest, SmartEvent, SmartObservationRequest,
+    SmartTrackingEndReason, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
+    StorageHealthEvent, StorageHealthRequest, SystemTelemetryRevision, UrlOpenRequest,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     ContainerRollup, CpuMetrics, CpuTelemetryObservation, DesktopAppearance, DeviceGeneration,
     DeviceId, DeviceState, DeviceStatus, DirectoryScanControl, DirectoryScanSpec,
@@ -33,6 +33,11 @@ use taskmanager_core::{
     ServiceLogQuery, ServiceLogState, ServiceLogStreamState, ServiceLogTimeFilter,
     ServiceRelationKind, SessionId, SessionItem, SmartSelfTestIntent, SmartSelfTestReport,
     StartupBootEvidenceSnapshot, StartupEntry, StorageDeviceTarget, StorageTelemetryObservation,
+};
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityStatus, CompositeSourceSnapshot, DeviceSourceSnapshot, EventEnvelope,
+    PartialSourceSnapshot, ProviderFailure, RequestEnvelope, RequestId, RequestIdGenerator,
+    SubmissionErrorKind,
 };
 use taskmanager_platform_linux::{
     EnvironmentProviders, IntegrationProviders, LinuxPlatformRuntime, LinuxProviderRegistry,

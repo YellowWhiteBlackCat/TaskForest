@@ -1,6 +1,6 @@
 //! Performance options, on-demand capability and replay message reducer.
 
-use taskmanager_application::DeviceId;
+use taskmanager_core::core::identity::DeviceId;
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::gpu_engine_rows::{
     GpuEngineRowsAction, present_gpu_engine_rows,
@@ -41,7 +41,7 @@ impl IcedApp {
                         self.shell.gpu_engine_rows_state(),
                         id,
                         self.shell.projection().capability_status(
-                            &taskmanager_application::CapabilityId::TELEMETRY_GPU_ENGINES,
+                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES,
                         ),
                     )
                     .action()
@@ -59,14 +59,6 @@ impl IcedApp {
                     }),
                     GpuEngineRowsAction::None => None,
                 }
-            }
-            Message::SelectGpuChartMetric(metric) => {
-                // The shell owns the selection and its availability gate
-                // (ADR-034): the message only names the family; the gate
-                // derived from the viewed device accepts or rejects it.
-                let gate = taskmanager_shell::gpu_chart_metric_gate(self.viewed_gpu());
-                self.shell.select_gpu_chart_metric(metric, &gate);
-                None
             }
             Message::ToggleDirectoryUsageScan => {
                 let selected = self.perf_device();

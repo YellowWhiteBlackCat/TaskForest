@@ -15,20 +15,22 @@ pub(super) use details_panel::{heterogeneous_core_rows, sockets_row};
 use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div};
 use taskmanager_telemetry_store::TelemetryStore;
 
-use crate::core::hardware::HardwareInfo;
-use crate::core::metrics::{CpuFrequencySource, CpuMetrics, CpuTemperatureSource, SystemSnapshot};
 use crate::gpui_app::formatting::{self, GraphUnit};
 use crate::gpui_app::graph::GraphHover;
 use crate::gpui_app::perf_views::{ChartSpec, HeadlineSurface, PerfPageProps, perf_page};
 use crate::gpui_app::root::responsive::{PerformanceChartInventory, PerformancePageBudget};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
 pub(crate) use per_core::CpuHistoryCache;
 pub(crate) use per_core::per_core_cell_label;
 use stats::CpuLiveStats;
 use std::cell::RefCell;
 use std::rc::Rc;
+use taskmanager_application::i18n;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::metrics::{
+    CpuFrequencySource, CpuMetrics, CpuTemperatureSource, SystemSnapshot,
+};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum CpuChartLayout {

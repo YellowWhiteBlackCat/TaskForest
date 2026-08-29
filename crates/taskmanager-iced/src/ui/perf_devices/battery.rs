@@ -4,6 +4,7 @@
 //! section / block quintet mirrors the GPU / disk / network panels.
 
 use super::*;
+use taskmanager_shell::presentation::duration;
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::super::responsive::{
@@ -130,7 +131,7 @@ pub(crate) fn battery_section(
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let power_supplies = app.shell.projection().power_supplies.as_ref();
     let theme_snapshot = app.theme();
-    let color = theme::color(theme_snapshot.battery);
+    let color = taskmanager_theme::iced::color(theme_snapshot.battery);
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let rows = match (battery_section_state(power_supplies), power_supplies) {
         (tables::ListState::Loading, _) => {

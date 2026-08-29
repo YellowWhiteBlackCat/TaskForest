@@ -5,13 +5,37 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Cell, Row};
 use ratatui::{Frame, layout::Rect};
-use taskmanager_application::{ApplicationHistoryStatus, HistoryWindow, i18n::t};
+use taskmanager_application::{
+    ApplicationHistoryProjection, ApplicationHistoryStatus, ApplicationHistoryUnavailableReason,
+    i18n::t,
+};
+use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::presentation::{bytes, missing_value};
 
-use crate::{TuiApp, TuiTheme};
+use crate::{TuiApp, TuiGlyphMode, TuiTheme};
 
 pub(super) fn render_app_history(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    let projection = app.application_history_projection();
+    render_app_history_projection(
+        frame,
+        theme,
+        area,
+        &app.application_history_projection(),
+        app.selected,
+        app.application_history_unavailable_reason(),
+    );
+}
+
+/// The page body projected from one immutable [`ApplicationHistoryProjection`],
+/// split from the app-backed entry above so behavior tests can paint the Ready
+/// table from a hand-built typed projection without a live replay session.
+fn render_app_history_projection(
+    frame: &mut Frame<'_>,
+    theme: TuiTheme,
+    area: Rect,
+    projection: &ApplicationHistoryProjection,
+    selected: usize,
+    unavailable_reason: Option<ApplicationHistoryUnavailableReason>,
+) {
     let title = format!(
         "{} · {}  [1] 1h  [2] 24h  [3] 7d",
         t("history.application.title"),
@@ -25,7 +49,7 @@ pub(super) fn render_app_history(frame: &mut Frame<'_>, app: &TuiApp, theme: Tui
             ApplicationHistoryStatus::Collecting => t("history.application.collecting_detail"),
             ApplicationHistoryStatus::Ready => "",
         };
-        let detail = app.application_history_unavailable_reason().map_or_else(
+        let detail = unavailable_reason.map_or_else(
             || detail.to_owned(),
             |reason| format!("{detail} ({})", reason.stable_code()),
         );
@@ -33,7 +57,7 @@ pub(super) fn render_app_history(frame: &mut Frame<'_>, app: &TuiApp, theme: Tui
         return;
     }
 
-    let row_window = super::table_window(projection.rows.len(), app.selected, area);
+    let row_window = super::table_window(projection.rows.len(), selected, area);
     let rows = projection.rows[row_window.start..row_window.end]
         .iter()
         .map(|row| {
@@ -47,7 +71,10 @@ pub(super) fn render_app_history(frame: &mut Frame<'_>, app: &TuiApp, theme: Tui
                 .filter(|value| value.is_finite() && *value >= 0.0)
                 .map_or_else(missing_value, |value| format!("{:.0}", value));
             let name = Cell::from(Line::from(vec![
-                Span::styled(row.display_name().to_owned(), Style::new().fg(Color::White)),
+                Span::styled(
+                    row.display_name().to_owned(),
+                    Style::new().fg(theme.color(Color::White)),
+                ),
                 Span::styled(format!(" · {provenance}"), Style::new().fg(theme.dim)),
             ]));
             let cpu = row
@@ -70,7 +97,7 @@ pub(super) fn render_app_history(frame: &mut Frame<'_>, app: &TuiApp, theme: Tui
                 Cell::from(cpu).style(Style::new().fg(theme.accent)),
                 Cell::from(memory),
                 Cell::from(process_peak),
-                Cell::from(history_trend(&samples))
+                Cell::from(history_trend_in(theme.terminal.glyphs, &samples))
                     .style(Style::new().fg(theme.accent).add_modifier(Modifier::BOLD)),
             ])
         })
@@ -110,8 +137,44 @@ fn window_label(window: HistoryWindow) -> &'static str {
     }
 }
 
-fn history_trend(samples: &[f32]) -> String {
-    const BLOCKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+/// The glyph for an explicit recording-downtime gap under the selected
+/// repertoire. Both repertoires pick a character outside their own ramp so a
+/// gap can never read as a real level; the ASCII underline mirrors the shared
+/// sparkline's ASCII gap. (The Unicode gap stays the renderer-local space —
+/// deliberately narrower than the device trends' mid-dot, because this trend
+/// renders inside a table text column.)
+const fn history_trend_gap(mode: TuiGlyphMode) -> char {
+    match mode {
+        TuiGlyphMode::Unicode => ' ',
+        TuiGlyphMode::Ascii => '_',
+    }
+}
+
+/// The ramp character for one clamped normalized level (index always 0..=7)
+/// under the selected glyph repertoire. Both repertoires index the shared
+/// `sparkline` component's published ramps (`super::sparkline::
+/// SPARKLINE_BLOCKS` / `super::sparkline::SPARKLINE_ASCII_BLOCKS`) — the
+/// one ladder single-source — so the app-history trend and the device trends
+/// carry the same level at the same index by construction.
+const fn history_trend_block(mode: TuiGlyphMode, index: usize) -> char {
+    match mode {
+        TuiGlyphMode::Unicode => super::sparkline::SPARKLINE_BLOCKS[index],
+        TuiGlyphMode::Ascii => super::sparkline::SPARKLINE_ASCII_BLOCKS[index],
+    }
+}
+
+/// Project the bounded recent window of one application's CPU-history samples
+/// (oldest→newest, `NaN` = a recording-downtime gap) onto a single-line trend
+/// in the given terminal glyph repertoire. Min/max normalization uses the
+/// finite samples only, so downtime gaps never flatten the shape, and a window
+/// without a single finite sample renders the honest "collecting" text instead
+/// of a fabricated trend. The Unicode repertoire keeps the historical block
+/// ramp byte for byte; the ASCII repertoire paints the same normalized levels
+/// through the shared [`super::sparkline::SPARKLINE_ASCII_BLOCKS`] ladder at
+/// paint time, so an ASCII-only
+/// terminal reads a monotonic gradient straight from the renderer instead of
+/// the collapsed output of the post-paint cell rewrite.
+fn history_trend_in(mode: TuiGlyphMode, samples: &[f32]) -> String {
     let samples = super::sparkline::recent_window(samples);
     let finite = samples.iter().copied().filter(|sample| sample.is_finite());
     let min = finite.clone().fold(f32::INFINITY, f32::min);
@@ -124,14 +187,18 @@ fn history_trend(samples: &[f32]) -> String {
         .iter()
         .map(|sample| {
             if !sample.is_finite() {
-                return ' ';
+                return history_trend_gap(mode);
             }
             let normalized = if range > 0.0 {
                 ((*sample - min) / range).clamp(0.0, 1.0)
             } else {
                 0.5
             };
-            BLOCKS[((normalized * 7.0).round() as usize).min(7)]
+            history_trend_block(mode, ((normalized * 7.0).round() as usize).min(7))
         })
         .collect()
 }
+
+#[cfg(test)]
+#[path = "../../tests/gui/ui/app_history_tests.rs"]
+mod tests;

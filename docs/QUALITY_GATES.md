@@ -18,6 +18,7 @@
 | workspace nextest | 行为和平台无关契约 |
 | doctests / rustdoc | 文档代码和公开 API 链接 |
 | fallback feature matrix | 验证可选 provider 不产生产品 SKU 分叉 |
+| CORE-04 functional matrix | 验证每个产品意图在 GPUI/Iced/TUI/Bevy 都有显式 surface decision |
 
 CI 与本地门禁都使用 [`rust-toolchain.toml`](../rust-toolchain.toml) 声明的 stable 最新版；
 `Cargo.toml` 的 `rust-version` 仅是兼容性下限。所有 Cargo 验证使用锁文件，并行度不超过四。
@@ -34,10 +35,23 @@ bash scripts/quality/local-gates.sh standard
 bash scripts/quality/local-gates.sh extended
 ```
 
-- `quick`：公开边界、文档、格式、模块、安装清单、自动化和测试布局政策门；
+- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。
 - `standard`：quick + dependency audit、clippy、nextest、doctest、rustdoc、release build 和
   平台无关形态矩阵，以及 Linux release/package smoke；
 - `extended`：standard + coverage、mutation、Miri、fuzz 和性能/体积回归。
+
+**范围隔离**：并行前端线共用一个工作区时，追加 `--scope <core|bevy|gpui|iced|tui>`
+把 cargo 阶段（fmt/clippy/nextest/doctests/rustdoc）和源码面政策门限制在该前端的
+"core + 依赖闭包 + 自身 crate"（闭包由 `cargo tree` 从锁文件推导，不是手工清单）；
+跨前端的根验收层、形态矩阵和 release smoke 记为 SKIP，由主线/合并负责人在 `all`
+（默认）下承担。例：Bevy 线的日常门禁是
+`bash scripts/quality/local-gates.sh standard --scope bevy`（Bevy 交互矩阵为 headless，
+scoped 下随 standard 直接运行）。
+
+**共享锁降级**：开发阶段若另一条线正持续改写共享 Cargo.lock，`lock-consistency`
+探针等不到稳定窗口时，本次运行显式降级为不带 `--locked`（summary 记 FALLBACK，
+子脚本经 `TM_CARGO_LOCK` 同步），而不是各阶段以晦涩的锁错误失败；合并前合并
+负责人仍须以 `all` + 锁定模式重跑。
 
 默认遇到首个失败即退出；需要一次性收集多个失败时显式追加 `--keep-going`。Linux
 `release/package smoke` 与 CI 使用同一入口，平台不具备 Linux 打包能力时不在 Windows/macOS
@@ -102,7 +116,45 @@ SKIP，不能把 fixture、编译或静态图片写成平台验证通过。
   仍必须在目标桌面 compositor 上验证；未建立专用、可复现的 layer-shell capture receipt 前，
   gamescope 结果只能报告 `SKIP`，不能冒充 Layer-Shell PASS。
 
-## 7. 验证器质量
+## 7. 前端交互与像素证据
+
+每个前端由同一套合同约束，证据通道按 toolkit 能力选择，全部 fail-closed：
+
+| 前端 | headless 交互矩阵 | 真实像素证据 |
+|---|---|---|
+| GPUI | `scripts/accept-gpui-interactions.sh`（standard `--with-gui`） | `scripts/capture-niri.sh` / `capture-windows.sh` |
+| Iced | crate headless tests + capture matrix | `scripts/capture-iced.sh` |
+| TUI | crate headless tests + capture matrix | `scripts/capture-tui.sh` |
+| Bevy | `scripts/accept-bevy-interactions.sh`（standard `--with-gui`） | `scripts/capture-bevy.sh`（Wayland-only） |
+
+四个前端的画面证据统一默认 `TM_CAPTURE_NIRI_BACKGROUND=1`：由私有
+`kwin_wayland --virtual` 承载 nested Niri，按真实 PID/app-id/window-id 绑定窗口，使用
+Niri `screenshot-window` 写出 PNG；`TM_CAPTURE_NIRI_BACKGROUND=0` 仅用于明确的可见宿主调试，
+不能作为验收证据。
+
+Bevy 交互矩阵（`scripts/bevy_interaction_matrix.tsv`）由机械发现驱动：脚本先对 lib 目标做
+nextest discovery，矩阵中的每个命名测试必须真实存在，然后完整运行 lib 目标；矩阵之外不
+存在"已登记但未运行"的用例。真实像素走嵌套 Niri，validator 对 app_id、PID/窗口身份、PNG、
+marker、source provenance 和当前 worktree fail-closed；无 compositor 时只报告 SKIP。
+UI 边界改动由 `scripts/quality/ui-evidence-route.sh` 按前端路由到对应矩阵与新鲜回执。
+
+## 8. 验证器质量
 
 验证器必须自动发现范围、执行目标、检查结果和副作用，并在范围为空、解析失败或回执不完整
 时 fail-closed。禁止用源码字符串存在性、恒真断言、固定测试数量或 `echo PASS` 证明行为。
+
+## 9. 并行隔离验证与视觉对等（标准，2026-08-29 起）
+
+**并行隔离验证**（`scripts/verify-isolated.sh <line> [gate]`，各行通用）：行门禁只在
+本行自己的差异上跑——脚本按本行足迹清单（`scripts/isolated-paths/<line>.txt`）把本行
+未提交改动（含 intent-to-add 未跟踪文件）应用到 HEAD 私有 worktree 内执行 fmt/clippy/
+nextest/capture，主 checkout 永不被验证流程改动。这样兄弟线在共享 checkout 里的未提交
+重构（哪怕暂时编译不过）永远不阻塞本行门禁；本行也不得因他行撕裂而宣布 SKIP。足迹清单
+是行声明：本行拥有或改动的路径（含共享 crate 的行内改动）必须全部列入，隔离验证才携带
+全部本线事实。Cargo 锁回退沿用全仓约定（`TM_CARGO_LOCK` 空值 = 解锁，未设 = `--locked`）。
+
+**视觉对等目检**（渲染行收口门禁）：绿色门禁只证明行为与来源，不证明观感。渲染行每轮
+收口必须把本行捕获与参考行捕获逐页并排目检，差距逐条记账——修掉的进提交，暂缓的写入
+该行公开文档的"已知边界/存异"清单（如 `docs/BEVY_UI_FRONTEND.md`）。装饰禁止用文本
+字形冒充（嵌入字体无该字形即渲染 tofu）；图标走语义注册表（`IconId` → 共享 SVG → 各
+toolkit 材质化），行门禁须含机械反字形扫描与有界行单行契约测试。

@@ -3,9 +3,9 @@ use std::rc::Rc;
 use gpui::TestAppContext;
 
 use super::ProcessTooltipIndex;
-use crate::core::process::ProcessItem;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_theme::Theme;
 
 fn process(pid: u32, name: &str, cmdline: &str) -> ProcessItem {
     taskmanager_test_support::ProcessItemFixtureBuilder::new()

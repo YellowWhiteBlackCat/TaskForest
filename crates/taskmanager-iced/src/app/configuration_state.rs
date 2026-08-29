@@ -1,6 +1,8 @@
 //! Private Iced ownership for coordinator state and persisted projections.
 
-use taskmanager_application::{Config, ConfigClient, ConfigRevision};
+use taskmanager_application::{ConfigClient, ConfigRevision};
+use taskmanager_core::core::config::Config;
+
 use taskmanager_theme::Theme;
 
 use super::PresentationPreferences;

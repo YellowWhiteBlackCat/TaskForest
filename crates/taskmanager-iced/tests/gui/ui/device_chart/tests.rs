@@ -5,7 +5,7 @@ use std::rc::Rc;
 use iced::widget::canvas;
 use iced::{Color, Length, Point, Rectangle, Size, mouse};
 use taskmanager_application::i18n::t;
-use taskmanager_shell::history::MetricSeries;
+use taskmanager_telemetry_store::live_graph::MetricSeries;
 
 use super::scale::summary_value;
 use super::*;
@@ -246,17 +246,17 @@ fn device_mini_graph_factories_compose_with_hover_on_and_off() {
 /// clamps inside the frame, the ceiling does NOT grow.
 #[test]
 fn percentage_series_ceiling_is_one_hundred_regardless_of_samples() {
-    assert_eq!(series_max(MetricSeries::CpuUsagePercent, &[]), PERCENT_MAX);
+    assert_eq!(series_max(taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent, &[]), PERCENT_MAX);
     assert_eq!(
-        series_max(MetricSeries::GpuUsagePercent, &[200.0, 300.0]),
+        series_max(taskmanager_shell::presentation::trend::TrendSeries::GpuUsagePercent, &[200.0, 300.0]),
         PERCENT_MAX
     );
     assert_eq!(
-        series_max(MetricSeries::MemoryUsagePercent, &[12.0]),
+        series_max(taskmanager_shell::presentation::trend::TrendSeries::MemoryUsagePercent, &[12.0]),
         PERCENT_MAX
     );
     assert_eq!(
-        series_max(MetricSeries::DiskActiveTimePct, &[200.0]),
+        series_max(taskmanager_shell::presentation::trend::TrendSeries::DiskActiveTimePct, &[200.0]),
         PERCENT_MAX,
         "disk active time is percentage-typed: the ceiling stays 100"
     );
@@ -268,16 +268,16 @@ fn percentage_series_ceiling_is_one_hundred_regardless_of_samples() {
 #[test]
 fn bytes_per_sec_series_scales_to_its_finite_peak() {
     // Idle / empty → 0.0 (flat baseline, never a fabricated mid-line).
-    assert_eq!(series_max(MetricSeries::DiskBytesPerSec, &[]), 0.0);
+    assert_eq!(series_max(taskmanager_shell::presentation::trend::TrendSeries::DiskBytesPerSec, &[]), 0.0);
     assert_eq!(
-        series_max(MetricSeries::NetworkBytesPerSec, &[0.0, 0.0]),
+        series_max(taskmanager_shell::presentation::trend::TrendSeries::NetworkBytesPerSec, &[0.0, 0.0]),
         0.0
     );
     // A real peak sets the ceiling so the peak sample reaches the top.
     let disk = &[1_000_000.0_f32, 5_000_000.0, 2_000_000.0];
-    assert_eq!(series_max(MetricSeries::DiskBytesPerSec, disk), 5_000_000.0);
+    assert_eq!(series_max(taskmanager_shell::presentation::trend::TrendSeries::DiskBytesPerSec, disk), 5_000_000.0);
     let net = &[300.0_f32, 900.0];
-    assert_eq!(series_max(MetricSeries::NetworkBytesPerSec, net), 900.0);
+    assert_eq!(series_max(taskmanager_shell::presentation::trend::TrendSeries::NetworkBytesPerSec, net), 900.0);
 }
 
 /// The decoupled scale enum is the single source of truth for the per-device
@@ -304,17 +304,17 @@ fn device_metric_scale_picks_the_ceiling_and_bridges_metric_series() {
     );
     // Every MetricSeries bridges onto the scale it always had.
     assert_eq!(
-        DeviceMetricScale::from(MetricSeries::GpuUsagePercent),
+        DeviceMetricScale::from(taskmanager_shell::presentation::trend::TrendSeries::GpuUsagePercent),
         DeviceMetricScale::Percent,
         "GPU% (and battery charge %) is percentage-typed"
     );
     assert_eq!(
-        DeviceMetricScale::from(MetricSeries::DiskActiveTimePct),
+        DeviceMetricScale::from(taskmanager_shell::presentation::trend::TrendSeries::DiskActiveTimePct),
         DeviceMetricScale::Percent,
         "disk active-time % bridges onto the fixed percentage ceiling"
     );
     assert_eq!(
-        DeviceMetricScale::from(MetricSeries::DiskBytesPerSec),
+        DeviceMetricScale::from(taskmanager_shell::presentation::trend::TrendSeries::DiskBytesPerSec),
         DeviceMetricScale::BytesPerSecond {
             use_bytes: true,
             use_base2: true
@@ -381,11 +381,11 @@ fn every_scale_variant_formats_summary_values_with_its_unit() {
     assert_eq!(summary_value(bps(false, false), f32::NAN), "—");
     // The fixed CPU chart stack keeps unit-carrying histories typed.
     assert_eq!(
-        DeviceMetricScale::from(MetricSeries::CpuTemperatureC),
+        DeviceMetricScale::from(taskmanager_shell::presentation::trend::TrendSeries::CpuTemperatureC),
         DeviceMetricScale::Celsius
     );
     assert_eq!(
-        DeviceMetricScale::from(MetricSeries::CpuFrequencyMhz),
+        DeviceMetricScale::from(taskmanager_shell::presentation::trend::TrendSeries::CpuFrequencyMhz),
         DeviceMetricScale::Megahertz
     );
 }
@@ -398,19 +398,19 @@ fn every_scale_variant_formats_summary_values_with_its_unit() {
 #[test]
 fn cpu_power_watts_auto_scales_to_peak_not_clamped_to_one_hundred() {
     assert_eq!(
-        DeviceMetricScale::from(MetricSeries::CpuPowerW),
+        DeviceMetricScale::from(taskmanager_shell::presentation::trend::TrendSeries::CpuPowerW),
         DeviceMetricScale::Watts,
         "CPU power watts is magnitude-typed (unit W), not percentage-typed"
     );
     // Empty (RAPL absent) → 0.0, the flat-baseline idle — never a fake line.
-    assert_eq!(series_max(MetricSeries::CpuPowerW, &[]), 0.0);
+    assert_eq!(series_max(taskmanager_shell::presentation::trend::TrendSeries::CpuPowerW, &[]), 0.0);
     // A real RAPL trace scales to its finite peak; the 142 W sample reaches
     // the top of the frame instead of clamping against a meaningless 100.
     let power = &[7.5_f32, 142.0, 38.0];
-    assert_eq!(series_max(MetricSeries::CpuPowerW, power), 142.0);
+    assert_eq!(series_max(taskmanager_shell::presentation::trend::TrendSeries::CpuPowerW, power), 142.0);
     // The percentage ceiling does NOT apply — a 42 W reading is well under
     // 100 yet still maps its peak (42) to the frame top, not to 42% of it.
-    assert_eq!(series_max(MetricSeries::CpuPowerW, &[42.0, 42.0]), 42.0);
+    assert_eq!(series_max(taskmanager_shell::presentation::trend::TrendSeries::CpuPowerW, &[42.0, 42.0]), 42.0);
 }
 
 /// The mini-graph caption honors the DeviceChart's <2-point draw gate: an

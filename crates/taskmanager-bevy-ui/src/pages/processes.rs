@@ -11,15 +11,15 @@
 //!   page's global [`ShellProjectionFolded`] observer as a child of the root,
 //!   so it lives and dies with the mounted page (a route change despawns the
 //!   page recursively). Idle frames — no folded batches — redraw nothing.
-//! - **Input seams**: keyboard/wheel/click bridges are not reachable from a
-//!   page module in the M1 composition (bevy input messages need polling
-//!   systems and pointer picking is not in this crate's feature closure),
-//!   so the page exposes typed `EntityEvent` seams on the rows root —
-//!   [`ProcessSelectStep`], [`ProcessSelectRow`], [`ProcessScrollIntent`],
-//!   [`ProcessQueryCommit`] — each with an `on()` observer that reduces
-//!   through the SAME public shell reducers the TUI keyboard path uses
-//!   (`move_selection`, `select_row`, `push_search_text`). The W4 input wiring
-//!   triggers these events; the semantics are final and headless-tested here.
+//! - **Input seams**: the keyboard arrives through [`crate::input`], which
+//!   drives the shell's own routers (`handle_local_key` / `handle_local_char`
+//!   — arrows, Delete gate, search typing, y/n/Esc confirmation); the
+//!   [`input`] submodule bridges pointer picking and wheel scrolling into the
+//!   typed `EntityEvent` seams below — [`ProcessSelectRow`],
+//!   [`ProcessScrollIntent`] — and re-renders shell mutations through
+//!   `ShellInteractionApplied`. Each seam observer reduces through the SAME
+//!   public shell reducers the TUI keyboard path uses (`move_selection`,
+//!   `select_row`, `push_search_text`).
 //! - **Selection identity**: every accepted selection change publishes
 //!   [`ProcessSelectionChanged`]. The sibling [`details`] component consumes
 //!   it, reuses the shared process-details VM, and requests matching frozen
@@ -45,14 +45,16 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
-use bevy::text::EditableText;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Val, percent, px,
 };
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::Button;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{AppAction, AppPage, LocalTimeRulesObservation, ProcessItem};
-use taskmanager_shell::app::search_input::SEARCH_QUERY_MAX;
+use taskmanager_application::{AppAction, AppPage};
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
+
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes, optional_nice, start_clock_local};
 use taskmanager_shell::{ShellApp, SortCol, SortDir};
 use taskmanager_ui_contract::ProcessColumnSpec;
@@ -60,6 +62,7 @@ use taskmanager_ui_contract::ProcessColumnSpec;
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_8, space_24};
+use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::widgets::table::{
     RowWindow, SortProjection, header_scene, row_scene, row_window, rows_in_viewport,
     visible_columns,
@@ -67,6 +70,7 @@ use crate::widgets::table::{
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod details;
+pub(crate) mod input;
 
 /// Height of the scrollable rows area in px. The bevy_ui flexbox cannot report
 /// a computed node height to an observer without a layout system, so M1 fixes
@@ -174,9 +178,13 @@ fn row_cells(process: &ProcessItem, columns: &[&ProcessColumnSpec], selected: bo
 /// The rendered rows of one virtual window: pure over (shell, viewport,
 /// scroll intent), so every observer and the headless tests share one
 /// materialization rule.
+/// One rendered row: its visible-set index, identity for the accessibility
+/// node and the details seam, its cells, and the selected flag.
 pub(crate) struct ProcessRowView {
     /// Visible-set index of the row (the shell cursor's coordinate space).
     pub(crate) index: usize,
+    pub(crate) pid: u32,
+    pub(crate) name: String,
     pub(crate) cells: Vec<String>,
     pub(crate) selected: bool,
 }
@@ -209,6 +217,8 @@ pub(crate) fn rows_projection(
             let index = window.first + offset;
             ProcessRowView {
                 index,
+                pid: process.pid,
+                name: process.name.clone(),
                 cells: row_cells(process, &columns, Some(index) == selected),
                 selected: Some(index) == selected,
             }
@@ -353,7 +363,8 @@ pub(crate) struct ProcessTableArtifact;
 #[derive(Component, Clone, Default)]
 pub(crate) struct ProcessCountLine;
 
-/// The search input node (focus target for the W4 input wiring).
+/// The search display node (the shell query, kept in step by the input
+/// submodule's re-render observer).
 #[derive(Component, Clone, Default)]
 pub(crate) struct ProcessSearchInput;
 
@@ -401,6 +412,7 @@ fn bootstrap_processes_page(
     palette: Option<Res<WindowPalette>>,
     mut commands: Commands,
 ) {
+    let root = trigger.event().entity;
     let Some(palette) = palette else {
         return;
     };
@@ -409,9 +421,10 @@ fn bootstrap_processes_page(
         viewport_rows,
         top: 0,
     });
+    input::bootstrap(root, &mut commands);
     let fold_observer = commands.spawn(Observer::new(on_projection_folded)).id();
     commands
-        .entity(trigger.event().entity)
+        .entity(root)
         .add_one_related::<ChildOf>(fold_observer);
 }
 
@@ -543,8 +556,9 @@ fn row_fill(selected: bool, palette: &UiPalette) -> bevy::color::Color {
 
 /// One row wrapper: the virtual window's row height and selection fill, with
 /// the shared widgets row scene inside (cell widths/alignment stay contract-
-/// owned). The wrapper carries the link index so tests and future pointer
-/// bridges can map a node to its visible-set row.
+/// owned). The wrapper is a Button — pointer picking activates the row seam —
+/// and carries the link index plus the AccessKit identity node so tests,
+/// pointer bridges, and assistive technology map a node to its row.
 fn row_wrapper_scene(
     row: &ProcessRowView,
     columns: &[&ProcessColumnSpec],
@@ -554,6 +568,7 @@ fn row_wrapper_scene(
     let fill = row_fill(row.selected, palette);
     let index = row.index;
     let cells = row.cells.clone();
+    let accessibility = crate::semantic::process_row_node(&row.name, row.pid);
     let inner = row_scene(&cells, columns);
     Box::new(bsn! {
         Node {
@@ -563,6 +578,10 @@ fn row_wrapper_scene(
         BackgroundColor({ fill })
         ProcessRowLink({ index })
         ProcessTableArtifact
+        ControlVisual(ControlTone::Surface, { row.selected })
+        Button
+        on(input::on_row_activated)
+        template_value(accessibility)
         Children [
             ( { inner } ),
         ]
@@ -626,17 +645,13 @@ fn rebuild_table(
     }
 }
 
-/// The search box: an official `EditableText` (the bevy_text half of the
-/// bevy_ui_widgets base) capped at the shell's search-query limit. Typing and
-/// focus plumbing belong to the widget package (registered with
-/// `DefaultPlugins` in the windowed composition); this page owns the box
-/// chrome and the commit semantics. `template_value` carries the pre-built
-/// component because `EditableText`'s editor state is not a bsn! template.
-fn search_input_scene(palette: &UiPalette) -> impl Scene + use<> {
-    let input = EditableText {
-        max_characters: Some(SEARCH_QUERY_MAX),
-        ..EditableText::default()
-    };
+/// The search box: a display surface over the shell-owned query. The shell is
+/// the single search authority (Ctrl+F opens it, typing folds into the query,
+/// Escape closes) exactly like the TUI and GPUI surfaces; this node renders
+/// the query and the [`input::sync_after_shell_interaction`] observer keeps
+/// it in step — there is no second editor buffer to double-own the keyboard.
+fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
+    let text = query.to_owned();
     let width = space_24() * 12.0;
     let height = palette.control_height_px;
     let radius = palette.control_radius_px;
@@ -650,8 +665,9 @@ fn search_input_scene(palette: &UiPalette) -> impl Scene + use<> {
         }
         BackgroundColor({ palette.panel_fill })
         ProcessSearchInput
-        template_value(input)
-        TextRole(Role::Body)
+        Children [
+            ( Text(text) TextRole(Role::Body) ),
+        ]
     }
 }
 
@@ -685,20 +701,25 @@ fn rows_root_scene(
 /// Content-region scene for the Processes page.
 pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let palette = context.palette;
-    let title = Page::Processes.title().to_owned();
-    // Honest capability note: the table still has deliberate incubation
-    // seams, while the selected-process details panel is a real projection
-    // and request path. The shared placeholder census reads this declaration.
+    let title = Page::Processes.title();
+    // Honest capability note: grouping and per-row trend remain incubation
+    // seams; Delete arms the shared end-task gate, and details follow the
+    // selected row.
     let note = format!(
-        "{} — grouping, per-row trend and batch verbs are in incubation; details follow the selected row",
+        "{} — grouping and per-row trend are in incubation; Delete arms the shared end-task gate; details follow the selected row",
         Page::Processes.nav_label()
     );
     let viewport_rows = rows_in_viewport(TABLE_VIEWPORT_HEIGHT_PX, palette.control_height_px);
     let projection = rows_projection(context.shell, viewport_rows, 0);
     let count = count_line_text(projection.total, &context.shell.query);
     let columns = visible_columns(&[]);
-    let header = header_scene(&columns, sort_projection(context.shell.process_sort));
+    let header = header_scene(
+        &columns,
+        sort_projection(context.shell.process_sort),
+        palette,
+    );
     let rows_root = rows_root_scene(&projection, palette, &context.shell.query);
+    let search = search_input_scene(palette, &context.shell.query);
     let table = bsn! {
         Node {
             width: percent(68),
@@ -726,7 +747,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             ( Text(title) TextRole(Role::Heading) ),
             ( crate::pages::process_tree::panel_scene(context) ),
             ( Text(note) TextRole(Role::Caption) ),
-            ( search_input_scene(palette) ),
+            ( { search } ),
             (
                 Text(count)
                 ProcessCountLine

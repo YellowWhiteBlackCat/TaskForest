@@ -32,24 +32,22 @@ use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 #[cfg(feature = "test-support")]
-pub use taskmanager_core::core::services::{
-    ServiceAction, ServiceDeps, ServiceItem, ServiceLogAvailability, ServiceLogEntries,
-    ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevel,
-    ServiceLogLevelFilter, ServiceLogLines, ServiceLogProviderState, ServiceLogQuery,
+use taskmanager_core::core::services::{
+    ServiceDeps, ServiceItem, ServiceLogAvailability, ServiceLogEntry, ServiceLogErrorKind,
+    ServiceLogFailure, ServiceLogFeed, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
     ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd, ServiceLogStreamSnapshot,
-    ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationEdge, ServiceRelationGraph,
-    ServiceRelationKind, ServiceStatus,
+    ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationKind, ServiceStatus,
 };
 #[cfg(not(feature = "test-support"))]
-pub(crate) use taskmanager_core::core::services::{
+use taskmanager_core::core::services::{
     ServiceDeps, ServiceItem, ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure,
     ServiceLogLevel, ServiceLogQuery, ServiceLogState, ServiceLogStreamState, ServiceLogTimeFilter,
     ServiceRelationKind, ServiceStatus,
 };
 #[cfg(all(test, not(feature = "test-support")))]
-pub(crate) use taskmanager_core::core::services::{
+use taskmanager_core::core::services::{
     ServiceLogAvailability, ServiceLogFeed, ServiceLogLevelFilter, ServiceLogSnapshot,
-    ServiceLogStreamEnd, ServiceLogStreamSnapshot, ServiceRelationEdge,
+    ServiceLogStreamEnd, ServiceLogStreamSnapshot,
 };
 
 #[cfg(target_os = "linux")]

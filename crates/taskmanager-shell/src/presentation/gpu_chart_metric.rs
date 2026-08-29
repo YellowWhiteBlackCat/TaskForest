@@ -30,9 +30,9 @@
 //! “此阶段不触碰任何 renderer”; stage 2 wires the frontends onto this
 //! contract, stage 3 adds Bevy).
 
-use crate::history::LiveGraphHistory;
-use taskmanager_application::GpuMetrics;
+use taskmanager_core::core::metrics::GpuMetrics;
 use taskmanager_telemetry_store::GpuMetricPoint;
+use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 
 /// One chartable GPU series family (ADR-034 decision 1).
 ///

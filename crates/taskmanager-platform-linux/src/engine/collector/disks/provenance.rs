@@ -4,8 +4,9 @@ use std::fs;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 
-use taskmanager_core::ScalarObservation;
-use taskmanager_platform_contract::{FailureKind, SourceOutcome};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::source::SourceOutcome;
 
 #[derive(Debug, Default)]
 pub(super) struct SourceFailures {

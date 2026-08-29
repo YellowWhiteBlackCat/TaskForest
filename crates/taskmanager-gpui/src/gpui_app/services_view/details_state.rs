@@ -10,13 +10,18 @@ use std::path::PathBuf;
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 
-use crate::core::{DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource};
 use taskmanager_application::{
-    FailureKind, RequestId, ServiceDependenciesLifecycle, ServiceDeps, ServiceId,
-    ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevelFilter, ServiceLogQuery,
-    ServiceLogState, ServiceLogStreamLifecycle, ServiceLogStreamState, ServiceLogTimeFilter,
-    ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind, ServiceUpdate,
+    ServiceDependenciesLifecycle, ServiceLogStreamLifecycle, ServiceUpdate,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::services::{
+    ServiceDeps, ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevelFilter,
+    ServiceLogQuery, ServiceLogState, ServiceLogStreamState, ServiceLogTimeFilter,
+    ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind,
+};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_core::core::{DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource};
+use taskmanager_platform_contract::RequestId;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ServiceLogCopyFeedback {
@@ -154,7 +159,7 @@ impl ServiceDetailsState {
     pub(crate) fn accept_stream(
         &mut self,
         attempt_id: taskmanager_application::ServiceAttemptId,
-        request_id: taskmanager_application::RequestId,
+        request_id: taskmanager_platform_contract::RequestId,
     ) {
         self.stream.accept_attempt(attempt_id, request_id);
     }

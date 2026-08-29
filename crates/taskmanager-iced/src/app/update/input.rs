@@ -5,6 +5,12 @@ use super::super::{FocusTarget, IcedApp, IcedKey, InputScope, LocalSurface, Mess
 use super::dispatch::UpdateDispatch;
 
 impl IcedApp {
+    /// The selectable value that owns the window's one active text selection;
+    /// the view resolves each widget's `selection_owner` flag against it.
+    pub(crate) fn text_selection_owner(&self) -> Option<iced::advanced::widget::Id> {
+        self.input.text_selection_owner.clone()
+    }
+
     pub(super) fn reduce_input_message(
         &mut self,
         message: Message,
@@ -18,6 +24,7 @@ impl IcedApp {
                 UpdateDispatch::none()
             }
             Message::Key(IcedKey::Fixed(event)) => {
+                crate::input_modality::observe_keyboard();
                 if let Some(copy) = self.copy_selected_row_summary(&event) {
                     UpdateDispatch::task(copy)
                 } else {
@@ -25,6 +32,7 @@ impl IcedApp {
                 }
             }
             Message::Key(IcedKey::Character(character, modifiers)) => {
+                crate::input_modality::observe_keyboard();
                 let effect = match self.input_scope() {
                     InputScope::ServiceLog => {
                         match character {
@@ -62,7 +70,23 @@ impl IcedApp {
                 };
                 UpdateDispatch::effect(effect)
             }
-            Message::Key(IcedKey::Other) => UpdateDispatch::none(),
+            Message::Key(IcedKey::Other) => {
+                // Bare modifiers and other unmapped keys are still keyboard
+                // input to the focus-visible tracker.
+                crate::input_modality::observe_keyboard();
+                UpdateDispatch::none()
+            }
+            Message::PointerPressed => {
+                crate::input_modality::observe_pointer();
+                UpdateDispatch::none()
+            }
+            Message::TextSelectionClaimed(id) => {
+                // The reference selection registry, collapsed to one owner
+                // slot: beginning a selection anywhere moves ownership, and
+                // every other selectable value clears its highlight.
+                self.input.text_selection_owner = Some(id);
+                UpdateDispatch::none()
+            }
             Message::SearchBackspace => {
                 if self.shell.search_active() {
                     self.shell.pop_search_char();

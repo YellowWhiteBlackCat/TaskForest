@@ -291,3 +291,63 @@ fn confirmation_scene_is_still_the_four_text_panel() {
     assert_eq!(count, 4, "title, echoed body, confirm, dismiss");
     assert!(world.despawn(root));
 }
+
+/// A table row is always exactly one line tall: a value wider than its
+/// column is clipped at the column edge — never wrapped into a second line,
+/// never allowed to stretch the row or shift the sibling cells' alignment.
+/// (The pixel half of this contract is the Wayland capture matrix.)
+#[test]
+fn table_rows_stay_single_line_and_clip_instead_of_wrapping() {
+    use bevy::ecs::hierarchy::Children;
+    use bevy::text::{LineBreak, TextLayout};
+    use bevy::ui::OverflowAxis;
+    use bevy::ui::prelude::Node;
+
+    let columns = crate::widgets::table::visible_columns(&[]);
+    let mut cells: Vec<String> = columns.iter().map(|spec| spec.id.to_owned()).collect();
+    // The Name column carries a value far wider than any contract width.
+    cells[0] = "gnome-shell-very-long-name-that-cannot-possibly-fit".to_owned();
+
+    let mut app = headless_scene_app();
+    let world = app.world_mut();
+    let row = world
+        .spawn_scene(crate::widgets::table::row_scene(&cells, &columns))
+        .expect("the row scene resolves without assets")
+        .id();
+    app.update();
+
+    let world = app.world_mut();
+    // The full value survives clipping (the data is intact; only the paint
+    // is clipped at the column edge).
+    let mut seen_name = false;
+    for (text, layout) in world.query::<(&Text, &TextLayout)>().iter(world) {
+        assert_eq!(
+            layout.linebreak,
+            LineBreak::NoWrap,
+            "a table cell may never wrap: {text:?}"
+        );
+        if text.0.contains("gnome-shell-very-long-name") {
+            seen_name = true;
+        }
+    }
+    assert!(seen_name, "the clipped value is still rendered in full");
+    // Every CELL node (the row's direct children) clips horizontally, so an
+    // over-wide value cannot push into the sibling columns or stretch the
+    // row height.
+    let row_children: Vec<_> = world
+        .get::<Children>(row)
+        .expect("the row node holds its cells")
+        .iter()
+        .collect();
+    assert_eq!(row_children.len(), columns.len(), "one cell per column");
+    for child in row_children {
+        let node = world
+            .get::<Node>(*child)
+            .expect("each cell carries a layout node");
+        assert_eq!(
+            node.overflow.x,
+            OverflowAxis::Clip,
+            "cells clip at the column edge"
+        );
+    }
+}

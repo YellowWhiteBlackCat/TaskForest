@@ -1,12 +1,10 @@
 use super::*;
-use crate::process_category;
+use taskmanager_core::core::process::{ProcessCategory, ProcessItem, process_category};
 use taskmanager_test_support::{
     category_fixture_with_empty_bucket, mixed_availability_category_fixture,
 };
 
-fn buckets_of(
-    items: &[crate::ProcessItem],
-) -> Vec<CategoryBucketProjection<'_, crate::ProcessItem>> {
+fn buckets_of(items: &[ProcessItem]) -> Vec<CategoryBucketProjection<'_, ProcessItem>> {
     category_buckets(items, process_category)
 }
 

@@ -1,3 +1,9 @@
+//! source-inspection: static-policy
+//!
+//! Capture scripts are textual policy artifacts: these tests protect the
+//! required non-publishing, background compositor route rather than trying to
+//! use source text as a proxy for production behavior.
+
 use std::process::Command;
 
 /// These evidence/quality gates shell out to `timeout … python3 <repo-script>`.
@@ -77,14 +83,50 @@ fn tui_capture_script_keeps_required_evidence_markers() {
     assert!(script.contains("hotkey-overlay {\n    skip-at-startup\n}"));
     assert!(script.contains("niri validate --config \"$CONF\""));
     assert!(script.contains("TM_TUI_CAPTURE_MARKER_FILE"));
-    assert!(script.contains("alacritty --class taskmanager-tui"));
+    assert!(script.contains("alacritty --class"));
     assert!(script.contains("--source-manifest \"$SOURCE_MANIFEST\""));
+    assert!(script.contains("CAPTURE_NIRI_BACKGROUND=\"${TM_CAPTURE_NIRI_BACKGROUND:-1}\""));
+    assert!(script.contains("kwin_wayland --virtual"));
+    assert!(script.contains("screenshot-window"));
+    assert!(script.contains("--id \"$WINDOW_ID\""));
     // Receipt freshness (committed source-manifest hashes vs current sources)
     // is enforced by the capture flow itself: `scripts/capture-tui.sh` runs
     // `validate_tui_evidence.py` against the freshly captured artifacts, and
     // `--with-gui` / ui-route demands a fresh receipt. The default test suite
     // must not compare committed receipts, or every production change would
-    // redden ordinary `cargo test` runs until a Wayland capture is re-run.
+    // redden ordinary test runs until a Wayland capture is re-run.
+}
+
+#[test]
+fn every_visual_frontend_uses_the_background_niri_capture_route() {
+    let scripts = [
+        ("gpui", include_str!("../../scripts/capture-niri.sh")),
+        ("iced", include_str!("../../scripts/capture-iced-matrix.sh")),
+        ("tui", include_str!("../../scripts/capture-tui.sh")),
+        ("bevy", include_str!("../../scripts/capture-bevy.sh")),
+    ];
+    for (frontend, script) in scripts {
+        assert!(
+            script.contains("CAPTURE_NIRI_BACKGROUND=\"${TM_CAPTURE_NIRI_BACKGROUND:-1}\""),
+            "{frontend} capture must default to background Niri"
+        );
+        assert!(
+            script.contains("kwin_wayland --virtual"),
+            "{frontend} capture must isolate nested Niri in virtual KWin"
+        );
+        assert!(
+            script.contains("screenshot-window") && script.contains("--id"),
+            "{frontend} capture must bind screenshot-window to an explicit window id"
+        );
+    }
+}
+
+#[test]
+fn capture_route_rejects_stale_or_visible_receipts() {
+    let route = include_str!("../../scripts/quality/ui-evidence-route.sh");
+    assert!(route.contains("frontend_source_manifest.py"));
+    assert!(route.contains("source_manifest_sha256"));
+    assert!(route.contains("^niri_background=1$"));
 }
 
 #[test]

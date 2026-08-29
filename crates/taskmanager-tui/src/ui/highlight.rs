@@ -1,13 +1,13 @@
 //! Search-match highlighting for the process table.
 //!
 //! Match geometry comes exclusively from
-//! `taskmanager_application::text::match_ranges_ascii_ci` (ADR-020) — this
+//! `taskmanager_core::core::text::match_ranges_ascii_ci` (ADR-020) — this
 //! module only splits a name into plain/highlighted segments around those
 //! byte ranges. The matcher guarantees every range falls on a UTF-8
 //! character boundary, so byte slicing (`&text[range]`) is safe for any
 //! text, including non-ASCII names.
 
-use taskmanager_application::text::match_ranges_ascii_ci;
+use taskmanager_core::core::text::match_ranges_ascii_ci;
 
 /// Split `text` into display segments, marking which ones matched `query`.
 ///

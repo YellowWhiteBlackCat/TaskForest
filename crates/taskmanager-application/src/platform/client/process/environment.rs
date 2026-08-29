@@ -1,6 +1,7 @@
 //! Submission helper for the independently scheduled Environment insight
 //! facet (working directory + bounded environment table).
 
+use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_platform_contract::{RequestId, SubmissionError};
 
 use crate::platform::{ProcessEnvironmentRequest, ProcessInsightFacet};
@@ -10,7 +11,7 @@ use super::super::{PlatformClient, submit_request};
 impl PlatformClient {
     pub(super) fn submit_process_environment(
         &mut self,
-        target: &crate::FrozenProcessIdentity,
+        target: &FrozenProcessIdentity,
         revision: crate::ProcessInsightsRevision,
         submitted_at_ms: u64,
     ) -> Result<RequestId, SubmissionError> {

@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use taskmanager_application::FrozenProcessIdentity;
+use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_shell::SortCol;
 
 use super::DetailsSection;

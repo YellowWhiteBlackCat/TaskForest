@@ -5,8 +5,8 @@
 //! existence facts (SMART health, removable media) omit their rows when the
 //! host does not have them.
 
-use crate::core::metrics::DiskMetrics;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::DiskMetrics;
 
 use crate::gpui_app::formatting::{DisplayUnits, UnitKind};
 use taskmanager_shell::viewmodel::StatRow;

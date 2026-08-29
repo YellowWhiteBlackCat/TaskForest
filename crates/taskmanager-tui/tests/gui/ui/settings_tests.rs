@@ -29,7 +29,7 @@ fn form_navigation_wraps_at_edges_and_changes_values() {
     form.field = 29;
     form.step_value(1);
     assert!(form.history_persistence);
-    let mut config = taskmanager_application::Config::default();
+    let mut config = taskmanager_core::core::config::Config::default();
     let mut theme = crate::ThemeParams::default();
     apply_settings_to_config(&form, &mut config, &mut theme);
     assert!(config.history_persistence);
@@ -116,4 +116,98 @@ fn language_tokens_round_trip_with_unknown_falling_back_to_english() {
         Some(taskmanager_application::i18n::Language::En)
     );
     assert_eq!(SettingsForm::language_for_token(None), None);
+}
+
+/// Every overlay label must come from the shared i18n catalog; a label that
+/// leaks its raw catalog key means a `t()` wrapper was forgotten at a call
+/// site (visible in every locale, not just English).
+#[test]
+fn overlay_labels_resolve_through_the_shared_catalog() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    let mut app = crate::demo_app();
+    app.toggle_settings();
+
+    let backend = ratatui::backend::TestBackend::new(70, 34);
+    let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+    terminal
+        .draw(|frame| {
+            render_settings_overlay_at(
+                frame,
+                &app.settings_form,
+                crate::TuiTheme::default(),
+                crate::ui::frame_plan::TuiFocusPlan {
+                    target: crate::ui::frame_plan::TuiFocusTarget::LocalSurface(
+                        crate::TuiSurfaceKind::Settings,
+                    ),
+                    order: crate::ui::frame_plan::TuiFocusOrder::None,
+                    control: crate::ui::frame_plan::TuiFocusControl::SettingsField(0),
+                },
+                ratatui::layout::Rect::new(0, 0, 68, 32),
+            );
+        })
+        .expect("draw");
+    let text = terminal.backend().to_string();
+    assert!(
+        !text.contains("settings."),
+        "overlay labels must resolve through the shared catalog instead of \
+         leaking raw keys, got:\n{text}"
+    );
+}
+
+/// TUI-002 tail: a successful settings save reconciles the Performance
+/// resource anchor in the SAME call. Closing the family of the currently
+/// selected resource fails closed to the first still-backed resource
+/// immediately (the save must not wait for the next platform batch to
+/// reconcile), and re-opening a family only adds resources, so the live
+/// selection never drifts.
+#[test]
+fn settings_save_reconciles_the_perf_device_selection_immediately() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    let mut app = crate::demo_app();
+    assert!(
+        app.visible_perf_devices()
+            .contains(&crate::PerfDevice::Disk),
+        "the demo fixture must back the Disk resource for this scenario"
+    );
+
+    // Select Disk, close its family, save: the anchor must fall back now,
+    // before any new platform batch arrives.
+    app.select_perf_device(crate::PerfDevice::Disk);
+    app.begin_settings_edit();
+    app.settings_form.show[2] = false;
+    assert!(
+        app.apply_settings_form(),
+        "demo-mode saves apply locally without a config client"
+    );
+    let visible = app.visible_perf_devices();
+    assert!(
+        !visible.contains(&crate::PerfDevice::Disk),
+        "the closed family must be gone from the visible set"
+    );
+    assert_eq!(
+        Some(app.perf_device),
+        visible.first().copied(),
+        "the selection must fail closed to the first still-backed resource"
+    );
+
+    // Re-opening the family adds resources only: no drift.
+    let reconciled = app.perf_device;
+    app.begin_settings_edit();
+    app.settings_form.show[2] = true;
+    assert!(app.apply_settings_form());
+    assert_eq!(
+        app.perf_device, reconciled,
+        "enabling a family must not move the selection"
+    );
+    assert!(
+        app.visible_perf_devices()
+            .contains(&crate::PerfDevice::Disk),
+        "the reopened family is selectable again"
+    );
 }

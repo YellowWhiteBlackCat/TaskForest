@@ -180,7 +180,7 @@ impl HistoryRuntimeState {
 
     pub(in crate::gpui_app) fn record_sink(
         &self,
-    ) -> Option<std::sync::Arc<dyn taskmanager_application::HistoryRecordSink>> {
+    ) -> Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>> {
         match &self.resources {
             HistoryRuntimeResources::Active(session) => {
                 Some(session.persistence.record_sink.clone())

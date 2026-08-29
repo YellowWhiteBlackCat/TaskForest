@@ -35,7 +35,7 @@ pub const NAV_RAIL_WIDTH: f32 = 144.0;
 pub const PERFORMANCE_MAIN_MIN_WIDTH: f32 = 360.0;
 pub const PERFORMANCE_STATS_MIN_WIDTH: f32 = 236.0;
 pub const PERFORMANCE_STATS_MAX_WIDTH: f32 = 280.0;
-pub const PERFORMANCE_SIDEBAR_MIN_WIDTH: f32 = 220.0;
+pub const PERFORMANCE_SIDEBAR_MIN_WIDTH: f32 = 248.0;
 pub const PERFORMANCE_SIDEBAR_MAX_WIDTH: f32 = 460.0;
 pub const PERFORMANCE_SLOT_GAP: f32 = 12.0;
 /// Stacked statistics rail height (GPUI `PERFORMANCE_STATS_STACK_HEIGHT`
@@ -46,6 +46,13 @@ pub const PERFORMANCE_STATS_STACK_HEIGHT: f32 = 220.0;
 /// header band + headline tier floor + summary row + shared gaps. Below this
 /// height the page degrades to the Floor rung.
 pub const PERFORMANCE_RUNWAY_CORE_FLOOR: f32 = 380.0;
+/// Content height from which the FULL chart inventory (Charts rung — the
+/// per-core matrix included) composes. GPUI's actual 780px window carries the
+/// full inventory at a ~652px content height (ICED-024-8); the 700px
+/// CONSTRAINED_CONTENT_HEIGHT belongs to the separate VerticalSpace density
+/// axis and kept the per-core matrix below the fold on the very window GPUI
+/// shows it in.
+pub const CHART_INVENTORY_MIN_CONTENT_HEIGHT: f32 = 650.0;
 /// The Iced root chrome (page scaffold padding + spacing + nav row + footer)
 /// that the shared rung thresholds must be measured without. GPUI's
 /// `FrameBudget` already excludes chrome; Iced subtracts this typed constant
@@ -204,7 +211,7 @@ impl PerformanceVerticalRunway {
     /// threshold; the Core threshold is the composed core-stack floor.
     #[must_use]
     pub const fn for_content_height(height: f32) -> Self {
-        if height >= CONSTRAINED_CONTENT_HEIGHT {
+        if height >= CHART_INVENTORY_MIN_CONTENT_HEIGHT {
             Self::Charts
         } else if height >= PERFORMANCE_RUNWAY_CORE_FLOOR {
             Self::Core

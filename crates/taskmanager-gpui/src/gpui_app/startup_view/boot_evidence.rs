@@ -8,14 +8,15 @@
 
 use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, relative};
 
-use crate::core::startup::{
+use crate::gpui_app::formatting;
+use taskmanager_application::i18n;
+use taskmanager_core::core::startup::{
     BootTimeline, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     StartupBootEvidenceSnapshot,
 };
-use crate::gpui_app::formatting;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Color, Theme};
-use crate::i18n;
+use taskmanager_theme::Color;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 // ── boot evidence strip: failed units + critical chain ──────────────────────
 //
@@ -56,7 +57,7 @@ fn critical_chain_summary(evidence: &StartupBootEvidenceSnapshot) -> Option<Stri
     if evidence.critical_chain_failure.is_some() {
         return Some(i18n::t("startup.evidence_unavailable").to_string());
     }
-    let measured: Vec<&crate::core::startup::StartupCriticalChainNode> = evidence
+    let measured: Vec<&taskmanager_core::core::startup::StartupCriticalChainNode> = evidence
         .critical_chain
         .iter()
         .filter(|node| node.duration_ms.is_some())
@@ -195,16 +196,17 @@ pub(super) fn format_delta_ms(delta_ms: i64) -> String {
 pub(super) fn boot_timeline_block(
     theme: &Theme,
     evidence: Option<&StartupBootEvidenceSnapshot>,
-    baseline: Option<&crate::core::BootTimeline>,
+    baseline: Option<&taskmanager_core::core::BootTimeline>,
     row_limit: usize,
 ) -> Option<Div> {
     let evidence = evidence?;
     let timeline = boot_timeline_rows(evidence)?;
     let deltas = baseline.map(|baseline| {
-        crate::core::segment_deltas(&timeline, baseline)
+        taskmanager_core::core::segment_deltas(&timeline, baseline)
             .into_iter()
             .map(|delta| (delta.unit.clone(), delta))
-            .collect::<std::collections::HashMap<String, crate::core::BootSegmentDelta>>()
+            .collect::<std::collections::HashMap<String, taskmanager_core::core::BootSegmentDelta>>(
+            )
     });
     let mut rows: Vec<Div> = timeline
         .segments

@@ -1,0 +1,62 @@
+name: 问题报告
+description: 报告 TaskForest 的缺陷或错误行为
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢报告问题。TaskForest 是跨平台系统监视器，环境差异是最常见的根因，
+        请尽量填写环境信息。注意：请勿附带可能泄露隐私的真实主机截图或系统快照。
+  - type: dropdown
+    id: os
+    attributes:
+      label: 操作系统与显示服务器
+      options:
+        - Linux / Wayland
+        - Linux / X11
+        - Windows
+        - macOS
+    validations:
+      required: true
+  - type: input
+    id: os-version
+    attributes:
+      label: 系统版本
+      description: 例如 Debian 13、Windows 11 24H2、macOS 15.5；Linux 可附发行版与内核版本
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: 安装方式
+      options:
+        - DEB
+        - RPM
+        - MSI
+        - AUR
+        - 源码构建
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: TaskForest 版本
+      description: 应用内可见的版本号，或 git 提交
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: 现象
+      description: 期望行为、实际行为、复现步骤
+    validations:
+      required: true
+  - type: textarea
+    id: permissions
+    attributes:
+      label: 权限相关
+      description: 是否出现 polkit / UAC 提示；以普通用户运行时哪些数据标记为不可用
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志或补充信息

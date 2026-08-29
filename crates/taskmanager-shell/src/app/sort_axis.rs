@@ -1,7 +1,7 @@
 //! The single `SortCol → ProcessSortAxis` mapping every frontend consumes
 //! (ADR-027 single source of ordering semantics).
 //!
-//! The tree/flat/category row sorts in GPUI, Iced, and the TUI all project
+//! The tree/flat/category row sorts in GPUI, Iced, TUI, and Bevy all project
 //! through the neutral
 //! [`taskmanager_application::process_sort::compare_processes`] comparator;
 //! this module is the only place a shell [`SortCol`] is translated into that
@@ -22,8 +22,8 @@
 //! which genuinely lack per-axis data for some columns.
 
 use super::sorting::SortCol;
-use taskmanager_application::ProcessSortKey;
 use taskmanager_application::process_sort::ProcessSortAxis;
+use taskmanager_core::core::process::ProcessSortKey;
 
 /// Map a process-table column onto the neutral comparator axis. The single
 /// exhaustive translation — consumers are shell `SortCol::ascending`, the

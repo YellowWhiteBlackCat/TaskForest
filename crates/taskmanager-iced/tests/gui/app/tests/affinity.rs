@@ -13,7 +13,7 @@ fn process_affinity_editor_freezes_identity_and_applies_a_sorted_mask() {
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::ProcessAffinity(Some(
             taskmanager_application::ProcessAffinityReady {
-                request_id: taskmanager_application::RequestId::MIN,
+                request_id: taskmanager_platform_contract::RequestId::MIN,
                 target: target.clone(),
                 cpus: vec![2, 0],
             },

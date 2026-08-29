@@ -1,11 +1,11 @@
 //! Linux startup-entry and session providers.
 
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     SessionControlAction, SessionId, SessionItem, StartupBootEvidenceSnapshot, StartupEntry,
 };
-use taskmanager_platform_contract::{
-    PartialSourceSnapshot, ProviderFailure, ProviderId, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     SessionControlProvider, SessionInventoryProvider, StartupControlProvider,
     StartupEvidenceProvider, StartupInventoryProvider,

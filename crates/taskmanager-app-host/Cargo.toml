@@ -16,6 +16,7 @@ taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-core = { path = "../taskmanager-core" }
 taskmanager-history-store = { path = "../taskmanager-history-store" }
 taskmanager-platform-native = { path = "../taskmanager-platform-native", default-features = false }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
 crossbeam-channel = "0.5"
 ctrlc = { version = "3.5", features = ["termination"] }

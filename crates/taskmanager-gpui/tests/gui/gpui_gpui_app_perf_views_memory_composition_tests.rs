@@ -1,9 +1,9 @@
-use crate::core::FailureKind;
-use crate::core::metrics::{
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::metrics::{
     MemoryCompositionObservations, MemoryMetrics, MemoryOptionalObservations,
     MemoryScalarObservations, OptionalObservation, ScalarObservation,
 };
-use crate::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 use super::memory_segments;
 

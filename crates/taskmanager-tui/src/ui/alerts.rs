@@ -2,7 +2,7 @@
 //!
 //! Surfaces the shared [`AlertEngine::suggest_threshold`] heuristic that the
 //! `--suggest-thresholds` CLI already exposes, but driven from the TUI's own
-//! rolling window (see [`crate::history::LiveGraphHistory`]) so the proposal
+//! rolling window (see [`taskmanager_telemetry_store::live_graph::LiveGraphHistory`]) so the proposal
 //! becomes principled once enough telemetry accrues.
 //!
 //! Honesty contract (mirrored verbatim from `src/cli.rs`): an `Insufficient`
@@ -19,11 +19,11 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use taskmanager_application::ManagedAlertRule;
-use taskmanager_application::alerts::{
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::alerts::{
     AlertMetric, AlertSeverity, InsufficientReason, SUGGESTION_MIN_SAMPLES, SuggestedThreshold,
     SuggestionBasis, SuggestionConfidence,
 };
-use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::IconId;
 
 use crate::TuiTheme;
@@ -32,13 +32,28 @@ use crate::TuiTheme;
 /// if the terminal is too small for a readable box. The overlay is driven by
 /// [`crate::TuiApp::history`]; it never reads the point-in-time snapshot directly, so
 /// a stale latest snapshot cannot leak a fabricated threshold into the view.
+#[cfg(test)]
+#[allow(dead_code)]
 pub fn render_suggestions_overlay(
     frame: &mut Frame<'_>,
     app: &crate::TuiApp,
     theme: TuiTheme,
     area: Rect,
 ) {
-    let popup = centered(area, 74, 22);
+    render_suggestions_overlay_at(
+        frame,
+        app,
+        theme,
+        super::planned_popup(area, crate::TuiInputScope::Suggestions),
+    );
+}
+
+pub(super) fn render_suggestions_overlay_at(
+    frame: &mut Frame<'_>,
+    app: &crate::TuiApp,
+    theme: TuiTheme,
+    popup: Rect,
+) {
     frame.render_widget(Clear, popup);
     let block = Block::new()
         .borders(Borders::ALL)
@@ -46,7 +61,7 @@ pub fn render_suggestions_overlay(
         .style(Style::new().bg(theme.overlay_bg))
         .title(format!(
             " {} {} ",
-            crate::icon_glyph(IconId::Settings),
+            theme.glyph(IconId::Settings),
             t("alerts.threshold_suggestions")
         ));
     let inner = block.inner(popup);
@@ -76,7 +91,10 @@ pub fn render_suggestions_overlay(
         Paragraph::new(vec![
             Line::from(""),
             Line::from(vec![
-                Span::styled(" T / Esc ", Style::new().fg(Color::Black).bg(theme.accent)),
+                Span::styled(
+                    " T / Esc ",
+                    Style::new().fg(theme.color(Color::Black)).bg(theme.accent),
+                ),
                 Span::styled(
                     format!("  {}   ", t("chrome.close")),
                     Style::new().fg(theme.dim),
@@ -100,7 +118,7 @@ pub(crate) fn metric_line(
     theme: TuiTheme,
 ) -> Line<'static> {
     let label = Span::styled(
-        format!("{:<18}", metric_label(row)),
+        super::text::pad_cells(metric_label(row), 18),
         Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
     );
     match suggestion {
@@ -198,7 +216,7 @@ pub(crate) fn managed_rule_line(managed: &ManagedAlertRule, theme: TuiTheme) -> 
     };
     Line::from(vec![
         Span::styled(
-            format!("{:<18}", metric_label(managed.rule.metric)),
+            super::text::pad_cells(metric_label(managed.rule.metric), 18),
             Style::new().fg(severity).add_modifier(Modifier::BOLD),
         ),
         Span::styled(
@@ -270,17 +288,6 @@ fn confidence_label(confidence: SuggestionConfidence) -> &'static str {
     match confidence {
         SuggestionConfidence::Low => "low",
         SuggestionConfidence::High => "high",
-    }
-}
-
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width.saturating_sub(4));
-    let height = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        height,
-        width,
     }
 }
 

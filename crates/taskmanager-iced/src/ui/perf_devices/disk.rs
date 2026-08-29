@@ -4,7 +4,8 @@ use std::rc::Rc;
 
 use super::*;
 use iced::Element;
-use taskmanager_application::{DiskMetrics, DiskPartition, SystemSnapshot};
+use taskmanager_core::core::metrics::{DiskMetrics, DiskPartition, SystemSnapshot};
+
 use taskmanager_shell::presentation::{
     device_status_i18n_key, effective_smart_status, has_smart_fields, missing_value,
     smart_section_visible,
@@ -217,7 +218,7 @@ pub(crate) fn disk_section(
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let snapshot = app.shell.projection().snapshot.as_ref();
     let theme_snapshot = app.theme();
-    let color = theme::color(theme_snapshot.disk);
+    let color = taskmanager_theme::iced::color(theme_snapshot.disk);
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let mut disk_graph = app.graph_prefs();
     disk_graph.hover = true;
@@ -463,7 +464,7 @@ pub(crate) fn partition_panel<'a>(
 /// One mounted partition's identity row + usage row + 6px family bar (GPUI
 /// `partition_row` parity).
 fn partition_row<'a>(
-    partition: &taskmanager_application::DiskPartition,
+    partition: &taskmanager_core::core::metrics::DiskPartition,
     observed: &super::projection::PartitionObservation,
     theme_snapshot: &'a taskmanager_theme::Theme,
     units: UnitPrefs,
@@ -489,7 +490,9 @@ fn partition_row<'a>(
             )
         }
         _ => (
-            if partition.device_state.status == taskmanager_application::DeviceStatus::Healthy {
+            if partition.device_state.status
+                == taskmanager_core::core::device_state::DeviceStatus::Healthy
+            {
                 t("disk.usage_unavailable").to_string()
             } else {
                 t(device_status_i18n_key(partition.device_state.status)).to_string()
@@ -500,8 +503,8 @@ fn partition_row<'a>(
 
     // 6px family-colored progress bar (FillPortion siblings keep the measured
     // fraction visible on Iced).
-    let bar_fill_color = theme::color(theme_snapshot.disk);
-    let bar_bg = theme::color(theme_snapshot.shade);
+    let bar_fill_color = taskmanager_theme::iced::color(theme_snapshot.disk);
+    let bar_bg = taskmanager_theme::iced::color(theme_snapshot.shade);
     let progress_bar_content = match usage.1 {
         Some(value) => {
             let fill_portion = ((value * 1000.0).round() as u16).clamp(1, 1000);

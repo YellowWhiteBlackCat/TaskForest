@@ -1,5 +1,6 @@
 use super::*;
-use taskmanager_application::{ContainerSummary, FailureKind};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process_telemetry::ContainerSummary;
 
 fn healthy_rollup() -> ContainerRollup {
     let mut rollup = ContainerRollup::empty_healthy(1_000);

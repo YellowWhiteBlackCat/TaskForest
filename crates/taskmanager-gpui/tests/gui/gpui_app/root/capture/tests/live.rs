@@ -1,6 +1,6 @@
 use super::super::{CaptureEvidence, CaptureScenario, SystemSnapshot, TopPage};
-use crate::core::metrics::DiskPartition;
-use crate::core::{
+use taskmanager_core::core::metrics::DiskPartition;
+use taskmanager_core::core::{
     BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceState, PowerSupplySnapshot,
     ScalarObservation,
 };

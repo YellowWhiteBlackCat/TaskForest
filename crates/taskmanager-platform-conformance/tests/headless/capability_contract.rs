@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_application::CapabilityDescriptor;
+use taskmanager_platform_contract::CapabilityDescriptor;
 
 #[test]
 fn surface_descriptors_accepts_the_exact_declared_table() {

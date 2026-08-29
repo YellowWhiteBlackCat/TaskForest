@@ -78,11 +78,16 @@ fn click_row(vcx: &mut VisualTestContext, index: usize) {
     });
 }
 
-fn assert_selected(cx: &mut TestAppContext, view: &Entity<RootView>, key: ProcessRowKey) {
-    assert_eq!(
-        view.read_with(cx, |v, _| v.selected_process_row()),
-        Some(key)
-    );
+fn assert_selected(cx: &mut TestAppContext, view: &Entity<RootView>, pid: u32) {
+    view.read_with(cx, |v, _| {
+        let expected = v
+            .processes()
+            .iter()
+            .find(|process| process.pid == pid)
+            .and_then(taskmanager_shell::ProcessRowIdentity::from_process)
+            .map(taskmanager_shell::ProcessRowId::Process);
+        assert_eq!(v.selected_process_row(), expected);
+    });
 }
 
 /// Mirror of iced's
@@ -98,7 +103,7 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
 
     click_row(&mut vcx, 1);
-    assert_selected(cx, &view, ProcessRowKey::Process(100));
+    assert_selected(cx, &view, 100);
 
     // Handler-liveness probes: Alt+Left/Right must reach the focused row's
     // handler and step the column cursor both ways (Name → User → Name).
@@ -118,7 +123,7 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
     // Right on the already-expanded root: an honest no-op — the selection
     // holds and nothing enters the collapsed set.
     press(cx, win, "right");
-    assert_selected(cx, &view, ProcessRowKey::Process(100));
+    assert_selected(cx, &view, 100);
     assert!(
         view.read_with(cx, |v, _| v.processes_state.collapsed.is_empty()),
         "Right on an expanded row must not collapse anything"
@@ -127,7 +132,7 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
     // Down to the child; Left collapses ITS subtree while the selection stays
     // on the collapsed row.
     press(cx, win, "down");
-    assert_selected(cx, &view, ProcessRowKey::Process(101));
+    assert_selected(cx, &view, 101);
     // The handler must still own the keyboard after the selection moved.
     press(cx, win, "alt-right");
     assert_eq!(
@@ -137,7 +142,7 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
     );
     press(cx, win, "alt-left");
     press(cx, win, "left");
-    assert_selected(cx, &view, ProcessRowKey::Process(101));
+    assert_selected(cx, &view, 101);
     assert!(
         view.read_with(cx, |v, _| v.processes_state.collapsed.contains(&101)),
         "Left must record 101 in the collapsed set"
@@ -157,7 +162,7 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
     // its parent (100).
     press(cx, win, "left");
     // "Left on a collapsed node moves the selection to the parent"
-    assert_selected(cx, &view, ProcessRowKey::Process(100));
+    assert_selected(cx, &view, 100);
 
     // Down + Right re-expands the child's subtree.
     press(cx, win, "down");
@@ -166,7 +171,7 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
         !view.read_with(cx, |v, _| v.processes_state.collapsed.contains(&101)),
         "Right on the collapsed child re-expands its subtree"
     );
-    assert_selected(cx, &view, ProcessRowKey::Process(101));
+    assert_selected(cx, &view, 101);
     view.update(cx, |v, _cx| {
         let (rows, _, _) = v.processes_projection();
         assert_eq!(rows.len(), 4, "the re-expanded subtree restores all rows");
@@ -187,7 +192,7 @@ async fn structural_keys_act_on_the_live_selection_not_the_focused_row(cx: &mut 
 
     // Click the LEAF row (102): row focus + selection on the leaf.
     click_row(&mut vcx, 3);
-    assert_selected(cx, &view, ProcessRowKey::Process(102));
+    assert_selected(cx, &view, 102);
     press(cx, win, "right");
     assert_eq!(
         view.read_with(cx, |v, _| v.processes_state.column_cursor),
@@ -197,15 +202,15 @@ async fn structural_keys_act_on_the_live_selection_not_the_focused_row(cx: &mut 
 
     // Click the subtree root (100): row focus + selection move there.
     click_row(&mut vcx, 1);
-    assert_selected(cx, &view, ProcessRowKey::Process(100));
+    assert_selected(cx, &view, 100);
 
     // End routes through the root command router: selection jumps to the last
     // visible row (the leaf 102) while row focus remains on row 1.
     press(cx, win, "end");
-    assert_selected(cx, &view, ProcessRowKey::Process(102));
+    assert_selected(cx, &view, 102);
 
     press(cx, win, "left");
-    assert_selected(cx, &view, ProcessRowKey::Process(102));
+    assert_selected(cx, &view, 102);
     assert_eq!(
         view.read_with(cx, |v, _| v.processes_state.column_cursor),
         SortCol::Name,
@@ -239,5 +244,5 @@ async fn alt_right_keeps_column_stepping_on_a_subtree_row(cx: &mut TestAppContex
         "Alt+Right must not collapse the selected row's subtree"
     );
     // "column navigation preserves the selected row"
-    assert_selected(cx, &view, ProcessRowKey::Process(100));
+    assert_selected(cx, &view, 100);
 }

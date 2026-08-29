@@ -1,5 +1,7 @@
-use taskmanager_application::{DeviceDiscovery, DeviceId, ProviderId};
-use taskmanager_core::ProcessResourceObservations;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::process_telemetry::ProcessResourceObservations;
+use taskmanager_platform_contract::DeviceDiscovery;
 
 use super::*;
 
@@ -14,7 +16,7 @@ fn source(outcome: SourceOutcome) -> SourceStatus {
 #[test]
 fn process_resource_health_uses_published_sources_not_coarse_state() {
     let snapshot = ProcessInsightSnapshot {
-        identity: taskmanager_core::ProcessIdentity {
+        identity: taskmanager_core::core::process_telemetry::ProcessIdentity {
             pid: 42,
             start_token: 900,
         },

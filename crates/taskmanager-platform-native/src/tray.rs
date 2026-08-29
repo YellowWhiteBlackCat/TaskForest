@@ -13,8 +13,8 @@
 
 use std::sync::mpsc::Sender;
 
-use taskmanager_core::tray::{TrayEvent, TraySpec};
-pub use taskmanager_platform_contract::{TrayController, TrayFailure};
+use taskmanager_core::core::tray::{TrayEvent, TraySpec};
+use taskmanager_platform_contract::{TrayController, TrayFailure};
 
 /// Spawn the system tray for the given validated spec.
 ///

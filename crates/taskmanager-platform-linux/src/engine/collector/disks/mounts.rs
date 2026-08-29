@@ -6,7 +6,8 @@ use std::ops::Deref;
 use std::path::PathBuf;
 
 use sysinfo::Disks;
-use taskmanager_platform_contract::{ProviderId, SourceStatus};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::SourceStatus;
 
 use super::provenance::SourceFailures;
 

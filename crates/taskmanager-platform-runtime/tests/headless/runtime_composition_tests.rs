@@ -1,6 +1,6 @@
-use taskmanager_application::{
-    CapabilityRequest, DirectoryUsageRequest, ProviderId, automatic_schedules,
-};
+use taskmanager_application::{DirectoryUsageRequest, automatic_schedules};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::CapabilityRequest;
 
 use crate::{ProviderBinding, RuntimeConfig, RuntimeProviderBindings};
 

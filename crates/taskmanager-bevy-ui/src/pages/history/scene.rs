@@ -1,5 +1,7 @@
 //! Bevy scene construction and observer painting for application history.
 
+use bevy::scene::WorldSceneExt;
+
 use super::*;
 use crate::window::WindowPalette;
 
@@ -11,9 +13,13 @@ struct HistoryPageBound;
 /// Build the route-ready page scene from one immutable application
 /// projection. Mainline route registration supplies the projection resource;
 /// this function never reaches into app-host or the process projection.
+/// The History page shell: title, status line, and the EMPTY body container.
+/// The body's only author is [`paint_history`] (bound by the root's
+/// on-insert hook) — a static initial body here would race the paint pass
+/// into a doubled surface, so the container starts empty by contract.
 pub(crate) fn content(
     projection: &ApplicationHistoryProjection,
-    palette: &UiPalette,
+    _palette: &UiPalette,
 ) -> impl Scene + use<> {
     let model = HistoryPageModel::from_projection(projection);
     let title = format!(
@@ -53,9 +59,7 @@ pub(crate) fn content(
                     row_gap: Val::Px(space_2()),
                 }
                 HistoryBody
-                Children [
-                    ( history_body_scene(&model, palette) ),
-                ]
+                Children []
             ),
         ]
     }
@@ -278,12 +282,17 @@ fn paint_history(world: &mut World) {
     let stale: Vec<Entity> = children
         .map(|children| children.iter().copied().collect())
         .unwrap_or_default();
-    let mut commands = world.commands();
+    // Synchronous World mutation, not queued commands: a same-frame second
+    // paint (bind hook + Add can both fire in one flush) must observe the
+    // previous paint's result, or each stale pass spawns a duplicate body.
     for entity in stale {
-        commands.entity(entity).despawn();
+        let _ = world.despawn(entity);
     }
-    let fresh = commands.spawn_scene(scene).id();
-    commands.entity(body).add_one_related::<ChildOf>(fresh);
+    let fresh = world
+        .spawn_scene(scene)
+        .expect("the repainted history body resolves without assets")
+        .id();
+    world.entity_mut(body).add_one_related::<ChildOf>(fresh);
     let mut lines = world.query_filtered::<&mut Text, With<HistoryStatusLine>>();
     if let Ok(mut line) = lines.single_mut(world) {
         line.0 = summary_text(&model);

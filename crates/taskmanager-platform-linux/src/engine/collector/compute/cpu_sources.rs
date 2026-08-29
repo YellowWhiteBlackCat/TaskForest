@@ -4,8 +4,10 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::metrics::CpuTemperatureSource;
-use taskmanager_platform_contract::{FailureKind, ProviderId, SourceOutcome, SourceStatus};
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 mod temperatures;
 use temperatures::observe_temperatures_from_paths;

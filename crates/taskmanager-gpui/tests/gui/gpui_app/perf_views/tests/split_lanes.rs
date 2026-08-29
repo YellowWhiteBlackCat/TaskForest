@@ -6,11 +6,11 @@ use super::*;
 
 // ── two-series main graphs (disk read/write, NIC rx/tx) ────────────────────
 
-use crate::core::{
+use std::collections::BTreeMap;
+use taskmanager_core::core::{
     DeviceLifecycle, DevicePresence, DiskScalarObservations, NetworkScalarObservations,
     NetworkTelemetryObservation, StorageTelemetryObservation,
 };
-use std::collections::BTreeMap;
 
 fn split_storage_observation(
     device_id: &str,
@@ -89,7 +89,7 @@ fn split_network_observation(
 async fn disk_and_network_pages_paint_two_series_legends_from_split_lanes(cx: &mut TestAppContext) {
     for key in ["disk.read", "disk.write", "net.receive", "net.send"] {
         assert_ne!(
-            crate::i18n::t(key),
+            taskmanager_application::i18n::t(key),
             key,
             "the legend direction labels must be localized product keys"
         );

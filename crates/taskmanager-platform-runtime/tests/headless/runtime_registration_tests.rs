@@ -1,4 +1,6 @@
-use taskmanager_application::{CapabilityStatus, CommandLaunchRequest, ProviderId};
+use taskmanager_application::CommandLaunchRequest;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::CapabilityStatus;
 
 use super::*;
 

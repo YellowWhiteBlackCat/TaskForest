@@ -1,7 +1,7 @@
 use super::*;
-use taskmanager_application::ServiceLogQuery;
 #[cfg(windows)]
 use taskmanager_core::ServiceLogState;
+use taskmanager_core::core::services::ServiceLogQuery;
 
 #[test]
 fn non_windows_service_inventory_is_isolated_and_typed() {

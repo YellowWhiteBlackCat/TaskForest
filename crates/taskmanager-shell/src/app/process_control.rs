@@ -10,10 +10,10 @@
 //! one typed completion emitted to the batch fold, and the post-completion
 //! process-list refresh request GPUI issues.
 use super::SystemProjectionStore;
-use taskmanager_application::{
-    CapabilityId, FailureKind, FrozenProcessIdentity, OperationFailure, ProcessSignal, RequestId,
-    ResourceGroupLimitRequest,
-};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessSignal};
+use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
+use taskmanager_platform_contract::{CapabilityId, OperationFailure, RequestId};
 
 /// Which renderer-neutral process-control operation a completion reports.
 /// Completion events are success signals; correlated failures arrive as

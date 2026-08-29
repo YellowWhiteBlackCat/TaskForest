@@ -1,13 +1,13 @@
 use gpui::{AppContext, Modifiers, TestAppContext, VisualTestContext, px};
 
-use crate::core::device_state::DeviceState;
-use crate::core::metrics::{DiskMetrics, ScalarObservation};
-use crate::core::{
+use crate::gpui_app::root::RootView;
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::metrics::{DiskMetrics, ScalarObservation};
+use taskmanager_core::core::{
     DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageEntry,
     DirectoryUsageSnapshot, FailureKind,
 };
-use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 use super::*;
 
@@ -126,7 +126,9 @@ fn entry_with_unreadable_subtree_renders_the_typed_state_not_a_zero() {
     assert!(unreadable.unreadable.is_some());
     assert_eq!(
         unreadable.size_bytes.availability(),
-        crate::core::metrics::ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
+        taskmanager_core::core::metrics::ScalarAvailability::Unavailable(
+            FailureKind::PermissionDenied
+        )
     );
 }
 

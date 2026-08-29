@@ -1,9 +1,11 @@
 //! Request-correlated command, resource-reveal and URL-open lifecycle.
 
 use crate::{
-    CapabilityId, CommandLaunchRequest, FailureKind, RequestAttemptId, RequestCorrelation,
-    RequestId, ResourceRevealRequest, ShellEvent, UrlOpenRequest,
+    CommandLaunchRequest, RequestAttemptId, RequestCorrelation, ResourceRevealRequest, ShellEvent,
+    UrlOpenRequest,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_platform_contract::{CapabilityId, RequestId};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ShellUiActionIntent {

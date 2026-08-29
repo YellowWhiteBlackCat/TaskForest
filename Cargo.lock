@@ -29,6 +29,20 @@ dependencies = [
 
 [[package]]
 name = "accesskit_atspi_common"
+version = "0.18.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1e8c61bee90b42a772d39d06a740207dc71a4e780004ace1db8d99fb1baaa954"
+dependencies = [
+ "accesskit",
+ "accesskit_consumer 0.36.0",
+ "atspi-common",
+ "phf 0.13.1",
+ "serde",
+ "zvariant",
+]
+
+[[package]]
+name = "accesskit_atspi_common"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "023da0e5097f46df7092d5280b02efb9bbf8d93298daeced42652463e357d636"
@@ -46,6 +60,16 @@ name = "accesskit_consumer"
 version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "53cf47daed85312e763fbf85ceca136e0d7abc68e0a7e12abe11f48172bc3b10"
+dependencies = [
+ "accesskit",
+ "hashbrown 0.16.1",
+]
+
+[[package]]
+name = "accesskit_consumer"
+version = "0.36.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25e0d7e25d06f4dc21d1774d67146e9e80d6789216cbd4d1e88185b0095dba60"
 dependencies = [
  "accesskit",
  "hashbrown 0.16.1",
@@ -77,12 +101,30 @@ dependencies = [
 
 [[package]]
 name = "accesskit_unix"
+version = "0.21.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b016ca8db0ea0ea2ceff29a9d6240391492d960716aa471967c00e8cc8cb197c"
+dependencies = [
+ "accesskit",
+ "accesskit_atspi_common 0.18.1",
+ "async-channel 2.5.0",
+ "async-executor",
+ "async-task",
+ "atspi",
+ "futures-lite 2.6.1",
+ "futures-util",
+ "serde",
+ "zbus",
+]
+
+[[package]]
+name = "accesskit_unix"
 version = "0.22.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "03e156ed3802e35eefe894ef2671bc6c889303d8a7e110b5e1b48f504b91362f"
 dependencies = [
  "accesskit",
- "accesskit_atspi_common",
+ "accesskit_atspi_common 0.19.1",
  "async-channel 2.5.0",
  "async-executor",
  "async-task",
@@ -115,6 +157,7 @@ checksum = "1fe9a94394896352cc4660ca2288bd4ef883d83238853c038b44070c8f134313"
 dependencies = [
  "accesskit",
  "accesskit_macos",
+ "accesskit_unix 0.21.1",
  "accesskit_windows",
  "raw-window-handle",
  "winit",
@@ -1408,6 +1451,7 @@ version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd610a417e7b4a3b9602cf11264d16cbbff8eabe689c5fed8be4e84c6a2680a3"
 dependencies = [
+ "async-io",
  "critical-section",
  "foldhash 0.2.0",
  "futures-channel",
@@ -2881,12 +2925,10 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 [[package]]
 name = "cryoglyph"
 version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "08bc795bdbccdbd461736fb163930a009da6597b226d6f6fce33e7a8eb6ec519"
 dependencies = [
  "cosmic-text 0.15.0",
  "etagere",
- "lru 0.16.4",
+ "lru",
  "rustc-hash 2.1.3",
  "wgpu 27.0.1",
 ]
@@ -5680,12 +5722,6 @@ dependencies = [
 
 [[package]]
 name = "lru"
-version = "0.16.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f66e8d5d03f609abc3a39e6f08e4164ebf1447a732906d39eb9b99b7919ef39"
-
-[[package]]
-name = "lru"
 version = "0.18.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d2f2f9b4ba7e6b24d95e7e899329d35be83bcded72c8540cdd5368932d1d90a"
@@ -7860,7 +7896,7 @@ dependencies = [
  "hashbrown 0.17.1",
  "itertools 0.14.0",
  "kasuari",
- "lru 0.18.2",
+ "lru",
  "palette",
  "serde",
  "strum 0.28.0",
@@ -9496,6 +9532,7 @@ dependencies = [
  "taskmanager-shell",
  "taskmanager-telemetry-store",
  "taskmanager-test-support",
+ "taskmanager-theme",
  "taskmanager-tui",
  "taskmanager-ui",
  "taskmanager-ui-contract",
@@ -9509,7 +9546,7 @@ version = "0.1.0"
 dependencies = [
  "accesskit",
  "accesskit_consumer 0.38.0",
- "accesskit_unix",
+ "accesskit_unix 0.22.1",
  "taskmanager-ui-contract",
 ]
 
@@ -9529,6 +9566,7 @@ dependencies = [
  "taskmanager-application",
  "taskmanager-core",
  "taskmanager-history-store",
+ "taskmanager-platform-contract",
  "taskmanager-platform-native",
  "taskmanager-platform-runtime",
 ]
@@ -9556,10 +9594,14 @@ dependencies = [
 name = "taskmanager-bevy-ui"
 version = "0.1.0"
 dependencies = [
+ "accesskit",
  "bevy",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
+ "taskmanager-core",
+ "taskmanager-icons",
+ "taskmanager-platform-contract",
  "taskmanager-shell",
  "taskmanager-theme",
  "taskmanager-ui-contract",
@@ -9605,6 +9647,7 @@ dependencies = [
  "taskmanager-assets",
  "taskmanager-core",
  "taskmanager-icons",
+ "taskmanager-platform-contract",
  "taskmanager-shell",
  "taskmanager-telemetry-store",
  "taskmanager-test-support",
@@ -9637,11 +9680,15 @@ dependencies = [
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
+ "taskmanager-core",
  "taskmanager-icons",
+ "taskmanager-platform-contract",
  "taskmanager-shell",
+ "taskmanager-telemetry-store",
  "taskmanager-test-support",
  "taskmanager-theme",
  "taskmanager-ui-contract",
+ "unicode-segmentation",
  "windows 0.58.0",
 ]
 
@@ -9674,6 +9721,7 @@ name = "taskmanager-platform-android"
 version = "0.1.0"
 dependencies = [
  "taskmanager-application",
+ "taskmanager-platform-contract",
  "taskmanager-platform-runtime",
 ]
 
@@ -9794,6 +9842,7 @@ dependencies = [
  "crossbeam-channel",
  "taskmanager-application",
  "taskmanager-core",
+ "taskmanager-platform-contract",
 ]
 
 [[package]]
@@ -9851,6 +9900,8 @@ name = "taskmanager-shell"
 version = "0.1.0"
 dependencies = [
  "taskmanager-application",
+ "taskmanager-core",
+ "taskmanager-platform-contract",
  "taskmanager-telemetry-store",
  "taskmanager-test-support",
  "taskmanager-ui-contract",
@@ -9878,6 +9929,7 @@ name = "taskmanager-theme"
 version = "0.1.0"
 dependencies = [
  "gpui",
+ "iced_core",
 ]
 
 [[package]]
@@ -9897,7 +9949,10 @@ dependencies = [
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
+ "taskmanager-core",
+ "taskmanager-platform-contract",
  "taskmanager-shell",
+ "taskmanager-telemetry-store",
  "taskmanager-test-support",
  "taskmanager-theme",
  "taskmanager-ui-contract",
@@ -9918,6 +9973,7 @@ name = "taskmanager-ui-contract"
 version = "0.1.0"
 dependencies = [
  "taskmanager-application",
+ "taskmanager-platform-contract",
 ]
 
 [[package]]

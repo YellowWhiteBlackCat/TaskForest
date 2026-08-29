@@ -14,7 +14,8 @@
 //! `current_*` accessors return `None` when the observation is unavailable,
 //! so the branches below fall through automatically.
 
-use taskmanager_application::{MemoryMetrics, i18n::t};
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::metrics::MemoryMetrics;
 
 /// Semantic role of one memory-composition segment. Each frontend maps this
 /// to its own theme color (every frontend palette derives from the same

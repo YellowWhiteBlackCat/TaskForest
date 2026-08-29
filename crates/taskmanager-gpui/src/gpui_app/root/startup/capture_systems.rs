@@ -9,7 +9,7 @@ use super::super::{
 };
 use crate::gpui_app::dashboard::SystemSection;
 use crate::gpui_app::first_run::FirstRunPhase;
-use crate::gpui_app::processes_view;
+use taskmanager_application::process_category_projection::category_expansion_key;
 
 pub(super) fn apply_platform_batch(
     view: &mut RootView,
@@ -62,7 +62,7 @@ fn apply_process_capture(view: &mut RootView, processes_updated: bool, cx: &mut 
                 view.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
                 view.capture_evidence.mark_process_batch_ready(
                     view.process_batch_confirmation().is_some(),
-                    view.selected_pids().len(),
+                    view.selected_process_count(),
                 );
             }
             CaptureProcessAction::Properties(pid, section) => {
@@ -161,26 +161,26 @@ fn apply_process_page_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     if view.capture_evidence.process_memory_pss_swap_requested() {
         view.page = TopPage::Apps;
         view.set_process_sort(
-            processes_view::SortCol::Memory,
+            taskmanager_shell::SortCol::Memory,
             taskmanager_shell::SortDir::Desc,
         );
         view.processes_state
             .hidden_cols
-            .remove(&processes_view::SortCol::Swap);
+            .remove(&taskmanager_shell::SortCol::Swap);
     }
 }
 
 fn configure_category_apps(view: &mut RootView) {
     view.page = TopPage::Apps;
     view.set_process_sort(
-        processes_view::SortCol::Cpu,
+        taskmanager_shell::SortCol::Cpu,
         taskmanager_shell::SortDir::Desc,
     );
     view.processes_state.expanded_apps.clear();
     view.processes_state
         .expanded_apps
-        .insert(processes_view::category_expansion_key(
-            crate::core::process::ProcessCategory::Application,
+        .insert(category_expansion_key(
+            taskmanager_core::core::process::ProcessCategory::Application,
         ));
 }
 
@@ -267,7 +267,9 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
     if view.capture_evidence.diagnostic_failure_requested() {
         view.page = TopPage::System;
         view.show_diagnostic_bundle_state(DiagnosticBundleUiState::Failed(
-            crate::core::DiagnosticBundleError::new(crate::core::DiagnosticBundleErrorKind::Io),
+            taskmanager_core::core::DiagnosticBundleError::new(
+                taskmanager_core::core::DiagnosticBundleErrorKind::Io,
+            ),
         ));
         view.capture_evidence
             .mark_diagnostic_failure_ready(matches!(
@@ -281,6 +283,9 @@ fn apply_shell_capture(view: &mut RootView, cx: &mut Context<RootView>) {
         &view.telemetry_ingestor,
         timestamp_ms,
     );
+    if let Some(events) = view.capture_evidence.take_event_history_fixture() {
+        view.shell.replace_alert_event_history(events);
+    }
     if let Some(panel) = panel {
         view.show_dashboard_panel(panel);
     }

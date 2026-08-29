@@ -1,7 +1,8 @@
 //! Typed process-control user feedback.
 
-use crate::i18n;
-use taskmanager_application::{FailureKind, PriorityTier, ProcessSignal};
+use taskmanager_application::i18n;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::{PriorityTier, ProcessSignal};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProcessControlAction {

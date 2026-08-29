@@ -1,6 +1,6 @@
 use super::{BootEvidenceStrip, StartupRow, boot_evidence_strip_data, startup_control_actionable};
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{
+use taskmanager_core::core::startup::{
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode,
     StartupEvidenceFailure, StartupFailedUnit, StartupImpact, StartupImpactEvidence, StartupScope,
     StartupSource,

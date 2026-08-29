@@ -1,37 +1,16 @@
 use super::{DashboardState, EventCenterState, EventKind};
-use crate::core::{Alert, AlertMetric, AlertSeverity};
-use crate::gpui_app::processes_view::{ProcessStatusFilter, SortCol};
-
-fn alert(id: &str) -> Alert {
-    Alert {
-        instance_id: id.into(),
-        rule_id: "rule".into(),
-        target: "system".into(),
-        metric: AlertMetric::CpuUsagePercent,
-        severity: AlertSeverity::Warning,
-        value: 95.0,
-        threshold: 90.0,
-        active_since_ms: 1,
-    }
-}
+use taskmanager_shell::{ProcessStatusFilter, SortCol};
 
 #[test]
-fn event_center_records_only_transitions_and_bounds_storage() {
+fn event_center_reads_shared_history_and_tracks_local_read_state() {
     let mut center = EventCenterState::default();
-    let active = alert("cpu:system");
-    center.observe(&[], std::slice::from_ref(&active), 10);
-    center.observe(
-        std::slice::from_ref(&active),
-        std::slice::from_ref(&active),
-        11,
-    );
-    center.observe(std::slice::from_ref(&active), &[], 12);
-    let events = center.visible_events();
-    assert_eq!(events.len(), 2);
-    assert_eq!(events[0].kind, EventKind::Cleared);
-    assert_eq!(center.unread_count(), 2);
-    center.mark_all_read();
-    assert_eq!(center.unread_count(), 0);
+    let events = EventCenterState::capture_event_fixture();
+    let visible = center.visible_events(&events);
+    assert_eq!(visible.len(), 2);
+    assert_eq!(visible[0].kind, EventKind::Cleared);
+    assert_eq!(center.unread_count(&events), 2);
+    center.mark_all_read(&events);
+    assert_eq!(center.unread_count(&events), 0);
 }
 
 #[test]

@@ -49,6 +49,9 @@ __pycache__/
 # outside the public documentation contract and must never be committed.
 .private/
 
+# Local security-scan findings, reports and scan history — private material.
+.mimosa/
+
 # UI captures are host evidence, not public product assets. Only the policy
 # README is publishable; generated images and receipts stay local.
 docs/screenshots/*

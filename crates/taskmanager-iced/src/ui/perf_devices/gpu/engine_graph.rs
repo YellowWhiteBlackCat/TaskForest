@@ -14,7 +14,10 @@ use crate::ui::responsive::{PerformanceChartInventory, PerformancePageBudget};
 use iced::widget::{column, row, text};
 use iced::{Color, Element, Renderer};
 use taskmanager_application::i18n::t;
-use taskmanager_application::{CapabilityId, DeviceId, GpuEngine, GpuMetrics};
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::{GpuEngine, GpuMetrics};
+use taskmanager_platform_contract::CapabilityId;
+
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricAvailability, GpuChartMetricUnit,
 };

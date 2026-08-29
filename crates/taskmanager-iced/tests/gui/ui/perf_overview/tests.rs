@@ -26,16 +26,18 @@ mod graph_summary_tests {
 
     #[test]
     fn headline_chart_floor_keeps_a_legible_but_bounded_viewport() {
-        // GPUI headline-tier parity: a headline chart inside a scrolling strip
-        // frame keeps the shared 180px floor (the old compact 80px was below
-        // the authority's MAIN_GRAPH_MIN_HEIGHT).
-        assert_eq!(cpu::HEADLINE_CHART_FLOOR, 180.0);
+        // GPUI headline-tier parity, raised to GPUI's actual ~276px presence
+        // at a 780px window (ICED-024-7): the floor keeps the chart legible
+        // while the fixed-viewport frames still bound it by the column.
+        assert_eq!(cpu::HEADLINE_CHART_FLOOR, 240.0);
     }
 }
 
 mod memory_stats_tests {
     use super::*;
-    use taskmanager_application::{FailureKind, OptionalObservation, ScalarObservation};
+    use taskmanager_core::core::failure::FailureKind;
+    use taskmanager_core::core::metrics::{OptionalObservation, ScalarObservation};
+
     use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
     const GIB: u64 = 1024 * 1024 * 1024;

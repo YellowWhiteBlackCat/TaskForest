@@ -1,9 +1,9 @@
 //! Pure stat-row projection for dynamic battery and sensor devices.
 
-use crate::core::{
+use taskmanager_application::i18n;
+use taskmanager_core::core::{
     BatteryInfo, SensorCenterSnapshot, SensorMagnitude, SensorQuantity, SensorReading,
 };
-use crate::i18n;
 use taskmanager_shell::viewmodel::StatRow;
 
 pub(super) fn battery_stats(battery: &BatteryInfo) -> Vec<StatRow> {

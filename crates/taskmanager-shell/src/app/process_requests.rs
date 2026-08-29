@@ -50,30 +50,43 @@ impl ShellApp {
 
     /// Build a batch process-control intent (Kill / Suspend / Resume /
     /// SetPriority) over the selected target set and return it as a renderer-
-    /// neutral [`PlatformEffect::ExecuteBatch`]. Every pid in
-    /// [`Self::selected_pids`] is frozen into the intent via
-    /// [`ProcessBatchIntent::freeze`] so a later list refresh cannot retarget
-    /// it (mirrors [`Self::request_startup_control`]). When the set is empty
-    /// the keyboard anchor is used as a single-target fallback.
+    /// neutral [`PlatformEffect::ExecuteBatch`]. Every identity in
+    /// [`Self::selected_rows`] is resolved exactly (pid AND start token) and
+    /// frozen into the intent via [`ProcessBatchIntent::freeze`] so a later
+    /// list refresh — or a pid reused by a different process — cannot
+    /// retarget it (mirrors [`Self::request_startup_control`]). When the set
+    /// is empty the keyboard anchor is used as a single-target fallback.
     #[must_use]
     pub fn request_process_batch(&mut self, action: ProcessBatchAction) -> Option<PlatformEffect> {
         let destructive = matches!(action, ProcessBatchAction::Kill | ProcessBatchAction::End);
         let processes = self.data.processes.as_deref()?;
         // Prefer the multi-select set; fall back to the keyboard anchor for
-        // single-select callers (the TUI arrow path keeps the set at one pid).
-        if let Some(ProcessRowKey::Application(root_pid)) = self.selected_process_row {
-            let intent = ProcessBatchIntent::freeze_tree(processes, root_pid, action);
+        // single-select callers (the TUI arrow path keeps the set at one row).
+        if let Some(ProcessRowId::Application(root)) = self.selected_row {
+            let intent = ProcessBatchIntent::freeze_tree(processes, root.pid(), action);
             if destructive {
                 self.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
                 return None;
             }
             return Some(PlatformEffect::ExecuteBatch(intent));
         }
-        let pids: Vec<u32> = if self.selected_pids.is_empty() {
+        let pids: Vec<u32> = if self.selected_rows.is_empty() {
             let target_pid = processes.get(self.selected)?.pid;
             vec![target_pid]
         } else {
-            self.selected_pids.iter().copied().collect()
+            // Exact-identity resolution: a pid-reuse impostor never matches.
+            self.selected_rows
+                .iter()
+                .filter_map(|identity| {
+                    processes
+                        .iter()
+                        .find(|process| {
+                            process.pid == identity.pid()
+                                && process.current_start_token() == Some(identity.start_token())
+                        })
+                        .map(|process| process.pid)
+                })
+                .collect()
         };
         let intent = ProcessBatchIntent::freeze(processes, pids, action);
         if destructive {

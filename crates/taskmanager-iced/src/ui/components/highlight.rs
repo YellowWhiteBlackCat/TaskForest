@@ -1,7 +1,8 @@
-//! Search-match highlighting for table cells (ADR-020).
+//! Search-match highlighting — the shared rich-text path of the component
+//! vocabulary (ADR-020).
 //!
 //! Match geometry comes exclusively from the shared
-//! `taskmanager_application::text::match_ranges_ascii_ci`; this module only
+//! `taskmanager_core::core::text::match_ranges_ascii_ci`; this module only
 //! turns those byte ranges into segments and maps them onto iced [`Span`]s.
 //! Iced 0.14's plain `text` widget cannot restyle substrings, so highlighted
 //! cells render as one `Rich` span run: a single widget with the same fixed
@@ -9,10 +10,9 @@
 
 use iced::widget::text::{Rich, Span};
 use iced::{Element, Length};
-use taskmanager_application::text::match_ranges_ascii_ci;
+use taskmanager_core::core::text::match_ranges_ascii_ci;
 
 use crate::app::Message;
-use crate::theme;
 
 /// Split `text` into alternating non-matching/matching segments for `query`.
 ///
@@ -67,8 +67,8 @@ pub fn cell(
     }
 
     let palette = theme_snapshot.palette();
-    let accent = theme::color(palette.accent);
-    let foreground = theme::color(palette.fg);
+    let accent = taskmanager_theme::iced::color(palette.accent);
+    let foreground = taskmanager_theme::iced::color(palette.fg);
 
     let spans: Vec<Span<'static, ()>> = highlight_segments(text, query)
         .into_iter()
@@ -81,5 +81,5 @@ pub fn cell(
 }
 
 #[cfg(test)]
-#[path = "../../tests/gui/ui/highlight_tests.rs"]
+#[path = "../../../tests/gui/ui/highlight_tests.rs"]
 mod tests;

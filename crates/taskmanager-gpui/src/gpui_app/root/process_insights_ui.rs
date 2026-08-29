@@ -8,10 +8,12 @@ use crate::gpui_app::process_insights::{
 };
 use gpui::Context;
 use taskmanager_application::{
-    FailureKind, FrozenProcessIdentity, ProcessInsightFacetState, ProcessInsightUnavailable,
-    ProcessInsightsRevision, ProjectedProcessInsights, SubmissionErrorKind,
-    request_submission_failure,
+    ProcessInsightFacetState, ProcessInsightUnavailable, ProcessInsightsRevision,
+    ProjectedProcessInsights, request_submission_failure,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_platform_contract::SubmissionErrorKind;
 
 use super::{ProcessDetailsSection, RootView, platform_submission_time_ms};
 
@@ -49,7 +51,7 @@ pub(super) enum ProcessInsightsLifecycle {
     },
     Ready {
         request: ProcessInsightsRequest,
-        snapshot: Box<taskmanager_application::ProcessTelemetrySnapshot>,
+        snapshot: Box<taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot>,
     },
     Failed {
         attempt: ProcessInsightsAttempt,

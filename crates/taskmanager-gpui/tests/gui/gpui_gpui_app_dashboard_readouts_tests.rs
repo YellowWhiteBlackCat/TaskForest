@@ -1,5 +1,5 @@
-use crate::core::FailureKind;
-use crate::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::metrics::{CpuMetrics, CpuScalarObservations, ScalarObservation};
 
 use super::cpu_summary_readout;
 

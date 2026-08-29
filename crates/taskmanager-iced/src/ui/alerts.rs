@@ -11,8 +11,8 @@
 
 use iced::widget::{checkbox, column, container, row, scrollable, text};
 use iced::{Element, Length};
-use taskmanager_application::alerts::AlertSeverity;
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::alerts::AlertSeverity;
 use taskmanager_ui_contract::IconId;
 
 use crate::app::alerts::{AlertRuleRowModel, active_alert_lines, empty_state_text, rule_rows};
@@ -33,9 +33,9 @@ fn severity_color(
 ) -> iced::Color {
     let palette = theme_snapshot.palette();
     match severity {
-        AlertSeverity::Critical => theme::color(palette.danger),
-        AlertSeverity::Warning => theme::color(palette.warning),
-        AlertSeverity::Info => theme::color(palette.accent),
+        AlertSeverity::Critical => taskmanager_theme::iced::color(palette.danger),
+        AlertSeverity::Warning => taskmanager_theme::iced::color(palette.warning),
+        AlertSeverity::Info => taskmanager_theme::iced::color(palette.accent),
     }
 }
 

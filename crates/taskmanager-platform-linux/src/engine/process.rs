@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use crate::config::FD_COUNT_REFRESH_EVERY_N_TICKS;
 use sysinfo::{ProcessStatus, System};
-pub use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::{
     FailureKind, ProcessHistorySample, ProcessHistoryStore, ProcessMetadataFailure, ProviderId,
     SourceOutcome, SourceStatus,

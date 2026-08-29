@@ -24,15 +24,14 @@ use taskmanager_application::{
     SessionControlRequest, SessionInventoryRequest, StartupControlRequest, StartupEvidenceRequest,
     StartupInventoryRequest,
 };
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{FailureKind, ProviderId, StartupEntry};
 #[cfg(windows)]
 use taskmanager_core::{
     StartupControlPolicy, StartupEntryId, StartupEntryLocator, StartupImpact,
     StartupImpactEvidence, StartupScope, StartupSource,
 };
-use taskmanager_platform_contract::{
-    PartialSourceSnapshot, ProviderFailure, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     SessionControlProvider, SessionInventoryProvider, StartupControlProvider,
     StartupEvidenceProvider, StartupInventoryProvider,

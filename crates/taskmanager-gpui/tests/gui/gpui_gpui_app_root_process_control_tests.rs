@@ -1,6 +1,6 @@
 use super::*;
 use gpui::AppContext;
-use taskmanager_application::CapabilityId;
+use taskmanager_platform_contract::CapabilityId;
 
 #[test]
 fn typed_submission_errors_preserve_provider_unavailable_presentation() {
@@ -24,7 +24,7 @@ fn typed_submission_errors_preserve_provider_unavailable_presentation() {
 fn accepted_control_feedback_replaces_local_toast_with_one_shell_notice(
     cx: &mut gpui::TestAppContext,
 ) {
-    let entity = cx.new(|cx| RootView::new(crate::gpui_app::theme::Theme::dark(), cx));
+    let entity = cx.new(|cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
     let target = FrozenProcessIdentity::from_authoritative_parts(42, "worker", 10, 99)
         .expect("fixture identity is authoritative");
     let feedback = taskmanager_shell::ProcessControlFeedback {

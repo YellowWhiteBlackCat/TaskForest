@@ -4,12 +4,14 @@ use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
 use taskmanager_application::{
-    CapabilityId, PartialSourceSnapshot, PlatformEvent, ProviderFailure, SessionControlAction,
-    SessionControlOutcome, SessionControlRequest, SessionEvent, SessionId, SessionInventoryRequest,
-    SessionItem, StartupBootEvidenceSnapshot, StartupControlOutcome, StartupControlRequest,
-    StartupEntry, StartupEvent, StartupEvidenceEvent, StartupEvidenceRequest,
-    StartupInventoryRequest,
+    PlatformEvent, SessionControlOutcome, SessionControlRequest, SessionEvent,
+    SessionInventoryRequest, StartupControlOutcome, StartupControlRequest, StartupEvent,
+    StartupEvidenceEvent, StartupEvidenceRequest, StartupInventoryRequest,
 };
+use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
+use taskmanager_core::core::target::SessionId;
+use taskmanager_platform_contract::{CapabilityId, PartialSourceSnapshot, ProviderFailure};
 
 use crate::{
     Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_observation_lane,

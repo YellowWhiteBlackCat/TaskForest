@@ -4,7 +4,7 @@
 //! never zero), and render coverage across every window selection.
 
 use super::*;
-use taskmanager_application::HistoryWindow;
+use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::SystemProjectionStore;
 
 #[test]

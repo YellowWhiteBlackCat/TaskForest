@@ -7,7 +7,9 @@ use taskmanager_application::snapshot_export::{
     SnapshotExportPayload, SnapshotExportSession, SnapshotExportState, SnapshotExportSubmitError,
     SnapshotExportTarget,
 };
-use taskmanager_application::{ProcessItem, SystemSnapshot};
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::process::ProcessItem;
+
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 use tracing::{info, warn};
 
@@ -44,7 +46,7 @@ impl RootView {
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::UntilReplaced,
-                crate::i18n::t("system.export_unavailable"),
+                taskmanager_application::i18n::t("system.export_unavailable"),
             );
             return;
         };
@@ -64,20 +66,20 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Info,
                     FeedbackLifecycle::UntilReplaced,
-                    crate::i18n::t("system.export_queued"),
+                    taskmanager_application::i18n::t("system.export_queued"),
                 );
             }
             Err(SnapshotExportSubmitError::Busy(_)) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
                 FeedbackLifecycle::SHORT,
-                crate::i18n::t("system.export_busy"),
+                taskmanager_application::i18n::t("system.export_busy"),
             ),
             Err(SnapshotExportSubmitError::RequestSpaceExhausted) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
                 FeedbackLifecycle::UntilReplaced,
-                crate::i18n::t("system.export_unavailable"),
+                taskmanager_application::i18n::t("system.export_unavailable"),
             ),
             Err(SnapshotExportSubmitError::Rejected(error)) => {
                 warn!(
@@ -90,7 +92,8 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::UntilReplaced,
-                    crate::i18n::t("system.export_failed").replace("{}", error.detail()),
+                    taskmanager_application::i18n::t("system.export_failed")
+                        .replace("{}", error.detail()),
                 );
             }
         }
@@ -116,7 +119,7 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Success,
                     FeedbackLifecycle::SHORT,
-                    crate::i18n::t("system.export_success").replace("{}", &base),
+                    taskmanager_application::i18n::t("system.export_success").replace("{}", &base),
                 );
             }
             SnapshotExportState::Failed { request, error } => {
@@ -131,7 +134,8 @@ impl RootView {
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
                     FeedbackLifecycle::UntilReplaced,
-                    crate::i18n::t("system.export_failed").replace("{}", error.detail()),
+                    taskmanager_application::i18n::t("system.export_failed")
+                        .replace("{}", error.detail()),
                 );
             }
             SnapshotExportState::Closed

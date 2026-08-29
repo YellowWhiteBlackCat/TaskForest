@@ -6,6 +6,7 @@
 
 use super::*;
 use std::marker::PhantomData;
+use taskmanager_platform_contract::OperationFailure;
 
 mod frontend_facts;
 mod inventory;
@@ -326,7 +327,7 @@ impl SystemProjectionStore {
     pub fn storage_health_projection(
         &self,
     ) -> Option<(
-        &taskmanager_application::FilesystemHealthSnapshot,
+        &taskmanager_core::core::storage_health::FilesystemHealthSnapshot,
         &[SourceStatus],
     )> {
         Some((
@@ -340,7 +341,7 @@ impl SystemProjectionStore {
         &self,
     ) -> (
         &SmartObservationProjection,
-        Option<&taskmanager_application::StorageDeviceTarget>,
+        Option<&taskmanager_core::core::storage::StorageDeviceTarget>,
     ) {
         (&self.smart_observations, self.smart_subject.as_ref())
     }
@@ -397,11 +398,7 @@ impl SystemProjectionStore {
         }
     }
 
-    fn apply_batch_failures(
-        &mut self,
-        failures: &[taskmanager_application::OperationFailure],
-        fold: &mut FoldState,
-    ) {
+    fn apply_batch_failures(&mut self, failures: &[OperationFailure], fold: &mut FoldState) {
         for failure in failures {
             if let Some(feedback) = self.apply_process_control_failure(failure) {
                 fold.output.process_feedback = Some(feedback);

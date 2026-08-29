@@ -31,11 +31,16 @@ use taskmanager_application::process_details_vm::{
     ProcessDetailsField, detail_value, process_details_rows,
 };
 use taskmanager_application::{
-    FailureKind, FrozenProcessIdentity, IsolationKind, LimitValue, ProcessEnvironment,
-    ProcessGpuSnapshot, ProcessInsightFacetState, ProcessInsightUnavailable,
-    ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreads,
-    SubmissionErrorKind, i18n::t, project_process_resources,
+    ProcessInsightFacetState, ProcessInsightUnavailable, i18n::t, project_process_resources,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process_telemetry::{
+    IsolationKind, LimitValue, ProcessEnvironment, ProcessGpuSnapshot, ProcessNetworkSnapshot,
+    ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreads,
+};
+use taskmanager_platform_contract::SubmissionErrorKind;
+
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
 
@@ -111,7 +116,7 @@ pub(crate) fn projection(shell: &ShellApp) -> ProcessDetailsProjection {
 
     let vm = process_details_rows(
         process,
-        &taskmanager_application::units::UnitPreferences::default(),
+        &taskmanager_core::core::units::UnitPreferences::default(),
     );
     let overview = OVERVIEW_FIELDS
         .iter()
@@ -286,7 +291,9 @@ fn resources_summary(resources: &ProcessResourceSnapshot) -> String {
     }
 }
 
-fn isolation_summary(isolation: &taskmanager_application::ProcessIsolation) -> String {
+fn isolation_summary(
+    isolation: &taskmanager_core::core::process_telemetry::ProcessIsolation,
+) -> String {
     let kind = match isolation.kind {
         Some(IsolationKind::Docker) => "Docker",
         Some(IsolationKind::Podman) => "Podman",

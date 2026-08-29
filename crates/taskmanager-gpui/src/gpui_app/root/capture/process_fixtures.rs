@@ -1,13 +1,13 @@
 //! Deterministic process and startup fixtures used only by capture evidence.
 
-use crate::core::DeviceState;
-use crate::core::ScalarObservation;
-use crate::core::process::{
+use taskmanager_core::core::DeviceState;
+use taskmanager_core::core::ScalarObservation;
+use taskmanager_core::core::process::{
     ApplicationIconAsset, ApplicationIconFormat, ProcessApplicationIdentity, ProcessItem,
     ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity,
     ProcessScalarObservations,
 };
-use crate::core::startup::{
+use taskmanager_core::core::startup::{
     BootTimeline, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     StartupBootEvidenceSnapshot, StartupControlPolicy, StartupCriticalChainNode, StartupEntry,
     StartupFailedUnit, StartupImpact, StartupImpactEvidence, StartupImpactUnknownReason,

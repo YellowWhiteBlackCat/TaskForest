@@ -10,9 +10,8 @@ use std::time::Duration;
 use crate::TuiApp;
 use crate::theme::ThemeParams;
 use crate::ui::settings::SettingsForm;
-use crate::{SortCol, SortDir};
 use taskmanager_application::{AppPage, TelemetryInterval};
-use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, SortCol, SortDir};
 
 /// Stable token for one shell [`SortCol`], compatible with the GPUI frontend's
 /// persisted tokens (`"PID"` / `"Name"` / `"CPU"` / …) so a shared config file
@@ -96,13 +95,13 @@ pub(crate) enum SettingsDraftLifecycle {
     },
     Dirty {
         base_revision: Option<taskmanager_application::ConfigRevision>,
-        base: Box<taskmanager_application::Config>,
+        base: Box<taskmanager_core::core::config::Config>,
     },
     Conflict {
         base_revision: Option<taskmanager_application::ConfigRevision>,
-        base: Box<taskmanager_application::Config>,
+        base: Box<taskmanager_core::core::config::Config>,
         latest_revision: taskmanager_application::ConfigRevision,
-        latest: Box<taskmanager_application::Config>,
+        latest: Box<taskmanager_core::core::config::Config>,
     },
 }
 
@@ -145,15 +144,17 @@ impl TuiApp {
                     format!("Configuration fallback: {source:?}"),
                 );
             }
-            None => {
-                self.apply_config_snapshot(&taskmanager_application::Config::default(), true, true)
-            }
+            None => self.apply_config_snapshot(
+                &taskmanager_core::core::config::Config::default(),
+                true,
+                true,
+            ),
         }
     }
 
     fn apply_config_snapshot(
         &mut self,
-        config: &taskmanager_application::Config,
+        config: &taskmanager_core::core::config::Config,
         startup: bool,
         update_form: bool,
     ) {
@@ -392,7 +393,7 @@ impl TuiApp {
         }
     }
 
-    fn commit_config_draft(&mut self, config: taskmanager_application::Config) -> bool {
+    fn commit_config_draft(&mut self, config: taskmanager_core::core::config::Config) -> bool {
         let submission = self
             .config_client
             .as_ref()
@@ -538,6 +539,15 @@ impl TuiApp {
                 gray_zero: self.settings_form.gray_zero,
                 graph_points: self.settings_form.graph_points(),
             };
+            // TUI-002 tail: the visibility toggles are live THIS frame. The
+            // Performance resource anchor re-checks the selection against the
+            // just-applied `show` set (the same projection-backed visibility
+            // the batch fold consults), so a resource whose family the save
+            // just switched off fails closed to the first still-backed
+            // resource now instead of waiting for the next platform batch;
+            // enabling a family only adds resources, so a still-visible
+            // selection does not drift.
+            self.reconcile_perf_device_anchor();
             // The graph window preference re-points the shared rolling
             // history store every frontend graph reads (G-02).
             self.shell.set_history_capacity(self.prefs.graph_points);

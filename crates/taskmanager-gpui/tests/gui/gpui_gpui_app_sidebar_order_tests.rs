@@ -1,4 +1,4 @@
-use crate::core::config::SidebarDeviceOverrideConfig;
+use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
 
 use super::{ordered_indices, visible_with_override};
 

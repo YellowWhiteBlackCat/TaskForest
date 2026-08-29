@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 
-use taskmanager_core::DiagnosticSource;
+use taskmanager_core::core::diagnostics::DiagnosticSource;
+use taskmanager_core::core::services::{ServiceLogEntry, ServiceLogLevel};
 
 use super::*;
 
@@ -91,11 +92,11 @@ fn close_makes_late_completion_inert() {
 
 #[test]
 fn service_log_plan_is_sanitized_before_crossing_the_port() {
-    let entries = [crate::ServiceLogEntry {
+    let entries = [ServiceLogEntry {
         cursor: "1".into(),
         realtime_timestamp_micros: Some(1),
         priority: Some(6),
-        level: crate::ServiceLogLevel::Info,
+        level: ServiceLogLevel::Info,
         message: "user alice at /home/<user>".into(),
     }];
     let plan = prepare_service_log_bundle(&entries).expect("plan");

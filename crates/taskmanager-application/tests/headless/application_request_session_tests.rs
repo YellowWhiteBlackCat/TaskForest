@@ -1,14 +1,21 @@
 use taskmanager_application::{
-    CapabilityId, CommandLaunchRequest, DeviceGeneration, DeviceId, FailureKind,
-    FrozenProcessIdentity, GpuEngineRowsRequestFailure, GpuEngineRowsSession,
-    GpuEngineRowsSnapshot, GpuEngineRowsState, NetworkEscalationSession, NetworkEscalationState,
-    PriorityTier, ProcessAffinitySession, ProcessAffinityState, ProcessBatchAction,
-    ProcessBatchIntent, ProcessBatchResult, ProcessBatchSession, ProcessBatchState,
-    ProcessBatchTargetResult, ProcessGroupScope, RequestCorrelation, RequestId,
-    ResourceRevealRequest, ShellEvent, ShellUiActionIntent, ShellUiActionReceipt,
-    ShellUiActionSession, ShellUiActionState, SmartSelfTestIntent, SmartSelfTestKind,
-    SmartSelfTestSession, SmartSelfTestState, StorageDeviceKey, UrlOpenRequest,
+    CommandLaunchRequest, GpuEngineRowsRequestFailure, GpuEngineRowsSession, GpuEngineRowsState,
+    NetworkEscalationSession, NetworkEscalationState, ProcessAffinitySession, ProcessAffinityState,
+    ProcessBatchSession, ProcessBatchState, RequestCorrelation, ResourceRevealRequest, ShellEvent,
+    ShellUiActionIntent, ShellUiActionReceipt, ShellUiActionSession, ShellUiActionState,
+    SmartSelfTestSession, SmartSelfTestState, UrlOpenRequest,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, PriorityTier, ProcessBatchAction, ProcessBatchIntent,
+    ProcessBatchResult, ProcessBatchTargetResult, ProcessGroupScope,
+};
+use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_core::core::target::StorageDeviceKey;
+use taskmanager_platform_contract::{CapabilityId, RequestId};
 
 fn request(value: u64) -> RequestId {
     RequestId::new(value).expect("fixture request id is non-zero")

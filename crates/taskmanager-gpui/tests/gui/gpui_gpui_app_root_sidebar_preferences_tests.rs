@@ -2,9 +2,9 @@ use super::{
     MAX_PERSISTED_SIDEBAR_KEYS, normalize_sidebar_preferences, reordered_sidebar_order,
     set_sidebar_override,
 };
-use crate::core::config::SidebarDeviceOverrideConfig;
 use crate::gpui_app::root::RootView;
 use gpui::{AppContext, TestAppContext};
+use taskmanager_core::core::config::SidebarDeviceOverrideConfig;
 
 fn order(values: &[&str]) -> Vec<String> {
     values.iter().map(|value| (*value).to_string()).collect()
@@ -109,7 +109,7 @@ fn corrupt_sidebar_preferences_are_trimmed_deduplicated_and_bounded() {
 
 #[gpui::test]
 fn root_sidebar_reorder_updates_the_persisted_projection(cx: &mut TestAppContext) {
-    let root = cx.new(|cx| RootView::new(crate::gpui_app::theme::Theme::dark(), cx));
+    let root = cx.new(|cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
     root.update(cx, |view, cx| {
         view.move_sidebar_device(
             "disk:nvme0n1",

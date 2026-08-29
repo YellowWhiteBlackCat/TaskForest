@@ -1,6 +1,6 @@
 //! Pure CPU and memory observation view models for the Performance overview.
 
-use taskmanager_application::{CpuMetrics, MemoryMetrics};
+use taskmanager_core::core::metrics::{CpuMetrics, MemoryMetrics};
 
 /// Responsive CPU composition derived from the frame budget's typed chart
 /// inventory (GPUI `CpuChartLayout::for_inventory` parity). This is layout

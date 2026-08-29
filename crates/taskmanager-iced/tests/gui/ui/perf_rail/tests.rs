@@ -1,13 +1,18 @@
 use super::*;
 use crate::app::{Message, SettingsChange};
 use taskmanager_application::i18n::{Language, set_language};
-use taskmanager_application::{
-    BatteryInfo, BatteryScalarObservations, CpuMetrics, CpuScalarObservations, DeviceGeneration,
-    DeviceState, DeviceStatus, GpuMetrics, GpuScalarObservations, MemoryMetrics,
+use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::identity::DeviceGeneration;
+use taskmanager_core::core::metrics::{
+    CpuMetrics, CpuScalarObservations, GpuMetrics, GpuScalarObservations, MemoryMetrics,
     MemoryScalarObservations, NetworkAdapterType, ScalarObservation, ScalarObservationGroup,
+};
+use taskmanager_core::core::power::{BatteryInfo, BatteryScalarObservations};
+use taskmanager_core::core::sensors::{
     SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorQuantity, SensorScale,
 };
-use taskmanager_shell::history::MetricSeries;
+
+use taskmanager_telemetry_store::live_graph::MetricSeries;
 
 fn rail_key(app: &crate::IcedApp, theme: &Theme) -> u64 {
     let devices = [PerfDevice::Cpu];
@@ -133,12 +138,12 @@ fn disk_caption_combines_active_rate_type_temperature_and_badge() {
         .current_write_bytes_per_sec(24 << 20)
         .current_active_time_pct(12.4)
         .smart_temperature_c(Some(41.0))
-        .device_state(taskmanager_application::DeviceState {
+        .device_state(taskmanager_core::core::device_state::DeviceState {
             status: DeviceStatus::Healthy,
             ..Default::default()
         })
-        .smart_availability(taskmanager_application::SmartAvailability::Available)
-        .smart_state(taskmanager_application::DeviceState {
+        .smart_availability(taskmanager_core::core::metrics::SmartAvailability::Available)
+        .smart_state(taskmanager_core::core::device_state::DeviceState {
             status: DeviceStatus::Healthy,
             ..Default::default()
         })
@@ -170,18 +175,18 @@ fn nic_caption_reads_wireless_association_and_wired_link() {
         .interface_name("wlan0".into())
         .adapter_type(NetworkAdapterType::WiFi)
         .ssid_observation(match Some("office".into()) {
-            Some(value) => taskmanager_application::OptionalObservation::present(value, 1),
-            None => taskmanager_application::OptionalObservation::default(),
+            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
+            None => taskmanager_core::core::metrics::OptionalObservation::default(),
         })
         .signal_observation(match Some(-50) {
-            Some(value) => taskmanager_application::OptionalObservation::present(value, 1),
-            None => taskmanager_application::OptionalObservation::default(),
+            Some(value) => taskmanager_core::core::metrics::OptionalObservation::present(value, 1),
+            None => taskmanager_core::core::metrics::OptionalObservation::default(),
         })
         .link_speed_observation(match Some(866) {
-            Some(value) => taskmanager_application::ScalarObservation::available(value, 1),
-            None => taskmanager_application::ScalarObservation::default(),
+            Some(value) => taskmanager_core::core::metrics::ScalarObservation::available(value, 1),
+            None => taskmanager_core::core::metrics::ScalarObservation::default(),
         })
-        .device_state(taskmanager_application::DeviceState {
+        .device_state(taskmanager_core::core::device_state::DeviceState {
             status: DeviceStatus::Healthy,
             ..Default::default()
         })
@@ -197,10 +202,10 @@ fn nic_caption_reads_wireless_association_and_wired_link() {
         .interface_name("enp3s0".into())
         .adapter_type(NetworkAdapterType::Ethernet)
         .link_speed_observation(match Some(1000) {
-            Some(value) => taskmanager_application::ScalarObservation::available(value, 1),
-            None => taskmanager_application::ScalarObservation::default(),
+            Some(value) => taskmanager_core::core::metrics::ScalarObservation::available(value, 1),
+            None => taskmanager_core::core::metrics::ScalarObservation::default(),
         })
-        .device_state(taskmanager_application::DeviceState {
+        .device_state(taskmanager_core::core::device_state::DeviceState {
             status: DeviceStatus::Healthy,
             ..Default::default()
         })
@@ -299,16 +304,14 @@ fn rail_rows_project_every_visible_device_from_its_own_window() {
         snapshot: Some(&snapshot),
         power: shell.projection().power_supplies.as_ref(),
         sensors: shell.projection().sensors.as_ref(),
-        history,
+        shell: &shell,
         device_samples: None,
         cpu_samples: std::rc::Rc::from(
-            history
-                .series(MetricSeries::CpuUsagePercent)
+            taskmanager_shell::presentation::trend::cpu_usage_percent(history)
                 .into_boxed_slice(),
         ),
         memory_samples: std::rc::Rc::from(
-            history
-                .series(MetricSeries::MemoryUsagePercent)
+            taskmanager_shell::presentation::trend::memory_usage_percent(history)
                 .into_boxed_slice(),
         ),
         memory_units: UnitPrefs::default(),

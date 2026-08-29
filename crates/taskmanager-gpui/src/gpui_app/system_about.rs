@@ -10,11 +10,14 @@ use gpui::{
     StatefulInteractiveElement, Styled, Window, div, px,
 };
 
-use crate::core::{DesktopAppearance, DesktopFamily, HardwareInfo, PreferredColorScheme};
 use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::{
+    DesktopAppearance, DesktopFamily, HardwareInfo, PreferredColorScheme,
+};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui::primitives::selectable_text::SelectableText;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -223,7 +226,7 @@ fn format_memory(total_memory_mb: u64) -> String {
     }
 }
 
-fn display_summary(display: &crate::core::hardware::DisplayInfo) -> Option<String> {
+fn display_summary(display: &taskmanager_core::core::hardware::DisplayInfo) -> Option<String> {
     let identity = [display.manufacturer.as_deref(), display.model.as_deref()]
         .into_iter()
         .flatten()
@@ -255,7 +258,9 @@ fn display_summary(display: &crate::core::hardware::DisplayInfo) -> Option<Strin
     (!parts.is_empty()).then(|| parts.join(" · "))
 }
 
-fn display_hdr_capability(display: &crate::core::hardware::DisplayInfo) -> Option<String> {
+fn display_hdr_capability(
+    display: &taskmanager_core::core::hardware::DisplayInfo,
+) -> Option<String> {
     let state = match display.hdr_supported {
         Some(true) => i18n::t("system.hdr_supported"),
         Some(false) => i18n::t("system.hdr_unsupported"),

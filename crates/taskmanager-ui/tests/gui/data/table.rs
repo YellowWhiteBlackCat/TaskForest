@@ -19,9 +19,9 @@ use taskmanager_theme::Theme;
 use crate::overlays::popup::{MenuEntry, MenuItem, PopupMenuState};
 
 use super::{
-    ColGroup, ResizeColumn, SortState, Table, TableColumn, TableDelegate, TableEvent,
+    ColGroup, ColumnResizeDrag, SortState, Table, TableColumn, TableDelegate, TableEvent,
     TableSelection, TableState, horizontal_scroll_widths, leading_fixed_cols_count,
-    render::DragColumn, validate_leading_fixed,
+    render::DragColumn, validate_leading_fixed, width_from_drag,
 };
 
 /// A scriptable delegate recording every callback.
@@ -638,6 +638,26 @@ async fn column_resize_clamps_width(cx: &mut TestAppContext) {
     });
 }
 
+#[test]
+fn column_resize_anchors_the_first_pointer_sample() {
+    let mut anchor = None;
+
+    // The first motion establishes the drag origin and therefore keeps the
+    // width at the captured start value.
+    assert_eq!(
+        width_from_drag(px(100.0), &mut anchor, px(300.0)),
+        px(100.0)
+    );
+    assert_eq!(anchor, Some(px(300.0)));
+
+    // Later motion is a stable delta from that origin, not a delta from the
+    // last rendered column bounds.
+    assert_eq!(
+        width_from_drag(px(100.0), &mut anchor, px(365.0)),
+        px(165.0)
+    );
+}
+
 #[gpui::test]
 async fn move_column_reorders_and_notifies_delegate(cx: &mut TestAppContext) {
     let table = setup(cx);
@@ -661,8 +681,14 @@ async fn drag_payloads_are_typed(cx: &mut TestAppContext) {
         col_ix,
     };
     assert_eq!(payload.col_ix, 0);
-    let resize = ResizeColumn((entity_id, col_ix));
-    assert_eq!(resize.0.1, 0);
+    let resize = ColumnResizeDrag {
+        owner: entity_id,
+        column: col_ix,
+        start_width: px(100.0),
+    };
+    assert_eq!(resize.owner, entity_id);
+    assert_eq!(resize.column, 0);
+    assert_eq!(resize.start_width, px(100.0));
 }
 
 /// Perf smoke: 10k rows render with virtualization — only the visible cells

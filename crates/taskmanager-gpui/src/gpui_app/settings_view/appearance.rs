@@ -10,14 +10,15 @@ use gpui::{
     StatefulInteractiveElement, Styled, div, px,
 };
 
-use crate::core::config::{
-    COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM,
-};
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::{LightDark, Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::config::{
+    COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM,
+};
 use taskmanager_theme::skins::tokens_for;
+use taskmanager_theme::tokens;
+use taskmanager_theme::{LightDark, Theme};
 
 /// Product color-mode chooser. Light/Dark/EyeForest are the primary visual
 /// axis and therefore get a real preview card; System remains a compact

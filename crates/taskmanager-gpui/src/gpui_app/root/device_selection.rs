@@ -41,7 +41,9 @@ impl RootView {
                 .sensors()
                 .readings
                 .iter()
-                .filter(|reading| reading.quantity() == &crate::core::SensorQuantity::FanSpeed)
+                .filter(|reading| {
+                    reading.quantity() == &taskmanager_core::core::SensorQuantity::FanSpeed
+                })
                 .nth(index)
                 .map(|reading| (StableDeviceKind::Fan, reading.id().to_owned())),
             SelectedDevice::Cpu | SelectedDevice::Memory => None,
@@ -100,9 +102,9 @@ impl RootView {
                         .readings
                         .iter()
                         .filter(|reading| {
-                            reading.quantity() == &crate::core::SensorQuantity::FanSpeed
+                            reading.quantity() == &taskmanager_core::core::SensorQuantity::FanSpeed
                         })
-                        .map(crate::core::SensorReading::id),
+                        .map(taskmanager_core::core::SensorReading::id),
                 )
                 .map(SelectedDevice::Fan),
             None => {

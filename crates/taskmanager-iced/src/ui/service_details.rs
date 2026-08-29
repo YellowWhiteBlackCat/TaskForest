@@ -6,10 +6,11 @@
 
 use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};
-use taskmanager_application::{
+use taskmanager_application::i18n::t;
+use taskmanager_core::core::services::{
     ServiceItem, ServiceLogLevelFilter, ServiceLogState, ServiceLogTimeFilter, ServiceRelationKind,
-    i18n::t,
 };
+
 use taskmanager_shell::presentation::{control_error_detail, missing_value};
 use taskmanager_theme::{Theme, tokens};
 
@@ -253,13 +254,15 @@ pub(crate) fn dependency_panel<'a>(
                         container(text(dep_name.to_owned()).size(f32::from(tokens::FONT_11)))
                             .padding([2, 6])
                             .style(move |_| container::Style {
-                                background: Some(iced::Background::Color(theme::color(
-                                    app.theme().shade,
-                                ))),
+                                background: Some(iced::Background::Color(
+                                    taskmanager_theme::iced::color(app.theme().shade),
+                                )),
                                 border: iced::Border {
                                     radius: 3.0.into(),
                                     width: 1.0,
-                                    color: theme::color(app.theme().palette().border),
+                                    color: taskmanager_theme::iced::color(
+                                        app.theme().palette().border,
+                                    ),
                                 },
                                 ..Default::default()
                             })
@@ -353,10 +356,30 @@ fn logs_panel<'a>(
 
     let lines_body: Element<'_, Message, iced::Theme, iced::Renderer> = match &details.logs {
         ServiceLogState::Ready(lines) => {
+            // Each log line is an independently selectable value (GPUI
+            // SelectableText parity for the line-level copy workflow): drag a
+            // line into the primary clipboard, Ctrl/Cmd-C to the standard
+            // clipboard. Whole-block export stays on the copy/export actions
+            // by design — the paragraph layer exposes no line metrics, so a
+            // block-wide highlight could only be approximate.
+            let owner = app.text_selection_owner();
             let rows = lines
                 .as_slice()
                 .iter()
-                .map(|line| text(line.clone()).size(f32::from(tokens::FONT_11)).into())
+                .enumerate()
+                .map(|(line_index, line)| {
+                    let value_id =
+                        iced::advanced::widget::Id::from(format!("svc-details-log-{line_index}"));
+                    let is_owner = owner.as_ref() == Some(&value_id);
+                    crate::ui::components::SelectableText::new(
+                        value_id,
+                        line.clone(),
+                        f32::from(tokens::FONT_11),
+                        taskmanager_theme::iced::color(theme_snapshot.palette().fg),
+                    )
+                    .selection_owner(is_owner)
+                    .into()
+                })
                 .collect::<Vec<Element<'_, Message, iced::Theme, iced::Renderer>>>();
             scrollable(column(rows).spacing(2))
                 .height(Length::Fixed(140.0))
@@ -414,6 +437,6 @@ fn value_or_dash(value: &str) -> String {
 
 fn warning_panel_style(theme_snapshot: &Theme) -> iced::widget::container::Style {
     let mut style = theme::panel_style(theme_snapshot);
-    style.border.color = theme::color(theme_snapshot.palette().warning);
+    style.border.color = taskmanager_theme::iced::color(theme_snapshot.palette().warning);
     style
 }

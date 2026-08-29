@@ -7,9 +7,9 @@ use gpui::{
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::icons;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::{Theme, tokens};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 pub(super) struct ActionBtnProps<'a, F> {
     pub theme: &'a Theme,
@@ -60,7 +60,7 @@ where
         .text_size(tokens::FONT_13)
         .text_color(foreground);
     if let Some(icon) = icon {
-        button = button.child(icons::icon(icon).size(px(14.0)));
+        button = button.child(taskmanager_icons::icon(icon).size(px(14.0)));
     }
     button = button.child(label);
     if enabled {

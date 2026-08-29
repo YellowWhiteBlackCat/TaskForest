@@ -1,8 +1,9 @@
 //! Pure typed-observation projection for Performance device view models.
 
-use taskmanager_application::{
-    BatteryInfo, DiskMetrics, DiskPartition, GpuEngine, GpuMetrics, NetworkMetrics,
+use taskmanager_core::core::metrics::{
+    DiskMetrics, DiskPartition, GpuEngine, GpuMetrics, NetworkMetrics,
 };
+use taskmanager_core::core::power::BatteryInfo;
 
 /// Responsive GPU chart composition. This is derived from the frame budget's
 /// typed chart inventory, never selected by the user: the Full inventory adds

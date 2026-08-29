@@ -11,7 +11,10 @@ use std::rc::Rc;
 
 use super::RootView;
 use crate::gpui_app::{app_history_view, services_view, startup_view};
-use taskmanager_application::{ServiceItem, SessionItem, StartupEntry};
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::startup::StartupEntry;
+
 use taskmanager_shell::InfoTable;
 
 impl RootView {

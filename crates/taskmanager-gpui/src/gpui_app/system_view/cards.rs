@@ -6,14 +6,14 @@
 use gpui::{Div, ParentElement, Styled, div, px, relative};
 use taskmanager_ui_contract::IconId;
 
-use crate::gpui_app::icons;
-use crate::gpui_app::theme::{Color, Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::{Color, Theme};
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 use taskmanager_ui::layout::AdaptiveGrid;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
 use super::sections::{SystemMeter, SystemSection, SystemTile};
+use taskmanager_theme::tokens;
 
 /// Hero identity card: a large tinted icon block, the device's display name,
 /// and a dim hostname · OS · kernel subtitle line. The card replaces the old
@@ -193,7 +193,7 @@ fn icon_block(theme: &Theme, icon: IconId, size: f32, tint: Color) -> Div {
         .flex_shrink_0()
         .rounded(tokens::control_radius(theme))
         .bg(tint.with_alpha(0.12))
-        .child(icons::icon(icon).size(px(size * 0.55)))
+        .child(taskmanager_icons::icon(icon).size(px(size * 0.55)))
 }
 
 /// One spec row: dim label left, value right.

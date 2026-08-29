@@ -5,27 +5,33 @@ use taskmanager_application::Modifiers;
 
 struct TestTray;
 
-impl taskmanager_app_host::TrayController for TestTray {
-    fn set_visible(&self, _visible: bool) -> Result<(), taskmanager_app_host::TrayFailure> {
+impl taskmanager_platform_contract::TrayController for TestTray {
+    fn set_visible(
+        &self,
+        _visible: bool,
+    ) -> Result<(), taskmanager_platform_contract::TrayFailure> {
         Ok(())
     }
 
     fn set_tooltip(
         &self,
         _tooltip: Option<String>,
-    ) -> Result<(), taskmanager_app_host::TrayFailure> {
+    ) -> Result<(), taskmanager_platform_contract::TrayFailure> {
         Ok(())
     }
 
-    fn set_title(&self, _title: Option<String>) -> Result<(), taskmanager_app_host::TrayFailure> {
+    fn set_title(
+        &self,
+        _title: Option<String>,
+    ) -> Result<(), taskmanager_platform_contract::TrayFailure> {
         Ok(())
     }
 
     fn set_item_checked(
         &self,
-        _id: taskmanager_application::tray::TrayActionId,
+        _id: taskmanager_core::core::tray::TrayActionId,
         _checked: bool,
-    ) -> Result<(), taskmanager_app_host::TrayFailure> {
+    ) -> Result<(), taskmanager_platform_contract::TrayFailure> {
         Ok(())
     }
 }

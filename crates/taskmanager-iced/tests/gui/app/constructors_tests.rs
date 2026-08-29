@@ -129,8 +129,8 @@ fn only_the_system_capture_target_seeds_complete_typed_npu_facts() {
     assert!(device.memory.shared_total_bytes.current_value().is_none());
     assert_eq!(
         device.memory.shared_total_bytes.availability(),
-        taskmanager_application::ScalarAvailability::Unavailable(
-            taskmanager_application::FailureKind::Unsupported
+        taskmanager_core::core::metrics::ScalarAvailability::Unavailable(
+            taskmanager_core::core::failure::FailureKind::Unsupported
         )
     );
 
@@ -170,7 +170,7 @@ impl IcedApp {
 
     pub(crate) fn wait_for_config_where(
         &mut self,
-        predicate: impl Fn(&taskmanager_application::Config) -> bool,
+        predicate: impl Fn(&taskmanager_core::core::config::Config) -> bool,
     ) {
         if self
             .configuration

@@ -44,7 +44,7 @@ impl IcedApp {
     /// existing direct-menu behavior while retaining the exact target.
     pub(super) fn request_user_menu_action(
         &mut self,
-        action: taskmanager_application::SessionControlAction,
+        action: taskmanager_core::core::session::SessionControlAction,
     ) -> Option<taskmanager_application::PlatformEffect> {
         let session = self.user_menu_session()?.clone();
         self.close_context_menus();

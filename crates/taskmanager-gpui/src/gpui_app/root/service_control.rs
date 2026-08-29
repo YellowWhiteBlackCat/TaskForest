@@ -13,18 +13,21 @@
 //! type, the confirm/cancel methods, and the dialog renderer.
 
 use crate::gpui_app::elements;
-use crate::gpui_app::theme::Theme;
-use crate::i18n;
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, relative,
 };
+use taskmanager_application::i18n;
 use taskmanager_application::{
-    ConfirmationKind, PendingConfirmation, ServiceAction, ServiceControlTarget, ServiceId,
-    StartupControlRequest, StartupEntry, SurfaceDismissReason, SurfaceKind,
+    ConfirmationKind, PendingConfirmation, ServiceControlTarget, StartupControlRequest,
+    SurfaceDismissReason, SurfaceKind,
 };
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::startup::StartupEntry;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_theme::Theme;
 
 use super::RootView;
-use crate::gpui_app::theme::tokens;
+use taskmanager_theme::tokens;
 
 /// Pending service / startup control intent awaiting explicit confirmation.
 ///

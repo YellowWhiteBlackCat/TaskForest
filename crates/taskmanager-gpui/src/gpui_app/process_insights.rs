@@ -6,7 +6,7 @@
 //! the responsive Properties body. The test-only worker exercises the same
 //! capacity-one latest-request semantics without a native provider.
 
-use taskmanager_application::ProcessTelemetrySnapshot;
+use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
 
 mod view;
 
@@ -49,7 +49,7 @@ pub(crate) enum ProcessInsightsRenderState<'a> {
 }
 
 pub(crate) fn state_from_snapshot(snapshot: ProcessTelemetrySnapshot) -> ProcessInsightsState {
-    use crate::core::device_state::DeviceStatus;
+    use taskmanager_core::core::device_state::DeviceStatus;
 
     let kind = match snapshot.state.status {
         DeviceStatus::Healthy => return ProcessInsightsState::Ready(Box::new(snapshot)),

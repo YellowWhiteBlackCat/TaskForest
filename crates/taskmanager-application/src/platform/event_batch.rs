@@ -1,8 +1,9 @@
 //! Bounded groups of correlated domain events drained by a frontend tick.
 
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::setup::SetupScriptEvent;
 use taskmanager_platform_contract::{
-    CapabilityId, EventEnvelope, EventSequence, OperationFailure, ProviderFailure, ProviderId,
-    RequestId,
+    CapabilityId, EventEnvelope, EventSequence, OperationFailure, ProviderFailure, RequestId,
 };
 
 use super::facets::PlatformEventVisitor;
@@ -10,8 +11,8 @@ use super::{
     ContainerRollupEvent, DesktopAppearanceEvent, DirectoryUsageEvent, GpuEngineRowsEvent,
     HardwareInventoryEvent, NpuInventoryEvent, PlatformEvent, PowerSupplyEvent,
     ProcessAffinityEvent, ProcessEvent, ProjectedProcessInsights, ProjectedStartupEvidence,
-    ProjectedSystemTelemetry, SensorEvent, ServiceEvent, SessionEvent, SetupScriptEvent,
-    ShellEvent, SmartEvent, StartupEvent, StartupEvidenceEvent, StorageHealthEvent,
+    ProjectedSystemTelemetry, SensorEvent, ServiceEvent, SessionEvent, ShellEvent, SmartEvent,
+    StartupEvent, StartupEvidenceEvent, StorageHealthEvent,
 };
 
 mod environment;

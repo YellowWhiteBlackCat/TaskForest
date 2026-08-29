@@ -2,18 +2,21 @@
 
 use crossbeam_channel::Receiver;
 use taskmanager_application::{
-    CapabilityId, PartialSourceSnapshot, ProcessAffinityControlRequest, ProcessAffinityRequest,
-    ProcessControlRequest, ProcessEnvironmentRequest, ProcessEvent, ProcessGpuRequest,
-    ProcessIsolationRequest, ProcessListRequest, ProcessNetworkEscalationRequest,
-    ProcessNetworkRequest, ProcessOpenFilesRequest, ProcessResourceControlRequest,
-    ProcessResourcesRequest, ProcessThreadsRequest, ProviderFailure,
+    ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
+    ProcessEnvironmentRequest, ProcessEvent, ProcessGpuRequest, ProcessIsolationRequest,
+    ProcessListRequest, ProcessNetworkEscalationRequest, ProcessNetworkRequest,
+    ProcessOpenFilesRequest, ProcessResourceControlRequest, ProcessResourcesRequest,
+    ProcessThreadsRequest,
 };
-use taskmanager_core::{
-    FrozenProcessIdentity, ProcessBatchResult, ProcessEnvironment, ProcessGpuSnapshot,
-    ProcessInsightSnapshot, ProcessIsolation, ProcessItem, ProcessNetworkSnapshot,
-    ProcessOpenFiles, ProcessResourceSnapshot, ProcessSignal, ProcessThreads,
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchResult, ProcessItem, ProcessSignal,
+};
+use taskmanager_core::core::process_telemetry::{
+    ProcessEnvironment, ProcessGpuSnapshot, ProcessInsightSnapshot, ProcessIsolation,
+    ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreads,
     ResourceGroupLimitRequest,
 };
+use taskmanager_platform_contract::{CapabilityId, PartialSourceSnapshot, ProviderFailure};
 
 use crate::Queued;
 

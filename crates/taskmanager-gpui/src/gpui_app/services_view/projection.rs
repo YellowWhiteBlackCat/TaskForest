@@ -3,9 +3,9 @@
 use taskmanager_shell::{InfoSortCol, SortDir};
 use taskmanager_ui_contract::IconId;
 
-use crate::core::services::{ServiceItem, ServiceStatus};
 use crate::gpui_app::list_view::FilterSpec;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 
 /// Status filter for the Services list.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -81,8 +81,8 @@ pub fn filter_services(
         .filter(|service| {
             filter.matches(service.status)
                 && (query.is_empty()
-                    || crate::core::text::contains_ascii_ci(&service.name, query)
-                    || crate::core::text::contains_ascii_ci(&service.description, query))
+                    || taskmanager_core::core::text::contains_ascii_ci(&service.name, query)
+                    || taskmanager_core::core::text::contains_ascii_ci(&service.description, query))
         })
         .cloned()
         .collect()

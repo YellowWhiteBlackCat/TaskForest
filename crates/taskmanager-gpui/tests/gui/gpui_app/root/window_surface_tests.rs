@@ -1,6 +1,6 @@
 use super::*;
-use crate::core::{DiagnosticBundleError, DiagnosticBundleErrorKind};
-use taskmanager_application::ServiceId;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_core::core::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 
 fn surface_fixture(kind: WindowSurfaceKind) -> WindowSurface {
     match kind {

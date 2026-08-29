@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
-use taskmanager_application::{
-    CapabilityId, ProviderId, RequestId, RequestScope, RequestTracking, SidebandPolicy,
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{
+    CapabilityId, RequestId, RequestScope, RequestTracking, SidebandPolicy,
 };
 
 use crate::config::{
@@ -205,7 +206,8 @@ fn fixed_seed_lifecycle_model_preserves_ownership_bounds_and_monotonic_leases() 
         assert!(model.len() <= DEFAULT_ACTIVE_TARGET_LIMIT_PER_CAPABILITY);
         assert!(snapshot.target_high_water <= DEFAULT_ACTIVE_TARGET_LIMIT_PER_CAPABILITY as u64);
         assert!(
-            snapshot.recent_stalls.len() <= taskmanager_application::MAX_RECENT_SCHEDULING_STALLS
+            snapshot.recent_stalls.len()
+                <= taskmanager_platform_contract::MAX_RECENT_SCHEDULING_STALLS
         );
     }
 }

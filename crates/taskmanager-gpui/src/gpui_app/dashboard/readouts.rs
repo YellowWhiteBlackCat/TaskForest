@@ -2,7 +2,7 @@
 //! typed observation read behind the summary cards lives here so the render
 //! module only paints the folded readout string.
 
-use crate::core::metrics::CpuMetrics;
+use taskmanager_core::core::metrics::CpuMetrics;
 
 use crate::gpui_app::formatting;
 

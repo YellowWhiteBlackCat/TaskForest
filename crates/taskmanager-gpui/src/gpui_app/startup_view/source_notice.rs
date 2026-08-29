@@ -1,7 +1,7 @@
 //! Startup-specific explanation for degraded provider facets.
 
-use crate::core::source::{SourceOutcome, SourceStatus};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 /// Explain the exact startup facet affected by a degraded source. The generic
 /// list banner can only say "provider failed"; this page knows that the

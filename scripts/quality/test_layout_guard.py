@@ -37,22 +37,34 @@ def source_roots(repository: Path) -> list[Path]:
     return roots
 
 
-def crate_roots(repository: Path) -> list[Path]:
-    crates = repository / "crates"
-    if not crates.is_dir():
-        return []
-    return [
+def crate_roots(repository: Path, crates: list[str] | None = None) -> list[Path]:
+    all_roots = [
         package
-        for package in sorted(crates.iterdir())
+        for package in sorted((repository / "crates").iterdir())
         if (package / "Cargo.toml").is_file()
-    ]
+    ] if (repository / "crates").is_dir() else []
+    if crates is None:
+        return all_roots
+    wanted = set(crates)
+    missing = wanted - {package.name for package in all_roots}
+    if missing:
+        raise SystemExit(f"unknown crate(s) for --crate: {sorted(missing)}")
+    return [package for package in all_roots if package.name in wanted]
 
 
-def scan(repository: Path) -> list[Violation]:
+def scan(repository: Path, crates: list[str] | None = None) -> list[Violation]:
     violations: list[Violation] = []
+    scoped = crates is not None
+    crate_filter = set(crates) if crates is not None else None
     for root in source_roots(repository):
         if not root.is_dir():
             continue
+        if scoped:
+            # Scope mode keeps only the named crates' production sources; the
+            # repository-level src/ root stays out of a crate-scoped run.
+            crate_name = root.parent.name if root.parent.name != repository.name else None
+            if crate_name is None or crate_name not in crate_filter:
+                continue
         for path in sorted(root.rglob("*.rs")):
             relative = path.relative_to(repository).as_posix()
             if "tests/" in f"{relative}/":
@@ -79,7 +91,7 @@ def scan(repository: Path) -> list[Violation]:
                     )
     allowed_test_entries = {"common.rs", "headless.rs", "gui.rs"}
     allowed_test_directories = {"common", "headless", "gui"}
-    for package in crate_roots(repository):
+    for package in crate_roots(repository, crates):
         test_root = package / "tests"
         if not test_root.is_dir():
             continue
@@ -105,6 +117,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--mode", choices=("report", "enforce"), default="enforce")
     parser.add_argument("--repo-root", type=Path, default=Path(__file__).resolve().parents[2])
+    parser.add_argument(
+        "--crate",
+        action="append",
+        default=None,
+        help="limit the scan to the named workspace crate(s); "
+        "repeatable. Unset scans the whole workspace.",
+    )
     parser.add_argument("--self-test", action="store_true")
     return parser.parse_args()
 
@@ -127,9 +146,10 @@ def main() -> int:
         print("Test layout guard self-test: PASS")
         return 0
     repository = args.repo_root.resolve()
-    violations = scan(repository)
+    violations = scan(repository, args.crate)
     try:
-        print(f"Test layout guard: violations={len(violations)} mode={args.mode}")
+        scope = f" crates={','.join(sorted(args.crate))}" if args.crate else " workspace"
+        print(f"Test layout guard: violations={len(violations)} mode={args.mode}{scope}")
         for violation in violations:
             print(f" - {violation.path}:{violation.line}: {violation.reason}")
     except BrokenPipeError:

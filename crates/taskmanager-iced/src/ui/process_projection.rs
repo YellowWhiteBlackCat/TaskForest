@@ -31,14 +31,15 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::process_category_projection::{
     category_buckets, category_expansion_key,
 };
-use taskmanager_application::{
-    AppGroup, ProcessCategory, ProcessItem, ProcessNode, build_process_tree, process_category,
-    sort_apps,
+use taskmanager_core::core::process::AppGroup;
+use taskmanager_core::core::process::{
+    ProcessCategory, ProcessItem, ProcessNode, build_process_tree, process_category, sort_apps,
 };
+
 use taskmanager_shell::presentation::{
     bytes, missing_value, optional_bytes, optional_count, optional_duration, optional_nice,
 };
-use taskmanager_shell::{ProcessRowKey, ProcessStatusFilter, SortCol, SortDir};
+use taskmanager_shell::{ProcessRowId, ProcessStatusFilter, SortCol, SortDir};
 
 mod category;
 
@@ -63,7 +64,7 @@ pub(crate) enum ProjectedRow {
         main_pid: u32,
         /// Selectable semantic row identity. Category/type headers are
         /// structural (`None`); application aggregates carry their root key.
-        row_key: Option<ProcessRowKey>,
+        row_key: Option<ProcessRowId>,
         name: String,
         expansion_key: String,
         member_count: usize,
@@ -92,6 +93,8 @@ pub(crate) enum ProjectedRow {
     Tree {
         flat_index: usize,
         pid: u32,
+        /// Selectable semantic row identity (CORE-01: pid + start token).
+        row_key: Option<ProcessRowId>,
         depth: usize,
         has_children: bool,
         /// Whether the subtree is currently collapsed (present in the
@@ -113,9 +116,9 @@ impl ProjectedRow {
     }
 
     #[must_use]
-    pub(crate) const fn row_key(&self) -> Option<ProcessRowKey> {
+    pub(crate) const fn row_key(&self) -> Option<ProcessRowId> {
         match self {
-            Self::Tree { pid, .. } => Some(ProcessRowKey::Process(*pid)),
+            Self::Tree { row_key, .. } => *row_key,
             Self::GroupHeader { row_key, .. } => *row_key,
         }
     }
@@ -195,13 +198,13 @@ impl ProcessRowFacts {
 pub(crate) fn build_row_cells(process: &ProcessItem) -> RowCells {
     build_row_cells_with_rules(
         process,
-        &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     )
 }
 
 fn build_row_cells_with_rules(
     process: &ProcessItem,
-    local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> RowCells {
     RowCells {
         pid: process.pid.to_string(),
@@ -249,7 +252,7 @@ impl ProcessProjection {
         sort: (SortCol, SortDir),
         expanded_groups: &HashSet<String>,
         expanded_tree: &HashSet<u32>,
-        local_time_rules: &taskmanager_application::LocalTimeRulesObservation,
+        local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
     ) -> Self {
         let by_pid: HashMap<u32, usize> = flat
             .iter()
@@ -362,7 +365,7 @@ pub(crate) struct ProcessProjectionFingerprint {
     query: String,
     expanded_groups: HashSet<String>,
     expanded_tree: HashSet<u32>,
-    local_time_rules: Option<taskmanager_application::LocalTimeRulesCacheKey>,
+    local_time_rules: Option<taskmanager_core::core::time::LocalTimeRulesCacheKey>,
 }
 
 impl ProcessProjectionFingerprint {
@@ -393,7 +396,7 @@ impl ProcessProjectionFingerprint {
     #[must_use]
     pub(crate) fn with_local_time_rules(
         mut self,
-        rules: &taskmanager_application::LocalTimeRulesObservation,
+        rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
     ) -> Self {
         self.local_time_rules = Some(rules.cache_key());
         self
@@ -564,6 +567,7 @@ fn flatten_with_parents<'a>(
             rows.push(ProjectedRow::Tree {
                 flat_index,
                 pid: node.item.pid,
+                row_key: ProcessRowId::from_process(node.item),
                 depth,
                 has_children,
                 collapsed: has_children && collapsed.contains(&node.item.pid),

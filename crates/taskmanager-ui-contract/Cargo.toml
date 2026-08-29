@@ -8,6 +8,7 @@ description = "Toolkit-neutral semantic UI contracts for TaskForest frontends"
 
 [dependencies]
 taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 
 [lib]
 name = "taskmanager_ui_contract"

@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use crate::core::alerts::{export_alert_rules_json, import_alert_rules_json};
-use crate::core::{AlertMetric, AlertRule, AlertSeverity};
 use taskmanager_application::{
     AlertCenter, AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit,
 };
+use taskmanager_core::core::alerts::{export_alert_rules_json, import_alert_rules_json};
+use taskmanager_core::core::{AlertMetric, AlertRule, AlertSeverity};
 
 use super::{managed_rules, transfer_entries};
 
@@ -32,7 +32,7 @@ fn clipboard_adapter_round_trips_enabled_rules_and_replaces_id_conflicts() {
         .edit_rules(ManagedAlertRuleEdit::Import {
             rules: managed_rules(imported),
             mode: AlertRuleImportMode::Merge(
-                crate::core::alerts::AlertRuleConflictPolicy::ReplaceExisting,
+                taskmanager_core::core::alerts::AlertRuleConflictPolicy::ReplaceExisting,
             ),
         })
         .unwrap();

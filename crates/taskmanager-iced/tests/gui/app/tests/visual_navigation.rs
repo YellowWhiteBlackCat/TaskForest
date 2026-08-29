@@ -4,6 +4,7 @@ use super::*;
 use crate::app::SettingsChange;
 use crate::test_support::temp_dir;
 use taskmanager_application::{AppPage, ConfigStore, KeyCode, Modifiers};
+
 use taskmanager_shell::ShellKeyEvent;
 
 fn grouped_fixture(
@@ -11,15 +12,15 @@ fn grouped_fixture(
     name: &str,
     cpu: f32,
     memory_bytes: u64,
-) -> taskmanager_application::ProcessItem {
+) -> taskmanager_core::core::process::ProcessItem {
     taskmanager_test_support::ProcessItemFixtureBuilder::new()
         .pid(pid)
         .name(name.into())
         .current_cpu_percentage(cpu)
         .current_memory_bytes(memory_bytes)
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("devuser"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("devuser"),
                 None,
                 1,
             ),

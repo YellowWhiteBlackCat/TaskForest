@@ -27,6 +27,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
 
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     CumulativeCounter, FailureKind, FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult,
     ProcessBatchTargetResult, ProcessInsightSnapshot, ProcessItem, ProcessMetadataFailure,
@@ -34,9 +35,7 @@ use taskmanager_core::{
     ProcessResourceSnapshot, ProcessScalarObservations, ProcessSignal, ProviderId,
     ScalarObservation,
 };
-use taskmanager_platform_contract::{
-    PartialSourceSnapshot, ProviderFailure, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     ProcessControlProvider, ProcessListProvider, ProcessResourcesProvider,
 };

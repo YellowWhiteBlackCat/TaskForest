@@ -1,9 +1,10 @@
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use taskmanager_application::{
-    DeviceGeneration, DeviceId, GpuEngine, GpuEngineRowsSnapshot, GpuMetrics,
-    GpuScalarObservations, GpuThrottleReason, ScalarObservation, SystemSnapshot,
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::metrics::{
+    GpuEngine, GpuEngineRowsSnapshot, GpuMetrics, GpuScalarObservations, GpuThrottleReason,
+    ScalarObservation, SystemSnapshot,
 };
 
 fn observed_gpu() -> GpuMetrics {
@@ -91,6 +92,126 @@ fn compact_fact_strip_keeps_primary_values_in_two_rows() {
     }
 }
 
+// test-intent: behavior
+/// The full fact strip names every proven graphics-API version and the PCI
+/// slot (GPUI gpu_stats parity, §2.5 B-1..B-3). The core `GpuGraphicsApi`
+/// contract says consumers must OMIT an unproven version row — never render
+/// an inferred or dash placeholder — so a partially proven API keeps only its
+/// proven row, and a GPU without any proven capability or slot renders
+/// neither row.
+#[test]
+fn full_fact_strip_names_proven_graphics_apis_and_pci_slot() {
+    taskmanager_test_support::pin_english();
+    let mut proven = observed_gpu();
+    proven.graphics_api = Some(taskmanager_core::core::metrics::GpuGraphicsApi {
+        opengl_version: Some("4.6".into()),
+        vulkan_version: Some("1.3.290".into()),
+    });
+    proven.pci_slot = Some("0000:03:00.0".into());
+    let text = joined(&gpu_fact_lines(&[proven], GpuFactDensity::Full));
+    for fact in [
+        format!("{} 4.6", t("gpu.opengl_version")),
+        format!("{} 1.3.290", t("gpu.vulkan_version")),
+        format!("{} 0000:03:00.0", t("gpu.pci_slot")),
+    ] {
+        assert!(
+            text.contains(&fact),
+            "GPU fact strip lost {fact:?}:\n{text}"
+        );
+    }
+
+    // Unavailable path: only the OpenGL context proved usable, so the Vulkan
+    // row is omitted outright instead of rendering a dash placeholder.
+    let mut partial = observed_gpu();
+    partial.graphics_api = Some(taskmanager_core::core::metrics::GpuGraphicsApi {
+        opengl_version: Some("4.6".into()),
+        vulkan_version: None,
+    });
+    let partial_text = joined(&gpu_fact_lines(&[partial], GpuFactDensity::Full));
+    assert!(
+        partial_text.contains(t("gpu.opengl_version")),
+        "the proven OpenGL version must still render:\n{partial_text}"
+    );
+    assert!(
+        !partial_text.contains(t("gpu.vulkan_version")),
+        "an unproven Vulkan version must omit its row, never render a dash:\n{partial_text}"
+    );
+
+    // A GPU with no proven API and no PCI slot renders neither row.
+    let unproven_text = joined(&gpu_fact_lines(&[observed_gpu()], GpuFactDensity::Full));
+    assert!(!unproven_text.contains(t("gpu.opengl_version")));
+    assert!(!unproven_text.contains(t("gpu.vulkan_version")));
+    assert!(!unproven_text.contains(t("gpu.pci_slot")));
+}
+
+// test-intent: behavior
+/// The capability rows resolve their labels through the shared catalog in the
+/// active locale: the same proven facts render the English copy under En and
+/// the Chinese copy under Zh (one `t()` truth per locale, never hardcoded).
+#[test]
+fn gpu_capability_rows_render_the_active_locale_copy() {
+    let mut gpu = observed_gpu();
+    gpu.graphics_api = Some(taskmanager_core::core::metrics::GpuGraphicsApi {
+        opengl_version: Some("4.6".into()),
+        vulkan_version: Some("1.3.290".into()),
+    });
+    gpu.pci_slot = Some("0000:03:00.0".into());
+    let keys = ["gpu.opengl_version", "gpu.vulkan_version", "gpu.pci_slot"];
+    let guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    let en_text = joined(&gpu_fact_lines(
+        std::slice::from_ref(&gpu),
+        GpuFactDensity::Full,
+    ));
+    let en_labels: Vec<&'static str> = keys.iter().map(|key| t(key)).collect();
+
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::Zh);
+    let zh_text = joined(&gpu_fact_lines(
+        std::slice::from_ref(&gpu),
+        GpuFactDensity::Full,
+    ));
+    let zh_labels: Vec<&'static str> = keys.iter().map(|key| t(key)).collect();
+    drop(guard);
+
+    for (key, en, zh) in keys
+        .iter()
+        .zip(en_labels.iter())
+        .zip(zh_labels.iter())
+        .map(|((key, en), zh)| (*key, *en, *zh))
+    {
+        assert_ne!(en, zh, "{key} must translate to distinct En/Zh copy");
+        assert!(
+            en_text.contains(en),
+            "En strip must paint {en:?}:\n{en_text}"
+        );
+        assert!(
+            zh_text.contains(zh),
+            "Zh strip must paint {zh:?}:\n{zh_text}"
+        );
+    }
+}
+
+// test-intent: behavior
+/// The standard-layout threshold stays exact: at its minimum height the whole
+/// ten-row full fact strip fits above a chart that keeps
+/// `MIN_STANDARD_GRAPH_HEIGHT`, so the parity rows can never be clipped away.
+#[test]
+fn standard_threshold_fits_every_full_fact_row_above_the_min_chart() {
+    let area = Rect::new(0, 0, 120, STANDARD_LAYOUT_HEIGHT);
+    let layout = GpuPanelLayout::resolve(area, 2, 10, 0);
+    assert_eq!(
+        layout.facts().height,
+        10,
+        "the fully-observed fact strip must fit whole: {layout:?}"
+    );
+    assert!(
+        layout.graph().height >= MIN_STANDARD_GRAPH_HEIGHT,
+        "the primary chart keeps its minimum: {layout:?}"
+    );
+}
+
 #[test]
 fn standard_engine_projection_includes_live_and_pmu_rows() {
     let gpu = observed_gpu();
@@ -101,15 +222,15 @@ fn standard_engine_projection_includes_live_and_pmu_rows() {
     let shell = history_for(&snapshot);
     let pmu = GpuEngineRowsSnapshot::success(
         DeviceId::new("card0"),
-        vec![taskmanager_application::GpuEngineMetric {
+        vec![taskmanager_core::core::metrics::GpuEngineMetric {
             name: "Render Ring".into(),
-            kind: taskmanager_application::GpuEngineKind::Unknown,
+            kind: taskmanager_core::core::metrics::GpuEngineKind::Unknown,
             utilization_pct: 43.0,
         }],
     );
     let lines = gpu_engine_lines(
         &snapshot.gpu,
-        &shell.history,
+        &shell,
         TuiTheme::default(),
         60,
         taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation::Active(
@@ -126,7 +247,7 @@ fn engine_without_history_is_an_honest_placeholder() {
     let gpu = observed_gpu();
     let lines = gpu_engine_lines(
         &[gpu],
-        &LiveGraphHistory::default(),
+        &taskmanager_shell::ShellApp::new(),
         TuiTheme::default(),
         60,
         taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation::PermissionRequired,
@@ -186,7 +307,7 @@ fn utilization_chart_uses_the_real_per_device_history() {
             render_gpu_metric_chart(
                 frame,
                 &snapshot.gpu,
-                &shell.history,
+                &shell,
                 TuiTheme::default(),
                 frame.area(),
                 taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric::DEFAULT,
@@ -222,7 +343,7 @@ fn selected_metric_flips_title_and_axis_unit_in_the_same_frame() {
             render_gpu_metric_chart(
                 frame,
                 &snapshot.gpu,
-                &shell.history,
+                &shell,
                 TuiTheme::default(),
                 frame.area(),
                 taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric::Power,
@@ -267,7 +388,7 @@ fn unavailable_selected_family_keeps_the_honest_dash_projection() {
             render_gpu_metric_chart(
                 frame,
                 &snapshot.gpu,
-                &shell.history,
+                &shell,
                 TuiTheme::default(),
                 frame.area(),
                 // The fixture observes every split VRAM pair but never the

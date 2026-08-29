@@ -549,9 +549,9 @@ fn draw_series(
 /// pre-formatted readout label (`None` still draws the reference line — the
 /// honest "position, no value" state — but no pill); the pill is clamped
 /// inside the frame so an edge sample never draws its label off-canvas. The
-/// pill's width is a fixed per-glyph estimate (the canvas has no text
-/// measurement without a renderer) — a layout approximation, not a measured
-/// glyph width.
+/// pill's width is the MEASURED shaped text extent
+/// ([`crate::text_metrics::measured_text_width`]) — correct for proportional
+/// glyphs and CJK, not a per-glyph estimate.
 pub(crate) fn draw_readout_pill(
     frame: &mut canvas::Frame<iced::Renderer>,
     size: Size,
@@ -571,7 +571,7 @@ pub(crate) fn draw_readout_pill(
         return;
     };
     let font_size = 11.0;
-    let text_width = content.chars().count() as f32 * font_size * 0.6;
+    let text_width = crate::text_metrics::measured_text_width(content, font_size);
     let pill_width = text_width + 12.0;
     let pill_height = 18.0;
     let pill_x = (x - pill_width / 2.0).clamp(2.0, (size.width - pill_width - 2.0).max(2.0));

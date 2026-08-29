@@ -22,13 +22,12 @@ use taskmanager_application::{
     CommandLaunchRequest, DesktopAppearanceRequest, DesktopNotificationRequest,
     ResourceRevealRequest, SetupScriptRequest, UrlOpenRequest,
 };
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     AlertSeverity, DesktopAppearance, DesktopFamily, FailureKind, FrozenProcessIdentity,
     PreferredColorScheme, ProviderId, SetupScriptAction, SetupScriptEvent,
 };
-use taskmanager_platform_contract::{
-    CompositeSourceSnapshot, ProviderFailure, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     CommandLaunchProvider, DesktopAppearanceProvider, DesktopNotificationProvider,
     ResourceRevealProvider, SetupScriptProvider, UrlOpenProvider,

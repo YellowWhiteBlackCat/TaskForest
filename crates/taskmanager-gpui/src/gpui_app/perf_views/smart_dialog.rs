@@ -1,11 +1,12 @@
 //! Read-only SMART attribute dialog rendering.
 
-use super::smart_availability_i18n_key;
-use crate::core::metrics::DiskMetrics;
 use crate::gpui_app::root::prop_row;
-use crate::gpui_app::theme::{Theme, tokens, with_alpha};
-use crate::i18n;
 use gpui::{Div, ParentElement, Styled, div, px};
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_shell::presentation::smart_availability_i18n_key;
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Theme, with_alpha};
 
 pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
     let mut column = div()

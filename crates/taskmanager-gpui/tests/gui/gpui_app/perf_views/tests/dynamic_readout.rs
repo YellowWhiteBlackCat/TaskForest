@@ -3,12 +3,12 @@
 
 use gpui::{TestAppContext, VisualTestContext};
 
-use crate::core::{
+use crate::gpui_app::root::TopPage;
+use crate::gpui_app::sidebar::SelectedDevice;
+use taskmanager_core::core::{
     BatteryInfo, DeviceGeneration, DeviceId, DeviceState, PowerSupplySnapshot,
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorScale,
 };
-use crate::gpui_app::root::TopPage;
-use crate::gpui_app::sidebar::SelectedDevice;
 
 use super::{draw, sensor_reading, with_battery_scalars, wrapped_root};
 

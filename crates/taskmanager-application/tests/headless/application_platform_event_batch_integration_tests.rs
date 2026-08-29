@@ -1,7 +1,7 @@
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{DesktopAppearance, DesktopFamily};
-use taskmanager_platform_contract::{
-    CapabilityId, CompositeSourceSnapshot, ProviderId, RequestId, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, RequestId};
 
 use super::super::super::{DesktopAppearanceEvent, PlatformEvent};
 use super::super::{PlatformEventBatch, test_support::test_event_context};

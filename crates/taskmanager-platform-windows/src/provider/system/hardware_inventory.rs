@@ -9,12 +9,11 @@
 //! provider never reaches WMI or a command interpreter and never invents
 //! vendor/version strings.
 
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     ComputeTopology, DisplayInfo, FailureKind, HardwareInfo, HostIdentity, KernelInfo, ProviderId,
 };
-use taskmanager_platform_contract::{
-    CompositeSourceSnapshot, ProviderFailure, SourceOutcome, SourceStatus,
-};
+use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::HardwareInventoryProvider;
 
 use super::{HARDWARE_INVENTORY_PROVIDER, available_source, unavailable_source};

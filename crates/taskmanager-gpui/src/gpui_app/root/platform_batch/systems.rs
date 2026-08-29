@@ -2,6 +2,7 @@
 
 use gpui::Context;
 use taskmanager_application::{DesktopAppearanceEvent, RefreshRequest, SystemTelemetryDomain};
+
 use taskmanager_shell::BatchFoldOutput;
 
 use super::super::ProcessControlAction;
@@ -77,8 +78,11 @@ impl RootView {
             self.projection().process_revision,
             self.projection().processes.clone().unwrap_or_default(),
         );
-        let live_pids = self.processes().iter().map(|process| process.pid).collect();
-        self.shell.selection.retain_live(&live_pids);
+        // Token-aware reconcile (CORE-01): a pid reused by a new process
+        // drops instead of retargeting.
+        let snapshot: &[taskmanager_core::core::process::ProcessItem] =
+            self.materialized.processes();
+        self.shell.selection.reconcile(snapshot);
         if let Some(pid) = self.process_affinity_pid() {
             let expected = match self.shell.process_affinity_state() {
                 taskmanager_application::ProcessAffinityState::Loading { target, .. }
@@ -334,12 +338,7 @@ impl RootView {
         if !output.changes.snapshot_recorded {
             return;
         }
-        let previous = self.active_alerts().to_vec();
         let next = self.projection().alert_active.clone();
-        let timestamp_ms = self.system_snapshot().timestamp_ms;
-        self.dashboard
-            .events
-            .observe(&previous, &next, timestamp_ms);
         self.materialized
             .replace_active_alerts(self.projection().refresh_count, next);
         let notifications = self.shell.drain_alert_notifications();

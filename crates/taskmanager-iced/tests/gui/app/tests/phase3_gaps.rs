@@ -51,22 +51,35 @@ fn test_alert_center_lifecycle() {
     let _ = app.update(Message::OpenAlertCenter);
     assert!(app.alert_center_open());
 
-    // Add a fake alert incident and then clear it
-    app.alert_center
-        .events
-        .push(crate::ui::overlays::alerts::AlertIncidentItem {
+    // Install a deterministic event through the shared alert authority and
+    // then clear it through the same application path the overlay uses.
+    let alert = taskmanager_core::core::alerts::Alert {
+        instance_id: "cpu-high:system".into(),
+        rule_id: "cpu-high".into(),
+        target: "system".into(),
+        metric: taskmanager_core::core::alerts::AlertMetric::CpuUsagePercent,
+        severity: taskmanager_core::core::alerts::AlertSeverity::Critical,
+        value: 99.5,
+        threshold: 90.0,
+        active_since_ms: 1000,
+    };
+    app.shell
+        .replace_alert_event_history(vec![taskmanager_core::core::alerts::AlertEvent {
             id: 1,
-            timestamp_ms: 1000,
-            metric: taskmanager_application::alerts::AlertMetric::CpuUsagePercent,
-            severity: taskmanager_application::alerts::AlertSeverity::Critical,
-            value: 99.5,
-            threshold: 90.0,
-            message: "CPU high".to_string(),
-        });
-    assert_eq!(app.alert_center.events.len(), 1);
+            kind: taskmanager_core::core::alerts::AlertEventKind::Activated,
+            alert,
+            observed_at_ms: 1000,
+        }]);
+    assert_eq!(app.shell.projection().alert_center.event_history().len(), 1);
 
     let _ = app.update(Message::ClearAlertEvents);
-    assert!(app.alert_center.events.is_empty());
+    assert!(
+        app.shell
+            .projection()
+            .alert_center
+            .event_history()
+            .is_empty()
+    );
 
     let _ = app.update(Message::CloseAlertCenter);
     assert!(!app.alert_center_open());

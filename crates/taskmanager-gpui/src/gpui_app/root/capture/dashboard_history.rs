@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use crate::core::{
+use taskmanager_core::core::{
     CpuMetrics, CpuScalarObservations, DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence,
     DeviceState, DiskMetrics, DiskScalarObservations, MemoryMetrics, NetworkAdapterType,
     NetworkMetrics, NetworkScalarObservations, NetworkWirelessObservations, ScalarObservation,
@@ -54,7 +54,7 @@ pub(super) fn seed(
         if ingestor
             .ingest_correlated_cpu(
                 stamp,
-                &crate::core::CpuTelemetryObservation::current(
+                &taskmanager_core::core::CpuTelemetryObservation::current(
                     cpu(index, timestamp_ms),
                     timestamp_ms,
                     Vec::new(),
@@ -67,7 +67,7 @@ pub(super) fn seed(
         if ingestor
             .ingest_correlated_memory(
                 stamp,
-                &crate::core::MemoryTelemetryObservation::current(
+                &taskmanager_core::core::MemoryTelemetryObservation::current(
                     memory(index),
                     timestamp_ms,
                     Vec::new(),
@@ -82,7 +82,7 @@ pub(super) fn seed(
         if ingestor
             .ingest_correlated_storage(
                 stamp,
-                &crate::core::StorageTelemetryObservation::current(
+                &taskmanager_core::core::StorageTelemetryObservation::current(
                     disks,
                     timestamp_ms,
                     Vec::new(),
@@ -99,7 +99,7 @@ pub(super) fn seed(
         if ingestor
             .ingest_correlated_network(
                 stamp,
-                &crate::core::NetworkTelemetryObservation::current(
+                &taskmanager_core::core::NetworkTelemetryObservation::current(
                     networks,
                     timestamp_ms,
                     Vec::new(),
@@ -126,7 +126,7 @@ pub(super) fn cpu(index: u64, observed_at_ms: u64) -> CpuMetrics {
 
 pub(super) fn memory(index: u64) -> MemoryMetrics {
     MemoryMetrics::from_observations(
-        taskmanager_application::MemoryScalarObservations {
+        taskmanager_core::core::metrics::MemoryScalarObservations {
             total_bytes: ScalarObservation::available(1_000, index),
             used_bytes: ScalarObservation::available(
                 480_u64.saturating_add((index % 16).saturating_mul(7)),

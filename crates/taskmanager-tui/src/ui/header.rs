@@ -13,7 +13,7 @@ use taskmanager_assets::product;
 use taskmanager_shell::{PageHelp, page_help};
 use taskmanager_ui_contract::IconId;
 
-use crate::{TuiApp, TuiTheme, icon_glyph};
+use crate::{TuiApp, TuiTheme};
 
 pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
     let brand = if area.width < 68 {
@@ -24,7 +24,7 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
     let mut spans = vec![Span::styled(
         brand,
         Style::new()
-            .fg(Color::Black)
+            .fg(theme.color(Color::Black))
             .bg(theme.accent)
             .add_modifier(Modifier::BOLD),
     )];
@@ -38,10 +38,10 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
     {
         let active = app.page() == page;
         spans.push(Span::styled(
-            header_tab_text(icon, label, shortcut, area.width),
+            header_tab_text_with_theme(icon, label, shortcut, area.width, theme),
             if active {
                 Style::new()
-                    .fg(Color::White)
+                    .fg(theme.color(Color::White))
                     .bg(theme.highlight_bg)
                     .add_modifier(Modifier::BOLD)
             } else {
@@ -61,26 +61,31 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
     );
 }
 
+#[cfg(test)]
 fn header_tab_text(icon: IconId, label: &str, shortcut: &str, width: u16) -> String {
+    header_tab_text_with_theme(icon, label, shortcut, width, TuiTheme::default())
+}
+
+fn header_tab_text_with_theme(
+    icon: IconId,
+    label: &str,
+    shortcut: &str,
+    width: u16,
+    theme: TuiTheme,
+) -> String {
     if width >= 140 {
-        format!(" {} {} {} ", icon_glyph(icon), label, shortcut)
+        format!(" {} {} {} ", theme.glyph(icon), label, shortcut)
     } else if width >= 88 {
-        format!(" {} {} ", icon_glyph(icon), label)
+        format!(" {} {} ", theme.glyph(icon), label)
     } else if width >= 68 {
-        format!(" {} {} ", icon_glyph(icon), bounded_header_label(label, 6))
+        format!(" {} {} ", theme.glyph(icon), bounded_header_label(label, 6))
     } else {
-        format!(" {} ", icon_glyph(icon))
+        format!(" {} ", theme.glyph(icon))
     }
 }
 
 fn bounded_header_label(label: &str, max_chars: usize) -> String {
-    let chars: Vec<char> = label.chars().collect();
-    if chars.len() <= max_chars {
-        return label.to_owned();
-    }
-    let take = max_chars.saturating_sub(1).max(1);
-    let prefix: String = chars.into_iter().take(take).collect();
-    format!("{prefix}…")
+    super::text::truncate_cells(label, max_chars)
 }
 
 #[cfg(test)]

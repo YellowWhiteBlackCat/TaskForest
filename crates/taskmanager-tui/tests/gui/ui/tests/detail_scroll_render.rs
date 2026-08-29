@@ -47,10 +47,30 @@ fn modal_text(target: &ProcessPropertiesTarget, app: &TuiApp, width: u16, height
     terminal
         .draw(|frame| {
             let area = Rect::new(0, 0, width, height);
-            render_process_properties(frame, target, app, TuiTheme::default(), area);
+            render_process_properties(
+                frame,
+                target,
+                app,
+                TuiTheme::default(),
+                modal_focus_plan(target.section),
+                area,
+            );
         })
         .expect("draw");
     terminal.backend().to_string()
+}
+
+/// The focus plan that mirrors this modal fixture: the shared Properties
+/// surface addressing `section`. The renderer must highlight from this plan.
+fn modal_focus_plan(section: ProcessDetailsSection) -> crate::ui::frame_plan::TuiFocusPlan {
+    use crate::ui::frame_plan::{TuiFocusControl, TuiFocusOrder, TuiFocusPlan, TuiFocusTarget};
+    TuiFocusPlan {
+        target: TuiFocusTarget::SharedSurface(
+            taskmanager_application::SurfaceKind::ProcessProperties,
+        ),
+        order: TuiFocusOrder::None,
+        control: TuiFocusControl::PropertiesTab(section),
+    }
 }
 
 /// A demo app parked on the Applications page with the cursor on its first

@@ -6,16 +6,16 @@
 use gpui::{ClipboardItem, Div, Entity, ParentElement, Styled, div};
 use tracing::warn;
 
-use crate::core::alerts::{
+use crate::gpui_app::elements;
+use crate::gpui_app::root::RootView;
+use taskmanager_application::i18n;
+use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
+use taskmanager_core::core::alerts::{
     AlertRuleConflictPolicy, AlertRuleTransferEntry, AlertRuleTransferError,
     export_alert_rules_json, import_alert_rules_json,
 };
-use crate::gpui_app::elements;
-use crate::gpui_app::root::RootView;
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::i18n;
-use taskmanager_application::{AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit};
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 fn transfer_entries(rules: &[ManagedAlertRule]) -> Vec<AlertRuleTransferEntry> {
     rules

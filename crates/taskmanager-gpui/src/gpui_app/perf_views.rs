@@ -8,8 +8,6 @@ use gpui::{
 };
 use taskmanager_telemetry_store::TelemetryStore;
 
-use crate::core::DirectoryUsageSnapshot;
-use crate::core::metrics::{NetworkAdapterType, SystemSnapshot};
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{DisplayUnits, GraphUnit, PerformanceSettings, UnitKind};
 use crate::gpui_app::graph::GraphHover;
@@ -20,10 +18,12 @@ use crate::gpui_app::history_samples::{
 };
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::{PerformanceChartInventory, PerformancePageBudget};
-use crate::gpui_app::theme::Theme;
-use crate::i18n;
 use std::cell::RefCell;
 use std::rc::Rc;
+use taskmanager_application::i18n;
+use taskmanager_core::core::DirectoryUsageSnapshot;
+use taskmanager_core::core::metrics::{NetworkAdapterType, SystemSnapshot};
+use taskmanager_theme::Theme;
 
 mod directory_usage;
 mod disk_stats;
@@ -42,9 +42,9 @@ mod network_stats;
 mod partition_stats;
 mod smart_dialog;
 mod smart_status;
-use crate::gpui_app::theme::tokens;
 use disk_stats::disk_stats;
 pub(crate) use dynamic::{BatteryViewProps, FanViewProps, render_battery, render_fan};
+use taskmanager_theme::tokens;
 // The ONE page composition root and its chart specification are the crate's
 // public surface for Performance pages: cpu_view composes through the same
 // root as every device page, so no sibling module can hand-roll a parallel
@@ -57,9 +57,8 @@ use network_stats::{network_link_speed_graph_max, network_stats, network_title};
 use partition_stats::partition_panel;
 pub use smart_dialog::render_smart_dialog;
 use smart_status::status_footer;
-pub use smart_status::{
-    device_status_i18n_key, effective_smart_status, has_smart_fields, smart_availability_i18n_key,
-    smart_section_visible,
+use taskmanager_shell::presentation::{
+    device_status_i18n_key, effective_smart_status, has_smart_fields, smart_section_visible,
 };
 
 pub(crate) use gpu_page::{GpuChartLayout, GpuRenderState, gpu_percentage_readout, render_gpu};

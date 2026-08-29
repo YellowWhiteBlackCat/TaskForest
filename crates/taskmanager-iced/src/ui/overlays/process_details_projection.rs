@@ -1,6 +1,6 @@
 //! Pure process-details action projection.
 
-use taskmanager_application::ProcessItem;
+use taskmanager_core::core::process::ProcessItem;
 
 /// Executable path suitable for the clipboard action. Missing and non-UTF-8
 /// observations remain absent instead of becoming an empty button payload.

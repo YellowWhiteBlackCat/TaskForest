@@ -6,7 +6,10 @@
 //! (the TUI's four local blocks were collapsed into this vocabulary).
 
 use super::super::*;
-use taskmanager_application::{AppAction, ProcessBatchAction, ServiceAction, SessionControlAction};
+use taskmanager_application::AppAction;
+use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
 
 #[test]
 fn armed_service_gate_confirms_and_dismisses_through_handle_local_char() {

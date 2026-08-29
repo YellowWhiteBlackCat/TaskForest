@@ -13,10 +13,13 @@ use super::super::*;
 
 use std::collections::HashSet;
 
-use taskmanager_application::{
-    AppAction, AppPage, CpuMetrics, CpuScalarObservations, FailureKind, FrozenProcessIdentity,
-    MemoryMetrics, MemoryScalarObservations, ProcessItem, ScalarObservation, SystemSnapshot,
+use taskmanager_application::{AppAction, AppPage};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::{
+    CpuMetrics, CpuScalarObservations, MemoryMetrics, MemoryScalarObservations, ScalarObservation,
+    SystemSnapshot,
 };
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_ui_contract::{SemanticAction, SemanticLiveRegion, SemanticNodeId, SemanticRole};
 
@@ -103,7 +106,13 @@ fn process_rows_carry_typed_name_cpu_memory_and_selection_semantics() {
         taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRefresh,
     );
     app.selected = 2;
-    app.shell.selected_pids.insert(103);
+    app.shell.selected_rows.insert(
+        taskmanager_shell::ProcessRowIdentity::from_parts(
+            103,
+            taskmanager_test_support::fixture_start_token(103),
+        )
+        .expect("non-zero parts"),
+    );
     app.shell.set_feedback_activity("");
     app.shell.clear_feedback_notice();
 
@@ -159,6 +168,43 @@ fn process_rows_carry_typed_name_cpu_memory_and_selection_semantics() {
         .expect("status live region present");
     assert_eq!(status.live_region(), SemanticLiveRegion::Polite);
     assert_eq!(status.name(), Some("4 processes visible"));
+}
+
+#[test]
+fn semantic_process_rows_follow_the_visual_tree_visibility() {
+    let mut app = app_on_applications_page();
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut app.shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![
+            process_with(201, "parent", None, Some(1_000)),
+            process_with(202, "child", Some(12.0), Some(2_000)),
+        ])),
+    );
+
+    // The default category tree is expanded; semantic rows mirror both the
+    // structural group rows and the two visible process nodes.
+    let expanded = app.semantic_snapshot().expect("expanded semantic tree");
+    assert_eq!(row_nodes(&expanded).len(), 2);
+    assert!(
+        expanded
+            .nodes()
+            .any(|node| node.role() == SemanticRole::TreeItem),
+        "the visual category/application group must have a semantic TreeItem"
+    );
+
+    app.expanded_groups.clear();
+    let collapsed = app.semantic_snapshot().expect("collapsed semantic tree");
+    assert_eq!(
+        row_nodes(&collapsed).len(),
+        0,
+        "collapsed visual process rows must not remain in semantics"
+    );
+    assert!(
+        collapsed
+            .nodes()
+            .any(|node| node.role() == SemanticRole::TreeItem),
+        "a collapsed visual group remains available to assistive technology"
+    );
 }
 
 /// A first frame with no system snapshot omits the CPU graph entirely (an
@@ -303,6 +349,7 @@ fn snapshot_stays_in_the_semantic_vocabulary_with_three_domain_cells_per_row() {
         SemanticRole::Table,
         SemanticRole::ColumnHeader,
         SemanticRole::Row,
+        SemanticRole::TreeItem,
         SemanticRole::Cell,
         SemanticRole::Graph,
         SemanticRole::StaticText,
@@ -350,9 +397,12 @@ fn row_publication_is_bounded_to_the_reader_friendly_prefix() {
     );
 
     let snapshot = app.semantic_snapshot().expect("bounded tree must build");
+    let interactive_rows = snapshot
+        .nodes()
+        .filter(|node| matches!(node.role(), SemanticRole::Row | SemanticRole::TreeItem))
+        .count();
     assert_eq!(
-        row_nodes(&snapshot).len(),
-        EXPECTED_MAX_PUBLISHED_ROWS,
-        "a 70-process list must publish only the bounded prefix"
+        interactive_rows, EXPECTED_MAX_PUBLISHED_ROWS,
+        "a 70-process visual-row list must publish only the bounded prefix"
     );
 }

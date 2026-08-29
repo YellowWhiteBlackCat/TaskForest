@@ -17,7 +17,7 @@ use crate::gpui_app::perf_views::PERF_MAIN_VIEWPORT_SELECTOR;
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::navigation::{PageFamily, TopPage};
 use crate::gpui_app::root::render::TELEMETRY_READY_BODY_SELECTOR;
-use crate::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 use taskmanager_ui::layout::selectors::{PAGE_SCAFFOLD, PAGE_SCAFFOLD_FOOTER};
 
 fn wrapped_root(cx: &mut TestAppContext) -> (gpui::WindowHandle<RootView>, gpui::Entity<RootView>) {

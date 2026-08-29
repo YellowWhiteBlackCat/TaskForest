@@ -1,10 +1,11 @@
 //! gpui-based Mission Center UI (replacing the legacy wgpu stack).
 //!
-//! Reuses the framework-agnostic data layer in [`crate::core`] (collector, metrics,
+//! Reuses the framework-agnostic data layer in [`taskmanager_core::core`] (collector, metrics,
 //! process, services, hardware). This module owns only the gpui view code.
 
 pub mod about;
 pub mod app_history_view;
+pub mod capabilities;
 pub mod chrome;
 pub mod containers_view;
 pub mod cpu_view;
@@ -12,6 +13,7 @@ pub mod dashboard;
 pub mod elements;
 pub mod first_run;
 pub mod formatting;
+pub mod functional;
 pub mod graph;
 pub mod help_overlay;
 pub(crate) mod history_samples;

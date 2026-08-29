@@ -20,8 +20,8 @@ use taskmanager_ui_contract::{
 };
 
 use super::RootView;
-use super::termination::ProcessTerminationAction;
 use crate::gpui_app::formatting;
+use taskmanager_application::ProcessTerminationAction;
 
 /// Maximum number of process rows published to the accessibility tree. The
 /// process list can contain thousands of entries; a screen reader reads the
@@ -110,7 +110,8 @@ fn build_snapshot(
     }
 
     // Publish the highest-CPU rows first; the AT reads them top-down.
-    let mut rows: Vec<&crate::core::process::ProcessItem> = view.processes().iter().collect();
+    let mut rows: Vec<&taskmanager_core::core::process::ProcessItem> =
+        view.processes().iter().collect();
     rows.sort_by(|a, b| {
         b.current_cpu_percentage()
             .unwrap_or(0.0)
@@ -129,7 +130,7 @@ fn build_snapshot(
                 .current_cpu_percentage()
                 .map(|value| f64::from(value.clamp(0.0, 100.0))),
             memory_percent,
-            selected: view.selected_pids().contains(&item.pid),
+            selected: view.is_process_selected(item),
         });
     }
 

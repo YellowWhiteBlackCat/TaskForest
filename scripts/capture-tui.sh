@@ -1,5 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Capture the real Ratatui/Crossterm frame inside Alacritty on nested Niri.
+# The default acceptance path mirrors capture-niri.sh: nested Niri is hosted by
+# a private virtual KWin framebuffer, so no capture window reaches the user's
+# foreground desktop. Niri's screenshot-window action is bound to the exact
+# Alacritty PID/app-id/window-id tuple rather than whichever window has focus.
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,12 +17,14 @@ export RUSTC_WRAPPER=
 APP="$REPO/target/debug/taskmanager"
 OUT="$REPO/target/tui-evidence/latest"
 EVIDENCE_ROOT="$REPO/target/tui-evidence"
+APP_ID="taskmanager-tui"
 CAPTURE_PAGE="${TM_TUI_CAPTURE_PAGE:-performance}"
 CAPTURE_DEVICE="${TM_TUI_CAPTURE_DEVICE:-}"
 CAPTURE_SCENE="${TM_TUI_CAPTURE_SCENE:-}"
 CAPTURE_COLUMNS="${TM_TUI_CAPTURE_COLUMNS:-120}"
 CAPTURE_LINES="${TM_TUI_CAPTURE_LINES:-36}"
 CAPTURE_FONT_SIZE="${TM_TUI_CAPTURE_FONT_SIZE:-13}"
+CAPTURE_NIRI_BACKGROUND="${TM_CAPTURE_NIRI_BACKGROUND:-1}"
 if ! [[ "$CAPTURE_COLUMNS" =~ ^[0-9]+$ ]] || [ "$CAPTURE_COLUMNS" -lt 54 ]; then
   printf 'TM_TUI_CAPTURE_COLUMNS must be an integer >= 54\n' >&2
   exit 2
@@ -62,7 +68,6 @@ else
 fi
 RUN_ID="${RUN_STAMP}_${GIT_HEAD}_${WORKTREE_STATE}"
 RUN_DIR="$EVIDENCE_ROOT/$RUN_ID"
-RUNTIME_DIR="$(mktemp -d /tmp/taskmanager-tui-niri.XXXXXX)"
 CONF="$RUN_DIR/config.kdl"
 MARKERS="$RUN_DIR/tui-capture-markers.log"
 METADATA="$RUN_DIR/tui-capture-metadata.txt"
@@ -72,29 +77,82 @@ IMAGE="$RUN_DIR/tui-mvp.png"
 SOURCE_MANIFEST="$RUN_DIR/tui-source-manifest.sha256"
 HOST_XDG="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 HOST_DISPLAY="$HOST_XDG/${WAYLAND_DISPLAY:-wayland-0}"
-mkdir -p "$RUN_DIR" "$OUT"
-chmod 700 "$RUNTIME_DIR"
+NIRI_PARENT_WAYLAND="$HOST_DISPLAY"
 NIRI_PID=""
+NIRI_PGID=""
 ALACRITTY_PID=""
+ALACRITTY_PGID=""
+WINDOW_PID=""
+WINDOW_PGID=""
+KWIN_PID=""
+KWIN_PGID=""
+KWIN_RUNTIME=""
+KWIN_DISPLAY=""
 
-terminate_child() {
+for command in cargo file git jq niri ps rustc sha256sum setsid stat timeout; do
+  if ! command -v "$command" >/dev/null 2>&1; then
+    printf 'required capture command is unavailable: %s\n' "$command" >&2
+    exit 2
+  fi
+done
+case "$CAPTURE_NIRI_BACKGROUND" in
+  0|1) ;;
+  *)
+    printf 'TM_CAPTURE_NIRI_BACKGROUND must be 0 or 1: %s\n' \
+      "$CAPTURE_NIRI_BACKGROUND" >&2
+    exit 2
+    ;;
+esac
+if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ] \
+  && ! command -v kwin_wayland >/dev/null 2>&1; then
+  printf 'background TUI capture requires kwin_wayland --virtual; set TM_CAPTURE_NIRI_BACKGROUND=0 for visible nested debug mode\n' >&2
+  exit 2
+fi
+
+mkdir -p "$RUN_DIR" "$OUT"
+RUNTIME_DIR="$(mktemp -d /tmp/taskmanager-tui-niri.XXXXXX)"
+chmod 700 "$RUNTIME_DIR"
+
+process_group() {
   local pid="$1"
+  ps -o pgid= -p "$pid" 2>/dev/null | tr -d '[:space:]'
+}
+
+terminate_owned() {
+  local pid="$1" pgid="$2"
   [ -n "$pid" ] || return 0
-  kill "$pid" 2>/dev/null || true
+  if [[ "$pgid" =~ ^[0-9]+$ ]] && [ "$pgid" = "$pid" ]; then
+    kill -TERM -- "-$pgid" 2>/dev/null || true
+  else
+    kill -TERM "$pid" 2>/dev/null || true
+  fi
   for _ in $(seq 1 20); do
-    kill -0 "$pid" 2>/dev/null || break
+    if [[ "$pgid" =~ ^[0-9]+$ ]] && [ "$pgid" = "$pid" ]; then
+      kill -0 -- "-$pgid" 2>/dev/null || break
+    else
+      kill -0 "$pid" 2>/dev/null || break
+    fi
     sleep 0.1
   done
-  if kill -0 "$pid" 2>/dev/null; then
+  if [[ "$pgid" =~ ^[0-9]+$ ]] && [ "$pgid" = "$pid" ]; then
+    kill -0 -- "-$pgid" 2>/dev/null && kill -KILL -- "-$pgid" 2>/dev/null || true
+  elif kill -0 "$pid" 2>/dev/null; then
     kill -KILL "$pid" 2>/dev/null || true
   fi
   wait "$pid" 2>/dev/null || true
 }
 
 cleanup() {
-  terminate_child "$ALACRITTY_PID"
-  terminate_child "$NIRI_PID"
-  rm -rf "$RUNTIME_DIR"
+  terminate_owned "$WINDOW_PID" "$WINDOW_PGID"
+  terminate_owned "$ALACRITTY_PID" "$ALACRITTY_PGID"
+  terminate_owned "$NIRI_PID" "$NIRI_PGID"
+  terminate_owned "$KWIN_PID" "$KWIN_PGID"
+  if [ -n "$KWIN_RUNTIME" ] && [ -d "$KWIN_RUNTIME" ]; then
+    rm -rf -- "$KWIN_RUNTIME"
+  fi
+  if [ -d "$RUNTIME_DIR" ]; then
+    rm -rf -- "$RUNTIME_DIR"
+  fi
   if [ -n "${TASKMGR_AGENT_LEASE:-}" ] && [ -d "$TASKMGR_AGENT_LEASE" ]; then
     rm -rf "$TASKMGR_AGENT_LEASE"
   fi
@@ -124,27 +182,84 @@ window-rule {
 KDL
 timeout 10s niri validate --config "$CONF"
 
+start_capture_host() {
+  if [ "$CAPTURE_NIRI_BACKGROUND" -eq 0 ]; then
+    return 0
+  fi
+
+  # Niri's nested winit backend is itself a host window. Put it inside a
+  # private virtual KWin compositor so the capture never steals focus or
+  # paints over the operator's desktop.
+  KWIN_RUNTIME="$(mktemp -d /tmp/taskmanager-tui-kwin.XXXXXX)"
+  KWIN_DISPLAY="$KWIN_RUNTIME/wayland-outer"
+  mkdir -p "$KWIN_RUNTIME"
+  chmod 700 "$KWIN_RUNTIME"
+  XDG_RUNTIME_DIR="$KWIN_RUNTIME" WAYLAND_DISPLAY= DISPLAY= \
+    QT_QPA_PLATFORM=wayland setsid timeout --foreground --kill-after=10s 20m \
+    kwin_wayland --virtual --socket=wayland-outer --width=1920 --height=1080 \
+      --scale=1 --no-global-shortcuts --no-lockscreen \
+      >"$RUN_DIR/kwin-wayland.log" 2>&1 &
+  KWIN_PID=$!
+  KWIN_PGID=""
+  for _ in $(seq 1 40); do
+    KWIN_PGID="$(process_group "$KWIN_PID")"
+    [ "$KWIN_PGID" = "$KWIN_PID" ] && break
+    sleep 0.1
+  done
+  if [ "$KWIN_PGID" != "$KWIN_PID" ]; then
+    printf 'virtual KWin did not obtain a private process group\n' >&2
+    return 1
+  fi
+  for _ in $(seq 1 40); do
+    [ -S "$KWIN_DISPLAY" ] && break
+    sleep 0.2
+  done
+  if ! kill -0 "$KWIN_PID" 2>/dev/null || [ ! -S "$KWIN_DISPLAY" ]; then
+    printf 'virtual KWin did not start; tail of log:\n' >&2
+    tail -20 "$RUN_DIR/kwin-wayland.log" >&2 || true
+    return 1
+  fi
+  NIRI_PARENT_WAYLAND="$KWIN_DISPLAY"
+  printf 'background capture host: kwin-wayland --virtual (%s)\n' "$KWIN_DISPLAY"
+}
+
+start_capture_host || exit 1
+
 # Software GL keeps the nested capture reliable: on hosts whose GPU context
 # is degraded (KWin "atomic commit failed" storms), EGL initialization hangs
 # and windows never map or present. llvmpipe renders the same frame; pixel
 # content is unchanged. Applied to both the nested compositor and Alacritty.
-XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$HOST_DISPLAY" \
-  LIBGL_ALWAYS_SOFTWARE=1 \
-  niri --config "$CONF" >"$RUN_DIR/niri.log" 2>&1 &
+XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$NIRI_PARENT_WAYLAND" DISPLAY= \
+  LIBGL_ALWAYS_SOFTWARE=1 RUST_LOG=niri=info \
+  setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" \
+  >"$RUN_DIR/niri.log" 2>&1 &
 NIRI_PID=$!
+NIRI_PGID="$(process_group "$NIRI_PID")"
+[ "$NIRI_PGID" = "$NIRI_PID" ] || {
+  printf 'nested Niri did not obtain a private process group\n' >&2
+  exit 1
+}
 
 SOCK=""
 IPC=""
 for _ in $(seq 1 60); do
-  SOCK="$(grep -oE 'wayland-[0-9]+' "$RUN_DIR/niri.log" | head -1 || true)"
-  IPC="$(grep -oE "$RUNTIME_DIR/niri\.[^ ]*\.sock" "$RUN_DIR/niri.log" | head -1 || true)"
+  SOCK="$(find "$RUNTIME_DIR" -maxdepth 1 -type s -name 'wayland-[0-9]*' \
+    -printf '%f\n' -quit 2>/dev/null || true)"
+  if [ -z "$SOCK" ]; then
+    SOCK="$(grep -oE 'wayland-[0-9]+' "$RUN_DIR/niri.log" | head -1 || true)"
+  fi
+  IPC="$(find "$RUNTIME_DIR" -maxdepth 1 -type s -name 'niri.*.sock' \
+    -print -quit 2>/dev/null || true)"
+  if [ -z "$IPC" ]; then
+    IPC="$(grep -oE "$RUNTIME_DIR/niri\.[^ ]*\.sock" "$RUN_DIR/niri.log" | head -1 || true)"
+  fi
   if [ -n "$SOCK" ] && [ -S "$RUNTIME_DIR/$SOCK" ] && [ -n "$IPC" ]; then
     break
   fi
   sleep 0.2
 done
 if ! kill -0 "$NIRI_PID" 2>/dev/null || [ -z "$SOCK" ] || [ -z "$IPC" ]; then
-  tail -20 "$RUN_DIR/niri.log"
+  tail -20 "$RUN_DIR/niri.log" >&2
   exit 1
 fi
 
@@ -159,7 +274,7 @@ XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$SOCK" \
   TM_TUI_CAPTURE_SCENE="$CAPTURE_SCENE" \
   TM_TUI_CAPTURE_SOURCE_FAILURE="${TM_TUI_CAPTURE_SOURCE_FAILURE:-}" \
   LIBGL_ALWAYS_SOFTWARE=1 \
-  alacritty --class taskmanager-tui --title "TaskForest TUI Evidence" \
+  setsid alacritty --class "$APP_ID" --title "TaskForest TUI Evidence" \
     -o "window.dimensions.columns=$CAPTURE_COLUMNS" \
     -o "window.dimensions.lines=$CAPTURE_LINES" \
     -o 'window.padding.x=8' \
@@ -167,10 +282,27 @@ XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$SOCK" \
     -o "font.size=$CAPTURE_FONT_SIZE" \
     -e "$APP" --demo >"$RUN_DIR/alacritty.log" 2>&1 &
 ALACRITTY_PID=$!
+ALACRITTY_PGID="$(process_group "$ALACRITTY_PID")"
 
 WINDOW_READY=0
+WINDOWS="$RUN_DIR/windows.json"
+WINDOWS_TMP="$RUN_DIR/windows.json.tmp"
+WINDOW_ID=""
+: >"$WINDOWS"
 for _ in $(seq 1 80); do
-  if NIRI_SOCKET="$IPC" timeout 3s niri msg windows 2>/dev/null | grep -q 'taskmanager-tui'; then
+  NIRI_SOCKET="$IPC" timeout 3s niri msg -j windows >"$WINDOWS_TMP" 2>/dev/null || true
+  if [ -s "$WINDOWS_TMP" ]; then
+    mv -f "$WINDOWS_TMP" "$WINDOWS"
+  fi
+  WINDOW_ID="$(jq -r --arg app "$APP_ID" \
+    '[.[] | select(.app_id == $app)] | if length == 1 then .[0].id else empty end' \
+    "$WINDOWS" 2>/dev/null || true)"
+  WINDOW_PID="$(jq -r --arg app "$APP_ID" \
+    '[.[] | select(.app_id == $app)] | if length == 1 then (.[0].pid|tostring) else empty end' \
+    "$WINDOWS" 2>/dev/null || true)"
+  if [ -n "$WINDOW_ID" ] && [ -n "$WINDOW_PID" ] \
+    && kill -0 "$WINDOW_PID" 2>/dev/null; then
+    WINDOW_PGID="$(process_group "$WINDOW_PID")"
     WINDOW_READY=1
     break
   fi
@@ -187,14 +319,26 @@ if [ "$WINDOW_READY" -ne 1 ] || ! grep -q 'event=frame_ready' "$MARKERS" 2>/dev/
   exit 1
 fi
 sleep 1
-NIRI_SOCKET="$IPC" timeout 8 niri msg action screenshot-window >/dev/null
-sleep 1
-CAPTURED="$(ls -t "$RUN_DIR"/shot-*.png 2>/dev/null | head -1 || true)"
-if [ -z "$CAPTURED" ] || [ "$(stat -c%s "$CAPTURED")" -lt 5000 ]; then
+ACTION="$RUN_DIR/action.log"
+printf 'window_id=%s\n' "$WINDOW_ID" >"$ACTION"
+printf 'action=screenshot-window --id %s --write-to-disk true --path %s\n' \
+  "$WINDOW_ID" "$IMAGE" >>"$ACTION"
+if ! NIRI_SOCKET="$IPC" timeout 8s niri msg action screenshot-window \
+  --id "$WINDOW_ID" --write-to-disk true --path "$IMAGE" >>"$ACTION" 2>&1; then
+  printf 'TUI screenshot-window action failed\n' >&2
+  exit 1
+fi
+for _ in $(seq 1 50); do
+  if [ -s "$IMAGE" ] && file "$IMAGE" | grep -q 'PNG image data'; then
+    break
+  fi
+  sleep 0.1
+done
+if [ ! -s "$IMAGE" ] || ! file "$IMAGE" | grep -q 'PNG image data' \
+  || [ "$(stat -c%s "$IMAGE")" -lt 5000 ]; then
   printf 'TUI screenshot missing or too small\n' >&2
   exit 1
 fi
-mv "$CAPTURED" "$IMAGE"
 
 RUST_VERSION="$(rustc -V)"
 NIRI_VERSION="$(niri --version)"
@@ -208,6 +352,19 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'niri=%s\n' "$NIRI_VERSION"
   printf 'terminal=%s\n' "$(alacritty --version)"
   printf 'stack=ratatui 0.30.2 + crossterm 0.29.0\n'
+  printf 'app_id=%s\n' "$APP_ID"
+  printf 'app_pid=%s\n' "$WINDOW_PID"
+  printf 'launcher_pid=%s\n' "$ALACRITTY_PID"
+  printf 'window_id=%s\n' "$WINDOW_ID"
+  printf 'capture_backend=niri-screenshot-window-wayland\n'
+  if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+    printf 'niri_host=kwin-wayland-virtual\n'
+  else
+    printf 'niri_host=host-wayland-visible\n'
+  fi
+  printf 'niri_background=%s\n' "$CAPTURE_NIRI_BACKGROUND"
+  printf 'windows_receipt=%s\n' "$WINDOWS"
+  printf 'action_receipt=%s\n' "$ACTION"
   printf 'source_scope=tui\n'
   printf 'page=%s\n' "$CAPTURE_PAGE"
   printf 'device=%s\n' "${CAPTURE_DEVICE:-default}"

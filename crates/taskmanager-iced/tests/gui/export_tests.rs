@@ -8,8 +8,8 @@ fn test_process_to_tsv() {
         .current_cpu_percentage(45.2)
         .current_memory_bytes(1024 * 1024 * 50)
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("testuser".to_string()),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("testuser".to_string()),
                 None,
                 1,
             ),
@@ -28,8 +28,8 @@ fn test_process_to_json() {
         .current_cpu_percentage(12.0)
         .current_memory_bytes(1024 * 1024 * 10)
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("admin".to_string()),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("admin".to_string()),
                 None,
                 1,
             ),

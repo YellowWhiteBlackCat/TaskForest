@@ -4,10 +4,10 @@ use gpui::{Context, Div, Entity, ParentElement, Styled, div};
 
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::tokens::RowDensity;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
+use taskmanager_theme::tokens::RowDensity;
 
 /// Row-density chooser: two pills (Comfortable / Compact) writing
 /// `RootView.density` directly — the same pill pattern as the skin/mode rows.

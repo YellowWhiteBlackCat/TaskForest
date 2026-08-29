@@ -10,13 +10,13 @@ use taskmanager_assets::product;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 use taskmanager_ui_contract::IconId;
 
-use crate::core::SystemSnapshot;
 use crate::gpui_app::formatting;
-use crate::gpui_app::icons;
-use crate::gpui_app::theme::{Color, Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::SystemSnapshot;
+use taskmanager_theme::{Color, Theme};
 
 use super::readouts::cpu_summary_readout;
+use taskmanager_theme::tokens;
 
 /// Inputs for the compact desktop widget.
 pub struct DashboardWidgetProps<'a> {
@@ -47,7 +47,11 @@ fn metric_card(
                 .gap(tokens::SPACE_5)
                 .text_size(tokens::FONT_11)
                 .text_color(theme.fg_dim)
-                .child(icons::icon(icon).size(px(14.0)).text_color(color))
+                .child(
+                    taskmanager_icons::icon(icon)
+                        .size(px(14.0))
+                        .text_color(color),
+                )
                 .child(label),
         )
         .child(

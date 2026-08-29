@@ -9,10 +9,10 @@ use std::sync::Arc;
 
 use super::*;
 use taskmanager_application::{
-    ApplicationHistoryRow, HistoryMetric, HistoryReplayCompletion,
-    HistoryReplayCompletionDisposition, HistoryReplayCompletionOutcome, HistoryReplayError,
-    HistoryReplayErrorKind, HistoryReplayRow, HistorySeriesKey,
+    ApplicationHistoryRow, HistoryReplayCompletion, HistoryReplayCompletionDisposition,
+    HistoryReplayCompletionOutcome, HistoryReplayError, HistoryReplayErrorKind, HistoryReplayRow,
 };
+use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey};
 
 fn identity(value: &str, verified: bool) -> ApplicationHistoryIdentity {
     if verified {
@@ -295,4 +295,63 @@ fn runtime_is_inert_without_a_connector_and_only_exposes_typed_read_states() {
         runtime.projection().status,
         ApplicationHistoryStatus::Disabled
     );
+}
+
+// ---- wired page assembly: the disabled state speaks exactly once ----------
+
+/// A disabled history page states its case once: the disabled heading and
+/// detail are one surface, not a copy per series or per mount path. The
+/// capture matrix renders this page; this test is its headless twin.
+#[test]
+fn the_disabled_page_states_itself_exactly_once() {
+    use bevy::MinimalPlugins;
+    use bevy::app::App;
+    use bevy::asset::{AssetPlugin, Assets};
+    use bevy::scene::{ScenePlugin, WorldSceneExt};
+    use bevy::text::Font;
+    use bevy::ui::widget::Text;
+    use taskmanager_theme::Theme;
+
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    app.init_resource::<Assets<Font>>();
+    // The paint path (bound by the page's on-insert hook) reads these two
+    // resources; the window composition always has them.
+    app.insert_resource(crate::pages::history::HistoryProjectionResource::default());
+    app.insert_resource(crate::window::WindowPalette {
+        inner: crate::palette::ui_palette(&Theme::dark()),
+    });
+    let projection = crate::pages::history::HistoryRuntime::default().projection();
+    let palette = crate::palette::ui_palette(&Theme::dark());
+    let world = app.world_mut();
+    let root = world
+        .spawn_scene(crate::pages::history::scene::content(&projection, &palette))
+        .expect("the history scene resolves without assets")
+        .id();
+    // Flush the spawn AND a second frame so any late bind/paint pass runs.
+    app.update();
+    app.update();
+
+    let heading = t("history.application.disabled");
+    let detail = t("history.application.disabled_detail");
+    let mut texts = app.world_mut().query::<&Text>();
+    let count_hits = |state: &mut bevy::ecs::query::QueryState<&Text>,
+                      world: &bevy::ecs::world::World,
+                      needle: &str|
+     -> usize { state.iter(world).filter(|text| text.0 == needle).count() };
+    // Flush the spawn AND extra frames so every late bind/paint pass has
+    // settled before counting.
+    app.update();
+    app.update();
+    app.update();
+
+    let said = count_hits(&mut texts, app.world(), heading);
+    let said_detail = count_hits(&mut texts, app.world(), detail);
+    assert_eq!(
+        said, 1,
+        "the disabled heading must appear exactly once, got {said}"
+    );
+    assert_eq!(said_detail, 1, "the disabled detail appears exactly once");
+    let _ = root;
 }

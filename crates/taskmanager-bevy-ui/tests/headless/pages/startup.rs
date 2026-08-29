@@ -18,15 +18,24 @@ use bevy::ecs::query::With;
 use bevy::ui::BackgroundColor;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    CorrelatedStartupEvent, EventEnvelope, EventPort, EventPortError, EventSequence, FailureKind,
-    HostTelemetryRequest, PartialSourceSnapshot, PlatformClient, PlatformEvent, PlatformEventBatch,
-    PlatformFacets, PlatformHandle, ProjectedStartupEvidence, ProviderId, RequestEnvelope,
-    RequestId, RequestPort, SourceOutcome, SourceStatus, StartupBootEvidenceSnapshot,
-    StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupEvent,
-    StartupEvidenceRevision, StartupEvidenceUnavailable, StartupImpact, StartupImpactEvidence,
-    StartupImpactUnknownReason, StartupScope, StartupSource, SubmissionError, SystemFacets,
+    CorrelatedStartupEvent, HostTelemetryRequest, PlatformClient, PlatformEvent,
+    PlatformEventBatch, PlatformFacets, PlatformHandle, ProjectedStartupEvidence, StartupEvent,
+    StartupEvidenceRevision, StartupEvidenceUnavailable, SystemFacets,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_core::core::startup::{
+    StartupBootEvidenceSnapshot, StartupControlPolicy, StartupEntry, StartupEntryId,
+    StartupEntryLocator, StartupImpact, StartupImpactEvidence, StartupImpactUnknownReason,
+    StartupScope, StartupSource,
+};
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    EventEnvelope, EventPort, EventPortError, EventSequence, PartialSourceSnapshot,
+    RequestEnvelope, RequestId, RequestPort, SubmissionError,
+};
+
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 use taskmanager_theme::Theme;
 
@@ -370,14 +379,14 @@ fn evidence_line_stays_silent_then_honest() {
     let mut snapshot = StartupBootEvidenceSnapshot::default();
     snapshot
         .critical_chain
-        .push(taskmanager_application::StartupCriticalChainNode {
+        .push(taskmanager_core::core::startup::StartupCriticalChainNode {
             unit: "multi-user.target".to_owned(),
             activated_at_ms: Some(1200),
             duration_ms: Some(300),
         });
     snapshot
         .failed_units
-        .push(taskmanager_application::StartupFailedUnit {
+        .push(taskmanager_core::core::startup::StartupFailedUnit {
             unit: "broken.service".to_owned(),
             load_state: "loaded".to_owned(),
             active_state: "failed".to_owned(),

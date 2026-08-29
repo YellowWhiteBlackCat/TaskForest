@@ -6,14 +6,25 @@
 use super::super::*;
 use std::sync::{Arc, Mutex};
 use taskmanager_application::{
-    AppPage, CapabilityCatalog, CapabilityRequest, CapabilitySnapshot, CommandLaunchRequest,
-    DirectoryScanBounds, DirectoryScanSpec, DirectoryUsageRequest, EventEnvelope, EventPort,
-    EventPortError, GpuEngineRowsRequest, IntegrationFacets, PlatformClient, PlatformEvent,
-    PlatformFacets, PlatformHandle, ProcessAffinityControlRequest, ProcessAffinityRequest,
-    ProcessFacets, ProcessNetworkEscalationRequest, ProcessResourceControlRequest,
-    ResourceGroupLimitRequest, ServiceDependenciesRequest, ServiceFacets, ServiceId,
-    ServiceLogSnapshotRequest, SetupScriptAction, SetupScriptRequest, SmartControlRequest,
-    StorageDeviceTarget, StorageFacets, SubmissionError, SystemFacets,
+    AppPage, CommandLaunchRequest, DirectoryUsageRequest, GpuEngineRowsRequest, IntegrationFacets,
+    PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ProcessAffinityControlRequest,
+    ProcessAffinityRequest, ProcessFacets, ProcessNetworkEscalationRequest,
+    ProcessResourceControlRequest, ServiceDependenciesRequest, ServiceFacets,
+    ServiceLogSnapshotRequest, SetupScriptRequest, SmartControlRequest, StorageFacets,
+    SystemFacets,
+};
+use taskmanager_core::core::directory_usage::{
+    DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec,
+};
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
+use taskmanager_core::core::setup::SetupScriptAction;
+use taskmanager_core::core::storage::StorageDeviceTarget;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityRequest, CapabilitySnapshot, EventEnvelope, EventPort,
+    EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 
 #[derive(Default)]
@@ -49,13 +60,10 @@ impl<T> Default for RecordingRequests<T> {
     }
 }
 
-impl<T: CapabilityRequest> taskmanager_application::RequestPort for RecordingRequests<T> {
+impl<T: CapabilityRequest> RequestPort for RecordingRequests<T> {
     type Request = T;
 
-    fn try_submit(
-        &self,
-        request: taskmanager_application::RequestEnvelope<T>,
-    ) -> Result<(), SubmissionError> {
+    fn try_submit(&self, request: RequestEnvelope<T>) -> Result<(), SubmissionError> {
         self.submitted
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -143,7 +151,7 @@ fn gpu_engine_rows_effect_begins_the_typed_request_session() {
             .with_system(SystemFacets::default().with_gpu_engine_rows(recorder.clone())),
     );
     let mut app = crate::demo_app();
-    let device_id = taskmanager_application::DeviceId::new("gpu:fixture");
+    let device_id = DeviceId::new("gpu:fixture");
 
     queue_effect(
         &mut app,
@@ -276,7 +284,7 @@ fn service_log_snapshot_effect_submits_the_service_scoped_request() {
     );
 }
 
-fn selected_demo_identity(app: &mut ShellApp) -> taskmanager_application::FrozenProcessIdentity {
+fn selected_demo_identity(app: &mut ShellApp) -> FrozenProcessIdentity {
     app.application.active_page = AppPage::Applications;
     app.selected = 1;
     app.selected_process_identity()
@@ -453,9 +461,7 @@ fn on_demand_submission_failure_reports_the_typed_capability() {
     queue_effect(
         &mut app,
         &mut client,
-        ShellApp::request_directory_usage(DirectoryUsageRequest::Cancel(
-            taskmanager_application::DirectoryScanId::new(4),
-        )),
+        ShellApp::request_directory_usage(DirectoryUsageRequest::Cancel(DirectoryScanId::new(4))),
     );
 
     assert!(

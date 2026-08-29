@@ -10,10 +10,10 @@
 //! the shell crate even though the GPUI window does not run the shell state
 //! machine. The rules mirror the `ShellApp` counterparts exactly:
 //!
-//! - selection: the pid set + the anchor pid follow the same
-//!   plain-click-collapse / ctrl-toggle / shift-range / live-prune semantics
-//!   as `ShellApp::selected_pids` (see `app/selection.rs` and the gpui
-//!   per-row handler docs);
+//! - selection: the live-identity set + the anchor identity follow the same
+//!   plain-click-collapse / ctrl-toggle / shift-range / token-aware reconcile
+//!   semantics as `ShellApp::selected_rows` (see `app/selection.rs` and the
+//!   gpui per-row handler docs);
 //! - inventory sorts: `None` keeps provider order, a same-column click flips
 //!   the direction, a new column starts ascending — the same post-conditions
 //!   as `ShellApp::set_info_sort` in `app/sorting.rs`;
@@ -27,17 +27,23 @@
 
 use std::collections::HashSet;
 
-use taskmanager_application::{
-    CapabilitySnapshot, InteractionState, ProcessCategory, ServiceDependenciesLifecycle,
-    ServiceItem, ServiceStatus, SessionItem, StartupEntry,
-};
+use taskmanager_application::{InteractionState, ServiceDependenciesLifecycle};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
+use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::startup::StartupEntry;
+use taskmanager_platform_contract::{CapabilitySnapshot, RequestId};
 
+use super::process_rows::{ProcessRowId, ProcessRowIdentity};
 use super::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
 use crate::ProcessStatusFilter;
 
 mod inventory_sort;
 mod process_selection;
 mod process_viewing;
+
+pub use process_selection::identity_range;
 
 /// The Applications-table viewing state for a direct-track window: the active
 /// sort, the status bucket, and the search query — the same authoritative
@@ -49,7 +55,7 @@ mod process_viewing;
 /// row projection, keyboard paging, and persistence all read one state.
 ///
 /// Unlike the shell track, the reducers own NO selection side effects: a
-/// direct-track window anchors selection by pid
+/// direct-track window anchors selection by live row identity
 /// ([`ProcessSelection`]), so re-ordering rows never needs a cursor reset.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProcessViewing {
@@ -58,49 +64,20 @@ pub struct ProcessViewing {
     query: String,
 }
 
-/// Stable semantic identity of one projected Applications-table row.
-///
-/// Category rows are structural tree headers. Application rows are PID-less
-/// aggregates keyed by their process-tree root; the root pid is a live lookup
-/// key, never a representative process identity. Process rows retain their
-/// real pid. Exact authority is frozen only when an action is submitted.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum ProcessRowKey {
-    Category(ProcessCategory),
-    Application(u32),
-    Process(u32),
-}
-
 /// Row-anchored multi-select over the Applications process table: the batch
-/// PID set plus the active semantic row.
+/// identity set plus the active semantic row.
 ///
-/// The anchor is the direct-track counterpart of `ShellApp::selected` (the
-/// index cursor): grouped/tree frontends resolve their own visual-row
-/// projection to pids and drive this struct, so a group header (no pid) can be
-/// excluded before reaching here. Single-select is "the set contains exactly
-/// the anchor pid"; the set is the authoritative batch target and the anchor
-/// is the fallback target when the set is empty.
+/// The anchor is the direct-track counterpart of the composed track's
+/// cursor: grouped/tree frontends resolve their own visual-row projection to
+/// live identities and drive this struct, so a group header (no process
+/// target) can be excluded before reaching here. Single-select is "the set
+/// contains exactly the anchor identity"; the set is the authoritative
+/// batch target and the anchor is the fallback target when the set is empty.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ProcessSelection {
-    pids: HashSet<u32>,
-    anchor: Option<u32>,
-    active_row: Option<ProcessRowKey>,
-}
-
-/// The pid range spanning `anchor` → `end` (inclusive, in display order).
-/// A missing endpoint yields an empty range (the caller keeps its prior set);
-/// this is the `&[u32]` counterpart of [`super::selected_pids_range`], which
-/// resolves the same span against `&ProcessItem` rows.
-#[must_use]
-pub fn pid_range(display_pids: &[u32], anchor: u32, end: u32) -> Vec<u32> {
-    let start = display_pids.iter().position(|pid| *pid == anchor);
-    let end_pos = display_pids.iter().position(|pid| *pid == end);
-    match (start, end_pos) {
-        (Some(start), Some(end_pos)) => {
-            display_pids[start.min(end_pos)..=start.max(end_pos)].to_vec()
-        }
-        _ => Vec::new(),
-    }
+    rows: HashSet<ProcessRowIdentity>,
+    anchor: Option<ProcessRowIdentity>,
+    active_row: Option<ProcessRowId>,
 }
 
 /// The three inventory-table sort slots (Services / Startup / Users), each
@@ -266,7 +243,7 @@ impl DirectTrackState {
     /// exposing persistence handles to the renderer.
     pub fn set_history_persistence_sink(
         &mut self,
-        sink: Option<std::sync::Arc<dyn taskmanager_application::HistoryRecordSink>>,
+        sink: Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>>,
     ) {
         if self.persistent_application_history.is_some() == sink.is_some() {
             return;
@@ -300,22 +277,35 @@ impl DirectTrackState {
         edit: taskmanager_application::ManagedAlertRuleEdit,
     ) -> Result<
         taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_application::alerts::AlertRuleTransferError,
+        taskmanager_core::core::alerts::AlertRuleTransferError,
     > {
         self.projection.alert_center.edit_rules(edit)
     }
 
-    pub fn set_alert_policy(
-        &mut self,
-        policy: taskmanager_application::alerts::NotificationPolicy,
-    ) {
+    pub fn set_alert_policy(&mut self, policy: taskmanager_core::core::alerts::NotificationPolicy) {
         self.projection.alert_center.set_policy(policy);
+    }
+
+    /// Clear the shared alert transition history without changing the active
+    /// evaluator or notification policy.
+    pub fn clear_alert_event_history(&mut self) {
+        self.projection.alert_center.clear_event_history();
+    }
+
+    /// Install deterministic alert transition history through the direct
+    /// track's fixture boundary; production events still come only from the
+    /// shared evaluator.
+    pub fn replace_alert_event_history(
+        &mut self,
+        events: Vec<taskmanager_core::core::alerts::AlertEvent>,
+    ) {
+        self.projection.alert_center.replace_event_history(events);
     }
 
     #[must_use]
     pub fn evaluate_alerts(
         &mut self,
-        snapshot: &taskmanager_application::SystemSnapshot,
+        snapshot: &taskmanager_core::core::metrics::SystemSnapshot,
         observed_at_ms: u64,
     ) -> taskmanager_application::AlertEvaluation {
         self.projection
@@ -327,7 +317,7 @@ impl DirectTrackState {
     /// Returns the new revision used by renderer materialization.
     pub fn accept_alert_evaluation(
         &mut self,
-        active: Vec<taskmanager_application::alerts::Alert>,
+        active: Vec<taskmanager_core::core::alerts::Alert>,
     ) -> u64 {
         self.projection.alert_active = active;
         self.projection.refresh_count = self.projection.refresh_count.saturating_add(1);
@@ -336,8 +326,8 @@ impl DirectTrackState {
 
     pub fn begin_process_control(
         &mut self,
-        request_id: taskmanager_application::RequestId,
-        target: taskmanager_application::FrozenProcessIdentity,
+        request_id: RequestId,
+        target: taskmanager_core::core::process::FrozenProcessIdentity,
         kind: super::ProcessControlKind,
     ) {
         self.projection
@@ -347,7 +337,7 @@ impl DirectTrackState {
     #[must_use]
     pub fn begin_process_affinity_read(
         &mut self,
-        target: taskmanager_application::FrozenProcessIdentity,
+        target: taskmanager_core::core::process::FrozenProcessIdentity,
     ) -> taskmanager_application::RequestAttemptId {
         self.request_sessions.begin_affinity(target)
     }
@@ -355,7 +345,7 @@ impl DirectTrackState {
     pub fn accept_process_affinity_read(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        request_id: taskmanager_application::RequestId,
+        request_id: RequestId,
     ) -> bool {
         self.request_sessions.accept_affinity(attempt, request_id)
     }
@@ -363,7 +353,7 @@ impl DirectTrackState {
     pub fn reject_process_affinity_read(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        failure: taskmanager_application::FailureKind,
+        failure: FailureKind,
     ) -> bool {
         self.request_sessions.reject_affinity(attempt, failure)
     }
@@ -380,7 +370,7 @@ impl DirectTrackState {
     #[must_use]
     pub fn begin_process_batch(
         &mut self,
-        intent: taskmanager_application::ProcessBatchIntent,
+        intent: taskmanager_core::core::process::ProcessBatchIntent,
     ) -> taskmanager_application::RequestAttemptId {
         self.request_sessions.begin_batch(intent)
     }
@@ -388,7 +378,7 @@ impl DirectTrackState {
     pub fn accept_process_batch(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        request_id: taskmanager_application::RequestId,
+        request_id: RequestId,
     ) -> bool {
         self.request_sessions.accept_batch(attempt, request_id)
     }
@@ -396,7 +386,7 @@ impl DirectTrackState {
     pub fn reject_process_batch(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        failure: taskmanager_application::FailureKind,
+        failure: FailureKind,
     ) -> bool {
         self.request_sessions.reject_batch(attempt, failure)
     }
@@ -413,7 +403,7 @@ impl DirectTrackState {
     #[must_use]
     pub fn begin_smart_self_test(
         &mut self,
-        intent: taskmanager_application::SmartSelfTestIntent,
+        intent: taskmanager_core::core::system_health::SmartSelfTestIntent,
     ) -> taskmanager_application::RequestAttemptId {
         self.request_sessions.begin_smart_self_test(intent)
     }
@@ -421,7 +411,7 @@ impl DirectTrackState {
     pub fn accept_smart_self_test(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        request_id: taskmanager_application::RequestId,
+        request_id: RequestId,
     ) -> bool {
         self.request_sessions
             .accept_smart_self_test(attempt, request_id)
@@ -430,7 +420,7 @@ impl DirectTrackState {
     pub fn reject_smart_self_test(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        failure: taskmanager_application::FailureKind,
+        failure: FailureKind,
     ) -> bool {
         self.request_sessions
             .reject_smart_self_test(attempt, failure)
@@ -448,7 +438,7 @@ impl DirectTrackState {
     #[must_use]
     pub fn begin_gpu_engine_rows_request(
         &mut self,
-        device_id: taskmanager_application::DeviceId,
+        device_id: taskmanager_core::core::identity::DeviceId,
     ) -> taskmanager_application::RequestAttemptId {
         self.request_sessions.begin_gpu_engine_rows(device_id)
     }
@@ -456,7 +446,7 @@ impl DirectTrackState {
     pub fn accept_gpu_engine_rows_request(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        request_id: taskmanager_application::RequestId,
+        request_id: RequestId,
     ) -> bool {
         self.request_sessions
             .accept_gpu_engine_rows(attempt, request_id)
@@ -465,7 +455,7 @@ impl DirectTrackState {
     pub fn reject_gpu_engine_rows_request(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        failure: taskmanager_application::FailureKind,
+        failure: FailureKind,
     ) -> bool {
         self.request_sessions
             .reject_gpu_engine_rows(attempt, failure)
@@ -528,7 +518,7 @@ impl DirectTrackState {
     pub fn accept_shell_ui_action(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        request_id: taskmanager_application::RequestId,
+        request_id: RequestId,
     ) -> bool {
         self.request_sessions
             .accept_shell_ui_action(attempt, request_id)
@@ -537,7 +527,7 @@ impl DirectTrackState {
     pub fn reject_shell_ui_action(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        failure: taskmanager_application::FailureKind,
+        failure: FailureKind,
     ) -> bool {
         self.request_sessions
             .reject_shell_ui_action(attempt, failure)
@@ -560,7 +550,7 @@ impl DirectTrackState {
     pub fn accept_network_escalation(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        request_id: taskmanager_application::RequestId,
+        request_id: RequestId,
     ) -> bool {
         self.request_sessions
             .accept_network_escalation(attempt, request_id)
@@ -569,7 +559,7 @@ impl DirectTrackState {
     pub fn reject_network_escalation(
         &mut self,
         attempt: taskmanager_application::RequestAttemptId,
-        failure: taskmanager_application::FailureKind,
+        failure: FailureKind,
     ) -> bool {
         self.request_sessions
             .reject_network_escalation(attempt, failure)
@@ -615,8 +605,8 @@ impl DirectTrackState {
     #[must_use]
     pub fn begin_service_control(
         &mut self,
-        service_id: taskmanager_application::ServiceId,
-        action: taskmanager_application::ServiceAction,
+        service_id: taskmanager_core::core::target::ServiceId,
+        action: taskmanager_core::core::services::ServiceAction,
     ) -> taskmanager_application::ControlRequestId {
         self.projection
             .service_control_requests
@@ -627,8 +617,8 @@ impl DirectTrackState {
     pub fn accept_service_control(
         &mut self,
         request_id: taskmanager_application::ControlRequestId,
-        service_id: &taskmanager_application::ServiceId,
-        action: taskmanager_application::ServiceAction,
+        service_id: &taskmanager_core::core::target::ServiceId,
+        action: taskmanager_core::core::services::ServiceAction,
     ) -> bool {
         self.projection
             .service_control_requests

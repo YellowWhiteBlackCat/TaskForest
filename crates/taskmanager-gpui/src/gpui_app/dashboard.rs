@@ -1,6 +1,6 @@
 //! Stateless System dashboard backed by typed, RootView-owned UI state.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::HashSet;
 
 mod panels;
 pub use panels::{DashboardPanelOverlayProps, render_panel_overlay};
@@ -11,16 +11,14 @@ mod widget;
 pub use view::{DashboardViewProps, render_dashboard, render_system_header};
 pub use widget::{DashboardWidgetProps, render_widget};
 
-use crate::core::{Alert, AlertMetric, AlertSeverity};
-use crate::gpui_app::processes_view::{ProcessStatusFilter, SortCol};
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::timeline::{HistoryWindow, TimelineSelection, TimelineState};
-use crate::i18n;
 use taskmanager_application::DesktopNotificationRequest;
+use taskmanager_application::i18n;
 use taskmanager_application::i18n::alert_severity_label;
+use taskmanager_core::core::{Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity};
 use taskmanager_shell::SortDir;
-
-const EVENT_LIMIT: usize = 100;
+use taskmanager_shell::{ProcessStatusFilter, SortCol};
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum SystemSection {
@@ -37,11 +35,7 @@ pub enum DashboardPanel {
     SavedViews,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum EventKind {
-    Activated,
-    Cleared,
-}
+pub type EventKind = AlertEventKind;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum EventFilter {
@@ -51,63 +45,26 @@ pub enum EventFilter {
     Cleared,
 }
 
-#[derive(Clone, Debug, PartialEq)]
-pub struct NotificationEvent {
-    pub id: u64,
-    pub kind: EventKind,
-    pub alert: Alert,
-    pub timestamp_ms: u64,
-    pub read: bool,
-}
+pub type NotificationEvent = AlertEvent;
 
 #[derive(Clone, Debug, Default)]
 pub struct EventCenterState {
-    events: VecDeque<NotificationEvent>,
-    next_id: u64,
+    read_ids: HashSet<u64>,
     pub filter: EventFilter,
 }
 
 impl EventCenterState {
-    pub fn observe(&mut self, previous: &[Alert], next: &[Alert], timestamp_ms: u64) {
-        let previous: HashMap<&str, &Alert> = previous
+    pub fn unread_count(&self, events: &[NotificationEvent]) -> usize {
+        events
             .iter()
-            .map(|alert| (alert.instance_id.as_str(), alert))
-            .collect();
-        let next_by_id: HashMap<&str, &Alert> = next
-            .iter()
-            .map(|alert| (alert.instance_id.as_str(), alert))
-            .collect();
-        for alert in next {
-            if !previous.contains_key(alert.instance_id.as_str()) {
-                self.push(EventKind::Activated, alert.clone(), timestamp_ms);
-            }
-        }
-        for alert in previous.values() {
-            if !next_by_id.contains_key(alert.instance_id.as_str()) {
-                self.push(EventKind::Cleared, (*alert).clone(), timestamp_ms);
-            }
-        }
+            .filter(|event| !self.read_ids.contains(&event.id))
+            .count()
     }
 
-    fn push(&mut self, kind: EventKind, alert: Alert, timestamp_ms: u64) {
-        self.next_id = self.next_id.wrapping_add(1);
-        self.events.push_front(NotificationEvent {
-            id: self.next_id,
-            kind,
-            alert,
-            timestamp_ms,
-            read: false,
-        });
-        self.events.truncate(EVENT_LIMIT);
-    }
-
-    pub fn unread_count(&self) -> usize {
-        self.events.iter().filter(|event| !event.read).count()
-    }
-
-    pub fn visible_events(&self) -> Vec<NotificationEvent> {
-        self.events
+    pub fn visible_events(&self, events: &[NotificationEvent]) -> Vec<NotificationEvent> {
+        events
             .iter()
+            .rev()
             .filter(|event| match self.filter {
                 EventFilter::All => true,
                 EventFilter::Active => event.kind == EventKind::Activated,
@@ -117,18 +74,18 @@ impl EventCenterState {
             .collect()
     }
 
-    pub fn mark_all_read(&mut self) {
-        for event in &mut self.events {
-            event.read = true;
-        }
+    pub fn mark_all_read(&mut self, events: &[NotificationEvent]) {
+        self.read_ids.extend(events.iter().map(|event| event.id));
     }
 
     pub fn clear(&mut self) {
-        self.events.clear();
+        self.read_ids.clear();
     }
 
-    pub fn seed_capture_events(&mut self) {
-        self.clear();
+    /// Deterministic event history used by the capture fixture. The caller
+    /// installs this into the shared shell alert authority; this function
+    /// only constructs owned domain events and keeps no local copy.
+    pub fn capture_event_fixture() -> Vec<AlertEvent> {
         let warning = Alert {
             instance_id: "capture-cpu:system".into(),
             rule_id: "capture-cpu".into(),
@@ -139,14 +96,27 @@ impl EventCenterState {
             threshold: 90.0,
             active_since_ms: 3_590_000,
         };
-        self.push(EventKind::Activated, warning.clone(), 3_590_000);
+        let activated = AlertEvent {
+            id: 1,
+            kind: EventKind::Activated,
+            alert: warning.clone(),
+            observed_at_ms: 3_590_000,
+        };
         let mut cleared = warning;
         cleared.instance_id = "capture-memory:system".into();
         cleared.rule_id = "capture-memory".into();
         cleared.metric = AlertMetric::MemoryUsagePercent;
         cleared.target = "Memory".into();
         cleared.value = 74.0;
-        self.push(EventKind::Cleared, cleared, 3_560_000);
+        vec![
+            activated,
+            AlertEvent {
+                id: 2,
+                kind: EventKind::Cleared,
+                alert: cleared,
+                observed_at_ms: 3_560_000,
+            },
+        ]
     }
 }
 
@@ -361,7 +331,7 @@ impl RootView {
         edit: taskmanager_application::ManagedAlertRuleEdit,
     ) -> Result<
         taskmanager_application::ManagedAlertRuleEditOutcome,
-        taskmanager_application::alerts::AlertRuleTransferError,
+        taskmanager_core::core::alerts::AlertRuleTransferError,
     > {
         let outcome = self.shell.edit_alert_rules(edit)?;
         if !outcome.changed() {
@@ -383,12 +353,7 @@ impl RootView {
         &mut self,
         evaluation: taskmanager_application::AlertEvaluation,
     ) {
-        let previous = self.active_alerts().to_vec();
         let next = evaluation.active;
-        let timestamp_ms = self.system_snapshot().timestamp_ms;
-        self.dashboard
-            .events
-            .observe(&previous, &next, timestamp_ms);
         let revision = self.shell.accept_alert_evaluation(next.clone());
         self.materialize_active_alerts(revision, next);
         self.submit_alert_notifications(evaluation.notifications);

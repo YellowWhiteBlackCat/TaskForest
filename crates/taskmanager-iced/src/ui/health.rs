@@ -5,8 +5,8 @@
 
 use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};
-use taskmanager_application::SystemSnapshot;
-use taskmanager_application::alerts::AlertMetric;
+use taskmanager_core::core::alerts::AlertMetric;
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_theme::tokens;
 
 use crate::app::Message;
@@ -14,7 +14,7 @@ use crate::i18n::{self, Key};
 use crate::theme;
 
 use super::overlays::{metric_label, modal_overlay, suggestion_text};
-use super::{bytes, missing_value};
+use taskmanager_shell::presentation::{bytes, missing_value};
 
 mod projection;
 
@@ -202,7 +202,7 @@ pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
         label: "System".into(),
         value: format!(
             "uptime {} · {} processes · {} threads",
-            super::duration(snapshot.uptime_secs),
+            taskmanager_shell::presentation::duration(snapshot.uptime_secs),
             snapshot.processes,
             snapshot
                 .threads
@@ -282,13 +282,25 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
         let mut temp_pills: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
         for (label, temp) in temps {
             let (bg_color, tag) = if temp < 45.0 {
-                (theme::color(theme_snapshot.network), "Cool")
+                (
+                    taskmanager_theme::iced::color(theme_snapshot.network),
+                    "Cool",
+                )
             } else if temp < 70.0 {
-                (theme::color(theme_snapshot.palette().accent), "Normal")
+                (
+                    taskmanager_theme::iced::color(theme_snapshot.palette().accent),
+                    "Normal",
+                )
             } else if temp < 85.0 {
-                (theme::color(theme_snapshot.palette().warning), "Warm")
+                (
+                    taskmanager_theme::iced::color(theme_snapshot.palette().warning),
+                    "Warm",
+                )
             } else {
-                (theme::color(theme_snapshot.palette().danger), "Hot")
+                (
+                    taskmanager_theme::iced::color(theme_snapshot.palette().danger),
+                    "Hot",
+                )
             };
 
             let pill = container(
@@ -311,11 +323,13 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
             )
             .padding([3, 6])
             .style(move |_| container::Style {
-                background: Some(iced::Background::Color(theme::color(theme_snapshot.shade))),
+                background: Some(iced::Background::Color(taskmanager_theme::iced::color(
+                    theme_snapshot.shade,
+                ))),
                 border: iced::Border {
                     radius: 4.0.into(),
                     width: 1.0,
-                    color: theme::color(theme_snapshot.palette().border),
+                    color: taskmanager_theme::iced::color(theme_snapshot.palette().border),
                 },
                 ..Default::default()
             });

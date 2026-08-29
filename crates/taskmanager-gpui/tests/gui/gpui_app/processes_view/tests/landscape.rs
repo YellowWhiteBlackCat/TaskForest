@@ -3,6 +3,7 @@
 use gpui::{Modifiers, MouseButton, TestAppContext, VisualTestContext, point, px, size};
 
 use crate::gpui_app::root::{NavOrientation, TopPage};
+use taskmanager_shell::SortCol;
 
 /// The returned rails must drive the real GPUI handles, not merely register a
 /// debug rectangle. A compact, full-column Apps table exercises both axes:
@@ -62,6 +63,81 @@ async fn apps_scrollbars_move_their_real_handles(cx: &mut TestAppContext) {
                 < px(0.0)
         }),
         "vertical rail click must update the uniform-list offset"
+    );
+}
+
+/// The Apps process table mounts the shared reference resize handle rather
+/// than a page-local drag implementation. A real pointer sequence proves the
+/// typed payload, first-motion anchor, live width update, and release path are
+/// still wired through `RootView`.
+#[gpui::test]
+async fn apps_column_edge_drag_updates_the_live_width(cx: &mut TestAppContext) {
+    let (win, view) = super::wrapped_root(cx);
+    cx.simulate_window_resize(win.into(), size(px(1280.0), px(720.0)));
+    view.update(cx, |v, cx| {
+        v.mark_telemetry_frame_ready();
+        v.page = TopPage::Apps;
+        v.processes_state.hidden_cols.clear();
+        v.replace_processes_for_test(
+            (1..=8)
+                .map(|pid| {
+                    taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                        .pid(pid)
+                        .name(format!("resize-worker-{pid}"))
+                        .build()
+                })
+                .collect(),
+        );
+        cx.notify();
+    });
+    super::draw(cx, win);
+
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    let handle = vcx
+        .debug_bounds("tm-proc-resize-h:6")
+        .expect("the visible CPU column must expose the shared resize handle");
+    let start = handle.center();
+    let before = view.read_with(cx, |v, _| v.proc_col_width(SortCol::Cpu));
+
+    vcx.simulate_mouse_move(start, None::<MouseButton>, Modifiers::none());
+    vcx.simulate_mouse_down(start, MouseButton::Left, Modifiers::none());
+    // The first movement promotes the drag; the next movement is the first
+    // width delta after the shared session anchor is captured.
+    vcx.simulate_mouse_move(
+        point(start.x + px(2.0), start.y),
+        Some(MouseButton::Left),
+        Modifiers::none(),
+    );
+    vcx.simulate_mouse_move(
+        point(start.x + px(42.0), start.y),
+        Some(MouseButton::Left),
+        Modifiers::none(),
+    );
+    vcx.simulate_mouse_move(
+        point(start.x + px(43.0), start.y),
+        Some(MouseButton::Left),
+        Modifiers::none(),
+    );
+    vcx.simulate_mouse_move(
+        point(start.x + px(83.0), start.y),
+        Some(MouseButton::Left),
+        Modifiers::none(),
+    );
+    vcx.simulate_mouse_up(
+        point(px(2000.0), start.y),
+        MouseButton::Left,
+        Modifiers::none(),
+    );
+
+    let after = view.read_with(cx, |v, _| v.proc_col_width(SortCol::Cpu));
+    assert_eq!(
+        after,
+        before + px(40.0),
+        "the shared column drag must apply the pointer delta to the live width"
+    );
+    assert!(
+        view.read_with(cx, |v, _| v.processes_state.resize_anchor_x.is_none()),
+        "releasing outside the window must close the page adapter's drag session"
     );
 }
 

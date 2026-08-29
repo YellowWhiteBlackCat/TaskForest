@@ -6,17 +6,14 @@
 
 use taskmanager_application::{
     CorrelatedPowerSupplyEvent, CorrelatedSensorEvent, CorrelatedSystemTelemetryOutcome,
-    FailureKind, PowerSupplyEvent, SensorEvent, SubmissionErrorKind, SystemTelemetryDomain,
-    SystemTelemetryDomainEvent, SystemTelemetryDomainOutcome, SystemTelemetryUnavailable,
+    PowerSupplyEvent, SensorEvent, SystemTelemetryDomain, SystemTelemetryDomainEvent,
+    SystemTelemetryDomainOutcome, SystemTelemetryUnavailable,
 };
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_platform_contract::SubmissionErrorKind;
 use taskmanager_telemetry_store::{
     CorrelatedIngestionError, CorrelatedIngestionReport, CorrelatedSystemTelemetryIngestor,
     CorrelatedTelemetryStamp, DynamicIngestionError, DynamicIngestionReport, SystemHistoryDomain,
-};
-
-pub use taskmanager_telemetry_store::live_graph::{
-    DEFAULT_HISTORY_CAPACITY, LiveGraphHistory, MAX_HISTORY_CAPACITY, MIN_HISTORY_CAPACITY,
-    MetricSeries, clamp_history_capacity,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

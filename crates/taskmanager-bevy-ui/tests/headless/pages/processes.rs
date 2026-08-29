@@ -17,6 +17,7 @@ use bevy::MinimalPlugins;
 use bevy::app::App;
 use bevy::asset::{AssetPlugin, Assets};
 use bevy::ecs::entity::Entity;
+use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
@@ -25,10 +26,11 @@ use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::{
     ProcessItem, ProcessMetadataObservations, ProcessOwner, ProcessScalarObservations,
-    ScalarObservation,
 };
+
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
 use taskmanager_theme::Theme;
@@ -40,7 +42,7 @@ use super::{
     TABLE_VIEWPORT_HEIGHT_PX, centered_scroll_top, content, count_line_text, empty_state_text,
     rows_projection, sort_projection,
 };
-use crate::app::{FrontendTrack, PageContext};
+use crate::app::{FrontendTrack, Page, PageContext};
 use crate::palette::{UiPalette, ui_palette};
 use crate::window::WindowPalette;
 
@@ -365,10 +367,25 @@ fn mount_renders_the_contract_header_and_the_initial_window() {
     assert_eq!(indices, vec![0, 1, 2]);
 
     let texts = row_texts(&mut app);
-    assert!(texts.iter().any(|text| text == "Processes"), "page title");
     assert!(
-        texts.iter().any(|text| text == "CPU ▼"),
-        "the default CPU-descending sort is marked in the header"
+        texts.iter().any(|text| *text == Page::Processes.title()),
+        "the page renders the shared tab word as its title"
+    );
+    // The sorted column keeps its pure label; the direction renders as the
+    // semantic down plate (never spliced glyph text — the tofu law).
+    assert!(
+        texts.iter().any(|text| text == "CPU"),
+        "the sorted column keeps its pure label"
+    );
+    let down_plates = app
+        .world_mut()
+        .query::<&crate::icons::IconPlate>()
+        .iter(app.world())
+        .filter(|plate| plate.0 == taskmanager_ui_contract::IconId::NavigateDown)
+        .count();
+    assert!(
+        down_plates >= 1,
+        "the default CPU-descending sort is marked by the semantic direction plate"
     );
     assert_eq!(count_line(&mut app), count_line_text(3, ""));
 }
@@ -682,23 +699,28 @@ fn the_rows_root_survives_its_own_bootstrap_and_seams() {
 }
 
 #[test]
-fn the_search_input_is_capped_by_the_shell_query_contract() {
-    // The input box must carry the shell's SEARCH_QUERY_MAX as its own
-    // max_characters — the cap the shell's bulk paste path also enforces.
-    let items = vec![process(10, "alpha")];
-    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+fn the_search_input_displays_the_shell_query() {
+    // The box is a display over the shell-owned query: the shell is the
+    // single search authority (typing folds through its router, paste is
+    // capped by SEARCH_QUERY_MAX there), and the input submodule keeps the
+    // node in step on every shell mutation.
+    let mut shell = shell_with(vec![process(10, "alpha")]);
+    let _ = shell.apply_action(taskmanager_application::AppAction::FocusSearch);
+    shell.push_search_char('a');
+    shell.push_search_char('l');
+    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell);
     app.update();
-    let input = app
-        .world_mut()
-        .query_filtered::<&bevy::text::EditableText, With<super::ProcessSearchInput>>()
-        .single(app.world())
-        .expect("exactly one search input");
-    assert_eq!(input.max_characters, Some(256));
-    assert_eq!(
-        Some(256),
-        Some(taskmanager_shell::app::search_input::SEARCH_QUERY_MAX),
-        "the cap is the shell contract value"
-    );
+    let world = app.world_mut();
+    let input = world
+        .query_filtered::<Entity, With<super::ProcessSearchInput>>()
+        .single(world)
+        .expect("exactly one search input node");
+    let text = world
+        .get::<Children>(input)
+        .and_then(|children| children.iter().next())
+        .and_then(|child| world.get::<Text>(*child))
+        .expect("the search display text node");
+    assert_eq!(text.0, "al", "the display mirrors the shell query");
 }
 
 #[test]
@@ -725,4 +747,18 @@ fn viewport_capacity_comes_from_the_palette_control_height() {
         expected,
         "the initial window is the viewport, not the whole set"
     );
+}
+
+#[test]
+fn wheel_scrolls_map_to_signed_rows_by_unit() {
+    // Line units map one-to-one; pixel units divide by the row height. The
+    // truncation is toward zero and a zero-height row yields zero — a wheel
+    // notch is a row, never a rounding surprise. (The scroll system negates
+    // the signed result: wheel up moves the window toward earlier rows.)
+    use super::input::wheel_rows;
+    use bevy::input::mouse::MouseScrollUnit;
+    assert_eq!(wheel_rows(3.0, MouseScrollUnit::Line, 34.0), 3);
+    assert_eq!(wheel_rows(-1.0, MouseScrollUnit::Line, 34.0), -1);
+    assert_eq!(wheel_rows(70.0, MouseScrollUnit::Pixel, 34.0), 2);
+    assert_eq!(wheel_rows(10.0, MouseScrollUnit::Pixel, 0.0), 0);
 }

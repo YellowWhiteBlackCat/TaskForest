@@ -1,9 +1,10 @@
 use super::*;
 use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::smart::DiskSmart;
 
 #[test]
 fn apply_smart_copies_availability_with_optional_fields() {
-    let smart = smart::DiskSmart {
+    let smart = DiskSmart {
         availability: taskmanager_core::core::metrics::SmartAvailability::MissingTool,
         state: DeviceState {
             status: taskmanager_core::core::device_state::DeviceStatus::MissingTool,

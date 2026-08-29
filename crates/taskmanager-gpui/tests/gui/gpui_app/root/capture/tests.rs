@@ -6,11 +6,11 @@ mod live;
 use super::{
     CaptureEvidence, CaptureProcessAction, CaptureScenario, DashboardState, ProcessBatchAction,
     ProcessDetailsSection, ProcessInsightsState, ProcessItem, ProcessTerminationAction, ServiceId,
-    StartupImpactEvidence, SystemHealthCaptureOutcome, SystemSection, SystemSnapshot, TopPage,
+    SystemHealthCaptureOutcome, SystemSection, SystemSnapshot, TopPage,
 };
-use crate::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
-use crate::core::startup::StartupImpactUnknownReason;
-use crate::core::{ScalarObservation, SmartAvailability};
+use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+use taskmanager_core::core::startup::{StartupImpactEvidence, StartupImpactUnknownReason};
+use taskmanager_core::core::{ScalarObservation, SmartAvailability};
 
 impl CaptureEvidence {
     pub(super) fn for_test(scenario: Option<CaptureScenario>) -> Self {
@@ -437,8 +437,8 @@ fn health_scenarios_wait_for_exact_visible_fixture_state() {
         assert!(evidence.on_processes_update(true, &mut processes).is_none());
         let mut page = TopPage::Apps;
         let mut dashboard = DashboardState::new();
-        let mut filesystems = crate::core::FilesystemHealthSnapshot::default();
-        let mut sensors = crate::core::SensorCenterSnapshot::default();
+        let mut filesystems = taskmanager_core::core::FilesystemHealthSnapshot::default();
+        let mut sensors = taskmanager_core::core::SensorCenterSnapshot::default();
         let outcome = evidence.on_system_health_state(
             &mut page,
             &mut dashboard,
@@ -478,8 +478,8 @@ fn dynamic_device_capture_installs_battery_and_fan_fixture_after_readiness() {
     let mut processes = Vec::new();
     assert!(evidence.on_processes_update(true, &mut processes).is_none());
     let mut page = TopPage::Apps;
-    let mut power_supplies = crate::core::PowerSupplySnapshot::default();
-    let mut sensors = crate::core::SensorCenterSnapshot::default();
+    let mut power_supplies = taskmanager_core::core::PowerSupplySnapshot::default();
+    let mut sensors = taskmanager_core::core::SensorCenterSnapshot::default();
     assert!(evidence.on_dynamic_device_state(&mut page, &mut power_supplies, &mut sensors,));
     assert_eq!(page, TopPage::Performance);
     assert_eq!(power_supplies.batteries.len(), 1);
@@ -487,7 +487,7 @@ fn dynamic_device_capture_installs_battery_and_fan_fixture_after_readiness() {
         sensors
             .readings
             .iter()
-            .any(|reading| reading.quantity() == &crate::core::SensorQuantity::FanSpeed)
+            .any(|reading| reading.quantity() == &taskmanager_core::core::SensorQuantity::FanSpeed)
     );
     assert!(evidence.scenario_ready);
     assert!(!evidence.on_dynamic_device_state(&mut page, &mut power_supplies, &mut sensors,));
@@ -597,11 +597,11 @@ fn intel_and_alert_capture_states_keep_optional_values_honest() {
 
 #[test]
 fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
-    use crate::core::DeviceGeneration;
     use crate::gpui_app::history_samples::gpu_engine_samples;
-    use taskmanager_shell::history::LiveGraphHistory;
+    use taskmanager_core::core::DeviceGeneration;
     use taskmanager_shell::presentation::gpu_chart_metric::GpuChartMetric;
     use taskmanager_telemetry_store::TelemetryStore;
+    use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::GpuEngineInventory));
     let mut snapshot = SystemSnapshot {
@@ -855,12 +855,12 @@ fn boot_markers_capture_seeds_waterfall_and_baseline_pair() {
     {
         assert!(units.contains(&unit), "baseline must cover unit {unit}");
     }
-    let current = crate::core::startup::BootTimeline::from_critical_chain(
+    let current = taskmanager_core::core::startup::BootTimeline::from_critical_chain(
         &evidence_snapshot.critical_chain,
-        crate::core::startup::DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS,
-        crate::core::startup::DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
+        taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS,
+        taskmanager_core::core::startup::DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     );
-    let deltas: Vec<i64> = crate::core::startup::segment_deltas(&current, baseline)
+    let deltas: Vec<i64> = taskmanager_core::core::startup::segment_deltas(&current, baseline)
         .into_iter()
         .map(|delta| delta.delta_ms)
         .collect();
@@ -971,7 +971,7 @@ fn force_kill_scenario_only_returns_one_non_executing_intent() {
         taskmanager_test_support::ProcessItemFixtureBuilder::new()
             .pid(4242)
             .name("capture-worker".into())
-            .scalar_observations(crate::core::process::ProcessScalarObservations {
+            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
                 start_token: ScalarObservation::available(42_420, 1),
                 ..Default::default()
             })
@@ -1005,7 +1005,7 @@ fn force_kill_capture_prefers_a_readable_process_name() {
         taskmanager_test_support::ProcessItemFixtureBuilder::new()
             .pid(20)
             .name("worker/u65:0-btrfs-endio-meta".into())
-            .scalar_observations(crate::core::process::ProcessScalarObservations {
+            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
                 start_token: ScalarObservation::available(2_000, 1),
                 ..Default::default()
             })
@@ -1013,7 +1013,7 @@ fn force_kill_capture_prefers_a_readable_process_name() {
         taskmanager_test_support::ProcessItemFixtureBuilder::new()
             .pid(30)
             .name("bash".into())
-            .scalar_observations(crate::core::process::ProcessScalarObservations {
+            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
                 start_token: ScalarObservation::available(3_000, 1),
                 ..Default::default()
             })
@@ -1021,7 +1021,7 @@ fn force_kill_capture_prefers_a_readable_process_name() {
         taskmanager_test_support::ProcessItemFixtureBuilder::new()
             .pid(40)
             .name("taskmanager".into())
-            .scalar_observations(crate::core::process::ProcessScalarObservations {
+            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
                 start_token: ScalarObservation::available(4_000, 1),
                 ..Default::default()
             })

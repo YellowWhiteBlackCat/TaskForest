@@ -1,14 +1,14 @@
 //! Production-root keyboard behavior not covered by pure command-router tests.
 
 use gpui::{AppContext, Entity, Keystroke, TestAppContext, WindowHandle};
-use taskmanager::core::SmartSelfTestKind;
 use taskmanager_application::{ConfirmationKind, SurfaceKind};
+use taskmanager_core::core::SmartSelfTestKind;
 use taskmanager_gpui::gpui_app::dashboard::DashboardPanel;
 use taskmanager_gpui::gpui_app::root::{
     GpuiSurfaceKind, RootView, TopPage, WindowSurfaceDismissReason, WindowSurfaceKind,
 };
 use taskmanager_gpui::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
-use taskmanager_gpui::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 /// The harness window root is our own RootView directly (P4 consumption switch:
 /// the gc Root wrapper is gone; the LayerStack overlay host lives inside
@@ -207,7 +207,7 @@ async fn mc06_modal_cancel_case_escape_closes_open_modals(cx: &mut TestAppContex
         }));
         v.request_system_health_self_test_confirmation(SmartSelfTestConfirmationRequest {
             device_id: "disk:wwid:escape-fixture".into(),
-            device_generation: taskmanager::core::DeviceGeneration::INITIAL,
+            device_generation: taskmanager_core::core::DeviceGeneration::INITIAL,
             disk_name: "nvme0n1".into(),
             disk_label: "Escape fixture".into(),
             kind: SmartSelfTestKind::Short,

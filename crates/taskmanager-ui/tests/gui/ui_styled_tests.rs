@@ -1,8 +1,6 @@
-use super::{
-    active_fill, blend, contrast_ratio, disabled_fg, focus_ring_refinement, hover_fill, on_accent,
-    scrim,
-};
+use super::{active_fill, blend, disabled_fg, focus_ring_refinement, hover_fill, scrim};
 use gpui::Hsla;
+use taskmanager_theme::color::{contrast_ratio, on_accent};
 use taskmanager_theme::{Color, Theme};
 
 fn palette() -> taskmanager_theme::Palette {

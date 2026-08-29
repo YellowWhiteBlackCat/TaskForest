@@ -7,7 +7,8 @@
 
 use std::time::Instant;
 
-use taskmanager_application::{CapabilityId, ProviderId, RequestId, SidebandPolicy};
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{CapabilityId, RequestId, SidebandPolicy};
 
 use crate::config::{CapabilityRoute, DeliveryClass};
 

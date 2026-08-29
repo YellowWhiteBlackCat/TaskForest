@@ -14,19 +14,19 @@ mod tests_inner {
 
     use super::super::fonts::effective_font_summary;
     use super::super::{render_settings, startup_page_row};
-    use crate::core::config::{
-        STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER, TEXT_RENDERING_PLATFORM_DEFAULT,
-    };
     use crate::gpui_app::first_run::{self, FirstRunPhase};
     use crate::gpui_app::formatting::DisplayUnits;
     use crate::gpui_app::graph::GraphSettings;
     use crate::gpui_app::root::RootView;
     use crate::gpui_app::settings_view::init_data_points_slider;
     use crate::gpui_app::settings_view::refresh::init_slider_entity;
-    use crate::gpui_app::theme::tokens;
-    use crate::gpui_app::theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
-    use crate::i18n;
-    use taskmanager_application::SetupScriptInfo;
+    use taskmanager_application::i18n;
+    use taskmanager_core::core::config::{
+        STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER, TEXT_RENDERING_PLATFORM_DEFAULT,
+    };
+    use taskmanager_core::core::setup::SetupScriptInfo;
+    use taskmanager_theme::tokens;
+    use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
     use taskmanager_ui::inputs::switch::SwitchState;
 
     /// Test harness: a window whose root renders the Settings dialog content

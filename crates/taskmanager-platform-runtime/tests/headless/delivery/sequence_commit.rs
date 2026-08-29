@@ -1,7 +1,7 @@
 use std::sync::{Arc, Barrier, Mutex};
 
 use super::SequenceCommitter;
-use taskmanager_application::EventSequence;
+use taskmanager_platform_contract::EventSequence;
 
 #[test]
 fn sequence_authority_remains_locked_until_the_queue_commit_finishes() {

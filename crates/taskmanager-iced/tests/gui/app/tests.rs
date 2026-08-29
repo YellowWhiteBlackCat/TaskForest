@@ -3,6 +3,7 @@ use super::motion::viewport_compact;
 use super::*;
 use taskmanager_application::PlatformClient;
 use taskmanager_application::{FocusDirection, KeyCode, Modifiers};
+
 use taskmanager_shell::ShellKeyEvent;
 
 #[derive(Default)]
@@ -10,13 +11,13 @@ struct RecordingSessionInventory(
     std::sync::Mutex<Vec<taskmanager_application::SessionInventoryRequest>>,
 );
 
-impl taskmanager_application::RequestPort for RecordingSessionInventory {
+impl taskmanager_platform_contract::RequestPort for RecordingSessionInventory {
     type Request = taskmanager_application::SessionInventoryRequest;
 
     fn try_submit(
         &self,
-        request: taskmanager_application::RequestEnvelope<Self::Request>,
-    ) -> Result<(), taskmanager_application::SubmissionError> {
+        request: taskmanager_platform_contract::RequestEnvelope<Self::Request>,
+    ) -> Result<(), taskmanager_platform_contract::SubmissionError> {
         self.0
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
@@ -27,10 +28,11 @@ impl taskmanager_application::RequestPort for RecordingSessionInventory {
 
 fn session_refresh_client(port: std::sync::Arc<RecordingSessionInventory>) -> PlatformClient {
     use taskmanager_application::{
-        CapabilityCatalog, CapabilitySnapshot, EnvironmentFacets, PlatformClient, PlatformFacets,
-        PlatformHandle,
+        EnvironmentFacets, PlatformClient, PlatformFacets, PlatformHandle,
     };
-    use taskmanager_application::{EventEnvelope, EventPort, EventPortError};
+    use taskmanager_platform_contract::{CapabilityCatalog, CapabilitySnapshot};
+
+    use taskmanager_platform_contract::{EventEnvelope, EventPort, EventPortError};
 
     #[derive(Default)]
     struct EmptyCapabilities;
@@ -203,7 +205,7 @@ fn request_process_batch_routes_through_the_shared_shell_batch_path() {
     // ShellApp::request_process_batch; demo mode has no platform client, so the
     // produced ExecuteBatch effect is honestly suppressed rather than executed.
     let _ = app.update(Message::RequestProcessBatch(
-        taskmanager_application::ProcessBatchAction::Suspend,
+        taskmanager_core::core::process::ProcessBatchAction::Suspend,
     ));
     assert!(
         app.shell.feedback_text().contains("Demo mode"),
@@ -218,18 +220,23 @@ fn application_aggregate_selection_stays_pidless() {
     let _ = app.update(Message::SelectPage(AppPage::Applications));
     let root_pid = app.shell.visible_processes()[0].pid;
 
+    let root_row_key = app
+        .shell
+        .visible_processes()[0]
+        .current_start_token()
+        .and_then(|token| {
+            taskmanager_shell::ProcessRowIdentity::from_parts(root_pid, token)
+        })
+        .map(taskmanager_shell::ProcessRowId::Application);
     let _ = app.update(Message::ToggleGroupExpansion {
         name: format!("app-tree:{root_pid}"),
         main_pid: root_pid,
         flat_index: 0,
-        row_key: Some(taskmanager_shell::ProcessRowKey::Application(root_pid)),
+        row_key: root_row_key,
     });
 
-    assert_eq!(
-        app.shell.selected_process_row,
-        Some(taskmanager_shell::ProcessRowKey::Application(root_pid))
-    );
-    assert!(app.shell.selected_pids().is_empty());
+    assert_eq!(app.shell.selected_row, root_row_key);
+    assert!(app.shell.selected_identities().is_empty());
     assert!(app.shell.selected_process_identity().is_none());
 }
 
@@ -239,7 +246,7 @@ fn kill_gates_behind_confirmation_and_confirm_emits_the_batch() {
     // Kill is destructive: requesting it gates behind a confirmation (no effect
     // yet) and sets the pending batch intent.
     let _ = app.update(Message::RequestProcessBatch(
-        taskmanager_application::ProcessBatchAction::Kill,
+        taskmanager_core::core::process::ProcessBatchAction::Kill,
     ));
     assert!(
         app.shell.pending_batch().is_some(),
@@ -258,7 +265,7 @@ fn kill_gates_behind_confirmation_and_confirm_emits_the_batch() {
     );
     // Dismiss cancels a pending Kill without submitting.
     let _ = app.update(Message::RequestProcessBatch(
-        taskmanager_application::ProcessBatchAction::Kill,
+        taskmanager_core::core::process::ProcessBatchAction::Kill,
     ));
     assert!(app.shell.pending_batch().is_some());
     let _ = app.update(Message::DismissOverlay);
@@ -303,9 +310,9 @@ fn startup_toggle_gates_behind_confirmation_like_gpui() {
 #[test]
 fn opening_the_containers_modal_requests_and_renders_a_rollup() {
     use taskmanager_application::{
-        CapabilityId, ContainerRollupEvent, CorrelatedEvent, EventSequence, PlatformEventBatch,
-        PlatformEventContext, RequestId,
+        ContainerRollupEvent, CorrelatedEvent, PlatformEventBatch, PlatformEventContext,
     };
+    use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
     let mut app = IcedApp::demo();
     assert!(app.shell.projection().containers.is_none());
@@ -319,7 +326,7 @@ fn opening_the_containers_modal_requests_and_renders_a_rollup() {
 
     // The rollup answer arrives as a platform event batch; the shell fold is
     // the same one the live tick drives.
-    let rollup = taskmanager_application::ContainerRollup::empty_healthy(1_000);
+    let rollup = taskmanager_core::core::process_telemetry::ContainerRollup::empty_healthy(1_000);
     let mut batch = PlatformEventBatch::default();
     batch.containers_events.push(CorrelatedEvent::new(
         PlatformEventContext {
@@ -391,28 +398,28 @@ fn row_click_branches_on_live_modifier_state() {
         iced::keyboard::Modifiers::default(),
     ));
     let _ = app.update(Message::SelectRow(0));
-    assert_eq!(app.shell.selected_pids().len(), 1);
-    assert!(app.shell.selected_pids().contains(&pids[0]));
+    assert_eq!(app.shell.selected_identities().len(), 1);
+    assert!(app.shell.visible_process_by_pid(pids[0]).is_some_and(|p| app.shell.is_process_selected(p)));
 
     // Ctrl-click toggles a second, non-adjacent row into the set.
     let _ = app.update(Message::ModifiersChanged(iced::keyboard::Modifiers::CTRL));
     let _ = app.update(Message::SelectRow(2));
-    assert_eq!(app.shell.selected_pids().len(), 2);
-    assert!(app.shell.selected_pids().contains(&pids[2]));
+    assert_eq!(app.shell.selected_identities().len(), 2);
+    assert!(app.shell.visible_process_by_pid(pids[2]).is_some_and(|p| app.shell.is_process_selected(p)));
 
     // Shift-click grows the range from anchor (2) to 3, folding in pids 2..=3.
     let _ = app.update(Message::ModifiersChanged(iced::keyboard::Modifiers::SHIFT));
     let _ = app.update(Message::SelectRow(3));
-    assert!(app.shell.selected_pids().contains(&pids[3]));
-    assert!(app.shell.selected_pids().len() >= 3);
+    assert!(app.shell.visible_process_by_pid(pids[3]).is_some_and(|p| app.shell.is_process_selected(p)));
+    assert!(app.shell.selected_identities().len() >= 3);
 
     // Releasing the modifiers and plain-clicking collapses back to one.
     let _ = app.update(Message::ModifiersChanged(
         iced::keyboard::Modifiers::default(),
     ));
     let _ = app.update(Message::SelectRow(1));
-    assert_eq!(app.shell.selected_pids().len(), 1);
-    assert!(app.shell.selected_pids().contains(&pids[1]));
+    assert_eq!(app.shell.selected_identities().len(), 1);
+    assert!(app.shell.visible_process_by_pid(pids[1]).is_some_and(|p| app.shell.is_process_selected(p)));
 }
 
 #[test]

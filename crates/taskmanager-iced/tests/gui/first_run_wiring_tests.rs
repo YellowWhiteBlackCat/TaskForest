@@ -9,9 +9,12 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use taskmanager_application::{
-    CapabilityId, CorrelatedSetupScriptEvent, EventSequence, FailureKind, OperationFailure,
-    PlatformEventBatch, PlatformEventContext, RequestId, RetryDisposition, SetupScriptAction,
-    SetupScriptEvent, SetupScriptInfo,
+    CorrelatedSetupScriptEvent, PlatformEventBatch, PlatformEventContext,
+};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::setup::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
+use taskmanager_platform_contract::{
+    CapabilityId, EventSequence, OperationFailure, RequestId, RetryDisposition,
 };
 
 use super::*;
@@ -127,6 +130,7 @@ fn close_dismisses_the_surface_slot_without_touching_dialog_state() {
 #[test]
 fn escape_rides_the_local_surface_lane_and_keeps_dialog_state_bit_identical() {
     use taskmanager_application::{KeyCode, Modifiers};
+
     use taskmanager_shell::ShellKeyEvent;
 
     let mut app = shown_app();

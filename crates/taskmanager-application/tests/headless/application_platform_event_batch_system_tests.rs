@@ -1,7 +1,8 @@
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{CpuMetrics, CpuTelemetryObservation, HardwareInfo, NpuInventorySnapshot};
 use taskmanager_platform_contract::{
-    CapabilityId, CompositeSourceSnapshot, EventSequence, ProviderId, RequestId, SourceOutcome,
-    SourceStatus,
+    CapabilityId, CompositeSourceSnapshot, EventSequence, RequestId,
 };
 
 use super::super::super::{

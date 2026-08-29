@@ -1,6 +1,6 @@
 //! Pure system-health observation projection.
 
-use taskmanager_application::SystemSnapshot;
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 pub(super) struct HealthObservation {
     pub cpu_usage_pct: Option<f32>,

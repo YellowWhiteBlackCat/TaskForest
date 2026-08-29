@@ -4,7 +4,9 @@
 //! Provider failures precede request correlation; operation and delivery
 //! failures are tracked separately for accepted requests.
 
-use crate::{CapabilityId, EventSequence, FailureKind, ProviderId, RequestId};
+use crate::{CapabilityId, EventSequence, RequestId};
+use taskmanager_core::FailureKind;
+use taskmanager_core::ProviderId;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum RetryDisposition {

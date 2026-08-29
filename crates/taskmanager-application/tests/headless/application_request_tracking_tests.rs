@@ -3,14 +3,20 @@ use taskmanager_platform_contract::{
 };
 
 use super::*;
-use crate::{
-    FrozenProcessIdentity, LatestControlRequest, ProcessBatchAction, ProcessBatchIntent,
-    ProcessGroupScope, ProcessSignal, ResourceGroupLimitRequest, ServiceAction, ServiceId,
-    ServiceLogLevelFilter, ServiceLogQuery, ServiceLogTimeFilter, SessionControlAction,
-    SessionControlRequest, SessionId, StartupControlPolicy, StartupControlRequest, StartupEntry,
-    StartupEntryId, StartupEntryLocator, StartupImpact, StartupImpactEvidence,
-    StartupImpactUnknownReason, StartupScope, StartupSource,
+use crate::{LatestControlRequest, SessionControlRequest, StartupControlRequest};
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope, ProcessSignal,
 };
+use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
+use taskmanager_core::core::services::{
+    ServiceAction, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogTimeFilter,
+};
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::startup::{
+    StartupControlPolicy, StartupEntry, StartupEntryId, StartupEntryLocator, StartupImpact,
+    StartupImpactEvidence, StartupImpactUnknownReason, StartupScope, StartupSource,
+};
+use taskmanager_core::core::target::{ServiceId, SessionId};
 
 fn target_scope(request: &impl CapabilityRequest) -> RequestScope {
     match request

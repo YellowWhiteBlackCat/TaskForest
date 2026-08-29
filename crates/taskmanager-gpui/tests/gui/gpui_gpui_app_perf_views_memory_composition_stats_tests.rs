@@ -1,4 +1,4 @@
-use crate::core::metrics::MemoryMetrics;
+use taskmanager_core::core::metrics::MemoryMetrics;
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::{overview_stats, summary_tiles, swap_bar_stats};
@@ -25,7 +25,7 @@ fn summary_tiles_fold_measured_and_missing_memory_states() {
     assert_eq!(tiles.available, "4.00 GiB");
     assert_eq!(
         tiles.available_note,
-        format!("{} 8.00 GiB", crate::i18n::t("mem.of"))
+        format!("{} 8.00 GiB", taskmanager_application::i18n::t("mem.of"))
     );
     assert_eq!(tiles.swap, "1.00 GiB");
     assert_eq!(tiles.swap_note, "50%");
@@ -87,10 +87,10 @@ fn swap_bar_label_appends_the_guarded_zram_compression_depth() {
         stats.label,
         format!(
             "Swap  1.00 GiB / 2.00 GiB  (50%)   ·   zram 512 MiB   ·   {} 256 MiB   ·   {} 3.0:1 · {} 3.00 GiB → {} 1.00 GiB",
-            crate::i18n::t("mem.zram_ram_used"),
-            crate::i18n::t("mem.compression_ratio"),
-            crate::i18n::t("mem.compression_original"),
-            crate::i18n::t("mem.compression_compressed"),
+            taskmanager_application::i18n::t("mem.zram_ram_used"),
+            taskmanager_application::i18n::t("mem.compression_ratio"),
+            taskmanager_application::i18n::t("mem.compression_original"),
+            taskmanager_application::i18n::t("mem.compression_compressed"),
         )
     );
 

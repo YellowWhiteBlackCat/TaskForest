@@ -48,10 +48,14 @@ if [[ "${1:-}" == --self-test ]]; then
 fi
 
 validate_matrix
+# Lock policy follows the caller: unset TM_CARGO_LOCK keeps repo law
+# (--locked); local-gates' dev-phase fallback exports it empty to run
+# unlocked while a sibling line holds the shared lock mid-write.
+LOCK_FLAG="${TM_CARGO_LOCK---locked}"
 git status --short >"$OUT/git-status.txt"
 git rev-parse HEAD >"$OUT/git-head.txt"
 rustc -V >"$OUT/rust.txt"
-timeout 60s cargo nextest list --locked -p taskmanager-bevy-ui --lib \
+timeout 60s cargo nextest list "$LOCK_FLAG" -p taskmanager-bevy-ui --lib \
     >"$OUT/discovery.txt"
 sed 's/^taskmanager-bevy-ui //' "$OUT/discovery.txt" >"$OUT/discovery-names.txt"
 
@@ -65,7 +69,7 @@ done < <(tail -n +2 "$MATRIX")
 [ "$missing" -eq 0 ] || die "matrix contains an undiscovered test (see $OUT/missing-tests.tsv)"
 
 set +e
-timeout --kill-after=10s 20m cargo nextest run --locked -p taskmanager-bevy-ui --lib \
+timeout --kill-after=10s 20m cargo nextest run "$LOCK_FLAG" -p taskmanager-bevy-ui --lib -j 4 \
     --no-fail-fast >"$OUT/nextest.log" 2>&1
 status=$?
 set -e
@@ -77,7 +81,7 @@ cp "$MATRIX" "$OUT/matrix.tsv"
     printf 'rust=%s\n' "$(cat "$OUT/rust.txt")"
     printf 'matrix=scripts/bevy_interaction_matrix.tsv\n'
     printf 'matrix_count=%s\n' "$MATRIX_COUNT"
-    printf 'command=cargo nextest run --locked -p taskmanager-bevy-ui --lib --no-fail-fast\n'
+    printf 'command=cargo nextest run %s -p taskmanager-bevy-ui --lib -j 4 --no-fail-fast\n' "$LOCK_FLAG"
     printf 'status=%s\n' "$status"
 } >"$OUT/receipt.txt"
 [ "$status" -eq 0 ] || die "Bevy lib target failed (receipt: $OUT/receipt.txt)"

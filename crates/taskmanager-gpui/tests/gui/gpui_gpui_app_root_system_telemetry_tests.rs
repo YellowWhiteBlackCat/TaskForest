@@ -3,15 +3,17 @@ use std::collections::BTreeMap;
 use std::rc::Rc;
 
 use taskmanager_application::{
-    CapabilityId, CorrelatedEvent, DeviceLifecycleDiagnosticHistory, DeviceLifecyclePartition,
-    DeviceLifecycleProjection, EventSequence, PlatformEventContext, ProjectedSystemTelemetry,
-    ProjectionAcceptance, RequestId, SystemTelemetryDomainEvent, SystemTelemetryDomainOutcome,
+    CorrelatedEvent, DeviceLifecycleDiagnosticHistory, DeviceLifecyclePartition,
+    DeviceLifecycleProjection, PlatformEventContext, ProjectedSystemTelemetry,
+    ProjectionAcceptance, SystemTelemetryDomainEvent, SystemTelemetryDomainOutcome,
     SystemTelemetryProjection, SystemTelemetryProjectionApplyResult, SystemTelemetryRevision,
     SystemTelemetryUnavailable,
 };
+use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
+
 use taskmanager_telemetry_store::{CorrelatedIngestionError, SystemHistoryDomain, TelemetryStore};
 
-use crate::core::{
+use taskmanager_core::core::{
     CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, DeviceId, DeviceLifecycle,
     DevicePresence, DeviceState, FailureKind, GpuTelemetryObservation, HostRuntimeFacts,
     HostRuntimeObservation, MemoryMetrics, MemoryTelemetryObservation, NetworkTelemetryObservation,

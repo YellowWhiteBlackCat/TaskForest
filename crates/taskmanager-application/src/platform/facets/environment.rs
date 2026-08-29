@@ -5,14 +5,15 @@
 
 use std::sync::Arc;
 
+use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
 use taskmanager_platform_contract::{
     CapabilityId, CapabilityRequest, PartialSourceSnapshot, RequestPort, RequestTracking,
     RequestTrackingError,
 };
 
 use crate::{
-    SessionControlOutcome, SessionControlRequest, SessionItem, StartupBootEvidenceSnapshot,
-    StartupControlOutcome, StartupControlRequest, StartupEntry,
+    SessionControlOutcome, SessionControlRequest, StartupControlOutcome, StartupControlRequest,
 };
 
 #[derive(Clone, Debug)]

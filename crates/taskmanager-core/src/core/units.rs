@@ -153,7 +153,7 @@ pub fn format_quantity_f64(
 }
 
 /// Format a byte count from an already-resolved `(use_bytes, use_base2)`
-/// pair — the entry the firewalled frontends (TUI/Iced) delegate through,
+/// pair — the entry every frontend delegates through,
 /// since their preference resolution predates [`UnitPreferences`].
 #[must_use]
 pub fn format_quantity_with(

@@ -1,7 +1,7 @@
-use taskmanager_application::{
-    DeviceGeneration, DeviceId, SmartSelfTestObservation, StorageDeviceKey,
-};
-use taskmanager_core::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::smart::{SmartSelfTestKind, SmartSelfTestPhase, SmartSelfTestReport};
+use taskmanager_core::core::system_health::SmartSelfTestObservation;
+use taskmanager_core::core::target::StorageDeviceKey;
 
 use super::{SharedSmartRuntimeState, SmartCommitStatus, SmartRuntimeState};
 
@@ -187,7 +187,7 @@ fn exhausted_job_generation_fails_closed_without_retiring_current_jobs() {
 
     assert_eq!(
         error,
-        taskmanager_application::ProviderFailure::ProviderFault
+        taskmanager_platform_contract::ProviderFailure::ProviderFault
     );
     assert!(state.contains(&current.installed.token));
     assert_eq!(state.snapshot().jobs.len(), 1);
@@ -207,19 +207,19 @@ fn exhausted_projection_revision_rejects_every_mutation_without_partial_state_ch
 
     assert_eq!(
         state.commit_observation(&current.installed.token, refreshed, 2),
-        Err(taskmanager_application::ProviderFailure::ProviderFault)
+        Err(taskmanager_platform_contract::ProviderFailure::ProviderFault)
     );
     assert_eq!(
         state.stop_tracking(&current.installed.observation.target()),
-        Err(taskmanager_application::ProviderFailure::ProviderFault)
+        Err(taskmanager_platform_contract::ProviderFailure::ProviderFault)
     );
     assert_eq!(
         state.prune_expired(100),
-        Err(taskmanager_application::ProviderFailure::ProviderFault)
+        Err(taskmanager_platform_contract::ProviderFailure::ProviderFault)
     );
     assert_eq!(
         state.install_started(observation("a", 2, "sdb"), 3),
-        Err(taskmanager_application::ProviderFailure::ProviderFault)
+        Err(taskmanager_platform_contract::ProviderFailure::ProviderFault)
     );
     assert_eq!(state.snapshot(), saturated);
     assert_eq!(state.snapshot().jobs, original.jobs);
@@ -238,7 +238,7 @@ fn tracked_job_limit_rejects_new_identity_but_allows_same_device_replacement() {
 
     assert_eq!(
         state.install_started(observation("c", 1, "sdc"), 2),
-        Err(taskmanager_application::ProviderFailure::Rejected)
+        Err(taskmanager_platform_contract::ProviderFailure::Rejected)
     );
     assert_eq!(state.snapshot().jobs.len(), 2);
 

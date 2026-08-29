@@ -22,7 +22,7 @@ mc03-swap-truth	P0-MC-03	lib	ui::tests::pages::apps_resource_projection_preserve
 mc04-gpu-layout	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact	success|responsive	gpu|gpu-compact
 mc04-gpu-unavailable	P0-MC-04	lib	ui::tests::devices::gpu_summary_keeps_honest_dashes_for_unavailable_fields	failure	gpu
 mc04-gpu-metric-projection	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_projection_defaults_to_utilization_and_gates_families	success	gpu
-mc04-gpu-metric-select	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_messages_select_through_the_shared_gate	success|toggle	gpu
+mc04-gpu-metric-select	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_selects_through_the_shared_gate	success|toggle	gpu
 mc04-gpu-metric-unavailable	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_selected_unavailable_stays_explicit	failure	gpu
 mc04-gpu-metric-generation	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_generation_change_resets_to_the_default	lifecycle	gpu
 mc04-engine-failures	P0-MC-04	lib	ui::perf_devices::tests::engine_rows_failure_keys_cover_every_typed_kind	failure	gpu
@@ -47,7 +47,7 @@ mc06-first-run-failure	P0-MC-06	lib	app::update::first_run::tests::request_actio
 mc06-modal-focus-restore	P0-MC-06	lib	app::tests::modal_opening_captures_a_renderer_trigger_and_dismissal_clears_it	focus|cancel	-
 mc06-modal-focus-scope	P0-MC-06	lib	app::tests::modal_focus_commands_enter_and_remain_inside_the_modal_scope	focus|keyboard	-
 mc06-service-cancel	P0-MC-06	lib	app::tests::settings_and_service_control_tests::service_control_cancel_dismisses_without_submitting	cancel	-
-mc07-focus-visible	P0-MC-07	lib	theme::tests::focus_ring_consumes_the_shared_ring_token	success|focus	-
+mc07-focus-visible	P0-MC-07	lib	theme::tests::focus_ring_consumes_the_shared_ring_token_and_follows_focus_visible	success|focus	-
 mc07-focus-isolation	P0-MC-07	lib	app::tests::table_focus_is_renderer_local_but_selection_stays_in_the_shell	success|focus|isolation	-
 mc07-responsive-thresholds	P0-MC-07	lib	ui::responsive::responsive_tests::shared_thresholds_flip_exactly_at_the_gpui_boundaries	success|responsive	cpu-compact|applications-compact
 mc07-compact-mirror	P0-MC-07	lib	app::tests::compact_breakpoint_mirrors_gpui_responsive_policy	success|responsive	-

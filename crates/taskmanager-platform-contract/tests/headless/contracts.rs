@@ -1,6 +1,7 @@
+use taskmanager_core::{FailureKind, ProviderId};
 use taskmanager_platform_contract::{
-    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus, FailureKind,
-    MAX_REQUEST_SCOPE_BYTES, ProviderFailure, ProviderId, RequestIdGenerator, RequestScope,
+    CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    MAX_REQUEST_SCOPE_BYTES, ProviderFailure, RequestIdGenerator, RequestScope,
     RequestTrackingError, RetryDisposition,
 };
 

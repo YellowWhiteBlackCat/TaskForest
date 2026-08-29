@@ -4,21 +4,21 @@ use super::{
     export_process_batch_history_with, process_batch_failure_feedback_key,
     record_completed_process_batch, result_counts,
 };
-use crate::core::process::{
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryFormat,
     ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
 };
-use taskmanager_application::FailureKind;
 
 #[gpui::test]
 fn application_root_batch_freezes_the_exact_tree_without_a_representative_pid(
     cx: &mut gpui::TestAppContext,
 ) {
-    use crate::core::ScalarObservation;
-    use crate::core::process::ProcessScalarObservations;
     use crate::gpui_app::root::RootView;
-    use crate::gpui_app::theme::Theme;
     use gpui::AppContext;
+    use taskmanager_core::core::ScalarObservation;
+    use taskmanager_core::core::process::ProcessScalarObservations;
+    use taskmanager_theme::Theme;
 
     let process = |pid, parent_pid, token| {
         taskmanager_test_support::ProcessItemFixtureBuilder::new()
@@ -72,10 +72,11 @@ fn clipboard_adapter_receives_the_exact_deterministic_payload() {
 
 #[test]
 fn completed_result_is_consumed_once_into_history() {
-    let identity = crate::core::process::FrozenProcessIdentity::from_authoritative_parts(
-        42, "worker", 123, 1_230,
-    )
-    .expect("fixture identity");
+    let identity =
+        taskmanager_core::core::process::FrozenProcessIdentity::from_authoritative_parts(
+            42, "worker", 123, 1_230,
+        )
+        .expect("fixture identity");
     let result = ProcessBatchResult {
         intent: ProcessBatchIntent {
             action: ProcessBatchAction::End,
@@ -93,7 +94,9 @@ fn completed_result_is_consumed_once_into_history() {
 
     assert_eq!(history.len(), 1);
     assert_eq!(history.entries()[0].completed_at_unix_ms, 789);
-    assert!(summary.ends_with(crate::i18n::t("feedback.permission_denied")));
+    assert!(summary.ends_with(taskmanager_application::i18n::t(
+        "feedback.permission_denied"
+    )));
     assert!(matches!(
         history.entries()[0].targets[0].result,
         ProcessBatchTargetResult::Failed(FailureKind::PermissionDenied)

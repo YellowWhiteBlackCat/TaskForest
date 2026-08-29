@@ -9,7 +9,8 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use taskmanager_shell::history::{LiveGraphHistory, MetricSeries};
+use taskmanager_shell::ShellApp;
+use taskmanager_shell::presentation::trend::TrendSeries;
 
 use crate::perf_history::{
     ProcessPerfHistory, ProcessPerfHistoryCache, ProcessPerfHistorySnapshot,
@@ -135,29 +136,27 @@ impl IcedProjectionCaches {
         snapshot
     }
 
-    pub(super) fn metric_series(
-        &self,
-        history: &LiveGraphHistory,
-        series: MetricSeries,
-    ) -> Rc<[f32]> {
+    pub(super) fn metric_series(&self, shell: &ShellApp, series: TrendSeries) -> Rc<[f32]> {
         self.history
             .borrow_mut()
-            .get(history, history.revision(), series)
+            .get(shell, shell.history.revision(), series)
     }
 
-    pub(super) fn per_core_series(&self, history: &LiveGraphHistory) -> Rc<Vec<Rc<[f32]>>> {
-        self.history.borrow_mut().core(history, history.revision())
+    pub(super) fn per_core_series(&self, shell: &ShellApp) -> Rc<Vec<Rc<[f32]>>> {
+        self.history
+            .borrow_mut()
+            .core(shell, shell.history.revision())
     }
 
     pub(super) fn device_series(
         &self,
-        history: &LiveGraphHistory,
+        shell: &ShellApp,
         key: DeviceSeriesKey,
-        load: impl FnOnce(&LiveGraphHistory) -> Vec<f32>,
+        load: impl FnOnce(&ShellApp) -> Vec<f32>,
     ) -> Rc<[f32]> {
         self.history
             .borrow_mut()
-            .cached_device(history, history.revision(), key, load)
+            .cached_device(shell, shell.history.revision(), key, load)
     }
 
     /// Shared split-direction window PAIR for one device's two-series graph
@@ -168,26 +167,26 @@ impl IcedProjectionCaches {
     /// history write — cache hits clone only the two `Rc` handles.
     pub(super) fn dual_device_series(
         &self,
-        history: &LiveGraphHistory,
+        shell: &ShellApp,
         family: DualDeviceSeriesFamily,
         device_id: &str,
         generation: u64,
-        load: impl FnOnce(&LiveGraphHistory) -> (Vec<f32>, Vec<f32>),
+        load: impl FnOnce(&ShellApp) -> (Vec<f32>, Vec<f32>),
     ) -> (Rc<[f32]>, Rc<[f32]>) {
         let key = DualSeriesKey {
             family,
             device_id: device_id.to_owned(),
             generation,
         };
-        let revision = history.revision();
-        let capacity = history.capacity();
+        let revision = shell.history.revision();
+        let capacity = shell.history.capacity();
         if let Some(entry) = self.dual_device.borrow().get(&key)
             && entry.revision == revision
             && entry.capacity == capacity
         {
             return (Rc::clone(&entry.samples.0), Rc::clone(&entry.samples.1));
         }
-        let (primary, secondary) = load(history);
+        let (primary, secondary) = load(shell);
         let samples = (
             Rc::from(primary.into_boxed_slice()),
             Rc::from(secondary.into_boxed_slice()),
@@ -312,14 +311,18 @@ impl super::IcedApp {
         generation: u64,
     ) -> (Rc<[f32]>, Rc<[f32]>) {
         self.projection_caches.dual_device_series(
-            &self.shell.history,
+            &self.shell,
             DualDeviceSeriesFamily::DiskReadWrite,
             device_id,
             generation,
-            |history| {
+            |shell| {
                 (
-                    history.disk_read_bytes_per_sec_for(device_id, generation),
-                    history.disk_write_bytes_per_sec_for(device_id, generation),
+                    shell
+                        .history
+                        .disk_read_bytes_per_sec_for(device_id, generation),
+                    shell
+                        .history
+                        .disk_write_bytes_per_sec_for(device_id, generation),
                 )
             },
         )
@@ -334,14 +337,18 @@ impl super::IcedApp {
         generation: u64,
     ) -> (Rc<[f32]>, Rc<[f32]>) {
         self.projection_caches.dual_device_series(
-            &self.shell.history,
+            &self.shell,
             DualDeviceSeriesFamily::NetworkRxTx,
             device_id,
             generation,
-            |history| {
+            |shell| {
                 (
-                    history.network_rx_bytes_per_sec_for(device_id, generation),
-                    history.network_tx_bytes_per_sec_for(device_id, generation),
+                    shell
+                        .history
+                        .network_rx_bytes_per_sec_for(device_id, generation),
+                    shell
+                        .history
+                        .network_tx_bytes_per_sec_for(device_id, generation),
                 )
             },
         )

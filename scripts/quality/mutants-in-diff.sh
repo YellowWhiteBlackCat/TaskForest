@@ -96,7 +96,7 @@ fi
 echo "mutants-in-diff: base=$base packages=${packages[*]:-<diff-scope>} diff-lines=$(wc -l <"$diff_file")"
 output=""
 output="$(timeout --kill-after=30s 3600 cargo mutants --in-diff "$diff_file" \
-    "${package_args[@]}" --gitignore true --test-tool nextest \
+    "${package_args[@]}" --gitignore true --test-tool nextest -j 4 \
     -t "$mutants_timeout" -o "$scratch/out" 2>&1)"
 rc=$?
 echo "$output"

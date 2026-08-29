@@ -13,7 +13,8 @@ use taskmanager_application::{
 };
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
-use crate::{TuiApp, TuiTheme};
+use crate::command_palette::{TuiSurfaceScope, surface_protocol_action};
+use crate::{TuiApp, TuiTerminalProfile, TuiTheme};
 
 use crate::render;
 
@@ -24,6 +25,17 @@ mod seam;
 mod semantic;
 
 use keys::handle_key;
+
+/// Test-only re-export of the terminal event seam: the overlay HitMap
+/// behavior tests (`tests/gui/ui/tests/overlay_hit.rs`) apply pointer clicks
+/// against committed frame plans through the production dispatch, and the
+/// perf-budget behavior tests (`tests/gui/perf_budget_tests.rs`) drive the
+/// production loop with a counting backend + scripted event source to pin the
+/// dirty-repaint contract (idle cycles must not draw at all).
+#[cfg(test)]
+pub(crate) use seam::{
+    EventReaction, TerminalEventSource, apply_terminal_event_with_plan, run_event_loop,
+};
 
 const EVENT_POLL: Duration = Duration::from_millis(100);
 /// Upper bound on how many ready terminal events one loop cycle drains after
@@ -140,8 +152,8 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         }
     };
     app.local_time_rules = if demo {
-        taskmanager_application::LocalTimeRulesObservation::current(
-            taskmanager_application::LocalTimeRules::utc(),
+        taskmanager_core::core::time::LocalTimeRulesObservation::current(
+            taskmanager_core::core::time::LocalTimeRules::utc(),
             0,
         )
     } else {
@@ -176,6 +188,10 @@ fn run_interactive(demo: bool) -> io::Result<()> {
         );
     }
     let capture_marker = std::env::var_os("TM_TUI_CAPTURE_MARKER_FILE");
+    // Resolve terminal capabilities once at the native composition edge. The
+    // event loop and every renderer consume this value; no component reads
+    // TERM/locale or makes its own color/glyph guess.
+    let terminal_profile = TuiTerminalProfile::detect();
     // The full cycle — drain, pacing, draw decision, event application,
     // quit — lives behind the runtime seam (`runtime/seam.rs`), generic over
     // the terminal backend and the event source so it is drivable headlessly
@@ -194,13 +210,14 @@ fn run_interactive(demo: bool) -> io::Result<()> {
             ratatui::crossterm::event::EnableMouseCapture,
             ratatui::crossterm::event::EnableBracketedPaste
         )?;
-        let result = seam::run_event_loop(
+        let result = seam::run_event_loop_with_profile(
             terminal,
             &mut app,
             platform.as_mut(),
             seam::CrosstermEventSource,
             demo,
             capture_marker.as_deref(),
+            terminal_profile,
         );
         let _ = ratatui::crossterm::execute!(
             std::io::stdout(),
@@ -275,17 +292,22 @@ pub(super) fn handle_settings_key(app: &mut TuiApp, key: KeyEvent) {
             let _ = app.apply_settings_form();
         }
         ratatui::crossterm::event::KeyCode::Esc => app.cancel_settings(),
-        // The overlay toggle keys still switch surfaces from inside the
-        // settings modal (matching the `?`/`T` self-toggle precedent).
-        ratatui::crossterm::event::KeyCode::Char('p') => app.toggle_settings(),
-        ratatui::crossterm::event::KeyCode::Char('i') => app.toggle_about(),
-        ratatui::crossterm::event::KeyCode::Char('h') => app.toggle_health(),
-        ratatui::crossterm::event::KeyCode::Char('c') => app.toggle_containers(),
+        // The overlay toggle chords (and the `p` self-toggle) are declared in
+        // the surface-protocol table
+        // ([`crate::command_palette::TUI_SURFACE_PROTOCOL`]) and resolve
+        // through it, matching the `?`/`T` self-toggle precedent. The modal
+        // consumes every key, so an unmatched character is a silent no-op and
+        // can never double-route a global command.
+        ratatui::crossterm::event::KeyCode::Char(character) => {
+            if let Some(action) = surface_protocol_action(TuiSurfaceScope::Settings, character) {
+                app.run_surface_protocol_action(action);
+            }
+        }
         _ => {}
     }
 }
 
-fn key_to_terminal(event: KeyEvent) -> Option<crate::ShellKeyEvent> {
+fn key_to_terminal(event: KeyEvent) -> Option<taskmanager_shell::ShellKeyEvent> {
     let key = match event.code {
         ratatui::crossterm::event::KeyCode::Char('f' | 'F') => KeyCode::F,
         ratatui::crossterm::event::KeyCode::Char('a' | 'A') => KeyCode::A,
@@ -318,7 +340,7 @@ fn key_to_terminal(event: KeyEvent) -> Option<crate::ShellKeyEvent> {
             || event.code == ratatui::crossterm::event::KeyCode::BackTab,
         event.modifiers.contains(KeyModifiers::SUPER),
     );
-    Some(crate::ShellKeyEvent::new(key, modifiers))
+    Some(taskmanager_shell::ShellKeyEvent::new(key, modifiers))
 }
 
 #[cfg(test)]

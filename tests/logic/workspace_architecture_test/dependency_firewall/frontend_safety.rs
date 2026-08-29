@@ -46,40 +46,63 @@ fn process_connections_split_transport_family_endpoint_and_provider_token_shapes
 }
 
 #[test]
-fn frontend_sources_import_core_only_through_application_or_the_crate_facade() {
-    // Design-debt #5: neither frontend may import `taskmanager-core` (or any
-    // Linux adapter) directly. The GPUI frontend reaches core types through
-    // the local facade (`crate::core`, re-exported once in
-    // taskmanager-gpui/src/lib.rs); the TUI has no core dependency at all.
+fn frontend_sources_import_domain_owners_directly() {
+    // Domain facts and platform-neutral port contracts have one owner each.
+    // Frontends import those owners directly; no application/model facade or
+    // frontend-local `crate::core` forwarding module is allowed to grow back.
     let repository = repository();
     let (gpui, tui) = frontend_sources(&repository);
-    for forbidden in [
-        "taskmanager_core",
-        "taskmanager_platform_linux",
-        "taskmanager_ebpf",
-    ] {
+    assert!(
+        !repository
+            .join("crates/taskmanager-application/src/model.rs")
+            .exists(),
+        "the retired application model forwarding facade must not return"
+    );
+    for forbidden in ["taskmanager_platform_linux", "taskmanager_ebpf"] {
         assert!(
             !gpui.contains(forbidden),
-            "GPUI frontend imported {forbidden}; use taskmanager_application or the crate::core facade instead"
+            "GPUI frontend reached a forbidden platform implementation: {forbidden}"
         );
     }
 
     for forbidden in [
-        "taskmanager_core",
         "taskmanager_platform_linux",
-        "taskmanager_platform_contract",
         "taskmanager_platform_provider",
         "taskmanager_platform_runtime",
         "taskmanager_telemetry_store",
-        // ADR-028: the opt-in history store is a composition-edge dependency
-        // (GPUI startup wires it); the TUI reaches history, if ever, through
-        // the application/shell re-export seam.
         "taskmanager_history_store",
         "taskmanager_ebpf",
     ] {
         assert!(
             !tui.contains(forbidden),
-            "TUI frontend imported {forbidden}; it must route through taskmanager_application / taskmanager_ui_contract / taskmanager_platform_native"
+            "TUI frontend reached a forbidden platform implementation: {forbidden}"
+        );
+    }
+
+    for (name, root) in [
+        ("Root", "src"),
+        ("Application", "crates/taskmanager-application/src"),
+        ("App host", "crates/taskmanager-app-host/src"),
+        ("GPUI", "crates/taskmanager-gpui/src"),
+        ("Iced", "crates/taskmanager-iced/src"),
+        (
+            "Platform contract",
+            "crates/taskmanager-platform-contract/src",
+        ),
+        ("Platform native", "crates/taskmanager-platform-native/src"),
+        ("TUI", "crates/taskmanager-tui/src"),
+        ("Bevy", "crates/taskmanager-bevy-ui/src"),
+    ] {
+        let code = rust_code_without_line_comments(&repository.join(root));
+        assert!(
+            code.contains("taskmanager_core"),
+            "{name} must consume domain facts from taskmanager-core directly"
+        );
+        assert!(
+            !code.contains("pub use taskmanager_application")
+                && !code.contains("pub use taskmanager_core")
+                && !code.contains("pub use taskmanager_platform_contract"),
+            "{name} restored a cross-layer forwarding re-export"
         );
     }
 }

@@ -4,7 +4,8 @@
 //! Successful payloads carry the envelope as their only correlation authority;
 //! `EventEnvelope` validates the duplicated metadata copy on a provider failure.
 
-use crate::{CapabilityId, OperationFailure, ProviderId};
+use crate::{CapabilityId, OperationFailure};
+use taskmanager_core::ProviderId;
 
 /// Non-zero correlation identifier allocated by the application layer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]

@@ -3,12 +3,16 @@
 use super::super::*;
 use std::sync::{Arc, Mutex};
 use taskmanager_application::{
-    CapabilityCatalog, CapabilityId, CapabilitySnapshot, ConfirmationKind, ControlRequestId,
-    CorrelatedEvent, EventEnvelope, EventPort, EventPortError, EventSequence, FailureKind,
-    PlatformClient, PlatformEvent, PlatformEventContext, PlatformFacets, PlatformHandle,
-    RequestEnvelope, RequestId, RequestPort, ServiceControlOutcome, ServiceControlRequest,
-    ServiceEvent, ServiceFacets, ServiceId, ServiceItem, ServiceStatus, ServiceUpdate,
-    SubmissionError, SurfaceKind,
+    ConfirmationKind, ControlRequestId, CorrelatedEvent, PlatformClient, PlatformEvent,
+    PlatformEventContext, PlatformFacets, PlatformHandle, ServiceControlOutcome,
+    ServiceControlRequest, ServiceEvent, ServiceFacets, ServiceUpdate, SurfaceKind,
+};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::{
+    CapabilityCatalog, CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+    EventSequence, RequestEnvelope, RequestId, RequestPort, SubmissionError,
 };
 
 #[test]

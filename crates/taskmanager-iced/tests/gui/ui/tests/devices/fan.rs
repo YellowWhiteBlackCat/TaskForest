@@ -15,10 +15,13 @@ fn fan_summary_lines_project_typed_values_and_honest_dashes() {
     use crate::ui::fan::{fan_section_state, fan_summary_lines};
     use taskmanager_application::i18n::{Language, set_language};
     set_language(Language::En);
-    use taskmanager_application::{
-        DeviceGeneration, DeviceState, SensorCenterSnapshot, SensorDescriptor, SensorMagnitude,
-        SensorMeasurementObservation, SensorReading, SensorScale,
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::identity::DeviceGeneration;
+    use taskmanager_core::core::sensors::{
+        SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+        SensorReading, SensorScale,
     };
+
     let reading =
         |id: &str, label: &str, descriptor: SensorDescriptor, magnitude: SensorMagnitude| {
             SensorReading::from_measurement_observation(

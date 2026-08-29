@@ -3,8 +3,8 @@
 use gpui::{App, Div, Entity, InteractiveElement, ParentElement, Window, div};
 
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
 use taskmanager_shell::ProcessStatusFilter;
+use taskmanager_theme::Theme;
 
 pub fn status_filter_row(
     theme: &Theme,

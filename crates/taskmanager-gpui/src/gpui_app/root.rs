@@ -15,10 +15,9 @@ use taskmanager_ui::inputs::slider::SliderState;
 use taskmanager_ui::inputs::text_input::TextInputState;
 use taskmanager_ui::primitives::button::ButtonState;
 
-use crate::core::process::ProcessBatchHistory;
-use crate::core::startup::StartupEntryId;
+use taskmanager_core::core::process::ProcessBatchHistory;
+use taskmanager_core::core::startup::StartupEntryId;
 
-use crate::core::StableDeviceSelection;
 use crate::gpui_app::containers_view;
 use crate::gpui_app::cpu_view::{self, CpuHistoryCache};
 use crate::gpui_app::dashboard::{self, DashboardState};
@@ -32,13 +31,20 @@ use crate::gpui_app::sidebar::{self, SelectedDevice};
 use crate::gpui_app::startup_view;
 use crate::gpui_app::system_health_view::{self, SystemHealthCallbacks};
 use crate::gpui_app::system_view;
-use crate::gpui_app::theme::{FontAvailability, Theme, WindowCorner, detect_font_availability};
 use crate::gpui_app::users_view;
-use crate::i18n;
+use taskmanager_application::i18n;
 use taskmanager_application::{
-    ConfigClient, DesktopAppearance, OperationFailure, PlatformClient, RefreshRequest, RequestId,
-    ServiceId, SetupScriptAction, SourceStatus, TelemetryRefreshPolicy,
+    ConfigClient, PlatformClient, RefreshRequest, TelemetryRefreshPolicy,
 };
+use taskmanager_core::core::StableDeviceSelection;
+use taskmanager_core::core::appearance::DesktopAppearance;
+use taskmanager_core::core::setup::SetupScriptAction;
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::{OperationFailure, RequestId};
+use taskmanager_theme::gpui::detect_font_availability;
+use taskmanager_theme::{FontAvailability, Theme, WindowCorner};
+
 use taskmanager_shell::{DirectTrackState, TelemetryFrameState};
 use taskmanager_telemetry_store::{CorrelatedSystemTelemetryIngestor, TelemetryStore};
 
@@ -109,7 +115,6 @@ mod tooltip;
 mod tray;
 mod units;
 mod window_surface;
-pub use crate::core::alerts::QuietBound;
 use capture::{CaptureEvidence, CaptureProcessAction};
 pub use chrome::*;
 pub use diagnostic_bundle::DiagnosticBundleUiState;
@@ -150,7 +155,7 @@ pub struct RootView {
     pub theme: Theme,
     /// Immutable native local-time rules injected at composition startup.
     /// Projection/render paths never discover host files or environment state.
-    pub(crate) local_time_rules: taskmanager_application::LocalTimeRulesObservation,
+    pub(crate) local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
     /// The selected surface role is frontend composition state, not business
     /// state. Standalone is the default so existing desktop launches retain
     /// the complete application shell; the compact widget branch is only
@@ -231,7 +236,8 @@ pub struct RootView {
     /// visible tail at the graph element, so sliding and the y-ceiling keep
     /// reading the full retained window exactly as before the single-track
     /// convergence (ADR-034 GPU chart-metric sampling).
-    pub(in crate::gpui_app) live_graph_history: taskmanager_shell::history::LiveGraphHistory,
+    pub(in crate::gpui_app) live_graph_history:
+        taskmanager_telemetry_store::live_graph::LiveGraphHistory,
     /// Frontend-retained write capability. Native providers never receive it.
     pub(crate) telemetry_ingestor: CorrelatedSystemTelemetryIngestor,
     /// Next-start preference plus this process's typed, boot-fixed history
@@ -248,12 +254,14 @@ pub struct RootView {
     pub telemetry_refresh_policy: TelemetryRefreshPolicy,
     /// The spawned system tray (ADR-032); `None` when the platform cannot
     /// host one (typed failure at spawn) or the tray was not started.
-    pub(crate) tray_controller: Option<Box<dyn taskmanager_app_host::TrayController>>,
+    pub(crate) tray_controller: Option<Box<dyn taskmanager_platform_contract::TrayController>>,
     /// The primary single-instance guard (ADR-032 follow-up); `Some` only
     /// when this process owns the instance. Held for the process lifetime.
-    pub(crate) instance_guard: Option<Box<dyn taskmanager_app_host::InstanceGuard>>,
-    pub(crate) instance_rx: Option<std::sync::mpsc::Receiver<taskmanager_app_host::InstanceEvent>>,
-    pub(crate) tray_events_rx: Option<std::sync::mpsc::Receiver<crate::core::tray::TrayEvent>>,
+    pub(crate) instance_guard: Option<Box<dyn taskmanager_platform_contract::InstanceGuard>>,
+    pub(crate) instance_rx:
+        Option<std::sync::mpsc::Receiver<taskmanager_platform_contract::InstanceEvent>>,
+    pub(crate) tray_events_rx:
+        Option<std::sync::mpsc::Receiver<taskmanager_core::core::tray::TrayEvent>>,
     materialized: projection_materialization::ProjectionMaterialization,
     pub selected: SelectedDevice,
     /// Stable hardware identity behind an index-based view selection. The ID is
@@ -493,7 +501,8 @@ impl RootView {
         {
             return (cache.rows.clone(), cache.pids.clone(), cache.query.clone());
         }
-        let procs_refs: Vec<&crate::core::process::ProcessItem> = self.processes().iter().collect();
+        let procs_refs: Vec<&taskmanager_core::core::process::ProcessItem> =
+            self.processes().iter().collect();
         let application_count = processes_view::rows::application_root_count(&procs_refs);
         let rows = processes_view::rows::visible_rows_with_local_time(
             processes_view::rows::VisibleRowsProps {
@@ -604,10 +613,11 @@ impl RootView {
         surface_role: crate::window_presentation::GpuiSurfaceRole,
         cx: &mut Context<Self>,
     ) -> Self {
-        let live_graph_history = taskmanager_shell::history::LiveGraphHistory::from_store(
-            telemetry.clone(),
-            taskmanager_shell::history::MAX_HISTORY_CAPACITY,
-        );
+        let live_graph_history =
+            taskmanager_telemetry_store::live_graph::LiveGraphHistory::from_store(
+                telemetry.clone(),
+                taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY,
+            );
         // Own UI layer bootstrap: focus registry + input/dialog/popup/table/tree
         // keymaps. The startup path already ran it; tests constructing RootView
         // directly get it here. Idempotent (P6: replaces the old
@@ -627,7 +637,9 @@ impl RootView {
         }
         Self {
             theme,
-            local_time_rules: taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+            local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(
+                0,
+            ),
             surface_role,
             presentation: presentation_preferences::PresentationPreferences::default(),
             nav_orientation: NavOrientation::Horizontal,
@@ -648,7 +660,7 @@ impl RootView {
             live_graph_history,
             telemetry_ingestor,
             history_runtime: history_runtime::HistoryRuntimeState::default(),
-            motion_token: crate::core::config::MOTION_NORMAL.to_string(),
+            motion_token: taskmanager_core::core::config::MOTION_NORMAL.to_string(),
             projection_caches: projection_caches::GpuiProjectionCaches::default(),
             system_history_ingestion_diagnostics: Vec::new(),
             telemetry_refresh_policy,

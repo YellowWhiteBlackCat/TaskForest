@@ -38,8 +38,3 @@ mod tests;
 
 pub use chrome::*;
 pub use rows::*;
-
-// The status-bucket filter is the shell's `ProcessStatusFilter` (classifier,
-// labels, and stable control ids live there); re-exported here so the
-// historical `processes_view::ProcessStatusFilter` import path keeps working.
-pub use taskmanager_shell::ProcessStatusFilter;

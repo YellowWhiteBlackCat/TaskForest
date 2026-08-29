@@ -12,9 +12,22 @@
 //! Feathers skin system, which this frontend does not adopt.
 
 use bevy::color::Color;
-use bevy::text::{FontSize, FontWeight, TextFont};
+use bevy::text::{FontSize, FontWeight, TextFont, TextLayout};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::{self, UiSize};
+
+/// Strictly single-line text layout for bounded rows: a value wider than its
+/// box clips at the edge, never wraps and never stretches its siblings. The
+/// typography-discipline companion to the theme's type scale — bounded rows
+/// compose this with `Overflow::clip_x()` so long facts degrade by clipping,
+/// never by reflowing into a wrapped stack.
+#[must_use]
+pub(crate) fn no_wrap_text() -> TextLayout {
+    TextLayout {
+        linebreak: bevy::text::LineBreak::NoWrap,
+        ..TextLayout::default()
+    }
+}
 
 /// sRGB channel mapping: the theme's linear-alpha sRGB quadruple becomes a
 /// bevy `Color::srgba` with identical channels. Exact by construction — no
@@ -144,10 +157,6 @@ pub(crate) fn space_2() -> f32 {
 
 pub(crate) fn space_4() -> f32 {
     tokens::SPACE_4.0
-}
-
-pub(crate) fn space_2_quarter() -> f32 {
-    tokens::SPACE_2.0 / 4.0
 }
 
 pub(crate) fn space_8() -> f32 {

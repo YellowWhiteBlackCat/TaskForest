@@ -1,27 +1,30 @@
 //! source-inspection: static-policy
 //!
-//! Negative gate for theme-toolkit neutrality (ADR-026).
+//! Negative gate for theme-toolkit neutrality (ADR-026, CORE-07).
 //!
 //! `taskmanager-theme` is the single design source for every frontend: its
-//! neutral modules (color/skins/palette/theme/tokens/fonts/detection) may
-//! never name a toolkit type, and the crate may carry a toolkit dependency
-//! only as the optional `gpui` feature that gates the one quarantined
-//! binding module (`src/gpui.rs`). Rust's orphan rule forces the
-//! `From<Color> for gpui::Rgba` conversions to live in the crate that owns
-//! `Color`, so the toolkit-dependent code is quarantined by feature instead
-//! of a separate adapter crate.
+//! neutral modules (color/skins/palette/theme/tokens/platform/fonts/
+//! detection) may never name a toolkit type, and the crate may carry a
+//! toolkit dependency only as an OPTIONAL binding feature that gates one
+//! quarantined binding module per toolkit (`src/gpui.rs` behind `gpui`,
+//! `src/iced.rs` behind `iced`/`iced_core`, CORE-07). Rust's orphan rule
+//! forces the `From<Color> for …` conversions to live in the crate that
+//! owns `Color`; the iced binding exists so the iced frontend does NOT grow
+//! a local second conversion point.
 //!
 //! Guards:
-//! 1. `gpui` in the theme manifest is optional (`optional = true`) — a
-//!    required toolkit dependency fails CI.
-//! 2. The neutral theme modules never `use gpui` (only the cfg'd `gpui.rs`
-//!    module may).
-//! 3. The TUI (the non-gpui frontend in the tree) does not enable the
-//!    theme's `gpui` feature — its `taskmanager-theme` dependency line must
-//!    not request features, so the isolated TUI build links zero gpui.
-//! 4. The gpui-side frontends (`taskmanager-gpui`, `taskmanager-ui`) DO enable
-//!    the feature — forgetting it breaks `.bg(palette.fg)` silently, so the
-//!    gate also fails if the feature is missing there.
+//! 1. Every toolkit dependency in the theme manifest (`gpui`, `iced_core`)
+//!    is optional (`optional = true`) — a required toolkit dependency
+//!    fails CI.
+//! 2. The neutral theme modules never `use` a toolkit (only the cfg'd
+//!    binding modules may).
+//! 3. The TUI (the lossy terminal-mapping frontend) enables NO theme
+//!    feature — its isolated build links zero toolkit.
+//! 4. The iced frontend enables the theme's `iced` feature (its only
+//!    conversion source) and never `gpui`.
+//! 5. The gpui-side frontends (`taskmanager-gpui`, `taskmanager-ui`) enable
+//!    the `gpui` feature — forgetting it breaks `.bg(palette.fg)`
+//!    silently — and never `iced`.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -37,6 +40,7 @@ const NEUTRAL_MODULES: &[&str] = &[
     "crates/taskmanager-theme/src/palette.rs",
     "crates/taskmanager-theme/src/theme.rs",
     "crates/taskmanager-theme/src/tokens.rs",
+    "crates/taskmanager-theme/src/platform.rs",
     "crates/taskmanager-theme/src/fonts.rs",
     "crates/taskmanager-theme/src/detection.rs",
 ];
@@ -72,8 +76,8 @@ fn theme_dependency(manifest_source: &str, who: &str) -> String {
 #[test]
 fn theme_manifest_has_no_required_toolkit_dependency() {
     let source = manifest(THEME_MANIFEST);
-    // Only the `[dependencies]` declaration makes gpui a required dependency;
-    // the `[features]` alias and the `[dev-dependencies]` test-support entry
+    // Only the `[dependencies]` declaration makes a toolkit required; the
+    // `[features]` aliases and the `[dev-dependencies]` test-support entry
     // are not transitive toolkit couplings.
     let in_dependencies = source
         .split("[dependencies]")
@@ -82,18 +86,18 @@ fn theme_manifest_has_no_required_toolkit_dependency() {
         .split('[')
         .next()
         .unwrap_or("");
-    let mut gpui_dep_lines = code_lines(in_dependencies).filter(|line| line.starts_with("gpui"));
-    let declaration = gpui_dep_lines.next().unwrap_or_else(|| {
-        panic!("theme must declare the optional gpui binding feature (ADR-026)")
-    });
-    assert!(
-        gpui_dep_lines.next().is_none(),
-        "only one gpui dependency declaration is expected"
-    );
-    assert!(
-        declaration.contains("optional"),
-        "the gpui dependency must be optional (ADR-026): {declaration}"
-    );
+    for toolkit in ["gpui", "iced_core"] {
+        let declaration = code_lines(in_dependencies)
+            .find(|line| line.trim_start().starts_with(toolkit))
+            .unwrap_or_else(|| {
+                panic!("theme must declare the optional {toolkit} binding dependency (ADR-026)")
+            })
+            .to_string();
+        assert!(
+            declaration.contains("optional"),
+            "the {toolkit} dependency must be optional (ADR-026): {declaration}"
+        );
+    }
 }
 
 #[test]
@@ -124,11 +128,15 @@ fn tui_consumes_the_theme_without_the_gpui_feature() {
 }
 
 #[test]
-fn iced_frontend_consumes_the_theme_without_the_gpui_feature() {
+fn iced_frontend_consumes_the_theme_iced_binding_not_gpui() {
     let line = theme_dependency(&manifest(ICED_MANIFEST), "taskmanager-iced");
     assert!(
-        !line.contains("features"),
-        "the iced frontend must take taskmanager-theme with default features (no gpui, ADR-026/027): {line}"
+        line.contains("iced"),
+        "the iced frontend must enable taskmanager-theme's iced binding feature — its ONLY token→value conversion source (CORE-07/ADR-026): {line}"
+    );
+    assert!(
+        !line.contains("gpui"),
+        "the iced frontend must never link gpui through the theme (ADR-026/027): {line}"
     );
 }
 
@@ -142,6 +150,10 @@ fn gpui_frontends_enable_the_theme_gpui_feature() {
         assert!(
             line.contains("gpui"),
             "{crate_name} must enable taskmanager-theme's gpui feature for the palette/token conversions (ADR-026): {line}"
+        );
+        assert!(
+            !line.contains("iced"),
+            "{crate_name} must not enable the theme's iced binding (ADR-026): {line}"
         );
     }
 }

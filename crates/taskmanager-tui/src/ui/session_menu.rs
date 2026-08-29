@@ -15,12 +15,14 @@ use ratatui::Frame;
 use ratatui::layout::{Alignment, Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Borders, Clear, Paragraph};
+use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::t;
-use taskmanager_application::{SessionControlAction, SessionItem};
+use taskmanager_core::core::session::{SessionControlAction, SessionItem};
 use taskmanager_ui_contract::IconId;
 
+use super::containers::{KeyHint, Modal};
 use crate::TuiTheme;
+use crate::bindings::{ACTION_MENU_HINTS, menu_hint_pairs};
 
 /// The action menu's frozen target: the provider-issued session row plus the
 /// menu cursor. Storing the row (not an index) keeps the intent stable while
@@ -35,26 +37,17 @@ pub struct SessionMenuTarget {
 pub const MENU_ACTIONS: [SessionControlAction; 2] =
     [SessionControlAction::Disconnect, SessionControlAction::Lock];
 
-/// Render the session-action menu centred over `area`.
-pub fn render_session_menu(
+/// Render the session-action menu from the committed focus plan.  The
+/// highlighted row is the plan's `MenuItem` control when it names this
+/// surface; any other control paints no highlight (fail-closed).
+pub(super) fn render_session_menu_at(
     frame: &mut Frame<'_>,
     menu: &SessionMenuTarget,
     theme: TuiTheme,
-    area: Rect,
+    focus: super::TuiFocusPlan,
+    popup: Rect,
 ) {
-    let popup = centered(area, 52, 11);
-    frame.render_widget(Clear, popup);
-    let block = Block::new()
-        .borders(Borders::ALL)
-        .border_style(Style::new().fg(theme.accent))
-        .style(Style::new().bg(theme.overlay_bg))
-        .title(format!(
-            " {} {} ",
-            crate::icon_glyph(IconId::Users),
-            t("users.session_actions")
-        ));
-    let inner = block.inner(popup);
-    frame.render_widget(block, popup);
+    let inner = Modal::new(theme, IconId::Users, t("users.session_actions")).render(frame, popup);
 
     let [body, footer] = Layout::vertical([Constraint::Min(5), Constraint::Length(3)]).areas(inner);
 
@@ -62,7 +55,9 @@ pub fn render_session_menu(
         Span::styled("  ", Style::new().fg(theme.dim)),
         Span::styled(
             menu.session.user.as_str(),
-            Style::new().fg(Color::White).add_modifier(Modifier::BOLD),
+            Style::new()
+                .fg(theme.color(Color::White))
+                .add_modifier(Modifier::BOLD),
         ),
         Span::styled(
             format!(
@@ -79,7 +74,7 @@ pub fn render_session_menu(
     ])];
     lines.push(Line::from(""));
     for (index, action) in MENU_ACTIONS.into_iter().enumerate() {
-        let selected = index == menu.selection;
+        let selected = focus.menu_item(crate::TuiSurfaceKind::SessionMenu) == Some(index);
         let label = action_label(action);
         lines.push(Line::from(vec![
             Span::styled(
@@ -89,7 +84,11 @@ pub fn render_session_menu(
             Span::styled(
                 label,
                 Style::new()
-                    .fg(if selected { Color::White } else { theme.dim })
+                    .fg(if selected {
+                        theme.color(Color::White)
+                    } else {
+                        theme.dim
+                    })
                     .add_modifier(if selected {
                         Modifier::BOLD
                     } else {
@@ -103,23 +102,7 @@ pub fn render_session_menu(
     frame.render_widget(
         Paragraph::new(vec![
             Line::from(""),
-            Line::from(vec![
-                Span::styled(" ↑↓ ", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!(" {} · ", t("menu.word_move")),
-                    Style::new().fg(theme.dim),
-                ),
-                Span::styled("Enter", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!(" {} · ", t("menu.word_select")),
-                    Style::new().fg(theme.dim),
-                ),
-                Span::styled("Esc", Style::new().fg(Color::Black).bg(theme.accent)),
-                Span::styled(
-                    format!(" {}", t("menu.word_cancel")),
-                    Style::new().fg(theme.dim),
-                ),
-            ]),
+            KeyHint::line(theme, menu_hint_pairs(&ACTION_MENU_HINTS)),
         ])
         .alignment(Alignment::Center),
         footer,
@@ -132,16 +115,5 @@ pub fn action_label(action: SessionControlAction) -> &'static str {
     match action {
         SessionControlAction::Disconnect => t("users.disconnect"),
         SessionControlAction::Lock => t("users.lock"),
-    }
-}
-
-fn centered(area: Rect, width: u16, height: u16) -> Rect {
-    let width = width.min(area.width.saturating_sub(4));
-    let height = height.min(area.height.saturating_sub(2));
-    Rect {
-        x: area.x + area.width.saturating_sub(width) / 2,
-        y: area.y + area.height.saturating_sub(height) / 2,
-        width,
-        height,
     }
 }

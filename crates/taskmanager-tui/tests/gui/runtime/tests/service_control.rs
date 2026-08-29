@@ -79,7 +79,10 @@ fn service_menu_select_opens_the_shared_confirmation_and_y_confirms() {
     let Some(PlatformEffect::ServiceControl(target)) = effect else {
         panic!("confirm must produce a ServiceControl effect");
     };
-    assert_eq!(target.action, taskmanager_application::ServiceAction::Stop);
+    assert_eq!(
+        target.action,
+        taskmanager_core::core::services::ServiceAction::Stop
+    );
     assert!(!target.service_id.as_str().is_empty());
     assert_eq!(app.pending_service_control(), None);
 }
@@ -118,9 +121,11 @@ fn service_confirmation_n_dismisses_without_a_platform_effect() {
 fn service_control_round_trip_submits_through_queue_effect() {
     use std::sync::{Arc, Mutex};
     use taskmanager_application::{
+        PlatformEvent, PlatformFacets, PlatformHandle, ServiceControlRequest, ServiceFacets,
+    };
+    use taskmanager_platform_contract::{
         CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-        PlatformEvent, PlatformFacets, PlatformHandle, RequestEnvelope, RequestPort,
-        ServiceControlRequest, ServiceFacets, SubmissionError,
+        RequestEnvelope, RequestPort, SubmissionError,
     };
 
     #[derive(Default)]
@@ -207,7 +212,7 @@ fn service_control_round_trip_submits_through_queue_effect() {
     let request = &submitted[0];
     assert_eq!(
         request.action,
-        taskmanager_application::ServiceAction::Stop,
+        taskmanager_core::core::services::ServiceAction::Stop,
         "the menu's Stop pick must reach the provider"
     );
     assert!(
@@ -275,7 +280,7 @@ fn service_log_open_and_panel_keys_drive_the_shared_state_machine() {
     );
     assert_eq!(
         app.shell.service_log.as_ref().unwrap().feed.level,
-        taskmanager_application::ServiceLogLevelFilter::Errors
+        taskmanager_core::core::services::ServiceLogLevelFilter::Errors
     );
     let _ = handle_key(
         &mut app,
@@ -286,7 +291,7 @@ fn service_log_open_and_panel_keys_drive_the_shared_state_machine() {
     );
     assert_eq!(
         app.shell.service_log.as_ref().unwrap().feed.time,
-        taskmanager_application::ServiceLogTimeFilter::LastHour
+        taskmanager_core::core::services::ServiceLogTimeFilter::LastHour
     );
 
     // `q` closes; the page switch closes it too (page-change hygiene).
@@ -571,11 +576,11 @@ fn s_key_on_the_applications_page_still_cycles_visible_process_columns() {
 
 /// One synthetic service row: the provider-issued id is derived from the
 /// name so the sorted-vs-provider order assertions below are unambiguous.
-fn sorted_fixture_service(name: &str) -> taskmanager_application::ServiceItem {
-    taskmanager_application::ServiceItem::from_inventory(
-        taskmanager_application::ServiceId::new(format!("fixture.service:{name}")),
+fn sorted_fixture_service(name: &str) -> taskmanager_core::core::services::ServiceItem {
+    taskmanager_core::core::services::ServiceItem::from_inventory(
+        taskmanager_core::core::target::ServiceId::new(format!("fixture.service:{name}")),
         name,
-        taskmanager_application::ServiceStatus::Active,
+        taskmanager_core::core::services::ServiceStatus::Active,
         "",
         "",
         "",
@@ -599,6 +604,9 @@ fn menu_and_log_open_target_the_sorted_services_row() {
         ])),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
+    // Select alpha before sorting. The identity anchor contract keeps this
+    // target selected when Name sort moves it to the first rendered row.
+    app.selected = 1;
     let _ = handle_key(
         &mut app,
         KeyEvent::new(

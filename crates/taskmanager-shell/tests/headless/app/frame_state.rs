@@ -1,7 +1,7 @@
 //! Regression tests for the shared telemetry-frame lifecycle and tick commit.
 
 use super::{FrameCommit, SystemProjectionStore, TelemetryFrameState};
-use taskmanager_application::SystemSnapshot;
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 #[test]
 fn telemetry_frame_lifecycle_is_collecting_until_a_snapshot_exists() {

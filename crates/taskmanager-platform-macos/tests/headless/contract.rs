@@ -17,16 +17,25 @@
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
-    CapabilityId, CapabilityStatus, CommandLaunchRequest, ContainerRollupEvent,
-    DesktopNotificationRequest, FailureKind, FrozenProcessIdentity, LatestControlRequest,
-    OperationFailure, PlatformClient, PlatformEventBatch, ProcessAffinityControlRequest,
-    ProcessControlRequest, ProcessResourceControlRequest, RefreshRequest,
-    ResourceGroupLimitRequest, ResourceRevealRequest, RetryDisposition, ServiceAction,
-    ServiceControlOutcome, ServiceControlRequest, ServiceEvent, ServiceId, ServiceUpdate,
-    SessionControlAction, SessionControlOutcome, SessionControlRequest, SessionEvent, SessionId,
-    SetupScriptAction, SetupScriptRequest, SmartObservationBatch, alerts::AlertSeverity,
+    CommandLaunchRequest, ContainerRollupEvent, DesktopNotificationRequest, LatestControlRequest,
+    PlatformClient, PlatformEventBatch, ProcessAffinityControlRequest, ProcessControlRequest,
+    ProcessResourceControlRequest, RefreshRequest, ResourceRevealRequest, ServiceControlOutcome,
+    ServiceControlRequest, ServiceEvent, ServiceUpdate, SessionControlOutcome,
+    SessionControlRequest, SessionEvent, SetupScriptRequest, SmartObservationBatch,
 };
 use taskmanager_core::DeviceStatus;
+use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::setup::SetupScriptAction;
+use taskmanager_core::core::target::{ServiceId, SessionId};
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityStatus, OperationFailure, RetryDisposition,
+};
 use taskmanager_platform_macos::MacOsPlatformRuntime;
 
 const DRAIN_DEADLINE: Duration = Duration::from_secs(5);
@@ -311,7 +320,7 @@ fn complete_standard_surface_composes_with_descriptors_and_facets() {
         );
         assert_eq!(
             descriptor.providers,
-            [taskmanager_application::ProviderId::borrowed(provider)],
+            [ProviderId::borrowed(provider)],
             "{capability} must be owned by its macos.* provider"
         );
         assert!(descriptor.last_success_at_ms.is_none());

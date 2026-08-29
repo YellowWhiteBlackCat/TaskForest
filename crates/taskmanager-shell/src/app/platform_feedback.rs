@@ -1,6 +1,7 @@
 //! Platform-fold side effects into shell history, feedback and view hygiene.
 
 use super::*;
+use taskmanager_platform_contract::RequestId;
 
 impl ShellApp {
     /// Attach or detach the process-owned durable-history sink. The shell
@@ -8,7 +9,7 @@ impl ShellApp {
     /// the optional persistence mirror is swapped.
     pub fn set_history_persistence_sink(
         &mut self,
-        sink: Option<std::sync::Arc<dyn taskmanager_application::HistoryRecordSink>>,
+        sink: Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>>,
     ) {
         if self.persistent_application_history.is_some() == sink.is_some() {
             return;
@@ -95,14 +96,18 @@ impl ShellApp {
     ) -> taskmanager_telemetry_store::CorrelatedSystemTelemetryIngestor {
         if self.history_ingestor.is_none() {
             let (history, ingestor) =
-                crate::history::LiveGraphHistory::shared(self.history.capacity());
+                taskmanager_telemetry_store::live_graph::LiveGraphHistory::shared(
+                    self.history.capacity(),
+                );
             self.history = history;
             self.history_ingestor = Some(ingestor);
         }
         if let Some(ingestor) = self.history_ingestor.as_ref() {
             return ingestor.clone();
         }
-        let (history, ingestor) = crate::history::LiveGraphHistory::shared(self.history.capacity());
+        let (history, ingestor) = taskmanager_telemetry_store::live_graph::LiveGraphHistory::shared(
+            self.history.capacity(),
+        );
         self.history = history;
         self.history_ingestor = Some(ingestor.clone());
         ingestor
@@ -110,7 +115,7 @@ impl ShellApp {
 
     pub(super) fn begin_process_control(
         &mut self,
-        request_id: taskmanager_application::RequestId,
+        request_id: RequestId,
         target: FrozenProcessIdentity,
         kind: ProcessControlKind,
     ) {
@@ -302,9 +307,9 @@ pub fn process_control_notice_text(feedback: &ProcessControlFeedback) -> (String
 }
 
 fn process_batch_notice_text(
-    result: &taskmanager_application::ProcessBatchResult,
+    result: &taskmanager_core::core::process::ProcessBatchResult,
 ) -> (String, bool) {
-    use taskmanager_application::ProcessBatchTargetResult;
+    use taskmanager_core::core::process::ProcessBatchTargetResult;
 
     let action = process_batch_action_label(result.intent.action);
     let total = result.targets.len();
@@ -357,21 +362,23 @@ fn process_control_action_label(kind: &ProcessControlKind) -> String {
     }
 }
 
-fn process_batch_action_label(action: taskmanager_application::ProcessBatchAction) -> String {
+fn process_batch_action_label(
+    action: taskmanager_core::core::process::ProcessBatchAction,
+) -> String {
     match action {
-        taskmanager_application::ProcessBatchAction::End => {
+        taskmanager_core::core::process::ProcessBatchAction::End => {
             taskmanager_application::i18n::t("proc.end_task").to_owned()
         }
-        taskmanager_application::ProcessBatchAction::Kill => {
+        taskmanager_core::core::process::ProcessBatchAction::Kill => {
             taskmanager_application::i18n::t("proc.kill").to_owned()
         }
-        taskmanager_application::ProcessBatchAction::Suspend => {
+        taskmanager_core::core::process::ProcessBatchAction::Suspend => {
             taskmanager_application::i18n::t("proc.suspend").to_owned()
         }
-        taskmanager_application::ProcessBatchAction::Resume => {
+        taskmanager_core::core::process::ProcessBatchAction::Resume => {
             taskmanager_application::i18n::t("proc.resume").to_owned()
         }
-        taskmanager_application::ProcessBatchAction::SetPriority(tier) => format!(
+        taskmanager_core::core::process::ProcessBatchAction::SetPriority(tier) => format!(
             "{} ({})",
             taskmanager_application::i18n::t("proc.priority"),
             crate::presentation::priority_tier_label(tier)

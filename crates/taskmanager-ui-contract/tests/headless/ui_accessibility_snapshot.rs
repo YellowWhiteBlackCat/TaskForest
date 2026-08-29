@@ -87,6 +87,32 @@ fn builder_minimal_tree_without_graph_or_status_still_validates() {
 }
 
 #[test]
+fn structural_process_group_rows_publish_tree_state_without_fake_metrics() {
+    let snapshot = SemanticSnapshotBuilder::new(8)
+        .process_group_row(ProcessGroupRowInput {
+            id: String::from("category:application"),
+            name: String::from("Applications (2)"),
+            expanded: true,
+            selected: true,
+        })
+        .process_row(sample_rows()[0].clone())
+        .build()
+        .expect("structural row must validate");
+
+    let group = snapshot
+        .get(&SemanticNodeId::owned("group-row:category:application"))
+        .expect("group TreeItem present");
+    assert_eq!(group.role(), SemanticRole::TreeItem);
+    assert_eq!(group.name(), Some("Applications (2)"));
+    assert_eq!(group.state().selected, Some(true));
+    assert_eq!(group.state().expanded, Some(true));
+    assert!(group.supports_action(SemanticAction::Focus));
+    assert!(group.supports_action(SemanticAction::Select));
+    assert!(group.supports_action(SemanticAction::Collapse));
+    assert!(!group.supports_action(SemanticAction::Expand));
+}
+
+#[test]
 fn unavailable_process_scalars_are_spoken_as_unavailable_not_zero() {
     let snapshot = SemanticSnapshotBuilder::new(4)
         .process_row(ProcessRowInput {

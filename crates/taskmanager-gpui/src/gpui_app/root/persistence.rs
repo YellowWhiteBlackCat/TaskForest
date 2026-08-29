@@ -6,19 +6,19 @@ use gpui::Pixels;
 
 use super::graph_options::normalize_graph_data_points;
 use super::{PROC_COL_MAX_WIDTH, PROC_COL_MIN_WIDTH, RootView, page_token};
-use crate::core::config::{
-    ColumnWidthConfig, Config, DENSITY_COMFORTABLE, DENSITY_COMPACT, ProcessViewPresetConfig,
-};
 use crate::gpui_app::dashboard::DashboardState;
 use crate::gpui_app::dashboard::saved_view_transfer::{
     hidden_from_tokens, hidden_tokens, preset_from_config, preset_to_config, sort_from_token,
     sort_token,
 };
-use crate::gpui_app::processes_view::rows::{SortCol, is_resizable};
-use crate::gpui_app::theme::{
-    FONT_MISANS_VF, FONT_ROBOTO_MONO, FontChoice, FontPreference, tokens::RowDensity,
+use crate::gpui_app::processes_view::rows::is_resizable;
+use taskmanager_core::core::config::{
+    ColumnWidthConfig, Config, DENSITY_COMFORTABLE, DENSITY_COMPACT, ProcessViewPresetConfig,
 };
+use taskmanager_shell::SortCol;
 use taskmanager_shell::SortDir;
+use taskmanager_theme::tokens::RowDensity;
+use taskmanager_theme::{FONT_MISANS_VF, FONT_ROBOTO_MONO, FontChoice, FontPreference};
 
 fn saved_views_to_config(dashboard: &DashboardState) -> Vec<ProcessViewPresetConfig> {
     dashboard
@@ -189,7 +189,7 @@ pub(super) fn config_from_view(view: &RootView) -> Config {
         // selectable subpixel/grayscale token would claim a renderer change
         // that never happened; keep the stored state honest until the API is
         // available in the dependency we ship.
-        text_rendering: crate::core::config::TEXT_RENDERING_PLATFORM_DEFAULT.to_string(),
+        text_rendering: taskmanager_core::core::config::TEXT_RENDERING_PLATFORM_DEFAULT.to_string(),
         startup_page: presentation.startup_page.to_string(),
         show_cpu: devices.cpu,
         show_memory: devices.memory,

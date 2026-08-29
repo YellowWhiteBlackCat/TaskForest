@@ -1,6 +1,8 @@
 //! Correlated shell and desktop-appearance events appended to the bounded `PlatformEventBatch`.
 
-use super::super::{DesktopAppearanceEvent, SetupScriptEvent, ShellEvent};
+use taskmanager_core::core::setup::SetupScriptEvent;
+
+use super::super::{DesktopAppearanceEvent, ShellEvent};
 use super::{CorrelatedEvent, PlatformEventBatch, PlatformEventContext};
 
 pub type CorrelatedShellEvent = CorrelatedEvent<ShellEvent>;

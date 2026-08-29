@@ -1,4 +1,6 @@
-use taskmanager_application::{FailureKind, ProviderId};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 use super::*;
 

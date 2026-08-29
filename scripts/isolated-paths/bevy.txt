@@ -1,0 +1,32 @@
+# bevy 行足迹清单:本行拥有/改动的路径(git pathspec,每行一条)。
+# verify-isolated.sh 以此为界把本行未提交差异隔离到 HEAD worktree 验证。
+# 行足迹扩大时同步维护;共享 crate(shell/ui-contract/application/core)
+# 的改动若进入本线,也必须列在这里,使隔离验证携带全部本线事实。
+#
+# 本行 cargo 包(test/clippy 的构建范围):
+package: taskmanager-bevy-ui
+package: taskmanager-assets
+package: taskmanager-icons
+crates/taskmanager-assets
+crates/taskmanager-bevy-ui
+crates/taskmanager-icons
+crates/taskmanager-ui-contract
+# shell 只携带本行消费的 presentation 面(trend/gpu 图表接缝,ADR-027):
+# 整个 shell 的未提交 diff 还混着依赖新 core 的告警重构,不携带。
+crates/taskmanager-shell/Cargo.toml
+crates/taskmanager-shell/src/presentation.rs
+crates/taskmanager-shell/src/presentation/trend.rs
+crates/taskmanager-shell/src/presentation/gpu_chart_metric.rs
+crates/taskmanager-shell/src/presentation/gpu_engine_rows.rs
+crates/taskmanager-shell/tests/headless/presentation_trend_tests.rs
+packaging/regenerate-ui-icons.sh
+scripts/bevy_interaction_matrix.tsv
+scripts/accept-bevy-interactions.sh
+scripts/capture-bevy.sh
+scripts/capture_bevy_scenarios.tsv
+scripts/quality/local-gates.sh
+scripts/quality/bevy_bsn_guard.py
+scripts/validate_bevy_matrix.py
+docs/BEVY_UI_FRONTEND.md
+locales/en.json
+locales/zh.json

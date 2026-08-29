@@ -60,6 +60,8 @@ fn route(message: Message) -> MessageDomain {
         message @ (Message::Tick
         | Message::Key(_)
         | Message::ModifiersChanged(_)
+        | Message::PointerPressed
+        | Message::TextSelectionClaimed(_)
         | Message::SearchBackspace
         | Message::Focus(_)) => MessageDomain::Input(message),
 
@@ -165,7 +167,6 @@ fn route(message: Message) -> MessageDomain {
         // `reduce_performance_message` (no shell effect).
         | Message::SystemDashboard(_)
         | Message::ToggleGpuEngines
-        | Message::SelectGpuChartMetric(_)
         | Message::ToggleDirectoryUsageScan
         | Message::ToggleHistoryReplay
         | Message::SelectHistoryReplayWindow(_)

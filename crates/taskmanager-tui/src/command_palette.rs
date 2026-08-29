@@ -1,5 +1,48 @@
-//! Searchable command palette: the filterable keyboard reference and its
-//! executable actions (ADR-027 frontend-local surface).
+//! Searchable command palette and the TUI-local binding registry (ADR-027
+//! frontend-local surface).
+//!
+//! # The registry layers (who owns which chord)
+//!
+//! 1. **Shell layer** — `taskmanager_shell::route_key` plus
+//!    [`taskmanager_shell::shell_local_bindings`] own the shared commands and
+//!    the five shell-local characters (`q` `?` `s` `S` `T`). The TUI refines
+//!    their *execution* (identity-preserving sort, palette-instead-of-help)
+//!    but never re-declares those chords; the only TUI-side chord→action map
+//!    for them is [`terminal_local_action`].
+//! 2. **This registry** — [`TUI_LOCAL_COMMANDS`] owns every TUI-local
+//!    command chord. It is the single authority for the help rows, the
+//!    palette rows, AND the direct keyboard dispatch (the `direct` arms below
+//!    are what `runtime::keys` executes). A chord may appear in layer 1 or
+//!    layer 2, never both; the binding-matrix test enforces the disjointness.
+//! 3. **Surface-modal protocol** — action-semantic character chords consumed
+//!    only while a modal surface owns input. [`TUI_SURFACE_PROTOCOL`] is
+//!    their single typed declaration source: the settings form's `p i h c`,
+//!    the About/Health/Containers overlays' `i h c`, and the open service-log
+//!    panel's `f p l t`. They never appear in help/palette — they are input
+//!    protocol of the open surface, not commands.
+//!    *Hard boundary against layers 1-2:* this layer is consulted at the top
+//!    of the modal precedence, above shell and registry dispatch, so a chord
+//!    declared both here and in a command layer can never double-route: the
+//!    owning surface consumes it first and the command layer never sees it
+//!    (the surface-protocol tests lock that masking invariant). The inverse
+//!    direction is deliberate partial ownership: full-modal surfaces consume
+//!    every key while up, while the service-log panel consumes only its
+//!    declared chords and falls the rest through to the command layers.
+//!    Structural surface-lifecycle keys (Esc, Enter, Tab/arrow navigation,
+//!    the panel's `q` close) stay hand-written at their dispatch sites and
+//!    are deliberately not declared here; the same holds for the pure
+//!    navigation/text protocols (action menus, palette editing,
+//!    Process-Properties). The painted footer hints of these surfaces are the
+//!    one presentation lane derived from this layer: [`TUI_SURFACE_HINTS`]
+//!    cites each protocol arm it paints (a parity test pins hint ⇄ protocol
+//!    coherence), while a structural key folded into a painted token (the
+//!    overlays' `/ Esc` glyph, the panel's localized `Esc closes` prefix)
+//!    and the unpainted structural `q` close stay outside both tables.
+//! 4. **Contextual gestures** — always-conditional moves with no command
+//!    identity (name-prefix jump letters, `r`/`R` source retry, the
+//!    AppHistory window digits, `F1`/`F9`, `Tab`). Deliberately outside the
+//!    registry; each stays in exactly one hand-written dispatch arm in
+//!    `runtime::keys`.
 //!
 //! `?` opens the palette (replacing the static help overlay): typing narrows
 //! the keybinding rows, Enter runs the selected row's action, Esc closes. The
@@ -7,11 +50,12 @@
 //! the TUI-local bindings (executed through [`PaletteLocalAction`]), so the
 //! palette is a true command entry point for the whole keyboard surface, not
 //! just the shared commands. Extracted from `lib.rs` so no crate-root file
-//! exceeds the source line budget; behavior unchanged — every method stays
-//! reachable on `TuiApp` (impl blocks may live in any module of the defining
-//! crate), and the types stay reachable at `crate::CommandPalette` /
-//! `crate::CommandPaletteRow` / `crate::PaletteLocalAction` via `pub use`.
+//! exceeds the source line budget; every method stays reachable on `TuiApp`
+//! (impl blocks may live in any module of the defining crate), and the types
+//! stay reachable at `crate::CommandPalette` / `crate::CommandPaletteRow` /
+//! `crate::PaletteLocalAction` via `pub use`.
 
+use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage, CommandId, PlatformEffect};
 use taskmanager_shell::QuitReason;
 
@@ -41,6 +85,7 @@ pub enum PaletteLocalAction {
     Quit,
     ToggleHelp,
     CycleSortColumn,
+    ToggleSortDirection,
     ToggleSuggestions,
     ToggleSettings,
     ToggleAbout,
@@ -53,7 +98,640 @@ pub enum PaletteLocalAction {
     CopyClipboard,
     OpenServiceLog,
     ToggleDirectoryScan,
+    /// `g` on the Performance·GPU page: cycles the headline chart metric.
+    ToggleGpuChartMetric,
+    /// `t` on the Performance·Disk page: arms the shared SMART self-test
+    /// confirmation gate (the platform request stays gated behind `y`).
+    RequestSmartSelfTest,
 }
+
+/// The typed direct-dispatch lane: what a TUI-local command DOES when its
+/// declared chord is pressed on the keyboard. [`TUI_LOCAL_COMMANDS`] is the
+/// single authority binding a shortcut to these actions; `runtime::keys`
+/// resolves the pressed chord through the registry and executes the first
+/// armed arm, so a hand-written `match` on a registry chord there is drift.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TuiDirectAction {
+    ToggleSettings,
+    ToggleAbout,
+    ToggleHealth,
+    ToggleContainers,
+    ExportSnapshot,
+    /// Digits `1`-`7` select the Performance resource the digit names.
+    SelectPerfResource,
+    /// `Enter` opens the selected row's action menu / properties.
+    OpenServiceMenu,
+    OpenSessionMenu,
+    OpenStartupMenu,
+    OpenProcessProperties,
+    ToggleColumnMenu,
+    ToggleMarkedProcess,
+    ToggleBatchMenu,
+    CopyClipboard,
+    OpenProcessMenu,
+    OpenServiceLog,
+    /// `e` on an escalation-ready Applications insight (G-04b).
+    RequestNetworkEscalation,
+    /// `e` on the Performance·GPU page.
+    ToggleGpuEngineRows,
+    /// `g` cycles the GPU headline chart metric (ADR-034 stage 2).
+    CycleGpuChartMetric,
+    /// `d` on the Performance·Disk page.
+    ToggleDirectoryScan,
+    /// `t` on the Performance·Disk page: arms the shared SMART self-test
+    /// confirmation gate (TUI-013). The confirm `y` emits the typed effect.
+    RequestSmartSelfTest,
+}
+
+/// Where (and under which modifier policy) a direct arm is armed. Declared as
+/// data so the binding-matrix test pins each command's scope; the guard
+/// implementation lives beside the executor in `runtime::keys`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TuiDirectScope {
+    /// Any page, any modifiers — the shell's own characters already had their
+    /// chance in the precedence order.
+    Anywhere,
+    /// Applications page; Ctrl/Alt refused (chorded variants stay unwired).
+    ApplicationsPage,
+    /// [`TuiDirectScope::ApplicationsPage`] plus the insights panel reporting
+    /// the typed `RequiresEscalation` network facet (G-04b).
+    ApplicationsEscalationReady,
+    /// The page's selected row offers an action target; Enter opens it.
+    /// Modifier-less by contract (the historical behavior ignores chords).
+    RowTarget(AppPage),
+    /// Performance page, bare digit (Shift passes; Ctrl/Alt/platform refused).
+    PerformanceResourceDigit,
+    /// Services page with the log panel closed (the panel owns keys while up).
+    ServicesPageLogClosed,
+    /// Performance page viewing the GPU device; Ctrl/Alt refused.
+    PerformanceGpuPage,
+    /// Performance page viewing the Disk device; Ctrl/Alt refused.
+    PerformanceDiskPage,
+    /// [`TuiDirectScope::PerformanceDiskPage`] plus a snapshot disk whose
+    /// provider reports `SmartAvailability::Available` — the disk the gate
+    /// freezes as its target (TUI-013).
+    PerformanceDiskSmartReady,
+}
+
+/// One executable arm of a registry command: scope guard + action. A command
+/// with several context-sensitive executions (the page-scoped `Enter`, the
+/// dual-personality `e`) declares one arm per context; the first armed arm
+/// wins, so arm order inside an entry is precedence.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TuiDirectArm {
+    pub(crate) scope: TuiDirectScope,
+    pub(crate) action: TuiDirectAction,
+}
+
+/// The registry's display token for the row-target (`Enter`) command; the
+/// content-level Enter resolver answers exactly this row.
+pub(crate) const ROW_TARGET_SHORTCUT: &str = "Enter";
+/// The registry's display token for the Performance resource digit range; the
+/// digit resolver answers exactly this row.
+pub(crate) const RESOURCE_DIGITS_SHORTCUT: &str = "1-7";
+
+/// One TUI-local shortcut together with the two execution lanes the command
+/// palette and the direct key router use for it.  Help rows, palette rows and
+/// the direct dispatch all derive from this one table; a row that is
+/// discoverable but intentionally not palette-executable carries
+/// `None` explicitly (for example the context-sensitive `m` and `e`
+/// gestures), and every entry wires at least one [`TuiDirectArm`] so an
+/// advertised chord always executes.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TuiLocalCommand {
+    pub(crate) binding: taskmanager_shell::LocalBinding,
+    pub(crate) palette_action: Option<PaletteLocalAction>,
+    /// Direct-dispatch arms, tried in order (first armed arm wins).
+    pub(crate) direct: &'static [TuiDirectArm],
+}
+
+/// The complete TUI-local binding registry.  The direct key router resolves
+/// every chord here — declaration and execution are one authority.
+pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 17] = [
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "p",
+            label: "Settings",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleSettings),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::Anywhere,
+            action: TuiDirectAction::ToggleSettings,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "i",
+            label: "About / system info",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleAbout),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::Anywhere,
+            action: TuiDirectAction::ToggleAbout,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "h",
+            label: "System health & alerts",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleHealth),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::Anywhere,
+            action: TuiDirectAction::ToggleHealth,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "c",
+            label: "Containers",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleContainers),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::Anywhere,
+            action: TuiDirectAction::ToggleContainers,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "x",
+            label: "Export snapshot",
+        },
+        palette_action: Some(PaletteLocalAction::ExportSnapshot),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::Anywhere,
+            action: TuiDirectAction::ExportSnapshot,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: ROW_TARGET_SHORTCUT,
+            label: "Service actions (Services page)",
+        },
+        palette_action: None,
+        direct: &[
+            TuiDirectArm {
+                scope: TuiDirectScope::RowTarget(AppPage::Services),
+                action: TuiDirectAction::OpenServiceMenu,
+            },
+            TuiDirectArm {
+                scope: TuiDirectScope::RowTarget(AppPage::Users),
+                action: TuiDirectAction::OpenSessionMenu,
+            },
+            TuiDirectArm {
+                scope: TuiDirectScope::RowTarget(AppPage::Startup),
+                action: TuiDirectAction::OpenStartupMenu,
+            },
+            TuiDirectArm {
+                scope: TuiDirectScope::RowTarget(AppPage::Applications),
+                action: TuiDirectAction::OpenProcessProperties,
+            },
+        ],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: RESOURCE_DIGITS_SHORTCUT,
+            label: "Performance resource (Performance page)",
+        },
+        palette_action: None,
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::PerformanceResourceDigit,
+            action: TuiDirectAction::SelectPerfResource,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "C",
+            label: "Columns (Applications page)",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleColumnMenu),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::ApplicationsPage,
+            action: TuiDirectAction::ToggleColumnMenu,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "m",
+            label: "Mark process for batch control (Applications page)",
+        },
+        palette_action: None,
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::ApplicationsPage,
+            action: TuiDirectAction::ToggleMarkedProcess,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "B",
+            label: "Batch actions on marked processes (Applications page)",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleBatchMenu),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::ApplicationsPage,
+            action: TuiDirectAction::ToggleBatchMenu,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "y",
+            label: "Copy selected pid+name to clipboard (Applications page)",
+        },
+        palette_action: Some(PaletteLocalAction::CopyClipboard),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::ApplicationsPage,
+            action: TuiDirectAction::CopyClipboard,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "a",
+            label: "Process actions · open location / search (Applications page)",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleProcessMenu),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::ApplicationsPage,
+            action: TuiDirectAction::OpenProcessMenu,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "o",
+            label: "Service logs (Services)",
+        },
+        palette_action: Some(PaletteLocalAction::OpenServiceLog),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::ServicesPageLogClosed,
+            action: TuiDirectAction::OpenServiceLog,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "e",
+            label: "GPU engines (Performance·GPU) · network escalate (process)",
+        },
+        palette_action: None,
+        direct: &[
+            TuiDirectArm {
+                scope: TuiDirectScope::ApplicationsEscalationReady,
+                action: TuiDirectAction::RequestNetworkEscalation,
+            },
+            TuiDirectArm {
+                scope: TuiDirectScope::PerformanceGpuPage,
+                action: TuiDirectAction::ToggleGpuEngineRows,
+            },
+        ],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "d",
+            label: "Directory usage scan (Performance·Disk)",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleDirectoryScan),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::PerformanceDiskPage,
+            action: TuiDirectAction::ToggleDirectoryScan,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "t",
+            label: "SMART self-test (Performance·Disk)",
+        },
+        palette_action: Some(PaletteLocalAction::RequestSmartSelfTest),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::PerformanceDiskSmartReady,
+            action: TuiDirectAction::RequestSmartSelfTest,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "g",
+            label: "GPU chart metric (Performance·GPU)",
+        },
+        palette_action: Some(PaletteLocalAction::ToggleGpuChartMetric),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::PerformanceGpuPage,
+            action: TuiDirectAction::CycleGpuChartMetric,
+        }],
+    },
+];
+
+// ── Surface-protocol registry (layer 3) ───────────────────────────────────
+
+/// Which owning surface a protocol chord is consumed by. Declared as data so
+/// the surface-protocol matrix can pin each scope's exact chord set; the
+/// consumption rule (full-modal surfaces swallow every key, the service-log
+/// panel only its declared chords) lives beside the dispatch in
+/// `runtime::modals` and `runtime::handle_settings_key`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TuiSurfaceScope {
+    /// The settings form modal (`runtime::handle_settings_key`).
+    Settings,
+    /// The three status overlays (About / Health / Containers), which share
+    /// one toggle protocol in `runtime::modals`.
+    StatusOverlay,
+    /// The Services-page service-log panel: a partial owner whose unclaimed
+    /// chords fall through to the command layers.
+    ServiceLogPanel,
+}
+
+/// What a surface-protocol chord DOES while its surface owns input. The
+/// overlay toggles run the very methods the global registry's direct arms
+/// run, so a chord can never mean one thing as a command and another inside
+/// a modal; the service-log transitions stay owned by the shell.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum TuiSurfaceAction {
+    /// `p` inside the settings form self-closes it (the toggle precedent).
+    ToggleSettings,
+    ToggleAbout,
+    ToggleHealth,
+    ToggleContainers,
+    /// `f` on the service-log panel: toggle tail follow.
+    ToggleServiceLogFollow,
+    /// `p` on the service-log panel: toggle feed pause — the panel outranks
+    /// the global settings command of the same chord.
+    ToggleServiceLogPaused,
+    /// `l` on the service-log panel: cycle the level filter.
+    CycleServiceLogLevel,
+    /// `t` on the service-log panel: cycle the time filter.
+    CycleServiceLogTime,
+}
+
+/// One declared protocol arm: `chord` runs `action` while `scope` owns
+/// input. Modifiers are deliberately not part of the declaration — the open
+/// surface claims its chords chorded or bare (the historical behavior this
+/// table preserves verbatim).
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TuiSurfaceArm {
+    pub(crate) scope: TuiSurfaceScope,
+    pub(crate) chord: char,
+    pub(crate) action: TuiSurfaceAction,
+}
+
+/// The typed single authority for every action-semantic surface-protocol
+/// chord: `p i h c` inside the settings form, `i h c` inside the
+/// About/Health/Containers overlays, `f p l t` on the open service-log
+/// panel. A hand-written `match` on one of these chords in
+/// `runtime::modals` / `runtime::handle_settings_key` is drift. Structural
+/// keys (Esc, Enter, Tab/arrows, the panel's `q` close) stay hand-written at
+/// their dispatch sites and must never appear here — the matrix pins the
+/// bare-lowercase-letter shape that enforces it. See the module header for
+/// the hard masking contract against the command layers.
+pub(crate) const TUI_SURFACE_PROTOCOL: [TuiSurfaceArm; 11] = [
+    // Settings form: the overlay toggles keep switching surfaces from inside
+    // the modal; `p` self-closes.
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::Settings,
+        chord: 'p',
+        action: TuiSurfaceAction::ToggleSettings,
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::Settings,
+        chord: 'i',
+        action: TuiSurfaceAction::ToggleAbout,
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::Settings,
+        chord: 'h',
+        action: TuiSurfaceAction::ToggleHealth,
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::Settings,
+        chord: 'c',
+        action: TuiSurfaceAction::ToggleContainers,
+    },
+    // The three status overlays share one toggle protocol.
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::StatusOverlay,
+        chord: 'i',
+        action: TuiSurfaceAction::ToggleAbout,
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::StatusOverlay,
+        chord: 'h',
+        action: TuiSurfaceAction::ToggleHealth,
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::StatusOverlay,
+        chord: 'c',
+        action: TuiSurfaceAction::ToggleContainers,
+    },
+    // The service-log panel's control chords (its `q`/Esc close stays
+    // structural, in `runtime::modals`).
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::ServiceLogPanel,
+        chord: 'f',
+        action: TuiSurfaceAction::ToggleServiceLogFollow,
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::ServiceLogPanel,
+        chord: 'p',
+        action: TuiSurfaceAction::ToggleServiceLogPaused,
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::ServiceLogPanel,
+        chord: 'l',
+        action: TuiSurfaceAction::CycleServiceLogLevel,
+    },
+    TuiSurfaceArm {
+        scope: TuiSurfaceScope::ServiceLogPanel,
+        chord: 't',
+        action: TuiSurfaceAction::CycleServiceLogTime,
+    },
+];
+
+/// Resolve one pressed character against a surface's declared protocol.
+/// `None` means the chord is not part of that surface's protocol: a full
+/// modal then swallows it as a silent no-op, and the service-log panel lets
+/// it fall through to the command layers.
+#[must_use]
+pub(crate) fn surface_protocol_action(
+    scope: TuiSurfaceScope,
+    chord: char,
+) -> Option<TuiSurfaceAction> {
+    TUI_SURFACE_PROTOCOL
+        .into_iter()
+        .find(|arm| arm.scope == scope && arm.chord == chord)
+        .map(|arm| arm.action)
+}
+
+// ── Surface-footer hint vocabulary (layer 3 presentation) ─────────────────
+
+/// The footer hint of one declared protocol arm: the painted chord token plus
+/// the i18n catalog key and exact spacing of its label. Every entry cites the
+/// protocol `(scope, chord, action)` triple it presents, so a painted hint can
+/// never name a chord the protocol does not declare (the parity test pins the
+/// citation). The vocabulary feeds the shared `KeyHint` component — the same
+/// shape [`crate::bindings::MenuHint`] gives the action menus.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct TuiSurfaceHint {
+    pub(crate) scope: TuiSurfaceScope,
+    /// The declared protocol chord this hint paints. A structural close key
+    /// folded into a token (the overlays' `/ Esc` glyph) stays out of
+    /// [`TUI_SURFACE_PROTOCOL`]; only the painted glyph carries it. Read by
+    /// the coherence test to re-resolve the cited arm against the protocol
+    /// table; the painted footer goes through `token`.
+    #[cfg_attr(not(test), allow(dead_code))]
+    pub(crate) chord: char,
+    pub(crate) action: TuiSurfaceAction,
+    /// The chord token exactly as painted (padding is part of the glyph).
+    pub(crate) token: &'static str,
+    /// The shared i18n catalog key of the label text.
+    pub(crate) label_key: &'static str,
+    /// Spacing painted before / after the resolved label — part of the pinned
+    /// footer bytes (the health footer's tail separates the protocol hint from
+    /// the shell-layer `T` hint span that follows it).
+    pub(crate) label_prefix: &'static str,
+    pub(crate) label_suffix: &'static str,
+}
+
+impl TuiSurfaceHint {
+    /// The rendered `(token, label)` pair shaped for the `KeyHint` component.
+    fn pair(self) -> (&'static str, String) {
+        (
+            self.token,
+            format!(
+                "{}{}{}",
+                self.label_prefix,
+                t(self.label_key),
+                self.label_suffix
+            ),
+        )
+    }
+}
+
+/// The footer-hint vocabulary of the surface-protocol scopes: the About /
+/// Health / Containers overlays' close footers and the service-log panel's
+/// title control run derive their chord/label pairs from this one table,
+/// cross-pinned to [`TUI_SURFACE_PROTOCOL`]. The settings scope deliberately
+/// has no entries — the settings form owns its own footer copy, and its
+/// `p i h c` protocol arms are not advertised in a footer.
+pub(crate) const TUI_SURFACE_HINTS: [TuiSurfaceHint; 7] = [
+    // The three status overlays: each paints its own toggle chord, with the
+    // structural Esc close folded into the painted token (never declared in
+    // the protocol table above).
+    TuiSurfaceHint {
+        scope: TuiSurfaceScope::StatusOverlay,
+        chord: 'i',
+        action: TuiSurfaceAction::ToggleAbout,
+        token: " i / Esc ",
+        label_key: "chrome.close",
+        label_prefix: "  ",
+        label_suffix: "",
+    },
+    TuiSurfaceHint {
+        scope: TuiSurfaceScope::StatusOverlay,
+        chord: 'h',
+        action: TuiSurfaceAction::ToggleHealth,
+        token: " h / Esc ",
+        label_key: "chrome.close",
+        label_prefix: "  ",
+        // The health footer appends the shell-layer `T` hint span after the
+        // label; this tail is the pinned gap between the two.
+        label_suffix: "   ",
+    },
+    TuiSurfaceHint {
+        scope: TuiSurfaceScope::StatusOverlay,
+        chord: 'c',
+        action: TuiSurfaceAction::ToggleContainers,
+        token: " c / Esc ",
+        label_key: "chrome.close",
+        label_prefix: "  ",
+        label_suffix: "",
+    },
+    // The service-log panel's title control run: `chord label · …` over its
+    // four declared action chords. The structural "Esc closes" prefix stays
+    // with the panel renderer (its own catalog key), and the panel's `q`
+    // close stays unpainted, exactly as dispatched.
+    TuiSurfaceHint {
+        scope: TuiSurfaceScope::ServiceLogPanel,
+        chord: 'f',
+        action: TuiSurfaceAction::ToggleServiceLogFollow,
+        token: "f",
+        label_key: "tui.surface.hint_follow",
+        label_prefix: " ",
+        label_suffix: " · ",
+    },
+    TuiSurfaceHint {
+        scope: TuiSurfaceScope::ServiceLogPanel,
+        chord: 'p',
+        action: TuiSurfaceAction::ToggleServiceLogPaused,
+        token: "p",
+        label_key: "tui.surface.hint_pause",
+        label_prefix: " ",
+        label_suffix: " · ",
+    },
+    TuiSurfaceHint {
+        scope: TuiSurfaceScope::ServiceLogPanel,
+        chord: 'l',
+        action: TuiSurfaceAction::CycleServiceLogLevel,
+        token: "l",
+        label_key: "tui.surface.hint_level",
+        label_prefix: " ",
+        label_suffix: " · ",
+    },
+    TuiSurfaceHint {
+        scope: TuiSurfaceScope::ServiceLogPanel,
+        chord: 't',
+        action: TuiSurfaceAction::CycleServiceLogTime,
+        token: "t",
+        label_key: "tui.surface.hint_time",
+        label_prefix: " ",
+        label_suffix: "",
+    },
+];
+
+/// The footer hint pairs `scope` paints for `action`'s declared protocol arm,
+/// in table order (exactly one pair for every declared entry). An undeclared
+/// action yields an empty run — honest absence, unreachable for a live
+/// overlay because the parity test pins every painted scope's arms.
+#[must_use]
+pub(crate) fn surface_hint_pairs(
+    scope: TuiSurfaceScope,
+    action: TuiSurfaceAction,
+) -> Vec<(&'static str, String)> {
+    TUI_SURFACE_HINTS
+        .into_iter()
+        .filter(|hint| hint.scope == scope && hint.action == action)
+        .map(TuiSurfaceHint::pair)
+        .collect()
+}
+
+/// The concatenated `chord label · …` control-hint run of a partial owner's
+/// declared protocol arms (the service-log panel's title suffix). The
+/// structural close copy stays with the calling surface.
+#[must_use]
+pub(crate) fn surface_hint_run(scope: TuiSurfaceScope) -> String {
+    TUI_SURFACE_HINTS
+        .into_iter()
+        .filter(|hint| hint.scope == scope)
+        .map(|hint| {
+            let (token, label) = hint.pair();
+            format!("{token}{label}")
+        })
+        .collect()
+}
+
+/// Shared commands safe to invoke from the command palette.  Destructive
+/// actions and direction-key commands stay out of the palette because their
+/// direct context/confirmation path is the only honest target.
+pub(crate) const PALETTE_SHARED_COMMANDS: [CommandId; 14] = [
+    CommandId::ShowPerformance,
+    CommandId::ShowApplications,
+    CommandId::ShowServices,
+    CommandId::ShowSystem,
+    CommandId::ShowStartup,
+    CommandId::ShowUsers,
+    CommandId::ShowAppHistory,
+    CommandId::Refresh,
+    CommandId::OpenProperties,
+    CommandId::ShowSystemAbout,
+    CommandId::TogglePause,
+    CommandId::FocusSearch,
+    CommandId::MoveToFirst,
+    CommandId::MoveToLast,
+];
 
 /// The open command palette: the filter text and the cursor over the FILTERED
 /// row list.
@@ -71,28 +749,9 @@ impl TuiApp {
     /// [`AppAction`]; local rows carry `None` and are shown for discovery only.
     #[must_use]
     pub fn palette_rows() -> Vec<CommandPaletteRow> {
-        // Shared router commands with an action that is safe to run from the
-        // palette (no direction keys — the keyboard moves the cursor directly —
-        // no dialog Confirm, no destructive End-task).
-        let executable: &[CommandId] = &[
-            CommandId::ShowPerformance,
-            CommandId::ShowApplications,
-            CommandId::ShowServices,
-            CommandId::ShowSystem,
-            CommandId::ShowStartup,
-            CommandId::ShowUsers,
-            CommandId::ShowAppHistory,
-            CommandId::Refresh,
-            CommandId::OpenProperties,
-            CommandId::ShowSystemAbout,
-            CommandId::TogglePause,
-            CommandId::FocusSearch,
-            CommandId::MoveToFirst,
-            CommandId::MoveToLast,
-        ];
-        let mut rows: Vec<CommandPaletteRow> = crate::command_help()
+        let mut rows: Vec<CommandPaletteRow> = taskmanager_shell::presentation::command_help()
             .into_iter()
-            .filter(|help| executable.contains(&help.command))
+            .filter(|help| crate::command_palette::PALETTE_SHARED_COMMANDS.contains(&help.command))
             .map(|help| CommandPaletteRow {
                 shortcut: help.shortcut,
                 label: help.label,
@@ -105,7 +764,7 @@ impl TuiApp {
         // TUI runs itself, so the palette is a true command entry point for
         // the whole keyboard surface. The prefix jump and the F1 alias are
         // discoverable only (`None`).
-        for binding in crate::shell_local_bindings() {
+        for binding in taskmanager_shell::shell_local_bindings() {
             rows.push(CommandPaletteRow {
                 shortcut: binding.shortcut,
                 label: binding.label,
@@ -113,12 +772,12 @@ impl TuiApp {
                 local_action: terminal_local_action(binding.shortcut),
             });
         }
-        for binding in crate::ui::help::TUI_LOCAL_BINDINGS {
+        for command in TUI_LOCAL_COMMANDS {
             rows.push(CommandPaletteRow {
-                shortcut: binding.shortcut,
-                label: binding.label,
+                shortcut: command.binding.shortcut,
+                label: command.binding.label,
                 action: None,
-                local_action: tui_local_action(binding.shortcut),
+                local_action: command.palette_action,
             });
         }
         rows.push(CommandPaletteRow {
@@ -147,8 +806,8 @@ impl TuiApp {
         Self::palette_rows()
             .into_iter()
             .filter(|row| {
-                taskmanager_application::text::contains_ascii_ci(row.shortcut, filter)
-                    || taskmanager_application::text::contains_ascii_ci(row.label, filter)
+                taskmanager_core::core::text::contains_ascii_ci(row.shortcut, filter)
+                    || taskmanager_core::core::text::contains_ascii_ci(row.label, filter)
             })
             .collect()
     }
@@ -234,6 +893,25 @@ impl TuiApp {
         None
     }
 
+    /// Execute one declared [`TuiSurfaceAction`] (layer 3 of the registry).
+    /// The overlay toggles are the same methods the direct arms and the
+    /// palette run, so a protocol chord can never diverge from its command
+    /// twin; the service-log transitions stay owned by the shell. Mirrors
+    /// [`Self::run_palette_local_action`] as the single execution site of
+    /// its lane.
+    pub(crate) fn run_surface_protocol_action(&mut self, action: TuiSurfaceAction) {
+        match action {
+            TuiSurfaceAction::ToggleSettings => self.toggle_settings(),
+            TuiSurfaceAction::ToggleAbout => self.toggle_about(),
+            TuiSurfaceAction::ToggleHealth => self.toggle_health(),
+            TuiSurfaceAction::ToggleContainers => self.toggle_containers(),
+            TuiSurfaceAction::ToggleServiceLogFollow => self.shell.toggle_service_log_follow(),
+            TuiSurfaceAction::ToggleServiceLogPaused => self.shell.toggle_service_log_paused(),
+            TuiSurfaceAction::CycleServiceLogLevel => self.shell.cycle_service_log_level(),
+            TuiSurfaceAction::CycleServiceLogTime => self.shell.cycle_service_log_time(),
+        }
+    }
+
     /// Run one TUI-local palette action (the local row the user selected).
     /// Maps back onto the same TUI bindings the keyboard uses, so the palette
     /// never executes anything the direct keys do not.
@@ -244,11 +922,34 @@ impl TuiApp {
                 self.shell.request_quit(QuitReason::CommandPalette);
             }
             Some(PaletteLocalAction::ToggleHelp) => self.toggle_help(),
-            Some(PaletteLocalAction::CycleSortColumn) => {
-                if self.page() == AppPage::Applications {
-                    self.cycle_sort_column_visible();
+            Some(PaletteLocalAction::CycleSortColumn) => match self.page() {
+                AppPage::Applications => self.cycle_sort_column_visible(),
+                AppPage::Services => self.cycle_info_sort_column_preserving_anchor(
+                    taskmanager_shell::InfoTable::Services,
+                ),
+                AppPage::Startup => self.cycle_info_sort_column_preserving_anchor(
+                    taskmanager_shell::InfoTable::Startup,
+                ),
+                AppPage::Users => self
+                    .cycle_info_sort_column_preserving_anchor(taskmanager_shell::InfoTable::Users),
+                AppPage::Performance | AppPage::System | AppPage::AppHistory => {}
+            },
+            Some(PaletteLocalAction::ToggleSortDirection) => match self.page() {
+                AppPage::Applications => {
+                    self.toggle_sort_direction();
+                    self.persist_process_prefs();
                 }
-            }
+                AppPage::Services => self.toggle_info_sort_direction_preserving_anchor(
+                    taskmanager_shell::InfoTable::Services,
+                ),
+                AppPage::Startup => self.toggle_info_sort_direction_preserving_anchor(
+                    taskmanager_shell::InfoTable::Startup,
+                ),
+                AppPage::Users => self.toggle_info_sort_direction_preserving_anchor(
+                    taskmanager_shell::InfoTable::Users,
+                ),
+                AppPage::Performance | AppPage::System | AppPage::AppHistory => {}
+            },
             Some(PaletteLocalAction::ToggleSuggestions) => self.shell.toggle_suggestions(),
             Some(PaletteLocalAction::ToggleSettings) => self.toggle_settings(),
             Some(PaletteLocalAction::ToggleAbout) => self.toggle_about(),
@@ -277,45 +978,42 @@ impl TuiApp {
             {
                 let _ = self.toggle_directory_scan();
             }
+            Some(PaletteLocalAction::ToggleGpuChartMetric)
+                if self.page() == AppPage::Performance
+                    && self.perf_device == crate::PerfDevice::Gpu =>
+            {
+                self.cycle_gpu_chart_metric();
+            }
+            // The SMART arm additionally refuses a snapshot without a
+            // SMART-capable disk — the same readiness the direct scope
+            // demands — so the palette can never arm a gate with no target.
+            Some(PaletteLocalAction::RequestSmartSelfTest)
+                if self.page() == AppPage::Performance
+                    && self.perf_device == crate::PerfDevice::Disk =>
+            {
+                let _ = self.arm_smart_self_test();
+            }
             None
             | Some(PaletteLocalAction::OpenServiceLog)
-            | Some(PaletteLocalAction::ToggleDirectoryScan) => {}
+            | Some(PaletteLocalAction::ToggleDirectoryScan)
+            | Some(PaletteLocalAction::ToggleGpuChartMetric)
+            | Some(PaletteLocalAction::RequestSmartSelfTest) => {}
         }
     }
 }
 
-/// Map a terminal-only shortcut (from
-/// [`crate::shell_local_bindings`]) to its executable palette action.
+/// Map a terminal-only shortcut (from [`taskmanager_shell::shell_local_bindings`]) to its
+/// executable palette action. This is the ONLY chord→action mapping for the
+/// shell-owned characters (registry layer 1): the TUI never re-declares them,
+/// it only records how the palette re-runs them locally.
 fn terminal_local_action(shortcut: &str) -> Option<PaletteLocalAction> {
     use PaletteLocalAction;
     match shortcut {
         "q" => Some(PaletteLocalAction::Quit),
         "?" => Some(PaletteLocalAction::ToggleHelp),
-        "s" | "S" => Some(PaletteLocalAction::CycleSortColumn),
+        "s" => Some(PaletteLocalAction::CycleSortColumn),
+        "S" => Some(PaletteLocalAction::ToggleSortDirection),
         "T" => Some(PaletteLocalAction::ToggleSuggestions),
-        _ => None,
-    }
-}
-
-/// Map a TUI-local shortcut (from [`crate::ui::help::TUI_LOCAL_BINDINGS`]) to
-/// its executable palette action. `m` (mark the current row) and `e`
-/// (context-sensitive escalation) are deliberately not executable from the
-/// palette: they are table/device-scoped gestures over the current cursor
-/// or projection, which a modal palette has no meaningful target for.
-fn tui_local_action(shortcut: &str) -> Option<PaletteLocalAction> {
-    use PaletteLocalAction;
-    match shortcut {
-        "p" => Some(PaletteLocalAction::ToggleSettings),
-        "i" => Some(PaletteLocalAction::ToggleAbout),
-        "h" => Some(PaletteLocalAction::ToggleHealth),
-        "c" => Some(PaletteLocalAction::ToggleContainers),
-        "x" => Some(PaletteLocalAction::ExportSnapshot),
-        "C" => Some(PaletteLocalAction::ToggleColumnMenu),
-        "B" => Some(PaletteLocalAction::ToggleBatchMenu),
-        "y" => Some(PaletteLocalAction::CopyClipboard),
-        "a" => Some(PaletteLocalAction::ToggleProcessMenu),
-        "o" => Some(PaletteLocalAction::OpenServiceLog),
-        "d" => Some(PaletteLocalAction::ToggleDirectoryScan),
         _ => None,
     }
 }

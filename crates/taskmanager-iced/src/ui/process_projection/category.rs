@@ -120,7 +120,7 @@ fn push_application_trees(
             rows,
             &group,
             GroupHeaderInput {
-                row_key: Some(ProcessRowKey::Application(group.main_pid)),
+                row_key: ProcessRowId::application_of(root.item),
                 name: group.name.clone(),
                 expansion_key,
                 expanded,
@@ -142,7 +142,7 @@ fn push_application_trees(
 }
 
 struct GroupHeaderInput<'a> {
-    row_key: Option<ProcessRowKey>,
+    row_key: Option<ProcessRowId>,
     name: String,
     expansion_key: String,
     expanded: bool,

@@ -8,7 +8,8 @@
 use std::sync::Arc;
 use std::{error, fmt};
 
-use taskmanager_application::{CapabilityId, PlatformHandle};
+use taskmanager_application::PlatformHandle;
+use taskmanager_platform_contract::CapabilityId;
 
 use crate::channel::{ChannelRuntime, RuntimeLanes};
 use crate::delivery::RuntimeEventPublisher;

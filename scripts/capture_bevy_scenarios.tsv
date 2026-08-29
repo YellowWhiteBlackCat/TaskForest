@@ -2,6 +2,8 @@ name	page	window_size
 applications	applications	1180x780
 performance	performance	1180x780
 services	services	1180x780
+service-logs	service-logs	1180x780
+system	system	1180x780
 startup	startup	1180x780
 users	users	1180x780
 alerts	alerts	1180x780
@@ -10,6 +12,8 @@ app-history	app-history	1180x780
 applications-compact	applications	720x480
 performance-compact	performance	720x480
 services-compact	services	720x480
+service-logs-compact	services	720x480
+system-compact	system	720x480
 startup-compact	startup	720x480
 users-compact	users	720x480
 alerts-compact	alerts	720x480

@@ -10,7 +10,9 @@
 | Bevy | TaskForestB | `io.github.YellowWhiteBlackCat.TaskForestB` |
 | TUI | TaskForest | 终端进程，无桌面 app id |
 
-GPUI 是当前发行包形态。Iced 与 TUI 支持源码构建；Bevy 是实验性前端，不进入发行包。
+GPUI 是当前发行包形态。Iced、TUI 与 Bevy 支持源码构建；Bevy 走独立二进制
+`taskforest-b`（由 `scripts/build-frontend-binaries.sh` 构建），成熟度口径见
+[BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md)，不进入发行包矩阵。
 
 ## 程序与兼容名称
 

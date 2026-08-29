@@ -1,7 +1,8 @@
 //! Per-event row-snapshot parity for the canonical category tree.
 
 use super::super::*;
-use taskmanager_application::{AppPage, ScalarObservation};
+use taskmanager_application::AppPage;
+use taskmanager_core::core::metrics::ScalarObservation;
 
 fn fixture_app() -> TuiApp {
     let mut processes = vec![
@@ -16,10 +17,12 @@ fn fixture_app() -> TuiApp {
             .build(),
     ];
     for process in &mut processes {
-        process.apply_scalar_observations(taskmanager_application::ProcessScalarObservations {
-            start_token: ScalarObservation::available(u64::from(process.pid), 42),
-            ..Default::default()
-        });
+        process.apply_scalar_observations(
+            taskmanager_core::core::process::ProcessScalarObservations {
+                start_token: ScalarObservation::available(u64::from(process.pid), 42),
+                ..Default::default()
+            },
+        );
     }
     let mut app = TuiApp::from_shell(ShellApp::new());
     taskmanager_shell::fixture::seed_projection_fact(

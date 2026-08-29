@@ -11,9 +11,9 @@ use gpui::{
     AnyElement, App, Div, Entity, InteractiveElement, IntoElement, ListSizingBehavior,
     ParentElement, Styled, UniformListScrollHandle, Window, div, px, uniform_list,
 };
-use taskmanager_application::{
-    ApplicationHistoryProjection, ApplicationHistoryStatus, HistoryWindow,
-};
+use taskmanager_application::{ApplicationHistoryProjection, ApplicationHistoryStatus};
+use taskmanager_core::core::history::HistoryWindow;
+
 use taskmanager_ui::data::row::DataRow;
 use taskmanager_ui::layout::pinned_scroll_region;
 use taskmanager_ui::primitives::segmented::{Segment, Segmented};
@@ -24,8 +24,9 @@ use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::{LayoutProfile, PageLayoutBudget};
-use crate::gpui_app::theme::{Color, Theme, tokens};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, Theme};
 
 const TREND_W: f32 = 160.0;
 const PROCESS_PEAK_W: f32 = 104.0;

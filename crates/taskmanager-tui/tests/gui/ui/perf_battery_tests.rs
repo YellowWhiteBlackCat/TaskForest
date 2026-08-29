@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_application::{BatteryInfo, PowerSupplySnapshot};
+use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
 
 /// A battery whose charge-% history has >=2 samples renders a real sparkline
 /// (a ramp block) on its trend line; a battery with no history renders the
@@ -10,15 +10,15 @@ fn battery_trend_line_matches_that_batterys_own_history_window() {
     // samples. Batteries live on the power event, not the system snapshot.
     let mut shell = taskmanager_shell::ShellApp::new();
     let mut battery = BatteryInfo::new("BAT0", Default::default());
-    battery.apply_scalar_observations(taskmanager_application::BatteryScalarObservations {
-        capacity_pct: taskmanager_application::ScalarObservation::available(80, 1),
+    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
+        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(80, 1),
         ..Default::default()
     });
     let snapshot = PowerSupplySnapshot {
         batteries: vec![battery],
         ..PowerSupplySnapshot::default()
     };
-    let system = taskmanager_application::SystemSnapshot::default();
+    let system = taskmanager_core::core::metrics::SystemSnapshot::default();
     taskmanager_shell::fixture::record_demo_history_frame(
         &mut shell,
         &system,
@@ -43,7 +43,7 @@ fn battery_trend_line_matches_that_batterys_own_history_window() {
     // The trend line in battery_lines is line index 1 (right after header).
     let known = battery_lines(
         &[BatteryInfo::new("BAT0", Default::default())],
-        history,
+        &shell,
         TuiTheme::default(),
         60,
     );
@@ -60,7 +60,7 @@ fn battery_trend_line_matches_that_batterys_own_history_window() {
     // A battery the history has never seen renders the dotted placeholder.
     let cold = battery_lines(
         &[BatteryInfo::new("BAT9", Default::default())],
-        history,
+        &shell,
         TuiTheme::default(),
         60,
     );

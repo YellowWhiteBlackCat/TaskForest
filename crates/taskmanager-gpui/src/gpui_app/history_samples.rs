@@ -8,10 +8,10 @@ use taskmanager_telemetry_store::{
     DeviceMetricHistory, DynamicTelemetryHistory,
 };
 
-use crate::core::{DeviceGeneration, DeviceId, GpuEngineMetricPoint, GpuMetrics};
 use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
+use taskmanager_core::core::{DeviceGeneration, DeviceId, GpuEngineMetricPoint, GpuMetrics};
 
 /// Which device-history family a cached sample vector was derived from.
 ///

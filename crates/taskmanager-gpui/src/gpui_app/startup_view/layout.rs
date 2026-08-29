@@ -2,12 +2,13 @@
 
 use gpui::{AnyElement, Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
 
-use crate::core::startup::StartupBootEvidenceSnapshot;
 use crate::gpui_app::list_view;
 use crate::gpui_app::root::responsive::{LayoutProfile, PageLayoutBudget, VerticalSpace};
-use crate::gpui_app::theme::{Theme, tokens};
+use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_theme::Theme;
 
 use super::boot_evidence::boot_timeline_block;
+use taskmanager_theme::tokens;
 
 const STARTUP_TABLE_MIN_HEIGHT: f32 = 168.0;
 const STARTUP_TIMELINE_SIDE_WIDTH: f32 = 480.0;
@@ -85,7 +86,7 @@ impl StartupPageBudget {
 pub(super) fn compose_content(
     theme: &Theme,
     evidence: Option<&StartupBootEvidenceSnapshot>,
-    baseline: Option<&crate::core::BootTimeline>,
+    baseline: Option<&taskmanager_core::core::BootTimeline>,
     layout: StartupPageBudget,
     primary: Div,
 ) -> AnyElement {

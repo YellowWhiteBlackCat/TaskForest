@@ -1,9 +1,9 @@
 use super::{HistoryWindow, TimelineMetric, TimelineSelection, TimelineState, TimelineStatistic};
-use crate::core::{
-    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, FailureKind, ScalarObservation,
-};
 use std::rc::Rc;
 use std::sync::Arc;
+use taskmanager_core::core::{
+    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, FailureKind, ScalarObservation,
+};
 use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryIngestor, CorrelatedTelemetryStamp, TelemetryStore,
 };

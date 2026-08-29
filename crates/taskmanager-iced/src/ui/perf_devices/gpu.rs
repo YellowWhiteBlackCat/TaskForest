@@ -2,9 +2,10 @@
 
 use super::*;
 use iced::Element;
-use taskmanager_application::{GpuMetrics, SystemSnapshot};
+use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
+
 use taskmanager_shell::presentation::{
-    device_status_i18n_key, gpu_display_identity, missing_value,
+    bytes, device_status_i18n_key, gpu_display_identity, missing_value,
 };
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
@@ -272,7 +273,7 @@ pub(crate) fn gpu_section(
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let snapshot = app.shell.projection().snapshot.as_ref();
     let theme_snapshot = app.theme();
-    let color = theme::color(theme_snapshot.gpu);
+    let color = taskmanager_theme::iced::color(theme_snapshot.gpu);
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let rows = match (gpu_section_state(snapshot), snapshot) {
         (tables::ListState::Loading, _) => {

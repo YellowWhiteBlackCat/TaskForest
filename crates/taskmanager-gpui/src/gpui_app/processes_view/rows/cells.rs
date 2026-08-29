@@ -1,23 +1,26 @@
 //! Body column cells and the per-row context menu for the process table.
 
-use super::{SortCol, VisibleRow, default_width};
+use super::{VisibleRow, default_width};
 use gpui::{
     AnyElement, App, Div, ElementId, Entity, IntoElement, ParentElement, Pixels, Stateful, Styled,
     div, px,
 };
 use std::collections::{HashMap, HashSet};
 use std::rc::Rc;
+use taskmanager_shell::SortCol;
 
 use taskmanager_ui::overlays::context_menu::ContextMenuExt;
 use taskmanager_ui::overlays::popup::PopupMenuState;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{self, RootView};
-use crate::gpui_app::theme::{Color, Theme, mono_font_with_fallback, tokens::UiSize};
-use crate::i18n;
+use crate::gpui_app::theme::mono_font_with_fallback;
+use taskmanager_application::i18n;
 use taskmanager_shell::ProcessStatusFilter;
+use taskmanager_theme::tokens::UiSize;
+use taskmanager_theme::{Color, Theme};
 
-use crate::gpui_app::theme::tokens;
+use taskmanager_theme::tokens;
 
 fn numeric_cell(theme: &Theme, text: String, color: Color, ui_size: UiSize) -> Div {
     div()

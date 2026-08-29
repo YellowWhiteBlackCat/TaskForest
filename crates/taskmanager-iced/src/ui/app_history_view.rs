@@ -6,10 +6,11 @@ use crate::app_history_chart::{SPARK_HEIGHT, Sparkline};
 use crate::{focus, theme};
 use iced::Length;
 use iced::widget::{canvas, column, container, row, scrollable, text};
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use std::rc::Rc;
-use taskmanager_application::{ApplicationHistoryRow, ApplicationHistoryStatus, HistoryWindow};
+use taskmanager_application::{ApplicationHistoryRow, ApplicationHistoryStatus};
+use taskmanager_core::core::history::HistoryWindow;
+use taskmanager_shell::presentation::bytes;
+
 use taskmanager_theme::tokens;
 
 #[derive(Clone)]
@@ -37,14 +38,10 @@ fn app_history_table_body(
 }
 
 fn app_history_table_key(generation: u64, theme_snapshot: &taskmanager_theme::Theme) -> u64 {
-    let mut hasher = DefaultHasher::new();
-    generation.hash(&mut hasher);
-    theme_snapshot.skin.label().hash(&mut hasher);
-    theme_snapshot.mode.label().hash(&mut hasher);
-    theme_snapshot.dark.hash(&mut hasher);
-    theme_snapshot.hc.hash(&mut hasher);
-    theme_snapshot.ui_font.hash(&mut hasher);
-    hasher.finish()
+    super::lazy_key::LazyKey::new("app-history-table")
+        .revision(generation)
+        .theme(theme_snapshot)
+        .finish()
 }
 
 pub(super) fn app_history_page(
@@ -87,7 +84,7 @@ pub(super) fn app_history_page(
     );
     let model = AppHistoryTableModel {
         rows: Rc::clone(&history_model.rows),
-        accent: theme::color(theme_snapshot.palette().accent),
+        accent: taskmanager_theme::iced::color(theme_snapshot.palette().accent),
         window,
     };
     let key = virtual_table_key(

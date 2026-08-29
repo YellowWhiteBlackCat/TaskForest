@@ -1,5 +1,5 @@
 use super::{DeviceStatus, SourceStateKind, source_state_color, state_color};
-use crate::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 /// Parity: the badge's render input is exactly the neutral VM's kind. The
 /// reroute through `SourceStateKind` must reproduce the historical tone

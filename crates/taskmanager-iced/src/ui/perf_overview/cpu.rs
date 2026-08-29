@@ -2,11 +2,11 @@
 
 use iced::widget::{column, progress_bar, text};
 use iced::{Element, Length};
-use taskmanager_application::CpuTemperatureSource;
 use taskmanager_application::i18n::t;
-use taskmanager_shell::history::MetricSeries;
+use taskmanager_core::core::metrics::CpuTemperatureSource;
 use taskmanager_shell::presentation::graph_summary;
 use taskmanager_shell::presentation::missing_value;
+use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_theme::tokens;
 
 use super::projection::{CpuHeadlineKind, CpuHeadlineMetric, CpuHeadlineValue};
@@ -70,10 +70,16 @@ pub(super) fn cpu_headline_label_value(
 }
 
 /// The shared headline-chart height floor (GPUI `MAIN_GRAPH_MIN_HEIGHT`
-/// parity): a headline chart inside a scrolling strip frame keeps this
+/// parity, raised to GPUI's actual ~276px presence at a 780px window —
+/// ICED-024-7): a headline chart inside a scrolling strip frame keeps this
 /// readable fixed height; fixed-viewport frames hand the chart the column's
 /// remaining height instead.
-pub(super) const HEADLINE_CHART_FLOOR: f32 = 180.0;
+pub(super) const HEADLINE_CHART_FLOOR: f32 = 240.0;
+
+/// The fixed headline-tier height when the per-core matrix shares the first
+/// viewport (GPUI CPU page composition, ICED-024-7/8): the tier is pinned so
+/// the core grid composes on screen instead of being pushed below the fold.
+pub(super) const HEADLINE_CHART_PRESENCE: f32 = 300.0;
 
 pub(super) fn gauge(
     title: &'static str,
@@ -90,9 +96,10 @@ pub(super) fn gauge(
 }
 
 pub(crate) fn percent_text(title: &str, value: Option<f32>) -> String {
+    // GPUI gauge parity: integer percent with a space before the unit.
     value.map_or_else(
         || format!("{title} —"),
-        |value| format!("{title} {value:>5.1}%"),
+        |value| format!("{title} {value:.0} %"),
     )
 }
 
@@ -102,8 +109,8 @@ pub(super) fn utilization_graph_summary_elements(
     app: &crate::IcedApp,
 ) -> Vec<Element<'static, Message, iced::Theme, iced::Renderer>> {
     let mut lines = Vec::new();
-    let cpu_series = app.cached_metric_series(MetricSeries::CpuUsagePercent);
-    let memory_series = app.cached_metric_series(MetricSeries::MemoryUsagePercent);
+    let cpu_series = app.cached_metric_series(TrendSeries::CpuUsagePercent);
+    let memory_series = app.cached_metric_series(TrendSeries::MemoryUsagePercent);
     push_graph_summary(&mut lines, t("common.cpu"), &cpu_series, |value| {
         format!("{value:.0}%")
     });

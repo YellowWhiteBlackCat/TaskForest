@@ -1,14 +1,11 @@
 use super::{ShellApp, SortCol, SortDir};
 use crate::sort_axis;
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
+use taskmanager_core::core::process::ProcessItem;
 use taskmanager_test_support::{SortFixtureMetrics, sort_fixture_row, sort_parity_fixture};
 
-fn neutral_pids(
-    items: &[taskmanager_application::ProcessItem],
-    axis: ProcessSortAxis,
-    ascending: bool,
-) -> Vec<u32> {
-    let mut sorted: Vec<&taskmanager_application::ProcessItem> = items.iter().collect();
+fn neutral_pids(items: &[ProcessItem], axis: ProcessSortAxis, ascending: bool) -> Vec<u32> {
+    let mut sorted: Vec<&ProcessItem> = items.iter().collect();
     sorted.sort_by(|left, right| compare_processes(left, right, axis, ascending));
     sorted.iter().map(|process| process.pid).collect()
 }
@@ -88,7 +85,7 @@ fn visible_processes_pin_absolute_converged_orders() {
 /// two different names (21/23 at 7.0); an EMPTY user (22 — `user` is a
 /// plain string, so the empty string is the missing-user spelling); and
 /// start-time (21/22) plus threads (21/23) ties crossing the rows.
-fn variance_fixture() -> Vec<taskmanager_application::ProcessItem> {
+fn variance_fixture() -> Vec<ProcessItem> {
     vec![
         sort_fixture_row(
             21,

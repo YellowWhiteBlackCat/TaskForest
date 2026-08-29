@@ -1,7 +1,9 @@
 use super::super::*;
-use taskmanager_application::{
-    CapabilityId, CorrelatedEvent, EventSequence, FailureKind, OperationFailure,
-    PlatformEventContext, ProcessEvent, ProviderFailure, ProviderId, RequestId,
+use taskmanager_application::{CorrelatedEvent, PlatformEventContext, ProcessEvent};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_platform_contract::{
+    CapabilityId, EventSequence, OperationFailure, ProviderFailure, RequestId,
 };
 
 fn process_snapshot_batch(sequence: u64) -> PlatformEventBatch {

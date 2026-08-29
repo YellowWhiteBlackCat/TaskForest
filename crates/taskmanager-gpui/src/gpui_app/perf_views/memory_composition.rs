@@ -5,12 +5,12 @@ use gpui::InteractiveElement;
 use gpui::{Div, ParentElement, Styled, div, px, relative};
 use taskmanager_ui_contract::IconId;
 
-use crate::core::metrics::MemoryMetrics;
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{self, DisplayUnits, UnitKind};
-use crate::gpui_app::icons;
-use crate::gpui_app::theme::{Color, Theme, tokens, with_alpha};
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_core::core::metrics::MemoryMetrics;
+use taskmanager_theme::tokens;
+use taskmanager_theme::{Color, Theme, with_alpha};
 
 mod stats;
 use stats::{composition_labels, overview_stats, segment_shares, summary_tiles, swap_bar_stats};
@@ -254,7 +254,7 @@ pub(super) fn composition_block(theme: &Theme, memory: &MemoryMetrics, units: Di
                         .text_size(tokens::FONT_13)
                         .font_weight(tokens::FONT_WEIGHT_BOLD.into())
                         .text_color(theme.fg)
-                        .child(icons::icon(IconId::Performance).size(px(14.0)))
+                        .child(taskmanager_icons::icon(IconId::Performance).size(px(14.0)))
                         .child(i18n::t("mem.composition")),
                 )
                 .child(

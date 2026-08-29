@@ -2,8 +2,8 @@
 //! isolation), affinity, and control.
 
 use super::*;
-use taskmanager_application::{ProcessEnvironment, ProcessEnvironmentEntry};
 use taskmanager_core::ProcessResourceObservations;
+use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
 use taskmanager_platform_provider::ProcessEnvironmentProvider;
 
 impl ProcessListProvider for FakeProvider {

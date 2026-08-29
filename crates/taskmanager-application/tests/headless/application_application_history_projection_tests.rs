@@ -2,9 +2,11 @@ use std::sync::Arc;
 
 use super::*;
 use crate::{
-    ApplicationHistoryCapability, ApplicationHistoryIdentity, ApplicationHistoryStatus,
-    ApplicationHistoryUnavailableReason, HistoryMetric, HistoryReplayError, HistoryReplayErrorKind,
-    HistoryReplayRow, HistorySeriesKey, HistoryWindow,
+    ApplicationHistoryCapability, ApplicationHistoryStatus, ApplicationHistoryUnavailableReason,
+    HistoryReplayError, HistoryReplayErrorKind, HistoryReplayRow,
+};
+use taskmanager_core::core::history::{
+    ApplicationHistoryIdentity, HistoryMetric, HistorySeriesKey, HistoryWindow,
 };
 
 fn replay_row(

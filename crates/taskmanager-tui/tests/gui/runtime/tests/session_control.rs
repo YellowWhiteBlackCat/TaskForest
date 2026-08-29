@@ -65,7 +65,7 @@ fn session_menu_select_opens_confirmation_and_y_confirms_disconnect() {
     assert!(app.session_menu().is_none(), "the menu closes on pick");
     assert_eq!(
         app.shell.pending_session().map(|pending| pending.action),
-        Some(taskmanager_application::SessionControlAction::Disconnect)
+        Some(taskmanager_core::core::session::SessionControlAction::Disconnect)
     );
 
     // y confirms: the platform request is produced with the frozen target.
@@ -81,7 +81,7 @@ fn session_menu_select_opens_confirmation_and_y_confirms_disconnect() {
     };
     assert_eq!(
         target.action,
-        taskmanager_application::SessionControlAction::Disconnect
+        taskmanager_core::core::session::SessionControlAction::Disconnect
     );
     // The first demo session has id "2".
     assert_eq!(target.session_id.as_str(), "2");
@@ -122,9 +122,11 @@ fn session_confirmation_n_dismisses_without_a_platform_effect() {
 fn session_control_round_trip_submits_through_queue_effect() {
     use std::sync::{Arc, Mutex};
     use taskmanager_application::{
-        CapabilityCatalog, CapabilitySnapshot, EnvironmentFacets, EventEnvelope, EventPort,
-        EventPortError, PlatformEvent, PlatformFacets, PlatformHandle, RequestEnvelope,
-        RequestPort, SessionControlRequest, SubmissionError,
+        EnvironmentFacets, PlatformEvent, PlatformFacets, PlatformHandle, SessionControlRequest,
+    };
+    use taskmanager_platform_contract::{
+        CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
+        RequestEnvelope, RequestPort, SubmissionError,
     };
 
     #[derive(Default)]
@@ -207,7 +209,7 @@ fn session_control_round_trip_submits_through_queue_effect() {
     let request = &submitted[0];
     assert_eq!(
         request.action,
-        taskmanager_application::SessionControlAction::Disconnect,
+        taskmanager_core::core::session::SessionControlAction::Disconnect,
         "the menu's Disconnect pick must reach the provider"
     );
     assert_eq!(
@@ -233,7 +235,7 @@ fn menu_targets_the_sorted_session_row() {
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::Sessions(Some(vec![
-            taskmanager_application::SessionItem {
+            taskmanager_core::core::session::SessionItem {
                 id: "7".into(),
                 uid: 1000,
                 user: "zeta".into(),
@@ -242,7 +244,7 @@ fn menu_targets_the_sorted_session_row() {
                 remote: false,
                 timestamp: None,
             },
-            taskmanager_application::SessionItem {
+            taskmanager_core::core::session::SessionItem {
                 id: "3".into(),
                 uid: 1000,
                 user: "alpha".into(),
@@ -254,6 +256,9 @@ fn menu_targets_the_sorted_session_row() {
         ])),
     );
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
+    // Select alpha before sorting so identity retention intentionally leaves it
+    // highlighted after Name sort moves it to the first rendered row.
+    app.selected = 1;
     let _ = handle_key(
         &mut app,
         KeyEvent::new(

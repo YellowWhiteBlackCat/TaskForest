@@ -100,7 +100,7 @@ impl IcedApp {
     /// resource (or no GPU) is viewed — the shell fold then leaves the
     /// selection untouched (ADR-034 stage 2).
     #[must_use]
-    pub fn viewed_gpu(&self) -> Option<&taskmanager_application::GpuMetrics> {
+    pub fn viewed_gpu(&self) -> Option<&taskmanager_core::core::metrics::GpuMetrics> {
         let index = match self.performance.selected_device {
             PerfDevice::Gpu(index) => index,
             _ => return None,

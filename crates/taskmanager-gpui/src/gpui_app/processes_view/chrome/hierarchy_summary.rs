@@ -8,8 +8,8 @@ use gpui::{App, Div, Entity, InteractiveElement, ParentElement, Window, div};
 use taskmanager_ui::primitives::segmented::{Segment, Segmented};
 
 use crate::gpui_app::root::{Hover, RootView};
-use crate::gpui_app::theme::Theme;
-use crate::i18n;
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
 
 pub(super) fn hierarchy_summary(
     theme: &Theme,

@@ -3,17 +3,20 @@ use std::thread;
 use std::time::Duration;
 
 use taskmanager_application::{
-    CapabilityId, PartialSourceSnapshot, PlatformEvent, ProcessAffinityEvent,
-    ProcessAffinityRequest, ProcessControlRequest, ProcessEnvironmentRequest, ProcessEvent,
-    ProcessInsightFacetEvent, ProcessInsightsRevision, ProcessListRequest, ProcessNetworkRequest,
-    ProcessOpenFilesRequest, ProcessThreadsRequest, ProviderId, RequestEnvelope, RequestId,
-    SourceOutcome, SourceStatus,
+    PlatformEvent, ProcessAffinityEvent, ProcessAffinityRequest, ProcessControlRequest,
+    ProcessEnvironmentRequest, ProcessEvent, ProcessInsightFacetEvent, ProcessInsightsRevision,
+    ProcessListRequest, ProcessNetworkRequest, ProcessOpenFilesRequest, ProcessThreadsRequest,
 };
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     DeviceState, FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult,
     ProcessBatchTargetResult, ProcessEnvironment, ProcessGpuSnapshot, ProcessIdentity,
     ProcessInsightSnapshot, ProcessIsolation, ProcessItem, ProcessNetworkSnapshot,
     ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreads, ResourceGroupLimitRequest,
+};
+use taskmanager_platform_contract::{
+    CapabilityId, PartialSourceSnapshot, RequestEnvelope, RequestId,
 };
 
 use super::*;
@@ -94,7 +97,7 @@ fn registered_process_provider(capability: &CapabilityId) -> ProviderId {
 }
 
 fn assert_registered_process_provider(
-    event: &taskmanager_application::EventEnvelope<PlatformEvent>,
+    event: &taskmanager_platform_contract::EventEnvelope<PlatformEvent>,
 ) {
     assert_eq!(
         event.provider,
@@ -383,7 +386,7 @@ fn frozen_process() -> FrozenProcessIdentity {
 
 fn wait_event(
     handle: &taskmanager_application::PlatformHandle,
-) -> taskmanager_application::EventEnvelope<PlatformEvent> {
+) -> taskmanager_platform_contract::EventEnvelope<PlatformEvent> {
     for _ in 0..100 {
         if let Some(event) = handle.events().try_recv().expect("connected event port") {
             return event;

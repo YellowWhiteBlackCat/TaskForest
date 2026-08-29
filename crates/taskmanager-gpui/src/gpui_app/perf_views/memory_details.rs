@@ -1,7 +1,7 @@
 //! Pure formatting for optional, platform-neutral memory detail rows.
 
-use crate::core::metrics::MemoryMetrics;
 use crate::gpui_app::formatting::{DisplayUnits, UnitKind};
+use taskmanager_core::core::metrics::MemoryMetrics;
 
 pub(super) fn virtual_memory_commit_readout(
     memory: &MemoryMetrics,
@@ -36,7 +36,7 @@ pub(super) fn compressed_swap_readout(
     match memory.current_compressed_swap_ratio() {
         Some(ratio) => Some(format!(
             "{readout} · {} {ratio:.1}:1",
-            crate::i18n::t("mem.compression_ratio")
+            taskmanager_application::i18n::t("mem.compression_ratio")
         )),
         None => Some(readout),
     }

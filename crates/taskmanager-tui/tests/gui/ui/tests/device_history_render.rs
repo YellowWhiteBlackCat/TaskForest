@@ -4,10 +4,13 @@
 //! Extracted as a small topic file so `device_render.rs` stays inside its
 //! line budget; each test asserts rendered text/state, never source text.
 
-use taskmanager_application::{
-    BatteryInfo, DeviceId, DeviceState, PowerSupplySnapshot, SensorCenterSnapshot,
-    SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
-    SmartAvailability,
+use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::SmartAvailability;
+use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
+use taskmanager_core::core::sensors::{
+    SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+    SensorReading, SensorScale,
 };
 
 use super::frame_text;
@@ -15,9 +18,9 @@ use super::frame_text;
 fn observed_battery() -> BatteryInfo {
     let mut battery = BatteryInfo::new("BAT0", DeviceState::healthy(1_000));
     battery.status = "Discharging".into();
-    battery.apply_scalar_observations(taskmanager_application::BatteryScalarObservations {
-        capacity_pct: taskmanager_application::ScalarObservation::available(80, 1_000),
-        power_w: taskmanager_application::ScalarObservation::available(9.5, 1_000),
+    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
+        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(80, 1_000),
+        power_w: taskmanager_core::core::metrics::ScalarObservation::available(9.5, 1_000),
         ..Default::default()
     });
     battery

@@ -16,8 +16,8 @@ fn projection_cache_app() -> crate::app::IcedApp {
         .current_cpu_percentage(24.8)
         .current_memory_bytes(2_640 * mib)
         .metadata_observations(
-            taskmanager_application::ProcessMetadataObservations::current(
-                taskmanager_application::ProcessOwner::opaque("devuser"),
+            taskmanager_core::core::process::ProcessMetadataObservations::current(
+                taskmanager_core::core::process::ProcessOwner::opaque("devuser"),
                 None,
                 1,
             ),
@@ -89,7 +89,7 @@ fn projection_cache_hits_on_unchanged_state_and_reuses_the_allocation() {
         app.shell.process_sort,
         &app.process_presentation.expanded_groups,
         &app.process_presentation.expanded_tree,
-        &taskmanager_application::LocalTimeRulesObservation::unsupported(0),
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     );
     let cached = app.projected_rows();
     assert_eq!(
@@ -246,7 +246,7 @@ fn services_projection_ignores_unrelated_process_revision() {
 #[test]
 fn unrelated_sidebar_state_preserves_every_projection_cache() {
     use std::rc::Rc;
-    use taskmanager_shell::history::MetricSeries;
+    use taskmanager_telemetry_store::live_graph::MetricSeries;
 
     let mut app = crate::IcedApp::demo();
     let mut process_history = crate::perf_history::ProcessPerfHistory::new(16);
@@ -254,7 +254,7 @@ fn unrelated_sidebar_state_preserves_every_projection_cache() {
     app.performance.process_history = Some(process_history);
 
     let process_perf = app.process_perf_series().unwrap().cpu;
-    let history = app.cached_metric_series(MetricSeries::CpuUsagePercent);
+    let history = app.cached_metric_series(taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent);
     let processes = app.projected_table_model().0;
     let app_history = app.projected_app_history_model();
     let services = app.services_projection("").0;
@@ -272,7 +272,7 @@ fn unrelated_sidebar_state_preserves_every_projection_cache() {
     ));
     assert!(Rc::ptr_eq(
         &history,
-        &app.cached_metric_series(MetricSeries::CpuUsagePercent)
+        &app.cached_metric_series(taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent)
     ));
     assert!(Rc::ptr_eq(&processes, &app.projected_table_model().0));
     assert!(Rc::ptr_eq(&app_history, &app.projected_app_history_model()));

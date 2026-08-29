@@ -1,7 +1,8 @@
 use taskmanager_platform_contract::{CapabilityRequest, RequestTracking};
 
 use super::*;
-use crate::{DeviceGeneration, DeviceId, StorageDeviceKey};
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::target::StorageDeviceKey;
 
 fn target(generation: u64, locator: &str) -> StorageDeviceTarget {
     StorageDeviceTarget {

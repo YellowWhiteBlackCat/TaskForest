@@ -5,7 +5,10 @@ use super::super::*;
 use taskmanager_application::AppAction;
 use taskmanager_application::ConfigStore;
 
-fn wait_for_config(app: &mut TuiApp, predicate: impl Fn(&taskmanager_application::Config) -> bool) {
+fn wait_for_config(
+    app: &mut TuiApp,
+    predicate: impl Fn(&taskmanager_core::core::config::Config) -> bool,
+) {
     for _ in 0..64 {
         let drain = app
             .config_client
@@ -40,7 +43,10 @@ fn pristine_first_launch_applies_defaults_without_a_recovery_notice() {
     app.shell.clear_feedback_notice();
     crate::ui::test_support::install_config_store(&mut app, dir.join("config.json"));
 
-    assert_eq!(app.config_draft, taskmanager_application::Config::default());
+    assert_eq!(
+        app.config_draft,
+        taskmanager_core::core::config::Config::default()
+    );
     assert!(app.shell.feedback_notice().is_none());
 
     drop(app);
@@ -368,20 +374,20 @@ fn device_visibility_preferences_filter_the_digit_selector() {
     let mut app = crate::demo_app();
     // Seed the demo with a battery and a fan so the full seven-resource rail
     // renders (the demo fixture carries neither).
-    let mut battery = taskmanager_application::BatteryInfo::new(
+    let mut battery = taskmanager_core::core::power::BatteryInfo::new(
         "battery:demo:BAT0",
-        taskmanager_application::DeviceState::healthy(1),
+        taskmanager_core::core::device_state::DeviceState::healthy(1),
     );
     battery.status = "Discharging".into();
-    battery.apply_scalar_observations(taskmanager_application::BatteryScalarObservations {
-        capacity_pct: taskmanager_application::ScalarObservation::available(80, 1),
+    battery.apply_scalar_observations(taskmanager_core::core::power::BatteryScalarObservations {
+        capacity_pct: taskmanager_core::core::metrics::ScalarObservation::available(80, 1),
         ..Default::default()
     });
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::PowerSupplies(Some(
-            taskmanager_application::PowerSupplySnapshot {
-                state: taskmanager_application::DeviceState::healthy(1),
+            taskmanager_core::core::power::PowerSupplySnapshot {
+                state: taskmanager_core::core::device_state::DeviceState::healthy(1),
                 timestamp_ms: 1,
                 batteries: vec![battery],
                 ..Default::default()
@@ -391,19 +397,19 @@ fn device_visibility_preferences_filter_the_digit_selector() {
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(
-            taskmanager_application::SensorCenterSnapshot {
-                state: taskmanager_application::DeviceState::healthy(1),
+            taskmanager_core::core::sensors::SensorCenterSnapshot {
+                state: taskmanager_core::core::device_state::DeviceState::healthy(1),
                 timestamp_ms: 1,
                 readings: vec![
-                    taskmanager_application::SensorReading::from_measurement_observation(
+                    taskmanager_core::core::sensors::SensorReading::from_measurement_observation(
                         "hwmon:demo:cpu".into(),
                         "fan1".into(),
                         "CPU Fan".into(),
-                        taskmanager_application::SensorMeasurementObservation::available(
-                            taskmanager_application::SensorDescriptor::fan_speed(
-                                taskmanager_application::SensorScale::IDENTITY,
+                        taskmanager_core::core::sensors::SensorMeasurementObservation::available(
+                            taskmanager_core::core::sensors::SensorDescriptor::fan_speed(
+                                taskmanager_core::core::sensors::SensorScale::IDENTITY,
                             ),
-                            taskmanager_application::SensorMagnitude::Unsigned(1200),
+                            taskmanager_core::core::sensors::SensorMagnitude::Unsigned(1200),
                             1,
                         )
                         .expect("valid fan fixture"),
@@ -523,7 +529,7 @@ fn startup_page_preference_opens_the_configured_page_at_launch() {
 
 #[test]
 fn graph_data_points_preference_scales_the_shared_history_store() {
-    use taskmanager_shell::history::MetricSeries;
+    use taskmanager_telemetry_store::live_graph::MetricSeries;
     // The applied preference drives the SHARED rolling store at the
     // composition edge (G-02): every headline/trend series the TUI renders
     // reads the shell `MetricHistory`, so the persisted graph window must
@@ -562,7 +568,10 @@ fn graph_data_points_preference_scales_the_shared_history_store() {
         point.timestamp_ms = 1_785_292_800_000 + tick;
         let mut observations = point.cpu.scalar_observations().clone();
         observations.global_usage_pct =
-            taskmanager_application::ScalarObservation::available(tick as f32, point.timestamp_ms);
+            taskmanager_core::core::metrics::ScalarObservation::available(
+                tick as f32,
+                point.timestamp_ms,
+            );
         point.cpu.apply_scalar_observations(observations);
         taskmanager_shell::fixture::record_demo_history_frame(&mut app.shell, &point, None, None);
     }

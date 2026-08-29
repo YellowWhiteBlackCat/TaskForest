@@ -6,6 +6,7 @@
 //! outside the toolkit.
 
 use taskmanager_application::{CorrelatedSystemTelemetryOutcome, SystemTelemetryDomain};
+
 use taskmanager_telemetry_store::{CorrelatedIngestionReport, CorrelatedSystemTelemetryIngestor};
 
 pub(super) type SystemHistoryIngestionError = taskmanager_shell::history::HistoryIngestionError;

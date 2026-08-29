@@ -3,16 +3,18 @@ use std::sync::{Arc, Mutex};
 
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityId, CapabilitySnapshot, CompositeSourceSnapshot, EventEnvelope,
-    EventPort, EventPortError, EventSequence, FailureKind, OperationFailure, ProviderFailure,
-    ProviderId, RequestEnvelope, RequestId, RequestPort, SourceOutcome, SourceStatus,
-    SubmissionError,
+    EventPort, EventPortError, EventSequence, OperationFailure, ProviderFailure, RequestEnvelope,
+    RequestId, RequestPort, SubmissionError,
 };
 
 use crate::platform::{
     DesktopAppearanceEvent, DesktopAppearanceRequest, IntegrationFacets, PlatformClient,
     PlatformEvent, PlatformFacets, PlatformHandle,
 };
-use crate::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 use super::submitted_at_ms;
 

@@ -1,6 +1,6 @@
 use super::*;
-use taskmanager_application::CpuMetrics;
-use taskmanager_application::alerts::NotificationPolicy;
+use taskmanager_core::core::alerts::NotificationPolicy;
+use taskmanager_core::core::metrics::CpuMetrics;
 
 impl ShellApp {
     pub(crate) fn apply_session_control_outcome(
@@ -96,6 +96,19 @@ mod on_demand_dispatch;
 mod process_control;
 #[path = "app/request_sessions.rs"]
 mod request_sessions;
+
+/// Resolve one demo process's validated row identity by pid (fixtures carry
+/// deterministic start tokens).
+fn identity_of(app: &crate::ShellApp, pid: u32) -> ProcessRowIdentity {
+    app.data
+        .processes
+        .as_deref()
+        .unwrap_or_default()
+        .iter()
+        .find(|process| process.pid == pid)
+        .and_then(ProcessRowIdentity::from_process)
+        .expect("demo process carries a current start token")
+}
 #[path = "app/row_summary.rs"]
 mod row_summary;
 #[path = "app/search_paste.rs"]
@@ -116,14 +129,24 @@ mod sort;
 mod source_status;
 
 use taskmanager_application::{
-    CapabilityId, CorrelatedDirectoryUsageEvent, CorrelatedEvent, CpuScalarObservations,
-    DeviceLifecyclePartition, DeviceSourceSnapshot, DirectoryScanId, DirectoryScanStatus,
-    DirectoryScanTotals, DirectoryUsageEvent, DirectoryUsageSnapshot, EventSequence, KeyCode,
-    Modifiers, PlatformEventContext, PowerSupplySnapshot, ProcessBatchAction, ProcessBatchIntent,
-    ProcessBatchResult, ProcessBatchTargetResult, ProviderId, RequestId, ScalarObservation,
-    SensorCenterSnapshot, SensorEvent, SessionControlAction, SessionControlOutcome, SourceOutcome,
-    SourceStatus, StartupControlOutcome,
+    CorrelatedDirectoryUsageEvent, CorrelatedEvent, DeviceLifecyclePartition, DirectoryUsageEvent,
+    KeyCode, Modifiers, PlatformEventContext, SensorEvent, SessionControlOutcome,
+    StartupControlOutcome,
 };
+use taskmanager_core::core::directory_usage::{
+    DirectoryScanId, DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageSnapshot,
+};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::{DeviceId, ProviderId};
+use taskmanager_core::core::metrics::{CpuScalarObservations, ScalarObservation};
+use taskmanager_core::core::power::PowerSupplySnapshot;
+use taskmanager_core::core::process::{
+    ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
+};
+use taskmanager_core::core::sensors::SensorCenterSnapshot;
+use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
+use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, EventSequence, RequestId};
 
 fn snapshot_with_cpu(cpu_usage: f32, timestamp_ms: u64) -> SystemSnapshot {
     SystemSnapshot {
@@ -137,11 +160,11 @@ fn snapshot_with_cpu(cpu_usage: f32, timestamp_ms: u64) -> SystemSnapshot {
 }
 
 /// A zero-duration CPU rule so the test fires on the first evaluation.
-fn instant_cpu_rule() -> taskmanager_application::alerts::AlertRule {
-    taskmanager_application::alerts::AlertRule::new(
+fn instant_cpu_rule() -> taskmanager_core::core::alerts::AlertRule {
+    taskmanager_core::core::alerts::AlertRule::new(
         "cpu-high",
-        taskmanager_application::alerts::AlertMetric::CpuUsagePercent,
-        taskmanager_application::alerts::AlertSeverity::Warning,
+        taskmanager_core::core::alerts::AlertMetric::CpuUsagePercent,
+        taskmanager_core::core::alerts::AlertSeverity::Warning,
         90.0,
         std::time::Duration::ZERO,
         0.0,
@@ -236,6 +259,46 @@ fn managed_rule_toggle_has_one_semantics_on_composed_and_direct_frontend_tracks(
 }
 
 #[test]
+fn alert_transition_history_is_identical_on_composed_and_direct_tracks() {
+    let mut composed = crate::ShellApp::new();
+    let mut direct = crate::DirectTrackState::default();
+    let edit = taskmanager_application::ManagedAlertRuleEdit::Import {
+        rules: vec![taskmanager_application::ManagedAlertRule::new(
+            instant_cpu_rule(),
+            true,
+        )],
+        mode: taskmanager_application::AlertRuleImportMode::Replace,
+    };
+    composed.edit_alert_rules(edit.clone()).unwrap();
+    direct.edit_alert_rules(edit).unwrap();
+
+    let high = snapshot_with_cpu(95.0, 100_000);
+    let low = snapshot_with_cpu(10.0, 200_000);
+    let _ = composed.evaluate_alerts(&high, 100_000);
+    let _ = direct.evaluate_alerts(&high, 100_000);
+    let _ = composed.evaluate_alerts(&low, 200_000);
+    let _ = direct.evaluate_alerts(&low, 200_000);
+
+    assert_eq!(
+        composed.projection().alert_center.event_history(),
+        direct.projection().alert_center.event_history(),
+        "both shell tracks must consume the same transition authority"
+    );
+    assert_eq!(composed.projection().alert_center.event_history().len(), 2);
+
+    composed.clear_alert_event_history();
+    direct.clear_alert_event_history();
+    assert!(
+        composed
+            .projection()
+            .alert_center
+            .event_history()
+            .is_empty()
+    );
+    assert!(direct.projection().alert_center.event_history().is_empty());
+}
+
+#[test]
 fn delete_uses_shared_reducer_and_never_executes_before_confirmation() {
     let mut app = crate::demo_app();
     app.application.active_page = AppPage::Applications;
@@ -250,13 +313,20 @@ fn delete_uses_shared_reducer_and_never_executes_before_confirmation() {
 
 #[test]
 fn legacy_process_row_cannot_open_or_confirm_a_dangerous_action() {
+    use taskmanager_core::core::metrics::ScalarObservation;
+    use taskmanager_core::core::process::ProcessScalarObservations;
+
     let mut app = ShellApp::new();
+    // Direct construction (not the fixture builder): this row deliberately
+    // carries NO provider start token — the legacy shape whose exact
+    // identity is unprovable and therefore must never arm a dangerous
+    // action (CORE-01 fail-closed rule).
     app.data.processes = Some(vec![
-        taskmanager_test_support::ProcessItemFixtureBuilder::new()
-            .pid(42)
-            .name("legacy-worker".to_owned())
-            .current_start_time_secs(7_500)
-            .build(),
+        taskmanager_core::core::process::ProcessItem::new(42, "legacy-worker")
+            .with_scalar_observations(ProcessScalarObservations {
+                start_time_secs: ScalarObservation::available(7_500, 1),
+                ..ProcessScalarObservations::default()
+            }),
     ]);
     app.application.active_page = AppPage::Applications;
 
@@ -314,7 +384,7 @@ fn session_control_completion_accepts_only_the_latest_intent() {
         request_id: second.request_id,
         session_id: second.session_id,
         action: second.action,
-        result: Err(taskmanager_application::FailureKind::PermissionDenied),
+        result: Err(FailureKind::PermissionDenied),
     });
     assert!(app.feedback_text().contains("failed"));
     assert!(app.feedback_text().contains("PermissionDenied"));
@@ -525,10 +595,11 @@ fn home_and_end_jump_to_the_visible_list_bounds() {
     // arrow semantics).
     assert!(app.select_row(0));
     assert!(app.toggle_row_selection(2));
-    assert_eq!(app.selected_pids().len(), 2);
+    assert_eq!(app.selected_identities().len(), 2);
     app.move_selection_to_last();
-    let anchor: std::collections::HashSet<u32> = std::iter::once(pids[pids.len() - 1]).collect();
-    assert_eq!(app.selected_pids(), &anchor);
+    let anchor: std::collections::HashSet<ProcessRowIdentity> =
+        std::iter::once(identity_of(&app, pids[pids.len() - 1])).collect();
+    assert_eq!(app.selected_identities(), &anchor);
 }
 
 #[test]
@@ -560,22 +631,28 @@ fn multi_select_toggle_extend_and_freeze_the_whole_set() {
 
     // Plain click collapses to a single anchor.
     assert!(app.select_row(0));
-    let one: std::collections::HashSet<u32> = std::iter::once(pids[0]).collect();
-    assert_eq!(app.selected_pids(), &one);
+    let one: std::collections::HashSet<ProcessRowIdentity> =
+        std::iter::once(identity_of(&app, pids[0])).collect();
+    assert_eq!(app.selected_identities(), &one);
 
     // Ctrl-click toggles a non-adjacent row into the set without losing the
     // anchor.
     assert!(app.toggle_row_selection(2));
     assert_eq!(app.selected, 2);
-    let two: std::collections::HashSet<u32> = [pids[0], pids[2]].into_iter().collect();
-    assert_eq!(app.selected_pids(), &two);
+    let two: std::collections::HashSet<ProcessRowIdentity> = [pids[0], pids[2]]
+        .iter()
+        .map(|&pid| identity_of(&app, pid))
+        .collect();
+    assert_eq!(app.selected_identities(), &two);
 
     // Shift-click grows a range from the anchor (2) to 4, folding in pids 2..=4.
     assert!(app.extend_row_selection(4));
     assert_eq!(app.selected, 4);
-    let grown: std::collections::HashSet<u32> =
-        [pids[0], pids[2], pids[3], pids[4]].into_iter().collect();
-    assert_eq!(app.selected_pids(), &grown);
+    let grown: std::collections::HashSet<ProcessRowIdentity> = [pids[0], pids[2], pids[3], pids[4]]
+        .iter()
+        .map(|&pid| identity_of(&app, pid))
+        .collect();
+    assert_eq!(app.selected_identities(), &grown);
 
     // The batch intent freezes the entire multi-select set (4 targets), not
     // just the keyboard anchor.
@@ -587,59 +664,73 @@ fn multi_select_toggle_extend_and_freeze_the_whole_set() {
     };
     assert_eq!(intent.action, ProcessBatchAction::Suspend);
     assert_eq!(intent.targets.len(), 4);
-    let frozen: std::collections::HashSet<u32> = intent.targets.iter().map(|id| id.pid).collect();
+    let frozen: std::collections::HashSet<ProcessRowIdentity> = intent
+        .targets
+        .iter()
+        .map(|id| identity_of(&app, id.pid))
+        .collect();
     assert_eq!(frozen, grown);
 
     // Toggling the anchor off drops exactly that pid.
     assert!(app.toggle_row_selection(4));
-    assert!(!app.selected_pids().contains(&pids[4]));
-    assert_eq!(app.selected_pids().len(), 3);
+    assert!(
+        !app.selected_identities()
+            .contains(&identity_of(&app, pids[4]))
+    );
+    assert_eq!(app.selected_identities().len(), 3);
 }
 
 #[test]
-fn selected_pids_range_spans_the_display_order_between_two_pids() {
+fn selected_rows_range_spans_the_display_order_between_two_identities() {
     // The demo's visible order (sorted); the range must follow that order,
     // not the pid order.
     let app = crate::demo_app();
     let rows = app.visible_processes();
-    let first = rows[0].pid;
-    let third = rows[2].pid;
+    let first = identity_of(&app, rows[0].pid);
+    let third = identity_of(&app, rows[2].pid);
 
     // Forward range: anchor → end.
-    let forward = selected_pids_range(&rows, first, third);
+    let forward = selected_rows_range(&rows, first, third);
     assert_eq!(forward.len(), 3, "the range spans anchor..=end");
     assert_eq!(forward[0], first);
     assert_eq!(forward[2], third);
 
     // Reverse range: end before anchor spans the same rows.
-    let reverse = selected_pids_range(&rows, third, first);
+    let reverse = selected_rows_range(&rows, third, first);
     assert_eq!(reverse.len(), 3);
     assert_eq!(reverse[0], first, "the range follows display order");
     assert_eq!(reverse[2], third);
 
-    // A stale end pid degenerates to the single pid (never a panic).
-    let stale = selected_pids_range(&rows, first, u32::MAX);
-    assert_eq!(stale, vec![u32::MAX]);
+    // A stale end identity degenerates to the single identity (never a panic).
+    let stale_id = ProcessRowIdentity::from_parts(u32::MAX, 1).expect("non-zero parts");
+    let stale = selected_rows_range(&rows, first, stale_id);
+    assert_eq!(stale, vec![stale_id]);
 }
 
 #[test]
-fn toggle_selected_pid_flips_one_pid_without_an_index() {
+fn toggle_selected_identity_flips_one_row_without_an_index() {
     let mut app = crate::demo_app();
     app.application.active_page = AppPage::Applications;
     let pids: Vec<u32> = app.visible_processes().iter().map(|p| p.pid).collect();
 
-    // Toggle on, then off — the pid-level API flips the same way the
+    // Toggle on, then off — the identity-level API flips the same way the
     // index-based path does, so a grouped/tree frontend can mark a row it
-    // resolved to a pid without touching the flat projection.
-    app.toggle_selected_pid(pids[0]);
-    assert!(app.selected_pids().contains(&pids[0]));
-    app.toggle_selected_pid(pids[0]);
-    assert!(!app.selected_pids().contains(&pids[0]));
+    // resolved to a live identity without touching the flat projection.
+    app.toggle_selected_identity(identity_of(&app, pids[0]));
+    assert!(
+        app.selected_identities()
+            .contains(&identity_of(&app, pids[0]))
+    );
+    app.toggle_selected_identity(identity_of(&app, pids[0]));
+    assert!(
+        !app.selected_identities()
+            .contains(&identity_of(&app, pids[0]))
+    );
 
-    // Two distinct pids accumulate.
-    app.toggle_selected_pid(pids[0]);
-    app.toggle_selected_pid(pids[1]);
-    assert_eq!(app.selected_pids().len(), 2);
+    // Two distinct identities accumulate.
+    app.toggle_selected_identity(identity_of(&app, pids[0]));
+    app.toggle_selected_identity(identity_of(&app, pids[1]));
+    assert_eq!(app.selected_identities().len(), 2);
 }
 
 #[test]
@@ -650,7 +741,8 @@ fn stale_selected_pids_are_pruned_when_the_process_list_refreshes() {
 
     assert!(app.select_row(0));
     assert!(app.toggle_row_selection(2));
-    assert!(app.selected_pids().contains(&pids[2]));
+    let reaped = identity_of(&app, pids[2]);
+    assert!(app.selected_identities().contains(&reaped));
 
     // A refresh that drops pid[2] must prune it from the selection set. This
     // exercises the same `prune_stale_selection` call the process-snapshot
@@ -667,11 +759,14 @@ fn stale_selected_pids_are_pruned_when_the_process_list_refreshes() {
     app.prune_stale_selection();
 
     assert!(
-        !app.selected_pids().contains(&pids[2]),
-        "a reaped pid must not survive as a batch target"
+        !app.selected_identities().contains(&reaped),
+        "a reaped identity must not survive as a batch target"
     );
     // pids[0] survives and stays selected.
-    assert!(app.selected_pids().contains(&pids[0]));
+    assert!(
+        app.selected_identities()
+            .contains(&identity_of(&app, pids[0]))
+    );
 }
 
 #[test]
@@ -1020,7 +1115,7 @@ fn process_status_filter_rebuilds_the_shared_rows_and_resets_selection() {
 
 fn gpu_engine_rows_event(
     sequence: u64,
-    snapshot: taskmanager_application::GpuEngineRowsSnapshot,
+    snapshot: taskmanager_core::core::metrics::GpuEngineRowsSnapshot,
 ) -> taskmanager_application::CorrelatedGpuEngineRowsEvent {
     CorrelatedEvent::new(
         PlatformEventContext {
@@ -1040,7 +1135,7 @@ fn gpu_engine_rows_event(
 /// untouched.
 #[test]
 fn gpu_engine_rows_snapshots_commit_only_the_active_request() {
-    use taskmanager_application::{DeviceId, FailureKind, GpuEngineMetric, GpuEngineRowsSnapshot};
+    use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineMetric, GpuEngineRowsSnapshot};
     let mut app = ShellApp::new();
     let attempt = app.begin_gpu_engine_rows_request(DeviceId::new("gpu:0"));
     assert!(app.accept_gpu_engine_rows_request(
@@ -1054,7 +1149,7 @@ fn gpu_engine_rows_snapshots_commit_only_the_active_request() {
             DeviceId::new("gpu:0"),
             vec![GpuEngineMetric {
                 name: "Render Ring".to_owned(),
-                kind: taskmanager_application::GpuEngineKind::Unknown,
+                kind: GpuEngineKind::Unknown,
                 utilization_pct: 40.0,
             }],
         ),

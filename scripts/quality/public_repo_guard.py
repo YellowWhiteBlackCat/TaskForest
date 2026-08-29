@@ -31,7 +31,8 @@ FORBIDDEN_PREFIXES = (
     "docs/screenshots/",
 )
 FORBIDDEN_PUBLIC_FILES = {
-    "docs/BEVY_UI_FRONTEND.md",
+    # docs/BEVY_UI_FRONTEND.md is public now: it is the Bevy frontend's
+    # current-state charter, registered in docs/README.md and QUALITY_GATES.
     "docs/BEVY_UPSTREAM_WATCH.md",
     "docs/TODO.md",
     "docs/ROADMAP_NEXT.md",

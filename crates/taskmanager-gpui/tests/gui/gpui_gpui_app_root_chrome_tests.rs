@@ -7,18 +7,18 @@ use super::{
     COMMAND_FIELDS, OVERVIEW_FIELDS, ProcessDetailsField, kv_label_value, missing_value,
     properties_unit_preferences, vm_display, vm_rows,
 };
-use crate::i18n;
+use taskmanager_application::i18n;
 
 /// The dialog's row sections fold straight through the neutral
 /// process-details VM: a fixed fixture's overview and command rows carry
 /// exactly the VM's values (behavior parity, not source text).
 #[test]
 fn overview_and_command_rows_mirror_the_neutral_vm() {
-    use crate::core::metrics::ScalarObservation;
     use taskmanager_application::process_details_vm::{DetailValue, detail_value};
+    use taskmanager_core::core::metrics::ScalarObservation;
 
     let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-        crate::core::process::ProcessItem::default(),
+        taskmanager_core::core::process::ProcessItem::default(),
     )
     .pid(4242)
     .parent_pid(Some(1))
@@ -28,8 +28,8 @@ fn overview_and_command_rows_mirror_the_neutral_vm() {
     .current_memory_bytes(100 * 1024 * 1024)
     .status("S".to_owned())
     .metadata_observations(
-        taskmanager_application::ProcessMetadataObservations::current(
-            taskmanager_application::ProcessOwner::opaque("root"),
+        taskmanager_core::core::process::ProcessMetadataObservations::current(
+            taskmanager_core::core::process::ProcessOwner::opaque("root"),
             Some(std::path::PathBuf::from("/usr/bin/sample")),
             42,
         ),
@@ -43,8 +43,8 @@ fn overview_and_command_rows_mirror_the_neutral_vm() {
     observations.swap_bytes = ScalarObservation::available(2 * 1024 * 1024, 42);
     item.apply_scalar_observations(observations);
 
-    let utc = taskmanager_application::LocalTimeRulesObservation::current(
-        taskmanager_application::LocalTimeRules::utc(),
+    let utc = taskmanager_core::core::time::LocalTimeRulesObservation::current(
+        taskmanager_core::core::time::LocalTimeRules::utc(),
         0,
     );
     let vm = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
@@ -79,7 +79,7 @@ fn performance_currents_mirror_the_neutral_vm() {
     use taskmanager_application::process_details_vm::process_details_rows;
 
     let item = taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
-        crate::core::process::ProcessItem::default(),
+        taskmanager_core::core::process::ProcessItem::default(),
     )
     .pid(4242)
     .current_cpu_percentage(12.5)
@@ -113,8 +113,8 @@ fn performance_currents_mirror_the_neutral_vm() {
 /// fixed-UTC fixture output for known epochs.
 #[test]
 fn injected_start_time_keeps_the_sentinel_and_fixture_shape() {
-    let utc = taskmanager_application::LocalTimeRulesObservation::current(
-        taskmanager_application::LocalTimeRules::utc(),
+    let utc = taskmanager_core::core::time::LocalTimeRulesObservation::current(
+        taskmanager_core::core::time::LocalTimeRules::utc(),
         0,
     );
     assert_eq!(

@@ -24,7 +24,7 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
-use bevy::scene::{CommandsSceneExt, Scene, bsn};
+use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, FlexDirection, JustifyContent, Node, UiRect, Val, percent, px,
 };
@@ -35,10 +35,11 @@ use taskmanager_app_host::{
 };
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    ApplicationHistoryCapability, ApplicationHistoryIdentity, ApplicationHistoryMetricSeries,
-    ApplicationHistoryProjection, ApplicationHistoryStatus, HistoryReplayController, HistoryWindow,
-    MAX_HISTORY_REPLAY_POINTS,
+    ApplicationHistoryCapability, ApplicationHistoryMetricSeries, ApplicationHistoryProjection,
+    ApplicationHistoryStatus, HistoryReplayController, MAX_HISTORY_REPLAY_POINTS,
 };
+use taskmanager_core::core::history::{ApplicationHistoryIdentity, HistoryWindow};
+
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::palette::{UiPalette, space_2, space_8, space_24};
@@ -468,7 +469,7 @@ impl HistoryRuntime {
 
     pub(crate) fn record_sink(
         &self,
-    ) -> Option<std::sync::Arc<dyn taskmanager_application::HistoryRecordSink>> {
+    ) -> Option<std::sync::Arc<dyn taskmanager_core::core::history::HistoryRecordSink>> {
         match &self.resources {
             HistoryResources::Active(session) => Some(session.persistence.record_sink.clone()),
             HistoryResources::Disabled

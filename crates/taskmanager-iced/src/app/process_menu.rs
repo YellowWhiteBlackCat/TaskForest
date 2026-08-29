@@ -4,13 +4,12 @@
 //! shared application/shell operation in `IcedApp::update`. Keeping this enum
 //! toolkit-local avoids importing GPUI menu entities into the Iced graph.
 
-use taskmanager_application::ProcessSignal;
+use taskmanager_core::core::process::ProcessSignal;
 
 use iced::Task;
-use taskmanager_application::{
-    AppAction, FrozenProcessIdentity, PlatformEffect, ProcessBatchAction, ResourceRevealRequest,
-    UrlOpenRequest,
-};
+use taskmanager_application::{AppAction, PlatformEffect, ResourceRevealRequest, UrlOpenRequest};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchAction};
+
 use taskmanager_shell::presentation::search_url_for;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
@@ -104,7 +103,7 @@ impl IcedApp {
         &mut self,
         pid: u32,
         label_key: &'static str,
-        value: impl FnOnce(&taskmanager_application::ProcessItem) -> String,
+        value: impl FnOnce(&taskmanager_core::core::process::ProcessItem) -> String,
         clipboard_task: &mut Option<Task<Message>>,
     ) {
         let Some(process) = self.shell.visible_process_by_pid(pid) else {

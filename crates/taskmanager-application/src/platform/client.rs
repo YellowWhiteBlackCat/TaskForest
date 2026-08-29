@@ -14,7 +14,7 @@ use super::{
     StartupEvidenceRequest, StartupEvidenceRevision, StartupInventoryRequest, StorageHealthRequest,
     SystemTelemetryDomain, SystemTelemetryProjection, SystemTelemetryRevision,
 };
-use crate::FrozenProcessIdentity;
+use taskmanager_core::core::process::FrozenProcessIdentity;
 
 mod drain;
 #[cfg(test)]

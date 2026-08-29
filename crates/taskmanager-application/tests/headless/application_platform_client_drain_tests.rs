@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityId, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
-    EventSequence, OperationFailure, ProviderFailure, ProviderId, RequestEnvelope, RequestPort,
+    EventSequence, OperationFailure, ProviderFailure, RequestEnvelope, RequestPort,
     SubmissionError,
 };
 
@@ -12,9 +12,11 @@ use crate::platform::{
     ProcessGpuRequest, ProcessInsightFacetEvent, ProcessInsightFacetState,
     ProcessInsightObservation, ProcessInsightUnavailable, ProcessNetworkRequest,
 };
-use crate::{
-    FailureKind, FrozenProcessIdentity, ProcessGpuSnapshot, ProcessIdentity,
-    ProcessInsightSnapshot, ProcessNetworkSnapshot,
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process_telemetry::{
+    ProcessGpuSnapshot, ProcessIdentity, ProcessInsightSnapshot, ProcessNetworkSnapshot,
 };
 
 #[derive(Default)]

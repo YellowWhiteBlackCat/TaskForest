@@ -1,5 +1,7 @@
 use super::*;
-use crate::{RefreshRequest, ServiceAction, ServiceId, SurfaceKind};
+use crate::{RefreshRequest, SurfaceKind};
+use taskmanager_core::core::services::ServiceAction;
+use taskmanager_core::core::target::ServiceId;
 
 fn selected_state() -> AppState {
     AppState {

@@ -1,17 +1,21 @@
 use super::super::RootView;
-use crate::core::Alert;
-use crate::core::hardware::HardwareInfo;
-use crate::core::metrics::SystemSnapshot;
-use crate::core::process::ProcessItem;
-use crate::core::services::ServiceItem;
-use crate::core::session::SessionItem;
-use crate::core::startup::StartupEntry;
 use crate::gpui_app::process_insights::ProcessInsightsState;
-use taskmanager_application::{
-    ContainerRollup, DirectoryUsageSnapshot, FilesystemHealthSnapshot, NpuInventorySnapshot,
-    PowerSupplySnapshot, SensorCenterSnapshot, SourceStatus, StartupBootEvidenceSnapshot,
-    StartupEvidenceUnavailable,
-};
+use taskmanager_application::StartupEvidenceUnavailable;
+use taskmanager_core::core::Alert;
+use taskmanager_core::core::directory_usage::DirectoryUsageSnapshot;
+use taskmanager_core::core::hardware::HardwareInfo;
+use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::npu::NpuInventorySnapshot;
+use taskmanager_core::core::power::PowerSupplySnapshot;
+use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process_telemetry::ContainerRollup;
+use taskmanager_core::core::sensors::SensorCenterSnapshot;
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::startup::StartupBootEvidenceSnapshot;
+use taskmanager_core::core::startup::StartupEntry;
+use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
 
 impl RootView {
     pub fn replace_process_insights_for_test(&mut self, state: ProcessInsightsState) {

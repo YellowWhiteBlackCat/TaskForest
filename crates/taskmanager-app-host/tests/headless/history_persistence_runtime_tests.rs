@@ -1,7 +1,7 @@
 use std::sync::{Arc, Barrier};
 use std::time::{Duration, Instant};
 
-use taskmanager_application::{HistoryMetric, HistorySeriesKey};
+use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 use taskmanager_core::{HistoricalSample, HistoryRecordSink};
 use taskmanager_history_store::HistoryQuery;
 
@@ -319,7 +319,7 @@ fn replay_during_writer_flush_never_poisons_the_later_complete_read() {
         if revision.is_multiple_of(17) {
             let _ = HistoryQuery::new(&root).series(
                 &key,
-                taskmanager_application::HistoryWindow::OneHour,
+                HistoryWindow::OneHour,
                 base_ms.saturating_add(1_000),
             );
         }
@@ -333,11 +333,7 @@ fn replay_during_writer_flush_never_poisons_the_later_complete_read() {
     drop(coordinator);
 
     let final_read = HistoryQuery::new(&root)
-        .series(
-            &key,
-            taskmanager_application::HistoryWindow::OneHour,
-            base_ms.saturating_add(1_000),
-        )
+        .series(&key, HistoryWindow::OneHour, base_ms.saturating_add(1_000))
         .expect("final replay read")
         .expect("persisted series");
     assert_eq!(final_read.corrupt_lines, 0);

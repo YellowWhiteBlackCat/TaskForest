@@ -2,9 +2,10 @@
 
 use super::super::*;
 
-use taskmanager_application::{
-    AppPage, FailureKind, ProviderId, RefreshRequest, SourceOutcome, SourceStatus,
-};
+use taskmanager_application::{AppPage, RefreshRequest};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::identity::ProviderId;
+use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 fn source(outcome: SourceOutcome) -> SourceStatus {
     SourceStatus {

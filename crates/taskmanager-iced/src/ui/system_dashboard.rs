@@ -4,7 +4,7 @@
 //! summary cards, the history-window selector, and the events center from the
 //! existing shell projection and is self-sufficient headless (the System page
 //! wiring lives in `ui::system_table`, owned by a parallel workflow). The
-//! window vocabulary is the shared `taskmanager_application::HistoryWindow`
+//! window vocabulary is the shared `taskmanager_core::core::history::HistoryWindow`
 //! (1h / 24h / 7d) — the shell exposes no GPUI-style `TimelineSelection`
 //! type, so the segment maps the window selection through that typed shell
 //! enum only. Honesty contract: an unobserved fact renders the shared dash,
@@ -14,9 +14,9 @@
 
 use iced::Length;
 use iced::widget::{column, row, text};
-use taskmanager_application::HistoryWindow;
-use taskmanager_application::alerts::AlertSeverity;
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::alerts::AlertSeverity;
+use taskmanager_core::core::history::HistoryWindow;
 
 use crate::app::alerts::active_alert_lines;
 use crate::app::{FocusTarget, Message};
@@ -25,7 +25,7 @@ use crate::theme;
 use taskmanager_theme::tokens;
 
 use super::components::{IcedElement, titled_card};
-use super::missing_value;
+use taskmanager_shell::presentation::missing_value;
 
 // The summary fold lives in the data layer (`super::system_dashboard_model`)
 // per ARCH.md §8.1; re-exported here so the segment module and its mounted
@@ -78,7 +78,7 @@ fn summary_card<'a>(
     let alert_color = if model.active_alerts == 0 {
         muted
     } else {
-        theme::color(theme_snapshot.palette().danger)
+        taskmanager_theme::iced::color(theme_snapshot.palette().danger)
     };
     let value = |label: &'static str, display: String, color: iced::Color| {
         column![
@@ -93,9 +93,9 @@ fn summary_card<'a>(
         .spacing(f32::from(tokens::SPACE_4))
         .width(Length::Fill)
     };
-    let cpu = theme::color(theme_snapshot.cpu);
-    let memory = theme::color(theme_snapshot.memory);
-    let disk = theme::color(theme_snapshot.disk);
+    let cpu = taskmanager_theme::iced::color(theme_snapshot.cpu);
+    let memory = taskmanager_theme::iced::color(theme_snapshot.memory);
+    let disk = taskmanager_theme::iced::color(theme_snapshot.disk);
     let values = row![
         value(t("common.cpu"), model.cpu.clone(), cpu),
         value(t("common.memory"), model.memory.clone(), memory),
@@ -163,9 +163,15 @@ fn events_card<'a>(
     } else {
         for line in lines {
             let color = match line.severity {
-                AlertSeverity::Critical => theme::color(theme_snapshot.palette().danger),
-                AlertSeverity::Warning => theme::color(theme_snapshot.palette().warning),
-                AlertSeverity::Info => theme::color(theme_snapshot.palette().accent),
+                AlertSeverity::Critical => {
+                    taskmanager_theme::iced::color(theme_snapshot.palette().danger)
+                }
+                AlertSeverity::Warning => {
+                    taskmanager_theme::iced::color(theme_snapshot.palette().warning)
+                }
+                AlertSeverity::Info => {
+                    taskmanager_theme::iced::color(theme_snapshot.palette().accent)
+                }
             };
             list = list.push(
                 text(line.text)

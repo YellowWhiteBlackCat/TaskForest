@@ -10,18 +10,18 @@ use gpui::{
 use std::rc::Rc;
 use taskmanager_application::SourceStateKind;
 
-use crate::core::metrics::{DiskMetrics, SmartAvailability};
-use crate::core::{
+use crate::gpui_app::elements;
+use crate::gpui_app::formatting;
+use crate::gpui_app::root::responsive::{SystemPageBudget, SystemSurfacePresentation};
+use taskmanager_core::core::metrics::{DiskMetrics, SmartAvailability};
+use taskmanager_core::core::{
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, FilesystemHealth,
     FilesystemHealthSnapshot, FilesystemHealthStatus, SensorCenterSnapshot, SensorQuantity,
     SensorReading, SmartSelfTestFailure, SmartSelfTestKind, SmartSelfTestPhase,
     SmartSelfTestReport,
 };
-use crate::gpui_app::elements;
-use crate::gpui_app::formatting;
-use crate::gpui_app::root::responsive::{SystemPageBudget, SystemSurfacePresentation};
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Color, Theme};
+use taskmanager_theme::Color;
+use taskmanager_theme::tokens;
 use taskmanager_ui::layout::scroll_region_with_rail;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
@@ -31,6 +31,7 @@ mod localized;
 pub use localized::localized_text;
 mod stats;
 use stats::{filesystem_capacity, sensor_value_vm};
+use taskmanager_theme::Theme;
 
 /// Copy identifiers are resolved by the caller so this isolated component can
 /// land before its final RootView/i18n integration without embedding production

@@ -233,11 +233,12 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
             viewport,
         );
 
-        if tree.state.downcast_ref::<State>().focused {
-            // The focused shell rings in the shared focus-ring token at the
-            // shared 1.5–2px width (see `theme::focus_ring_color` for the
-            // iced-vs-GPUI focus-visible parity gap: iced cannot distinguish
-            // keyboard from pointer focus, so every focus draws the ring).
+        let focused = tree.state.downcast_ref::<State>().focused;
+        // Ring visibility follows the shared palette contract (the ring
+        // token's alpha encodes focus-visible): only keyboard focus stays
+        // opaque, per `crate::input_modality`.
+        let ring_visible = focused && self.focus_color.a > 0.0;
+        if ring_visible {
             renderer.fill_quad(
                 iced::advanced::renderer::Quad {
                     bounds: layout.bounds(),

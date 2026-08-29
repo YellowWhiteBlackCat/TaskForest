@@ -4,14 +4,18 @@ use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
 use taskmanager_application::{
-    CapabilityId, PartialSourceSnapshot, PlatformEvent, ProviderFailure, ServiceControlOutcome,
-    ServiceControlRequest, ServiceDependenciesRequest, ServiceEvent, ServiceInventoryRequest,
-    ServiceLogSnapshotRequest, ServiceLogStreamRequest, ServiceUpdate,
+    PlatformEvent, ServiceControlOutcome, ServiceControlRequest, ServiceDependenciesRequest,
+    ServiceEvent, ServiceInventoryRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest,
+    ServiceUpdate,
 };
-use taskmanager_core::{
-    ServiceAction, ServiceDeps, ServiceId, ServiceItem, ServiceLogErrorKind, ServiceLogFailure,
+use taskmanager_core::core::services::{
+    ServiceAction, ServiceDeps, ServiceItem, ServiceLogErrorKind, ServiceLogFailure,
     ServiceLogQuery, ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd,
     ServiceLogStreamSnapshot, ServiceLogStreamState,
+};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::{
+    CapabilityId, PartialSourceSnapshot, ProviderFailure, RequestId,
 };
 
 use crate::{
@@ -197,7 +201,7 @@ pub fn spawn_service_lanes(
 }
 
 fn dependency_event(
-    request_id: taskmanager_application::RequestId,
+    request_id: RequestId,
     ServiceDependenciesRequest { service_id }: ServiceDependenciesRequest,
     execute: &mut DependenciesExecutor,
 ) -> (PlatformEvent, Result<(), ProviderFailure>) {
@@ -264,7 +268,7 @@ fn log_snapshot_event(
 }
 
 fn log_stream_event(
-    request_id: taskmanager_application::RequestId,
+    request_id: RequestId,
     ServiceLogStreamRequest { query }: ServiceLogStreamRequest,
     execute: &mut LogStreamExecutor,
     observed_at_ms: u64,

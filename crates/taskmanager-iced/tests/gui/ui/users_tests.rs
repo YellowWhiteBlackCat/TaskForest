@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_application::SessionItem;
+use taskmanager_core::core::session::SessionItem;
 
 #[test]
 fn user_projection_preserves_session_identity_and_remote_facts() {

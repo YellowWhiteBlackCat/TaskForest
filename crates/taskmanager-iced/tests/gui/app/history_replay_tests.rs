@@ -2,9 +2,10 @@ use std::rc::Rc;
 use std::sync::Arc;
 
 use taskmanager_application::{
-    HistoryMetric, HistoryReplayCompletion, HistoryReplayCompletionOutcome, HistoryReplayError,
-    HistoryReplayErrorKind, HistoryReplayRow, HistorySeriesKey, HistoryWindow,
+    HistoryReplayCompletion, HistoryReplayCompletionOutcome, HistoryReplayError,
+    HistoryReplayErrorKind, HistoryReplayRow,
 };
+use taskmanager_core::core::history::{HistoryMetric, HistorySeriesKey, HistoryWindow};
 
 use super::*;
 

@@ -10,10 +10,10 @@ fn instance_activation_is_drained_without_blocking_and_coalesced() {
     let (sender, receiver) = channel();
     app.install_instance_runtime(None, Some(receiver));
     sender
-        .send(taskmanager_app_host::InstanceEvent::Activate)
+        .send(taskmanager_platform_contract::InstanceEvent::Activate)
         .expect("test instance receiver is live");
     sender
-        .send(taskmanager_app_host::InstanceEvent::Activate)
+        .send(taskmanager_platform_contract::InstanceEvent::Activate)
         .expect("test instance receiver is live");
 
     assert!(app.runtime.drain_instance_events());
@@ -27,7 +27,7 @@ fn lifecycle_event_drains_are_bounded_and_converge_across_ticks() {
     runtime.install_instance(None, Some(instance_receiver));
     for _ in 0..=MAX_LIFECYCLE_EVENTS_PER_TICK {
         instance_sender
-            .send(taskmanager_app_host::InstanceEvent::Activate)
+            .send(taskmanager_platform_contract::InstanceEvent::Activate)
             .expect("test instance receiver is live");
     }
 
@@ -86,7 +86,7 @@ fn no_platform_reports_submission_failure_and_still_runs_tick_finish() {
         .and_then(|processes| processes.first())
         .cloned()
         .expect("demo process");
-    let identity = taskmanager_application::FrozenProcessIdentity::from_process(&first)
+    let identity = taskmanager_core::core::process::FrozenProcessIdentity::from_process(&first)
         .expect("demo process carries identity");
     app.shell.application.selected_process = Some(identity.clone());
     let _ = app.shell.open_process_properties_for(identity);
@@ -129,25 +129,29 @@ fn no_platform_reports_submission_failure_and_still_runs_tick_finish() {
 #[derive(Default)]
 struct EmptyCapabilities;
 
-impl taskmanager_application::CapabilityCatalog for EmptyCapabilities {
-    fn snapshot(&self) -> taskmanager_application::CapabilitySnapshot {
-        taskmanager_application::CapabilitySnapshot::default()
+impl taskmanager_platform_contract::CapabilityCatalog for EmptyCapabilities {
+    fn snapshot(&self) -> taskmanager_platform_contract::CapabilitySnapshot {
+        taskmanager_platform_contract::CapabilitySnapshot::default()
     }
 }
 
 #[derive(Default)]
 struct QueuedEvents(
-    Mutex<VecDeque<taskmanager_application::EventEnvelope<taskmanager_application::PlatformEvent>>>,
+    Mutex<
+        VecDeque<
+            taskmanager_platform_contract::EventEnvelope<taskmanager_application::PlatformEvent>,
+        >,
+    >,
 );
 
-impl taskmanager_application::EventPort for QueuedEvents {
+impl taskmanager_platform_contract::EventPort for QueuedEvents {
     type Event = taskmanager_application::PlatformEvent;
 
     fn try_recv(
         &self,
     ) -> Result<
-        Option<taskmanager_application::EventEnvelope<Self::Event>>,
-        taskmanager_application::EventPortError,
+        Option<taskmanager_platform_contract::EventEnvelope<Self::Event>>,
+        taskmanager_platform_contract::EventPortError,
     > {
         Ok(self.0.lock().expect("queue lock").pop_front())
     }
@@ -160,11 +164,12 @@ fn tick_drains_the_directly_owned_platform_before_view_local_finish() {
         .0
         .lock()
         .expect("queue lock")
-        .push_back(taskmanager_application::EventEnvelope {
-            request_id: taskmanager_application::RequestId::new(1).expect("non-zero request id"),
-            capability: taskmanager_application::CapabilityId::PROCESS_LIST,
+        .push_back(taskmanager_platform_contract::EventEnvelope {
+            request_id: taskmanager_platform_contract::RequestId::new(1)
+                .expect("non-zero request id"),
+            capability: taskmanager_platform_contract::CapabilityId::PROCESS_LIST,
             provider: None,
-            sequence: taskmanager_application::EventSequence::new(1),
+            sequence: taskmanager_platform_contract::EventSequence::new(1),
             observed_at_ms: 100,
             outcome: Ok(taskmanager_application::PlatformEvent::Processes(
                 taskmanager_application::ProcessEvent::Snapshot(vec![

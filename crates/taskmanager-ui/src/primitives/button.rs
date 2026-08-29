@@ -33,7 +33,8 @@ fn press_shadow() -> Vec<BoxShadow> {
 use taskmanager_theme::Palette;
 use taskmanager_ui_contract::IconId;
 
-use crate::styled::{active_fill, disabled_fg, hover_fill, on_accent};
+use crate::styled::{active_fill, disabled_fg, hover_fill};
+use taskmanager_theme::color::on_accent;
 use taskmanager_theme::tokens;
 
 /// Semantic button variants. The exact colors come from the palette per

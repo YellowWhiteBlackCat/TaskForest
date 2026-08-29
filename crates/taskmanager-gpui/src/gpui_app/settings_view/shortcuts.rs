@@ -1,8 +1,10 @@
 //! Compact, read-only shortcut legend for keyboard discoverability.
 
-use crate::gpui_app::theme::{Theme, mono_font_with_fallback, tokens};
-use crate::i18n;
+use crate::gpui_app::theme::mono_font_with_fallback;
 use gpui::{Div, ParentElement, Styled, div};
+use taskmanager_application::i18n;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 pub(super) fn shortcut_grid(t: &Theme) -> Div {
     div()

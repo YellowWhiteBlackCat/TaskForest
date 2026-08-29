@@ -21,7 +21,8 @@ pub use model::{
     SemanticState,
 };
 pub use snapshot::{
-    AlertRuleInput, GraphSummary, ModalInput, ProcessRowInput, SemanticSnapshotBuilder,
+    AlertRuleInput, GraphSummary, ModalInput, ProcessGroupRowInput, ProcessRowInput,
+    SemanticSnapshotBuilder,
 };
 
 #[cfg(test)]

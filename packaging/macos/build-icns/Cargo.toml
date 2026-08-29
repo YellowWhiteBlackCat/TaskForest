@@ -3,7 +3,7 @@
 #
 # This manifest is intentionally NOT part of the workspace
 # (workspace members are "." and "crates/*"), so it is never built by a
-# plain `cargo build`/`cargo test` at the repo root. Invoke it explicitly:
+# ordinary workspace build/test commands at the repo root. Invoke it explicitly:
 #
 #   cargo run --manifest-path packaging/macos/build-icns/Cargo.toml
 #
@@ -21,6 +21,6 @@ icns = "0.4"
 png = "0.17"
 
 # Empty workspace table: this tool is intentionally a standalone root, NOT a
-# member of the repo workspace, so `cargo build` / `cargo test` at the repo
+# member of the repo workspace, so ordinary build/test commands at the repo
 # root never compiles it. Invoke explicitly via --manifest-path.
 [workspace]

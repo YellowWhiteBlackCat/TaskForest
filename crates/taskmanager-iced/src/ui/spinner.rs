@@ -19,7 +19,6 @@ use iced::widget::canvas::{self, Geometry, Path, Stroke};
 use iced::{Color, Point, Radians, Rectangle};
 
 use crate::app::Message;
-use crate::theme;
 
 /// The spinner's square canvas side (the warm-up card's glyph slot). A
 /// cross-frontend layout contract, not a spacing token: the canvas extent
@@ -46,8 +45,8 @@ impl WarmupSpinner {
     /// for the faint track — so every skin restyles the spinner for free.
     pub(crate) fn new(theme: &taskmanager_theme::Theme, phase: Option<f32>) -> Self {
         Self {
-            accent: theme::color(theme.palette().accent),
-            track: theme::color(theme.palette().border),
+            accent: taskmanager_theme::iced::color(theme.palette().accent),
+            track: taskmanager_theme::iced::color(theme.palette().border),
             phase,
         }
     }

@@ -3,9 +3,11 @@
 use iced::widget::{column, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
-use taskmanager_application::{
-    ServiceId, ServiceLogAvailability, ServiceLogLevelFilter, ServiceLogTimeFilter,
+use taskmanager_core::core::services::{
+    ServiceLogAvailability, ServiceLogLevelFilter, ServiceLogTimeFilter,
 };
+use taskmanager_core::core::target::ServiceId;
+
 use taskmanager_shell::ShellApp;
 use taskmanager_theme::tokens;
 

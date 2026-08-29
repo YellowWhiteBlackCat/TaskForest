@@ -71,17 +71,17 @@ fn switch_track_fill_maps_state_onto_palette_tokens() {
     let palette = theme.palette();
     assert_eq!(
         switch_track_fill(&theme, true, button::Status::Active),
-        crate::theme::color(palette.accent)
+        taskmanager_theme::iced::color(palette.accent)
     );
     assert_eq!(
         switch_track_fill(&theme, false, button::Status::Active),
-        crate::theme::color(palette.border)
+        taskmanager_theme::iced::color(palette.border)
     );
     let disabled = switch_track_fill(&theme, true, button::Status::Disabled);
-    assert_ne!(disabled, crate::theme::color(palette.accent));
+    assert_ne!(disabled, taskmanager_theme::iced::color(palette.accent));
     assert_eq!(
         disabled,
-        crate::theme::color(mix(palette.accent, palette.window_backdrop, 0.5))
+        taskmanager_theme::iced::color(mix(palette.accent, palette.window_backdrop, 0.5))
     );
 }
 

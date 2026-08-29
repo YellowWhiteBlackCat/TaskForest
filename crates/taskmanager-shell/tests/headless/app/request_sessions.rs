@@ -2,13 +2,20 @@
 
 use super::super::*;
 use taskmanager_application::{
-    CapabilityId, CorrelatedEvent, DeviceGeneration, DeviceId, EventSequence, GpuEngineRowsEvent,
-    GpuEngineRowsSnapshot, PlatformEventContext, ProcessAffinityEvent, ProcessBatchAction,
-    ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessEvent,
-    ProcessGroupScope, ProviderFailure, RequestId, ShellEvent, ShellUiActionIntent, SmartEvent,
-    SmartObservationBatch, SmartSelfTestIntent, SmartSelfTestKind, SmartStateRevision,
-    StorageDeviceKey, UrlOpenRequest,
+    CorrelatedEvent, GpuEngineRowsEvent, PlatformEventContext, ProcessAffinityEvent, ProcessEvent,
+    ShellEvent, ShellUiActionIntent, SmartEvent, SmartObservationBatch, SmartStateRevision,
+    UrlOpenRequest,
 };
+use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
+use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchResult,
+    ProcessBatchTargetResult, ProcessGroupScope,
+};
+use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
+use taskmanager_core::core::target::StorageDeviceKey;
+use taskmanager_platform_contract::{CapabilityId, EventSequence, ProviderFailure, RequestId};
 
 fn request(value: u64) -> RequestId {
     RequestId::new(value).expect("fixture request id is non-zero")
@@ -255,7 +262,7 @@ fn direct_track_routes_operation_failures_to_the_exact_active_session() {
     assert!(track.accept_shell_ui_action(ui_attempt, request(32)));
 
     let operation_failure =
-        |request_id, capability, kind| taskmanager_application::OperationFailure {
+        |request_id, capability, kind| taskmanager_platform_contract::OperationFailure {
             request_id,
             capability,
             sequence: EventSequence::new(request_id.get()),
@@ -268,22 +275,22 @@ fn direct_track_routes_operation_failures_to_the_exact_active_session() {
     batch.failures.push(operation_failure(
         request(30),
         CapabilityId::TELEMETRY_GPU_ENGINES,
-        taskmanager_application::FailureKind::PermissionDenied,
+        taskmanager_core::core::failure::FailureKind::PermissionDenied,
     ));
     batch.failures.push(operation_failure(
         request(31),
         CapabilityId::PROCESS_NETWORK_ESCALATION,
-        taskmanager_application::FailureKind::Rejected,
+        taskmanager_core::core::failure::FailureKind::Rejected,
     ));
     batch.failures.push(operation_failure(
         request(32),
         CapabilityId::RESOURCE_REVEAL,
-        taskmanager_application::FailureKind::ProviderFault,
+        taskmanager_core::core::failure::FailureKind::ProviderFault,
     ));
     batch.failures.push(operation_failure(
         request(32),
         CapabilityId::URL_OPEN,
-        taskmanager_application::FailureKind::ProviderFault,
+        taskmanager_core::core::failure::FailureKind::ProviderFault,
     ));
     let _ = track.apply_platform_batch(batch);
 

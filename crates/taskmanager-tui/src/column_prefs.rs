@@ -119,7 +119,7 @@ impl TuiApp {
                 .into_iter()
                 .find(|candidate| !self.hidden_columns.contains(candidate))
         {
-            self.set_sort_column(first_visible);
+            self.set_process_sort_column_preserving_anchor(first_visible);
         }
         self.detail_scroll_reset();
         self.persist_process_prefs();
@@ -192,8 +192,15 @@ impl TuiApp {
             .copied()
             .unwrap_or(current);
         if next != current {
-            self.set_sort_column(next);
+            self.set_process_sort_column_preserving_anchor(next);
         }
+        self.persist_process_prefs();
+    }
+
+    /// TUI-owned wrapper around the shell sort direction so an Applications
+    /// row keeps its identity when the ordering flips.
+    pub fn toggle_sort_direction(&mut self) {
+        self.toggle_process_sort_direction_preserving_anchor();
         self.persist_process_prefs();
     }
 }

@@ -18,14 +18,15 @@
 //! threads through.
 
 use gpui::{Div, ParentElement, Styled, div, px};
-use taskmanager_application::{ProcessTelemetrySnapshot, ProcessThreadInfo};
+use taskmanager_core::core::process_telemetry::{ProcessTelemetrySnapshot, ProcessThreadInfo};
 
-use crate::core::device_state::DeviceStatus;
 use crate::gpui_app::formatting;
-use crate::gpui_app::theme::tokens;
-use crate::gpui_app::theme::{Theme, mono_font_with_fallback};
+use taskmanager_core::core::device_state::DeviceStatus;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 use super::ProcessInsightsLabels;
+use crate::gpui_app::theme::mono_font_with_fallback;
 
 /// Render one thread as `tid  comm  state  cpu-time`. The cpu-time field falls
 /// back to an explicit dash when the source did not parse CPU counters, so a

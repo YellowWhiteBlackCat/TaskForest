@@ -6,16 +6,17 @@
 
 use std::sync::Arc;
 
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult, ProcessItem, ProcessSignal,
+};
+use taskmanager_core::core::process_telemetry::{
+    ProcessEnvironment, ProcessGpuSnapshot, ProcessInsightSnapshot, ProcessIsolation,
+    ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreads,
+    ResourceGroupLimitRequest,
+};
 use taskmanager_platform_contract::{
     CapabilityId, CapabilityRequest, RequestId, RequestPort, RequestScope, RequestTracking,
     RequestTrackingError, SubmissionError,
-};
-
-use crate::{
-    FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult, ProcessEnvironment,
-    ProcessGpuSnapshot, ProcessInsightSnapshot, ProcessIsolation, ProcessItem,
-    ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot, ProcessSignal,
-    ProcessThreads, ResourceGroupLimitRequest,
 };
 
 #[derive(Clone, Debug)]

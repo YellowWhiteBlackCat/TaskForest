@@ -11,9 +11,11 @@ use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage};
 
 use super::{
-    EventReaction, RefreshPacing, TerminalEventSource, apply_terminal_event, run_event_loop,
+    EventReaction, RefreshPacing, TerminalEventSource, apply_terminal_event,
+    apply_terminal_event_with_plan, run_event_loop,
 };
 use crate::TuiApp;
+use crate::ui::TuiFramePlan;
 
 /// A scripted source: pops the queued items; once empty, `poll` fails
 /// with a typed error instead of blocking forever, so a regression that
@@ -373,6 +375,23 @@ fn click_selects_the_painted_row_through_the_shared_selection_entry() {
     }
 }
 
+#[test]
+fn committed_frame_plan_rejects_a_click_after_page_change_before_redraw() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+    let plan = TuiFramePlan::build(&app, TEST_FRAME);
+    let panel = plan.table_panel().expect("Applications has a table");
+
+    // The key changed the app state, but the terminal has not painted the new
+    // Services page yet. A coordinate from the old Applications frame must be
+    // ignored rather than retargeting an unseen Services row.
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
+    let reaction =
+        apply_terminal_event_with_plan(&mut app, click(panel.area.x + 2, panel.area.y + 3), &plan);
+    assert_eq!(reaction, EventReaction::default());
+    assert_eq!(app.page(), AppPage::Services);
+}
+
 /// The pages without pointer-addressable rows project to None.
 #[test]
 fn pages_without_a_keyboard_addressable_table_are_click_transparent() {
@@ -434,7 +453,7 @@ fn clicks_while_a_surface_owns_the_keyboard_are_no_ops() {
         .expect("demo sessions");
     assert!(app.shell.select_session_control(
         &session,
-        taskmanager_application::SessionControlAction::Lock
+        taskmanager_core::core::session::SessionControlAction::Lock
     ));
     let frame = Rect::new(0, 0, 120, 40);
     let panel = crate::ui::table_hit::table_panel_projection(&app, frame).expect("users");
@@ -576,7 +595,7 @@ fn refresh_pacing_only_owns_visible_gpu_engine_rows() {
     let mut gpu_app = crate::demo_app();
     let _ = gpu_app
         .shell
-        .begin_gpu_engine_rows_request(taskmanager_application::DeviceId::new("gpu:0"));
+        .begin_gpu_engine_rows_request(taskmanager_core::core::identity::DeviceId::new("gpu:0"));
     gpu_app.perf_device = crate::PerfDevice::Gpu;
     assert_eq!(
         gpu_app.apply_action(AppAction::SelectPage(AppPage::Performance)),

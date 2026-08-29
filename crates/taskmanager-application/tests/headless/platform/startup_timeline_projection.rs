@@ -4,7 +4,7 @@
 //! here (ADR-020 single-source).
 
 use super::boot_timeline_rows;
-use crate::{
+use taskmanager_core::core::startup::{
     DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
     StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupEvidenceFailure,
 };

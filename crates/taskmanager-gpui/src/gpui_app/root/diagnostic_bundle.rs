@@ -8,14 +8,16 @@ use std::path::PathBuf;
 use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 
-use crate::core::diagnostics::{
+use crate::gpui_app::elements;
+use crate::gpui_app::theme::mono_font_with_fallback;
+use taskmanager_application::i18n;
+use taskmanager_core::core::diagnostics::{
     DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticPreview,
     DiagnosticSource,
 };
-use crate::core::export::snapshot_to_json;
-use crate::gpui_app::elements;
-use crate::gpui_app::theme::{Theme, mono_font_with_fallback, tokens};
-use crate::i18n;
+use taskmanager_core::core::export::snapshot_to_json;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
 
 use super::RootView;

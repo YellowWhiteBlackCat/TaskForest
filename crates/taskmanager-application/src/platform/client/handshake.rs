@@ -3,10 +3,11 @@
 
 use std::time::{Duration, Instant};
 
+use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_platform_contract::{CompositeSourceSnapshot, OperationFailure};
 
+use crate::PlatformClient;
 use crate::platform::{DesktopAppearanceEvent, DesktopAppearanceRequest};
-use crate::{DesktopAppearance, PlatformClient};
 
 /// Outcome of one synchronous desktop-appearance handshake.
 #[derive(Debug, Default)]

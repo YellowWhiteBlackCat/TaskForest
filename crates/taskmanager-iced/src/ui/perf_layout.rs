@@ -124,8 +124,13 @@ pub(super) fn main_with_stats<'a>(
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let geometry = geometry_contract(compact);
     let subtitle_size = if geometry.compact { 12 } else { 15 };
+    // GPUI header hierarchy (ICED-024-6): the page title owns the left edge,
+    // the device model right-aligns on the same baseline — not a left-packed
+    // pair that leaves the row's right half unread.
     let heading = row![
-        text(bounded_heading(&title, if compact { 28 } else { 64 })).size(geometry.title_size),
+        text(bounded_heading(&title, if compact { 28 } else { 24 }))
+            .size(geometry.title_size)
+            .width(Length::Fill),
         text(bounded_heading(&subtitle, if compact { 32 } else { 72 }))
             .size(subtitle_size)
             .color(theme::muted_text_color(theme_snapshot)),
@@ -277,7 +282,7 @@ pub(super) fn stats_panel(
                 text(value).size(value_size).color(if missing {
                     theme::muted_text_color(theme_snapshot)
                 } else {
-                    theme::color(theme_snapshot.palette().fg)
+                    taskmanager_theme::iced::color(theme_snapshot.palette().fg)
                 }),
             ]
             .spacing(if compact { 4 } else { 8 })

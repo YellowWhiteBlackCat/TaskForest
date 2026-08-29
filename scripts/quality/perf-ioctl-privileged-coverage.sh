@@ -22,7 +22,7 @@ sudo env PATH="$PATH" CARGO_HOME="$HOME/.cargo" RUSTUP_HOME="$HOME/.rustup" \\
      CARGO_TARGET_DIR="$repo/.tmp/perf-priv-target" \\
      LLVM_PROFILE_FILE="$repo/.tmp/perf-priv-%p-%m.profraw" \\
      TASKFOREST_PRIVILEGED_PERF=1 \\
-     cargo llvm-cov nextest --locked -p taskmanager-perf-ioctl --all-targets \\
+     cargo llvm-cov nextest --locked -p taskmanager-perf-ioctl --all-targets -j 4 \\
        --profile ci --lcov --output-path "$repo/.tmp/lcov-perf-privileged.info"
 # 2) 产物属主归还普通用户
 sudo chown -R "$(id -u):$(id -g)" "$repo/.tmp/lcov-perf-privileged.info" "$repo/.tmp/perf-priv-target"

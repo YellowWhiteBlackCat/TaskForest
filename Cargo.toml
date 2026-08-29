@@ -37,6 +37,9 @@ taskmanager-ui-contract = { path = "crates/taskmanager-ui-contract" }
 # ADR-020 single source: the frontends read shared formatting from the
 # renderer-independent shell presentation layer.
 taskmanager-shell = { path = "crates/taskmanager-shell" }
+# ADR-026 single token authority: tests read skins/tokens from the neutral
+# theme crate directly, never through a frontend facade.
+taskmanager-theme = { path = "crates/taskmanager-theme" }
 taskmanager-assets = { path = "crates/taskmanager-assets" }
 
 # Serialization & Logging
@@ -156,6 +159,9 @@ proc-macro-error2 = { path = "./patches/proc-macro-error2" }
 # feature (enabled only by the dev-only `test-support`), so production links
 # zero X11 system libraries.
 gpui = { path = "./patches/gpui" }
+# Vendored cryoglyph 0.1.0 compatibility patch: its public API is unchanged,
+# but its glyph cache uses the fixed lru 0.18.2 panic-safety implementation.
+cryoglyph = { path = "./patches/cryoglyph" }
 
 # Release profile for the shipping artifacts (tag-triggered release.yml +
 # packaging/arch/PKGBUILD). The previous absence of an explicit profile meant

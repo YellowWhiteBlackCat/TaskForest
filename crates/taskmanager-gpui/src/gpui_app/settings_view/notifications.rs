@@ -7,9 +7,11 @@ use gpui::{Context, Div, Entity, InteractiveElement, ParentElement, Styled, div}
 use taskmanager_ui::inputs::select::{SelectOption, select};
 use taskmanager_ui::inputs::switch::{Switch, SwitchState};
 
-use crate::gpui_app::root::{QuietBound, RootView};
-use crate::gpui_app::theme::{Theme, tokens};
-use crate::i18n;
+use crate::gpui_app::root::RootView;
+use taskmanager_application::i18n;
+use taskmanager_core::core::alerts::QuietBound;
+use taskmanager_theme::Theme;
+use taskmanager_theme::tokens;
 
 /// One switch row: "Desktop notifications" with the current policy state.
 /// The switch updates the pure [`NotificationGate`] policy on `RootView`;

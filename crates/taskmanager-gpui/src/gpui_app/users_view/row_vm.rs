@@ -8,8 +8,8 @@
 //! layout types in this module — pure data, unit-tested without a window.
 
 use crate::gpui_app::formatting::missing_value;
-use crate::i18n;
-use taskmanager_application::SessionItem;
+use taskmanager_application::i18n;
+use taskmanager_core::core::session::SessionItem;
 
 /// Pre-folded display strings for one sessions-table row (columns: Session /
 /// User / Seat / TTY / Remote / Logon).

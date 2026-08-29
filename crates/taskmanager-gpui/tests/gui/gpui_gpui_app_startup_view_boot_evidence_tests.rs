@@ -1,9 +1,9 @@
 use super::{boot_timeline_rows, critical_chain_summary, failed_units_summary};
-use crate::core::startup::{
+use taskmanager_application::i18n;
+use taskmanager_core::core::startup::{
     BootTimeline, StartupBootEvidenceSnapshot, StartupCriticalChainNode, StartupEvidenceFailure,
     StartupFailedUnit,
 };
-use crate::i18n;
 
 fn failed(unit: &str) -> StartupFailedUnit {
     StartupFailedUnit {

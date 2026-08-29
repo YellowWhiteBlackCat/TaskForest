@@ -7,15 +7,18 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use taskmanager_application::{ServiceItem, SessionItem, StartupEntry};
+use taskmanager_core::core::services::ServiceItem;
+use taskmanager_core::core::session::SessionItem;
+use taskmanager_core::core::startup::StartupEntry;
+
 use taskmanager_shell::{InfoSortCol, SortDir};
 
 use super::tooltip::ProcessHistories;
-use crate::core::process::ProcessItem;
 use crate::gpui_app::app_history_view::AppHistoryRow;
 use crate::gpui_app::processes_view::rows::ProjectionCache;
 use crate::gpui_app::services_view::ServiceFilter;
 use crate::gpui_app::startup_view::StartupFilter;
+use taskmanager_core::core::process::ProcessItem;
 
 struct ServicesEntry {
     generation: u64,

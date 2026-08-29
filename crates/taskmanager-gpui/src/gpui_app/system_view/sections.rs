@@ -9,14 +9,14 @@ mod npu;
 
 use taskmanager_ui_contract::IconId;
 
-use crate::core::hardware::{DisplayInfo, HardwareInfo};
-use crate::core::metrics::SystemSnapshot;
+use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
+use taskmanager_core::core::metrics::SystemSnapshot;
 
 use super::{
     fmt_cache_kb, fmt_clock_ghz, fmt_observed_clock_ghz, joined_optional_text, kernel_display,
     optional_text, truncate_cmdline,
 };
-use crate::i18n;
+use taskmanager_application::i18n;
 
 /// One horizontal progress meter inside a section card (memory in use,
 /// battery charge). `pct` is 0..=100; the renderer clamps.
@@ -368,7 +368,7 @@ pub(super) fn memory_section(hw: &HardwareInfo, snap: &SystemSnapshot) -> System
 /// utilization and memory facts remain adjacent to its discovered identity.
 pub(super) fn graphics_section(
     snap: &SystemSnapshot,
-    npu_inventory: Option<&taskmanager_application::NpuInventorySnapshot>,
+    npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
 ) -> SystemSection {
     let mut s = SystemSection::new(IconId::Gpu, "system.section.graphics");
     let gpu_count = snap.gpu.len();
@@ -473,7 +473,7 @@ pub(super) fn storage_section(snap: &SystemSnapshot) -> SystemSection {
 pub(super) fn build_sections(
     hw: &HardwareInfo,
     snap: &SystemSnapshot,
-    npu_inventory: Option<&taskmanager_application::NpuInventorySnapshot>,
+    npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
 ) -> Vec<SystemSection> {
     let sections = vec![
         device_section(hw),

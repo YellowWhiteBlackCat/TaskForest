@@ -4,7 +4,8 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use crossbeam_channel::{Receiver, TryRecvError};
-use taskmanager_application::{EventEnvelope, EventPort, EventPortError, PlatformEvent};
+use taskmanager_application::PlatformEvent;
+use taskmanager_platform_contract::{EventEnvelope, EventPort, EventPortError};
 
 use super::catalog::RuntimeCapabilityCatalog;
 use super::event_queue::{EventClass, EventQueueState, QueuedEvent};

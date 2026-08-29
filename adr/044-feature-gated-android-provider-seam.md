@@ -58,7 +58,7 @@ owned boundary and reviewed under the repository's safe-Rust policy.
 ## Verification
 
 ```text
-cargo test -p taskmanager-platform-android
+cargo nextest run --locked -p taskmanager-platform-android --all-targets -j 4
 cargo check --locked --target aarch64-linux-android \
   -p taskmanager-platform-android --features android-provider
 ```

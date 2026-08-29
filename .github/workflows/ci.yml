@@ -168,7 +168,7 @@ jobs:
           cache-workspace-crates: true
       - run: cargo nextest run --locked --workspace --all-targets --features test-support --profile ci -j 4 -E 'not binary(throughput)'
       # nextest does not execute doctests on stable Rust.
-      - run: cargo test --locked --doc --workspace
+      - run: cargo test --locked --doc --workspace -j 4
 
   docs:
     name: Linux (rustdoc)

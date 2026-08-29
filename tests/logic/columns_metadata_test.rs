@@ -11,9 +11,10 @@
 use std::collections::HashSet;
 
 use taskmanager_gpui::gpui_app::processes_view::rows::{
-    SortCol, columns, header_label, is_hideable, is_numeric,
+    columns, header_label, is_hideable, is_numeric,
 };
 use taskmanager_gpui::gpui_app::processes_view::sort_id;
+use taskmanager_shell::SortCol;
 
 /// `columns()` is the canonical Win11-TM column order (Name → User → PID →
 /// Threads → Start → Status → CPU → Memory → Swap → Disk read → Disk write → CPU time →
@@ -57,7 +58,7 @@ fn sortcol_all_has_fourteen_columns_in_canonical_order_no_dups() {
 /// mapping is the real assertion; wording is locale-dependent by design).
 #[test]
 fn sortcol_header_labels_match_header_render() {
-    taskmanager::i18n::set_language(taskmanager::i18n::Language::En);
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     let cases = [
         (SortCol::Name, "Name"),
         (SortCol::User, "User"),

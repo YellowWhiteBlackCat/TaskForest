@@ -1,7 +1,11 @@
 //! Typed refresh requests and data delivered back to a frontend.
 
-use crate::model::{ServiceDeps, ServiceLogSnapshot, ServiceLogStreamSnapshot};
-use crate::{FailureKind, RequestId, ServiceControlOutcome, ServiceId};
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::services::{ServiceDeps, ServiceLogSnapshot, ServiceLogStreamSnapshot};
+use taskmanager_core::core::target::ServiceId;
+use taskmanager_platform_contract::RequestId;
+
+use crate::ServiceControlOutcome;
 
 /// A typed asynchronous service result. Keeping these in the shared update
 /// stream lets every frontend consume the same provider-neutral lifecycle.

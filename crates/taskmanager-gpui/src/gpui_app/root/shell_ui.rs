@@ -3,12 +3,15 @@
 //! failure feedback.
 
 use taskmanager_application::{
-    CapabilityId, CommandLaunchRequest, CorrelatedShellEvent, OperationFailure, RefreshRequest,
-    RequestAttemptId, RequestId, ResourceRevealRequest, ShellUiActionIntent, ShellUiActionReceipt,
-    ShellUiActionState, SubmissionErrorKind, UrlOpenRequest, request_submission_failure,
+    CommandLaunchRequest, CorrelatedShellEvent, RefreshRequest, RequestAttemptId,
+    ResourceRevealRequest, ShellUiActionIntent, ShellUiActionReceipt, ShellUiActionState,
+    UrlOpenRequest, request_submission_failure,
+};
+use taskmanager_platform_contract::{
+    CapabilityId, OperationFailure, RequestId, SubmissionErrorKind,
 };
 
-use crate::i18n;
+use taskmanager_application::i18n;
 
 use super::clipboard::process_failure_message;
 use super::{RootView, platform_submission_time_ms};

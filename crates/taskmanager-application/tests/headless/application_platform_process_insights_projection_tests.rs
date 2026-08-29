@@ -1,7 +1,9 @@
 use super::*;
-use crate::{ProcessInsightSnapshot, ProcessInsightsRevision};
-use taskmanager_core::{
-    DeviceState, DeviceStatus, ProcessResourceObservations, ProcessThreadInfo, ThreadState,
+use crate::ProcessInsightsRevision;
+use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::process_telemetry::{
+    ProcessIdentity, ProcessInsightSnapshot, ProcessNetworkSnapshot, ProcessResourceObservations,
+    ProcessThreadInfo, ThreadState,
 };
 
 fn target(start_time_secs: u64) -> FrozenProcessIdentity {

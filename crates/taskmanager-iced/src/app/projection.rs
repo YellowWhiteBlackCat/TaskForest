@@ -115,8 +115,8 @@ pub(crate) struct AppHistoryRowModel {
 pub(super) struct AppHistoryFingerprint {
     source_request: Option<taskmanager_application::HistoryReplayRequestId>,
     status: taskmanager_application::ApplicationHistoryStatus,
-    selected_window: taskmanager_application::HistoryWindow,
-    rows_window: Option<taskmanager_application::HistoryWindow>,
+    selected_window: taskmanager_core::core::history::HistoryWindow,
+    rows_window: Option<taskmanager_core::core::history::HistoryWindow>,
 }
 
 /// Complete invalidation identity for the materialized Performance rail.
@@ -179,7 +179,8 @@ impl IcedApp {
                         .readings
                         .iter()
                         .filter(|reading| {
-                            reading.quantity() == &taskmanager_application::SensorQuantity::FanSpeed
+                            reading.quantity()
+                                == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
                         })
                         .nth(index)
                 })
@@ -212,13 +213,13 @@ impl IcedApp {
                 snapshot: self.shell.projection().snapshot.as_ref(),
                 power: self.shell.projection().power_supplies.as_ref(),
                 sensors: self.shell.projection().sensors.as_ref(),
-                history: &self.shell.history,
+                shell: &self.shell,
                 device_samples: Some(&device_samples),
                 cpu_samples: self.cached_metric_series(
-                    taskmanager_shell::history::MetricSeries::CpuUsagePercent,
+                    taskmanager_shell::presentation::trend::TrendSeries::CpuUsagePercent,
                 ),
                 memory_samples: self.cached_metric_series(
-                    taskmanager_shell::history::MetricSeries::MemoryUsagePercent,
+                    taskmanager_shell::presentation::trend::TrendSeries::MemoryUsagePercent,
                 ),
                 memory_units: crate::ui::UnitPrefs {
                     use_bytes: self.memory_use_bytes(),
@@ -238,7 +239,7 @@ impl IcedApp {
                 .readings
                 .iter()
                 .filter(|reading| {
-                    reading.quantity() == &taskmanager_application::SensorQuantity::FanSpeed
+                    reading.quantity() == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
                 })
                 .collect::<Vec<_>>()
         });

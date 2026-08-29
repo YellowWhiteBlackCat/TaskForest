@@ -3,7 +3,7 @@
 use gpui::{AppContext, Keystroke, TestAppContext, VisualTestContext, WindowHandle};
 use taskmanager_gpui::gpui_app::dashboard::SystemSection;
 use taskmanager_gpui::gpui_app::root::{RootView, TopPage};
-use taskmanager_gpui::gpui_app::theme::Theme;
+use taskmanager_theme::Theme;
 
 fn root(cx: &mut TestAppContext) -> WindowHandle<RootView> {
     cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx))
