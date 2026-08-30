@@ -8,8 +8,10 @@
 use super::process_projection::{ProcessRowFacts, ProjectedRow};
 use super::*;
 use iced::widget::canvas;
+use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_shell::presentation::{
-    optional_bytes, optional_count, optional_duration, optional_nice,
+    missing_value, optional_bytes, optional_duration, optional_nice,
 };
 use taskmanager_theme::tokens;
 
@@ -124,7 +126,16 @@ fn tree_node_row(
         zero_tinted_text(ctx, cells.cpu.clone(), process.cpu_zero, SortCol::Cpu),
         // Per-row CPU-history sparkline: Tree leaves only (a parent row carries
         // no single history) — same gate as the gpui per-row sparkline.
-        process_sparkline_cell(theme_snapshot, &process.cpu_history, *pid, !*has_children),
+        process_sparkline_cell(
+            theme_snapshot,
+            &process.cpu_history,
+            row.row_key().and_then(|key| match key {
+                taskmanager_shell::ProcessRowId::Process(identity) => Some(identity),
+                taskmanager_shell::ProcessRowId::Category(_)
+                | taskmanager_shell::ProcessRowId::Application(_) => None,
+            }),
+            !*has_children,
+        ),
         zero_tinted_text(
             ctx,
             cells.memory.clone(),
@@ -204,7 +215,7 @@ fn tree_node_row(
         // reads as an actionable parent row.
         iced::widget::button(row_content)
             .on_press(Message::ActivateTreeNode {
-                pid: *pid,
+                identity: row.row_key().and_then(|key| key.live_key()),
                 flat_index: *flat_index,
             })
             .style(move |_theme, status| {
@@ -213,17 +224,23 @@ fn tree_node_row(
             .padding(0)
             .into()
     } else {
-        let row_element = focus::selectable_row_with_menu(
-            &theme_snapshot,
-            AppPage::Applications,
-            *flat_index,
-            row_content.into(),
-            Message::OpenProcessRowMenu {
-                flat_index: *flat_index,
-                pid: *pid,
-            },
-        );
-        if ctx.open_menu_pid == Some(*pid) {
+        let identity = row.row_key().and_then(|key| key.live_key());
+        let row_element = match identity {
+            Some(identity) => focus::selectable_row_with_menu(
+                &theme_snapshot,
+                AppPage::Applications,
+                *flat_index,
+                row_content.into(),
+                Message::OpenProcessRowMenu { identity },
+            ),
+            None => focus::selectable_row(
+                &theme_snapshot,
+                AppPage::Applications,
+                *flat_index,
+                row_content.into(),
+            ),
+        };
+        if ctx.open_menu_identity == identity {
             // The open menu floats on its own row: anchored by the popover
             // primitive, dismissible by an outside press, and never clipped
             // by the table viewport the way the old inline panel was.
@@ -250,8 +267,7 @@ pub(crate) struct RowRender {
     pub(crate) ui_size: taskmanager_theme::tokens::UiSize,
     /// The full multi-select target set. A row highlights when its pid is a
     /// member (covers the keyboard anchor AND every Ctrl/Shift-selected row).
-    pub(crate) selected_identities:
-        std::rc::Rc<std::collections::HashSet<taskmanager_shell::ProcessRowIdentity>>,
+    pub(crate) selected_identities: std::rc::Rc<std::collections::HashSet<ProcessLiveKey>>,
     pub(crate) selected_row: Option<taskmanager_shell::ProcessRowId>,
     /// GPUI-parity zero-value policy: when enabled, measured zero resource
     /// values render in the muted foreground instead of their category color
@@ -264,11 +280,11 @@ pub(crate) struct RowRender {
     /// resolve through [`Self::resolved_column_width`] — the same
     /// override-or-default source the header cells read.
     pub(crate) column_widths: std::rc::Rc<crate::app::ColumnWidthOverrides>,
-    /// The pid whose process context menu is currently open, if any. The row
+    /// The live identity whose process context menu is currently open, if any. The row
     /// carrying it hosts the floating menu panel; every other row renders
     /// unchanged. Part of the lazy-body key so opening/closing the menu
     /// rebuilds exactly the materialized window.
-    pub(crate) open_menu_pid: Option<u32>,
+    pub(crate) open_menu_identity: Option<ProcessLiveKey>,
 }
 
 impl RowRender {
@@ -393,22 +409,14 @@ fn group_header_row(
     row: &ProjectedRow,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let ProjectedRow::GroupHeader {
-        flat_index,
-        main_pid,
+        flat_index: _,
+        main_pid: _,
         row_key,
         name,
         expansion_key,
         member_count,
         expanded,
-        cpu,
-        pss,
-        memory_rss,
-        swap,
-        disk_read,
-        disk_write,
-        threads,
-        cpu_time,
-        fds,
+        metrics,
         user,
         status,
         nice,
@@ -423,9 +431,18 @@ fn group_header_row(
     let theme_snapshot = ctx.theme;
     let selected = row_key.is_some_and(|key| ctx.selected_row == Some(key));
     let marker = if *expanded { "▼" } else { "▶" };
-    // The Memory column shows the PSS-preferred sum; the PSS column shows the
-    // PSS sum alone (an honest dash when no member measured one).
-    let memory = pss.or(*memory_rss);
+    // The typed aggregate keeps the PSS-preferred display metric and the PSS
+    // metric separate. Only current values become strings; stale and
+    // unavailable values remain explicit dashes.
+    let (cpu_text, cpu_zero) = aggregate_f32_text(&metrics.cpu, |cpu| format!("{cpu:>5.1}%"));
+    let memory = metrics.memory_display.current_value().copied();
+    let pss = metrics.memory_pss.current_value().copied();
+    let swap = metrics.swap.current_value().copied();
+    let disk_read = metrics.disk_read.current_value().copied();
+    let disk_write = metrics.disk_write.current_value().copied();
+    let cpu_time = metrics.cpu_time.current_value().copied();
+    let threads = aggregate_count_text(&metrics.threads);
+    let fds = aggregate_count_text(&metrics.fds);
     // The fused leading cell spans Pid+Name while Pid is visible and collapses
     // to the Name extent once Pid is hidden, so the identity column keeps its
     // boundary aligned with the member rows beneath it.
@@ -444,7 +461,7 @@ fn group_header_row(
         .align_y(iced::Alignment::Center)
         .width(Length::Fixed(identity_width))
         .into(),
-        zero_tinted_text(ctx, format!("{:>5.1}%", cpu), *cpu == 0.0, SortCol::Cpu),
+        zero_tinted_text(ctx, cpu_text, cpu_zero, SortCol::Cpu),
         // Aggregate group headers carry no single CPU history, so the Trend
         // column stays blank — but the same-width cell keeps the column
         // boundary pixel-aligned with the member rows beneath it.
@@ -458,48 +475,43 @@ fn group_header_row(
             memory == Some(0),
             SortCol::Memory,
         ),
-        zero_tinted_text(ctx, optional_bytes(*pss), *pss == Some(0), SortCol::Pss),
+        zero_tinted_text(ctx, optional_bytes(pss), pss == Some(0), SortCol::Pss),
     ];
     if ctx.swap_visible {
         cells.push(zero_tinted_text(
             ctx,
-            optional_bytes(*swap),
-            *swap == Some(0),
+            optional_bytes(swap),
+            swap == Some(0),
             SortCol::Swap,
         ));
     }
     cells.push(zero_tinted_text(
         ctx,
-        optional_bytes(*disk_read),
-        *disk_read == Some(0),
+        optional_bytes(disk_read),
+        disk_read == Some(0),
         SortCol::DiskRead,
     ));
     cells.push(zero_tinted_text(
         ctx,
-        optional_bytes(*disk_write),
-        *disk_write == Some(0),
+        optional_bytes(disk_write),
+        disk_write == Some(0),
         SortCol::DiskWrite,
     ));
     cells.push(zero_tinted_text(
         ctx,
-        optional_duration(*cpu_time),
-        *cpu_time == Some(0),
+        optional_duration(cpu_time),
+        cpu_time == Some(0),
         SortCol::CpuTime,
     ));
     cells.push(zero_tinted_text(
         ctx,
-        optional_count(*threads),
-        *threads == Some(0),
+        threads.0,
+        threads.1,
         SortCol::Threads,
     ));
     cells.push(text_cell(ctx, user.clone(), SortCol::User));
     cells.push(text_cell(ctx, status.clone(), SortCol::State));
-    cells.push(zero_tinted_text(
-        ctx,
-        optional_count(*fds),
-        *fds == Some(0),
-        SortCol::Fds,
-    ));
+    cells.push(zero_tinted_text(ctx, fds.0, fds.1, SortCol::Fds));
     cells.push(zero_tinted_text(
         ctx,
         optional_nice(*nice),
@@ -515,14 +527,29 @@ fn group_header_row(
     ))
     .on_press(Message::ToggleGroupExpansion {
         name: expansion_key.clone(),
-        main_pid: *main_pid,
-        flat_index: *flat_index,
         row_key: *row_key,
     })
     .style(move |_theme, status| theme::header_button_style(&theme_snapshot, status, selected))
     .padding(0)
     .width(Length::Fill)
     .into()
+}
+
+fn aggregate_f32_text(
+    metric: &AggregateMetric<f32>,
+    format: impl FnOnce(f32) -> String,
+) -> (String, bool) {
+    match metric.current_value().copied() {
+        Some(value) => (format(value), value == 0.0),
+        None => (missing_value(), false),
+    }
+}
+
+fn aggregate_count_text(metric: &AggregateMetric<u64>) -> (String, bool) {
+    match metric.current_value().copied() {
+        Some(value) => (value.to_string(), value == 0),
+        None => (missing_value(), false),
+    }
 }
 
 /// One per-row CPU sparkline cell, or a same-width blank container when the
@@ -533,14 +560,14 @@ fn group_header_row(
 fn process_sparkline_cell(
     theme_snapshot: taskmanager_theme::Theme,
     history: &std::rc::Rc<[f32]>,
-    pid: u32,
+    identity: Option<ProcessLiveKey>,
     show: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
-    if show {
+    if let Some(identity) = identity.filter(|_| show) {
         canvas::Canvas::new(ProcessCpuSparkline::new(
             std::rc::Rc::clone(history),
             taskmanager_theme::iced::color(theme_snapshot.cpu),
-            pid,
+            identity,
         ))
         .width(Length::Fixed(PROCESS_SPARK_WIDTH))
         .height(Length::Fixed(PROCESS_SPARK_HEIGHT))

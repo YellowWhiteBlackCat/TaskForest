@@ -28,17 +28,6 @@ use taskmanager_platform_contract::{
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture::{self, ProjectionSeedFact};
 
-fn expected_key(
-    kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId,
-    pid: u32,
-) -> Option<taskmanager_shell::ProcessRowId> {
-    taskmanager_shell::ProcessRowIdentity::from_parts(
-        pid,
-        taskmanager_test_support::fixture_start_token(pid),
-    )
-    .map(kind)
-}
-
 // ── shared fixtures ──────────────────────────────────────────────────────────
 
 fn service(id: &str, name: &str) -> ServiceItem {

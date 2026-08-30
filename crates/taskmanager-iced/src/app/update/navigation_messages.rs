@@ -2,6 +2,7 @@
 
 use super::super::{ContextMenu, ContextMenuKind, IcedApp, Message};
 use super::dispatch::UpdateDispatch;
+use taskmanager_shell::ProcessRowId;
 
 impl IcedApp {
     pub(super) fn reduce_navigation_message(&mut self, message: Message) -> UpdateDispatch {
@@ -12,18 +13,18 @@ impl IcedApp {
                 self.shell.set_process_status_filter(filter);
                 self.process_presentation.visual_cursor = 0;
             }
-            Message::ToggleGroupExpansion {
-                name,
-                main_pid: _,
+            Message::ToggleGroupExpansion { name, row_key } => {
+                self.toggle_group_expansion_message(name, row_key)
+            }
+            Message::ActivateTreeNode {
+                identity,
                 flat_index,
-                row_key,
-            } => self.toggle_group_expansion_message(name, flat_index, row_key),
-            Message::ActivateTreeNode { pid, flat_index } => {
-                self.activate_tree_node_message(pid, flat_index);
+            } => {
+                self.activate_tree_node_message(identity, flat_index);
             }
             Message::ExpandAllProcessTree => self.expand_all_process_tree_message(),
             Message::CollapseAllProcessTree => self.collapse_all_process_tree_message(),
-            Message::JumpToProcess { pid } => self.jump_to_process_message(pid),
+            Message::JumpToProcess { identity } => self.jump_to_process_message(identity),
             Message::EnvironmentFilterChanged(filter) => {
                 self.process_presentation.env_filter = filter
             }
@@ -65,9 +66,10 @@ impl IcedApp {
             Message::SelectDetailsSection(section) => {
                 self.process_presentation.details_section = section
             }
-            Message::OpenProcessRowMenu { flat_index, pid } => {
-                let _ = self.shell.select_row(flat_index);
-                self.open_context_menu(ContextMenu::Process { pid });
+            Message::OpenProcessRowMenu { identity } => {
+                if self.shell.select_row_id(ProcessRowId::Process(identity)) {
+                    self.open_context_menu(ContextMenu::Process { identity });
+                }
             }
             Message::CloseProcessRowMenu => {
                 self.dismiss_context_menu_kind(ContextMenuKind::Process);

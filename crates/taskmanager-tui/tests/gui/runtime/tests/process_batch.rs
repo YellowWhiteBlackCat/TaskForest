@@ -6,8 +6,7 @@ use super::super::*;
 
 use crate::ui::process_menu::ProcessMenuAction;
 use taskmanager_application::AppAction;
-use taskmanager_core::core::process::PriorityTier;
-use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction, ProcessLiveKey};
 
 fn open_process_menu(app: &mut TuiApp) {
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
@@ -289,8 +288,8 @@ fn mark_key_resolves_the_visual_row_pid_in_the_category_tree() {
         .selected_detail_process()
         .expect("grouped row resolves to a process");
     let expected = expected_item.pid;
-    let expected_identity = taskmanager_shell::ProcessRowIdentity::from_process(&expected_item)
-        .expect("demo row carries a live identity");
+    let expected_identity =
+        ProcessLiveKey::from_process(&expected_item).expect("demo row carries a live identity");
     assert!(app.shell.selected_identities().is_empty());
 
     let _ = handle_key(
@@ -314,7 +313,7 @@ fn mark_key_resolves_the_visual_row_pid_in_the_category_tree() {
     );
     assert!(
         !app.shell.selected_identities().contains(
-            &taskmanager_shell::ProcessRowIdentity::from_parts(
+            &ProcessLiveKey::from_parts(
                 expected,
                 taskmanager_test_support::fixture_start_token(expected)
             )

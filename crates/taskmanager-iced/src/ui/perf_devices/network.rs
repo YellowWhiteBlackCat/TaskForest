@@ -60,18 +60,14 @@ pub(crate) fn wifi_signal_quality_percent(dbm: i32) -> f32 {
     ((dbm as f32 + 90.0) / 60.0 * 100.0).clamp(0.0, 100.0)
 }
 
-/// Whether the adapter is currently associated/carrier-up. Falls back to an
-/// observed IPv4/IPv6 address when the link state is unknown — never invents
-/// a connection.
+/// Whether the adapter is currently associated/carrier-up.
+///
+/// `None` is meaningful: an address proves that an address was assigned, not
+/// that the current carrier state was observed. The caller must preserve that
+/// unknown state instead of turning it into `Disconnected` or `Connected`.
 #[must_use]
-pub(crate) fn network_connected(nic: &NetworkMetrics) -> bool {
-    match super::projection::NetworkObservation::from(nic).link_up {
-        Some(up) => up,
-        None => {
-            nic.ipv4_addr.as_deref().is_some_and(|a| !a.is_empty())
-                || nic.ipv6_addr.as_deref().is_some_and(|a| !a.is_empty())
-        }
-    }
+pub(crate) fn network_connected(nic: &NetworkMetrics) -> Option<bool> {
+    super::projection::NetworkObservation::from(nic).link_up
 }
 
 /// Project one network adapter's honest scalar readouts as pre-folded shell
@@ -101,10 +97,12 @@ pub(crate) fn network_summary_lines(
         StatRow::text(t("net.send"), rate(observed.tx_bytes_per_sec)),
         StatRow::text(
             t("net.connection"),
-            Some(if network_connected(nic) {
-                t("common.connected").to_string()
-            } else {
-                t("common.disconnected").to_string()
+            network_connected(nic).map(|connected| {
+                if connected {
+                    t("common.connected").to_string()
+                } else {
+                    t("common.disconnected").to_string()
+                }
             }),
         ),
         StatRow::text(
@@ -340,14 +338,15 @@ fn network_block<'a>(
         let mut wifi_items: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
         // Semantic connection-state dot: healthy+connected reads success,
         // disconnected reads muted, degraded/error states read danger.
-        let status_color =
-            if nic.device_state.status == DeviceStatus::Healthy && network_connected(nic) {
+        let status_color = match (nic.device_state.status, network_connected(nic)) {
+            (DeviceStatus::Healthy, Some(true)) => {
                 taskmanager_theme::iced::color(theme_snapshot.success)
-            } else if nic.device_state.status == DeviceStatus::Healthy {
+            }
+            (DeviceStatus::Healthy, Some(false) | None) => {
                 crate::theme::muted_text_color(theme_snapshot)
-            } else {
-                taskmanager_theme::iced::color(theme_snapshot.gpu)
-            };
+            }
+            _ => taskmanager_theme::iced::color(theme_snapshot.gpu),
+        };
         wifi_items.push(
             text("\u{25CF}")
                 .size(f32::from(tokens::FONT_10))
@@ -375,7 +374,7 @@ fn network_block<'a>(
                 .into(),
             );
         }
-        if !network_connected(nic) {
+        if network_connected(nic) == Some(false) {
             wifi_items.push(
                 text(t("common.disconnected"))
                     .size(f32::from(tokens::FONT_12))

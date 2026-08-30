@@ -3,9 +3,9 @@
 //! reorder, disappearance, and pid reuse each have exactly one outcome.
 
 use crate::app::direct_track::ProcessSelection;
-use crate::app::process_rows::{ProcessRowId, ProcessRowIdentity};
+use crate::app::process_rows::ProcessRowId;
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
 
 fn live_process(pid: u32, start_token: u64) -> ProcessItem {
     ProcessItem::new(pid, "worker").with_scalar_observations(ProcessScalarObservations {
@@ -14,8 +14,8 @@ fn live_process(pid: u32, start_token: u64) -> ProcessItem {
     })
 }
 
-fn identity(pid: u32, start_token: u64) -> ProcessRowIdentity {
-    ProcessRowIdentity::from_process(&live_process(pid, start_token))
+fn identity(pid: u32, start_token: u64) -> ProcessLiveKey {
+    ProcessLiveKey::from_process(&live_process(pid, start_token))
         .expect("fixture carries a current start token")
 }
 

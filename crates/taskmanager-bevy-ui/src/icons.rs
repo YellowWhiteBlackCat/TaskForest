@@ -16,6 +16,10 @@
 
 use std::collections::HashMap;
 
+#[cfg(test)]
+#[path = "../tests/headless/icons_support.rs"]
+mod icons_support;
+
 use bevy::asset::{Assets, Handle, RenderAssetUsages};
 use bevy::color::Color;
 use bevy::ecs::component::Component;
@@ -123,13 +127,6 @@ impl IconPlates {
     #[must_use]
     pub(crate) fn handle(&self, icon: IconId) -> Option<Handle<Image>> {
         self.plates.get(&icon).cloned()
-    }
-
-    /// How many semantic ids resolved to a drawable plate.
-    #[must_use]
-    #[cfg(test)]
-    pub(crate) fn resolved(&self) -> usize {
-        self.plates.len()
     }
 }
 

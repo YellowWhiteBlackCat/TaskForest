@@ -11,13 +11,14 @@ use gpui::{
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::formatting::{DisplayUnits, UnitKind, missing_value};
+use crate::gpui_app::formatting::missing_value;
 use crate::gpui_app::root::RootView;
 use taskmanager_application::i18n;
 use taskmanager_core::core::DirectoryScanStatus;
 use taskmanager_core::core::DirectoryUsageEntry;
 use taskmanager_core::core::DirectoryUsageSnapshot;
 use taskmanager_core::core::metrics::{DiskMetrics, ScalarAvailability};
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::primitives::card_surface::CardSurface;
@@ -35,7 +36,7 @@ pub(super) fn directory_usage_panel(
     theme: &Theme,
     d: &DiskMetrics,
     state: Option<&DirectoryUsageSnapshot>,
-    units: DisplayUnits,
+    units: UnitPreferences,
     cx: &mut Context<RootView>,
 ) -> Div {
     let ent = cx.entity();
@@ -208,7 +209,7 @@ fn status_text(snapshot: &DirectoryUsageSnapshot) -> String {
 /// Honest cumulative counters: files/dirs counted, the typed byte sum, and
 /// the partial / unreadable / capped markers — each failure dimension is a
 /// separate fact, never folded into a fabricated "complete" number.
-fn totals_row(theme: &Theme, snapshot: &DirectoryUsageSnapshot, units: DisplayUnits) -> Div {
+fn totals_row(theme: &Theme, snapshot: &DirectoryUsageSnapshot, units: UnitPreferences) -> Div {
     let totals = &snapshot.totals;
     let mut text = format!(
         "{} {} · {} {}",
@@ -219,7 +220,7 @@ fn totals_row(theme: &Theme, snapshot: &DirectoryUsageSnapshot, units: DisplayUn
     );
     if let Some(bytes) = totals.bytes_counted.current_value() {
         text.push_str(" · ");
-        text.push_str(&units.format(*bytes, UnitKind::Drive, false));
+        text.push_str(&units.format_quantity(*bytes, QuantityFamily::Drive, false));
     }
     if matches!(
         totals.bytes_counted.availability(),
@@ -249,7 +250,7 @@ fn entry_row(
     theme: &Theme,
     snapshot: &DirectoryUsageSnapshot,
     entry: &DirectoryUsageEntry,
-    units: DisplayUnits,
+    units: UnitPreferences,
     ent: gpui::Entity<RootView>,
     index: usize,
 ) -> gpui::Stateful<Div> {
@@ -259,7 +260,7 @@ fn entry_row(
         entry.path.clone()
     };
     let size_text = match entry.size_bytes.current_value() {
-        Some(bytes) => units.format(*bytes, UnitKind::Drive, false),
+        Some(bytes) => units.format_quantity(*bytes, QuantityFamily::Drive, false),
         None if entry.unreadable.is_some() => i18n::t("disk.usage_unreadable").to_string(),
         None => missing_value(),
     };

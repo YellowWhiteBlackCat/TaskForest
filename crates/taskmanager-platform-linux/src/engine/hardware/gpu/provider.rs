@@ -89,20 +89,27 @@ impl GpuProviderRegistry {
     pub(crate) fn standard() -> Self {
         Self::standard_with_roots(
             PathBuf::from("/sys/class/drm"),
+            PathBuf::from("/sys/module"),
             PathBuf::from("/proc/driver/nvidia"),
         )
     }
 
-    fn standard_with_roots(drm_root: PathBuf, nvidia_root: PathBuf) -> Self {
+    fn standard_with_roots(drm_root: PathBuf, module_root: PathBuf, nvidia_root: PathBuf) -> Self {
         let mut registry = Self {
             entries: Vec::new(),
             scalar_tracker: GpuScalarTracker::default(),
         };
-        registry.register(DrmSysfsGpuProvider::new(drm_root.clone()));
+        registry.register(DrmSysfsGpuProvider::new(
+            drm_root.clone(),
+            module_root.clone(),
+        ));
         #[cfg(not(any(test, feature = "test-support")))]
-        registry.register(GraphicsApiProvider::new(drm_root.clone()));
+        registry.register(GraphicsApiProvider::new(
+            drm_root.clone(),
+            module_root.clone(),
+        ));
         registry.register(AmdSysfsGpuProvider::new(drm_root.clone()));
-        registry.register(IntelSysfsGpuProvider::new(drm_root));
+        registry.register(IntelSysfsGpuProvider::new(drm_root, module_root));
         registry.register(NvidiaProcfsGpuProvider::new(nvidia_root));
         #[cfg(feature = "nvidia")]
         registry.register(NvmlGpuProvider);

@@ -44,7 +44,10 @@ timeout --kill-after=30s "$build_timeout" cargo build --locked --release -j "$jo
     -p taskmanager-setup-helper \
     -p taskmanager-privilege-helper \
     -p taskmanager-net-launcher \
-    -p taskmanager-process-control-helper
+    -p taskmanager-process-control-helper \
+    -p taskmanager-smbios-helper \
+    -p taskmanager-rapl-helper \
+    -p taskmanager-msr-helper
 
 install -m755 target/release/taskmanager target/release/taskforest-g
 timeout --kill-after=10s 30s scripts/test-system-install-manager.sh

@@ -14,11 +14,21 @@
 //! mis-set niceness/mask on a recycled pid, never death).
 //!
 //! Args:
-//! `taskmanager-process-control-helper <pid> <start-token> <operation>`
+//! `taskmanager-process-control-helper <pid> <start-token> <operation> [reply-file]`
 //!
 //! Operations are `end`, `kill`, `suspend`, `resume`, `priority:<nice>`,
 //! `signal:<name>`, or `affinity:<cpu,cpu,...>`. The helper performs no shell
 //! expansion, reads no user-controlled path, and emits one typed JSON result.
+//!
+//! The optional fourth argument is the one-shot reply channel of the Windows
+//! UAC transport (ADR-035 decision 4): an elevated child spawned through
+//! `ShellExecuteExW("runas")` has no captured stdout, so the app pre-creates
+//! a per-call, randomly named file and the SAME contract envelope is written
+//! there. The channel is hardening-bounded: the file must already exist (the
+//! app created it exclusively), is only ever truncated and rewritten with the
+//! fixed envelope, and a write failure is the typed write-failure exit. The
+//! Linux pkexec crossing keeps the three-argument form and its stdout
+//! contract unchanged.
 
 #![forbid(unsafe_code)]
 // The control surface exists behind unix and windows gates; on other targets
@@ -29,6 +39,7 @@ use serde::Serialize;
 // Consumed only by the unix-gated control paths below.
 #[cfg(unix)]
 use std::io;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 const SCHEMA_VERSION: u32 = 1;
@@ -218,40 +229,56 @@ struct ErrorEnvelope<'a> {
 }
 
 fn main() -> ExitCode {
-    let outcome = run();
-    emit(outcome)
+    let (outcome, reply_channel) = run();
+    emit(outcome, reply_channel.as_deref())
 }
 
 #[cfg(any(unix, windows))]
-fn run() -> Result<Applied, HelperError> {
-    let (pid, start_token, operation) = parse_args(std::env::args().skip(1))?;
-    apply_operation(pid, start_token, &operation)?;
-    Ok(Applied {
+fn run() -> (Result<Applied, HelperError>, Option<PathBuf>) {
+    let (pid, start_token, operation, reply_channel) = match parse_args(std::env::args().skip(1)) {
+        Ok(parsed) => parsed,
+        Err(error) => return (Err(error), None),
+    };
+    let outcome = apply_operation(pid, start_token, &operation).map(|()| Applied {
         pid,
         start_token,
         operation: operation.contract_name(),
-    })
+    });
+    (outcome, reply_channel)
 }
 
 #[cfg(not(any(unix, windows)))]
-fn run() -> Result<Applied, HelperError> {
-    Err(HelperError::Unsupported(
-        "foreign process control helper is Unix and Windows only".to_owned(),
-    ))
+fn run() -> (Result<Applied, HelperError>, Option<PathBuf>) {
+    (
+        Err(HelperError::Unsupported(
+            "foreign process control helper is Unix and Windows only".to_owned(),
+        )),
+        None,
+    )
 }
 
 fn parse_args(
     mut args: impl Iterator<Item = String>,
-) -> Result<(u32, u64, Operation), HelperError> {
+) -> Result<(u32, u64, Operation, Option<PathBuf>), HelperError> {
     let pid = parse_nonzero_u32(args.next(), "pid")?;
     let start_token = parse_nonzero_u64(args.next(), "start-token")?;
     let operation = args
         .next()
         .ok_or_else(|| HelperError::ArgError(usage().to_owned()))?;
+    let reply_channel = match args.next() {
+        Some(path) if !path.trim().is_empty() => Some(PathBuf::from(path)),
+        Some(_) => return Err(HelperError::ArgError(usage().to_owned())),
+        None => None,
+    };
     if args.next().is_some() {
         return Err(HelperError::ArgError(usage().to_owned()));
     }
-    Ok((pid, start_token, Operation::parse(&operation)?))
+    Ok((
+        pid,
+        start_token,
+        Operation::parse(&operation)?,
+        reply_channel,
+    ))
 }
 
 fn parse_nonzero_u32(raw: Option<String>, label: &str) -> Result<u32, HelperError> {
@@ -281,7 +308,7 @@ fn parse_nonzero_u64(raw: Option<String>, label: &str) -> Result<u64, HelperErro
 }
 
 const fn usage() -> &'static str {
-    "usage: taskmanager-process-control-helper <pid> <start-token> <operation>"
+    "usage: taskmanager-process-control-helper <pid> <start-token> <operation> [reply-file]"
 }
 
 #[cfg(unix)]
@@ -614,37 +641,79 @@ fn map_win_api_err(err: taskmanager_windows_api::WindowsApiError) -> HelperError
     }
 }
 
-fn emit(outcome: Result<Applied, HelperError>) -> ExitCode {
-    match outcome {
-        Ok(applied) => {
-            let envelope = SuccessEnvelope {
+fn emit(outcome: Result<Applied, HelperError>, reply_channel: Option<&Path>) -> ExitCode {
+    let (code, envelope) = match outcome {
+        Ok(applied) => (
+            ExitCode::SUCCESS,
+            serde_json::to_string(&SuccessEnvelope {
                 schema: SCHEMA_VERSION,
                 status: "applied",
                 pid: applied.pid,
                 start_token: applied.start_token,
                 operation: applied.operation,
-            };
-            write_json(&envelope).map_or_else(|_| ExitCode::from(4), |_| ExitCode::SUCCESS)
-        }
-        Err(error) => {
-            let envelope = ErrorEnvelope {
+            }),
+        ),
+        Err(error) => (
+            ExitCode::from(error.exit_code()),
+            serde_json::to_string(&ErrorEnvelope {
                 schema: SCHEMA_VERSION,
                 status: "error",
                 kind: error.kind(),
                 detail: error.detail(),
-            };
-            write_json(&envelope)
-                .map_or_else(|_| ExitCode::from(4), |_| ExitCode::from(error.exit_code()))
-        }
+            }),
+        ),
+    };
+    let Ok(json) = envelope else {
+        return ExitCode::from(4);
+    };
+    match reply_channel {
+        // The one-shot reply channel (ADR-035): the SAME envelope crosses on
+        // the app-created file. The write is deliberately create-less — the
+        // channel must already exist — so the helper can only ever truncate
+        // and rewrite one file the caller prepared, never mint a new path
+        // with elevated rights.
+        Some(path) => match write_reply_channel(path, json.as_bytes()) {
+            Ok(()) => {
+                // stdout is diagnostics-only on this path (an elevated runas
+                // child has no captured console); a failing stdout write must
+                // not poison the delivered contract.
+                let _ = write_stdout(&json);
+                code
+            }
+            Err(()) => ExitCode::from(4),
+        },
+        // Without a channel, stdout IS the contract (the pkexec crossing).
+        None => write_stdout(&json).map_or_else(|_| ExitCode::from(4), |()| code),
     }
 }
 
-fn write_json<T: Serialize>(value: &T) -> Result<(), ()> {
-    let json = serde_json::to_string(value).map_err(|_| ())?;
-    println!("{json}");
-    Ok(())
+/// Truncate-rewrite the pre-created reply channel; the file must exist.
+fn write_reply_channel(path: &Path, payload: &[u8]) -> Result<(), ()> {
+    use std::io::Write;
+
+    let mut file = std::fs::OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(path)
+        .map_err(|_| ())?;
+    file.write_all(payload).map_err(|_| ())?;
+    file.flush().map_err(|_| ())
+}
+
+fn write_stdout(json: &str) -> Result<(), ()> {
+    use std::io::Write;
+
+    let stdout = std::io::stdout();
+    let mut lock = stdout.lock();
+    lock.write_all(json.as_bytes()).map_err(|_| ())?;
+    lock.write_all(b"\n").map_err(|_| ())?;
+    lock.flush().map_err(|_| ())
 }
 
 #[cfg(test)]
 #[path = "../tests/headless/process_control_helper_main.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../tests/common/test_support.rs"]
+pub(crate) mod test_support;

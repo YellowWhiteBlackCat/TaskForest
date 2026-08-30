@@ -21,6 +21,7 @@ use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
 use taskmanager_application::container_row_window;
 use taskmanager_application::i18n;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
 use taskmanager_ui::data::row::DataRow;
@@ -30,7 +31,7 @@ use taskmanager_ui_contract::IconId;
 /// Render the Containers page body (no outer padding — the caller wraps it).
 /// The rollup's typed [`DeviceStatus`] drives which branch is taken so a
 /// failed source and a genuinely empty host never share copy.
-pub fn render_containers(t: &Theme, rollup: &ContainerRollup) -> Div {
+pub fn render_containers(t: &Theme, rollup: &ContainerRollup, units: UnitPreferences) -> Div {
     let body = match rollup.state.status {
         DeviceStatus::Unsupported => typed_message(
             t,
@@ -60,7 +61,7 @@ pub fn render_containers(t: &Theme, rollup: &ContainerRollup) -> Div {
                     Some(i18n::t("containers.empty_hint")),
                 )
             } else {
-                container_list(t, &rollup.containers)
+                container_list(t, &rollup.containers, units)
             }
         }
     };
@@ -86,11 +87,11 @@ fn header_row(t: &Theme) -> Div {
     )
 }
 
-fn container_list(t: &Theme, containers: &[ContainerSummary]) -> Div {
+fn container_list(t: &Theme, containers: &[ContainerSummary], units: UnitPreferences) -> Div {
     let (shown, hidden) = container_row_window(containers.len());
     let mut list = div().flex().flex_col();
     for (index, container) in containers[..shown].iter().enumerate() {
-        list = list.child(with_row_selector(row_for(t, container), index));
+        list = list.child(with_row_selector(row_for(t, container, units), index));
     }
     if hidden > 0 {
         list = list.child(with_more_hint_selector(elements::more_rows_hint(t, hidden)));
@@ -143,7 +144,7 @@ pub struct ContainerRowVm {
 
 /// Fold one [`ContainerSummary`] into its row display strings, mirroring the
 /// exact formatter/dash conventions the inline render path used.
-pub fn container_row_vm(container: &ContainerSummary) -> ContainerRowVm {
+pub fn container_row_vm(container: &ContainerSummary, units: UnitPreferences) -> ContainerRowVm {
     // One shared dash spelling for uncollected cells (first-sample CPU rate,
     // vanished cgroup memory) — never a fabricated `0.0%` / `0 MB`, and the
     // memory cell no longer borrows the CPU-specific pending key.
@@ -167,7 +168,7 @@ pub fn container_row_vm(container: &ContainerSummary) -> ContainerRowVm {
         memory: container
             .memory_bytes
             .current_value()
-            .map(|bytes| formatting::format_decimal_memory(*bytes))
+            .map(|bytes| units.format_quantity(*bytes, QuantityFamily::Memory, false))
             .unwrap_or_else(formatting::missing_value),
         processes: if container.member_pids.is_empty() {
             formatting::missing_value()
@@ -177,8 +178,8 @@ pub fn container_row_vm(container: &ContainerSummary) -> ContainerRowVm {
     }
 }
 
-fn row_for(t: &Theme, container: &ContainerSummary) -> Div {
-    let vm = container_row_vm(container);
+fn row_for(t: &Theme, container: &ContainerSummary, units: UnitPreferences) -> Div {
+    let vm = container_row_vm(container, units);
     row_skeleton(
         t,
         &vm.name,

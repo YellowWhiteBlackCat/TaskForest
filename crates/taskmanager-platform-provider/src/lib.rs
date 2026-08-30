@@ -45,6 +45,7 @@ pub use storage::{
 };
 pub use system::{
     ContainerRollupProvider, CpuTelemetryProvider, GpuEngineRowsProvider, GpuTelemetryProvider,
-    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider,
-    NetworkTelemetryProvider, NpuInventoryProvider, StorageTelemetryProvider,
+    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider, MsrReadoutProvider,
+    NetworkTelemetryProvider, NpuInventoryProvider, RaplPowerProvider, SmbiosMemoryProvider,
+    StorageTelemetryProvider,
 };

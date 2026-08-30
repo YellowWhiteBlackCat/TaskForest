@@ -3,14 +3,15 @@
 //! query cap, and the cursor/multi-set reset mirroring `push_search_char`.
 
 use super::*;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 #[allow(dead_code)]
-fn identity_of(app: &crate::ShellApp, pid: u32) -> crate::app::process_rows::ProcessRowIdentity {
+fn identity_of(app: &crate::ShellApp, pid: u32) -> ProcessLiveKey {
     app.projection()
         .processes_slice()
         .iter()
         .find(|process| process.pid == pid)
-        .and_then(crate::app::process_rows::ProcessRowIdentity::from_process)
+        .and_then(ProcessLiveKey::from_process)
         .expect("demo process carries a current start token")
 }
 

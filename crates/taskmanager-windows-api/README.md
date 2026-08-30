@@ -11,9 +11,12 @@ per-core CPU frequency), ACPI thermal zones, Windows Event Log
 (`EvtQuery`/`EvtSubscribe`), power scheme/overlay queries, SMBIOS, the
 handle-table open-files lane (sacrificial-thread name resolution), the
 kernel-snapshot memory-compression size, SetupAPI compute-accelerator (NPU)
-inventory, and EnumDisplayDevices + registry EDID reads, plus the LXss
+inventory, EnumDisplayDevices + registry EDID reads, and the LXss
 registry WSL distribution inventory (ADR-031; gap ledger
-in ADR-018).
+in ADR-018), plus the ADR-035 UAC `runas` call group
+(`ShellExecuteExW("runas")` + `SEE_MASK_NOCLOSEPROCESS`, bounded
+`WaitForSingleObject`, `GetExitCodeProcess`, `CloseHandle`, and the
+interactive-session check that gates it).
 
 ## Boundary
 

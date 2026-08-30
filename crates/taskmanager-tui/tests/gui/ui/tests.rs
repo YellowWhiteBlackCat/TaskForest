@@ -38,6 +38,8 @@ mod acceptance_raw_keys;
 mod acceptance_size_matrix;
 #[path = "tests/acceptance_support.rs"]
 mod acceptance_support;
+#[path = "tests/chipset_render.rs"]
+mod chipset_render;
 #[path = "tests/cpu_metrics_render.rs"]
 mod cpu_metrics_render;
 #[path = "tests/cpu_right_rail.rs"]
@@ -282,7 +284,7 @@ mod process_frame_layout_tests {
         frame_chrome_layout,
     };
     use crate::ui::process_table::process_table_layout;
-    use crate::ui::table_hit::table_panel_projection;
+    use crate::ui::table_hit::table_hit_support::table_panel_projection;
 
     #[test]
     fn applications_hit_projection_uses_the_painted_frame_bands() {

@@ -34,7 +34,7 @@ use taskmanager_application::{
     ProcessInsightFacetState, ProcessInsightUnavailable, i18n::t, project_process_resources,
 };
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_core::core::process_telemetry::{
     IsolationKind, LimitValue, ProcessEnvironment, ProcessGpuSnapshot, ProcessNetworkSnapshot,
     ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreads,
@@ -86,6 +86,7 @@ pub(crate) struct ProcessDetailsProjection {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ProcessDetailsSelection {
+    pub(crate) identity: Option<ProcessLiveKey>,
     pub(crate) pid: u32,
     pub(crate) name: String,
 }
@@ -126,6 +127,7 @@ pub(crate) fn projection(shell: &ShellApp) -> ProcessDetailsProjection {
         })
         .collect();
     let selected = ProcessDetailsSelection {
+        identity: ProcessLiveKey::from_process(process),
         pid: process.pid,
         name: process.name.clone(),
     };

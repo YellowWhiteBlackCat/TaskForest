@@ -5,6 +5,7 @@ use taskmanager_application::PlatformClient;
 use taskmanager_application::{
     PlatformEvent, PlatformFacets, PlatformHandle, ServiceControlRequest, ServiceFacets,
 };
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
     RequestEnvelope, RequestPort, SubmissionError,
@@ -337,7 +338,7 @@ fn process_ring_samples_once_per_advancing_snapshot_watermark() {
     app.sample_process_history();
     app.sample_process_history();
     let ring = app.process_perf_history().expect("ring created on overlay");
-    assert_eq!(ring.pid(), 42);
+    assert_eq!(ring.identity(), ProcessLiveKey::from_parts(42, 420_001));
     assert_eq!(ring.cpu_samples(), vec![25.0]);
     assert_eq!(ring.memory_samples(), vec![1_024.0]);
 }

@@ -35,8 +35,6 @@ pub enum DashboardPanel {
     SavedViews,
 }
 
-pub type EventKind = AlertEventKind;
-
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum EventFilter {
     #[default]
@@ -45,8 +43,6 @@ pub enum EventFilter {
     Cleared,
 }
 
-pub type NotificationEvent = AlertEvent;
-
 #[derive(Clone, Debug, Default)]
 pub struct EventCenterState {
     read_ids: HashSet<u64>,
@@ -54,27 +50,27 @@ pub struct EventCenterState {
 }
 
 impl EventCenterState {
-    pub fn unread_count(&self, events: &[NotificationEvent]) -> usize {
+    pub fn unread_count(&self, events: &[AlertEvent]) -> usize {
         events
             .iter()
             .filter(|event| !self.read_ids.contains(&event.id))
             .count()
     }
 
-    pub fn visible_events(&self, events: &[NotificationEvent]) -> Vec<NotificationEvent> {
+    pub fn visible_events(&self, events: &[AlertEvent]) -> Vec<AlertEvent> {
         events
             .iter()
             .rev()
             .filter(|event| match self.filter {
                 EventFilter::All => true,
-                EventFilter::Active => event.kind == EventKind::Activated,
-                EventFilter::Cleared => event.kind == EventKind::Cleared,
+                EventFilter::Active => event.kind == AlertEventKind::Activated,
+                EventFilter::Cleared => event.kind == AlertEventKind::Cleared,
             })
             .cloned()
             .collect()
     }
 
-    pub fn mark_all_read(&mut self, events: &[NotificationEvent]) {
+    pub fn mark_all_read(&mut self, events: &[AlertEvent]) {
         self.read_ids.extend(events.iter().map(|event| event.id));
     }
 
@@ -98,7 +94,7 @@ impl EventCenterState {
         };
         let activated = AlertEvent {
             id: 1,
-            kind: EventKind::Activated,
+            kind: AlertEventKind::Activated,
             alert: warning.clone(),
             observed_at_ms: 3_590_000,
         };
@@ -112,7 +108,7 @@ impl EventCenterState {
             activated,
             AlertEvent {
                 id: 2,
-                kind: EventKind::Cleared,
+                kind: AlertEventKind::Cleared,
                 alert: cleared,
                 observed_at_ms: 3_560_000,
             },

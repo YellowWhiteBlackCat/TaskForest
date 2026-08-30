@@ -28,11 +28,14 @@ mod directory_usage;
 mod environment;
 mod gpu_engine_rows;
 mod integration;
+mod msr_readout;
 mod npu_inventory;
 mod power;
 mod process;
+mod rapl_power;
 mod sensor;
 mod service;
+mod smbios_memory;
 mod storage;
 mod system;
 
@@ -40,11 +43,14 @@ pub use directory_usage::*;
 pub use environment::*;
 pub use gpu_engine_rows::*;
 pub use integration::*;
+pub use msr_readout::*;
 pub use npu_inventory::*;
 pub use power::*;
 pub use process::*;
+pub use rapl_power::*;
 pub use sensor::*;
 pub use service::*;
+pub use smbios_memory::*;
 pub use storage::*;
 pub use system::*;
 
@@ -70,6 +76,9 @@ pub enum PlatformEvent {
     DirectoryUsage(DirectoryUsageEvent),
     GpuEngineRows(GpuEngineRowsEvent),
     NpuInventory(NpuInventoryEvent),
+    SmbiosMemory(SmbiosMemoryEvent),
+    RaplPower(RaplPowerEvent),
+    MsrReadout(MsrReadoutEvent),
 }
 
 pub(crate) trait PlatformEventVisitor {
@@ -91,6 +100,9 @@ pub(crate) trait PlatformEventVisitor {
     fn visit_directory_usage(&mut self, event: DirectoryUsageEvent);
     fn visit_gpu_engine_rows(&mut self, event: GpuEngineRowsEvent);
     fn visit_npu_inventory(&mut self, event: NpuInventoryEvent);
+    fn visit_smbios_memory(&mut self, event: SmbiosMemoryEvent);
+    fn visit_rapl_power(&mut self, event: RaplPowerEvent);
+    fn visit_msr_readout(&mut self, event: MsrReadoutEvent);
 }
 
 impl PlatformEvent {
@@ -122,6 +134,9 @@ impl PlatformEvent {
             Self::DirectoryUsage(event) => event.accepts_capability(capability),
             Self::GpuEngineRows(event) => event.accepts_capability(capability),
             Self::NpuInventory(event) => event.accepts_capability(capability),
+            Self::SmbiosMemory(event) => event.accepts_capability(capability),
+            Self::RaplPower(event) => event.accepts_capability(capability),
+            Self::MsrReadout(event) => event.accepts_capability(capability),
         }
     }
 
@@ -151,6 +166,9 @@ impl PlatformEvent {
             Self::DirectoryUsage(event) => visitor.visit_directory_usage(event),
             Self::GpuEngineRows(event) => visitor.visit_gpu_engine_rows(event),
             Self::NpuInventory(event) => visitor.visit_npu_inventory(event),
+            Self::SmbiosMemory(event) => visitor.visit_smbios_memory(event),
+            Self::RaplPower(event) => visitor.visit_rapl_power(event),
+            Self::MsrReadout(event) => visitor.visit_msr_readout(event),
         }
     }
 }

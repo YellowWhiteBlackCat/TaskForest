@@ -29,6 +29,11 @@ identity map.
 - `src/application_history_projection.rs` joins persistent replay rows into the
   one application-history read model consumed by GPUI, Iced, TUI, and Bevy, including
   explicit capability states and timestamp-aware chart gaps.
+- `src/process_category_projection.rs` owns category bucket order and typed
+  process aggregates. It selects the PSS-preferred display observation, then
+  delegates availability, coverage, freshness, failure, and saturating-add
+  semantics to core's `AggregateMetric` API; missing values never become a
+  successful zero.
 - `src/config_store.rs` owns base-aware configuration transactions. Each
   writer merges only top-level fields changed from its last locally observed
   snapshot into the lock-protected current disk value; an unchanged periodic

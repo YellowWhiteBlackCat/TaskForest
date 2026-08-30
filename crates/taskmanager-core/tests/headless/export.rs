@@ -120,6 +120,20 @@ fn snapshot_to_json_round_trips_brand_and_processes() {
 }
 
 #[test]
+fn snapshot_to_json_exports_process_history_gaps_as_null_slots() {
+    let mut process = ProcessItem::new(42, "worker");
+    process.cpu_history = vec![10.0, f32::NAN, 30.0];
+
+    let value: serde_json::Value =
+        serde_json::from_str(&snapshot_to_json(&SystemSnapshot::default(), &[process]))
+            .expect("non-finite history must use JSON null");
+    assert_eq!(
+        value["processes"][0]["cpu_history"],
+        serde_json::json!([10.0, null, 30.0])
+    );
+}
+
+#[test]
 fn snapshot_json_keeps_unknown_cpu_observations_distinct_from_zero() {
     let unknown: serde_json::Value =
         serde_json::from_str(&snapshot_to_json(&SystemSnapshot::default(), &[]))
@@ -128,7 +142,8 @@ fn snapshot_json_keeps_unknown_cpu_observations_distinct_from_zero() {
     assert!(cpu["brand"].is_null());
     assert!(cpu["physical_cores"].is_null());
     assert!(cpu["logical_cores"].is_null());
-    assert!(cpu["l1_cache_kb"].is_null());
+    assert!(cpu["l1d_cache_kb"].is_null());
+    assert!(cpu["l1i_cache_kb"].is_null());
     assert!(cpu["frequency_mhz"].is_null());
     assert!(cpu["max_freq_mhz"].is_null());
     assert!(cpu["temperature_c"].is_null());

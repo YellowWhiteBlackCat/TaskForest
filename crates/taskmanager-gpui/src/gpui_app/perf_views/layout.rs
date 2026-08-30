@@ -259,8 +259,12 @@ fn badge_formatter(unit: GraphUnit) -> fn(f32) -> String {
 fn format_graph_value(unit: GraphUnit, value: f32) -> String {
     match unit {
         GraphUnit::Percent => format!("{value:.0}%"),
-        GraphUnit::NetworkRate(units) => units.format_network_graph_megabytes(value),
-        GraphUnit::DriveRate(units) => units.format_drive_graph_megabytes(value),
+        GraphUnit::NetworkRate(units) => {
+            crate::gpui_app::formatting::format_network_graph_megabytes(units, value)
+        }
+        GraphUnit::DriveRate(units) => {
+            crate::gpui_app::formatting::format_drive_graph_megabytes(units, value)
+        }
         GraphUnit::Rpm => taskmanager_shell::presentation::fan_rpm(value),
         GraphUnit::Watts => taskmanager_shell::presentation::power_w(value),
         GraphUnit::Temperature => taskmanager_shell::presentation::temperature_c(value),

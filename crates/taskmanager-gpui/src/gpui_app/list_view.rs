@@ -608,7 +608,7 @@ pub fn source_notice_with_detail_presentation(
             )
             .children(detail.into_iter().map(|detail| {
                 div().flex().flex_row().min_w(px(0.0)).child(
-                    crate::gpui_app::elements::truncated_text(&detail.to_string())
+                    crate::gpui_app::elements::truncated_text(detail)
                         .text_size(tokens::FONT_11)
                         .text_color(theme.fg_dim),
                 )

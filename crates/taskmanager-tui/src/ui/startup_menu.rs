@@ -8,6 +8,10 @@
 //! confirmation (y), mirroring the session-action flow.
 
 use ratatui::Frame;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/startup_menu_support.rs"]
+pub(crate) mod startup_menu_support;
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
@@ -46,26 +50,6 @@ pub fn action_label(enabled: bool) -> &'static str {
 /// Render the startup-action menu centred over `area`.  Test-only entry: the
 /// caller supplies the committed focus plan so the highlighted row stays the
 /// plan's decision, not the frozen menu state's.
-#[cfg(test)]
-pub fn render_startup_menu(
-    frame: &mut Frame<'_>,
-    menu: &StartupMenuTarget,
-    theme: TuiTheme,
-    focus: super::TuiFocusPlan,
-    area: Rect,
-) {
-    render_startup_menu_at(
-        frame,
-        menu,
-        theme,
-        focus,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::LocalSurface(crate::TuiSurfaceKind::StartupMenu),
-        ),
-    );
-}
-
 pub(super) fn render_startup_menu_at(
     frame: &mut Frame<'_>,
     menu: &StartupMenuTarget,

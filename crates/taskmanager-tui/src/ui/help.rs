@@ -89,17 +89,6 @@ fn localize_tui_binding(binding: LocalBinding) -> LocalBinding {
 /// is too small for a readable box. The binding list is laid out as two
 /// side-by-side columns and sliced by [`TuiApp::help_scroll`], so a short
 /// terminal (or a growing binding list) scrolls instead of clipping the tail.
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn render_help_overlay(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    render_help_overlay_at(
-        frame,
-        app,
-        theme,
-        super::planned_popup(area, crate::TuiInputScope::Help),
-    );
-}
-
 pub(super) fn render_help_overlay_at(
     frame: &mut Frame<'_>,
     app: &TuiApp,
@@ -262,3 +251,7 @@ pub(super) fn render_command_palette_at(
 #[cfg(test)]
 #[path = "../../tests/gui/ui/help_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/help_support.rs"]
+pub(crate) mod help_support;

@@ -70,6 +70,15 @@ fn parse_args_dispatches_flag_modes() {
         parse_args(["--gpu-engines".into()]),
         Ok(CliMode::GpuEngines)
     );
+    assert_eq!(
+        parse_args(["--memory-smbios".into()]),
+        Ok(CliMode::MemorySmbios)
+    );
+    assert_eq!(
+        parse_args(["--package-power".into()]),
+        Ok(CliMode::PackagePower)
+    );
+    assert_eq!(parse_args(["--msr".into()]), Ok(CliMode::Msr));
     assert_eq!(parse_args(["--help".into()]), Ok(CliMode::Help));
     assert_eq!(parse_args(["-h".into()]), Ok(CliMode::Help));
 }
@@ -99,6 +108,18 @@ fn parse_args_rejects_unknown_and_trailing_tokens() {
         Err(CliArgError::UnknownArgument)
     );
     assert_eq!(
+        parse_args(["--memory-smbios".into(), "extra".into()]),
+        Err(CliArgError::UnknownArgument)
+    );
+    assert_eq!(
+        parse_args(["--package-power".into(), "extra".into()]),
+        Err(CliArgError::UnknownArgument)
+    );
+    assert_eq!(
+        parse_args(["--msr".into(), "extra".into()]),
+        Err(CliArgError::UnknownArgument)
+    );
+    assert_eq!(
         parse_args(["--app-id".into()]),
         Err(CliArgError::MissingApplicationId)
     );
@@ -114,6 +135,36 @@ fn parse_args_rejects_unknown_and_trailing_tokens() {
         parse_args(["--app-id".into(), "org.example.App".into(), "extra".into()]),
         Err(CliArgError::UnknownArgument)
     );
+}
+
+#[test]
+fn help_and_unknown_argument_hint_list_every_mode_flag() {
+    // Every mode the parser dispatches must be discoverable from the binary's
+    // own output: the help text and the unknown-argument usage hint. A mode
+    // missing from either is invisible to a scripting user.
+    let mut help = Vec::new();
+    print_help_to(&mut help).expect("help renders to the buffer");
+    let help = String::from_utf8(help).expect("help output is UTF-8");
+    let hint = CliArgError::UnknownArgument.to_string();
+    for flag in [
+        "--app-id",
+        "--demo",
+        "--json",
+        "--suggest-thresholds",
+        "--gpu-engines",
+        "--memory-smbios",
+        "--package-power",
+        "--msr",
+        "--snapshot",
+        "--capture-window",
+        "--help",
+    ] {
+        assert!(help.contains(flag), "--help must list {flag}");
+        assert!(
+            hint.contains(flag),
+            "the unknown-argument hint must mention {flag}"
+        );
+    }
 }
 
 #[test]

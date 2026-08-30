@@ -66,7 +66,7 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
             .take(MAX_SNAPSHOT_ROWS)
             .enumerate()
             .map(|(index, process)| ProcessRowInput {
-                id: format!("process:{}", process.pid),
+                id: taskmanager_shell::process_semantic_key(process),
                 name: process.name.clone(),
                 cpu_percent: process.current_cpu_percentage().map(f64::from),
                 // A per-process share needs the denominator the shell does
@@ -130,9 +130,10 @@ fn sync_semantic_snapshot(
 /// with the row scene so the required-component default from `Button` never
 /// reduces a data row to an unnamed button.
 #[must_use]
-pub(crate) fn process_row_node(name: &str, pid: u32) -> AccessibilityNode {
+pub(crate) fn process_row_node(name: &str, semantic_id: &str) -> AccessibilityNode {
     let mut node = accesskit::Node::new(accesskit::Role::Row);
-    node.set_label(format!("{name} ({pid})"));
+    node.set_label(name);
+    node.set_description(semantic_id);
     AccessibilityNode(node)
 }
 

@@ -1,7 +1,7 @@
 use super::memory_stats::optional_memory;
 use super::network_stats::network_link_speed_graph_max_mbps;
 use super::{finite_graph_summary, gpu_percentage_readout};
-use crate::gpui_app::formatting::DisplayUnits;
+use taskmanager_core::core::units::UnitPreferences;
 
 #[test]
 fn gpu_optional_percentages_distinguish_unknown_from_measured_zero() {
@@ -12,8 +12,8 @@ fn gpu_optional_percentages_distinguish_unknown_from_measured_zero() {
 
 #[test]
 fn optional_memory_capacity_distinguishes_unknown_from_measured_zero() {
-    assert_eq!(optional_memory(None, DisplayUnits::default()), "—");
-    assert_eq!(optional_memory(Some(0), DisplayUnits::default()), "0 KiB");
+    assert_eq!(optional_memory(None, UnitPreferences::default()), "—");
+    assert_eq!(optional_memory(Some(0), UnitPreferences::default()), "0 B");
 }
 
 #[test]

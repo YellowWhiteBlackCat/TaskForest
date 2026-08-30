@@ -155,11 +155,6 @@ mod tests;
 /// graph-data-points preference). Production callers go through
 /// [`device_trend_in`]; this wrapper remains as the Unicode-regression entry
 /// for the paint-time ladder tests.
-#[cfg(test)]
-pub(super) fn device_trend_with(samples: &[f32], window: usize) -> String {
-    device_trend_in(TuiGlyphMode::Unicode, samples, window)
-}
-
 /// [`device_trend_with`] for an explicit terminal glyph repertoire: the
 /// cold-start placeholder and the ramp are both selected for the repertoire at
 /// paint time.
@@ -204,20 +199,6 @@ pub(super) struct DeviceDualTrend {
 /// inside a live row renders the gap glyph instead of a baseline block.
 /// Production callers go through [`device_dual_trend_in`]; this wrapper
 /// remains as the Unicode-regression entry for the ladder tests.
-#[cfg(test)]
-pub(super) fn device_dual_trend_with(
-    primary_samples: &[f32],
-    secondary_samples: &[f32],
-    window: usize,
-) -> DeviceDualTrend {
-    device_dual_trend_in(
-        TuiGlyphMode::Unicode,
-        primary_samples,
-        secondary_samples,
-        window,
-    )
-}
-
 /// [`device_dual_trend_with`] for an explicit terminal glyph repertoire: the
 /// ramp, the gap glyph and the cold-start placeholder are all selected for the
 /// repertoire at paint time.
@@ -307,11 +288,6 @@ pub(super) fn dual_trend_line(
 /// two trend views can never drift apart. Production callers go through
 /// [`process_cpu_trend_in`]; this wrapper remains as the Unicode-regression
 /// entry for the ladder tests.
-#[cfg(test)]
-pub(super) fn process_cpu_trend(samples: &[f32]) -> String {
-    process_cpu_trend_in(TuiGlyphMode::Unicode, samples)
-}
-
 /// [`process_cpu_trend`] for an explicit terminal glyph repertoire, so the
 /// per-row table can paint the same finite-sample gate and bounded window
 /// through the ASCII ladder on ASCII-only terminals.
@@ -395,16 +371,4 @@ pub(super) fn device_summary_line_in(
         t("common.peak"),
         summary_value(summary.maximum, unit, mode),
     ))
-}
-
-/// [`device_summary_line_in`] in the Unicode repertoire. Production callers
-/// go through [`device_summary_line_in`]; this wrapper remains as the
-/// Unicode-regression entry for the ladder tests.
-#[cfg(test)]
-pub(super) fn device_summary_line(
-    label: &str,
-    samples: &[f32],
-    unit: DeviceSummaryUnit,
-) -> Option<String> {
-    device_summary_line_in(TuiGlyphMode::Unicode, label, samples, unit)
 }

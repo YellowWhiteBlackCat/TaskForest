@@ -9,10 +9,10 @@ use taskmanager_platform_contract::{
 use super::facets::PlatformEventVisitor;
 use super::{
     ContainerRollupEvent, DesktopAppearanceEvent, DirectoryUsageEvent, GpuEngineRowsEvent,
-    HardwareInventoryEvent, NpuInventoryEvent, PlatformEvent, PowerSupplyEvent,
+    HardwareInventoryEvent, MsrReadoutEvent, NpuInventoryEvent, PlatformEvent, PowerSupplyEvent,
     ProcessAffinityEvent, ProcessEvent, ProjectedProcessInsights, ProjectedStartupEvidence,
-    ProjectedSystemTelemetry, SensorEvent, ServiceEvent, SessionEvent, ShellEvent, SmartEvent,
-    StartupEvent, StartupEvidenceEvent, StorageHealthEvent,
+    ProjectedSystemTelemetry, RaplPowerEvent, SensorEvent, ServiceEvent, SessionEvent, ShellEvent,
+    SmartEvent, SmbiosMemoryEvent, StartupEvent, StartupEvidenceEvent, StorageHealthEvent,
 };
 
 mod environment;
@@ -36,7 +36,8 @@ pub use storage::{
     CorrelatedDirectoryUsageEvent, CorrelatedSmartEvent, CorrelatedStorageHealthEvent,
 };
 pub use system::{
-    CorrelatedGpuEngineRowsEvent, CorrelatedHardwareInventoryEvent, CorrelatedNpuInventoryEvent,
+    CorrelatedGpuEngineRowsEvent, CorrelatedHardwareInventoryEvent, CorrelatedMsrReadoutEvent,
+    CorrelatedNpuInventoryEvent, CorrelatedRaplPowerEvent, CorrelatedSmbiosMemoryEvent,
     CorrelatedSystemTelemetryOutcome,
 };
 
@@ -73,6 +74,9 @@ pub struct PlatformEventBatch {
     pub directory_usage_events: Vec<CorrelatedDirectoryUsageEvent>,
     pub gpu_engine_rows_events: Vec<CorrelatedGpuEngineRowsEvent>,
     pub npu_inventory_events: Vec<CorrelatedNpuInventoryEvent>,
+    pub smbios_memory_events: Vec<CorrelatedSmbiosMemoryEvent>,
+    pub rapl_power_events: Vec<CorrelatedRaplPowerEvent>,
+    pub msr_readout_events: Vec<CorrelatedMsrReadoutEvent>,
     pub failures: Vec<OperationFailure>,
 }
 
@@ -158,6 +162,9 @@ impl PlatformEventBatch {
             directory_usage_events,
             gpu_engine_rows_events,
             npu_inventory_events,
+            smbios_memory_events,
+            rapl_power_events,
+            msr_readout_events,
             failures,
         } = self;
         system_telemetry_outcomes.is_empty()
@@ -181,6 +188,9 @@ impl PlatformEventBatch {
             && directory_usage_events.is_empty()
             && gpu_engine_rows_events.is_empty()
             && npu_inventory_events.is_empty()
+            && smbios_memory_events.is_empty()
+            && rapl_power_events.is_empty()
+            && msr_readout_events.is_empty()
             && failures.is_empty()
     }
 
@@ -217,6 +227,9 @@ impl PlatformEventBatch {
             directory_usage_events,
             gpu_engine_rows_events,
             npu_inventory_events,
+            smbios_memory_events,
+            rapl_power_events,
+            msr_readout_events,
             failures,
         } = &mut self;
         sort_correlated(system_telemetry_outcomes);
@@ -240,6 +253,9 @@ impl PlatformEventBatch {
         sort_correlated(directory_usage_events);
         sort_correlated(gpu_engine_rows_events);
         sort_correlated(npu_inventory_events);
+        sort_correlated(smbios_memory_events);
+        sort_correlated(rapl_power_events);
+        sort_correlated(msr_readout_events);
         failures.sort_by_key(|failure| failure.sequence);
         self
     }
@@ -342,6 +358,18 @@ impl PlatformEventVisitor for BatchEventVisitor<'_> {
 
     fn visit_npu_inventory(&mut self, event: NpuInventoryEvent) {
         system::push_npu_inventory(self.batch, self.context.clone(), event);
+    }
+
+    fn visit_smbios_memory(&mut self, event: SmbiosMemoryEvent) {
+        system::push_smbios_memory(self.batch, self.context.clone(), event);
+    }
+
+    fn visit_rapl_power(&mut self, event: RaplPowerEvent) {
+        system::push_rapl_power(self.batch, self.context.clone(), event);
+    }
+
+    fn visit_msr_readout(&mut self, event: MsrReadoutEvent) {
+        system::push_msr_readout(self.batch, self.context.clone(), event);
     }
 }
 

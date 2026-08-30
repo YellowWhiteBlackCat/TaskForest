@@ -160,11 +160,12 @@ fn test_system_hardware_rows_include_panorama_facts() {
         architecture: Some("x86_64".into()),
         motherboard_vendor: Some("ASUSTeK COMPUTER INC.".into()),
         motherboard_model: Some("ROG STRIX B760-I".into()),
+        chipset: Some("B760 Chipset".into()),
         firmware_release_date: Some("08/01/2026".into()),
         secure_boot: Some(true),
         ..Default::default()
     };
-    let rows = crate::ui::system_table::hardware_info_rows(&hw);
+    let rows = crate::ui::system_table::hardware_info_rows(&hw, None);
     let value = |label: &str| {
         rows.iter()
             .find(|row| row.label == label)
@@ -173,9 +174,17 @@ fn test_system_hardware_rows_include_panorama_facts() {
     assert_eq!(value("Architecture"), Some("x86_64"));
     assert_eq!(value("Motherboard vendor"), Some("ASUSTeK COMPUTER INC."));
     assert_eq!(value("Motherboard model"), Some("ROG STRIX B760-I"));
+    assert_eq!(value("Chipset"), Some("B760 Chipset"));
     assert_eq!(value("Firmware release date"), Some("08/01/2026"));
     assert_eq!(value("Secure Boot"), Some("Enabled"));
     assert_eq!(value("Installed packages"), Some("1489"));
+    // Row order: the chipset sits directly beneath the motherboard model.
+    let index = |label: &str| {
+        rows.iter()
+            .position(|row| row.label == label)
+            .unwrap_or(usize::MAX)
+    };
+    assert_eq!(index("Motherboard model") + 1, index("Chipset"));
 }
 
 #[test]

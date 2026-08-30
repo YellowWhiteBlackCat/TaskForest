@@ -87,6 +87,8 @@ struct GpuMetricsWire {
     throttle_reasons: Option<Vec<GpuThrottleReason>>,
     #[serde(default)]
     driver: Option<String>,
+    #[serde(default)]
+    driver_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     graphics_api: Option<GpuGraphicsApi>,
 }
@@ -155,6 +157,7 @@ impl Serialize for GpuMetrics {
             gpu_throttle_reason,
             throttle_reasons,
             driver: self.driver.clone(),
+            driver_version: self.driver_version.clone(),
             graphics_api: self.graphics_api.clone(),
         }
         .serialize(serializer)
@@ -351,6 +354,7 @@ impl<'de> Deserialize<'de> for GpuMetrics {
             engine_failure: wire.engine_failure,
             engine_provider: wire.engine_provider,
             driver: wire.driver,
+            driver_version: wire.driver_version,
             graphics_api: wire.graphics_api,
         })
     }

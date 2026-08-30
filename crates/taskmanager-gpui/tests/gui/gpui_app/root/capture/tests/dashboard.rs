@@ -8,6 +8,7 @@ use super::super::{
     CaptureEvidence, CaptureScenario, DashboardPanel, DashboardState, HistoryWindow, SystemSection,
     SystemSnapshot,
 };
+use super::PROCESSES_OBSERVED_AT_MS;
 use std::sync::Arc;
 use taskmanager_telemetry_store::{CorrelatedSystemTelemetryIngestor, TelemetryStore};
 
@@ -35,7 +36,11 @@ fn dashboard_marker_waits_for_live_readiness_and_prepares_exact_target() {
     );
     assert!(!evidence.scenario_ready);
     let mut processes = Vec::new();
-    assert!(evidence.on_processes_update(true, &mut processes).is_none());
+    assert!(
+        evidence
+            .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
+            .is_none()
+    );
     let panel =
         evidence.on_dashboard_state(&mut dashboard, &store.system_history, &ingestor, 7_200_000);
     assert!(evidence.scenario_ready);
@@ -57,7 +62,7 @@ fn every_dashboard_capture_token_reaches_its_exact_root_state() {
         let mut snapshot = SystemSnapshot::default();
         let mut processes = Vec::new();
         evidence.on_snapshot(&mut snapshot);
-        evidence.on_processes_update(true, &mut processes);
+        evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
         let panel = evidence.on_dashboard_state(
             &mut dashboard,
             &store.system_history,
@@ -102,7 +107,7 @@ fn system_npu_capture_selects_hardware_but_defers_marker_to_post_layout_scroll()
     let mut snapshot = SystemSnapshot::default();
     let mut processes = Vec::new();
     evidence.on_snapshot(&mut snapshot);
-    evidence.on_processes_update(true, &mut processes);
+    evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
 
     let panel =
         evidence.on_dashboard_state(&mut dashboard, &store.system_history, &ingestor, 7_200_000);
@@ -125,7 +130,7 @@ fn dashboard_capture_history_stays_anchored_when_a_new_live_frame_arrives() {
     };
     let mut processes = Vec::new();
     evidence.on_snapshot(&mut snapshot);
-    evidence.on_processes_update(true, &mut processes);
+    evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
     let _ = evidence.on_dashboard_state(
         &mut dashboard,
         &store.system_history,

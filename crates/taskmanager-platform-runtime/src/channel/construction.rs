@@ -12,7 +12,7 @@ use taskmanager_application::{
 };
 
 use super::lanes::RuntimeLanes;
-use super::port::request_lane;
+use super::port::{ChannelRequestPort, request_lane};
 use crate::config::{DeliveryClass, RuntimeBudgets, RuntimeConfig, RuntimeProviderBindings};
 use crate::delivery::LaneStartRegistry;
 use crate::delivery::{
@@ -28,6 +28,7 @@ use crate::sensor::PendingSensorRuntimeLanes;
 use crate::service::PendingServiceRuntimeLanes;
 use crate::storage::PendingStorageRuntimeLanes;
 use crate::system::PendingSystemRuntimeLanes;
+use taskmanager_platform_contract::CapabilityRequest;
 
 mod budget;
 use budget::validate_runtime_config;
@@ -39,6 +40,17 @@ pub struct ChannelRuntime {
     pub publisher: Arc<RuntimeEventPublisher>,
     pub lanes: RuntimeLanes,
     pub(crate) lane_starters: Arc<LaneStartRegistry>,
+}
+
+fn attach_optional<R, F, T>(facets: T, port: Option<Arc<ChannelRequestPort<R>>>, attach: F) -> T
+where
+    R: CapabilityRequest,
+    F: FnOnce(T, Arc<ChannelRequestPort<R>>) -> T,
+{
+    match port {
+        Some(port) => attach(facets, port),
+        None => facets,
+    }
 }
 
 impl ChannelRuntime {
@@ -133,6 +145,24 @@ impl ChannelRuntime {
         let (npu_inventory_port, npu_inventory_rx) = request_lane(
             observation_capacity,
             bindings.system.npu_inventory.as_ref(),
+            ecs_scheduler.clone(),
+            lane_starters.clone(),
+        );
+        let (smbios_memory_port, smbios_memory_rx) = request_lane(
+            observation_capacity,
+            bindings.system.smbios_memory.as_ref(),
+            ecs_scheduler.clone(),
+            lane_starters.clone(),
+        );
+        let (rapl_power_port, rapl_power_rx) = request_lane(
+            observation_capacity,
+            bindings.system.rapl_power.as_ref(),
+            ecs_scheduler.clone(),
+            lane_starters.clone(),
+        );
+        let (msr_readout_port, msr_readout_rx) = request_lane(
+            observation_capacity,
+            bindings.system.msr_readout.as_ref(),
             ecs_scheduler.clone(),
             lane_starters.clone(),
         );
@@ -375,155 +405,171 @@ impl ChannelRuntime {
             capabilities.clone(),
         ));
 
-        let mut system = SystemFacets::default();
-        if let Some(port) = host_telemetry_port {
-            system = system.with_host(port);
-        }
-        if let Some(port) = cpu_telemetry_port {
-            system = system.with_cpu(port);
-        }
-        if let Some(port) = memory_telemetry_port {
-            system = system.with_memory(port);
-        }
-        if let Some(port) = storage_telemetry_port {
-            system = system.with_storage(port);
-        }
-        if let Some(port) = network_telemetry_port {
-            system = system.with_network(port);
-        }
-        if let Some(port) = gpu_telemetry_port {
-            system = system.with_gpu(port);
-        }
-        if let Some(port) = hardware_inventory_port {
-            system = system.with_hardware_inventory(port);
-        }
-        if let Some(port) = containers_port {
-            system = system.with_containers(port);
-        }
-        if let Some(port) = gpu_engine_rows_port {
-            system = system.with_gpu_engine_rows(port);
-        }
-        if let Some(port) = npu_inventory_port {
-            system = system.with_npu_inventory(port);
-        }
+        let system = SystemFacets::default();
+        let system = attach_optional(system, host_telemetry_port, |system, port| {
+            system.with_host(port)
+        });
+        let system = attach_optional(system, cpu_telemetry_port, |system, port| {
+            system.with_cpu(port)
+        });
+        let system = attach_optional(system, memory_telemetry_port, |system, port| {
+            system.with_memory(port)
+        });
+        let system = attach_optional(system, storage_telemetry_port, |system, port| {
+            system.with_storage(port)
+        });
+        let system = attach_optional(system, network_telemetry_port, |system, port| {
+            system.with_network(port)
+        });
+        let system = attach_optional(system, gpu_telemetry_port, |system, port| {
+            system.with_gpu(port)
+        });
+        let system = attach_optional(system, hardware_inventory_port, |system, port| {
+            system.with_hardware_inventory(port)
+        });
+        let system = attach_optional(system, containers_port, |system, port| {
+            system.with_containers(port)
+        });
+        let system = attach_optional(system, gpu_engine_rows_port, |system, port| {
+            system.with_gpu_engine_rows(port)
+        });
+        let system = attach_optional(system, npu_inventory_port, |system, port| {
+            system.with_npu_inventory(port)
+        });
+        let system = attach_optional(system, smbios_memory_port, |system, port| {
+            system.with_smbios_memory(port)
+        });
+        let system = attach_optional(system, rapl_power_port, |system, port| {
+            system.with_rapl_power(port)
+        });
+        let system = attach_optional(system, msr_readout_port, |system, port| {
+            system.with_msr_readout(port)
+        });
 
-        let mut process = ProcessFacets::default();
-        if let Some(port) = process_list_port {
-            process = process.with_list(port);
-        }
-        if let Some(port) = process_control_port {
-            process = process.with_control(port);
-        }
-        if let Some(port) = process_network_port {
-            process = process.with_network(port);
-        }
-        if let Some(port) = process_gpu_port {
-            process = process.with_gpu(port);
-        }
-        if let Some(port) = process_resources_port {
-            process = process.with_resources(port);
-        }
-        if let Some(port) = process_isolation_port {
-            process = process.with_isolation(port);
-        }
-        if let Some(port) = process_threads_port {
-            process = process.with_threads(port);
-        }
-        if let Some(port) = process_open_files_port {
-            process = process.with_open_files(port);
-        }
-        if let Some(port) = process_environment_port {
-            process = process.with_environment(port);
-        }
-        if let Some(port) = process_affinity_port {
-            process = process.with_affinity(port);
-        }
-        if let Some(port) = process_affinity_control_port {
-            process = process.with_affinity_control(port);
-        }
-        if let Some(port) = process_resource_control_port {
-            process = process.with_resource_control(port);
-        }
-        if let Some(port) = process_network_escalation_port {
-            process = process.with_network_escalation(port);
-        }
+        let process = ProcessFacets::default();
+        let process = attach_optional(process, process_list_port, |process, port| {
+            process.with_list(port)
+        });
+        let process = attach_optional(process, process_control_port, |process, port| {
+            process.with_control(port)
+        });
+        let process = attach_optional(process, process_network_port, |process, port| {
+            process.with_network(port)
+        });
+        let process = attach_optional(process, process_gpu_port, |process, port| {
+            process.with_gpu(port)
+        });
+        let process = attach_optional(process, process_resources_port, |process, port| {
+            process.with_resources(port)
+        });
+        let process = attach_optional(process, process_isolation_port, |process, port| {
+            process.with_isolation(port)
+        });
+        let process = attach_optional(process, process_threads_port, |process, port| {
+            process.with_threads(port)
+        });
+        let process = attach_optional(process, process_open_files_port, |process, port| {
+            process.with_open_files(port)
+        });
+        let process = attach_optional(process, process_environment_port, |process, port| {
+            process.with_environment(port)
+        });
+        let process = attach_optional(process, process_affinity_port, |process, port| {
+            process.with_affinity(port)
+        });
+        let process = attach_optional(process, process_affinity_control_port, |process, port| {
+            process.with_affinity_control(port)
+        });
+        let process = attach_optional(process, process_resource_control_port, |process, port| {
+            process.with_resource_control(port)
+        });
+        let process = attach_optional(process, process_network_escalation_port, |process, port| {
+            process.with_network_escalation(port)
+        });
 
-        let mut service = ServiceFacets::default();
-        if let Some(port) = service_inventory_port {
-            service = service.with_inventory(port);
-        }
-        if let Some(port) = service_dependencies_port {
-            service = service.with_dependencies(port);
-        }
-        if let Some(port) = service_control_port {
-            service = service.with_control(port);
-        }
-        if let Some(port) = service_log_snapshot_port {
-            service = service.with_log_snapshot(port);
-        }
-        if let Some(port) = service_log_stream_port {
-            service = service.with_log_stream(port);
-        }
+        let service = ServiceFacets::default();
+        let service = attach_optional(service, service_inventory_port, |service, port| {
+            service.with_inventory(port)
+        });
+        let service = attach_optional(service, service_dependencies_port, |service, port| {
+            service.with_dependencies(port)
+        });
+        let service = attach_optional(service, service_control_port, |service, port| {
+            service.with_control(port)
+        });
+        let service = attach_optional(service, service_log_snapshot_port, |service, port| {
+            service.with_log_snapshot(port)
+        });
+        let service = attach_optional(service, service_log_stream_port, |service, port| {
+            service.with_log_stream(port)
+        });
 
-        let mut environment = EnvironmentFacets::default();
-        if let Some(port) = startup_inventory_port {
-            environment = environment.with_startup_inventory(port);
-        }
-        if let Some(port) = startup_evidence_port {
-            environment = environment.with_startup_evidence(port);
-        }
-        if let Some(port) = startup_control_port {
-            environment = environment.with_startup_control(port);
-        }
-        if let Some(port) = session_inventory_port {
-            environment = environment.with_session_inventory(port);
-        }
-        if let Some(port) = session_control_port {
-            environment = environment.with_session_control(port);
-        }
+        let environment = EnvironmentFacets::default();
+        let environment =
+            attach_optional(environment, startup_inventory_port, |environment, port| {
+                environment.with_startup_inventory(port)
+            });
+        let environment =
+            attach_optional(environment, startup_evidence_port, |environment, port| {
+                environment.with_startup_evidence(port)
+            });
+        let environment =
+            attach_optional(environment, startup_control_port, |environment, port| {
+                environment.with_startup_control(port)
+            });
+        let environment =
+            attach_optional(environment, session_inventory_port, |environment, port| {
+                environment.with_session_inventory(port)
+            });
+        let environment =
+            attach_optional(environment, session_control_port, |environment, port| {
+                environment.with_session_control(port)
+            });
 
-        let mut integration = IntegrationFacets::default();
-        if let Some(port) = command_launch_port {
-            integration = integration.with_command_launch(port);
-        }
-        if let Some(port) = resource_reveal_port {
-            integration = integration.with_resource_reveal(port);
-        }
-        if let Some(port) = url_open_port {
-            integration = integration.with_url_open(port);
-        }
-        if let Some(port) = desktop_appearance_port {
-            integration = integration.with_desktop_appearance(port);
-        }
-        if let Some(port) = setup_script_port {
-            integration = integration.with_setup_script(port);
-        }
-        if let Some(port) = desktop_notification_port {
-            integration = integration.with_desktop_notification(port);
-        }
+        let integration = IntegrationFacets::default();
+        let integration = attach_optional(integration, command_launch_port, |integration, port| {
+            integration.with_command_launch(port)
+        });
+        let integration =
+            attach_optional(integration, resource_reveal_port, |integration, port| {
+                integration.with_resource_reveal(port)
+            });
+        let integration = attach_optional(integration, url_open_port, |integration, port| {
+            integration.with_url_open(port)
+        });
+        let integration =
+            attach_optional(integration, desktop_appearance_port, |integration, port| {
+                integration.with_desktop_appearance(port)
+            });
+        let integration = attach_optional(integration, setup_script_port, |integration, port| {
+            integration.with_setup_script(port)
+        });
+        let integration = attach_optional(
+            integration,
+            desktop_notification_port,
+            |integration, port| integration.with_desktop_notification(port),
+        );
 
-        let mut storage = StorageFacets::default();
-        if let Some(port) = storage_health_port {
-            storage = storage.with_health(port);
-        }
-        if let Some(port) = smart_observation_port {
-            storage = storage.with_smart_observation(port);
-        }
-        if let Some(port) = smart_control_port {
-            storage = storage.with_smart_control(port);
-        }
-        if let Some(port) = directory_usage_port {
-            storage = storage.with_directory_usage(port);
-        }
+        let storage = StorageFacets::default();
+        let storage = attach_optional(storage, storage_health_port, |storage, port| {
+            storage.with_health(port)
+        });
+        let storage = attach_optional(storage, smart_observation_port, |storage, port| {
+            storage.with_smart_observation(port)
+        });
+        let storage = attach_optional(storage, smart_control_port, |storage, port| {
+            storage.with_smart_control(port)
+        });
+        let storage = attach_optional(storage, directory_usage_port, |storage, port| {
+            storage.with_directory_usage(port)
+        });
 
-        let mut sensor = SensorFacets::default();
-        if let Some(port) = sensor_port {
-            sensor = sensor.with_observation(port);
-        }
-        let mut power = PowerFacets::default();
-        if let Some(port) = power_supply_port {
-            power = power.with_supplies(port);
-        }
+        let sensor = attach_optional(SensorFacets::default(), sensor_port, |sensor, port| {
+            sensor.with_observation(port)
+        });
+        let power = attach_optional(PowerFacets::default(), power_supply_port, |power, port| {
+            power.with_supplies(port)
+        });
         let facets = PlatformFacets::default()
             .with_system(system)
             .with_process(process)
@@ -555,6 +601,9 @@ impl ChannelRuntime {
                         hardware_inventory_rx,
                         gpu_engine_rows_rx,
                         npu_inventory_rx,
+                        smbios_memory_rx,
+                        rapl_power_rx,
+                        msr_readout_rx,
                     ),
                 ),
                 process: PendingProcessRuntimeLanes::new(

@@ -44,6 +44,21 @@ impl ProcessLiveKey {
         Self::new(identity.pid, identity.start_token)
     }
 
+    /// Validate the current identity of one process row.
+    #[must_use]
+    pub const fn from_process(process: &ProcessItem) -> Option<Self> {
+        match process.current_start_token() {
+            Some(start_token) => Self::new(process.pid, start_token),
+            None => None,
+        }
+    }
+
+    /// Construct from raw identity components at a projection boundary.
+    #[must_use]
+    pub const fn from_parts(pid: u32, start_token: u64) -> Option<Self> {
+        Self::new(pid, start_token)
+    }
+
     /// The PID as its ordinary platform-facing scalar.
     #[must_use]
     pub const fn pid(self) -> u32 {
@@ -56,6 +71,16 @@ impl ProcessLiveKey {
         self.start_token.get()
     }
 
+    /// Stable, provider-neutral key for row, semantic, and cache identities.
+    ///
+    /// The key intentionally contains the provider-issued start token. A PID
+    /// by itself is only a lookup hint and may be reused by the operating
+    /// system after the original process exits.
+    #[must_use]
+    pub fn stable_key(self) -> String {
+        format!("pid:{}:start:{}", self.pid(), self.start_token())
+    }
+
     /// Convert back to the provider-neutral process-insights identity shape.
     #[must_use]
     pub const fn into_identity(self) -> ProcessIdentity {
@@ -63,6 +88,12 @@ impl ProcessLiveKey {
             pid: self.pid(),
             start_token: self.start_token(),
         }
+    }
+
+    /// Borrow-free copy of the provider-neutral identity shape.
+    #[must_use]
+    pub const fn identity(self) -> ProcessIdentity {
+        self.into_identity()
     }
 
     /// Exact equality against a raw provider identity.

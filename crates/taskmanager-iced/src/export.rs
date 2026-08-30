@@ -12,7 +12,7 @@ use taskmanager_shell::presentation::{bytes, duration, missing_value};
 /// Format a single process item as tab-separated values (TSV).
 #[must_use]
 pub fn process_to_tsv(process: &ProcessItem) -> String {
-    let user = process.current_user().unwrap_or_default();
+    let user = process.current_user().unwrap_or_else(missing_value);
     let cpu = process
         .current_cpu_percentage()
         .map_or_else(missing_value, |value| format!("{value:.1}%"));
@@ -33,12 +33,10 @@ pub fn process_to_tsv(process: &ProcessItem) -> String {
 /// Format a process item as a clean JSON object string.
 #[must_use]
 pub fn process_to_json(process: &ProcessItem) -> String {
-    let user = process.current_user().unwrap_or_default();
-    let user_str = if user.is_empty() {
-        "null".to_string()
-    } else {
-        format!("\"{user}\"")
-    };
+    let user_str = process.current_user().map_or_else(
+        || "null".to_owned(),
+        |user| format!("\"{}\"", user.replace('\\', "\\\\").replace('"', "\\\"")),
+    );
     let cmd_str = if process.cmdline.is_empty() {
         "null".to_string()
     } else {
@@ -144,12 +142,18 @@ pub fn system_diagnostics_markdown(
         if !snap.gpu.is_empty() {
             out.push_str(&format!("GPU Count: {}\n", snap.gpu.len()));
             for (idx, gpu) in snap.gpu.iter().enumerate() {
-                out.push_str(&format!(
-                    "  [GPU {}] {} (Driver: {})\n",
-                    idx,
-                    gpu.brand,
-                    gpu.driver.as_deref().unwrap_or("—")
-                ));
+                // The driver name and its version are independent facts: an
+                // adapter may prove a release string without a kernel driver
+                // label, so the version is appended only when proven.
+                let mut gpu_facts = format!("Driver: {}", gpu.driver.as_deref().unwrap_or("—"));
+                if let Some(version) = gpu
+                    .driver_version
+                    .as_deref()
+                    .filter(|value| !value.is_empty())
+                {
+                    gpu_facts.push_str(&format!(", Version: {version}"));
+                }
+                out.push_str(&format!("  [GPU {}] {} ({gpu_facts})\n", idx, gpu.brand));
             }
         }
         if !snap.disks.is_empty() {

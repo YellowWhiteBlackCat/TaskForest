@@ -89,6 +89,24 @@ impl UnitPreferences {
             QuantityFamily::Network => (self.network_use_bytes, self.network_use_base2),
         }
     }
+
+    /// Format one byte-count quantity through the canonical core ladder.
+    #[must_use]
+    pub fn format_quantity(self, bytes: u64, family: QuantityFamily, per_second: bool) -> String {
+        format_quantity(bytes, family, per_second, &self)
+    }
+
+    /// Format a used/total pair through the canonical core ladder.
+    #[must_use]
+    pub fn format_quantity_pair(
+        self,
+        used: u64,
+        total: u64,
+        family: QuantityFamily,
+        per_second: bool,
+    ) -> String {
+        format_quantity_pair(used, total, family, per_second, &self)
+    }
 }
 
 /// Format a memory quantity with the memory preference pair — the canonical
@@ -165,6 +183,29 @@ pub fn format_quantity_with(
     ladder(bytes as f64, use_bytes, use_base2, per_second)
 }
 
+/// Convert bytes to binary gibibytes without first rounding the complete byte
+/// count to `f64`. The integer quotient remains exact for all `u64` inputs and
+/// the remainder is smaller than the binary unit.
+#[must_use]
+pub fn bytes_to_gib(bytes: u64) -> f64 {
+    split_units(bytes, 1024 * 1024 * 1024)
+}
+
+/// Convert bytes to binary mebibytes without first rounding the complete byte
+/// count to `f64`.
+#[must_use]
+pub fn bytes_to_mib(bytes: u64) -> f64 {
+    split_units(bytes, 1024 * 1024)
+}
+
+/// Percentage share of `used` within `total`. A missing/zero denominator is
+/// unavailable rather than a numeric zero.
+#[must_use]
+pub fn bytes_percent(used: u64, total: u64) -> Option<f64> {
+    let total = (total > 0).then_some(total)?;
+    Some(bytes_to_gib(used) / bytes_to_gib(total) * 100.0)
+}
+
 /// The shared missing-value placeholder for non-finite float inputs. Spec pin
 /// of [`taskmanager_shell::presentation::MISSING_VALUE`] (core cannot depend
 /// on the shell presentation layer).
@@ -189,6 +230,11 @@ fn ladder(value_bytes: f64, use_bytes: bool, use_base2: bool, per_second: bool) 
     } else {
         format!("{value:.0} {unit}{rate}")
     }
+}
+
+#[inline]
+fn split_units(value: u64, unit: u64) -> f64 {
+    (value / unit) as f64 + (value % unit) as f64 / unit as f64
 }
 
 #[cfg(test)]

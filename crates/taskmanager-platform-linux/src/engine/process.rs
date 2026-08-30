@@ -6,7 +6,7 @@ use std::time::Instant;
 
 use crate::config::FD_COUNT_REFRESH_EVERY_N_TICKS;
 use sysinfo::{ProcessRefreshKind, ProcessStatus, System};
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_core::{
     FailureKind, ProcessHistorySample, ProcessHistoryStore, ProcessMetadataFailure, ProviderId,
     SourceOutcome, SourceStatus,
@@ -228,8 +228,8 @@ impl ProcessManager {
         let mut process_pids: Vec<u32> = self
             .system
             .processes()
-            .iter()
-            .map(|(pid, _)| pid.as_u32())
+            .keys()
+            .map(|pid| pid.as_u32())
             .collect();
         process_pids.sort_unstable();
         self.memory_maps.refresh(&process_pids, observed_at_ms);
@@ -356,11 +356,11 @@ impl ProcessManager {
             item.apply_metadata_observations(metadata_observations);
             item.apply_application_identity(application_identity);
             item.apply_scalar_observations(scalar_observations);
-            let history = self.histories.record(
-                pid,
-                item.current_start_token(),
-                ProcessHistorySample::from_process(&item),
-            );
+            let history =
+                ProcessLiveKey::from_process(&item).map_or_else(Default::default, |identity| {
+                    self.histories
+                        .record(identity, ProcessHistorySample::from_process(&item))
+                });
             item.cpu_history = history.cpu;
             item.mem_history = history.memory;
             item.disk_history = history.disk;

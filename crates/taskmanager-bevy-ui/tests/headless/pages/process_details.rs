@@ -27,6 +27,7 @@ fn selected_projection_uses_the_shared_vm_and_keeps_insights_typed() {
     assert_eq!(
         view.selected,
         Some(super::ProcessDetailsSelection {
+            identity: None,
             pid: 42,
             name: "worker".to_owned(),
         })

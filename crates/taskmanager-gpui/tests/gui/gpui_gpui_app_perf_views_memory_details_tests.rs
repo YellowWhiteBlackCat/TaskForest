@@ -1,6 +1,6 @@
-use crate::gpui_app::formatting::DisplayUnits;
 use taskmanager_core::core::FailureKind;
 use taskmanager_core::core::metrics::{MemoryMetrics, OptionalObservation};
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
 use super::{compressed_swap_readout, virtual_memory_commit_readout};
@@ -9,11 +9,11 @@ use super::{compressed_swap_readout, virtual_memory_commit_readout};
 fn optional_memory_rows_require_complete_observations() {
     let unknown = MemoryMetrics::default();
     assert_eq!(
-        virtual_memory_commit_readout(&unknown, DisplayUnits::default()),
+        virtual_memory_commit_readout(&unknown, UnitPreferences::default()),
         None
     );
     assert_eq!(
-        compressed_swap_readout(&unknown, DisplayUnits::default()),
+        compressed_swap_readout(&unknown, UnitPreferences::default()),
         None
     );
 
@@ -23,11 +23,11 @@ fn optional_memory_rows_require_complete_observations() {
         .compressed_swap_used_bytes(512 * 1024 * 1024)
         .build();
     assert_eq!(
-        virtual_memory_commit_readout(&partial, DisplayUnits::default()),
+        virtual_memory_commit_readout(&partial, UnitPreferences::default()),
         None
     );
     assert_eq!(
-        compressed_swap_readout(&partial, DisplayUnits::default()),
+        compressed_swap_readout(&partial, UnitPreferences::default()),
         None
     );
 }
@@ -43,12 +43,12 @@ fn measured_zero_is_not_treated_as_missing_memory_data() {
         .build();
 
     assert_eq!(
-        virtual_memory_commit_readout(&memory, DisplayUnits::default()).as_deref(),
-        Some("0 KiB / 1.00 GiB")
+        virtual_memory_commit_readout(&memory, UnitPreferences::default()).as_deref(),
+        Some("0 B / 1.0 GiB")
     );
     assert_eq!(
-        compressed_swap_readout(&memory, DisplayUnits::default()).as_deref(),
-        Some("0 KiB / 1.00 GiB")
+        compressed_swap_readout(&memory, UnitPreferences::default()).as_deref(),
+        Some("0 B / 1.0 GiB")
     );
 }
 
@@ -66,11 +66,11 @@ fn failed_typed_truth_never_renders_optional_values() {
         ))
         .build();
     assert_eq!(
-        virtual_memory_commit_readout(&memory, DisplayUnits::default()),
+        virtual_memory_commit_readout(&memory, UnitPreferences::default()),
         None
     );
     assert_eq!(
-        compressed_swap_readout(&memory, DisplayUnits::default()),
+        compressed_swap_readout(&memory, UnitPreferences::default()),
         None
     );
 }
@@ -86,10 +86,10 @@ fn zram_readout_appends_only_a_derivable_compression_ratio() {
         .compressed_swap_compressed_bytes(1024 * 1024 * 1024)
         .build();
     assert_eq!(
-        compressed_swap_readout(&measured, DisplayUnits::default()).as_deref(),
+        compressed_swap_readout(&measured, UnitPreferences::default()).as_deref(),
         Some(
             format!(
-                "512 MiB / 1.00 GiB · {} 3.0:1",
+                "512.0 MiB / 1.0 GiB · {} 3.0:1",
                 taskmanager_application::i18n::t("mem.compression_ratio")
             )
             .as_str()
@@ -105,7 +105,7 @@ fn zram_readout_appends_only_a_derivable_compression_ratio() {
         .compressed_swap_compressed_bytes(0)
         .build();
     assert_eq!(
-        compressed_swap_readout(&undecompressible, DisplayUnits::default()).as_deref(),
-        Some("512 MiB / 1.00 GiB")
+        compressed_swap_readout(&undecompressible, UnitPreferences::default()).as_deref(),
+        Some("512.0 MiB / 1.0 GiB")
     );
 }

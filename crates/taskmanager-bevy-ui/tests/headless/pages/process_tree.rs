@@ -1,5 +1,13 @@
 use super::*;
+use taskmanager_application::process_category_projection::category_buckets;
+use taskmanager_core::core::FailureKind;
+use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+
+/// Fixture accepted-snapshot timestamp matching the observations below, whose
+/// `last_success_ms` is 1.
+const SNAPSHOT_MS: u64 = 1;
 
 fn tokened(
     pid: u32,
@@ -17,10 +25,10 @@ fn tokened(
 }
 
 fn key_of(
-    kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId,
+    kind: fn(ProcessLiveKey) -> taskmanager_shell::ProcessRowId,
     pid: u32,
 ) -> taskmanager_shell::ProcessRowId {
-    taskmanager_shell::ProcessRowIdentity::from_parts(pid, u64::from(pid) * 10 + 1)
+    ProcessLiveKey::from_parts(pid, u64::from(pid) * 10 + 1)
         .map(kind)
         .expect("non-zero parts")
 }
@@ -46,19 +54,22 @@ fn application(pid: u32, parent_pid: Option<u32>, name: &str) -> ProcessItem {
 fn expansion_keys_are_stable_and_typed() {
     let mut expansion = ProcessTreeExpansion::default();
     assert!(!expansion.category_expanded(ProcessCategory::Application));
-    assert!(!expansion.application_expanded(7));
-    assert!(!expansion.process_collapsed(7));
+    let identity = key_of(taskmanager_shell::ProcessRowId::Process, 7)
+        .live_key()
+        .expect("fixture identity");
+    assert!(!expansion.application_expanded(identity));
+    assert!(!expansion.process_collapsed(identity));
 
     expansion.toggle_category(ProcessCategory::Application);
-    expansion.toggle_application(7);
-    expansion.toggle_process(7);
+    expansion.toggle_application(identity);
+    expansion.toggle_process(identity);
     assert!(expansion.category_expanded(ProcessCategory::Application));
-    assert!(expansion.application_expanded(7));
-    assert!(expansion.process_collapsed(7));
+    assert!(expansion.application_expanded(identity));
+    assert!(expansion.process_collapsed(identity));
 
     expansion.toggle_category(ProcessCategory::Application);
-    expansion.toggle_application(7);
-    expansion.toggle_process(7);
+    expansion.toggle_application(identity);
+    expansion.toggle_process(identity);
     assert_eq!(expansion, ProcessTreeExpansion::default());
 }
 
@@ -73,7 +84,7 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
     child.parent_pid = Some(10);
     let items = vec![root, child, background, unknown];
 
-    let collapsed = project_items(&items, &ProcessTreeExpansion::default());
+    let collapsed = project_items(&items, &ProcessTreeExpansion::default(), SNAPSHOT_MS);
     assert_eq!(
         collapsed.iter().map(|row| row.key).collect::<Vec<_>>(),
         vec![
@@ -86,15 +97,19 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
 
     let mut expansion = ProcessTreeExpansion::default();
     expansion.toggle_category(ProcessCategory::Application);
-    let category_open = project_items(&items, &expansion);
+    let category_open = project_items(&items, &expansion, SNAPSHOT_MS);
     assert_eq!(
         category_open[1].key,
         key_of(taskmanager_shell::ProcessRowId::Application, 10)
     );
     assert_eq!(category_open[1].member_count, 2);
 
-    expansion.toggle_application(10);
-    let tree_open = project_items(&items, &expansion);
+    expansion.toggle_application(
+        key_of(taskmanager_shell::ProcessRowId::Process, 10)
+            .live_key()
+            .expect("root identity"),
+    );
+    let tree_open = project_items(&items, &expansion, SNAPSHOT_MS);
     assert_eq!(
         tree_open[2].key,
         key_of(taskmanager_shell::ProcessRowId::Process, 10)
@@ -110,6 +125,39 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
 }
 
 #[test]
+fn category_projection_consumes_typed_aggregate_without_zero_fallback() {
+    let measured_zero = application(60, None, "Editor").with_scalar_observations(
+        taskmanager_core::core::process::ProcessScalarObservations {
+            cpu_percentage: ScalarObservation::available(0.0, 1),
+            ..Default::default()
+        },
+    );
+    let unavailable = application(61, None, "EditorWorker").with_scalar_observations(
+        taskmanager_core::core::process::ProcessScalarObservations {
+            cpu_percentage: ScalarObservation::unavailable(FailureKind::PermissionDenied),
+            ..Default::default()
+        },
+    );
+    let items = vec![measured_zero, unavailable];
+    let buckets = category_buckets(&items, process_category);
+    let application_bucket = buckets
+        .iter()
+        .find(|bucket| bucket.category() == ProcessCategory::Application)
+        .expect("application category is present");
+
+    let aggregate = application_bucket
+        .aggregate_process_cpu(2)
+        .expect("non-empty category has a typed aggregate");
+    assert_eq!(aggregate.member_count(), 2);
+    assert_eq!(aggregate.current_member_count(), 1);
+    assert_eq!(aggregate.current_value(), Some(&0.0));
+    assert_eq!(
+        aggregate.availability(),
+        ScalarAvailability::Partial(FailureKind::PermissionDenied)
+    );
+}
+
+#[test]
 fn process_collapse_hides_only_descendants() {
     let mut root = application(50, None, "Editor");
     let mut child = application(51, Some(50), "Worker");
@@ -121,9 +169,17 @@ fn process_collapse_hides_only_descendants() {
 
     let mut expansion = ProcessTreeExpansion::default();
     expansion.toggle_category(ProcessCategory::Application);
-    expansion.toggle_application(50);
-    expansion.toggle_process(51);
-    let rows = project_items(&items, &expansion);
+    expansion.toggle_application(
+        key_of(taskmanager_shell::ProcessRowId::Process, 50)
+            .live_key()
+            .expect("root identity"),
+    );
+    expansion.toggle_process(
+        key_of(taskmanager_shell::ProcessRowId::Process, 51)
+            .live_key()
+            .expect("child identity"),
+    );
+    let rows = project_items(&items, &expansion, SNAPSHOT_MS);
     assert_eq!(
         rows.iter().map(|row| row.key).collect::<Vec<_>>(),
         vec![
@@ -135,4 +191,75 @@ fn process_collapse_hides_only_descendants() {
     );
     assert!(rows[3].has_children);
     assert!(!rows[3].expanded);
+}
+
+#[test]
+fn tree_rows_carry_typed_aggregates_without_zero_fallback() {
+    let mut measured = application(70, None, "Editor");
+    let mut measured_observations = *measured.scalar_observations();
+    measured_observations.cpu_percentage = ScalarObservation::available(0.0, SNAPSHOT_MS);
+    measured_observations.memory_bytes = ScalarObservation::available(2_048, SNAPSHOT_MS);
+    measured.apply_scalar_observations(measured_observations);
+    let mut helper = application(71, Some(70), "Helper");
+    let mut helper_observations = *helper.scalar_observations();
+    helper_observations.cpu_percentage =
+        ScalarObservation::unavailable(FailureKind::PermissionDenied);
+    helper.apply_scalar_observations(helper_observations);
+    measured.parent_pid = None;
+    helper.parent_pid = Some(70);
+    let background = tokened(80, "daemon", None).with_scalar_observations(
+        taskmanager_core::core::process::ProcessScalarObservations {
+            cpu_percentage: ScalarObservation::available(1.5, SNAPSHOT_MS),
+            memory_bytes: ScalarObservation::available(4_096, SNAPSHOT_MS),
+            ..Default::default()
+        },
+    );
+    let items = vec![measured, helper, background];
+
+    let mut expansion = ProcessTreeExpansion::default();
+    expansion.toggle_category(ProcessCategory::Application);
+    expansion.toggle_application(
+        key_of(taskmanager_shell::ProcessRowId::Process, 70)
+            .live_key()
+            .expect("root identity"),
+    );
+    let rows = project_items(&items, &expansion, SNAPSHOT_MS);
+
+    // Category header: partial CPU coverage keeps the measured member's zero
+    // visible as a current zero, never collapsing into a fabricated total.
+    // The identity-less daemon lands in another category and stays out here.
+    let category = &rows[0];
+    let category_cpu = category.cpu.as_ref().expect("category carries cpu");
+    assert_eq!(category_cpu.member_count(), 2);
+    assert_eq!(
+        category_cpu.availability(),
+        ScalarAvailability::Partial(FailureKind::PermissionDenied)
+    );
+    assert_eq!(category_cpu.current_value(), Some(&0.0));
+    assert!(category.memory.is_some());
+
+    // Application root: the typed group's current CPU excludes the
+    // unavailable member; memory only counts the member that reported it.
+    let app_root = &rows[1];
+    let app_cpu = app_root.cpu.as_ref().expect("app root carries cpu");
+    assert_eq!(app_root.member_count, 2);
+    assert_eq!(app_cpu.member_count(), 2);
+    assert_eq!(app_cpu.current_value(), Some(&0.0));
+    assert_eq!(
+        app_cpu.availability(),
+        ScalarAvailability::Partial(FailureKind::PermissionDenied)
+    );
+    assert_eq!(
+        app_root
+            .memory
+            .as_ref()
+            .and_then(|memory| memory.current_value())
+            .copied(),
+        Some(2_048)
+    );
+
+    // Plain process rows aggregate nothing; they render their own scalars.
+    let process_row = &rows[2];
+    assert!(process_row.cpu.is_none());
+    assert!(process_row.memory.is_none());
 }

@@ -24,25 +24,6 @@ const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Render the about overlay centred over `area`. Reads `app.projection().hardware`
 /// and `app.projection().snapshot`; absent telemetry renders as `—`.
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn render_about_overlay(
-    frame: &mut Frame<'_>,
-    app: &crate::TuiApp,
-    theme: TuiTheme,
-    area: Rect,
-) {
-    render_about_overlay_at(
-        frame,
-        app,
-        theme,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::LocalSurface(crate::TuiSurfaceKind::About),
-        ),
-    );
-}
-
 pub(super) fn render_about_overlay_at(
     frame: &mut Frame<'_>,
     app: &crate::TuiApp,
@@ -136,3 +117,7 @@ pub(super) fn render_about_overlay_at(
 #[cfg(test)]
 #[path = "../../tests/gui/ui/about_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/about_support.rs"]
+pub(crate) mod about_support;

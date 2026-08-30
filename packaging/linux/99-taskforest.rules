@@ -7,7 +7,7 @@
 # so every later unprivileged launch reads the data without privileges.
 #
 # Install (systemd systems):
-#   sudo install -Dm644 99-taskmanager.rules /etc/udev/rules.d/99-taskmanager.rules
+#   sudo install -Dm644 99-taskforest.rules /etc/udev/rules.d/99-taskforest.rules
 #   sudo udevadm control --reload-rules && sudo udevadm trigger
 #
 # What each rule opens and why:

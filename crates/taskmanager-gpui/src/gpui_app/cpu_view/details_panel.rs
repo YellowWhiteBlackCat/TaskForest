@@ -1,23 +1,36 @@
 //! CPU detail/specification surface kept separate from the graph renderer.
 
-use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, uniform_list};
+use gpui::{
+    Context, Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, uniform_list,
+};
 
 use crate::gpui_app::formatting;
+use crate::gpui_app::root::RootView;
 use taskmanager_application::i18n;
 use taskmanager_core::core::hardware::{CoreBreakdown, HardwareInfo};
 use taskmanager_core::core::metrics::{CpuMetrics, SystemSnapshot};
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 
-use super::{format_uptime, stats::CpuDetailsStats};
+use super::msr_readouts::MsrReadoutsModel;
+use super::package_power::PackagePowerModel;
+use super::{EscalationReadouts, format_uptime, stats::CpuDetailsStats};
 
 pub(super) fn render_pinned(
     theme: &Theme,
     snap: &SystemSnapshot,
     hardware: &HardwareInfo,
     live: &CpuDetailsStats,
+    units: UnitPreferences,
+    escalation: &EscalationReadouts,
+    cx: &mut Context<RootView>,
 ) -> Div {
+    let EscalationReadouts {
+        package_power,
+        msr_readouts,
+    } = escalation;
     let cpu = &snap.cpu;
     // Per-core average + maximum temperature, surfaced as a note beneath the
     // package reading. The typed CPU sensor source exposes Intel `coretemp`
@@ -42,9 +55,23 @@ pub(super) fn render_pinned(
         // cluttered "a:b" rather than a scannable column. Mirrors the row geometry
         // of `spec_grid` below for one unified details-panel aesthetic.
         .child(live_stats(theme, snap, live))
+        // Package-power subsection (the escalation-backed RAPL lane). Absent
+        // entirely while `Hidden`: no session and no registered lane on this
+        // host renders nothing, never a placeholder.
+        .children(
+            (!matches!(package_power, PackagePowerModel::Hidden)).then(|| {
+                super::package_power::render_package_power_section(theme, package_power, cx)
+            }),
+        )
+        // MSR-readout subsection (the escalation-backed CpuMsr lane). Same
+        // absence discipline: `Hidden` renders nothing at all.
+        .children(
+            (!matches!(msr_readouts, MsrReadoutsModel::Hidden))
+                .then(|| super::msr_readouts::render_msr_readouts_section(theme, msr_readouts, cx)),
+        )
         // Hairline section divider between the live stats and the static spec list.
         .child(div().h(px(1.0)).w_full().bg(theme.border))
-        .child(spec_grid(theme, cpu, hardware))
+        .child(spec_grid(theme, cpu, hardware, units))
 }
 
 fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> Div {
@@ -92,7 +119,7 @@ fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> D
 /// these rows reads as one scannable, consistently right-aligned list. Used by
 /// BOTH the CPU details panel's top stats AND the spec list below — one shared
 /// geometry for a unified panel.
-fn kv_row(theme: &Theme, label: &str, value: &str) -> Div {
+pub(super) fn kv_row(theme: &Theme, label: &str, value: &str) -> Div {
     // The shared row owns the shrinkable label/value geometry so uniform-list
     // measurement and the live-stat block cannot drift apart.
     KeyValueRow::new(label, value, theme.palette())
@@ -125,10 +152,15 @@ fn kv_row_with_note(theme: &Theme, label: &str, value: &str, note: Option<&str>)
     col
 }
 
-fn spec_grid(theme: &Theme, cpu: &CpuMetrics, hardware: &HardwareInfo) -> impl IntoElement {
+fn spec_grid(
+    theme: &Theme,
+    cpu: &CpuMetrics,
+    hardware: &HardwareInfo,
+    units: UnitPreferences,
+) -> impl IntoElement {
     // Pure projection lives in `cpu_spec_rows` (data/render split, ARCH.md §4);
     // this fn only paints the ordered rows it returns.
-    let rows = cpu_spec_rows(cpu, hardware);
+    let rows = cpu_spec_rows(cpu, hardware, units);
     // Scrollable list — the spec table can grow (e.g. heterogeneous "Core types"
     // row) beyond a short window, so render it via uniform_list rather than overflow.
     // Each row reuses `kv_row` (the same geometry as the top stats above) so the
@@ -156,14 +188,18 @@ fn spec_grid(theme: &Theme, cpu: &CpuMetrics, hardware: &HardwareInfo) -> impl I
 /// (label, value) list `spec_grid` paints, free of any element/theme
 /// concern so surface tests assert the projection directly. The socket
 /// fold is shared with the System page via [`sockets_row`].
-pub(crate) fn cpu_spec_rows(cpu: &CpuMetrics, hardware: &HardwareInfo) -> Vec<(String, String)> {
+pub(crate) fn cpu_spec_rows(
+    cpu: &CpuMetrics,
+    hardware: &HardwareInfo,
+    units: UnitPreferences,
+) -> Vec<(String, String)> {
     let cache = |kb: Option<u64>| -> String {
         // `*_cache_kb` from detect_cpu_cache is in KiB; format_mib_2 expects
         // BYTES (it divides by 1024^2). Convert KiB -> bytes first, else every
         // cache reads ~1/1024 of its real size and L1 rounds to "0.00 MiB"
         // (matching system_view::fmt_cache_kb's `value * 1024`).
         kb.map_or_else(formatting::missing_value, |v| {
-            formatting::format_mib_2(v * 1024)
+            units.format_quantity(v * 1024, QuantityFamily::Memory, false)
         })
     };
     // Base speed = STATIC advertised base clock (NOT the live frequency, which
@@ -174,8 +210,15 @@ pub(crate) fn cpu_spec_rows(cpu: &CpuMetrics, hardware: &HardwareInfo) -> Vec<(S
     // Heterogeneous topology gets one aligned row per core class. A combined
     // "4 P + 8 E + 4 LP-E" value is hard to scan and truncates in this 280px
     // panel; separate label-left/count-right rows preserve the column rhythm.
-    let mut rows: Vec<(String, String)> = vec![
+    let multiplier = cpu
+        .clock_multiplier(hardware.base_freq_mhz)
+        .map_or_else(formatting::missing_value, |multiplier| {
+            format!("\u{00d7}{multiplier:.1}")
+        });
+    let mut rows: Vec<(String, String)> = cpu_identity_rows(hardware);
+    rows.extend([
         (i18n::t("cpu.base_speed").to_string(), base_speed),
+        (i18n::t("cpu.multiplier").to_string(), multiplier),
         // Real socket count from HardwareInfo (distinct physical_package_id
         // values), shared with system_view.rs. Was hardcoded "1".
         sockets_row(hardware.sockets),
@@ -184,7 +227,7 @@ pub(crate) fn cpu_spec_rows(cpu: &CpuMetrics, hardware: &HardwareInfo) -> Vec<(S
             cpu.physical_cores
                 .map_or_else(formatting::missing_value, |cores| cores.to_string()),
         ),
-    ];
+    ]);
     rows.extend(heterogeneous_core_rows(&hardware.core_breakdown));
     rows.extend([
         (
@@ -202,8 +245,12 @@ pub(crate) fn cpu_spec_rows(cpu: &CpuMetrics, hardware: &HardwareInfo) -> Vec<(S
                 .unwrap_or_else(|| i18n::t("common.none").to_string()),
         ),
         (
-            i18n::t("common.l1_cache").to_string(),
-            cache(cpu.l1_cache_kb),
+            i18n::t("common.l1_data_cache").to_string(),
+            cache(cpu.l1d_cache_kb),
+        ),
+        (
+            i18n::t("common.l1_instruction_cache").to_string(),
+            cache(cpu.l1i_cache_kb),
         ),
         (
             i18n::t("common.l2_cache").to_string(),
@@ -231,6 +278,35 @@ pub(crate) fn cpu_spec_rows(cpu: &CpuMetrics, hardware: &HardwareInfo) -> Vec<(S
             i18n::t("cpu.power_preference").to_string(),
             preference.clone(),
         ));
+    }
+    rows
+}
+
+/// Single source for the CPUID identity rows (ADR-020): the CPU details
+/// panel's spec list and the System page's CPU section share one ordered
+/// projection of `HardwareInfo::cpu_identity`. The rows are conditional — a
+/// platform that cannot probe the identity (non-x86 host, fixture inventory)
+/// renders no row at all rather than a dash slot, matching the policy-row
+/// discipline above.
+pub(crate) fn cpu_identity_rows(hardware: &HardwareInfo) -> Vec<(String, String)> {
+    let mut rows = Vec::new();
+    if let Some(codename) = hardware.cpu_identity.codename() {
+        rows.push((
+            i18n::t("system.cpu_codename").to_string(),
+            codename.to_string(),
+        ));
+    }
+    if let Some(process) = hardware.cpu_identity.process_node() {
+        rows.push((
+            i18n::t("system.cpu_process").to_string(),
+            process.to_string(),
+        ));
+    }
+    if let Some(vendor) = hardware.cpu_identity.vendor_id.as_deref() {
+        rows.push((i18n::t("system.cpu_vendor").to_string(), vendor.to_string()));
+    }
+    if let Some(code) = hardware.cpu_identity.code() {
+        rows.push((i18n::t("system.cpu_identity").to_string(), code));
     }
     rows
 }

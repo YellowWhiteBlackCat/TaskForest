@@ -32,22 +32,6 @@ use crate::TuiTheme;
 /// if the terminal is too small for a readable box. The overlay is driven by
 /// [`crate::TuiApp::history`]; it never reads the point-in-time snapshot directly, so
 /// a stale latest snapshot cannot leak a fabricated threshold into the view.
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn render_suggestions_overlay(
-    frame: &mut Frame<'_>,
-    app: &crate::TuiApp,
-    theme: TuiTheme,
-    area: Rect,
-) {
-    render_suggestions_overlay_at(
-        frame,
-        app,
-        theme,
-        super::planned_popup(area, crate::TuiInputScope::Suggestions),
-    );
-}
-
 pub(super) fn render_suggestions_overlay_at(
     frame: &mut Frame<'_>,
     app: &crate::TuiApp,
@@ -294,3 +278,7 @@ fn confidence_label(confidence: SuggestionConfidence) -> &'static str {
 #[cfg(test)]
 #[path = "../../tests/gui/ui/alerts_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/alerts_support.rs"]
+pub(crate) mod alerts_support;

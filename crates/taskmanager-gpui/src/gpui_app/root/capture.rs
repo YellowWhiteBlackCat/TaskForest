@@ -12,8 +12,9 @@ use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
 use crate::gpui_app::timeline::HistoryWindow;
 use taskmanager_application::{ProcessTerminationAction, ProcessTerminationConfirmation};
 use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::process::group_aggregate::aggregate_apps_typed;
 use taskmanager_core::core::process::{
-    ProcessBatchAction, ProcessBatchIntent, ProcessCategory, ProcessItem, aggregate_apps,
+    ProcessBatchAction, ProcessBatchIntent, ProcessCategory, ProcessItem, ProcessLiveKey,
     process_category,
 };
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
@@ -51,11 +52,11 @@ pub use scenarios::CaptureScenario;
 #[derive(Debug, PartialEq)]
 pub enum CaptureProcessAction {
     Termination(ProcessTerminationConfirmation),
-    ApplicationSelection(u32),
+    ApplicationSelection(ProcessLiveKey),
     Batch(ProcessBatchIntent),
-    Properties(u32, ProcessDetailsSection),
+    Properties(ProcessLiveKey, ProcessDetailsSection),
     Insights {
-        pid: u32,
+        identity: ProcessLiveKey,
         state: ProcessInsightsState,
     },
 }
@@ -100,7 +101,7 @@ pub struct CaptureEvidence {
     ui_data_ready: bool,
     scenario_ready: bool,
     snapshot_count: u8,
-    scenario_process_pid: Option<u32>,
+    scenario_process_identity: Option<ProcessLiveKey>,
     history_replay_opened: bool,
     system_npu_state: SystemNpuCaptureState,
     /// Capture-only comparison evidence. Persistent history runtime is
@@ -187,10 +188,12 @@ impl CaptureEvidence {
     /// Record that a real background process-list update reached RootView and,
     /// for the force-kill scenario, return a typed intent for the first live
     /// process. Returning an intent only prepares the dialog; execution remains
-    /// exclusively behind the dialog's confirm button.
+    /// exclusively behind the dialog's confirm button. `processes_observed_at_ms`
+    /// is the accepted-snapshot timestamp behind `processes`.
     pub fn on_processes_update(
         &mut self,
         processes_updated: bool,
+        processes_observed_at_ms: u64,
         processes: &mut Vec<ProcessItem>,
     ) -> Option<CaptureProcessAction> {
         if !self.enabled || !processes_updated {
@@ -211,8 +214,10 @@ impl CaptureEvidence {
         if self.scenario == Some(CaptureScenario::ProcessPropertiesPerformance)
             && self.scenario_ready
         {
-            if let Some(pid) = self.scenario_process_pid
-                && let Some(process) = processes.iter_mut().find(|process| process.pid == pid)
+            if let Some(identity) = self.scenario_process_identity
+                && let Some(process) = processes
+                    .iter_mut()
+                    .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
             {
                 prepare_process_histories(process);
             }
@@ -227,8 +232,8 @@ impl CaptureEvidence {
                 .scenario
                 .is_some_and(CaptureScenario::is_process_insights)
         {
-            let pid = prepare_process_insights(processes);
-            debug_assert_eq!(self.scenario_process_pid, Some(pid));
+            let identity = prepare_process_insights(processes)?;
+            debug_assert_eq!(self.scenario_process_identity, Some(identity));
             return None;
         }
         if self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) && self.scenario_ready {
@@ -272,8 +277,8 @@ impl CaptureEvidence {
                         })
                         .max_by(|left, right| {
                             left.current_cpu_percentage()
-                                .unwrap_or(0.0)
-                                .total_cmp(&right.current_cpu_percentage().unwrap_or(0.0))
+                                .partial_cmp(&right.current_cpu_percentage())
+                                .unwrap_or(std::cmp::Ordering::Equal)
                         })
                 })
                 .or_else(|| {
@@ -282,15 +287,16 @@ impl CaptureEvidence {
                         .copied()
                         .find(|process| process.pid > 1)
                 })?;
-            let selected_pid = process.pid;
-            let root_pid = aggregate_apps(&application_processes)
-                .into_iter()
-                .find(|group| group.pids.contains(&selected_pid))?
-                .main_pid;
-            self.scenario_process_pid = Some(root_pid);
+            let selected_identity = ProcessLiveKey::from_process(process)?;
+            let root_identity =
+                aggregate_apps_typed(&application_processes, processes_observed_at_ms)
+                    .into_iter()
+                    .find(|group| group.member_identities().contains(&selected_identity))?
+                    .main_identity()?;
+            self.scenario_process_identity = Some(root_identity);
             self.scenario_ready = true;
             emit_marker("scenario_ready", self.scenario);
-            return Some(CaptureProcessAction::ApplicationSelection(root_pid));
+            return Some(CaptureProcessAction::ApplicationSelection(root_identity));
         }
 
         if self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) {
@@ -324,10 +330,10 @@ impl CaptureEvidence {
             if !self.telemetry_ready {
                 return None;
             }
-            let pid = prepare_process_insights(processes);
-            self.scenario_process_pid = Some(pid);
+            let identity = prepare_process_insights(processes)?;
+            self.scenario_process_identity = Some(identity);
             return Some(CaptureProcessAction::Insights {
-                pid,
+                identity,
                 state: process_insights_capture_fixture(),
             });
         }
@@ -336,14 +342,24 @@ impl CaptureEvidence {
             prepare_process_tree(processes);
             self.scenario_ready = true;
             emit_marker("scenario_ready", self.scenario);
-            return snapshot_process_tree(processes, 90_000).map(CaptureProcessAction::Termination);
+            let identity = processes
+                .iter()
+                .find(|process| process.pid == 90_000)
+                .and_then(ProcessLiveKey::from_process)?;
+            return snapshot_process_tree(processes, identity)
+                .map(CaptureProcessAction::Termination);
         }
 
         if self.scenario == Some(CaptureScenario::ProcessBatchConfirm) {
             prepare_process_batch(processes);
             let intent = ProcessBatchIntent::freeze(
                 processes,
-                [91_001, 91_002, 91_003],
+                [91_001, 91_002, 91_003].into_iter().filter_map(|pid| {
+                    processes
+                        .iter()
+                        .find(|process| process.pid == pid)
+                        .and_then(ProcessLiveKey::from_process)
+                }),
                 ProcessBatchAction::Suspend,
             );
             return Some(CaptureProcessAction::Batch(intent));
@@ -367,15 +383,18 @@ impl CaptureEvidence {
             })
             .or_else(|| processes.iter().find(|process| process.pid > 1))?;
         if self.scenario == Some(CaptureScenario::ProcessPropertiesPerformance) {
-            let pid = process.pid;
-            if let Some(process) = processes.iter_mut().find(|process| process.pid == pid) {
+            let identity = ProcessLiveKey::from_process(process)?;
+            if let Some(process) = processes
+                .iter_mut()
+                .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
+            {
                 prepare_process_histories(process);
             }
-            self.scenario_process_pid = Some(pid);
+            self.scenario_process_identity = Some(identity);
             self.scenario_ready = true;
             emit_marker("scenario_ready", self.scenario);
             return Some(CaptureProcessAction::Properties(
-                pid,
+                identity,
                 ProcessDetailsSection::Performance,
             ));
         }
@@ -384,7 +403,10 @@ impl CaptureEvidence {
         }
         self.scenario_ready = true;
         emit_marker("scenario_ready", self.scenario);
-        snapshot_single_process(ProcessTerminationAction::ForceKill, process.pid, processes)
+        ProcessLiveKey::from_process(process)
+            .and_then(|identity| {
+                snapshot_single_process(ProcessTerminationAction::ForceKill, identity, processes)
+            })
             .map(CaptureProcessAction::Termination)
     }
 

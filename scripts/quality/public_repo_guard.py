@@ -19,12 +19,37 @@ SECRET_PATTERNS = (
     re.compile(rb"\bxox[baprs]-[A-Za-z0-9-]{20,}\b"),
     re.compile(rb"\bBearer\s+[A-Za-z0-9._-]{20,}\b"),
 )
+EMAIL_PATTERN = re.compile(
+    r"(?<![/\\])\b[A-Za-z0-9.!#$%&'*+?^_`{|}~-]+@"
+    r"[A-Za-z][A-Za-z0-9-]*(?:\.[A-Za-z][A-Za-z0-9-]*)+\b"
+)
 PRIVATE_PATH_PATTERN = re.compile(
     rb"(?<![A-Za-z0-9_])(?:/run/media/(?!<user>)[A-Za-z0-9._-]+|"
     rb"/(?:home|Users)/(?!<user>)[A-Za-z0-9._-]+|"
     rb"/mnt/c/Users/(?!<user>)[A-Za-z0-9._-]+|"
     rb"[A-Za-z]:[\\/](?:Users|users)[\\/](?!<user>)[A-Za-z0-9._-]+)"
 )
+ALLOWED_EMAILS = {
+    "noreply@yellowwhiteblackcat.github.io",
+    "noreply@anthropic.com",
+    # GitHub's generic committer identity for squash/web-flow merges: it
+    # carries no personal data, unlike the per-account noreply suffix.
+    "noreply@github.com",
+    # Maintainer commit identities already published in this repository's
+    # history; the guard only blocks identities that are not on record.
+    "873691128@qq.com",
+    "simadongxi@proton.me",
+    "zhugenanbei@proton.me",
+    # Public upstream package metadata retained in patch provenance.
+    "nathan@zed.dev",
+    "creepy-skeleton@yandex.ru",
+    "david2005thomas@gmail.com",
+    "hector@hecrj.dev",
+}
+ALLOWED_EMAIL_SUFFIX = "@users.noreply.github.com"
+NON_EMAIL_SUFFIXES = (".service", ".socket", ".target")
+# Composed at runtime so this guard never ships a scannable email literal.
+SAMPLE_EMAIL = "stranger" + chr(64) + "example.com"
 FORBIDDEN_PREFIXES = (
     ".private/",
     "docs/archive/",
@@ -97,6 +122,11 @@ def path_violations(root: Path, files: list[Path]) -> list[str]:
     return findings
 
 
+def allowed_email(address: str) -> bool:
+    lowered = address.lower()
+    return lowered in ALLOWED_EMAILS or lowered.endswith(ALLOWED_EMAIL_SUFFIX)
+
+
 def content_violations(root: Path, files: list[Path]) -> list[str]:
     findings: list[str] = []
     for path in files:
@@ -111,9 +141,16 @@ def content_violations(root: Path, files: list[Path]) -> list[str]:
         if PRIVATE_PATH_PATTERN.search(data):
             findings.append(f"host-specific path in tracked file: {name}")
         try:
-            data.decode("utf-8")
+            text = data.decode("utf-8")
         except UnicodeDecodeError:
             findings.append(f"non-UTF-8 text must be reviewed before publication: {name}")
+            continue
+        for address in EMAIL_PATTERN.findall(text):
+            if address.lower().endswith(NON_EMAIL_SUFFIXES):
+                continue
+            if not allowed_email(address):
+                findings.append(f"personal or unapproved email in tracked file: {name}")
+                break
     return findings
 
 
@@ -128,6 +165,14 @@ def history_violations(root: Path) -> list[str]:
             normalized.startswith(prefix) for prefix in FORBIDDEN_PREFIXES
         ):
             findings.append(f"private path remains in Git history: {normalized}")
+
+    emails = {
+        line.strip().lower()
+        for line in git_lines(root, "log", "--all", "--format=%ae%n%ce")
+        if line.strip()
+    }
+    if any(not allowed_email(address) for address in emails):
+        findings.append("personal or unapproved author email remains in Git history")
     return findings
 
 
@@ -144,11 +189,22 @@ def self_test() -> None:
     assert PRIVATE_PATH_PATTERN.search(b"/run/" + b"media/person/disk/project")
     assert PRIVATE_PATH_PATTERN.search(b"/" + b"Users/person/project")
     assert PRIVATE_PATH_PATTERN.search(b"C:" + b"/User" + b"s/person/project")
+    assert EMAIL_PATTERN.search(f"reach the team at {SAMPLE_EMAIL} soon")
+    assert allowed_email("Maintainer@Users.Noreply.Github.com")
+    assert not allowed_email(SAMPLE_EMAIL)
     with tempfile.TemporaryDirectory(prefix="public-repo-guard-") as directory:
         root = Path(directory)
         path = root / "sample.txt"
         path.write_text("/run/" + "media/person/disk/project\n", encoding="utf-8")
         assert content_violations(root, [path])
+        contact = root / "contact.txt"
+        contact.write_text(f"ping: {SAMPLE_EMAIL}\n", encoding="utf-8")
+        assert any(
+            "email" in finding for finding in content_violations(root, [contact])
+        )
+        unit = root / "device@.service"
+        unit.write_text("after=network.target\n", encoding="utf-8")
+        assert content_violations(root, [unit]) == []
     print("public-repo-guard self-test: PASS")
 
 

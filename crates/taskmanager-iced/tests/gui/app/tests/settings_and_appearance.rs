@@ -6,6 +6,7 @@ use super::*;
 use crate::app::SettingsChange;
 use crate::test_support::temp_dir;
 use taskmanager_application::{AppPage, ConfigStore};
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use taskmanager_shell::ShellKeyEvent;
 use taskmanager_theme::tokens::MotionPolicy;
@@ -428,7 +429,7 @@ fn overlay_open_seeds_the_process_ring_from_provider_history() {
     let ring = app
         .process_perf_history()
         .expect("the overlay open must seed the ring");
-    assert_eq!(ring.pid(), 3_100);
+    assert_eq!(ring.identity(), ProcessLiveKey::from_parts(3_100, 310_001));
     assert_eq!(ring.cpu_samples(), vec![10.0, 20.0, 30.0]);
     assert_eq!(ring.memory_samples(), vec![1_000.0, 1_500.0]);
     assert_eq!(ring.disk_read_samples(), vec![5.0, 6.0, 7.0]);
@@ -449,7 +450,7 @@ fn overlay_open_seeds_the_process_ring_from_provider_history() {
     let ring = app
         .process_perf_history()
         .expect("the re-open keeps a ring for live sampling");
-    assert_eq!(ring.pid(), 3_101);
+    assert_eq!(ring.identity(), ProcessLiveKey::from_parts(3_101, 310_002));
     assert!(ring.is_empty(), "no provider history → no fabricated seed");
 }
 

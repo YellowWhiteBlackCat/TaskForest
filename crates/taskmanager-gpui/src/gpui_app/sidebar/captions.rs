@@ -1,14 +1,15 @@
 //! Sidebar caption projections kept separate from the device-row renderer.
 
-use crate::gpui_app::formatting::{self, DisplayUnits, UnitKind};
+use crate::gpui_app::formatting;
 use crate::gpui_app::perf_views::gpu_percentage_readout;
 use taskmanager_application::i18n;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::metrics::{DiskMetrics, GpuMetrics, NetworkMetrics, SystemSnapshot};
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_core::core::{BatteryInfo, SensorReading};
 
-pub(super) fn rate_str(units: DisplayUnits, bytes_per_sec: u64) -> String {
-    units.format(bytes_per_sec, UnitKind::Network, true)
+pub(super) fn rate_str(units: UnitPreferences, bytes_per_sec: u64) -> String {
+    units.format_quantity(bytes_per_sec, QuantityFamily::Network, true)
 }
 
 pub(super) fn clean_disk_name(name: &str) -> String {
@@ -17,7 +18,7 @@ pub(super) fn clean_disk_name(name: &str) -> String {
         .to_string()
 }
 
-pub(super) fn disk_activity_caption(disk: &DiskMetrics, units: DisplayUnits) -> String {
+pub(super) fn disk_activity_caption(disk: &DiskMetrics, units: UnitPreferences) -> String {
     let active = disk
         .current_active_time_pct()
         .map_or_else(formatting::missing_value, |value| {
@@ -28,14 +29,14 @@ pub(super) fn disk_activity_caption(disk: &DiskMetrics, units: DisplayUnits) -> 
         disk.current_write_bytes_per_sec(),
     ) {
         (Some(read), Some(write)) => {
-            units.format(read.saturating_add(write), UnitKind::Drive, true)
+            units.format_quantity(read.saturating_add(write), QuantityFamily::Drive, true)
         }
         _ => formatting::missing_value(),
     };
     format!("{active}  ·  {rate}")
 }
 
-pub(super) fn network_rate_caption(network: &NetworkMetrics, units: DisplayUnits) -> String {
+pub(super) fn network_rate_caption(network: &NetworkMetrics, units: UnitPreferences) -> String {
     let tx = network
         .current_tx_bytes_per_sec()
         .map_or_else(formatting::missing_value, |value| rate_str(units, value));
@@ -123,17 +124,17 @@ pub(super) fn cpu_caption(snap: &SystemSnapshot) -> (String, String) {
     (brand, line2)
 }
 
-pub(super) fn mem_caption(snap: &SystemSnapshot, units: DisplayUnits) -> (String, String) {
+pub(super) fn mem_caption(snap: &SystemSnapshot, units: UnitPreferences) -> (String, String) {
     let m = &snap.memory;
     let used = m
         .current_used_bytes()
         .map_or_else(formatting::missing_value, |value| {
-            units.format(value, UnitKind::Memory, false)
+            units.format_quantity(value, QuantityFamily::Memory, false)
         });
     let total = m
         .current_total_bytes()
         .map_or_else(formatting::missing_value, |value| {
-            units.format(value, UnitKind::Memory, false)
+            units.format_quantity(value, QuantityFamily::Memory, false)
         });
     (
         format!("{used} / {total}"),
@@ -156,7 +157,7 @@ pub(super) fn append_status_badge(caption: &mut String, status: DeviceStatus) {
 /// First GPU caption line: absolute memory when exposed, otherwise the live
 /// clock. The clock is shown with the advertised max when available, e.g.
 /// "1300 / 2500 MHz". Returns an empty string only when neither fact exists.
-pub(super) fn gpu_caption_line1(g: &GpuMetrics, units: DisplayUnits) -> String {
+pub(super) fn gpu_caption_line1(g: &GpuMetrics, units: UnitPreferences) -> String {
     let (vram_used, vram_total) = if let (Some(used), Some(total)) = (
         g.current_dedicated_vram_used_bytes(),
         g.current_dedicated_vram_total_bytes(),
@@ -184,14 +185,17 @@ pub(super) fn gpu_caption_line1(g: &GpuMetrics, units: DisplayUnits) -> String {
     {
         return format!(
             "VRAM {} / {}",
-            units.format(used, UnitKind::Memory, false),
-            units.format(total, UnitKind::Memory, false)
+            units.format_quantity(used, QuantityFamily::Memory, false),
+            units.format_quantity(total, QuantityFamily::Memory, false)
         );
     }
     if let Some(total) = vram_total
         && total > 0
     {
-        return format!("VRAM {}", units.format(total, UnitKind::Memory, false));
+        return format!(
+            "VRAM {}",
+            units.format_quantity(total, QuantityFamily::Memory, false)
+        );
     }
     // Fall back to the core clock or driver.
     match (g.current_frequency_mhz(), g.current_max_frequency_mhz()) {
@@ -235,9 +239,8 @@ pub(super) fn gpu_caption_line2(g: &GpuMetrics) -> String {
     };
 
     if let (Some(used), Some(total)) = (vram_used, vram_total)
-        && total > 0
+        && let Some(pct) = taskmanager_core::core::units::bytes_percent(used, total)
     {
-        let pct = formatting::bytes_percent(used, total);
         parts.push(format!("VRAM {:.0}%", pct.min(100.0).round()));
     }
     if let Some(temp) = g.current_temperature_c() {

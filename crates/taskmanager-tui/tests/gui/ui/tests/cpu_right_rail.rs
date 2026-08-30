@@ -44,7 +44,8 @@ fn with_full_spec(app: &mut crate::TuiApp) {
         snapshot.cpu.brand = Some("Intel(R) Core(TM) Ultra 7 358H".into());
         snapshot.cpu.physical_cores = Some(16);
         snapshot.cpu.logical_cores = Some(22);
-        snapshot.cpu.l1_cache_kb = Some(1280);
+        snapshot.cpu.l1d_cache_kb = Some(1280);
+        snapshot.cpu.l1i_cache_kb = Some(1024);
         snapshot.cpu.l2_cache_kb = Some(20_480);
         snapshot.cpu.l3_cache_kb = Some(24_576);
         snapshot.cpu.performance_policy.frequency_implementation = Some("intel_pstate".into());
@@ -106,7 +107,8 @@ fn right_rail_paints_the_full_live_and_spec_row_set_at_reference_size() {
         ("Low-power E-cores", "2"),
         ("Logical processors", "22"),
         ("Virtualization", "KVM"),
-        ("L1 cache", "1.25 MiB"),
+        ("L1 data", "1.25 MiB"),
+        ("L1 instruction", "1.00 MiB"),
         ("L2 cache", "20.00 MiB"),
         ("L3 cache", "24.00 MiB"),
         ("Cpufreq driver", "intel_pstate"),

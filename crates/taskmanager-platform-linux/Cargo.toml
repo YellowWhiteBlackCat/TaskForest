@@ -44,6 +44,11 @@ taskmanager-platform-contract = { path = "../taskmanager-platform-contract" }
 taskmanager-platform-portable = { path = "../taskmanager-platform-portable" }
 taskmanager-platform-provider = { path = "../taskmanager-platform-provider" }
 taskmanager-platform-runtime = { path = "../taskmanager-platform-runtime" }
+# ONE authority for SMBIOS record parsing (ADR-023 C1): this unprivileged
+# raw-DMI probe and the pkexec-escalated `taskmanager-smbios-helper` decode
+# Memory Device records through the same pure parser so the two readers can
+# never drift on offsets or sentinel semantics. Pure safe-Rust leaf.
+taskmanager-smbios-tables = { path = "../taskmanager-smbios-tables" }
 tracing = "0.1"
 
 # ADR-024: the second audited `unsafe` boundary crate — the AF_PACKET socket

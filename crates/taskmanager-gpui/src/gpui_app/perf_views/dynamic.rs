@@ -69,11 +69,11 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
     // Title-row doctrine: the LEFT slot is the category, the RIGHT slot is
     // the specific model — never a chart caption.
     let model = if battery.model_name.is_empty() {
-        battery
-            .display_name
-            .is_empty()
-            .then(|| format!("{} {}", i18n::t("common.battery"), index))
-            .unwrap_or_else(|| battery.display_name.clone())
+        if battery.display_name.is_empty() {
+            format!("{} {}", i18n::t("common.battery"), index)
+        } else {
+            battery.display_name.clone()
+        }
     } else {
         battery.model_name.clone()
     };

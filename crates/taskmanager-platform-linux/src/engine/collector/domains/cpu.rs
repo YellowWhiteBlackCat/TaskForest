@@ -16,7 +16,7 @@ use crate::engine::hardware::{detect_cpu_cache, read_sysfs_u64};
 pub(crate) struct LinuxCpuTelemetryCollector {
     system: System,
     previous_rapl: Option<(u64, Instant)>,
-    cache_kb: (Option<u64>, Option<u64>, Option<u64>),
+    cache_kb: (Option<u64>, Option<u64>, Option<u64>, Option<u64>),
     rapl_max_energy_uj: u64,
     static_facts_initialized: bool,
     last_value: Option<(CpuMetrics, u64)>,
@@ -28,7 +28,7 @@ impl LinuxCpuTelemetryCollector {
         Self {
             system: System::new(),
             previous_rapl: None,
-            cache_kb: (None, None, None),
+            cache_kb: (None, None, None, None),
             rapl_max_energy_uj: 1u64 << 32,
             static_facts_initialized: false,
             last_value: None,

@@ -29,6 +29,14 @@ the lower document layers.
 - Cross-crate forwarding facades and type re-exports are forbidden. Consumers import the
   actual owner module (`taskmanager-core` or `taskmanager-platform-contract`); composition
   crates select adapters and expose behavior, not a second public address for shared types.
+- Core evolution is a hard cutover: once a new typed contract is current, delete the old
+  API, alias, wrapper, fallback, renderer state, fixture, demo/capture path, and caller in
+  the same change. Do not add `deprecated`, compatibility facades, dual-stack state, or a
+  migration wait-list. A private external-payload decoder may canonicalize an already
+  published format at ingress, but that decoder is not an implementation API or a second
+  semantic path.
+- Import owner types with `use` at the module boundary. Do not introduce long qualified
+  paths as a substitute for an import, especially after a core type migration.
 
 ## Non-negotiable invariants
 

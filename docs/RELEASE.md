@@ -9,16 +9,20 @@
 当前发行包只包含 GPUI / TaskForestG。Iced、TUI 和 Bevy 不进入二进制发行包；macOS
 打包、签名和公证暂缓。
 
-只有推送与根 `Cargo.toml` 版本一致的 `vX.Y.Z` tag，才会创建正式 Release 并生成以下产物：
+只有推送与根 `Cargo.toml` 版本一致的 `vX.Y.Z` tag，才会创建正式 Release 并生成以下产物。
+所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 当前恒为 `G`，
+平台为 `x64`/`arm64`）；权威定义见 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)。
+包内元数据仍遵守发行版惯例：DEB `Architecture` 为 `amd64`/`arm64`，RPM arch 为
+`x86_64`/`aarch64`，与文件名中的 `x64`/`arm64` 是固定映射。
 
-| 平台 | 架构 | 产物 | 构建入口 |
-|---|---|---|---|
-| Linux | amd64 | `taskforest_<ver>_amd64.deb` | `packaging/debian/build-deb.sh` |
-| Linux | arm64 | `taskforest_<ver>_arm64.deb` | `packaging/debian/build-deb.sh` |
-| Linux | x86_64 | `taskforest-<ver>-1.x86_64.rpm` | `packaging/rpm/build-rpm.sh` |
-| Linux | aarch64 | `taskforest-<ver>-1.aarch64.rpm` | `packaging/rpm/build-rpm.sh` |
-| Windows | x64 | `TaskForest-<ver>-x64.msi` | `packaging/windows/build-msi.sh`（WiX） |
-| Windows | arm64 | `TaskForest-<ver>-arm64.msi` | `packaging/windows/build-msi.sh`（WiX） |
+| 平台 | 架构 | 产物 | 包内 arch | 构建入口 |
+|---|---|---|---|---|
+| Linux | x64 | `TaskForest-G-<ver>-x64.deb` | `amd64` | `packaging/debian/build-deb.sh` |
+| Linux | arm64 | `TaskForest-G-<ver>-arm64.deb` | `arm64` | `packaging/debian/build-deb.sh` |
+| Linux | x64 | `TaskForest-G-<ver>-x64.rpm` | `x86_64` | `packaging/rpm/build-rpm.sh` |
+| Linux | arm64 | `TaskForest-G-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh` |
+| Windows | x64 | `TaskForest-G-<ver>-x64.msi` | `x64` | `packaging/windows/build-msi.sh`（WiX） |
+| Windows | arm64 | `TaskForest-G-<ver>-arm64.msi` | `arm64` | `packaging/windows/build-msi.sh`（WiX） |
 
 任一 DEB、RPM 或 MSI 架构缺失或验证失败，发布必须失败。Windows 不再是可选或
 `continue-on-error` 平台。
@@ -40,19 +44,28 @@ Linux amd64/arm64 和 Windows x64/arm64 均使用对应的 GitHub-hosted 原生 
 WiX 文件 `packaging/windows/taskforest.wxs` 是 MSI 文件清单权威。MSI 安装 GPUI 可执行文件、
 LICENSE 和开始菜单入口，不安装后台历史服务或 autostart。
 
+MSI 的 `ProductVersion` 属性受 Windows Installer 硬性限制只能为数字段 `X.Y.Z`；完整版本
+（含 `rcN`）出现在文件名、MSI 摘要 Description、ARP comments 以及安装后的
+`Software\TaskForest\Version` 注册表值中，CI 会在反编译校验里断言完整版本确实入包。
+rc 与正式版共享数字 `ProductVersion`，覆盖升级由 `AllowSameVersionUpgrades` 保证。
+
 CI 在构建后使用 Windows Installer 管理提取验证 MSI 数据库和关键文件。配置
 `WINDOWS_CERT_B64` 与 `WINDOWS_CERT_PASSWORD` 时执行 Authenticode 签名；没有证书时
 可以生成明确标注的未签名预发布包，但 SmartScreen 可能警告。
 
 ## 版本与 tag
 
-- tag 形如 `vX.Y.Z` 或 `vX.Y.Z-pre`；
+- tag 形如 `vX.Y.Z` 或 `vX.Y.Z-rcN`；预发布后缀统一连写不带点
+  （如 `v0.1.0-rc5`），与 Cargo 版本、产物文件名逐字一致；
+  semver 按字典序比较预发布标识（`rc10` 会排在 `rc5` 之前），因此 `rcN`
+  只用于个位数编号，需要更多轮次时应直接发布正式版；
 - 默认要求 tag 版本与根 `Cargo.toml` 完全一致；
 - `Cargo.lock` 必须提交且 `cargo metadata --locked` 通过；
 - prerelease tag 自动创建 GitHub prerelease；
-- DEB/RPM 的版本字段禁止预发布连字符：`0.1.0-rc.1` 落盘为 `0.1.0~rc.1`
+- DEB/RPM 的版本字段禁止预发布连字符：`0.1.0-rc5` 落盘为 `0.1.0~rc5`
   （~ 排序低于正式版，保证 rc 可被 `0.1.0` 升级覆盖）；
-- MSI ProductVersion 只使用数字段 `X.Y.Z`；
+- MSI 文件名使用完整 Cargo 版本（含 `rcN` 预发布后缀），与其他产物一致；
+  MSI `ProductVersion` 属性只使用数字段 `X.Y.Z`（WiX 要求），由 CI 从完整版本剥离；
 - 每个平台输出独立 SHA-256 清单；
 - tag 一经推送不可移动、重打或删除重发；
 - prerelease 编号连续递增，作废编号不回收，缺失原因在根

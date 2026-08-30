@@ -1,6 +1,6 @@
 use super::{disk_stats, temperature_trend_value};
-use crate::gpui_app::formatting::DisplayUnits;
 use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_core::core::units::UnitPreferences;
 
 /// An empty or all-gap window renders no trend row — absence stays
 /// absence instead of becoming a fabricated "0 °C" summary.
@@ -37,7 +37,7 @@ fn removable_and_power_on_rows_use_locale_catalog_entries() {
         .media_removable(Some(true))
         .smart_power_on_hours(Some(72))
         .build();
-    let rows = disk_stats(&disk, DisplayUnits::default(), &[]);
+    let rows = disk_stats(&disk, UnitPreferences::default(), &[]);
     let find = |key: &'static str| {
         rows.iter()
             .find(|row| row.label() == taskmanager_application::i18n::t(key))
@@ -62,7 +62,7 @@ fn removable_and_power_on_rows_use_locale_catalog_entries() {
 /// shared dash; capacity rows stay `None` until the provider reports.
 #[test]
 fn first_sample_rate_rows_are_none_not_fabricated_zeros() {
-    let rows = disk_stats(&DiskMetrics::default(), DisplayUnits::default(), &[]);
+    let rows = disk_stats(&DiskMetrics::default(), UnitPreferences::default(), &[]);
     let find = |key: &'static str| {
         rows.iter()
             .find(|row| row.label() == taskmanager_application::i18n::t(key))

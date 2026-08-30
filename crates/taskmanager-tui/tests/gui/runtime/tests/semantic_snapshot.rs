@@ -19,7 +19,7 @@ use taskmanager_core::core::metrics::{
     CpuMetrics, CpuScalarObservations, MemoryMetrics, MemoryScalarObservations, ScalarObservation,
     SystemSnapshot,
 };
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_ui_contract::{SemanticAction, SemanticLiveRegion, SemanticNodeId, SemanticRole};
 
@@ -67,6 +67,17 @@ fn row_nodes(
         .collect()
 }
 
+fn process_row_id(pid: u32) -> String {
+    format!(
+        "row:process:pid:{pid}:start:{}",
+        taskmanager_test_support::fixture_start_token(pid)
+    )
+}
+
+fn process_cell_id(pid: u32, cell: &str) -> String {
+    format!("{}:cell:{cell}", process_row_id(pid))
+}
+
 /// N injected processes publish exactly N rows whose name/CPU/memory cell
 /// semantics match the typed inputs, the cursor row and the batch-marked row
 /// are selected, the observed CPU scalar publishes the graph, the revision
@@ -106,12 +117,10 @@ fn process_rows_carry_typed_name_cpu_memory_and_selection_semantics() {
         taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRefresh,
     );
     app.selected = 2;
+    app.shell.clear_process_selection();
     app.shell.selected_rows.insert(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            103,
-            taskmanager_test_support::fixture_start_token(103),
-        )
-        .expect("non-zero parts"),
+        ProcessLiveKey::from_parts(103, taskmanager_test_support::fixture_start_token(103))
+            .expect("non-zero parts"),
     );
     app.shell.set_feedback_activity("");
     app.shell.clear_feedback_notice();
@@ -135,12 +144,21 @@ fn process_rows_carry_typed_name_cpu_memory_and_selection_semantics() {
             .and_then(|node| node.value_text())
             .map(str::to_owned)
     };
-    assert_eq!(cell("row:101:cell:name"), Some("alpha".into()));
-    assert_eq!(cell("row:101:cell:cpu"), Some("12.5%".into()));
-    assert_eq!(cell("row:101:cell:memory"), Some("25.0%".into()));
-    assert_eq!(cell("row:102:cell:memory"), Some("Unavailable".into()));
-    assert_eq!(cell("row:103:cell:cpu"), Some("Unavailable".into()));
-    assert_eq!(cell("row:104:cell:name"), Some("Unnamed process".into()));
+    assert_eq!(cell(&process_cell_id(101, "name")), Some("alpha".into()));
+    assert_eq!(cell(&process_cell_id(101, "cpu")), Some("12.5%".into()));
+    assert_eq!(cell(&process_cell_id(101, "memory")), Some("25.0%".into()));
+    assert_eq!(
+        cell(&process_cell_id(102, "memory")),
+        Some("Unavailable".into())
+    );
+    assert_eq!(
+        cell(&process_cell_id(103, "cpu")),
+        Some("Unavailable".into())
+    );
+    assert_eq!(
+        cell(&process_cell_id(104, "name")),
+        Some("Unnamed process".into())
+    );
 
     // Selection semantics: the TUI cursor row and the batch-marked row are
     // selected; the other rows truthfully report false.
@@ -149,10 +167,18 @@ fn process_rows_carry_typed_name_cpu_memory_and_selection_semantics() {
             .get(&SemanticNodeId::owned(row))
             .and_then(|node| node.state().selected)
     };
-    assert_eq!(selected_of("row:101"), Some(false));
-    assert_eq!(selected_of("row:102"), Some(true), "cursor row selected");
-    assert_eq!(selected_of("row:103"), Some(true), "marked row selected");
-    assert_eq!(selected_of("row:104"), Some(false));
+    assert_eq!(selected_of(&process_row_id(101)), Some(false));
+    assert_eq!(
+        selected_of(&process_row_id(102)),
+        Some(true),
+        "cursor row selected"
+    );
+    assert_eq!(
+        selected_of(&process_row_id(103)),
+        Some(true),
+        "marked row selected"
+    );
+    assert_eq!(selected_of(&process_row_id(104)), Some(false));
 
     // The observed CPU scalar publishes the graph with the typed current.
     let graph = snapshot
@@ -241,8 +267,8 @@ fn first_loading_frame_omits_unobserved_graph_and_keeps_scalars_unavailable() {
             .get(&SemanticNodeId::owned(suffix))
             .and_then(|node| node.value_text())
     };
-    assert_eq!(cell("row:77:cell:cpu"), Some("Unavailable"));
-    assert_eq!(cell("row:77:cell:memory"), Some("Unavailable"));
+    assert_eq!(cell(&process_cell_id(77, "cpu")), Some("Unavailable"));
+    assert_eq!(cell(&process_cell_id(77, "memory")), Some("Unavailable"));
 
     // A set footer status line is passed through to the live region verbatim
     // (the count fallback only applies to an empty status).

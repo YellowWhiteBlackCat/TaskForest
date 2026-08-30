@@ -23,8 +23,9 @@ pub fn read_sysfs_u64(path: &str) -> Option<u64> {
 /// 1600 KiB = 576 KiB L1d + 1024 KiB L1i). Shared caches (L2/L3) are still
 /// counted exactly once: every sharer reports the same `(level, id, type)`.
 #[cfg(target_os = "linux")]
-pub fn detect_cpu_cache() -> (Option<u64>, Option<u64>, Option<u64>) {
-    let mut totals: [Option<u64>; 3] = [None; 3]; // index level-1
+pub fn detect_cpu_cache() -> (Option<u64>, Option<u64>, Option<u64>, Option<u64>) {
+    // index 0 = L1 data, 1 = L1 instruction, 2 = L2, 3 = L3.
+    let mut totals: [Option<u64>; 4] = [None; 4];
     let mut seen: std::collections::HashSet<(String, String, String)> =
         std::collections::HashSet::new();
     for cpu in 0..num_cpu_dirs() {
@@ -42,12 +43,24 @@ pub fn detect_cpu_cache() -> (Option<u64>, Option<u64>, Option<u64>) {
                 continue;
             };
             let size_kb = parse_size_to_kb(&size);
-            if (1..=3).contains(&n) && size_kb > 0 && seen.insert((level, id, typ)) {
-                totals[n - 1] = Some(totals[n - 1].unwrap_or(0).saturating_add(size_kb));
+            if (1..=3).contains(&n) && size_kb > 0 && seen.insert((level.clone(), id, typ.clone()))
+            {
+                // L1 reports one sysfs entry per kind: `Data` feeds the data
+                // slot, `Instruction` the instruction slot, and a rare
+                // unified L1 reports into the data slot (a single capacity
+                // the product shows once, never double-counted).
+                let slot = match (n, typ.as_str()) {
+                    (1, "Data") | (1, "Unified") => &mut totals[0],
+                    (1, "Instruction") => &mut totals[1],
+                    (2, _) => &mut totals[2],
+                    (3, _) => &mut totals[3],
+                    _ => continue,
+                };
+                *slot = Some(slot.unwrap_or(0).saturating_add(size_kb));
             }
         }
     }
-    (totals[0], totals[1], totals[2])
+    (totals[0], totals[1], totals[2], totals[3])
 }
 
 /// Parse a kernel CPU list like "0-3,5,7-9" into a vec of CPU ids.

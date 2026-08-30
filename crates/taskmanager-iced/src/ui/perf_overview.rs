@@ -341,10 +341,16 @@ fn cpu_memory_header_and_stats(
                 ));
             }
         }
-        if let Some(l1) = cpu.l1_cache_kb {
+        if let Some(l1d) = cpu.l1d_cache_kb {
             stats.push(StatRow::text(
-                t("common.l1_cache"),
-                Some(format_cache_kb(l1)),
+                t("common.l1_data_cache"),
+                Some(format_cache_kb(l1d)),
+            ));
+        }
+        if let Some(l1i) = cpu.l1i_cache_kb {
+            stats.push(StatRow::text(
+                t("common.l1_instruction_cache"),
+                Some(format_cache_kb(l1i)),
             ));
         }
         if let Some(l2) = cpu.l2_cache_kb {

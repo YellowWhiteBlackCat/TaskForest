@@ -1,7 +1,9 @@
 use super::battery::battery_summary_lines;
+use super::disk::partition_usage_text;
 use super::gpu::gpu_headline_label_value;
 use super::network::network_summary_lines;
 use super::*;
+use taskmanager_core::core::device_state::DeviceStatus;
 
 /// Iced consumes the shared typed presentation keys; it does not maintain a
 /// second failure-kind mapping.
@@ -254,6 +256,23 @@ fn static_quantities_follow_the_resolved_unit_pairs() {
     let rows = network_summary_lines(&nic, false, false);
     assert_eq!(row_value(&rows, t("net.total_received")), "12.0 Mb");
     assert_eq!(row_value(&rows, t("net.total_sent")), "6.0 Mb");
+}
+
+#[test]
+fn partition_usage_does_not_turn_missing_free_space_into_zero() {
+    // The label resolves through the shared catalog: pin the language so the
+    // assertion is identical on any host locale (portability red line).
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    let (text, ratio) = partition_usage_text(
+        Some(70),
+        Some(100),
+        None,
+        DeviceStatus::Healthy,
+        crate::ui::UnitPrefs::default(),
+    );
+    assert_eq!(ratio, None);
+    assert_eq!(text, "Filesystem usage unavailable");
+    assert!(!text.contains("0 B"));
 }
 
 /// The throughput graphs' scale carries the resolved unit pair, so the

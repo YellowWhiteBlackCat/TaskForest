@@ -120,20 +120,25 @@ pub(super) fn observe_dmi_memory_from_paths(
                     Ok(bytes) if bytes.len() >= 23 => {
                         observed = observed.saturating_add(1);
                         type17_count = type17_count.saturating_add(1);
-                        let size = u16::from_le_bytes([bytes[12], bytes[13]]);
-                        if size > 0 && size != u16::MAX {
-                            type17_used = type17_used.saturating_add(1);
-                        }
-                        let mut module_speed =
-                            u32::from(u16::from_le_bytes([bytes[21], bytes[22]]));
-                        if bytes.len() >= 34 {
-                            let configured = u32::from(u16::from_le_bytes([bytes[32], bytes[33]]));
-                            if configured > 0 && configured != u32::from(u16::MAX) {
-                                module_speed = configured;
+                        // One parser for both readers of this format: the
+                        // shared `taskmanager-smbios-tables` decode is the
+                        // same one the pkexec-escalated helper runs as root,
+                        // so the unprivileged and escalated DMI facts cannot
+                        // drift on offsets or sentinel semantics. A record
+                        // the parser rejects is still a counted slot (the
+                        // 17-N entry exists) but contributes no fields.
+                        if let Some(record) = taskmanager_smbios_tables::parse_memory_device(&bytes)
+                        {
+                            if record.size_mb.is_some() {
+                                type17_used = type17_used.saturating_add(1);
                             }
-                        }
-                        if module_speed > 0 && module_speed != u32::from(u16::MAX) {
-                            max_speed = max_speed.max(module_speed);
+                            let module_speed = record
+                                .configured_speed_mts
+                                .or(record.speed_mts)
+                                .unwrap_or(0);
+                            if module_speed > 0 {
+                                max_speed = max_speed.max(module_speed);
+                            }
                         }
                     }
                     Ok(_) => {
@@ -212,6 +217,8 @@ pub(super) fn observe_dmi_memory_from_paths(
         slots_total,
         module_types: Vec::new(),
         module_manufacturers: Vec::new(),
+        module_part_numbers: Vec::new(),
+        module_serials: Vec::new(),
         module_form_factors: Vec::new(),
         status: source_status(DMI_PROVIDER, observed, source_reached, &failures),
         receipts: failures.fields,

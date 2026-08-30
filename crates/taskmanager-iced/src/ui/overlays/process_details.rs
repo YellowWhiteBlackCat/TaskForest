@@ -7,8 +7,9 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::{
     DetailValue, ProcessDetailsField, ProcessDetailsRowVm, detail_value,
 };
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process_telemetry::ProcessEnvironment;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
+use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_core::core::units::UnitPreferences;
 
 use taskmanager_shell::ShellApp;
@@ -52,6 +53,15 @@ pub(crate) fn details_overlay<'a>(
             appear,
         );
     };
+    let Some(identity) = target.live_key() else {
+        return super::modal_overlay(
+            theme_snapshot,
+            t("prop.process_details"),
+            t("prop.frozen_hint"),
+            column![].into(),
+            appear,
+        );
+    };
 
     let tabs: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> =
         crate::app::DetailsSection::ALL
@@ -69,12 +79,12 @@ pub(crate) fn details_overlay<'a>(
 
     let body: Element<'a, Message, iced::Theme, iced::Renderer> = match app.details_section() {
         crate::app::DetailsSection::Overview => key_value_rows(overview_rows_with_local_time(
-            target.pid,
+            identity,
             shell,
             &app.local_time_rules,
         )),
-        crate::app::DetailsSection::Performance => performance_tab(app, target.pid),
-        crate::app::DetailsSection::Command => command_tab(app, target.pid),
+        crate::app::DetailsSection::Performance => performance_tab(app, identity),
+        crate::app::DetailsSection::Command => command_tab(app, identity),
         crate::app::DetailsSection::Insights => {
             crate::ui::insights::insights_block(theme_snapshot, shell, &target)
         }
@@ -113,12 +123,12 @@ fn details_tab_label(section: crate::app::DetailsSection) -> &'static str {
 }
 
 fn overview_rows_with_local_time(
-    pid: u32,
+    identity: ProcessLiveKey,
     shell: &ShellApp,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(String, String)> {
-    let Some(process) = shell.visible_process_by_pid(pid) else {
-        return property_rows(pid, shell);
+    let Some(process) = shell.visible_process_by_identity(identity) else {
+        return property_rows(identity, shell);
     };
     property_pairs(process, local_time_rules)
         .into_iter()
@@ -133,11 +143,11 @@ fn overview_rows_with_local_time(
 }
 
 fn command_rows_with_local_time(
-    pid: u32,
+    identity: ProcessLiveKey,
     shell: &ShellApp,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(String, String)> {
-    let process = shell.visible_process_by_pid(pid);
+    let process = shell.visible_process_by_identity(identity);
     let mut rows = Vec::new();
     let Some(process) = process else {
         push_property(&mut rows, t("common.name"), Some(MISSING_VALUE));
@@ -179,7 +189,7 @@ pub(crate) fn environment_facet<'a>(
 /// the headless tests drive the same seam the modal renders.
 #[must_use]
 pub(crate) fn filtered_environment_rows<'a>(
-    entries: &'a [taskmanager_core::core::process_telemetry::ProcessEnvironmentEntry],
+    entries: &'a [ProcessEnvironmentEntry],
     filter: &str,
 ) -> Vec<&'a taskmanager_core::core::process_telemetry::ProcessEnvironmentEntry> {
     let needle = filter.trim().to_lowercase();
@@ -191,12 +201,12 @@ pub(crate) fn filtered_environment_rows<'a>(
 
 fn command_tab<'a>(
     app: &'a crate::IcedApp,
-    pid: u32,
+    identity: ProcessLiveKey,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let theme_snapshot = app.theme();
     let shell = &app.shell;
-    let mut rows = command_rows_with_local_time(pid, shell, &app.local_time_rules);
-    let process = shell.visible_process_by_pid(pid);
+    let mut rows = command_rows_with_local_time(identity, shell, &app.local_time_rules);
+    let process = shell.visible_process_by_identity(identity);
     let mut actions = Vec::new();
     if let Some(cmd) = process
         .map(|p| p.cmdline.as_str())
@@ -396,11 +406,11 @@ fn environment_section<'a>(
 
 fn performance_tab<'a>(
     app: &'a crate::IcedApp,
-    pid: u32,
+    identity: ProcessLiveKey,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let theme_snapshot = app.theme();
     let smooth = true;
-    let process = app.shell.visible_process_by_pid(pid);
+    let process = app.shell.visible_process_by_identity(identity);
     let local_time_rules = &app.local_time_rules;
     let history = app.process_perf_series();
     let cpu = history.as_ref().map_or_else(
@@ -527,27 +537,25 @@ fn performance_tab<'a>(
     .into()
 }
 
-pub(crate) fn properties_target(
-    shell: &ShellApp,
-) -> Option<&taskmanager_core::core::process::FrozenProcessIdentity> {
+pub(crate) fn properties_target(shell: &ShellApp) -> Option<&FrozenProcessIdentity> {
     shell.process_properties_target()
 }
 
 #[must_use]
-pub(crate) fn property_rows(pid: u32, shell: &ShellApp) -> Vec<(String, String)> {
+pub(crate) fn property_rows(identity: ProcessLiveKey, shell: &ShellApp) -> Vec<(String, String)> {
     property_rows_with_local_time(
-        pid,
+        identity,
         shell,
         &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     )
 }
 
 fn property_rows_with_local_time(
-    pid: u32,
+    identity: ProcessLiveKey,
     shell: &ShellApp,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(String, String)> {
-    let process = shell.visible_process_by_pid(pid);
+    let process = shell.visible_process_by_identity(identity);
     let Some(process) = process else {
         let mut rows = Vec::new();
         push_property(&mut rows, t("common.name"), Some(MISSING_VALUE));
@@ -572,8 +580,8 @@ fn property_rows_with_local_time(
 /// the shared dash.
 #[must_use]
 fn property_pairs(
-    process: &taskmanager_core::core::process::ProcessItem,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    process: &ProcessItem,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<(ProcessDetailsField, String, String)> {
     let vm = details_vm(process, local_time_rules);
     let row =
@@ -614,8 +622,8 @@ fn property_pairs(
 }
 
 fn details_vm(
-    process: &taskmanager_core::core::process::ProcessItem,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    process: &ProcessItem,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<ProcessDetailsRowVm> {
     taskmanager_application::process_details_vm::process_details_rows_with_local_time(
         process,

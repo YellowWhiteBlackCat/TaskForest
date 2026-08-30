@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_core::core::{DiagnosticBundleError, DiagnosticBundleErrorKind};
 
@@ -20,7 +21,9 @@ fn surface_fixture(kind: WindowSurfaceKind) -> WindowSurface {
         }
         WindowSurfaceKind::DiskSmart => WindowSurface::DiskSmart(2),
         WindowSurfaceKind::DashboardPanel => WindowSurface::DashboardPanel(DashboardPanel::Events),
-        WindowSurfaceKind::ProcessAffinity => WindowSurface::ProcessAffinity(41),
+        WindowSurfaceKind::ProcessAffinity => WindowSurface::ProcessAffinity(
+            ProcessLiveKey::from_parts(41, 41).expect("fixture identity"),
+        ),
     }
 }
 

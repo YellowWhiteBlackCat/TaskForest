@@ -15,6 +15,10 @@ use taskmanager_core::core::units::UnitPreferences;
 use super::highlight;
 use super::{kv, panel};
 use crate::TuiApp;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/process_details_support.rs"]
+pub(crate) mod process_details_support;
 use crate::TuiTheme;
 use taskmanager_shell::SortCol;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes, missing_value};
@@ -331,8 +335,8 @@ pub(super) struct SearchHighlight<'a> {
 pub(super) fn group_header_cells(
     name: &str,
     count: usize,
-    cpu: f32,
-    memory: u64,
+    cpu: Option<f32>,
+    memory: Option<u64>,
     expanded: bool,
     columns: ColumnVisibility,
     highlight: SearchHighlight,
@@ -360,7 +364,7 @@ pub(super) fn group_header_cells(
             highlight.search_active,
             highlight.theme,
         ),
-        Cell::from(format!("{cpu:>5.1}%")),
+        Cell::from(cpu.map_or_else(|| MISSING_VALUE.to_owned(), |cpu| format!("{cpu:>5.1}%"))),
     ];
     if sparkline_visible {
         // A group header aggregates many processes; it carries no single
@@ -369,7 +373,7 @@ pub(super) fn group_header_cells(
         // widened table (and matches the gpui `show_spark=false` blank cell).
         cells.push(Cell::from(MISSING_VALUE));
     }
-    cells.push(Cell::from(bytes(memory)));
+    cells.push(Cell::from(memory.map_or_else(missing_value, bytes)));
     if visible(SortCol::Pss) {
         cells.push(Cell::from(MISSING_VALUE));
     }
@@ -482,59 +486,13 @@ fn detail_panel_pairs_with_local_time(
 /// a visual row list that interleaves group headers; a header has no single
 /// process, so the panel surfaces an honest hint instead of fabricating one.
 /// Missing rows (empty list / cursor past the end) render the empty state.
-#[cfg(test)]
-pub(super) fn render_process_details(
-    frame: &mut Frame<'_>,
-    app: &TuiApp,
-    theme: TuiTheme,
-    area: Rect,
-) {
-    render_process_details_with_focus(
-        frame,
-        app,
-        theme,
-        area,
-        app.focus_panel == crate::FocusPanel::Details,
-    );
-}
-
 /// Render the detail panel with focus supplied by the immutable frame plan.
-/// The compatibility wrapper above remains for isolated headless tests and
-/// direct component callers; the full Applications frame passes the planned
-/// focus owner so paint and input cannot consult different focus facts.
-#[cfg(test)]
-pub(super) fn render_process_details_with_focus(
-    frame: &mut Frame<'_>,
-    app: &TuiApp,
-    theme: TuiTheme,
-    area: Rect,
-    focused: bool,
-) {
-    app.with_canonical_rows(|ids, visible| {
-        render_process_details_with_focus_from_canonical(
-            frame, app, theme, area, focused, ids, visible,
-        );
-    });
-}
-
+/// The full Applications frame passes the planned focus owner so paint and
+/// input cannot consult different focus facts.
 /// Test-side canonical details entry: the borrowed visible slice the isolated
 /// headless tests resolve through (`with_canonical_rows`). The production
 /// render path consumes the lazy-indexed twin below, which paints the identical
 /// bytes without materializing the O(N) pointer vector.
-#[cfg(test)]
-pub(super) fn render_process_details_with_focus_from_canonical(
-    frame: &mut Frame<'_>,
-    app: &TuiApp,
-    theme: TuiTheme,
-    area: Rect,
-    focused: bool,
-    ids: &[crate::process_view::CanonicalRowId],
-    visible: &[&ProcessItem],
-) {
-    let selected = crate::process_view::id_process(ids, visible, app.selected);
-    render_details_for_selection(frame, app, theme, area, focused, ids, selected);
-}
-
 /// The lazy-indexed twin of
 /// [`render_process_details_with_focus_from_canonical`]: the same projection,
 /// with the visible list behind a [`crate::process_view::VisibleProcesses`]

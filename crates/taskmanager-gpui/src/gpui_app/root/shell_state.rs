@@ -9,13 +9,11 @@
 //! `startup_feedback` / `session_feedback`). No view field may cache an
 //! authority that `shell_state` already owns.
 
-use std::collections::HashSet;
-
 use super::RootView;
 use crate::gpui_app::list_view::ActionFeedback;
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_shell::{
-    InfoSortCol, InfoTable, ProcessRowId, ProcessRowIdentity, ProcessStatusFilter, SortCol, SortDir,
+    InfoSortCol, InfoTable, ProcessRowId, ProcessStatusFilter, SortCol, SortDir,
 };
 use taskmanager_ui::data::table::SortState;
 
@@ -76,32 +74,9 @@ impl RootView {
 
     // ── process selection (authority: `self.shell.selection`) ───────────────
 
-    /// Resolve one live row identity by pid against the accepted snapshot.
-    /// A pid that no longer resolves (vanished or reused) yields `None` —
-    /// callers fail closed instead of acting on an impostor (CORE-01).
     #[must_use]
-    fn process_identity_of(&self, pid: u32) -> Option<ProcessRowIdentity> {
-        self.processes()
-            .iter()
-            .find(|process| process.pid == pid)
-            .and_then(ProcessRowIdentity::from_process)
-    }
-
-    /// [`Self::process_identity_of`] over an already-borrowed snapshot, for
-    /// call sites that must not hold `&self` while mutating the selection.
-    #[must_use]
-    fn identity_in(snapshot: &[ProcessItem], pid: u32) -> Option<ProcessRowIdentity> {
-        snapshot
-            .iter()
-            .find(|process| process.pid == pid)
-            .and_then(ProcessRowIdentity::from_process)
-    }
-
-    /// The anchor pid (keyboard / plain-click focus; the single-select
-    /// identity). Batch intents fall back to it when the set is empty.
-    #[must_use]
-    pub fn selected_pid(&self) -> Option<u32> {
-        self.shell.selection.anchor().map(ProcessRowIdentity::pid)
+    pub fn selected_process_identity(&self) -> Option<ProcessLiveKey> {
+        self.shell.selection.anchor()
     }
 
     /// Semantic active row. Application aggregates are represented by their
@@ -112,16 +87,13 @@ impl RootView {
     }
 
     #[must_use]
-    pub fn selected_application_root(&self) -> Option<u32> {
-        self.shell
-            .selection
-            .application_root()
-            .map(ProcessRowIdentity::pid)
+    pub fn selected_application_root(&self) -> Option<ProcessLiveKey> {
+        self.shell.selection.application_root()
     }
 
     /// The authoritative multi-select identity set (row highlighting).
     #[must_use]
-    pub fn selected_process_identities(&self) -> &std::collections::HashSet<ProcessRowIdentity> {
+    pub fn selected_process_identities(&self) -> &std::collections::HashSet<ProcessLiveKey> {
         self.shell.selection.rows()
     }
 
@@ -135,48 +107,56 @@ impl RootView {
     /// live identity.
     #[must_use]
     pub fn is_process_selected(&self, process: &ProcessItem) -> bool {
-        ProcessRowIdentity::from_process(process)
+        ProcessLiveKey::from_process(process)
             .is_some_and(|identity| self.shell.selection.contains(identity))
     }
 
-    /// Plain click / context-menu focus: collapse to exactly one row. A pid
-    /// that cannot be resolved to a live identity changes nothing.
-    pub fn select_process_single(&mut self, pid: u32) {
-        if let Some(identity) = self.process_identity_of(pid) {
+    /// Plain click / context-menu focus: collapse to exactly one exact live
+    /// row identity. Callers must resolve the identity from the rendered row.
+    pub fn select_process_single(&mut self, identity: ProcessLiveKey) {
+        if self
+            .processes()
+            .iter()
+            .any(|process| ProcessLiveKey::from_process(process) == Some(identity))
+        {
             self.shell.selection.select_single(identity);
         }
     }
 
-    pub fn select_application_root(&mut self, root_pid: u32) {
-        if let Some(root) = self.process_identity_of(root_pid) {
-            self.shell.selection.select_application(root);
+    pub fn select_application_root(&mut self, identity: ProcessLiveKey) {
+        if self
+            .processes()
+            .iter()
+            .any(|process| ProcessLiveKey::from_process(process) == Some(identity))
+        {
+            self.shell.selection.select_application(identity);
         }
     }
 
-    /// Ctrl-click toggle of one row (anchor follows membership).
-    pub fn toggle_process_selection(&mut self, pid: u32) {
-        if let Some(identity) = self.process_identity_of(pid) {
+    /// Ctrl-click toggle of one exact live row (anchor follows membership).
+    pub fn toggle_process_selection(&mut self, identity: ProcessLiveKey) {
+        if self
+            .processes()
+            .iter()
+            .any(|process| ProcessLiveKey::from_process(process) == Some(identity))
+        {
             self.shell.selection.toggle(identity);
         }
     }
 
-    /// Shift-click range grow against the live display-order projection. The
-    /// pid slice is resolved to identities first; unresolvable pids cannot
-    /// join the range.
-    pub fn extend_process_selection(&mut self, display_pids: &[u32], end: u32) {
-        let Some(end_identity) = self.process_identity_of(end) else {
-            return;
-        };
-        let display: Vec<ProcessRowIdentity> = display_pids
+    /// Shift-click range grow against the live display-order projection.
+    pub fn extend_process_selection(&mut self, display: &[ProcessLiveKey], end: ProcessLiveKey) {
+        if self
+            .processes()
             .iter()
-            .filter_map(|&pid| self.process_identity_of(pid))
-            .collect();
-        self.shell.selection.extend_range(&display, end_identity);
+            .any(|process| ProcessLiveKey::from_process(process) == Some(end))
+        {
+            self.shell.selection.extend_range(display, end);
+        }
     }
 
     /// Keyboard navigation move (collapse unless `preserve_set`).
-    pub fn move_process_selection(&mut self, pid: Option<u32>, preserve_set: bool) {
-        let identity = pid.and_then(|pid| self.process_identity_of(pid));
+    pub fn move_process_selection(&mut self, identity: Option<ProcessLiveKey>, preserve_set: bool) {
         self.shell.selection.move_to(identity, preserve_set);
     }
 
@@ -184,20 +164,14 @@ impl RootView {
         self.shell.selection.move_to_row(row, preserve_set);
     }
 
-    /// Replace the whole selection in one step (capture fixtures, batch-intent
-    /// reconciliation). Pids are resolved to live identities; unresolvable
-    /// entries are dropped.
+    /// Replace the whole selection in one step (capture fixtures and
+    /// batch-intent reconciliation). The caller supplies exact live keys.
     pub fn replace_process_selection(
         &mut self,
-        pids: impl IntoIterator<Item = u32>,
-        anchor: Option<u32>,
+        identities: impl IntoIterator<Item = ProcessLiveKey>,
+        anchor: Option<ProcessLiveKey>,
     ) {
-        let snapshot: Vec<ProcessItem> = self.processes().to_vec();
-        let identities = pids
-            .into_iter()
-            .filter_map(|pid| Self::identity_in(&snapshot, pid));
-        let anchor_identity = anchor.and_then(|pid| Self::identity_in(&snapshot, pid));
-        self.shell.selection.replace(identities, anchor_identity);
+        self.shell.selection.replace(identities, anchor);
     }
 
     /// Clear the multi-select set and the anchor.

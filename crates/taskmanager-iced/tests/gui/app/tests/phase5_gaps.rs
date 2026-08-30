@@ -5,6 +5,7 @@ use crate::app::Message;
 use std::collections::HashSet;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::hardware::{CoreBreakdown, CpuType, HardwareInfo};
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 
 #[test]
@@ -113,8 +114,16 @@ fn test_process_tree_bulk_expand_all_and_collapse_all() {
 
     // 1. Collapse all
     let _ = app.update(Message::CollapseAllProcessTree);
-    assert!(app.process_presentation.expanded_tree.contains(&1));
-    assert!(app.process_presentation.expanded_tree.contains(&100));
+    assert!(
+        app.process_presentation
+            .expanded_tree
+            .contains(&ProcessLiveKey::from_parts(1, 11).expect("fixture process identity"),)
+    );
+    assert!(
+        app.process_presentation
+            .expanded_tree
+            .contains(&ProcessLiveKey::from_parts(100, 1001).expect("fixture process identity"),)
+    );
 
     // 2. Expand all
     let _ = app.update(Message::ExpandAllProcessTree);
@@ -151,7 +160,19 @@ fn test_service_details_matching_pid_and_jump_to_process() {
     let _ = app
         .shell
         .apply_action(AppAction::SelectPage(AppPage::Services));
-    let _ = app.update(Message::JumpToProcess { pid: 456 });
+    let identity = app
+        .shell
+        .projection()
+        .processes
+        .as_deref()
+        .and_then(|processes| {
+            processes
+                .iter()
+                .find(|process| process.pid == 456)
+                .and_then(ProcessLiveKey::from_process)
+        })
+        .expect("matching service process identity");
+    let _ = app.update(Message::JumpToProcess { identity });
 
     assert_eq!(app.shell.page(), AppPage::Applications);
 }

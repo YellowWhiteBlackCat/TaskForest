@@ -16,6 +16,7 @@ fn complete_readout(pci_bus_id: &str) -> NvmlDeviceReadout {
         decoder_pct: Ok(11.0),
         fan_speed_pct: Ok(48.0),
         throttle_reasons: Ok(vec![GpuThrottleReason::SoftwarePowerLimit]),
+        sys_driver_version: Ok("566.36".to_string()),
     }
 }
 
@@ -25,6 +26,7 @@ fn partial_api_failures_keep_successful_fields_and_only_real_provenance() {
     readout.brand = Err(NvmlFailureKind::PermissionDenied);
     readout.memory = Err(NvmlFailureKind::NotSupported);
     readout.throttle_reasons = Err(NvmlFailureKind::Transient);
+    readout.sys_driver_version = Err(NvmlFailureKind::NotSupported);
 
     let assembly = assemble_nvml_device(readout);
     let sample = assembly.sample.expect("PCI identity remains available");
@@ -35,9 +37,18 @@ fn partial_api_failures_keep_successful_fields_and_only_real_provenance() {
     assert!(!sample.fields.contains(&GpuMetricField::Brand));
     assert!(!sample.fields.contains(&GpuMetricField::Memory));
     assert!(!sample.fields.contains(&GpuMetricField::Throttle));
+    assert!(!sample.fields.contains(&GpuMetricField::DriverVersion));
     assert_eq!(sample.metrics.current_fan_speed_pct(), Some(48.0));
     assert_eq!(sample.metrics.current_utilization_pct(), Some(41.0));
     assert_eq!(sample.metrics.current_memory_total_bytes(), None);
+    assert_eq!(
+        sample.metrics.driver_version, None,
+        "a failed sys-version query must not degrade into a fabricated release"
+    );
+    assert!(sample.field_failures.contains(&GpuProviderFieldFailure {
+        field: GpuMetricField::DriverVersion,
+        failure: FailureKind::Unsupported,
+    }));
     assert!(sample.field_failures.contains(&GpuProviderFieldFailure {
         field: GpuMetricField::Brand,
         failure: FailureKind::PermissionDenied,
@@ -128,6 +139,28 @@ fn uuid_is_a_stable_fallback_when_pci_identity_is_temporarily_unavailable() {
         field: GpuMetricField::Identity,
         kind: NvmlFailureKind::Transient,
     }));
+}
+
+/// The system-wide NVML driver version is attached to every assembled device
+/// as its own typed fact — never as a substitute for the absent kernel driver
+/// name.
+#[test]
+fn sys_driver_version_becomes_a_typed_driver_version_fact() {
+    let assembly = assemble_nvml_device(complete_readout("00000000:03:00.0"));
+    let sample = assembly.sample.expect("PCI identity remains available");
+
+    assert!(sample.fields.contains(&GpuMetricField::DriverVersion));
+    assert_eq!(sample.metrics.driver_version.as_deref(), Some("566.36"));
+    assert_eq!(
+        sample.metrics.driver, None,
+        "the release string is not a driver name"
+    );
+    assert!(
+        !sample
+            .field_failures
+            .iter()
+            .any(|failure| failure.field == GpuMetricField::DriverVersion)
+    );
 }
 
 #[test]

@@ -143,8 +143,12 @@ pub(super) fn cpu_spec_rail_rows(
             }),
         },
         CpuRailRow {
-            label: t("common.l1_cache").to_owned(),
-            value: cache_mib(cpu.l1_cache_kb),
+            label: t("common.l1_data_cache").to_owned(),
+            value: cache_mib(cpu.l1d_cache_kb),
+        },
+        CpuRailRow {
+            label: t("common.l1_instruction_cache").to_owned(),
+            value: cache_mib(cpu.l1i_cache_kb),
         },
         CpuRailRow {
             label: t("common.l2_cache").to_owned(),

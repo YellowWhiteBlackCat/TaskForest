@@ -403,6 +403,7 @@ impl IcedApp {
             &self.process_presentation.expanded_tree,
         )
         .with_local_time_rules(&self.local_time_rules);
+        let observed_at_ms = self.shell.projection().processes_observed_at_ms;
         self.projection_caches.process_projection(fingerprint, || {
             // The shell already memoizes the filtered/sorted raw indices.
             // Materialize row references only when this Iced cache misses.
@@ -418,6 +419,7 @@ impl IcedApp {
                 &self.process_presentation.expanded_groups,
                 &self.process_presentation.expanded_tree,
                 &self.local_time_rules,
+                observed_at_ms,
             )
         })
     }

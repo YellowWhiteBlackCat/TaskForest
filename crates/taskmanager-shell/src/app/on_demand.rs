@@ -11,9 +11,10 @@
 //! existing lanes.
 use super::ShellApp;
 use taskmanager_application::{
-    DirectoryUsageRequest, GpuEngineRowsRequest, NpuInventoryRequest, PlatformEffect,
-    ProcessAffinityControlRequest, ProcessAffinityRequest, ServiceDependenciesRequest,
-    ServiceLogSnapshotRequest, SmartControlRequest,
+    DirectoryUsageRequest, GpuEngineRowsRequest, MsrReadoutRequest, NpuInventoryRequest,
+    PlatformEffect, ProcessAffinityControlRequest, ProcessAffinityRequest, RaplPowerRequest,
+    ServiceDependenciesRequest, ServiceLogSnapshotRequest, SmartControlRequest,
+    SmbiosMemoryRequest,
 };
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::process::FrozenProcessIdentity;
@@ -49,6 +50,41 @@ impl ShellApp {
     #[must_use]
     pub fn request_npu_inventory() -> PlatformEffect {
         PlatformEffect::NpuInventory(NpuInventoryRequest {})
+    }
+
+    /// Queue a SMBIOS memory-inventory read (capability
+    /// `telemetry.memory.smbios`). The privileged helper runs once per request
+    /// on its own bounded lane; the answer arrives as
+    /// `PlatformEventBatch::smbios_memory_events` and the shared request
+    /// session admits only the active matching request terminal. Frontends
+    /// pace their own requests (the escalation discipline forbids
+    /// auto-triggering the OS-native prompt).
+    #[must_use]
+    pub fn request_smbios_memory() -> PlatformEffect {
+        PlatformEffect::SmbiosMemory(SmbiosMemoryRequest::Refresh)
+    }
+
+    /// Queue a CPU package-power read (capability
+    /// `telemetry.cpu.package_power`). The privileged RAPL helper samples once
+    /// per request on its own bounded lane; the answer arrives as
+    /// `PlatformEventBatch::rapl_power_events` and the shared request session
+    /// admits only the active matching request terminal. Frontends pace their
+    /// own requests (the escalation discipline forbids auto-triggering the
+    /// OS-native prompt).
+    #[must_use]
+    pub fn request_rapl_power() -> PlatformEffect {
+        PlatformEffect::RaplPower(RaplPowerRequest::Refresh)
+    }
+
+    /// Queue a CPU MSR readout (capability `telemetry.cpu.msr`). The
+    /// privileged MSR helper reads once per request on its own bounded lane;
+    /// the answer arrives as `PlatformEventBatch::msr_readout_events` and the
+    /// shared request session admits only the active matching request
+    /// terminal. Frontends pace their own requests (the escalation discipline
+    /// forbids auto-triggering the OS-native prompt).
+    #[must_use]
+    pub fn request_msr_readouts() -> PlatformEffect {
+        PlatformEffect::MsrReadout(MsrReadoutRequest::Refresh)
     }
 
     /// Queue the dependency-graph query for one service; the provider echoes

@@ -1,15 +1,21 @@
-//! Windows UAC transport seam for foreign-process control (ADR-035, stage 1).
+//! Windows UAC transport seam for foreign-process control (ADR-035).
 //!
 //! ADR-035 selected `ShellExecuteExW("runas")` + `SEE_MASK_NOCLOSEPROCESS` as
-//! the Windows escalation crossing. Stage 1 (this module) lands the SEAM only:
-//! the typed transport-fact vocabulary, the pure transport-fact → outcome
-//! mapping, the install-fact readiness probe, and the injectable transport
-//! trait with a `cfg(windows)` skeleton driver that honestly reports the
-//! transport as unwired. Stage 2 — blocked on the owner's helper
-//! signing/packaging decision — registers the runas call group in
-//! `taskmanager-windows-api`, packages the helper, and wires the provider; the
-//! production entry here then swaps the skeleton for the real driver without
-//! changing this contract.
+//! the Windows escalation crossing. Stage 1 landed the SEAM (typed
+//! transport-fact vocabulary, pure fact→outcome mapping, install-fact
+//! readiness probe, injectable transport trait). Stage 2 (this module's
+//! current state) adds the pure launch layer the real driver consumes: the
+//! helper command-line builder and the one-shot reply-channel naming rule.
+//! The OS call group itself lives in the audited `taskmanager-windows-api`
+//! boundary (`runas` module) and the production driver lives in
+//! `taskmanager-platform-windows` (`provider::process::uac`) — THIS crate is
+//! documented zero-dependency and `#![forbid(unsafe_code)]`, so the
+//! dependency direction forces the raw `ShellExecuteExW` /
+//! `WaitForSingleObject` / `GetExitCodeProcess` / `CloseHandle` calls outside
+//! it. The platform driver implements
+//! [`crate::uac::UacForeignProcessControlTransport`] and feeds
+//! [`crate::uac::invoke_uac_foreign_process_control_with`], so the fact→outcome
+//! mapping here stays the single authority.
 //!
 //! ## No second vocabulary
 //!
@@ -22,12 +28,13 @@
 //! helper-contract reader as the Linux stdout crossing, so one authority
 //! defines what a valid contract message is.
 //!
-//! ## Honesty (fixture-only in stage 1)
+//! ## Honesty (headless)
 //!
-//! No Windows runtime behavior is exercised or fabricated here: the mapping is
-//! pure over [`uac::UacCrossingObservation`] values and every test drives fixtures
-//! on any host. The real consent, deadline, and reply-channel behavior is
-//! proven only by the stage-3 on-box receipts (never headless).
+//! No Windows runtime behavior is exercised or fabricated here: the mappings
+//! are pure over [`crate::uac::UacCrossingObservation`] values and every test drives
+//! fixtures on any host. The real consent, deadline, and reply-channel
+//! behavior is proven only by on-box receipts (never headless); until those
+//! land the wiring is compile-verified only (see `docs/PERMISSION_MODEL.md`).
 //!
 //! ## Identity discipline
 //!
@@ -42,6 +49,8 @@
 
 #![forbid(unsafe_code)]
 
+use std::path::Path;
+
 use crate::polkit::process_control::{ParsedOutput, parse_output};
 use crate::polkit::{
     ForeignProcessControlOperation, ForeignProcessControlOutcome, ForeignProcessControlTarget,
@@ -54,9 +63,10 @@ use crate::{EscalationAvailability, EscalationDenialReason, EscalationFeature};
 
 /// The packaging/install facts the Windows readiness gate consumes (ADR-035).
 ///
-/// Stage 2 derives these from the real install tree (the packaged helper
-/// binary plus its install-manifest row); until packaging exists they stay a
-/// typed input so the probe semantics are fixture-provable on every host.
+/// The platform driver derives these from the real install tree (the packaged
+/// helper binary plus its install-manifest row); where no packaging decision
+/// exists yet they stay a typed input so the probe semantics are
+/// fixture-provable on every host.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct UacHelperInstallFacts {
     /// The packaged helper binary exists at its install location.
@@ -100,26 +110,34 @@ const WIN32_ERROR_FILE_NOT_FOUND: u32 = 2;
 /// What one Windows UAC crossing attempt observed (ADR-035 transport facts).
 ///
 /// This is the injectable seam between the OS transport and the typed
-/// escalation vocabulary: stage 2's runas driver produces these from
-/// `ShellExecuteExW`, the bounded wait, and the one-shot reply channel; tests
-/// produce them directly. The failure facts stay mutually exclusive — a user
-/// refusal is never folded into a deadline, a missing install is never a
-/// protocol violation, and an unwired transport is never a refusal.
+/// escalation vocabulary: the stage-2 runas driver in
+/// `taskmanager-platform-windows` produces these from `ShellExecuteExW`, the
+/// bounded wait, and the one-shot reply channel; tests produce them directly.
+/// The failure facts stay mutually exclusive — a user refusal is never folded
+/// into a deadline, a missing install is never a protocol violation, and an
+/// unwired transport is never a refusal.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UacCrossingObservation {
-    /// The transport is not wired (ADR-035 stage 1) — the honest current
-    /// state, never a fabricated crossing.
+    /// The transport is not wired for this composition — the honest
+    /// fail-closed fact, kept so an adapter set that never registered the
+    /// runas driver still cannot fabricate a crossing.
     TransportUnwired,
     /// There is no interactive session to show the consent in (e.g. a Session
     /// 0 service context) or the prompt cannot be presented. Authorization
     /// did not complete and the fact does not attribute it to the user.
     ConsentUnavailable,
     /// `ShellExecuteExW("runas", …)` failed; `win32_error` is the raw
-    /// `GetLastError` code, classified by the launch-failure table.
+    /// `GetLastError` code (or the non-win32 HRESULT bits when Windows
+    /// reports a plain COM failure), classified by the launch-failure table.
     LaunchFailed {
         /// The raw Win32 error code from the failed launch.
         win32_error: u32,
     },
+    /// The one-shot reply channel could not be established before any launch
+    /// was attempted (temp directory unavailable, name collisions exhausted).
+    /// The crossing infrastructure is unusable — distinct from a missing
+    /// helper install and from a launch the OS refused.
+    ReplyChannelUnavailable,
     /// The bounded wait ended while the consent/helper was still outstanding —
     /// the crossing did not deliver, which is not a user refusal.
     DeadlineExceeded,
@@ -164,7 +182,7 @@ pub fn uac_crossing_outcome(observation: UacCrossingObservation) -> ForeignProce
     match observation {
         UacCrossingObservation::TransportUnwired => ForeignProcessControlOutcome::Unavailable {
             reason: EscalationDenialReason::Unsupported,
-            detail: "the Windows UAC runas transport is not wired (ADR-035 stage 1)".to_owned(),
+            detail: "the Windows UAC runas transport is not wired for this composition".to_owned(),
         },
         UacCrossingObservation::ConsentUnavailable => ForeignProcessControlOutcome::Unavailable {
             reason: EscalationDenialReason::AuthorizationUnavailable,
@@ -176,6 +194,14 @@ pub fn uac_crossing_outcome(observation: UacCrossingObservation) -> ForeignProce
             ForeignProcessControlOutcome::Unavailable {
                 reason: launch_failure_reason(win32_error),
                 detail: format!("ShellExecuteExW(runas) failed with Win32 error {win32_error}"),
+            }
+        }
+        UacCrossingObservation::ReplyChannelUnavailable => {
+            ForeignProcessControlOutcome::Unavailable {
+                reason: EscalationDenialReason::HelperUnavailable,
+                detail: "the one-shot UAC reply channel could not be created; the crossing was \
+                         never launched"
+                    .to_owned(),
             }
         }
         UacCrossingObservation::DeadlineExceeded => ForeignProcessControlOutcome::Unavailable {
@@ -203,16 +229,105 @@ pub fn uac_crossing_outcome(observation: UacCrossingObservation) -> ForeignProce
 }
 
 // ===========================================================================
+// Stage-2 pure launch layer: helper command line + one-shot reply channel.
+// ===========================================================================
+
+/// The reply-channel file name for one crossing (ADR-035 decision 4: per-call
+/// and randomly named; the channel's access restriction rides the per-user
+/// temp directory ACL plus the app's exclusive creation).
+///
+/// Pure over the caller-supplied `nonce`; the driver sources nonce entropy
+/// from a process-addressed `RandomState` hash, so two crossings in one
+/// process never share a channel and no randomness dependency is added.
+#[must_use]
+pub fn reply_channel_file_name(nonce: u64) -> String {
+    format!("taskforest-uac-reply-{nonce:016x}.json")
+}
+
+/// Quote one argument for the `lpParameters` command line of
+/// `ShellExecuteExW`.
+///
+/// Applies the documented Windows command-line rule: an argument with no
+/// whitespace and no quote passes through verbatim; otherwise it is wrapped
+/// in quotes, every embedded quote is escaped as `\"`, and every backslash
+/// run before a quote or the closing quote is doubled. Pure, so the builder
+/// is provable on any host.
+#[must_use]
+pub fn quote_windows_argument(argument: &str) -> String {
+    let needs_quoting =
+        argument.is_empty() || argument.chars().any(|c| c.is_whitespace() || c == '"');
+    if !needs_quoting {
+        return argument.to_owned();
+    }
+    let mut quoted = String::with_capacity(argument.len() + 2);
+    quoted.push('"');
+    let mut backslash_run = 0usize;
+    for character in argument.chars() {
+        match character {
+            '\\' => backslash_run += 1,
+            '"' => {
+                for _ in 0..(2 * backslash_run + 1) {
+                    quoted.push('\\');
+                }
+                quoted.push('"');
+                backslash_run = 0;
+            }
+            _ => {
+                for _ in 0..backslash_run {
+                    quoted.push('\\');
+                }
+                backslash_run = 0;
+                quoted.push(character);
+            }
+        }
+    }
+    for _ in 0..(2 * backslash_run) {
+        quoted.push('\\');
+    }
+    quoted.push('"');
+    quoted
+}
+
+/// The fixed `lpParameters` string for one elevated helper launch.
+///
+/// Argument order is the helper's fixed contract — PID, start token,
+/// operation wire form, one-shot reply-channel path — so the PID and the
+/// frozen creation token cross together and the PID alone is never an
+/// authorization credential (the helper re-validates the token on its own
+/// elevated handle). Pure over its inputs.
+#[must_use]
+pub fn runas_command_line(
+    target: ForeignProcessControlTarget,
+    operation: &ForeignProcessControlOperation,
+    reply_channel: &Path,
+) -> String {
+    let arguments = [
+        target.pid().to_string(),
+        target.start_token().to_string(),
+        operation.argument(),
+        reply_channel.to_string_lossy().into_owned(),
+    ];
+    arguments
+        .iter()
+        .map(|argument| quote_windows_argument(argument))
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+// ===========================================================================
 // Transport seam.
 // ===========================================================================
 
 /// Injectable seam for one UAC foreign-process-control crossing.
 ///
-/// Production (ADR-035 stage 2) implements this with the runas call group:
-/// `ShellExecuteExW("runas")` + `SEE_MASK_NOCLOSEPROCESS`, a bounded wait, and
-/// the one-shot reply channel. Tests implement it with canned
-/// [`UacCrossingObservation`]s, so no real consent, child process, or channel
-/// is ever touched headless. The request carries PID + frozen creation token
+/// The production driver (ADR-035 stage 2) lives in
+/// `taskmanager-platform-windows`: it builds the launch through
+/// [`runas_command_line`], drives the audited `runas` call group in
+/// `taskmanager-windows-api` (`ShellExecuteExW("runas")` +
+/// `SEE_MASK_NOCLOSEPROCESS`, bounded wait, one-shot reply channel), and
+/// returns the observed [`UacCrossingObservation`]. Tests implement the trait
+/// with canned observations, so no real consent, child process, or channel is
+/// ever touched headless. The request carries PID + frozen creation token
 /// ([`ForeignProcessControlTarget`]) — PID alone is never an authorization
 /// credential.
 pub trait UacForeignProcessControlTransport {
@@ -228,74 +343,13 @@ pub trait UacForeignProcessControlTransport {
 /// typed escalation outcome.
 ///
 /// `P` is `?Sized` so a runtime object-safe lane (a boxed transport held by
-/// the stage-2 provider wiring) can drive this exact mapping instead of
-/// mirroring it.
+/// the provider wiring) can drive this exact mapping instead of mirroring it.
 pub fn invoke_uac_foreign_process_control_with<P: UacForeignProcessControlTransport + ?Sized>(
     transport: &P,
     target: ForeignProcessControlTarget,
     operation: ForeignProcessControlOperation,
 ) -> ForeignProcessControlOutcome {
     uac_crossing_outcome(transport.cross(target, &operation))
-}
-
-/// Stage-1 skeleton of the production runas transport (ADR-035).
-///
-/// The real driver — `ShellExecuteExW("runas")` + `SEE_MASK_NOCLOSEPROCESS` +
-/// a bounded wait + the one-shot reply channel, registered in
-/// `taskmanager-windows-api` — lands in stage 2 behind the owner's
-/// signing/packaging decision. Until then the only honest observation this
-/// driver can make is [`UacCrossingObservation::TransportUnwired`]: it never
-/// spawns the helper with the application's inherited token (that would not
-/// be an escalation) and never fabricates a crossing.
-#[cfg(windows)]
-#[derive(Debug, Clone, Copy, Default)]
-pub struct RunasForeignProcessControl;
-
-#[cfg(windows)]
-impl RunasForeignProcessControl {
-    #[must_use]
-    pub const fn new() -> Self {
-        Self
-    }
-}
-
-#[cfg(windows)]
-impl UacForeignProcessControlTransport for RunasForeignProcessControl {
-    fn cross(
-        &self,
-        _target: ForeignProcessControlTarget,
-        _operation: &ForeignProcessControlOperation,
-    ) -> UacCrossingObservation {
-        // Stage 1: the runas call group is not registered in the audited
-        // boundary yet, so fail closed — the typed Unwired fact maps to
-        // `Unsupported` downstream.
-        UacCrossingObservation::TransportUnwired
-    }
-}
-
-/// Invoke the production UAC crossing for one foreign-process operation.
-///
-/// Stage-1 Windows arm: the skeleton driver honestly reports the transport as
-/// unwired → typed `Unsupported`; stage 2 swaps in the real driver without
-/// changing this entry's contract. Non-Windows arm: the UAC transport can
-/// never exist there → typed `Unsupported` without touching anything.
-#[cfg(windows)]
-pub fn invoke_uac_foreign_process_control(
-    target: ForeignProcessControlTarget,
-    operation: ForeignProcessControlOperation,
-) -> ForeignProcessControlOutcome {
-    invoke_uac_foreign_process_control_with(&RunasForeignProcessControl::new(), target, operation)
-}
-
-#[cfg(not(windows))]
-pub fn invoke_uac_foreign_process_control(
-    _target: ForeignProcessControlTarget,
-    _operation: ForeignProcessControlOperation,
-) -> ForeignProcessControlOutcome {
-    ForeignProcessControlOutcome::Unavailable {
-        reason: EscalationDenialReason::Unsupported,
-        detail: "the UAC runas escalation transport is Windows-only".to_owned(),
-    }
 }
 
 #[cfg(test)]

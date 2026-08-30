@@ -33,6 +33,7 @@ use iced::{Color, Point, Rectangle, Size};
 
 use crate::app::Message;
 use crate::perf_chart::{SeriesGeneration, line_path, sample_x};
+use taskmanager_core::core::process::ProcessLiveKey;
 
 /// Fixed sparkline canvas height (matches the gpui per-row sparkline's 16 px
 /// band). Width is the column width (`56`); the `Canvas` reports this height to
@@ -50,19 +51,19 @@ const STROKE_WIDTH: f32 = 1.0;
 pub(crate) struct ProcessCpuSparkline {
     samples: Rc<[f32]>,
     color: Color,
-    pid: u32,
+    identity: ProcessLiveKey,
 }
 
 impl ProcessCpuSparkline {
     /// Build the sparkline program from one process's CPU% history plus the
-    /// resolved (token-derived) stroke color and the owning pid (the pid seeds
-    /// the cross-frame fingerprint so a reshuffled row order can never reuse
-    /// another process's cached geometry).
-    pub(crate) fn new(samples: Rc<[f32]>, color: Color, pid: u32) -> Self {
+    /// resolved (token-derived) stroke color and the owning live identity. The
+    /// identity seeds the cross-frame fingerprint so a reshuffled row order or
+    /// PID reuse can never reuse another process's cached geometry.
+    pub(crate) fn new(samples: Rc<[f32]>, color: Color, identity: ProcessLiveKey) -> Self {
         Self {
             samples,
             color,
-            pid,
+            identity,
         }
     }
 
@@ -71,26 +72,26 @@ impl ProcessCpuSparkline {
     /// without a renderer (see [`SparklineFingerprint`]).
     #[must_use]
     pub(crate) fn fingerprint(&self) -> SparklineFingerprint {
-        SparklineFingerprint::from_samples(self.pid, &self.samples)
+        SparklineFingerprint::from_samples(self.identity, &self.samples)
     }
 }
 
-/// The cached identity of one sparkline's geometry: owning pid plus immutable
+/// The cached identity of one sparkline's geometry: owning live identity plus immutable
 /// snapshot generation. Retaining the `Rc` avoids hashing each frame. Two
 /// programs with the same fingerprint would
 /// stroke identical geometry, so the cache need not be cleared between them.
 #[derive(Clone, Default, PartialEq, Debug)]
 pub(crate) struct SparklineFingerprint {
-    pid: u32,
+    identity: Option<ProcessLiveKey>,
     samples: SeriesGeneration,
 }
 
 impl SparklineFingerprint {
-    /// Build the fingerprint for one pid + immutable snapshot generation.
+    /// Build the fingerprint for one live identity + immutable snapshot generation.
     #[must_use]
-    fn from_samples(pid: u32, samples: &Rc<[f32]>) -> Self {
+    fn from_samples(identity: ProcessLiveKey, samples: &Rc<[f32]>) -> Self {
         Self {
-            pid,
+            identity: Some(identity),
             samples: SeriesGeneration::new(samples),
         }
     }

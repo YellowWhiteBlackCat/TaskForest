@@ -126,6 +126,11 @@ pub fn groups(hardware: &HardwareInfo, appearance: DesktopAppearance) -> Vec<Sys
         "system_about.version",
         optional_text(hardware.kernel_build.as_deref()),
     );
+    push_optional(
+        &mut kernel,
+        "system_about.compiler",
+        optional_text(hardware.kernel_compiler.as_deref()),
+    );
 
     let mut desktop = Vec::new();
     push_optional(

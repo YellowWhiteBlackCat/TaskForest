@@ -9,6 +9,10 @@ fn live_process(token: u64) -> ProcessItem {
     })
 }
 
+fn live_key(pid: u32, token: u64) -> ProcessLiveKey {
+    ProcessLiveKey::from_parts(pid, token).expect("fixture live identity")
+}
+
 #[test]
 fn priority_tier_all_covers_every_variant_exactly_once() {
     let mut seen: Vec<PriorityTier> = Vec::new();
@@ -79,7 +83,8 @@ fn freeze_tree_orders_descendants_leaf_first_and_fails_closed_for_missing_root()
         item(4, Some(1), 44),
     ];
 
-    let intent = ProcessBatchIntent::freeze_tree(&processes, 1, ProcessBatchAction::End);
+    let intent =
+        ProcessBatchIntent::freeze_tree(&processes, live_key(1, 11), ProcessBatchAction::End);
     assert_eq!(
         intent
             .targets
@@ -89,15 +94,16 @@ fn freeze_tree_orders_descendants_leaf_first_and_fails_closed_for_missing_root()
         vec![3, 2, 4, 1]
     );
 
-    let missing = ProcessBatchIntent::freeze_tree(&processes, 99, ProcessBatchAction::End);
+    let missing =
+        ProcessBatchIntent::freeze_tree(&processes, live_key(99, 1), ProcessBatchAction::End);
     assert!(missing.targets.is_empty());
 }
 
 /// 同一律 for the tree traversal: `freeze_tree` targets are exactly
-/// [`descendant_pids`] mapped through identity, in the SAME leaf-first
+/// [`descendant_live_keys`] is the SAME leaf-first
 /// order — the order logic has one home, so the two can never drift.
 #[test]
-fn descendant_pids_is_the_one_order_freeze_tree_freezes() {
+fn descendant_live_keys_is_the_one_order_freeze_tree_freezes() {
     let item = |pid, parent_pid, token| {
         let mut item = ProcessItem::new(pid, format!("p{pid}"));
         item.parent_pid = parent_pid;
@@ -115,17 +121,27 @@ fn descendant_pids_is_the_one_order_freeze_tree_freezes() {
         item(9, None, 99),
     ];
 
-    let pids = descendant_pids(&processes, 1);
-    assert_eq!(pids, vec![3, 2, 4, 1]);
-    let intent = ProcessBatchIntent::freeze_tree(&processes, 1, ProcessBatchAction::End);
+    let identities = descendant_live_keys(&processes, live_key(1, 11));
+    assert_eq!(
+        identities
+            .iter()
+            .map(|identity| identity.pid())
+            .collect::<Vec<_>>(),
+        vec![3, 2, 4, 1]
+    );
+    let intent =
+        ProcessBatchIntent::freeze_tree(&processes, live_key(1, 11), ProcessBatchAction::End);
     assert_eq!(
         intent
             .targets
             .iter()
             .map(|target| target.pid)
             .collect::<Vec<_>>(),
-        pids,
-        "freeze_tree must freeze descendant_pids' exact leaf-first order"
+        identities
+            .iter()
+            .map(|identity| identity.pid())
+            .collect::<Vec<_>>(),
+        "freeze_tree must freeze descendant_live_keys' exact leaf-first order"
     );
 
     // Cyclic parent chains stay total and duplicate-free.
@@ -134,12 +150,18 @@ fn descendant_pids_is_the_one_order_freeze_tree_freezes() {
         item(11, Some(10), 1011),
         item(12, Some(11), 1012),
     ];
-    assert_eq!(descendant_pids(&cycle, 10), vec![12, 11, 10]);
+    assert_eq!(
+        descendant_live_keys(&cycle, live_key(10, 1010))
+            .iter()
+            .map(|identity| identity.pid())
+            .collect::<Vec<_>>(),
+        vec![12, 11, 10]
+    );
 
     // An unknown root fails closed in both spellings.
-    assert!(descendant_pids(&processes, 99).is_empty());
+    assert!(descendant_live_keys(&processes, live_key(99, 1)).is_empty());
     assert!(
-        ProcessBatchIntent::freeze_tree(&processes, 99, ProcessBatchAction::End)
+        ProcessBatchIntent::freeze_tree(&processes, live_key(99, 1), ProcessBatchAction::End)
             .targets
             .is_empty()
     );
@@ -148,12 +170,13 @@ fn descendant_pids_is_the_one_order_freeze_tree_freezes() {
 #[test]
 fn freeze_and_freeze_tree_default_to_pid_adjacency_scope() {
     let processes = [live_process(7_500)];
-    let batch = ProcessBatchIntent::freeze(&processes, [42], ProcessBatchAction::End);
-    let tree = ProcessBatchIntent::freeze_tree(&processes, 42, ProcessBatchAction::End);
+    let identity = live_key(42, 7_500);
+    let batch = ProcessBatchIntent::freeze(&processes, [identity], ProcessBatchAction::End);
+    let tree = ProcessBatchIntent::freeze_tree(&processes, identity, ProcessBatchAction::End);
     assert_eq!(batch.scope, ProcessGroupScope::PidAdjacency);
     assert_eq!(tree.scope, ProcessGroupScope::PidAdjacency);
     assert_eq!(
-        ProcessBatchIntent::freeze_tree(&processes, 99, ProcessBatchAction::End).scope,
+        ProcessBatchIntent::freeze_tree(&processes, live_key(99, 1), ProcessBatchAction::End).scope,
         ProcessGroupScope::PidAdjacency,
         "the fail-closed empty intent also stays PidAdjacency"
     );

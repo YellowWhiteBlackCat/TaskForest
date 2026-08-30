@@ -1,0 +1,29 @@
+[package]
+name = "taskmanager-msr-helper"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+authors = ["TaskForest"]
+license = "Apache-2.0"
+description = "Privileged helper binary: reads CPU MSR readouts (Intel five-register set, AMD Zen P-state block) from /dev/cpu/N/msr and emits a typed JSON envelope (TaskForest permission-model Boundary 2, ADR-023/048/049)."
+publish = false
+
+# This is one feature-specific privileged piece of TaskForest (ADR-023/048/049,
+# docs/PERMISSION_MODEL.md Boundary 2). It performs exactly ONE operation: a
+# pread-only sweep of the verified MSR register set on every existing
+# /dev/cpu/N/msr node — the five Intel registers, or the AMD P-state block of
+# ADR-049 when the CPUID family gate (read from the read-only
+# /dev/cpu/N/cpuid node) identifies family 0x17-0x19 — decoded through a
+# pure safe layer, producing the per-node readout list. It emits ONE JSON
+# object to stdout then exits. There are NO flags, NO ioctl, NO unsafe code
+# and NO file access beyond those /dev/cpu nodes — the four audited boundary
+# crates remain the only unsafe trust roots. Missing or unverifiable data is
+# reported as per-field nulls or a typed ERROR envelope — NEVER a fabricated
+# number.
+
+[dependencies]
+# MSR reads are plain file I/O (open + pread, per libcpuid's Linux driver and
+# ADR-048), so the helper needs std only; serde/serde_json are non-workspace
+# deps for the one JSON envelope and keep the dependency firewall intact.
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

@@ -60,7 +60,7 @@ pub(super) fn filesystem_capacity(
         return None;
     }
     let used = total.saturating_sub(available);
-    let used_pct = crate::gpui_app::formatting::bytes_percent(used, total);
+    let used_pct = taskmanager_core::core::units::bytes_percent(used, total)?;
     Some((used_pct, available))
 }
 

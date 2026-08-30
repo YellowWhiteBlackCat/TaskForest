@@ -4,8 +4,9 @@ use std::time::Instant;
 
 use taskmanager_application::{
     ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
-    NetworkTelemetryRequest, NpuInventoryRequest, StorageTelemetryRequest,
+    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
+    NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest, SmbiosMemoryRequest,
+    StorageTelemetryRequest,
 };
 use taskmanager_core::{
     ContainerRollup, CpuTelemetryObservation, GpuTelemetryObservation, HardwareInfo,
@@ -27,7 +28,10 @@ use crate::engine::collector::domains::{
 };
 use crate::engine::storage_target::StorageTargetResolver;
 use crate::provider::gpu_engine_rows::NativeGpuEngineRowsProvider;
+use crate::provider::msr_readout::NativeMsrReadoutProvider;
 use crate::provider::npu_inventory::NativeNpuInventoryProvider;
+use crate::provider::rapl_power::NativeRaplPowerProvider;
+use crate::provider::smbios_memory::NativeSmbiosMemoryProvider;
 
 const HOST_TELEMETRY_PROVIDER: ProviderId = ProviderId::borrowed("linux.telemetry.host.procfs");
 const CPU_TELEMETRY_PROVIDER: ProviderId =
@@ -45,6 +49,11 @@ const CONTAINER_ROLLUP_PROVIDER: ProviderId = ProviderId::borrowed("linux.contai
 const GPU_ENGINE_ROWS_PROVIDER: ProviderId =
     ProviderId::borrowed("linux.telemetry.gpu-engines.pmu");
 const NPU_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("linux.accelerator.npu.sysfs");
+const SMBIOS_MEMORY_PROVIDER: ProviderId =
+    ProviderId::borrowed("linux.telemetry.memory.smbios-helper");
+const RAPL_POWER_PROVIDER: ProviderId =
+    ProviderId::borrowed("linux.telemetry.cpu.package-power.rapl-helper");
+const MSR_READOUT_PROVIDER: ProviderId = ProviderId::borrowed("linux.telemetry.cpu.msr-helper");
 
 pub(super) struct NativeHostTelemetryProvider {
     pub(super) collector: LinuxHostTelemetryCollector,
@@ -203,6 +212,30 @@ pub(super) fn native_system_providers() -> (SystemProviders, StorageTargetResolv
             NPU_INVENTORY_PROVIDER.clone(),
             NativeNpuInventoryProvider::new(),
         ),
+        {
+            let provider = NativeSmbiosMemoryProvider::new();
+            let initial_status = provider.initial_status();
+            ProviderRegistration::<SmbiosMemoryRequest, _>::new(
+                SMBIOS_MEMORY_PROVIDER.clone(),
+                provider,
+            )
+            .with_initial_status(initial_status)
+        },
+        {
+            let provider = NativeRaplPowerProvider::new();
+            let initial_status = provider.initial_status();
+            ProviderRegistration::<RaplPowerRequest, _>::new(RAPL_POWER_PROVIDER.clone(), provider)
+                .with_initial_status(initial_status)
+        },
+        {
+            let provider = NativeMsrReadoutProvider::new();
+            let initial_status = provider.initial_status();
+            ProviderRegistration::<MsrReadoutRequest, _>::new(
+                MSR_READOUT_PROVIDER.clone(),
+                provider,
+            )
+            .with_initial_status(initial_status)
+        },
     );
     (
         SystemProviders::new(observations, auxiliary),

@@ -13,7 +13,8 @@ use sysinfo::System;
 use taskmanager_core::core::cpu_features::CpuInstructionFeature;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::hardware::{
-    ComputeTopology, CoreBreakdown, CpuType, FirmwareInfo, HardwareInfo, HostIdentity, KernelInfo,
+    ComputeTopology, CoreBreakdown, CpuIdentity, CpuType, FirmwareInfo, HardwareInfo, HostIdentity,
+    KernelInfo,
 };
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
@@ -24,6 +25,7 @@ use super::{
     detect_cpu_core_breakdown, detect_cpu_types, detect_socket_count, detect_virtualization,
 };
 
+mod chipset;
 mod compute;
 
 use compute::ComputeTopologySource;
@@ -131,6 +133,8 @@ struct InventoryPaths {
     dmi_roots: [PathBuf; 2],
     efivars_root: PathBuf,
     display_root: PathBuf,
+    pci_devices_root: PathBuf,
+    pci_ids_candidates: [PathBuf; 3],
 }
 
 impl Default for InventoryPaths {
@@ -145,6 +149,8 @@ impl Default for InventoryPaths {
             ],
             efivars_root: PathBuf::from("/sys/firmware/efi/efivars"),
             display_root: PathBuf::from("/sys/class/drm"),
+            pci_devices_root: PathBuf::from("/sys/bus/pci/devices"),
+            pci_ids_candidates: super::pci_ids::native_pci_ids_candidates(),
         }
     }
 }
@@ -366,7 +372,9 @@ impl InventorySource for KernelSource {
                 version: context.system.kernel_version.clone(),
                 modules_count: modules,
                 command_line,
-                build,
+                build: build.as_ref().map(|(build, _)| build.clone()),
+                compiler: build
+                    .and_then(|(_, compiler)| (!compiler.is_empty()).then_some(compiler)),
             },
             KERNEL_PROVIDER,
             required_source_outcome(observed, 4, &failures),
@@ -375,10 +383,10 @@ impl InventorySource for KernelSource {
     }
 }
 
-fn read_linux_kernel_build(path: &Path, failures: &mut FailureSummary) -> Option<String> {
+fn read_linux_kernel_build(path: &Path, failures: &mut FailureSummary) -> Option<(String, String)> {
     let raw = read_required_text(path, failures)?;
     match parse_linux_kernel_build_description(&raw) {
-        Some(build) => Some(build),
+        Some(build) => Some((build, parse_linux_kernel_compiler(&raw))),
         None => {
             failures.record(FailureKind::ProviderFault);
             None
@@ -394,6 +402,55 @@ fn parse_linux_kernel_build_description(raw: &str) -> Option<String> {
     let release = parts.next()?.trim();
     let build = parts.next()?.trim();
     (!release.is_empty() && !build.is_empty()).then(|| build.to_owned())
+}
+
+/// Extract the kernel compiler description from Linux's native kernel
+/// record, e.g. `"gcc 14.2.0"` or `"clang version 18.1.8"`. The record
+/// carries the compiler inside the parenthesized build description; only
+/// the compiler name plus its version tokens are kept (dates and flags are
+/// not part of the identity). `None` when no recognizable compiler token
+/// exists — an honest absence, never a guessed toolchain.
+fn parse_linux_kernel_compiler(raw: &str) -> String {
+    let tokens: Vec<&str> = raw.split_whitespace().collect();
+    // The compiler lives inside the parenthesized build description, so its
+    // name token may open with '(' — match on the trimmed name.
+    let Some((start, name)) =
+        tokens
+            .iter()
+            .enumerate()
+            .find_map(|(index, token)| match token.trim_start_matches('(') {
+                "gcc" => Some((index, "gcc")),
+                "clang" => Some((index, "clang")),
+                _ => None,
+            })
+    else {
+        return String::new();
+    };
+    let mut end = start + 1;
+    // clang spells its version "clang version 18.1.8"; keep the spelling the
+    // native record uses. gcc may carry a parenthesized qualifier
+    // ("gcc (GCC) 14.2.1") before the version.
+    let mut clang_version_word = false;
+    if name == "clang" && tokens.get(end) == Some(&"version") {
+        clang_version_word = true;
+        end += 1;
+    }
+    while matches!(tokens.get(end), Some(token) if token.starts_with('(') && token.ends_with(')')) {
+        end += 1;
+    }
+    let version = tokens
+        .get(end)
+        .filter(|token| token.chars().next().is_some_and(|c| c.is_ascii_digit()))
+        // The version token closes the parenthesized build description, so
+        // it may trail a ')' that is not part of the version.
+        .map(|version| version.trim_end_matches(')'));
+    version.map_or_else(String::new, |version| {
+        if clang_version_word {
+            format!("{name} version {version}")
+        } else {
+            format!("{name} {version}")
+        }
+    })
 }
 
 fn read_required_text(path: &Path, failures: &mut FailureSummary) -> Option<String> {
@@ -415,8 +472,13 @@ impl InventorySource for FirmwareSource {
     fn collect(&mut self, context: &InventoryContext<'_>) -> SourceFragment<Self::Value> {
         let mut failures = FailureSummary::default();
         let dmi_root = readable_dmi_root(&context.paths.dmi_roots, &mut failures);
+        // The chipset is platform identity proved from the PCI tree plus the
+        // shared pci.ids database — path-injected exactly like the DMI roots,
+        // so fixture runs never read the host's hardware.
+        let chipset = chipset::collect_chipset_model(context.paths, &mut failures);
         let (firmware, observed) = super::firmware::collect_firmware_facts(
             context.virtualization.as_deref(),
+            chipset,
             dmi_root.as_deref(),
             &context.paths.efivars_root,
             &mut failures,

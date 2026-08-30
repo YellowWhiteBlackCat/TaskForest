@@ -3,11 +3,12 @@
 use gpui::Context;
 
 use super::{MagnitudeBase, QuantityNotation, RootView, UnitFamily};
+use taskmanager_core::core::units::UnitPreferences;
 
 impl RootView {
     /// Snapshot the six current unit choices at render entry. Providers only
     /// publish source values; this projection remains presentation-owned.
-    pub(crate) const fn display_units(&self) -> crate::gpui_app::formatting::DisplayUnits {
+    pub(crate) const fn display_units(&self) -> UnitPreferences {
         self.presentation.units()
     }
 

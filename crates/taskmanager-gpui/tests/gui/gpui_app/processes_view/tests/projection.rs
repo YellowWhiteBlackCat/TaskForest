@@ -145,30 +145,25 @@ mod canonical_category {
     use taskmanager_application::i18n::{self, Language};
     use taskmanager_application::process_category_projection::category_expansion_key;
     use taskmanager_core::core::process::{
-        ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessMetadataObservation,
+        ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
+        ProcessMetadataObservation,
     };
+    use taskmanager_shell::ProcessStatusFilter;
     use taskmanager_shell::SortCol;
-    use taskmanager_shell::{ProcessRowId, ProcessStatusFilter};
 
     /// The expected row id of one fixture process (token from
     /// `fixture_start_token`, the builder's single source).
     fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
         taskmanager_shell::ProcessRowId::Process(
-            taskmanager_shell::ProcessRowIdentity::from_parts(
-                pid,
-                taskmanager_test_support::fixture_start_token(pid),
-            )
-            .expect("fixture pid and token are non-zero"),
+            ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+                .expect("fixture pid and token are non-zero"),
         )
     }
 
     fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
         taskmanager_shell::ProcessRowId::Application(
-            taskmanager_shell::ProcessRowIdentity::from_parts(
-                pid,
-                taskmanager_test_support::fixture_start_token(pid),
-            )
-            .expect("fixture pid and token are non-zero"),
+            ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+                .expect("fixture pid and token are non-zero"),
         )
     }
 
@@ -227,7 +222,15 @@ mod canonical_category {
             unknown_item(31, "mystery", 0.5, 50),
         ];
         let refs: Vec<&ProcessItem> = procs.iter().collect();
-        let rows = category_tree_rows(&refs, SortCol::Cpu, false, &HashSet::new(), &HashSet::new());
+        let rows = category_tree_rows(
+            &refs,
+            42,
+            SortCol::Cpu,
+            false,
+            &HashSet::new(),
+            &HashSet::new(),
+            taskmanager_core::core::units::UnitPreferences::default(),
+        );
 
         assert_eq!(rows.len(), 3, "collapsed: one header per non-empty bucket");
         assert_eq!(rows[0].name, "Applications");
@@ -244,7 +247,7 @@ mod canonical_category {
             Some(500),
             "Applications memory is the bucket sum"
         );
-        assert_eq!(rows[0].process_pid, None);
+        assert_eq!(rows[0].process_identity, None);
         assert_eq!(rows[0].cell_text.pid, "");
         assert_eq!(rows[0].badge, None);
         assert_eq!(rows[1].cpu, Some(2.5));
@@ -273,20 +276,24 @@ mod canonical_category {
         let absent = background_item(21, "daemon", 2.0, 200);
         let rows = category_tree_rows(
             &[&unknown],
+            42,
             SortCol::Name,
             true,
             &HashSet::new(),
             &HashSet::new(),
+            taskmanager_core::core::units::UnitPreferences::default(),
         );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "Uncategorized");
 
         let rows = category_tree_rows(
             &[&absent],
+            42,
             SortCol::Name,
             true,
             &HashSet::new(),
             &HashSet::new(),
+            taskmanager_core::core::units::UnitPreferences::default(),
         );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "Background processes");
@@ -299,13 +306,29 @@ mod canonical_category {
         let prior = pinned_english();
         let procs = [background_item(21, "daemon", 2.0, 200)];
         let refs: Vec<&ProcessItem> = procs.iter().collect();
-        let rows = category_tree_rows(&refs, SortCol::Name, true, &HashSet::new(), &HashSet::new());
+        let rows = category_tree_rows(
+            &refs,
+            42,
+            SortCol::Name,
+            true,
+            &HashSet::new(),
+            &HashSet::new(),
+            taskmanager_core::core::units::UnitPreferences::default(),
+        );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "Background processes");
 
         let procs = [app_item(11, "editor", 1.0, 100)];
         let refs: Vec<&ProcessItem> = procs.iter().collect();
-        let rows = category_tree_rows(&refs, SortCol::Name, true, &HashSet::new(), &HashSet::new());
+        let rows = category_tree_rows(
+            &refs,
+            42,
+            SortCol::Name,
+            true,
+            &HashSet::new(),
+            &HashSet::new(),
+            taskmanager_core::core::units::UnitPreferences::default(),
+        );
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "Applications");
         i18n::set_language(prior);
@@ -325,8 +348,8 @@ mod canonical_category {
         let refs: Vec<&ProcessItem> = procs.iter().collect();
         let expanded = HashSet::from([
             category_expansion_key(ProcessCategory::Application),
-            "app-tree:12".to_owned(),
-            "app-tree:11".to_owned(),
+            "app-tree:pid:12:start:121".to_owned(),
+            "app-tree:pid:11:start:111".to_owned(),
         ]);
 
         assert_eq!(
@@ -335,7 +358,15 @@ mod canonical_category {
             "the expansion key is the stable category key, not the localized label"
         );
 
-        let rows = category_tree_rows(&refs, SortCol::Cpu, false, &expanded, &HashSet::new());
+        let rows = category_tree_rows(
+            &refs,
+            42,
+            SortCol::Cpu,
+            false,
+            &expanded,
+            &HashSet::new(),
+            taskmanager_core::core::units::UnitPreferences::default(),
+        );
         assert_eq!(
             rows.len(),
             6,
@@ -344,12 +375,12 @@ mod canonical_category {
         assert!(!rows[0].collapsed, "the expanded bucket's header flips");
         assert_eq!(rows[1].depth, 1);
         assert_eq!(rows[1].name, "Editor");
-        assert_eq!(rows[1].process_pid, None);
+        assert_eq!(rows[1].process_identity, None);
         assert_eq!(rows[1].cell_text.pid, "");
         assert_eq!(rows[2].depth, 2);
-        assert_eq!(rows[2].process_pid, Some(12));
+        assert_eq!(rows[2].process_identity.map(ProcessLiveKey::pid), Some(12));
         assert_eq!(rows[3].name, "Editor");
-        assert_eq!(rows[4].process_pid, Some(11));
+        assert_eq!(rows[4].process_identity.map(ProcessLiveKey::pid), Some(11));
         assert_eq!(rows[5].name, "Background processes");
         assert!(rows[5].collapsed, "untouched buckets stay collapsed");
 
@@ -361,11 +392,19 @@ mod canonical_category {
         assert_eq!(rows[1].cpu, Some(3.0));
 
         // Ascending flips the member order within the same bucket.
-        let rows = category_tree_rows(&refs, SortCol::Cpu, true, &expanded, &HashSet::new());
+        let rows = category_tree_rows(
+            &refs,
+            42,
+            SortCol::Cpu,
+            true,
+            &expanded,
+            &HashSet::new(),
+            taskmanager_core::core::units::UnitPreferences::default(),
+        );
         assert_eq!(rows[1].name, "Editor", "CPU% asc puts the 1.0% app first");
-        assert_eq!(rows[2].process_pid, Some(11));
+        assert_eq!(rows[2].process_identity.map(ProcessLiveKey::pid), Some(11));
         assert_eq!(rows[3].name, "Editor");
-        assert_eq!(rows[4].process_pid, Some(12));
+        assert_eq!(rows[4].process_identity.map(ProcessLiveKey::pid), Some(12));
         i18n::set_language(prior);
     }
 
@@ -404,23 +443,25 @@ mod canonical_category {
         let refs: Vec<&ProcessItem> = processes.iter().collect();
         let expanded = HashSet::from([
             category_expansion_key(ProcessCategory::Application),
-            "app-tree:100".to_owned(),
+            "app-tree:pid:100:start:1001".to_owned(),
         ]);
         let rows = visible_rows(VisibleRowsProps {
             processes: &refs,
+            observed_at_ms: 42,
             query: "",
             sort_col: SortCol::Pid,
             sort_asc: true,
             filter: ProcessStatusFilter::All,
             collapsed: &HashSet::new(),
             expanded_apps: &expanded,
+            units: taskmanager_core::core::units::UnitPreferences::default(),
         });
 
         assert_eq!(rows.len(), 7, "category + app total + five process rows");
         assert_eq!(rows[0].name, "Applications");
         assert_eq!(rows[1].name, "Mission Center");
-        assert_eq!(rows[0].process_pid, None);
-        assert_eq!(rows[1].process_pid, None);
+        assert_eq!(rows[0].process_identity, None);
+        assert_eq!(rows[1].process_identity, None);
         assert_eq!(rows[0].cell_text.pid, "");
         assert_eq!(rows[1].cell_text.pid, "");
         assert_eq!(rows[1].cpu, Some(24.0));
@@ -431,7 +472,7 @@ mod canonical_category {
         assert_eq!(
             process_rows
                 .iter()
-                .map(|row| row.process_pid)
+                .map(|row| row.process_identity.map(ProcessLiveKey::pid))
                 .collect::<Vec<_>>(),
             [Some(100), Some(101), Some(102), Some(103), Some(104)]
         );
@@ -458,7 +499,15 @@ mod canonical_category {
     fn single_member_bucket_renders_an_inert_header() {
         let procs = [app_item(11, "solo", 1.0, 100)];
         let refs: Vec<&ProcessItem> = procs.iter().collect();
-        let rows = category_tree_rows(&refs, SortCol::Name, true, &HashSet::new(), &HashSet::new());
+        let rows = category_tree_rows(
+            &refs,
+            42,
+            SortCol::Name,
+            true,
+            &HashSet::new(),
+            &HashSet::new(),
+            taskmanager_core::core::units::UnitPreferences::default(),
+        );
         assert_eq!(rows.len(), 1);
         assert!(rows[0].has_children);
         assert!(matches!(rows[0].toggle, Toggle::GroupCategory(_)));
@@ -478,15 +527,24 @@ mod canonical_category {
         let refs: Vec<&ProcessItem> = procs.iter().collect();
         let rows = visible_rows(VisibleRowsProps {
             processes: &refs,
+            observed_at_ms: 42,
             query: "",
             sort_col: SortCol::Cpu,
             sort_asc: false,
             filter: ProcessStatusFilter::All,
             collapsed: &HashSet::new(),
             expanded_apps: &HashSet::new(),
+            units: taskmanager_core::core::units::UnitPreferences::default(),
         });
-        let direct =
-            category_tree_rows(&refs, SortCol::Cpu, false, &HashSet::new(), &HashSet::new());
+        let direct = category_tree_rows(
+            &refs,
+            42,
+            SortCol::Cpu,
+            false,
+            &HashSet::new(),
+            &HashSet::new(),
+            taskmanager_core::core::units::UnitPreferences::default(),
+        );
         let names: Vec<&str> = rows.iter().map(|row| row.name.as_str()).collect();
         let direct_names: Vec<&str> = direct.iter().map(|row| row.name.as_str()).collect();
         assert_eq!(names, direct_names);
@@ -501,10 +559,10 @@ mod canonical_category {
         i18n::set_language(prior);
     }
 
-    /// Aggregate facts stay raw for sorting/diagnostics, while the displayed
-    /// aggregate is the sum of the already-rounded child cells. This catches
-    /// the screenshot bug where `12.5%` did not equal `9.1% + 3.3%`, and where
-    /// the memory header differed from the visible MB values by one unit.
+    /// Aggregate facts stay typed for sorting/diagnostics and the displayed
+    /// aggregate uses the same canonical raw sum. Member cells remain rounded
+    /// independently, so the header is allowed to preserve the exact
+    /// aggregate rather than becoming a second rounded fold.
     #[test]
     fn aggregate_cell_text_is_additive_with_visible_member_text() {
         let prior = pinned_english();
@@ -521,16 +579,18 @@ mod canonical_category {
         let refs: Vec<&ProcessItem> = procs.iter().collect();
         let expanded = HashSet::from([
             category_expansion_key(ProcessCategory::Application),
-            "app-tree:11".to_owned(),
+            "app-tree:pid:11:start:111".to_owned(),
         ]);
         let rows = visible_rows(VisibleRowsProps {
             processes: &refs,
+            observed_at_ms: 42,
             query: "",
             sort_col: SortCol::Cpu,
             sort_asc: false,
             filter: ProcessStatusFilter::All,
             collapsed: &HashSet::new(),
             expanded_apps: &expanded,
+            units: taskmanager_core::core::units::UnitPreferences::default(),
         });
 
         assert_eq!(
@@ -538,13 +598,13 @@ mod canonical_category {
             7,
             "category header + app aggregate + five members"
         );
-        assert_eq!(rows[0].cell_text.cpu, "12.4%");
-        assert_eq!(rows[0].cell_text.memory, "541 MB");
+        assert_eq!(rows[0].cell_text.cpu, "12.6%");
+        assert_eq!(rows[0].cell_text.memory, "515.9 MiB");
         assert_eq!(rows[1].name, "Editor");
-        assert_eq!(rows[1].process_pid, None);
+        assert_eq!(rows[1].process_identity, None);
         assert_eq!(rows[1].cell_text.pid, "");
-        assert_eq!(rows[1].cell_text.cpu, "12.4%");
-        assert_eq!(rows[1].cell_text.memory, "541 MB");
+        assert_eq!(rows[1].cell_text.cpu, "12.6%");
+        assert_eq!(rows[1].cell_text.memory, "515.9 MiB");
         assert_eq!(
             rows[2..]
                 .iter()
@@ -557,10 +617,10 @@ mod canonical_category {
                 .iter()
                 .map(|row| row.cell_text.memory.as_str())
                 .collect::<Vec<_>>(),
-            vec!["95 MB", "324 MB", "2 MB", "41 MB", "79 MB"]
+            vec!["90.6 MiB", "309.0 MiB", "1.9 MiB", "39.1 MiB", "75.3 MiB"]
         );
-        // The raw aggregate remains the exact sum used by sorting and
-        // diagnostics; only its presentation follows the visible rounding.
+        // The typed aggregate remains the exact sum used by sorting,
+        // diagnostics, and its presentation.
         assert!((rows[0].cpu.unwrap() - 12.60).abs() < f32::EPSILON);
         assert!((rows[1].cpu.unwrap() - 12.60).abs() < f32::EPSILON);
         assert_eq!(rows[0].mem, Some(541_000_000));
@@ -659,6 +719,7 @@ mod canonical_category {
         let refs: Vec<&ProcessItem> = apps.iter().chain(backgrounds.iter()).collect();
         let rows = visible_rows(VisibleRowsProps {
             processes: &refs,
+            observed_at_ms: 42,
             query: "",
             sort_col: SortCol::Pid,
             sort_asc: true,
@@ -667,8 +728,9 @@ mod canonical_category {
             expanded_apps: &HashSet::from([
                 category_expansion_key(ProcessCategory::Application),
                 category_expansion_key(ProcessCategory::Background),
-                "app-tree:100".to_owned(),
+                "app-tree:pid:100:start:1001".to_owned(),
             ]),
+            units: taskmanager_core::core::units::UnitPreferences::default(),
         });
 
         // Applications: header, aggregate, then the fully expanded tree.

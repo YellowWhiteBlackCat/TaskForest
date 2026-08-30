@@ -14,7 +14,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::SmartAvailability;
-use taskmanager_core::core::process::{ProcessBatchAction, ProcessItem};
+use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
 use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::smart::self_test::SmartSelfTestKind;
@@ -103,8 +103,12 @@ impl TuiApp {
         let Some(item) = self.selected_detail_process() else {
             return false;
         };
+        let Some(identity) = ProcessLiveKey::from_process(&item) else {
+            return false;
+        };
         self.open_local_surface(TuiSurface::ProcessMenu(Box::new(ProcessMenuTarget {
             item,
+            identity,
             selection: 0,
         })));
         true
@@ -122,10 +126,10 @@ impl TuiApp {
 
     /// The shell's flat position of the frozen menu row, matched by pid +
     /// provider start token so a reused PID can never redirect the request.
-    fn flat_index_of_frozen(&self, item: &ProcessItem) -> Option<usize> {
-        self.visible_processes().iter().position(|process| {
-            process.pid == item.pid && process.current_start_token() == item.current_start_token()
-        })
+    fn flat_index_of_frozen(&self, identity: ProcessLiveKey) -> Option<usize> {
+        self.visible_processes()
+            .iter()
+            .position(|process| ProcessLiveKey::from_process(process) == Some(identity))
     }
 
     /// Resolve the chosen process action into a [`PlatformEffect`]. Control
@@ -156,7 +160,7 @@ impl TuiApp {
                 // request) before arming the gate; a vanished row fails
                 // closed with an honest notice instead of end-tasking a
                 // neighbor.
-                match self.flat_index_of_frozen(&menu.item) {
+                match self.flat_index_of_frozen(menu.identity) {
                     Some(flat) => {
                         self.shell.selected = flat;
                         self.shell
@@ -174,7 +178,8 @@ impl TuiApp {
                 }
             }
             ui::process_menu::ProcessMenuAction::EndProcessTree => {
-                self.shell.request_process_tree_end(menu.item.pid)
+                self.shell.request_process_tree_end(menu.identity);
+                None
             }
             ui::process_menu::ProcessMenuAction::Kill => {
                 self.shell.request_process_batch(ProcessBatchAction::Kill)

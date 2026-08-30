@@ -7,6 +7,7 @@
 use super::viewport_state::ViewportRegion;
 use super::*;
 use crate::perf_history::ProcessPerfHistory;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 impl IcedApp {
     /// The view reads this to decide the search cursor rendering.
@@ -287,7 +288,7 @@ impl IcedApp {
     /// created with the persisted graph-data-points capacity and re-pointed
     /// automatically when the target pid changes.
     fn sample_process_perf_history(&mut self) {
-        let Some(target) = properties_target_pid(&self.shell) else {
+        let Some(target) = properties_target_identity(&self.shell) else {
             return;
         };
         let Some(process) = self
@@ -295,7 +296,11 @@ impl IcedApp {
             .projection()
             .processes
             .as_deref()
-            .and_then(|processes| processes.iter().find(|process| process.pid == target))
+            .and_then(|processes| {
+                processes
+                    .iter()
+                    .find(|process| ProcessLiveKey::from_process(process) == Some(target))
+            })
         else {
             return;
         };
@@ -304,7 +309,7 @@ impl IcedApp {
             .performance
             .process_history
             .get_or_insert_with(|| ProcessPerfHistory::new(capacity));
-        if entry.pid() != target || entry.capacity() != capacity {
+        if entry.identity() != Some(target) || entry.capacity() != capacity {
             entry.resize(capacity, target);
         }
         entry.push(
@@ -326,7 +331,7 @@ impl IcedApp {
     /// ring at the new target with an honest empty window — the live-only
     /// fallback, never the previous process's samples.
     pub(super) fn seed_process_perf_history_from_provider(&mut self) {
-        let Some(target) = properties_target_pid(&self.shell) else {
+        let Some(target) = properties_target_identity(&self.shell) else {
             return;
         };
         let Some(process) = self
@@ -334,7 +339,11 @@ impl IcedApp {
             .projection()
             .processes
             .as_deref()
-            .and_then(|processes| processes.iter().find(|process| process.pid == target))
+            .and_then(|processes| {
+                processes
+                    .iter()
+                    .find(|process| ProcessLiveKey::from_process(process) == Some(target))
+            })
         else {
             return;
         };
@@ -360,6 +369,8 @@ fn virtual_scroll(state: &VirtualScrollState, window_height: f32) -> (f32, f32) 
 
 /// The frozen pid behind the open process-properties overlay, when open
 /// (shared by the app's sampling path and the test suite).
-fn properties_target_pid(shell: &ShellApp) -> Option<u32> {
-    shell.process_properties_target().map(|target| target.pid)
+fn properties_target_identity(shell: &ShellApp) -> Option<ProcessLiveKey> {
+    shell
+        .process_properties_target()
+        .and_then(|target| target.live_key())
 }

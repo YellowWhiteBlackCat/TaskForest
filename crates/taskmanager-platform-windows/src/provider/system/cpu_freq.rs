@@ -163,7 +163,8 @@ impl CpuTelemetryProvider for WinCpuTelemetryProvider {
         if thermal_temp.is_some() {
             metrics.temperature_source = CpuTemperatureSource::ThermalZone;
         }
-        metrics.l1_cache_kb = self.topology.as_ref().and_then(|facts| facts.l1_cache_kb);
+        metrics.l1d_cache_kb = self.topology.as_ref().and_then(|facts| facts.l1d_cache_kb);
+        metrics.l1i_cache_kb = self.topology.as_ref().and_then(|facts| facts.l1i_cache_kb);
         metrics.l2_cache_kb = self.topology.as_ref().and_then(|facts| facts.l2_cache_kb);
         metrics.l3_cache_kb = self.topology.as_ref().and_then(|facts| facts.l3_cache_kb);
         metrics.performance_policy = performance_policy;

@@ -30,7 +30,11 @@ async fn projection_cache_reuses_rows_until_state_or_data_changes(cx: &mut TestA
         "unchanged state must reuse the cached row model"
     );
     assert_eq!(
-        first.1.iter().copied().collect::<Vec<_>>(),
+        first
+            .1
+            .iter()
+            .map(|identity| identity.pid())
+            .collect::<Vec<_>>(),
         vec![1, 2, 3, 4],
         "default CPU-descending state: the all-zero CPU tie breaks pid-ASCENDING \
          (the neutral comparator's direction-independent tie-break)"
@@ -56,7 +60,11 @@ async fn projection_cache_reuses_rows_until_state_or_data_changes(cx: &mut TestA
         "a data tick must invalidate the cached row model"
     );
     assert_eq!(
-        after_tick.1.iter().copied().collect::<Vec<_>>(),
+        after_tick
+            .1
+            .iter()
+            .map(|identity| identity.pid())
+            .collect::<Vec<_>>(),
         vec![10, 11, 12],
         "a data tick rebuilds with the same sort state (CPU tie, pid ascending)"
     );
@@ -68,7 +76,11 @@ async fn projection_cache_reuses_rows_until_state_or_data_changes(cx: &mut TestA
     });
     let after_sort = view.update(cx, |v, _cx| v.processes_projection());
     assert_eq!(
-        after_sort.1.iter().copied().collect::<Vec<_>>(),
+        after_sort
+            .1
+            .iter()
+            .map(|identity| identity.pid())
+            .collect::<Vec<_>>(),
         vec![12, 11, 10],
         "descending pid sort must reorder the projection"
     );

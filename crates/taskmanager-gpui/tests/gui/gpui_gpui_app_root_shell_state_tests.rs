@@ -1,7 +1,9 @@
 use super::*;
 use gpui::AppContext;
+use std::collections::HashSet;
 use taskmanager_application::{LatestControlRequest, ServiceControlOutcome};
 use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_theme::Theme;
@@ -30,60 +32,68 @@ fn selection_interactions_follow_the_shell_owned_rules(cx: &mut gpui::TestAppCon
             fixture(12),
             fixture(13),
         ]);
-        let display = [10u32, 11, 12, 13];
+        let identity = |pid| {
+            ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+                .expect("fixture identity")
+        };
+        let display = [identity(10), identity(11), identity(12), identity(13)];
 
         // Plain click: single select.
-        view.select_process_single(11);
-        assert_eq!(view.selected_pid(), Some(11));
+        view.select_process_single(identity(11));
+        assert_eq!(view.selected_process_identity(), Some(identity(11)));
         assert_eq!(view.selected_process_count(), 1);
 
         // Ctrl-click: grow the set, anchor follows.
-        view.toggle_process_selection(12);
-        assert_eq!(view.selected_pid(), Some(12));
+        view.toggle_process_selection(identity(12));
+        assert_eq!(view.selected_process_identity(), Some(identity(12)));
         assert_eq!(view.selected_process_count(), 2);
         // Ctrl-click the anchor off: anchor falls back to a member.
-        view.toggle_process_selection(12);
-        assert_eq!(view.selected_pid(), Some(11));
+        view.toggle_process_selection(identity(12));
+        assert_eq!(view.selected_process_identity(), Some(identity(11)));
         assert_eq!(view.selected_process_count(), 1);
 
         // Shift-click: span display order from the anchor.
-        view.extend_process_selection(&display, 13);
-        assert_eq!(view.selected_pid(), Some(13));
-        let spanned: std::collections::HashSet<u32> = view
-            .selected_process_identities()
-            .iter()
-            .map(|identity| taskmanager_shell::ProcessRowIdentity::pid(*identity))
-            .collect();
+        view.extend_process_selection(&display, identity(13));
+        assert_eq!(view.selected_process_identity(), Some(identity(13)));
+        let spanned: std::collections::HashSet<ProcessLiveKey> =
+            view.selected_process_identities().iter().copied().collect();
         assert_eq!(
             spanned,
-            HashSet::from([11u32, 12, 13]),
+            HashSet::from([identity(11), identity(12), identity(13)]),
             "the range spans anchor(11)→13 in display order"
         );
 
         // Keyboard move without modifiers collapses to the new anchor.
-        view.move_process_selection(Some(10), false);
-        assert_eq!(view.selected_pid(), Some(10));
+        view.move_process_selection(Some(identity(10)), false);
+        assert_eq!(view.selected_process_identity(), Some(identity(10)));
         assert_eq!(view.selected_process_count(), 1);
         // Modifier roaming preserves the set.
-        view.move_process_selection(Some(11), true);
+        view.move_process_selection(Some(identity(11)), true);
         assert_eq!(view.selected_process_count(), 2);
 
         // Batch targets prefer the sorted set; the anchor is the fallback.
-        assert_eq!(view.selected_process_pids(), vec![10, 11]);
-        view.select_process_single(9);
-        assert_eq!(view.selected_process_pids(), vec![9]);
+        assert_eq!(
+            view.batch_process_identities(),
+            vec![identity(10), identity(11)]
+        );
+        view.select_process_single(identity(9));
+        assert_eq!(view.batch_process_identities(), vec![identity(9)]);
 
         // A process refresh reconciles by exact identity: the survivor keeps
         // the anchor, an empty snapshot clears it (CORE-01).
         view.shell.selection.reconcile(&[fixture(9)]);
-        assert_eq!(view.selected_pid(), Some(9));
+        assert_eq!(view.selected_process_identity(), Some(identity(9)));
         view.shell.selection.reconcile(&[]);
-        assert_eq!(view.selected_pid(), None, "a dead anchor clears");
+        assert_eq!(
+            view.selected_process_identity(),
+            None,
+            "a dead anchor clears"
+        );
 
         // A pid the live snapshot cannot resolve never becomes selected —
         // the fail-closed CORE-01 rule for pid reuse.
-        view.select_process_single(100);
-        assert_eq!(view.selected_pid(), None);
+        view.select_process_single(identity(100));
+        assert_eq!(view.selected_process_identity(), None);
     });
 }
 

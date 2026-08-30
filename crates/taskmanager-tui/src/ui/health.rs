@@ -30,25 +30,15 @@ use super::health_data::{
     network_value, network_verdict, storage_value, storage_verdict,
 };
 use crate::TuiApp;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/health_support.rs"]
+pub(crate) mod health_support;
 use crate::TuiTheme;
 use crate::ui::alerts::managed_rule_line;
 use crate::ui::{DeviceHealth, classify_device_state};
 
 /// Render the health overlay centred over `area`.
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn render_health_overlay(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    render_health_overlay_at(
-        frame,
-        app,
-        theme,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::LocalSurface(crate::TuiSurfaceKind::Health),
-        ),
-    );
-}
-
 pub(super) fn render_health_overlay_at(
     frame: &mut Frame<'_>,
     app: &TuiApp,

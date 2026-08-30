@@ -30,6 +30,7 @@ impl Render for FixtureView {
             smart_report: Some(&self.fixture.smart_report),
             layout: self.layout,
             copy: &capture_english_text,
+            units: taskmanager_core::core::units::UnitPreferences::default(),
             callbacks: &callbacks,
         })
     }

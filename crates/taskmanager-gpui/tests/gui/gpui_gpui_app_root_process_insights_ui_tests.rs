@@ -6,7 +6,7 @@ use taskmanager_application::{
     ProcessInsightsRevision,
 };
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_platform_contract::SubmissionErrorKind;
 
 fn target(pid: u32, start_token: u64) -> FrozenProcessIdentity {
@@ -83,7 +83,8 @@ fn lifecycle_rejects_wrong_target_late_and_duplicate_terminals() {
     assert!(matches!(
         lifecycle,
         ProcessInsightsLifecycle::Failed { ref error, .. }
-            if error.pid == 42 && error.kind == ProcessInsightsErrorKind::PermissionDenied
+            if error.identity == ProcessLiveKey::from_parts(42, 200)
+                && error.kind == ProcessInsightsErrorKind::PermissionDenied
     ));
     assert!(
         !lifecycle.apply(next_terminal),

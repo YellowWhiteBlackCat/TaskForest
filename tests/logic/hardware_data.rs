@@ -7,10 +7,10 @@
 #[cfg(target_os = "linux")]
 #[test]
 fn cache_totals_are_aggregated_not_per_core() {
-    let (l1, l2, l3) = taskmanager_platform_linux::detect_cpu_cache();
+    let (l1d, _l1i, l2, l3) = taskmanager_platform_linux::detect_cpu_cache();
     assert!(
-        l1.is_some_and(|value| value > 0),
-        "L1 cache missing: {l1:?}"
+        l1d.is_some_and(|value| value > 0),
+        "L1 data cache missing: {l1d:?}"
     );
     assert!(
         l2.is_some_and(|value| value > 0),
@@ -34,7 +34,7 @@ fn cache_totals_are_aggregated_not_per_core() {
             "L2 aggregated total {l2:?} KiB < one cpu0 instance {one_instance} KiB — aggregation lost data"
         );
     }
-    eprintln!("cache: L1={l1:?} KiB, L2={l2:?} KiB, L3={l3:?} KiB");
+    eprintln!("cache: L1d={l1d:?} KiB, L2={l2:?} KiB, L3={l3:?} KiB");
 }
 
 /// Largest single L2 instance on cpu0, read straight from sysfs and parsed

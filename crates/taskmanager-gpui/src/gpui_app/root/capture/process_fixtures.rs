@@ -4,8 +4,8 @@ use taskmanager_core::core::DeviceState;
 use taskmanager_core::core::ScalarObservation;
 use taskmanager_core::core::process::{
     ApplicationIconAsset, ApplicationIconFormat, ProcessApplicationIdentity, ProcessItem,
-    ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity,
-    ProcessScalarObservations,
+    ProcessLiveKey, ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner,
+    ProcessOwnerIdentity, ProcessScalarObservations,
 };
 use taskmanager_core::core::startup::{
     BootTimeline, DEFAULT_BOOT_TIMELINE_MAX_SEGMENTS, DEFAULT_BOOT_TIMELINE_MAX_UNTIMED,
@@ -371,7 +371,7 @@ pub(super) fn prepare_apps_zero_gray(processes: &mut Vec<ProcessItem>) {
     }
 }
 
-pub(super) fn prepare_process_insights(processes: &mut Vec<ProcessItem>) -> u32 {
+pub(super) fn prepare_process_insights(processes: &mut Vec<ProcessItem>) -> Option<ProcessLiveKey> {
     const PID: u32 = 4242;
     processes.retain(|process| process.pid != PID);
     let mut process = ProcessItem::new(PID, "capture-telemetry-worker");
@@ -388,7 +388,7 @@ pub(super) fn prepare_process_insights(processes: &mut Vec<ProcessItem>) -> u32 
     });
     attach_capture_metadata(&mut process, "capture-user", None);
     processes.push(process);
-    PID
+    ProcessLiveKey::from_parts(PID, 987_654)
 }
 
 pub(super) fn prepare_diagnostic_process(processes: &mut Vec<ProcessItem>) {

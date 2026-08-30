@@ -1,6 +1,6 @@
 //! Frontend-local bounded ring buffer for the process-details Performance tab
 //! (ADR-028): CPU%, memory bytes, and disk read/write rates for ONE tracked
-//! pid.
+//! process incarnation.
 //!
 //! The former system-wide `PerfHistory` headline ring was retired (G-02): the
 //! Performance page's CPU%/memory% chart and summary lines now read the
@@ -20,6 +20,8 @@
 use std::collections::VecDeque;
 use std::rc::Rc;
 
+use taskmanager_core::core::process::ProcessLiveKey;
+
 /// The upper bound for a persisted graph-data-points window (GPUI parity:
 /// `MAX_GRAPH_DATA_POINTS = 600`).
 pub const MAX_HISTORY_CAPACITY: usize = 600;
@@ -32,13 +34,13 @@ fn newest_tail(window: &[f32], capacity: usize) -> &[f32] {
 }
 
 /// The per-process Performance-tab window (GPUI's `details_performance`
-/// parity): CPU%, memory bytes, and disk read/write rates for ONE tracked pid.
-/// Pushing a different pid clears the window so the sparklines never blend
-/// two processes; each series pushes independently and rejects non-finite
-/// values.
+/// parity): CPU%, memory bytes, and disk read/write rates for ONE tracked
+/// process incarnation. Pushing a different live key clears the window so
+/// PID reuse can never blend two processes; each series retains aligned gap
+/// slots for missing samples.
 #[derive(Clone, Debug)]
 pub struct ProcessPerfHistory {
-    pid: u32,
+    identity: Option<ProcessLiveKey>,
     cpu: VecDeque<f32>,
     memory: VecDeque<f32>,
     disk_read: VecDeque<f32>,
@@ -57,10 +59,10 @@ pub(crate) struct ProcessPerfHistorySnapshot {
     pub(crate) disk_write: Rc<[f32]>,
 }
 
-/// Renderer-local cache entry keyed by the tracked pid and ring revision.
+/// Renderer-local cache entry keyed by the tracked live identity and ring revision.
 #[derive(Clone, Debug)]
 pub(crate) struct ProcessPerfHistoryCache {
-    pub(crate) pid: u32,
+    pub(crate) identity: Option<ProcessLiveKey>,
     pub(crate) revision: u64,
     pub(crate) snapshot: ProcessPerfHistorySnapshot,
 }
@@ -70,7 +72,7 @@ impl ProcessPerfHistory {
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
-            pid: 0,
+            identity: None,
             cpu: VecDeque::new(),
             memory: VecDeque::new(),
             disk_read: VecDeque::new(),
@@ -80,52 +82,54 @@ impl ProcessPerfHistory {
         }
     }
 
-    /// Record one point-in-time sample for `pid`. A pid change resets all
-    /// series first (the tracked process identity is authoritative).
+    /// Record one point-in-time sample for `identity`. An identity change
+    /// resets all series first (the tracked process identity is authoritative). Every
+    /// series receives one slot per accepted tick; a missing field is stored
+    /// as a non-finite gap so later values cannot slide backward in time.
     pub fn push(
         &mut self,
-        pid: u32,
+        identity: ProcessLiveKey,
         cpu: Option<f32>,
         memory: Option<u64>,
         disk_read: Option<u64>,
         disk_write: Option<u64>,
     ) {
-        if pid != 0 && self.pid != pid {
-            self.reset(pid);
+        if self.identity != Some(identity) {
+            self.reset(identity);
         }
         let mut changed = false;
-        if let Some(value) = cpu {
-            changed |= Self::push_one(&mut self.cpu, value, self.capacity);
-        }
-        if let Some(value) = memory {
-            changed |= Self::push_one(&mut self.memory, value as f32, self.capacity);
-        }
-        if let Some(value) = disk_read {
-            changed |= Self::push_one(&mut self.disk_read, value as f32, self.capacity);
-        }
-        if let Some(value) = disk_write {
-            changed |= Self::push_one(&mut self.disk_write, value as f32, self.capacity);
-        }
+        changed |= Self::push_one(&mut self.cpu, cpu, self.capacity);
+        changed |= Self::push_one(
+            &mut self.memory,
+            memory.map(|value| value as f32),
+            self.capacity,
+        );
+        changed |= Self::push_one(
+            &mut self.disk_read,
+            disk_read.map(|value| value as f32),
+            self.capacity,
+        );
+        changed |= Self::push_one(
+            &mut self.disk_write,
+            disk_write.map(|value| value as f32),
+            self.capacity,
+        );
         if changed {
             self.revision = self.revision.wrapping_add(1);
         }
     }
 
-    fn push_one(buf: &mut VecDeque<f32>, value: f32, capacity: usize) -> bool {
-        if value.is_finite() {
-            if buf.len() >= capacity {
-                buf.pop_front();
-            }
-            buf.push_back(value);
-            true
-        } else {
-            false
+    fn push_one(buf: &mut VecDeque<f32>, value: Option<f32>, capacity: usize) -> bool {
+        if buf.len() >= capacity {
+            buf.pop_front();
         }
+        buf.push_back(value.filter(|value| value.is_finite()).unwrap_or(f32::NAN));
+        true
     }
 
-    /// Re-point the window at a new pid and clear every series.
-    fn reset(&mut self, pid: u32) {
-        self.pid = pid;
+    /// Re-point the window at a new process incarnation and clear every series.
+    fn reset(&mut self, identity: ProcessLiveKey) {
+        self.identity = Some(identity);
         self.cpu.clear();
         self.memory.clear();
         self.disk_read.clear();
@@ -135,24 +139,23 @@ impl ProcessPerfHistory {
 
     /// Re-point the window AND resize the capacity in one step (the persisted
     /// graph-data-points preference changed while tracking a process).
-    pub fn resize(&mut self, capacity: usize, pid: u32) {
+    pub fn resize(&mut self, capacity: usize, identity: ProcessLiveKey) {
         self.capacity = capacity.clamp(2, MAX_HISTORY_CAPACITY);
-        self.reset(pid);
+        self.reset(identity);
     }
 
     /// Seed every series from the provider-pre-populated per-process history
     /// windows (G-14: Linux fills ~60 s of `ProcessItem::cpu_history` /
     /// `mem_history` / `disk_read_history` / `disk_write_history`). The ring
-    /// is re-pointed at `pid` first, then the NEWEST tail of each window
+    /// is re-pointed at `identity` first, then the NEWEST tail of each window
     /// (bounded by the capacity) is pushed in arrival order — the same
     /// oldest-first shape the live sampling path produces, so the overlay's
     /// sparklines render the provider history immediately on open and the
-    /// live samples continue as the extension. Non-finite samples are dropped
-    /// by the same policy as [`Self::push`]; an all-empty seed leaves the
-    /// ring empty (the caller keeps the live-only fallback).
+    /// live samples continue as the extension. Non-finite samples remain
+    /// gaps, and an all-empty seed leaves the ring empty.
     pub fn seed_from_provider(
         &mut self,
-        pid: u32,
+        identity: ProcessLiveKey,
         capacity: usize,
         cpu: &[f32],
         memory: &[f32],
@@ -160,19 +163,19 @@ impl ProcessPerfHistory {
         disk_write: &[f32],
     ) {
         self.capacity = capacity.clamp(2, MAX_HISTORY_CAPACITY);
-        self.reset(pid);
+        self.reset(identity);
         let capacity = self.capacity;
         for value in newest_tail(cpu, capacity) {
-            let _ = Self::push_one(&mut self.cpu, *value, capacity);
+            let _ = Self::push_one(&mut self.cpu, Some(*value), capacity);
         }
         for value in newest_tail(memory, capacity) {
-            let _ = Self::push_one(&mut self.memory, *value, capacity);
+            let _ = Self::push_one(&mut self.memory, Some(*value), capacity);
         }
         for value in newest_tail(disk_read, capacity) {
-            let _ = Self::push_one(&mut self.disk_read, *value, capacity);
+            let _ = Self::push_one(&mut self.disk_read, Some(*value), capacity);
         }
         for value in newest_tail(disk_write, capacity) {
-            let _ = Self::push_one(&mut self.disk_write, *value, capacity);
+            let _ = Self::push_one(&mut self.disk_write, Some(*value), capacity);
         }
     }
 
@@ -182,10 +185,10 @@ impl ProcessPerfHistory {
         self.capacity
     }
 
-    /// The tracked pid (0 = never sampled).
+    /// The exact tracked process incarnation.
     #[must_use]
-    pub const fn pid(&self) -> u32 {
-        self.pid
+    pub const fn identity(&self) -> Option<ProcessLiveKey> {
+        self.identity
     }
 
     /// Monotonic data revision used by the Iced contiguous-series cache.
@@ -258,10 +261,9 @@ impl ProcessPerfHistory {
     /// True when every series is empty (the honest "collecting" branch).
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.cpu.is_empty()
-            && self.memory.is_empty()
-            && self.disk_read.is_empty()
-            && self.disk_write.is_empty()
+        [&self.cpu, &self.memory, &self.disk_read, &self.disk_write]
+            .into_iter()
+            .all(|series| !series.iter().any(|value| value.is_finite()))
     }
 }
 

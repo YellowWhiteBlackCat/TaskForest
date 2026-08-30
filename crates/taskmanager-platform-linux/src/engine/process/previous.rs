@@ -3,8 +3,8 @@
 use std::collections::HashMap;
 
 use taskmanager_core::core::process::{
-    ProcessApplicationIdentity, ProcessHistorySnapshot, ProcessItem, ProcessMetadataObservation,
-    ProcessMetadataObservations, ProcessScalarObservations,
+    ProcessApplicationIdentity, ProcessHistorySnapshot, ProcessItem, ProcessLiveKey,
+    ProcessMetadataObservation, ProcessMetadataObservations, ProcessScalarObservations,
 };
 use taskmanager_core::{FailureKind, ProcessHistoryStore};
 
@@ -150,7 +150,13 @@ impl PreviousItems {
         self.items
             .iter()
             .map(|previous| {
-                let mut item = previous.to_item(histories.snapshot_for(previous.pid));
+                let history = previous
+                    .current_start_token()
+                    .and_then(|token| ProcessLiveKey::from_parts(previous.pid, token))
+                    .map_or_else(ProcessHistorySnapshot::default, |identity| {
+                        histories.snapshot_for(identity)
+                    });
+                let mut item = previous.to_item(history);
                 super::observation::mark_retained_item_stale(&mut item, failure);
                 item
             })

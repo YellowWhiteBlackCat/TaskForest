@@ -20,18 +20,19 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::Activate;
 
 use super::{
-    ProcessCountLine, ProcessRowIdentity, ProcessRowLink, ProcessRowsRoot, ProcessScrollIntent,
-    ProcessSearchInput, ProcessSelectRow, ProcessSelectionChanged, ProcessTableArtifact,
-    TableSurface, rebuild_table, selected_identity,
+    ProcessCountLine, ProcessRowLink, ProcessRowsRoot, ProcessScrollIntent, ProcessSearchInput,
+    ProcessSelectRow, ProcessSelectionChanged, ProcessTableArtifact, TableSurface, rebuild_table,
+    selected_identity,
 };
 use crate::app::{Page, Route, ShellTrack};
 use crate::input::ShellInteractionApplied;
 use crate::window::WindowPalette;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 /// Last published selection identity, so keyboard-driven shell mutations
 /// publish the details seam only on a real identity change.
 #[derive(Default, Resource)]
-pub(crate) struct ProcessSelectionMemory(pub(crate) Option<ProcessRowIdentity>);
+pub(crate) struct ProcessSelectionMemory(pub(crate) Option<ProcessLiveKey>);
 
 /// Row pointer activation: the visible-set index rides the row wrapper, and
 /// the shell's `select_row` reducer owns bounds (a stale index is rejected,
@@ -145,7 +146,7 @@ fn sync_after_shell_interaction(
     rebuild_table(&mut commands, root, shell, &mut surface);
     let identity = selected_identity(shell);
     if memory.0 != identity {
-        memory.0 = identity.clone();
+        memory.0 = identity;
         commands.trigger(ProcessSelectionChanged(identity));
     }
 }

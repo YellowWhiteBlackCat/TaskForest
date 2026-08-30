@@ -14,6 +14,7 @@ pub(super) fn apply_process_events(
         match correlated.event {
             ProcessEvent::Snapshot(processes) => {
                 store.processes = Some(processes);
+                store.processes_observed_at_ms = correlated.observed_at_ms;
                 fold.output.changes.processes = true;
                 fold.mark_updated();
             }

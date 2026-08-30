@@ -18,11 +18,16 @@ fn every_known_relation_kind_has_a_stable_wire_name() {
         (ServiceRelationKind::RequiredBy, "required_by"),
         (ServiceRelationKind::UpheldBy, "upheld_by"),
     ] {
-        assert_eq!(kind.as_wire_name(), wire_name);
+        // The wire name is sealed serde-ingress vocabulary: pin the stable
+        // spelling through the serde boundary the ingress owns.
         assert_eq!(
             serde_json::from_value::<ServiceRelationKind>(json!(wire_name))
                 .expect("deserialize known relation"),
             kind
+        );
+        assert_eq!(
+            serde_json::to_value(&kind).expect("serialize known relation"),
+            json!(wire_name)
         );
     }
 }

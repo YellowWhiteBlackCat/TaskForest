@@ -59,10 +59,13 @@ pub enum ForeignProcessControlOperation {
 }
 
 impl ForeignProcessControlOperation {
-    // The production caller is Linux-only; the enum and its formatter remain
-    // available to cross-platform contract tests and typed fallbacks.
-    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
-    fn argument(&self) -> String {
+    /// The helper's fixed wire form for this operation (`end`, `kill`,
+    /// `priority:<nice>`, ...). `pub` because the Windows runas transport
+    /// (ADR-035 stage 2, driven from `taskmanager-platform-windows`) launches
+    /// the SAME helper binary with the SAME argument vocabulary; one authority
+    /// defines the wire form for both crossings.
+    #[must_use]
+    pub fn argument(&self) -> String {
         match self {
             Self::End => "end".to_owned(),
             Self::Kill => "kill".to_owned(),
@@ -92,7 +95,6 @@ pub enum ForeignProcessSignal {
 }
 
 impl ForeignProcessSignal {
-    #[cfg_attr(not(target_os = "linux"), allow(dead_code))]
     const fn argument(self) -> &'static str {
         match self {
             Self::Terminate => "terminate",
@@ -317,9 +319,11 @@ pub fn invoke_foreign_process_control(
     invoke_foreign_process_control_with(&PkexecForeignProcessControl::new(), target, operation)
 }
 
-/// Windows UAC/helper transport is not wired yet. A normal child process would
-/// inherit the application's token and is not an escalation mechanism, so the
-/// production path fails closed without spawning the helper binary.
+/// The pkexec/polkit crossing is Linux-only. On Windows the foreign-process
+/// crossing is the UAC transport (`crate::uac`, ADR-035) driven from
+/// `taskmanager-platform-windows`; a normal child process would inherit the
+/// application's token and is not an escalation mechanism, so this polkit
+/// entry fails closed without spawning the helper binary.
 #[cfg(target_os = "windows")]
 pub fn invoke_foreign_process_control(
     _target: ForeignProcessControlTarget,
@@ -332,7 +336,8 @@ pub fn invoke_foreign_process_control(
 fn windows_foreign_process_control_unavailable() -> ForeignProcessControlOutcome {
     ForeignProcessControlOutcome::Unavailable {
         reason: EscalationDenialReason::Unsupported,
-        detail: "Windows foreign-process control requires a UAC helper transport that is not wired"
+        detail: "the pkexec crossing is Linux-only; the Windows crossing is the UAC transport \
+                 (crate::uac) driven by taskmanager-platform-windows"
             .to_owned(),
     }
 }

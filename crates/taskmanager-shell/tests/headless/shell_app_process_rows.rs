@@ -11,7 +11,7 @@ fn row_identity_is_derived_only_from_a_current_process_observation() {
             start_token: ScalarObservation::available(100, 1),
             ..ProcessScalarObservations::default()
         });
-    let row_identity = ProcessRowIdentity::from_process(&process).expect("current identity");
+    let row_identity = ProcessLiveKey::from_process(&process).expect("current identity");
 
     assert_eq!(row_identity.pid(), 42);
     assert_eq!(row_identity.start_token(), 100);
@@ -26,7 +26,7 @@ fn row_identity_is_derived_only_from_a_current_process_observation() {
 
 #[test]
 fn row_id_keeps_structural_and_process_targets_distinct() {
-    let key = ProcessRowIdentity::new(ProcessIdentity {
+    let key = ProcessLiveKey::from_identity(ProcessIdentity {
         pid: 42,
         start_token: 100,
     })
@@ -36,7 +36,7 @@ fn row_id_keeps_structural_and_process_targets_distinct() {
     let process = ProcessRowId::Process(key);
 
     assert_eq!(category.live_key(), None);
-    assert_eq!(application.process_pid(), Some(42));
+    assert_eq!(application.live_key(), Some(key));
     assert!(!application.is_process());
     assert!(process.is_process());
     assert_ne!(application, process);
@@ -44,7 +44,7 @@ fn row_id_keeps_structural_and_process_targets_distinct() {
 
 #[test]
 fn projection_generation_is_separate_from_provider_identity() {
-    let key = ProcessRowIdentity::new(ProcessIdentity {
+    let key = ProcessLiveKey::from_identity(ProcessIdentity {
         pid: 42,
         start_token: 100,
     })
@@ -59,7 +59,7 @@ fn projection_generation_is_separate_from_provider_identity() {
     assert_eq!(anchor.generation(), first);
     assert_eq!(anchor.id().live_key(), Some(key));
     assert_eq!(
-        anchor.id().live_key().map(ProcessRowIdentity::start_token),
+        anchor.id().live_key().map(ProcessLiveKey::start_token),
         Some(100)
     );
 }

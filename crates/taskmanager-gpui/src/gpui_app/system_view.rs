@@ -15,6 +15,7 @@ use taskmanager_application::i18n;
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -32,16 +33,18 @@ pub struct SystemViewData<'a> {
     /// Per-window scroll handle for the sectioned spec cards, so the scroll
     /// position never crosses windows.
     pub scroll: &'a ScrollHandle,
+    /// Presentation unit preferences captured at render entry; every byte
+    /// readout on the page renders through this one value.
+    pub units: UnitPreferences,
+    /// SMBIOS memory-inventory request session + lane capability feeding the
+    /// memory-inventory subsection card beneath the memory section card.
+    pub memory_inventory: MemoryInventoryInputs<'a>,
 }
 
 /// Format an optional cache capacity. Absence is distinct from an observed zero.
-fn fmt_cache_kb(kb: Option<u64>) -> String {
+fn fmt_cache_kb(kb: Option<u64>, units: UnitPreferences) -> String {
     kb.map_or_else(formatting::missing_value, |value| {
-        if value >= 1024 {
-            formatting::format_mib_whole(value * 1024)
-        } else {
-            format!("{value} KiB")
-        }
+        units.format_quantity(value * 1024, QuantityFamily::Memory, false)
     })
 }
 
@@ -100,26 +103,47 @@ fn truncate_cmdline(s: &str) -> String {
 }
 
 mod cards;
+mod memory_inventory;
 mod sections;
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/system_view/tests.rs"]
 mod tests;
 use cards::{hero_card, section_card, tile_row};
+pub use sections::memory_inventory::MemoryInventoryInputs;
 use sections::{build_sections, build_tiles};
+
+/// True when the SMBIOS memory-inventory subsection card renders. The card
+/// sits directly beneath the memory section card, so scroll-item arithmetic
+/// that targets later cards must count it.
+pub(crate) fn memory_inventory_card_is_visible(
+    inputs: &MemoryInventoryInputs<'_>,
+    units: UnitPreferences,
+) -> bool {
+    use sections::memory_inventory::{MemoryInventoryModel, memory_inventory_model};
+    !matches!(
+        memory_inventory_model(inputs, units),
+        MemoryInventoryModel::Hidden
+    )
+}
 
 /// Child index of the Graphics card inside the tracked System scroll column.
 /// The hero and parameter tiles occupy the first two slots; omitted sections
 /// are folded before this index is derived, matching the actual render order.
+/// The memory-inventory subsection card (when visible) adds one child between
+/// the memory and storage cards, before Graphics.
 pub(super) fn graphics_scroll_item(
     hw: &HardwareInfo,
     snap: &SystemSnapshot,
     npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
+    smbios: &taskmanager_application::SmbiosMemoryState,
+    units: UnitPreferences,
+    inventory_card_visible: bool,
 ) -> Option<usize> {
     const FIXED_LEADING_ITEMS: usize = 2;
-    build_sections(hw, snap, npu_inventory)
+    build_sections(hw, snap, npu_inventory, smbios, units)
         .iter()
         .position(|section| section.title_key == "system.section.graphics")
-        .map(|index| FIXED_LEADING_ITEMS + index)
+        .map(|index| FIXED_LEADING_ITEMS + index + usize::from(inventory_card_visible))
 }
 
 pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<RootView>) -> Div {
@@ -129,10 +153,12 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
         npu_inventory,
         processes: procs,
         scroll,
+        units,
+        memory_inventory,
     } = data;
     // ── Sectioned spec data (pure builders, unit-tested in sections.rs) ──
-    let sections = build_sections(hw, snap, npu_inventory);
-    let tiles = build_tiles(hw, snap);
+    let sections = build_sections(hw, snap, npu_inventory, memory_inventory.state, units);
+    let tiles = build_tiles(hw, snap, units);
 
     // Mirror the rendered sections into a plain key:value summary for the
     // clipboard: every section's rows in page order.
@@ -321,6 +347,16 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
         .child(tile_row(theme, &tiles));
     for section in &sections {
         scroll_col = scroll_col.child(section_card(theme, section));
+        // The SMBIOS memory-inventory subsection rides directly beneath the
+        // memory section card (it renders no element while `Hidden`).
+        if section.title_key == "system.section.memory" {
+            scroll_col = scroll_col.child(memory_inventory::render_memory_inventory(
+                theme,
+                &memory_inventory,
+                units,
+                entity.clone(),
+            ));
+        }
     }
     let scroll_col = scroll_col.overflow_y_scroll().track_scroll(scroll);
     let scroll_panel = div()

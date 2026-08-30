@@ -1,10 +1,10 @@
 use super::network_stats;
-use crate::gpui_app::formatting::DisplayUnits;
 use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::NetworkMetrics;
+use taskmanager_core::core::units::UnitPreferences;
 
 fn labels_of(metrics: &NetworkMetrics) -> Vec<String> {
-    network_stats(metrics, false, DisplayUnits::default())
+    network_stats(metrics, false, UnitPreferences::default())
         .iter()
         .map(|row| row.label().to_owned())
         .collect()
@@ -45,7 +45,7 @@ fn rate_rows_keep_none_for_first_sample_gaps() {
         .ipv4_addr(Some("192.0.2.10".into()))
         .scalar_observations(scalar_observations)
         .build();
-    let rows = network_stats(&metrics, false, DisplayUnits::default());
+    let rows = network_stats(&metrics, false, UnitPreferences::default());
     let find = |key: &'static str| {
         rows.iter()
             .find(|row| row.label() == i18n::t(key))

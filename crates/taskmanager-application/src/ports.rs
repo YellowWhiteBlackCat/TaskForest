@@ -6,10 +6,10 @@
 
 use crate::platform::{
     CommandLaunchRequest, DesktopNotificationRequest, DirectoryUsageRequest, GpuEngineRowsRequest,
-    NpuInventoryRequest, ProcessAffinityControlRequest, ProcessAffinityRequest,
-    ProcessResourceControlRequest, ResourceRevealRequest, ServiceDependenciesRequest,
-    ServiceLogSnapshotRequest, ServiceLogStreamRequest, SetupScriptRequest, SmartControlRequest,
-    UrlOpenRequest,
+    MsrReadoutRequest, NpuInventoryRequest, ProcessAffinityControlRequest, ProcessAffinityRequest,
+    ProcessResourceControlRequest, RaplPowerRequest, ResourceRevealRequest,
+    ServiceDependenciesRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest,
+    SetupScriptRequest, SmartControlRequest, SmbiosMemoryRequest, UrlOpenRequest,
 };
 use crate::{ControlRequestId, RefreshRequest, StartupControlRequest};
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent, ProcessSignal};
@@ -136,4 +136,19 @@ pub enum PlatformEffect {
     /// own bounded lane; a sorted device list (empty on a no-NPU host) or a
     /// typed failure arrives as `PlatformEventBatch::npu_inventory_events`.
     NpuInventory(NpuInventoryRequest),
+    /// Submit a SMBIOS memory-inventory read (capability
+    /// `telemetry.memory.smbios`). The privileged helper runs once per request
+    /// on its own bounded lane; real slot/module rows or a typed failure arrive
+    /// as `PlatformEventBatch::smbios_memory_events`.
+    SmbiosMemory(SmbiosMemoryRequest),
+    /// Submit a CPU package-power read (capability
+    /// `telemetry.cpu.package_power`). The privileged RAPL helper samples once
+    /// per request on its own bounded lane; per-package watt figures or a
+    /// typed failure arrive as `PlatformEventBatch::rapl_power_events`.
+    RaplPower(RaplPowerRequest),
+    /// Submit a CPU MSR readout (capability `telemetry.cpu.msr`). The
+    /// privileged MSR helper reads once per request on its own bounded lane;
+    /// per-node register rows or a typed failure arrive as
+    /// `PlatformEventBatch::msr_readout_events`.
+    MsrReadout(MsrReadoutRequest),
 }

@@ -716,9 +716,9 @@ fn overlay_controls(
     })
 }
 
-/// Resolve an overlay popup from its typed input owner.  Surface renderers use
-/// [`planned_popup`] for their compatibility/test entry points, while the
-/// frame plan stores the same result for production rendering and hit-tests.
+/// Resolve an overlay popup from its typed input owner. The frame plan stores
+/// this result for production rendering and hit-tests; isolated render tests
+/// call the same function directly.
 pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
     let size = match scope {
         TuiInputScope::SharedSurface(surface) => match surface {
@@ -750,15 +750,6 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
         | TuiInputScope::Content => return None,
     };
     Some(centered_popup(area, size.0, size.1))
-}
-
-/// Compatibility entry for isolated surface tests.  The scope is known to be
-/// an overlay at every call site; returning a zero rectangle for an accidental
-/// non-overlay scope keeps the production path panic-free.
-#[must_use]
-#[cfg(test)]
-pub(crate) fn planned_popup(area: Rect, scope: TuiInputScope) -> Rect {
-    overlay_popup(area, scope).unwrap_or(Rect::ZERO)
 }
 
 const fn confirmation_size(kind: taskmanager_application::ConfirmationKind) -> (u16, u16) {

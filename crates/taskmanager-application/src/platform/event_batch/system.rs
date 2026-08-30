@@ -3,8 +3,8 @@
 //! `PlatformEventBatch`.
 
 use super::super::{
-    ContainerRollupEvent, GpuEngineRowsEvent, HardwareInventoryEvent, NpuInventoryEvent,
-    SystemTelemetryDomainOutcome,
+    ContainerRollupEvent, GpuEngineRowsEvent, HardwareInventoryEvent, MsrReadoutEvent,
+    NpuInventoryEvent, RaplPowerEvent, SmbiosMemoryEvent, SystemTelemetryDomainOutcome,
 };
 use super::{CorrelatedEvent, PlatformEventBatch, PlatformEventContext};
 
@@ -12,6 +12,9 @@ pub type CorrelatedSystemTelemetryOutcome = CorrelatedEvent<SystemTelemetryDomai
 pub type CorrelatedHardwareInventoryEvent = CorrelatedEvent<HardwareInventoryEvent>;
 pub type CorrelatedGpuEngineRowsEvent = CorrelatedEvent<GpuEngineRowsEvent>;
 pub type CorrelatedNpuInventoryEvent = CorrelatedEvent<NpuInventoryEvent>;
+pub type CorrelatedSmbiosMemoryEvent = CorrelatedEvent<SmbiosMemoryEvent>;
+pub type CorrelatedRaplPowerEvent = CorrelatedEvent<RaplPowerEvent>;
+pub type CorrelatedMsrReadoutEvent = CorrelatedEvent<MsrReadoutEvent>;
 
 pub(super) fn push_hardware_inventory(
     batch: &mut PlatformEventBatch,
@@ -50,6 +53,36 @@ pub(super) fn push_npu_inventory(
 ) {
     batch
         .npu_inventory_events
+        .push(CorrelatedEvent::new(context, event));
+}
+
+pub(super) fn push_smbios_memory(
+    batch: &mut PlatformEventBatch,
+    context: PlatformEventContext,
+    event: SmbiosMemoryEvent,
+) {
+    batch
+        .smbios_memory_events
+        .push(CorrelatedEvent::new(context, event));
+}
+
+pub(super) fn push_rapl_power(
+    batch: &mut PlatformEventBatch,
+    context: PlatformEventContext,
+    event: RaplPowerEvent,
+) {
+    batch
+        .rapl_power_events
+        .push(CorrelatedEvent::new(context, event));
+}
+
+pub(super) fn push_msr_readout(
+    batch: &mut PlatformEventBatch,
+    context: PlatformEventContext,
+    event: MsrReadoutEvent,
+) {
+    batch
+        .msr_readout_events
         .push(CorrelatedEvent::new(context, event));
 }
 

@@ -4,7 +4,7 @@ use super::*;
 
 impl ProcessRowId {
     #[must_use]
-    pub const fn process_identity(self) -> Option<ProcessRowIdentity> {
+    pub const fn process_identity(self) -> Option<ProcessLiveKey> {
         match self {
             Self::Process(identity) => Some(identity),
             Self::Category(_) | Self::Application(_) => None,
@@ -12,7 +12,7 @@ impl ProcessRowId {
     }
 
     #[must_use]
-    pub const fn application_root(self) -> Option<ProcessRowIdentity> {
+    pub const fn application_root(self) -> Option<ProcessLiveKey> {
         match self {
             Self::Application(identity) => Some(identity),
             Self::Category(_) | Self::Process(_) => None,
@@ -22,7 +22,7 @@ impl ProcessRowId {
 
 impl ProcessSelection {
     /// Plain click / context-menu focus: collapse to exactly one row.
-    pub fn select_single(&mut self, identity: ProcessRowIdentity) {
+    pub fn select_single(&mut self, identity: ProcessLiveKey) {
         self.rows.clear();
         self.rows.insert(identity);
         self.anchor = Some(identity);
@@ -32,7 +32,7 @@ impl ProcessSelection {
     /// Select a PID-less application aggregate without fabricating a
     /// representative process. Individual multi-selection is cleared; action
     /// resolution expands the root against the live tree at submit time.
-    pub fn select_application(&mut self, root: ProcessRowIdentity) {
+    pub fn select_application(&mut self, root: ProcessLiveKey) {
         self.rows.clear();
         self.anchor = None;
         self.active_row = Some(ProcessRowId::Application(root));
@@ -42,7 +42,7 @@ impl ProcessSelection {
     /// stays a member; removing the anchor falls back to an arbitrary member
     /// (removing the last member leaves an empty set with no anchor, which
     /// [`Self::batch_identities`] reports honestly).
-    pub fn toggle(&mut self, identity: ProcessRowIdentity) {
+    pub fn toggle(&mut self, identity: ProcessLiveKey) {
         if !self.rows.insert(identity) {
             self.rows.remove(&identity);
         }
@@ -58,7 +58,7 @@ impl ProcessSelection {
     /// (inclusive, in the caller's display order) and make `end` the anchor.
     /// A stale row (not in the display order) inserts nothing — the direct
     /// track resolves rows against the live projection before calling.
-    pub fn extend_range(&mut self, display: &[ProcessRowIdentity], end: ProcessRowIdentity) {
+    pub fn extend_range(&mut self, display: &[ProcessLiveKey], end: ProcessLiveKey) {
         let anchor = self.anchor.unwrap_or(end);
         for identity in identity_range(display, anchor, end) {
             self.rows.insert(identity);
@@ -70,7 +70,7 @@ impl ProcessSelection {
     /// Keyboard navigation: move the anchor to `identity` and, unless
     /// `preserve_set` is set (Ctrl/Shift roaming), collapse the set to the
     /// new anchor.
-    pub fn move_to(&mut self, identity: Option<ProcessRowIdentity>, preserve_set: bool) {
+    pub fn move_to(&mut self, identity: Option<ProcessLiveKey>, preserve_set: bool) {
         self.anchor = identity;
         if !preserve_set {
             self.rows.clear();
@@ -96,8 +96,8 @@ impl ProcessSelection {
     /// post-batch intent reconciliation that already know the exact targets).
     pub fn replace(
         &mut self,
-        identities: impl IntoIterator<Item = ProcessRowIdentity>,
-        anchor: Option<ProcessRowIdentity>,
+        identities: impl IntoIterator<Item = ProcessLiveKey>,
+        anchor: Option<ProcessLiveKey>,
     ) {
         self.rows = identities.into_iter().collect();
         self.anchor = anchor;
@@ -109,9 +109,9 @@ impl ProcessSelection {
     /// token — resolves. A pid reused by a new process does not match and is
     /// dropped; the selection never silently retargets onto the impostor.
     pub fn reconcile(&mut self, live: &[ProcessItem]) {
-        let live_rows: HashSet<ProcessRowIdentity> = live
+        let live_rows: HashSet<ProcessLiveKey> = live
             .iter()
-            .filter_map(ProcessRowIdentity::from_process)
+            .filter_map(ProcessLiveKey::from_process)
             .collect();
         self.rows.retain(|identity| live_rows.contains(identity));
         if self
@@ -140,14 +140,14 @@ impl ProcessSelection {
     /// The authoritative multi-select set (renderers highlight members;
     /// batch intents freeze from this).
     #[must_use]
-    pub fn rows(&self) -> &HashSet<ProcessRowIdentity> {
+    pub fn rows(&self) -> &HashSet<ProcessLiveKey> {
         &self.rows
     }
 
     /// The anchor identity (keyboard / plain-click focus; single-select
     /// identity).
     #[must_use]
-    pub const fn anchor(&self) -> Option<ProcessRowIdentity> {
+    pub const fn anchor(&self) -> Option<ProcessLiveKey> {
         self.anchor
     }
 
@@ -158,7 +158,7 @@ impl ProcessSelection {
     }
 
     #[must_use]
-    pub const fn application_root(&self) -> Option<ProcessRowIdentity> {
+    pub const fn application_root(&self) -> Option<ProcessLiveKey> {
         match self.active_row {
             Some(ProcessRowId::Application(root)) => Some(root),
             Some(ProcessRowId::Category(_) | ProcessRowId::Process(_)) | None => None,
@@ -167,18 +167,18 @@ impl ProcessSelection {
 
     /// Whether `identity` is part of the selection set.
     #[must_use]
-    pub fn contains(&self, identity: ProcessRowIdentity) -> bool {
+    pub fn contains(&self, identity: ProcessLiveKey) -> bool {
         self.rows.contains(&identity)
     }
 
     /// Batch-control targets: the identity set (pid-major order) when
     /// non-empty, otherwise the anchor as a single-target fallback.
     #[must_use]
-    pub fn batch_identities(&self) -> Vec<ProcessRowIdentity> {
+    pub fn batch_identities(&self) -> Vec<ProcessLiveKey> {
         if self.rows.is_empty() {
             return self.anchor.into_iter().collect();
         }
-        let mut identities: Vec<ProcessRowIdentity> = self.rows.iter().copied().collect();
+        let mut identities: Vec<ProcessLiveKey> = self.rows.iter().copied().collect();
         identities.sort_unstable();
         identities
     }
@@ -204,13 +204,13 @@ impl ProcessSelection {
 
 /// The identity range spanning `anchor` → `end` (inclusive, in the caller's
 /// display order). A missing endpoint yields an empty range (the caller
-/// keeps its prior set); this is the `&[ProcessRowIdentity]` counterpart of
+/// keeps its prior set); this is the `&[ProcessLiveKey]` counterpart of
 /// [`super::super::selection::selected_rows_range`].
 pub fn identity_range(
-    display: &[ProcessRowIdentity],
-    anchor: ProcessRowIdentity,
-    end: ProcessRowIdentity,
-) -> Vec<ProcessRowIdentity> {
+    display: &[ProcessLiveKey],
+    anchor: ProcessLiveKey,
+    end: ProcessLiveKey,
+) -> Vec<ProcessLiveKey> {
     let start = display.iter().position(|identity| *identity == anchor);
     let end_pos = display.iter().position(|identity| *identity == end);
     match (start, end_pos) {

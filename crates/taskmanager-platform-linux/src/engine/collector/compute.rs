@@ -242,7 +242,7 @@ fn observe_rapl_power(
 pub(super) fn collect_cpu(
     sys: &System,
     prev_rapl: &mut Option<(u64, Instant)>,
-    cache: (Option<u64>, Option<u64>, Option<u64>),
+    cache: (Option<u64>, Option<u64>, Option<u64>, Option<u64>),
     rapl_max_energy_uj: u64,
     now: Instant,
     now_ms: u64,
@@ -358,7 +358,7 @@ pub(super) fn collect_cpu(
         power_w: power_observation,
     };
 
-    let (l1_cache_kb, l2_cache_kb, l3_cache_kb) = cache;
+    let (l1d_cache_kb, l1i_cache_kb, l2_cache_kb, l3_cache_kb) = cache;
     let mut sources = vec![
         sysinfo_status,
         cpufreq.status,
@@ -378,7 +378,8 @@ pub(super) fn collect_cpu(
     metrics.temperature_source = temperatures.package_source;
     metrics.physical_cores = physical_core_count;
     metrics.logical_cores = (!cpus.is_empty()).then_some(cpus.len());
-    metrics.l1_cache_kb = l1_cache_kb;
+    metrics.l1d_cache_kb = l1d_cache_kb;
+    metrics.l1i_cache_kb = l1i_cache_kb;
     metrics.l2_cache_kb = l2_cache_kb;
     metrics.l3_cache_kb = l3_cache_kb;
     metrics.performance_policy = CpuPerformancePolicy {

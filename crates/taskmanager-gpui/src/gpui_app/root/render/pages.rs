@@ -13,6 +13,7 @@ use gpui::{
     Window, div, px,
 };
 use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
@@ -29,7 +30,7 @@ pub(crate) struct PageBodyFrame<'a> {
     pub selected: SelectedDevice,
     pub frame: responsive::FrameBudget,
     pub corner_radius_factor: f32,
-    pub selected_pid: Option<u32>,
+    pub selected_identity: Option<ProcessLiveKey>,
 }
 
 impl RootView {
@@ -49,7 +50,7 @@ impl RootView {
             selected,
             frame,
             corner_radius_factor,
-            selected_pid: sel_pid,
+            selected_identity,
         } = frame;
         let layout = frame.page_layout();
         let performance = self.performance_settings();
@@ -100,8 +101,22 @@ impl RootView {
                                 hover_slot: &self.graph_hover,
                                 graph_settings: performance.graph,
                                 layout: performance_layout,
+                                units: self.display_units(),
+                                package_power: cpu_view::PackagePowerInputs {
+                                    state: self.shell.rapl_power_state(),
+                                    capability: self.projection().capability_status(
+                                        &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+                                    ),
+                                },
+                                msr_readouts: cpu_view::MsrReadoutsInputs {
+                                    state: self.shell.msr_readout_state(),
+                                    capability: self.projection().capability_status(
+                                        &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_MSR,
+                                    ),
+                                },
                             },
                             &mut self.cpu_core_history,
+                            cx,
                         ),
                         SelectedDevice::Memory => {
                             perf_views::render_memory(perf_views::MemoryViewProps {
@@ -346,7 +361,6 @@ impl RootView {
                     processes_view::effective_process_sort_col(sort_column, &hidden_cols);
                 let sort_asc = matches!(sort_direction, taskmanager_shell::SortDir::Asc);
                 let (rows, _pids, query) = self.processes_projection();
-                let selected_target_count = self.selected_process_pids().len();
                 let application_count = self.process_application_count();
                 // Own TextInput backed by this window's persistent per-window
                 // state (lazily created on the first Apps render). The field
@@ -367,7 +381,7 @@ impl RootView {
                             search_input: &search_input,
                             rows: &rows,
                             query: &query,
-                            selected: sel_pid,
+                            selected_identity,
                             selected_row: self.selected_process_row(),
                             selected_target_count: self.selected_process_count(),
                             selected_identities: self.selected_process_identities(),
@@ -375,7 +389,7 @@ impl RootView {
                             sort_col,
                             sort_asc,
                             filter: self.process_status_filter(),
-                            affinity_pid: self.process_affinity_pid(),
+                            affinity_identity: self.process_affinity_identity(),
                             affinity_state: self.shell.process_affinity_state(),
                             affinity_cpus: &self.processes_state.affinity_editor.cpus,
                             affinity_hover: self.processes_state.affinity_editor.hover,
@@ -456,6 +470,13 @@ impl RootView {
                             npu_inventory: self.npu_inventory(),
                             processes,
                             scroll: &self.system_scroll,
+                            units: self.display_units(),
+                            memory_inventory: system_view::MemoryInventoryInputs {
+                                state: self.shell.smbios_memory_state(),
+                                capability: self.projection().capability_status(
+                                    &taskmanager_platform_contract::CapabilityId::TELEMETRY_MEMORY_SMBIOS,
+                                ),
+                            },
                         },
                         entity.clone(),
                     )
@@ -495,6 +516,7 @@ impl RootView {
                                 layout: system_layout,
                                 copy: &system_health_view::localized_text,
                                 callbacks: &callbacks,
+                                units: self.display_units(),
                             },
                         )
                         .into_any_element()
@@ -559,6 +581,7 @@ impl RootView {
                                 columns: app_history_view::AppHistoryColumns::from_page_layout(
                                     layout,
                                 ),
+                                units: self.display_units(),
                             },
                         ),
                     ),
@@ -576,7 +599,7 @@ impl RootView {
                 .render()
             }
             TopPage::Containers => PageScaffold::new(
-                containers_view::render_containers(t, self.containers()),
+                containers_view::render_containers(t, self.containers(), self.display_units()),
                 px(page_padding),
             )
             .render(),

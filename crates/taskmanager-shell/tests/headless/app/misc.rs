@@ -96,13 +96,17 @@ fn visible_process_index_helpers_match_the_borrowed_projection() {
 
     assert_eq!(direct, legacy);
     for (index, pid) in legacy.iter().copied().enumerate() {
+        let identity = app
+            .row_identity_at(index)
+            .expect("visible row has a live identity");
         assert_eq!(
             app.visible_process_at(index).map(|process| process.pid),
             Some(pid)
         );
-        assert_eq!(app.visible_process_index_of_pid(pid), Some(index));
+        assert_eq!(app.visible_process_index_of_identity(identity), Some(index));
         assert_eq!(
-            app.visible_process_by_pid(pid).map(|process| process.pid),
+            app.visible_process_by_identity(identity)
+                .map(|process| process.pid),
             Some(pid)
         );
     }

@@ -15,7 +15,6 @@ mod tests_inner {
     use super::super::fonts::effective_font_summary;
     use super::super::{render_settings, startup_page_row};
     use crate::gpui_app::first_run::{self, FirstRunPhase};
-    use crate::gpui_app::formatting::DisplayUnits;
     use crate::gpui_app::graph::GraphSettings;
     use crate::gpui_app::root::RootView;
     use crate::gpui_app::settings_view::init_data_points_slider;
@@ -25,6 +24,7 @@ mod tests_inner {
         STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER, TEXT_RENDERING_PLATFORM_DEFAULT,
     };
     use taskmanager_core::core::setup::SetupScriptInfo;
+    use taskmanager_core::core::units::UnitPreferences;
     use taskmanager_theme::tokens;
     use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
     use taskmanager_ui::inputs::switch::SwitchState;
@@ -100,7 +100,7 @@ mod tests_inner {
                                 show_network_virtual: true,
                                 show_network_other: true,
                                 show_gpus: true,
-                                units: DisplayUnits::default(),
+                                units: UnitPreferences::default(),
                                 graph_settings: GraphSettings::default(),
                                 graph_points_slider,
                                 gray_zero_values: presentation.gray_zero_values,

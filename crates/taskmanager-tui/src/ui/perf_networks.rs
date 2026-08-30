@@ -63,7 +63,7 @@ pub(super) fn render_network_section(
     }
     let lines = network_lines(
         &filtered,
-        &app,
+        app,
         theme,
         app.prefs.units[4],
         app.prefs.units[5],

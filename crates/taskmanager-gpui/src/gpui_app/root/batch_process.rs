@@ -15,7 +15,7 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{
     ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryExportError,
     ProcessBatchHistoryFormat, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
-    descendant_pids, export_process_batch_history,
+    ProcessLiveKey, descendant_live_keys, export_process_batch_history,
 };
 use taskmanager_theme::Theme;
 
@@ -128,29 +128,27 @@ pub fn export_process_batch_history_with(
 }
 
 impl RootView {
-    /// Batch targets as exact identities (CORE-01 fail-closed freeze): the
-    /// selection resolves pid + start token against the live snapshot, so an
-    /// identity that vanished — or a pid reused by a different process — is
-    /// excluded before the intent is frozen.
-    pub fn selected_process_pids(&self) -> Vec<u32> {
+    /// Batch targets as exact live identities (CORE-01 fail-closed freeze).
+    /// The application-root branch expands through the same core tree walk;
+    /// ordinary selection uses the shell's identity set directly.
+    pub fn batch_process_identities(&self) -> Vec<ProcessLiveKey> {
         self.selected_application_root().map_or_else(
-            || {
-                self.shell
-                    .selection
-                    .frozen_targets(self.processes())
-                    .into_iter()
-                    .map(|identity| identity.pid)
-                    .collect()
-            },
-            |root| descendant_pids(self.processes(), root),
+            || self.shell.selection.batch_identities(),
+            |root| descendant_live_keys(self.processes(), root),
         )
     }
 
-    /// Freeze PID/name/start-time now. A later refresh cannot change what the
-    /// confirmation represents.
+    /// Freeze the exact live identities now. A later refresh cannot change
+    /// what the confirmation represents.
     pub fn request_process_batch(&mut self, action: ProcessBatchAction) {
         let intent = self.selected_application_root().map_or_else(
-            || ProcessBatchIntent::freeze(self.processes(), self.selected_process_pids(), action),
+            || {
+                ProcessBatchIntent::freeze(
+                    self.processes(),
+                    self.batch_process_identities(),
+                    action,
+                )
+            },
             |root| ProcessBatchIntent::freeze_tree(self.processes(), root, action),
         );
         if !intent.targets.is_empty() {
@@ -161,10 +159,10 @@ impl RootView {
     pub(crate) fn submit_process_batch_immediate(
         &mut self,
         action: ProcessBatchAction,
-        pid: u32,
+        identity: ProcessLiveKey,
         cx: &mut Context<Self>,
     ) -> bool {
-        let intent = ProcessBatchIntent::freeze(self.processes(), [pid], action);
+        let intent = ProcessBatchIntent::freeze(self.processes(), [identity], action);
         if intent.targets.is_empty() {
             return false;
         }

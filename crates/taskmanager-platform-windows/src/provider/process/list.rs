@@ -12,8 +12,8 @@ use std::time::Instant;
 
 use taskmanager_core::{
     CumulativeCounter, FailureKind, ProcessHistorySample, ProcessHistoryStore, ProcessItem,
-    ProcessMetadataFailure, ProcessMetadataObservation, ProcessMetadataObservations,
-    ProcessScalarObservations, ScalarObservation,
+    ProcessLiveKey, ProcessMetadataFailure, ProcessMetadataObservation,
+    ProcessMetadataObservations, ProcessScalarObservations, ScalarObservation,
 };
 use taskmanager_platform_contract::{PartialSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::ProcessListProvider;
@@ -287,11 +287,11 @@ impl ProcessListProvider for WinProcessListProvider {
             });
             item.apply_scalar_observations(observations);
 
-            let history = self.histories.record(
-                pid_value,
-                item.current_start_token(),
-                ProcessHistorySample::from_process(&item),
-            );
+            let history =
+                ProcessLiveKey::from_process(&item).map_or_else(Default::default, |identity| {
+                    self.histories
+                        .record(identity, ProcessHistorySample::from_process(&item))
+                });
             item.cpu_history = history.cpu;
             item.mem_history = history.memory;
             item.disk_history = history.disk;

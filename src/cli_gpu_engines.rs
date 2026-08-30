@@ -98,6 +98,7 @@ fn feature_key() -> &'static str {
         EscalationFeature::SystemServiceControl => "system_service_control",
         EscalationFeature::MemorySmbios => "memory_smbios",
         EscalationFeature::PackagePowerRapl => "package_power_rapl",
+        EscalationFeature::CpuMsr => "cpu_msr",
     }
 }
 

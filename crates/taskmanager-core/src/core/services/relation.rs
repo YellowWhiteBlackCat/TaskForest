@@ -28,8 +28,10 @@ pub enum ServiceRelationKind {
 }
 
 impl ServiceRelationKind {
+    /// Wire-vocabulary decode for the private serde ingress only; the domain
+    /// speaks the typed kind, never the dependency-string.
     #[must_use]
-    pub fn from_wire_name(name: impl Into<String>) -> Self {
+    pub(crate) fn from_wire_name(name: impl Into<String>) -> Self {
         let name = name.into();
         match name.as_str() {
             "requires" => Self::Requires,
@@ -48,7 +50,7 @@ impl ServiceRelationKind {
     }
 
     #[must_use]
-    pub fn as_wire_name(&self) -> &str {
+    pub(crate) fn as_wire_name(&self) -> &str {
         match self {
             Self::Requires => "requires",
             Self::Wants => "wants",

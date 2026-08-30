@@ -8,6 +8,7 @@ use taskmanager_core::core::npu::{NpuDevice, NpuEngineKind, NpuInventorySnapshot
 
 use crate::gpui_app::formatting;
 use taskmanager_application::i18n;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 
 /// Render-neutral rows for one discovered accelerator.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -19,7 +20,7 @@ struct NpuDeviceViewModel {
 }
 
 impl NpuDeviceViewModel {
-    fn from_device(device: &NpuDevice) -> Self {
+    fn from_device(device: &NpuDevice, units: UnitPreferences) -> Self {
         let prefix = format!("{} {}", i18n::t("npu.title"), device.device_id.as_str());
         let brand = device
             .brand
@@ -61,7 +62,7 @@ impl NpuDeviceViewModel {
             bytes.map(|bytes| {
                 (
                     qualified_label(&prefix, i18n::t(label_key)),
-                    formatting::bytes_to_human(bytes),
+                    units.format_quantity(bytes, QuantityFamily::Memory, false),
                 )
             })
         })
@@ -83,14 +84,17 @@ impl NpuDeviceViewModel {
     }
 }
 
-pub(super) fn inventory_rows(inventory: Option<&NpuInventorySnapshot>) -> Vec<(String, String)> {
+pub(super) fn inventory_rows(
+    inventory: Option<&NpuInventorySnapshot>,
+    units: UnitPreferences,
+) -> Vec<(String, String)> {
     let Some(inventory) = inventory.filter(|inventory| inventory.is_success()) else {
         return Vec::new();
     };
     inventory
         .devices
         .iter()
-        .flat_map(|device| NpuDeviceViewModel::from_device(device).into_rows())
+        .flat_map(|device| NpuDeviceViewModel::from_device(device, units).into_rows())
         .collect()
 }
 

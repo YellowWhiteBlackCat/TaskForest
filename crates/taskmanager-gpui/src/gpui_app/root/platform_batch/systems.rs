@@ -75,14 +75,17 @@ impl RootView {
             return;
         }
         let processes = self.projection().processes.clone().unwrap_or_default();
-        self.materialized
-            .replace_processes(self.projection().process_revision, processes);
+        self.materialized.replace_processes(
+            self.projection().process_revision,
+            processes,
+            self.projection().processes_observed_at_ms,
+        );
         // Token-aware reconcile (CORE-01): a pid reused by a new process
         // drops instead of retargeting.
         let snapshot: &[taskmanager_core::core::process::ProcessItem] =
             self.materialized.processes();
         self.shell.selection.reconcile(snapshot);
-        if let Some(pid) = self.process_affinity_pid() {
+        if let Some(identity) = self.process_affinity_identity() {
             let expected = match self.shell.process_affinity_state() {
                 taskmanager_application::ProcessAffinityState::Loading { target, .. }
                 | taskmanager_application::ProcessAffinityState::Failed { target, .. } => {
@@ -93,7 +96,9 @@ impl RootView {
                 }
                 taskmanager_application::ProcessAffinityState::Closed => None,
             };
-            if expected.is_some_and(|target| self.frozen_process(pid).as_ref() != Some(&target)) {
+            if expected
+                .is_some_and(|target| self.frozen_process(identity).as_ref() != Some(&target))
+            {
                 self.dismiss_window_surface(
                     super::super::WindowSurfaceKind::ProcessAffinity,
                     super::super::WindowSurfaceDismissReason::TargetUnavailable,
@@ -237,12 +242,14 @@ impl RootView {
                 target, failure, ..
             } => {
                 self.processes_state.affinity_editor.cpus.clear();
-                self.record_process_control_result(
-                    ProcessControlAction::SetAffinity,
-                    target.pid,
-                    Err(failure),
-                    cx,
-                );
+                if let Some(identity) = target.live_key() {
+                    self.record_process_control_result(
+                        ProcessControlAction::SetAffinity,
+                        identity,
+                        Err(failure),
+                        cx,
+                    );
+                }
             }
             taskmanager_application::ProcessAffinityState::Closed
             | taskmanager_application::ProcessAffinityState::Loading { .. } => {}

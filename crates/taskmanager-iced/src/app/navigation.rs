@@ -176,7 +176,9 @@ impl IcedApp {
         };
         match row_key {
             Some(taskmanager_shell::ProcessRowId::Application(root)) => {
-                let _ = self.shell.select_application_row(root.pid(), flat_index);
+                let _ = self
+                    .shell
+                    .select_row_id(taskmanager_shell::ProcessRowId::Application(root));
             }
             Some(taskmanager_shell::ProcessRowId::Process(_)) => {
                 let _ = self.shell.select_row(flat_index);
@@ -234,7 +236,6 @@ impl IcedApp {
                 expansion_key,
                 expanded,
                 row_key,
-                flat_index,
                 ..
             } => {
                 if expand != expanded {
@@ -248,29 +249,42 @@ impl IcedApp {
                             .insert(expansion_key);
                     }
                     if let Some(taskmanager_shell::ProcessRowId::Application(root)) = row_key {
-                        let _ = self.shell.select_application_row(root.pid(), flat_index);
+                        let _ = self
+                            .shell
+                            .select_row_id(taskmanager_shell::ProcessRowId::Application(root));
                     }
                 }
             }
             ProjectedRow::Tree {
-                pid,
                 has_children,
                 collapsed,
                 parent_pid,
+                row_key,
                 ..
             } if has_children => {
+                let Some(identity) = row_key.and_then(|key| key.live_key()) else {
+                    return;
+                };
                 if expand && collapsed {
-                    self.process_presentation.expanded_tree.remove(&pid);
+                    self.process_presentation.expanded_tree.remove(&identity);
                     let _ = self.shell.select_row(flat_index);
                 } else if !expand && !collapsed {
-                    self.process_presentation.expanded_tree.insert(pid);
+                    self.process_presentation.expanded_tree.insert(identity);
                     let _ = self.shell.select_row(flat_index);
                 } else if !expand && collapsed {
                     // Left on a collapsed node moves the cursor to its parent
                     // (the subtree is already hidden; same rule as the GPUI
                     // structural-arrow fold).
                     if let Some(index) = parent_pid
-                        .and_then(|parent| self.shell.visible_process_index_of_pid(parent))
+                        .and_then(|parent| {
+                            self.shell
+                                .projection()
+                                .processes_slice()
+                                .iter()
+                                .find(|process| process.pid == parent)
+                                .and_then(ProcessLiveKey::from_process)
+                        })
+                        .and_then(|identity| self.shell.visible_process_index_of_identity(identity))
                     {
                         let _ = self.shell.select_row(index);
                     }

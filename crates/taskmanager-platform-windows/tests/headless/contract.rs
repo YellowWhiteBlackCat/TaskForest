@@ -137,6 +137,12 @@ const STANDARD_SURFACE: &[(&str, &str)] = &[
     ),
     ("telemetry.gpu.engines", "windows.system.gpu-engines"),
     ("accelerator.npu", "windows.accelerator.npu"),
+    ("telemetry.memory.smbios", "windows.telemetry.memory.smbios"),
+    (
+        "telemetry.cpu.package_power",
+        "windows.telemetry.cpu.package-power",
+    ),
+    ("telemetry.cpu.msr", "windows.telemetry.cpu.msr"),
     ("sensors", "windows.sensor.registry"),
     ("hardware.power-supplies", "windows.power-supply.registry"),
 ];
@@ -148,7 +154,16 @@ const STANDARD_SURFACE: &[(&str, &str)] = &[
 /// facets' failures ride the failure lane (G-05); service-log streaming
 /// left this set when the winevt boundary lane landed and resource control
 /// when the job-object lane landed (both 2026-08-24).
-const PENDING_CAPABILITIES: &[&str] = &["process.network.escalation", "first-run.setup"];
+const PENDING_CAPABILITIES: &[&str] = &[
+    "process.network.escalation",
+    "first-run.setup",
+    // The Linux polkit/pkexec helper crossings have no Windows seam yet
+    // (WMI SMBIOS / power-budget / MSR); the registered-pending facets
+    // complete with the same typed `Unsupported` outcome everywhere.
+    "telemetry.memory.smbios",
+    "telemetry.cpu.package_power",
+    "telemetry.cpu.msr",
+];
 
 /// Lanes implemented natively through the audited Windows API boundary
 /// (IP Helper connection tables, token/SID isolation, ToolHelp32
@@ -407,6 +422,14 @@ fn assert_complete_facet_surface(facets: &PlatformFacets) {
     assert!(
         facets.system().gpu_engine_rows().is_some(),
         "the engine-rows facet must expose its request port"
+    );
+    assert!(
+        facets.system().smbios_memory().is_some(),
+        "the registered-pending smbios facet must expose its request port"
+    );
+    assert!(
+        facets.system().rapl_power().is_some(),
+        "the registered-pending rapl facet must expose its request port"
     );
     assert!(
         facets.system().containers().is_some(),

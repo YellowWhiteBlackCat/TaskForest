@@ -7,7 +7,7 @@
 //! represented at the same time.
 
 use taskmanager_application::SurfaceKind;
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_core::core::services::ServiceItem;
 use taskmanager_core::core::session::SessionItem;
 use taskmanager_core::core::startup::StartupEntry;
@@ -155,7 +155,7 @@ pub(crate) enum ContextMenu {
         session: SessionItem,
     },
     Process {
-        pid: u32,
+        identity: ProcessLiveKey,
     },
     Service {
         source_index: usize,
@@ -400,9 +400,9 @@ impl IcedApp {
         }
     }
 
-    pub(crate) const fn process_menu_pid(&self) -> Option<u32> {
+    pub(crate) const fn process_menu_identity(&self) -> Option<ProcessLiveKey> {
         match self.context_menu() {
-            Some(ContextMenu::Process { pid }) => Some(*pid),
+            Some(ContextMenu::Process { identity }) => Some(*identity),
             _ => None,
         }
     }

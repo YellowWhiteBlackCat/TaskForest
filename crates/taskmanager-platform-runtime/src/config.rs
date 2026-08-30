@@ -10,17 +10,18 @@ use std::time::Instant;
 use taskmanager_application::{
     CommandLaunchRequest, ContainerRollupRequest, CpuTelemetryRequest, DesktopAppearanceRequest,
     DesktopNotificationRequest, DirectoryUsageRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
+    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
     NetworkTelemetryRequest, NpuInventoryRequest, PowerSupplyRequest,
     ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
     ProcessEnvironmentRequest, ProcessGpuRequest, ProcessIsolationRequest, ProcessListRequest,
     ProcessNetworkEscalationRequest, ProcessNetworkRequest, ProcessOpenFilesRequest,
     ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest,
-    ResourceRevealRequest, SensorRequest, ServiceControlRequest, ServiceDependenciesRequest,
-    ServiceInventoryRequest, ServiceLogSnapshotRequest, ServiceLogStreamRequest,
-    SessionControlRequest, SessionInventoryRequest, SetupScriptRequest, SmartControlRequest,
-    SmartObservationRequest, StartupControlRequest, StartupEvidenceRequest,
-    StartupInventoryRequest, StorageHealthRequest, StorageTelemetryRequest, UrlOpenRequest,
+    RaplPowerRequest, ResourceRevealRequest, SensorRequest, ServiceControlRequest,
+    ServiceDependenciesRequest, ServiceInventoryRequest, ServiceLogSnapshotRequest,
+    ServiceLogStreamRequest, SessionControlRequest, SessionInventoryRequest, SetupScriptRequest,
+    SmartControlRequest, SmartObservationRequest, SmbiosMemoryRequest, StartupControlRequest,
+    StartupEvidenceRequest, StartupInventoryRequest, StorageHealthRequest, StorageTelemetryRequest,
+    UrlOpenRequest,
 };
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_platform_contract::{
@@ -192,6 +193,9 @@ pub struct SystemProviderBindings {
     pub(crate) containers: crate::ProviderBinding<ContainerRollupRequest>,
     pub(crate) gpu_engine_rows: crate::ProviderBinding<GpuEngineRowsRequest>,
     pub(crate) npu_inventory: crate::ProviderBinding<NpuInventoryRequest>,
+    pub(crate) smbios_memory: crate::ProviderBinding<SmbiosMemoryRequest>,
+    pub(crate) rapl_power: crate::ProviderBinding<RaplPowerRequest>,
+    pub(crate) msr_readout: crate::ProviderBinding<MsrReadoutRequest>,
 }
 
 /// Required system capability bindings installed as one named composition
@@ -221,6 +225,9 @@ impl SystemProviderBindings {
             containers: input.containers,
             gpu_engine_rows: crate::ProviderBinding::absent(),
             npu_inventory: crate::ProviderBinding::absent(),
+            smbios_memory: crate::ProviderBinding::absent(),
+            rapl_power: crate::ProviderBinding::absent(),
+            msr_readout: crate::ProviderBinding::absent(),
         }
     }
 
@@ -249,6 +256,45 @@ impl SystemProviderBindings {
         npu_inventory: &crate::ProviderRegistration<NpuInventoryRequest, P>,
     ) -> Self {
         self.npu_inventory = npu_inventory.binding();
+        self
+    }
+
+    /// Attach the optional SMBIOS memory-inventory provider. Native adapters
+    /// without this facet leave it absent: no catalog descriptor, request
+    /// port, or execution lane is created (mirrors `with_gpu_engine_rows`),
+    /// and the UI reports the capability as honestly unavailable.
+    #[must_use]
+    pub fn with_smbios_memory<P>(
+        mut self,
+        smbios_memory: &crate::ProviderRegistration<SmbiosMemoryRequest, P>,
+    ) -> Self {
+        self.smbios_memory = smbios_memory.binding();
+        self
+    }
+
+    /// Attach the optional CPU package-power provider. Native adapters
+    /// without this facet leave it absent: no catalog descriptor, request
+    /// port, or execution lane is created (mirrors `with_gpu_engine_rows`),
+    /// and the UI reports the capability as honestly unavailable.
+    #[must_use]
+    pub fn with_rapl_power<P>(
+        mut self,
+        rapl_power: &crate::ProviderRegistration<RaplPowerRequest, P>,
+    ) -> Self {
+        self.rapl_power = rapl_power.binding();
+        self
+    }
+
+    /// Attach the optional CPU MSR-readout provider. Native adapters without
+    /// this facet leave it absent: no catalog descriptor, request port, or
+    /// execution lane is created (mirrors `with_gpu_engine_rows`), and the UI
+    /// reports the capability as honestly unavailable.
+    #[must_use]
+    pub fn with_msr_readout<P>(
+        mut self,
+        msr_readout: &crate::ProviderRegistration<MsrReadoutRequest, P>,
+    ) -> Self {
+        self.msr_readout = msr_readout.binding();
         self
     }
 }
@@ -627,6 +673,9 @@ impl RuntimeProviderBindings {
             route::<ContainerRollupRequest>(&self.system.containers, observation, system),
             route::<GpuEngineRowsRequest>(&self.system.gpu_engine_rows, observation, system),
             route::<NpuInventoryRequest>(&self.system.npu_inventory, observation, system),
+            route::<SmbiosMemoryRequest>(&self.system.smbios_memory, observation, system),
+            route::<RaplPowerRequest>(&self.system.rapl_power, observation, system),
+            route::<MsrReadoutRequest>(&self.system.msr_readout, observation, system),
             route::<ProcessListRequest>(&self.process.list, observation, process),
             route::<ProcessControlRequest>(&self.process.control, control, process),
             route::<ProcessNetworkRequest>(&self.process.network, observation, process),

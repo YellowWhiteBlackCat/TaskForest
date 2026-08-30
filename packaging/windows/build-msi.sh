@@ -7,23 +7,28 @@
 # output path onto `wix build` preprocessor variables.
 #
 # MSI ProductVersion is numeric x.y.z only: pass the release version with any
-# prerelease suffix already stripped (a v0.1.0-rc.1 tag packages as 0.1.0 with
+# prerelease suffix already stripped (a v0.1.0-rc5 tag packages as 0.1.0 with
 # AllowSameVersionUpgrades covering the later final install).
 #
-# Usage: packaging/windows/build-msi.sh STAGE_DIR NUMERIC_VERSION MSI_ARCH OUTPUT_MSI
+# Usage: packaging/windows/build-msi.sh STAGE_DIR NUMERIC_VERSION MSI_ARCH OUTPUT_MSI [FULL_VERSION]
 set -euo pipefail
 
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$script_dir/../.." && pwd)
 
-if [[ $# -ne 4 ]]; then
-    echo "usage: $0 STAGE_DIR NUMERIC_VERSION MSI_ARCH OUTPUT_MSI" >&2
+if [[ $# -ne 4 && $# -ne 5 ]]; then
+    echo "usage: $0 STAGE_DIR NUMERIC_VERSION MSI_ARCH OUTPUT_MSI [FULL_VERSION]" >&2
     exit 2
 fi
 stage=$1
 version=$2
 msi_arch=$3
 output=$4
+# The full Cargo version (prerelease suffix included, e.g. 0.1.0-rc5) rides in
+# the MSI summary metadata, the ARP comments, and the installed
+# Software\TaskForest\Version registry value; ProductVersion itself stays
+# numeric because Windows Installer rejects anything else.
+full_version=${5:-$version}
 icon_path=$(cygpath -w "$script_dir/taskmanager.ico" 2>/dev/null \
     || printf '%s' "$script_dir/taskmanager.ico")
 
@@ -54,6 +59,7 @@ wix build -acceptEula wix7 -arch "$msi_arch" \
     -d "StageDir=$(cygpath -w "$stage" 2>/dev/null || printf '%s' "$stage")" \
     -d "IconPath=$icon_path" \
     -d "ProductVersion=$version" \
+    -d "FullVersion=$full_version" \
     -bindvariable "WixUILicenseRtf=$(cygpath -w "$script_dir/license.rtf" 2>/dev/null || printf '%s' "$script_dir/license.rtf")" \
     -ext WixToolset.UI.wixext/7.0.0 \
     -o "$output" \

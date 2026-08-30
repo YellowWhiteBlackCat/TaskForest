@@ -9,9 +9,11 @@
 //! `unsafe impl GlobalAlloc`. The `taskmanager-tui` library forbids unsafe
 //! crate-wide, and every `tests/gui/*.rs` file is compiled INSIDE that
 //! library through `#[cfg(test)] #[path = ...]` module registration, so the
-//! allocator cannot live there. This file is its own test crate: the unsafe
-//! counting allocator is confined to this test binary, links only the
-//! library's public API, and never ships.
+//! allocator cannot live there. This file is its own test crate (declared as
+//! an explicit `[[test]]` target so it can live under `tests/headless/`
+//! while staying outside the library's module tree): the unsafe counting
+//! allocator is confined to this test binary, links only the library's
+//! public API, and never ships.
 //!
 //! Measurement protocol (identical for every budget below): build the app and
 //! render one warm-up frame (first-paint costs — shell filter/sort memo,

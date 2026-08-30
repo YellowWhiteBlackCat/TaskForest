@@ -25,11 +25,15 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::process_category_projection::{
     category_buckets, category_expansion_key,
 };
+use taskmanager_core::core::process::aggregate::AggregateMetric;
+use taskmanager_core::core::process::group_aggregate::aggregate_process_group_typed;
 use taskmanager_core::core::process::{
-    ProcessCategory, ProcessItem, build_process_tree, flatten_tree_visible, process_category,
+    ProcessCategory, ProcessItem, ProcessLiveKey, application_group_name, build_process_tree,
+    flatten_tree_visible, process_category,
 };
 
 use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
 
 use crate::app::{FrontendTrack, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
@@ -42,8 +46,8 @@ use crate::window::{Role, TextRole, WindowPalette};
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ProcessTreeExpansion {
     expanded_categories: HashSet<String>,
-    expanded_applications: HashSet<u32>,
-    collapsed_processes: HashSet<u32>,
+    expanded_applications: HashSet<ProcessLiveKey>,
+    collapsed_processes: HashSet<ProcessLiveKey>,
 }
 
 impl ProcessTreeExpansion {
@@ -62,44 +66,48 @@ impl ProcessTreeExpansion {
     }
 
     #[must_use]
-    pub(crate) fn application_expanded(&self, root_pid: u32) -> bool {
-        self.expanded_applications.contains(&root_pid)
+    pub(crate) fn application_expanded(&self, root: ProcessLiveKey) -> bool {
+        self.expanded_applications.contains(&root)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn toggle_application(&mut self, root_pid: u32) {
-        if !self.expanded_applications.insert(root_pid) {
-            self.expanded_applications.remove(&root_pid);
+    pub(crate) fn toggle_application(&mut self, root: ProcessLiveKey) {
+        if !self.expanded_applications.insert(root) {
+            self.expanded_applications.remove(&root);
         }
     }
 
     #[must_use]
     #[allow(dead_code)]
-    pub(crate) fn process_collapsed(&self, pid: u32) -> bool {
-        self.collapsed_processes.contains(&pid)
+    pub(crate) fn process_collapsed(&self, identity: ProcessLiveKey) -> bool {
+        self.collapsed_processes.contains(&identity)
     }
 
     #[allow(dead_code)]
-    pub(crate) fn toggle_process(&mut self, pid: u32) {
-        if !self.collapsed_processes.insert(pid) {
-            self.collapsed_processes.remove(&pid);
+    pub(crate) fn toggle_process(&mut self, identity: ProcessLiveKey) {
+        if !self.collapsed_processes.insert(identity) {
+            self.collapsed_processes.remove(&identity);
         }
     }
 
-    fn collapsed_set(&self) -> &HashSet<u32> {
+    fn collapsed_set(&self) -> &HashSet<ProcessLiveKey> {
         &self.collapsed_processes
     }
 }
 
 /// One row in the tree projection. Category and application rows have no
 /// process reference; only a real process row carries an item, so a visual
-/// aggregate can never be mistaken for an executable target.
+/// aggregate can never be mistaken for an executable target. Aggregate
+/// headers carry typed cpu/memory metrics whose availability survives to the
+/// renderer — a missing value stays missing instead of reading as zero.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct ProcessTreeRow<'a> {
     pub(crate) key: ProcessRowId,
     pub(crate) depth: usize,
     pub(crate) label: String,
     pub(crate) member_count: usize,
+    pub(crate) cpu: Option<AggregateMetric<f32>>,
+    pub(crate) memory: Option<AggregateMetric<u64>>,
     pub(crate) has_children: bool,
     pub(crate) expanded: bool,
     pub(crate) item: Option<&'a ProcessItem>,
@@ -110,11 +118,13 @@ pub(crate) struct ProcessTreeRow<'a> {
 /// Category order and classification come from the application layer. Empty
 /// buckets are omitted; unavailable application identity remains in the
 /// explicit Uncategorized bucket. The caller owns the input snapshot, while
-/// rows borrow it without cloning every process.
+/// rows borrow it without cloning every process. `observed_at_ms` is the
+/// accepted process snapshot timestamp behind `items`.
 #[must_use]
 pub(crate) fn project_items<'a>(
     items: &'a [ProcessItem],
     expansion: &ProcessTreeExpansion,
+    observed_at_ms: u64,
 ) -> Vec<ProcessTreeRow<'a>> {
     let buckets = category_buckets(items, process_category);
     let mut rows = Vec::new();
@@ -131,12 +141,18 @@ pub(crate) fn project_items<'a>(
             .iter()
             .filter(|item| process_category(item) == category)
             .collect();
+        let bucket = buckets
+            .iter()
+            .find(|bucket| bucket.category() == category)
+            .expect("bucket exists for its own category");
         let category_expanded = expansion.category_expanded(category);
         rows.push(ProcessTreeRow {
             key: ProcessRowId::Category(category),
             depth: 0,
             label: category_label(category),
             member_count,
+            cpu: bucket.aggregate_process_cpu(observed_at_ms),
+            memory: bucket.aggregate_process_memory_for_display(observed_at_ms),
             has_children: true,
             expanded: category_expanded,
             item: None,
@@ -148,18 +164,21 @@ pub(crate) fn project_items<'a>(
         let roots = build_process_tree(&members);
         if category == ProcessCategory::Application {
             for root in roots {
-                let application_expanded = expansion.application_expanded(root.item.pid);
+                let Some(root_identity) = ProcessLiveKey::from_process(root.item) else {
+                    continue;
+                };
+                let application_expanded = expansion.application_expanded(root_identity);
+                let mut tree_members = Vec::new();
+                collect_tree_members(&root, &mut tree_members);
+                let group = aggregate_process_group_typed(
+                    application_group_name(root.item),
+                    Some(root_identity),
+                    root.item.current_application_identity().cloned(),
+                    &tree_members,
+                    observed_at_ms,
+                );
                 rows.push(ProcessTreeRow {
-                    key: root
-                        .item
-                        .current_start_token()
-                        .and_then(|token| {
-                            taskmanager_shell::ProcessRowIdentity::from_parts(root.item.pid, token)
-                        })
-                        .map(ProcessRowId::Application)
-                        .unwrap_or(ProcessRowId::Category(
-                            taskmanager_core::core::process::ProcessCategory::Application,
-                        )),
+                    key: ProcessRowId::Application(root_identity),
                     depth: 1,
                     label: root
                         .item
@@ -167,6 +186,8 @@ pub(crate) fn project_items<'a>(
                         .unwrap_or(root.item.name.as_str())
                         .to_owned(),
                     member_count: tree_size(&root),
+                    cpu: group.as_ref().map(|group| group.cpu().clone()),
+                    memory: group.as_ref().map(|group| group.memory().clone()),
                     has_children: !root.children.is_empty(),
                     expanded: application_expanded,
                     item: None,
@@ -188,21 +209,34 @@ pub(crate) fn project_items<'a>(
 fn push_process_rows<'a>(
     root: &taskmanager_core::core::process::ProcessNode<'a>,
     depth_offset: usize,
-    collapsed: &HashSet<u32>,
+    collapsed: &HashSet<ProcessLiveKey>,
     rows: &mut Vec<ProcessTreeRow<'a>>,
 ) {
     for flat in flatten_tree_visible(std::slice::from_ref(root), collapsed) {
+        let Some(identity) = ProcessLiveKey::from_process(flat.item) else {
+            continue;
+        };
         rows.push(ProcessTreeRow {
-            key: ProcessRowId::from_process(flat.item).unwrap_or(ProcessRowId::Category(
-                taskmanager_core::core::process::ProcessCategory::Uncategorized,
-            )),
+            key: ProcessRowId::Process(identity),
             depth: depth_offset + flat.depth,
             label: flat.item.name.clone(),
             member_count: 1,
+            cpu: None,
+            memory: None,
             has_children: flat.has_children,
-            expanded: !collapsed.contains(&flat.item.pid),
+            expanded: !collapsed.contains(&identity),
             item: Some(flat.item),
         });
+    }
+}
+
+fn collect_tree_members<'a>(
+    node: &taskmanager_core::core::process::ProcessNode<'a>,
+    members: &mut Vec<&'a ProcessItem>,
+) {
+    members.push(node.item);
+    for child in &node.children {
+        collect_tree_members(child, members);
     }
 }
 
@@ -221,11 +255,18 @@ fn category_label(category: ProcessCategory) -> String {
 /// Minimal themed row scene. The full page will add selection and observer
 /// components when this projection is mounted into the route.
 pub(crate) fn row_scene(row: &ProcessTreeRow<'_>, palette: &UiPalette) -> impl Scene + use<> {
-    let label = if row.member_count > 1 || row.item.is_none() {
+    let mut label = if row.member_count > 1 || row.item.is_none() {
         format!("{} · {}", row.label, row.member_count)
     } else {
         row.label.clone()
     };
+    if let (Some(cpu), Some(memory)) = (&row.cpu, &row.memory) {
+        label.push_str(&format!(
+            " · {} · {}",
+            metric_text(cpu.current_value().map(|value| format!("{value:.1}%"))),
+            metric_text(memory.current_value().map(|value| bytes(*value))),
+        ));
+    }
     let left_padding = space_8() * (row.depth as f32 + 1.0);
     let semantic = SemanticAddress(stable_semantic_address(
         "process-tree",
@@ -246,12 +287,14 @@ pub(crate) fn row_scene(row: &ProcessTreeRow<'_>, palette: &UiPalette) -> impl S
     }
 }
 
+/// Format one aggregate cell. A missing current value renders the shared
+/// unavailable-value dash, never a fabricated zero.
+fn metric_text(value: Option<String>) -> String {
+    value.unwrap_or_else(|| MISSING_VALUE.to_owned())
+}
+
 fn semantic_key(key: ProcessRowId) -> String {
-    match key {
-        ProcessRowId::Category(category) => format!("category:{category:?}"),
-        ProcessRowId::Application(identity) => format!("application:{}", identity.pid()),
-        ProcessRowId::Process(identity) => format!("process:{}", identity.pid()),
-    }
+    key.stable_key()
 }
 
 /// Compact tree strip mounted above the existing Applications table. The
@@ -260,8 +303,9 @@ fn semantic_key(key: ProcessRowId) -> String {
 /// and the typed control/input anchors part of the formal route.
 pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
     let items = context.shell.projection().processes_slice();
+    let observed_at_ms = context.shell.projection().processes_observed_at_ms;
     let expansion = ProcessTreeExpansion::default();
-    let rows = project_items(items, &expansion);
+    let rows = project_items(items, &expansion, observed_at_ms);
     let row_scenes: Vec<Box<dyn Scene>> = rows
         .iter()
         .map(|row| Box::new(row_scene(row, context.palette)) as Box<dyn Scene>)
@@ -347,8 +391,9 @@ fn refresh_tree_on_fold(
     mut commands: Commands,
 ) {
     let items = track.shell().projection().processes_slice();
+    let observed_at_ms = track.shell().projection().processes_observed_at_ms;
     let expansion = ProcessTreeExpansion::default();
-    let rows = project_items(items, &expansion);
+    let rows = project_items(items, &expansion, observed_at_ms);
     for (root, children) in roots.iter() {
         let stale: Vec<Entity> = children.iter().copied().collect();
         for entity in stale {
@@ -376,8 +421,10 @@ fn on_end_tree_activated(
     let Some(process) = shell.visible_process_at(shell.selected) else {
         return;
     };
-    let pid = process.pid;
-    let _ = shell.request_process_tree_end(pid);
+    let Some(identity) = ProcessLiveKey::from_process(process) else {
+        return;
+    };
+    shell.request_process_tree_end(identity);
     let view = shell
         .pending_confirmation()
         .and_then(crate::confirmation::PendingConfirmationView::from_pending);

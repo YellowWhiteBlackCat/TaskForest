@@ -260,13 +260,13 @@ fn apply_app_action(
                 view.request_process_batch(
                     taskmanager_core::core::process::ProcessBatchAction::End,
                 );
-            } else if let Some(pid) = view.selected_pid() {
-                view.request_process_termination(ProcessTerminationAction::EndTask, pid);
+            } else if let Some(identity) = view.selected_process_identity() {
+                view.request_process_termination(ProcessTerminationAction::EndTask, identity);
             }
         }
         AppAction::OpenProperties => {
-            if let Some(pid) = view.selected_pid() {
-                view.open_process_details(pid, ProcessDetailsSection::Overview);
+            if let Some(identity) = view.selected_process_identity() {
+                view.open_process_details(identity, ProcessDetailsSection::Overview);
             }
         }
         AppAction::OpenSystemAbout => view.show_system_about(),

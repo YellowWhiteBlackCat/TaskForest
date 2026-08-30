@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use super::*;
 use iced::Element;
+use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::metrics::{DiskMetrics, DiskPartition, SystemSnapshot};
 
 use taskmanager_shell::presentation::{
@@ -463,20 +464,18 @@ pub(crate) fn partition_panel<'a>(
 
 /// One mounted partition's identity row + usage row + 6px family bar (GPUI
 /// `partition_row` parity).
-fn partition_row<'a>(
-    partition: &taskmanager_core::core::metrics::DiskPartition,
-    observed: &super::projection::PartitionObservation,
-    theme_snapshot: &'a taskmanager_theme::Theme,
+#[must_use]
+pub(crate) fn partition_usage_text(
+    used_bytes: Option<u64>,
+    capacity_bytes: Option<u64>,
+    free_bytes: Option<u64>,
+    status: DeviceStatus,
     units: UnitPrefs,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let label = partition_label(partition);
-    // Usage text: "used / total · free · pct"; unavailable facts name the
-    // reason instead of an empty bar with numbers that do not exist.
-    let usage = match (observed.used_bytes, observed.capacity_bytes) {
-        (Some(used), Some(total)) if total > 0 => {
+) -> (String, Option<f32>) {
+    match (used_bytes, capacity_bytes, free_bytes) {
+        (Some(used), Some(total), Some(free)) if total > 0 => {
             let used = used.min(total);
             let ratio = (used as f32 / total as f32).clamp(0.0, 1.0);
-            let free = observed.free_bytes.unwrap_or(0);
             (
                 format!(
                     "{} / {} · {} {} · {:.0}%",
@@ -490,16 +489,32 @@ fn partition_row<'a>(
             )
         }
         _ => (
-            if partition.device_state.status
-                == taskmanager_core::core::device_state::DeviceStatus::Healthy
-            {
+            if status == DeviceStatus::Healthy {
                 t("disk.usage_unavailable").to_string()
             } else {
-                t(device_status_i18n_key(partition.device_state.status)).to_string()
+                t(device_status_i18n_key(status)).to_string()
             },
             None,
         ),
-    };
+    }
+}
+
+fn partition_row<'a>(
+    partition: &taskmanager_core::core::metrics::DiskPartition,
+    observed: &super::projection::PartitionObservation,
+    theme_snapshot: &'a taskmanager_theme::Theme,
+    units: UnitPrefs,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let label = partition_label(partition);
+    // Usage text: "used / total · free · pct"; unavailable facts name the
+    // reason instead of an empty bar with numbers that do not exist.
+    let usage = partition_usage_text(
+        observed.used_bytes,
+        observed.capacity_bytes,
+        observed.free_bytes,
+        partition.device_state.status,
+        units,
+    );
 
     // 6px family-colored progress bar (FillPortion siblings keep the measured
     // fraction visible on Iced).

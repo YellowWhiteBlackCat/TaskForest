@@ -5,7 +5,6 @@
 //! intel, nvidia) through the GPU provider registry.
 
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 #[cfg(any(test, feature = "test-support"))]
 use std::{collections::HashMap, time::Instant};
@@ -25,6 +24,7 @@ mod intel;
 mod nvidia;
 mod parsing;
 mod provider;
+use super::pci_ids::{parse_pci_id, read_pci_marketing_name};
 use amd::probe_amdgpu_device;
 #[cfg(any(test, feature = "test-support"))]
 #[cfg_attr(feature = "test-support", allow(unused_imports))]
@@ -45,8 +45,8 @@ use nvidia::collect_nvidia_nvml;
 #[cfg(any(test, feature = "nvidia"))]
 pub(crate) use parsing::normalize_pci_slot;
 use parsing::{
-    compose_intel_brand, marketing_name_from_pci_label, parse_busy_percent, parse_driver_name,
-    parse_pci_id, pci_ids_device_name,
+    compose_intel_brand, parse_busy_percent, parse_driver_name, parse_module_version,
+    parse_nvrm_driver_version,
 };
 pub(crate) use provider::GpuProviderRegistry;
 #[cfg(any(test, feature = "test-support"))]
@@ -82,6 +82,19 @@ fn read_driver_name(device_path: &Path) -> Option<String> {
         .and_then(|p| parse_driver_name(&p.to_string_lossy()))
 }
 
+/// Read the release a kernel module declares about itself through
+/// `<module_root>/<driver>/version`. The node only exists for modules that set
+/// a module version: the out-of-tree `nvidia` module carries one, while the
+/// in-tree DRM drivers (`xe`, `i915`, `amdgpu`, `nouveau`, `radeon`) ship with
+/// the kernel and expose no independent version — for those this returns
+/// `None` (an honest absence, never the kernel release misfiled as a driver
+/// version).
+fn read_kernel_module_version(module_root: &Path, driver: &str) -> Option<String> {
+    fs::read_to_string(module_root.join(driver).join("version"))
+        .ok()
+        .and_then(|raw| parse_module_version(&raw))
+}
+
 /// Scans DRM devices (under `drm_base`) plus NVIDIA procfs (`nvidia_base`) to
 /// detect GPU metrics without consulting the live host. STATELESS (no per-tick
 /// rate): on Intel i915/xe
@@ -92,10 +105,18 @@ fn read_driver_name(device_path: &Path) -> Option<String> {
 /// `detect_gpu_metrics_with_rc6_from_paths`. NVML is deliberately applied only
 /// by the live entry point so fixture results never depend on host hardware.
 #[cfg(any(test, feature = "test-support"))]
-pub fn detect_gpu_metrics_from_paths(drm_base: &Path, nvidia_base: &Path) -> Vec<GpuMetrics> {
+pub fn detect_gpu_metrics_from_paths(
+    drm_base: &Path,
+    nvidia_base: &Path,
+    module_base: &Path,
+) -> Vec<GpuMetrics> {
     let mut gpus = Vec::new();
     for (card_name, device_path) in scan_drm_cards(drm_base) {
-        gpus.push(build_drm_card_metrics(&card_name, &device_path));
+        gpus.push(build_drm_card_metrics(
+            &card_name,
+            &device_path,
+            module_base,
+        ));
     }
     append_nvidia_procfs(nvidia_base, &mut gpus);
     gpus
@@ -106,12 +127,13 @@ pub fn detect_gpu_metrics_from_paths(drm_base: &Path, nvidia_base: &Path) -> Vec
 pub fn detect_gpu_metrics_with_rc6_from_paths(
     drm_base: &Path,
     nvidia_base: &Path,
+    module_base: &Path,
     prev_rc6: &mut HashMap<String, (u64, Instant)>,
     now: Instant,
 ) -> Vec<GpuMetrics> {
     let mut gpus = Vec::new();
     for (card_name, device_path) in scan_drm_cards(drm_base) {
-        let mut m = build_drm_card_metrics(&card_name, &device_path);
+        let mut m = build_drm_card_metrics(&card_name, &device_path, module_base);
         // Intel i915/xe: derive real usage from RC6 idle residency. amdgpu's
         // `gpu_busy_percent` (read above) and NVIDIA NVML are left as-is. The
         // guard matches every composed Intel brand ("Intel", "Intel Graphics",
@@ -168,8 +190,8 @@ fn scan_drm_cards(drm_base: &Path) -> Vec<(String, PathBuf)> {
 /// Compose the generic DRM identity with runtime-selected enrichments for the
 /// path-injected parser API. The live collector uses separate providers.
 #[cfg(any(test, feature = "test-support"))]
-fn build_drm_card_metrics(card_name: &str, device_path: &Path) -> GpuMetrics {
-    let mut metric = build_drm_identity_metrics(card_name, device_path);
+fn build_drm_card_metrics(card_name: &str, device_path: &Path, module_root: &Path) -> GpuMetrics {
+    let mut metric = build_drm_identity_metrics(card_name, device_path, module_root);
     let mut observations = *metric.scalar_observations();
     let mut throttle_observation = metric.throttle_observation().clone();
     if let Some(sample) = probe_amdgpu_device(card_name, device_path).sample {
@@ -198,10 +220,18 @@ fn build_drm_card_metrics(card_name: &str, device_path: &Path) -> GpuMetrics {
     metric
 }
 
-/// Generic DRM inventory fact: stable PCI/card identity, vendor label and
-/// bound kernel driver. It deliberately performs no vendor telemetry reads.
-fn build_drm_identity_metrics(_card_name: &str, device_path: &Path) -> GpuMetrics {
+/// Generic DRM inventory fact: stable PCI/card identity, vendor label, bound
+/// kernel driver and — only when the bound module itself declares one — the
+/// kernel driver version. It deliberately performs no vendor telemetry reads.
+fn build_drm_identity_metrics(
+    _card_name: &str,
+    device_path: &Path,
+    module_root: &Path,
+) -> GpuMetrics {
     let driver = read_driver_name(device_path);
+    let driver_version = driver
+        .as_deref()
+        .and_then(|name| read_kernel_module_version(module_root, name));
     let pci_slot = read_pci_slot_name(device_path);
     let pci_vendor_id = read_pci_id(device_path, "vendor");
     let pci_device_id = read_pci_id(device_path, "device");
@@ -238,6 +268,7 @@ fn build_drm_identity_metrics(_card_name: &str, device_path: &Path) -> GpuMetric
     metrics.pci_slot = pci_slot;
     metrics.pci_modalias = pci_modalias;
     metrics.driver = driver;
+    metrics.driver_version = driver_version;
     metrics
 }
 
@@ -328,6 +359,9 @@ fn apply_gpu_metric_field(
         }
         GpuMetricField::Throttle => throttle_observation.clone_from(sample.throttle_observation()),
         GpuMetricField::Driver => target.driver.clone_from(&sample.driver),
+        GpuMetricField::DriverVersion => {
+            target.driver_version.clone_from(&sample.driver_version);
+        }
     }
 }
 
@@ -344,37 +378,6 @@ fn read_pci_slot_name(device_path: &Path) -> Option<String> {
 fn read_pci_id(device_path: &Path, file: &str) -> Option<u16> {
     let raw = read_sysfs_string(&device_path.join(file).to_string_lossy())?;
     parse_pci_id(&raw)
-}
-
-fn read_pci_marketing_name(vendor: u16, device: u16) -> Option<String> {
-    const MAX_PCI_IDS_BYTES: usize = 8 * 1024 * 1024;
-    for path in [
-        Path::new("/usr/share/hwdata/pci.ids"),
-        Path::new("/usr/share/misc/pci.ids"),
-        Path::new("/usr/share/pci.ids"),
-    ] {
-        let Ok(file) = fs::File::open(path) else {
-            continue;
-        };
-        let mut bytes = Vec::new();
-        if file
-            .take(MAX_PCI_IDS_BYTES as u64 + 1)
-            .read_to_end(&mut bytes)
-            .is_err()
-            || bytes.len() > MAX_PCI_IDS_BYTES
-        {
-            continue;
-        }
-        let Ok(text) = String::from_utf8(bytes) else {
-            continue;
-        };
-        if let Some(label) = pci_ids_device_name(&text, vendor, device)
-            .and_then(|label| marketing_name_from_pci_label(&label))
-        {
-            return Some(label);
-        }
-    }
-    None
 }
 
 #[cfg(test)]

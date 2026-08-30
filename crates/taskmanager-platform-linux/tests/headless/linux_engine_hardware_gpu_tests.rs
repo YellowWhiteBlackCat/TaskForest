@@ -7,37 +7,11 @@ fn provider_pci_identity_normalizes_to_linux_sysfs_shape() {
         Some("0000:01:00.0".to_string())
     );
     assert_eq!(
-        normalize_pci_slot("0000:AF:1F.7"),
+        normalize_pci_slot("00000000:AF:1F.7"),
         Some("0000:af:1f.7".to_string())
     );
     assert_eq!(normalize_pci_slot("not-a-pci-id"), None);
     assert_eq!(normalize_pci_slot("0000:01:20.0"), None);
-}
-
-#[test]
-fn pci_ids_resolution_keeps_vendor_scope_and_extracts_marketing_sku() {
-    let ids = "\
-8086  Intel Corporation
-\tB080  Panther Lake [Arc B390]
-\tB081  Panther Lake [Arc B370]
-\t\t0000  Reference subsystem
-10DE  NVIDIA Corporation
-\tB080  Unrelated vendor device
-";
-
-    assert_eq!(
-        pci_ids_device_name(ids, 0x8086, 0xB080).as_deref(),
-        Some("Panther Lake [Arc B390]")
-    );
-    assert_eq!(
-        marketing_name_from_pci_label("Panther Lake [Arc B390]").as_deref(),
-        Some("Arc B390")
-    );
-    assert_eq!(
-        pci_ids_device_name(ids, 0x10DE, 0xB080).as_deref(),
-        Some("Unrelated vendor device")
-    );
-    assert_eq!(pci_ids_device_name(ids, 0x8086, 0x1234), None);
 }
 
 #[test]
@@ -105,6 +79,7 @@ fn nvml_sample_enriches_matching_pci_device_without_duplicate() {
         usage_pct: 7.0,
     }];
     enriched.driver = Some("nvidia".into());
+    enriched.driver_version = Some("566.36".into());
     enriched.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(42.0, 100),
         memory_used_bytes: ScalarObservation::available(4, 100),
@@ -131,6 +106,7 @@ fn nvml_sample_enriches_matching_pci_device_without_duplicate() {
                 GpuMetricField::Frequency,
                 GpuMetricField::Engines,
                 GpuMetricField::Driver,
+                GpuMetricField::DriverVersion,
             ],
             field_failures: Vec::new(),
         }],
@@ -145,6 +121,9 @@ fn nvml_sample_enriches_matching_pci_device_without_duplicate() {
     assert_eq!(gpus[0].current_max_frequency_mhz(), Some(2_700));
     assert_eq!(gpus[0].engines.len(), 1);
     assert_eq!(gpus[0].engines[0].kind, GpuEngineKind::VideoEncode);
+    // The driver name and its version merge as separate typed fields.
+    assert_eq!(gpus[0].driver.as_deref(), Some("nvidia"));
+    assert_eq!(gpus[0].driver_version.as_deref(), Some("566.36"));
 }
 
 /// `parse_busy_percent` is the one pure-parsing helper introduced for the
@@ -327,7 +306,8 @@ fn detect_amdgpu_like_card_populates_split_and_engines() {
     // with "card" and contains no "-". The intermediate `card0/device`
     // path is what detect scans, so card0 itself just has to exist.
     let nvidia = crate::test_support::repo_temp_dir().join("does_not_exist_in_this_test");
-    let gpus = detect_gpu_metrics_from_paths(&drm, &nvidia);
+    let modules = crate::test_support::repo_temp_dir().join("does_not_exist_in_this_test");
+    let gpus = detect_gpu_metrics_from_paths(&drm, &nvidia, &modules);
     assert_eq!(gpus.len(), 1, "got {gpus:?}");
     let g = &gpus[0];
     assert_eq!(g.brand, "AMD");
@@ -383,7 +363,8 @@ fn detect_intel_xe_like_card_has_zero_vram_and_no_engines() {
     // No gpu_busy_percent, no mem_info_*, no *_busy_percent — exactly this host.
 
     let nvidia = crate::test_support::repo_temp_dir().join("does_not_exist_in_this_test");
-    let gpus = detect_gpu_metrics_from_paths(&drm, &nvidia);
+    let modules = crate::test_support::repo_temp_dir().join("does_not_exist_in_this_test");
+    let gpus = detect_gpu_metrics_from_paths(&drm, &nvidia, &modules);
     assert_eq!(gpus.len(), 1, "got {gpus:?}");
     let g = &gpus[0];
     // No `driver` symlink in this synthetic tree → None; the brand composer
@@ -438,12 +419,13 @@ fn detect_intel_rc6_derives_usage_from_residency_delta() {
     std::fs::write(freq.join("act_freq"), "1300\n").unwrap();
 
     let nvidia = crate::test_support::repo_temp_dir().join("does_not_exist_in_this_test");
+    let modules = crate::test_support::repo_temp_dir().join("does_not_exist_in_this_test");
     let mut prev: std::collections::HashMap<String, (u64, std::time::Instant)> =
         std::collections::HashMap::new();
 
     // Tick 1: no prev entry → usage unchanged (0.0 for xe).
     let t0 = std::time::Instant::now();
-    let g1 = detect_gpu_metrics_with_rc6_from_paths(&drm, &nvidia, &mut prev, t0);
+    let g1 = detect_gpu_metrics_with_rc6_from_paths(&drm, &nvidia, &modules, &mut prev, t0);
     assert_eq!(g1.len(), 1);
     assert_eq!(g1[0].brand, "Intel Graphics");
     assert_eq!(g1[0].current_utilization_pct(), None);
@@ -459,7 +441,7 @@ fn detect_intel_rc6_derives_usage_from_residency_delta() {
     // Tick 2: simulate +100 ms RC6 residency over +1 s → RC6 = 10% → 90% busy.
     std::fs::write(gtidle.join("idle_residency_ms"), "100\n").unwrap();
     let t1 = t0 + std::time::Duration::from_secs(1);
-    let g2 = detect_gpu_metrics_with_rc6_from_paths(&drm, &nvidia, &mut prev, t1);
+    let g2 = detect_gpu_metrics_with_rc6_from_paths(&drm, &nvidia, &modules, &mut prev, t1);
     assert_eq!(g2.len(), 1);
     assert!(
         (g2[0].current_utilization_pct().unwrap_or_default() - 90.0).abs() < 0.5,
@@ -476,7 +458,7 @@ fn detect_intel_rc6_derives_usage_from_residency_delta() {
     // Tick 3: 100% idle over the next second (full RC6) → 0% usage.
     std::fs::write(gtidle.join("idle_residency_ms"), "1100\n").unwrap();
     let t2 = t1 + std::time::Duration::from_secs(1);
-    let g3 = detect_gpu_metrics_with_rc6_from_paths(&drm, &nvidia, &mut prev, t2);
+    let g3 = detect_gpu_metrics_with_rc6_from_paths(&drm, &nvidia, &modules, &mut prev, t2);
     assert!(
         g3[0]
             .current_utilization_pct()
@@ -622,10 +604,192 @@ fn detect_intel_xe_card_uses_driver_for_brand() {
     std::os::unix::fs::symlink(&fake_drv, card.join("driver")).unwrap();
 
     let nvidia = crate::test_support::repo_temp_dir().join("does_not_exist_in_this_test");
-    let gpus = detect_gpu_metrics_from_paths(&drm, &nvidia);
+    let modules = crate::test_support::repo_temp_dir().join("does_not_exist_in_this_test");
+    let gpus = detect_gpu_metrics_from_paths(&drm, &nvidia, &modules);
     assert_eq!(gpus.len(), 1);
     assert_eq!(gpus[0].brand, "Intel Xe Graphics");
     assert_eq!(gpus[0].driver.as_deref(), Some("xe"));
 
     std::fs::remove_dir_all(&drm).ok();
+}
+
+/// A driver module that declares its own release (the out-of-tree `nvidia`
+/// module carries `/sys/module/nvidia/version`) fills `driver_version`, while
+/// an in-tree DRM driver (`radeon`, `nouveau`) ships with the kernel and
+/// exposes no module version — its absence must stay honest (`None`), never
+/// the kernel release misfiled as a driver version. Also proves the DRI driver
+/// name and vendor brand thread through for the nouveau/radeon gap families.
+#[cfg(unix)]
+#[test]
+fn module_declared_driver_version_fills_only_versioned_modules() {
+    let base = crate::test_support::repo_temp_dir().join(format!(
+        "tm_drm_modver_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let drm = base.join("drm");
+    let modules = base.join("module");
+
+    // card0: NVIDIA vendor with the versioned out-of-tree `nvidia` module.
+    let nvidia_card = drm.join("card0").join("device");
+    std::fs::create_dir_all(&nvidia_card).unwrap();
+    std::fs::write(nvidia_card.join("vendor"), "0x10de\n").unwrap();
+    std::fs::write(nvidia_card.join("uevent"), "PCI_SLOT_NAME=0000:01:00.0\n").unwrap();
+    let nvidia_module_dir = modules.join("nvidia");
+    std::fs::create_dir_all(&nvidia_module_dir).unwrap();
+    std::fs::write(nvidia_module_dir.join("version"), "550.90.07\n").unwrap();
+    // The `driver` symlink's basename names the kernel driver, so the fixture
+    // link points at a directory ending in `nvidia`.
+    std::os::unix::fs::symlink(&nvidia_module_dir, nvidia_card.join("driver")).unwrap();
+
+    // card1/card2: AMD and NVIDIA boards bound to the in-tree `radeon` /
+    // `nouveau` drivers, which declare no module version of their own.
+    for (card, vendor, driver, slot) in [
+        ("card1", "0x1002\n", "radeon", "0000:02:00.0\n"),
+        ("card2", "0x10de\n", "nouveau", "0000:03:00.0\n"),
+    ] {
+        let device = drm.join(card).join("device");
+        std::fs::create_dir_all(&device).unwrap();
+        std::fs::write(device.join("vendor"), vendor).unwrap();
+        std::fs::write(device.join("uevent"), format!("PCI_SLOT_NAME={slot}")).unwrap();
+        let driver_dir = base.join("drivers").join(driver);
+        std::fs::create_dir_all(&driver_dir).unwrap();
+        std::os::unix::fs::symlink(&driver_dir, device.join("driver")).unwrap();
+    }
+
+    let nvidia = crate::test_support::repo_temp_dir().join("does_not_exist_in_this_test");
+    let gpus = detect_gpu_metrics_from_paths(&drm, &nvidia, &modules);
+    assert_eq!(gpus.len(), 3, "got {gpus:?}");
+    let by_driver: std::collections::HashMap<&str, &GpuMetrics> = gpus
+        .iter()
+        .map(|gpu| (gpu.driver.as_deref().unwrap_or_default(), gpu))
+        .collect();
+
+    let nvidia_gpu = by_driver["nvidia"];
+    assert_eq!(nvidia_gpu.brand, "NVIDIA");
+    assert_eq!(nvidia_gpu.driver_version.as_deref(), Some("550.90.07"));
+    let radeon_gpu = by_driver["radeon"];
+    assert_eq!(radeon_gpu.brand, "AMD");
+    assert_eq!(
+        radeon_gpu.driver_version, None,
+        "in-tree radeon declares no module version"
+    );
+    let nouveau_gpu = by_driver["nouveau"];
+    assert_eq!(nouveau_gpu.brand, "NVIDIA");
+    assert_eq!(
+        nouveau_gpu.driver_version, None,
+        "in-tree nouveau declares no module version"
+    );
+
+    std::fs::remove_dir_all(&base).ok();
+}
+
+/// `/proc/driver/nvidia/version` is a system-wide procfs fact: the NVRM
+/// release it declares attaches to every board found under the procfs GPU
+/// tree, without NVML. A missing or unparseable file keeps the field absent.
+#[cfg(unix)]
+#[test]
+fn nvidia_procfs_nvrm_release_attaches_to_every_board() {
+    let root = crate::test_support::repo_temp_dir().join(format!(
+        "tm_nvidia_procfs_version_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    for slot in ["0000:01:00.0", "0000:02:00.0"] {
+        let directory = root.join("gpus").join(slot);
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join("information"), "Model: NVIDIA RTX\n").unwrap();
+    }
+    std::fs::write(
+        root.join("version"),
+        "NVRM version: NVIDIA UNIX x86_64 Kernel Module  550.107.02  Tue Oct 15 12:50:29 UTC 2024\n\
+         GCC version:  gcc version 14.2.1\n",
+    )
+    .unwrap();
+
+    let mut gpus = Vec::new();
+    append_nvidia_procfs(&root, &mut gpus);
+
+    assert_eq!(gpus.len(), 2, "got {gpus:?}");
+    assert!(
+        gpus.iter()
+            .all(|gpu| gpu.driver_version.as_deref() == Some("550.107.02"))
+    );
+
+    std::fs::remove_dir_all(root).ok();
+}
+
+/// `parse_module_version` reports the module's declared release verbatim from
+/// the first line and treats empty nodes as an honest absence.
+mod parse_module_version {
+    use super::super::parse_module_version;
+
+    #[test]
+    fn single_line_release_is_kept_verbatim() {
+        assert_eq!(
+            parse_module_version("550.90.07\n"),
+            Some("550.90.07".into())
+        );
+        assert_eq!(parse_module_version("  3.2.1  \n"), Some("3.2.1".into()));
+    }
+
+    #[test]
+    fn only_the_first_line_counts() {
+        assert_eq!(parse_module_version("1.2\nignored\n"), Some("1.2".into()));
+    }
+
+    #[test]
+    fn empty_or_blank_node_is_none() {
+        assert_eq!(parse_module_version(""), None);
+        assert_eq!(parse_module_version("   \n"), None);
+        assert_eq!(parse_module_version("\n"), None);
+    }
+}
+
+/// `parse_nvrm_driver_version` extracts the release token from the NVRM prose
+/// line and rejects files without one.
+mod parse_nvrm_driver_version {
+    use super::super::parse_nvrm_driver_version;
+
+    #[test]
+    fn release_token_is_extracted_from_prose() {
+        assert_eq!(
+            parse_nvrm_driver_version(
+                "NVRM version: NVIDIA UNIX x86_64 Kernel Module  550.107.02  Tue Oct 15 12:50:29 UTC 2024\n"
+            )
+            .as_deref(),
+            Some("550.107.02")
+        );
+        assert_eq!(
+            parse_nvrm_driver_version(
+                "NVRM version: NVIDIA UNIX Open Kernel Module for x86_64  565.57.01  Release Build  (root@builder)\n"
+            )
+            .as_deref(),
+            Some("565.57.01")
+        );
+    }
+
+    #[test]
+    fn sibling_lines_are_ignored() {
+        assert_eq!(
+            parse_nvrm_driver_version(
+                "Platform: x86_64\nNVRM version: NVIDIA UNIX x86_64 Kernel Module  470.94  Wed\nGCC version:  gcc\n"
+            )
+            .as_deref(),
+            Some("470.94")
+        );
+    }
+
+    #[test]
+    fn missing_or_versionless_text_is_none() {
+        assert_eq!(parse_nvrm_driver_version("GCC version: gcc 14.2.1\n"), None);
+        assert_eq!(parse_nvrm_driver_version("NVRM version: unloaded\n"), None);
+        assert_eq!(parse_nvrm_driver_version(""), None);
+    }
 }

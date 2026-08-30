@@ -52,7 +52,7 @@ impl WinGpuTelemetryProvider {
         let Ok(count) = nvml.device_count() else {
             return Err(ProviderFailure::TemporarilyUnavailable);
         };
-        let driver = nvml.sys_driver_version().ok();
+        let driver_version = nvml.sys_driver_version().ok();
         let mut gpus = Vec::new();
         let (bounded_count, mut identity_failure) = nvml_enumeration_bound(count);
         for index in 0..bounded_count {
@@ -83,15 +83,15 @@ impl WinGpuTelemetryProvider {
                 GpuMetrics::new("", device.name().unwrap_or_else(|_| "NVIDIA GPU".into()));
             row.device_generation = DeviceGeneration::INITIAL;
             row.device_state = DeviceState::healthy(observed_at_ms);
-            row.driver.clone_from(&driver);
+            row.driver_version = driver_version.clone();
             row.pci_vendor_id = Some((pci.pci_device_id & 0xffff) as u16);
             row.pci_device_id = Some((pci.pci_device_id >> 16) as u16);
             row.pci_slot = Some(pci.bus_id.clone());
             let mut observations = GpuScalarObservations::default();
             let mut provenance = Vec::new();
-            if row.driver.is_some() {
+            if row.driver_version.is_some() {
                 provenance.push(GpuMetricProvenance {
-                    field: GpuMetricField::Driver,
+                    field: GpuMetricField::DriverVersion,
                     provider: GPU_TELEMETRY_PROVIDER,
                 });
             }
@@ -233,10 +233,10 @@ impl WinGpuTelemetryProvider {
                 }
             }
 
-            if let Some(driver) = adapter.driver_version {
-                row.driver = Some(driver);
+            if let Some(version) = adapter.driver_version {
+                row.driver_version = Some(version);
                 provenance.push(GpuMetricProvenance {
-                    field: GpuMetricField::Driver,
+                    field: GpuMetricField::DriverVersion,
                     provider: GPU_TELEMETRY_PROVIDER,
                 });
             }
@@ -526,8 +526,8 @@ fn enrich_dxgi_row(target: &mut GpuMetrics, source: GpuMetrics) {
     if source.current_throttle_reasons().is_some() {
         target.apply_throttle_observation(source.throttle_observation().clone());
     }
-    if source.driver.is_some() {
-        target.driver = source.driver;
+    if source.driver_version.is_some() {
+        target.driver_version = source.driver_version;
     }
 
     for provenance in source.provenance {

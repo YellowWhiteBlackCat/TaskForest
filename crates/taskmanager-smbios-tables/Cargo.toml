@@ -1,0 +1,20 @@
+[package]
+name = "taskmanager-smbios-tables"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+authors = ["TaskForest"]
+license = "Apache-2.0"
+description = "Pure safe SMBIOS record parser — the one authority for Memory Device (type 17) decoding shared by the Linux adapter and the privileged SMBIOS helper (TaskForest, ADR-023)."
+publish = false
+
+# ONE authority for the SMBIOS Memory Device (type 17) record format. Pure,
+# safe Rust with ZERO dependencies so every consumer (the unprivileged Linux
+# adapter and the pkexec-escalated SMBIOS helper, ADR-023 / Boundary 2 of
+# docs/PERMISSION_MODEL.md) decodes the same bytes through the same rules.
+# The parser is total: a malformed record yields the fields that fit or None
+# at the entry point — never a panic, never a fabricated zero/success value.
+
+[lib]
+name = "taskmanager_smbios_tables"
+path = "src/lib.rs"

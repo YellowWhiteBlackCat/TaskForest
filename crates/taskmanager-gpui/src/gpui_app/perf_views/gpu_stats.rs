@@ -8,12 +8,12 @@
 use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::GpuMetrics;
 
-use crate::gpui_app::formatting::{DisplayUnits, UnitKind};
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::device_status_i18n_key;
 
-pub(super) fn gpu_stats(g: &GpuMetrics, units: DisplayUnits) -> Vec<StatRow> {
+pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> {
     let mut stats: Vec<StatRow> = vec![
         StatRow::text(
             i18n::t("device.status"),
@@ -94,6 +94,18 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: DisplayUnits) -> Vec<StatRow> {
     if let Some(d) = &g.driver {
         stats.push(StatRow::text(i18n::t("common.driver"), Some(d.clone())));
     }
+    // ── Driver version (registry DriverVersion / NVML sys version). ──
+    // Absent on drivers that expose no versioned release — omit the row.
+    if let Some(version) = g
+        .driver_version
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        stats.push(StatRow::text(
+            i18n::t("gpu.driver_version"),
+            Some(version.to_owned()),
+        ));
+    }
     // ── Temperature: absent sensor omits the row (no fabricated "— °C"). ──
     if let Some(value) = g.current_temperature_c() {
         stats.push(StatRow::text(
@@ -112,7 +124,7 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: DisplayUnits) -> Vec<StatRow> {
     {
         stats.push(StatRow::pair(
             i18n::t("gpu.dedicated_vram"),
-            Some(units.format_pair(used, total, UnitKind::Memory, false)),
+            Some(units.format_quantity_pair(used, total, QuantityFamily::Memory, false)),
         ));
     }
     if let (Some(used), Some(total)) = (
@@ -122,7 +134,7 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: DisplayUnits) -> Vec<StatRow> {
     {
         stats.push(StatRow::pair(
             i18n::t("gpu.shared_vram"),
-            Some(units.format_pair(used, total, UnitKind::Memory, false)),
+            Some(units.format_quantity_pair(used, total, QuantityFamily::Memory, false)),
         ));
     }
     // Total video memory: dedicated + shared. Windows fills the shared half
@@ -134,7 +146,7 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: DisplayUnits) -> Vec<StatRow> {
     ) {
         stats.push(StatRow::pair(
             i18n::t("gpu.vram"),
-            Some(units.format_pair(used, total, UnitKind::Memory, false)),
+            Some(units.format_quantity_pair(used, total, QuantityFamily::Memory, false)),
         ));
     }
     // ── Per-engine utilization (amdgpu graphics/compute/copy/decode/encode) ──

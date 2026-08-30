@@ -240,7 +240,6 @@ fn seed_service_log_fixture(shell: &mut taskmanager_shell::ShellApp) {
         return;
     };
     let service_id = service.id.clone();
-    drop(service);
     let _ = shell.open_service_log_for(service_id.clone());
     let lines: &[&str] = &[
         "Started Network Manager.",
@@ -448,7 +447,8 @@ fn demo_cpu_frame(seed: &CpuMetrics, timestamp_ms: u64, offset: u64) -> CpuMetri
     frame.temperature_source = seed.temperature_source;
     frame.physical_cores = seed.physical_cores;
     frame.logical_cores = seed.logical_cores;
-    frame.l1_cache_kb = seed.l1_cache_kb;
+    frame.l1d_cache_kb = seed.l1d_cache_kb;
+    frame.l1i_cache_kb = seed.l1i_cache_kb;
     frame.l2_cache_kb = seed.l2_cache_kb;
     frame.l3_cache_kb = seed.l3_cache_kb;
     frame.performance_policy = seed.performance_policy.clone();

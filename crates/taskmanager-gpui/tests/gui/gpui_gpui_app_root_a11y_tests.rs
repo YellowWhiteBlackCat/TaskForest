@@ -2,7 +2,7 @@ use super::build_snapshot;
 use crate::gpui_app::root::{ProcessDetailsSection, RootView, TopPage};
 use gpui::{AppContext, Entity, TestAppContext};
 use taskmanager_application::ProcessTerminationAction;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
 use taskmanager_core::core::{CpuScalarObservations, ScalarObservation};
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::{SemanticAction, SemanticNodeId, SemanticRole};
@@ -33,6 +33,17 @@ fn process(pid: u32, name: &str) -> ProcessItem {
         .build()
 }
 
+fn identity(pid: u32) -> ProcessLiveKey {
+    ProcessLiveKey::from_parts(pid, u64::from(pid) + 100).expect("fixture identity")
+}
+
+fn process_row_id(pid: u32) -> SemanticNodeId {
+    SemanticNodeId::owned(format!(
+        "row:process:pid:{pid}:start:{}",
+        pid.saturating_add(100)
+    ))
+}
+
 /// (a) A plain Apps page yields a well-formed tree: an Application root
 /// with a Main landmark, a Table with column headers, one Row (with Cells)
 /// per process, the CPU graph, and the status live region. All values are
@@ -44,7 +55,7 @@ async fn apps_page_snapshot_has_expected_roles_and_values(cx: &mut TestAppContex
         view.mark_telemetry_frame_ready();
         view.page = TopPage::Apps;
         view.replace_processes_for_test(vec![process(1001, "alpha"), process(2002, "bravo")]);
-        view.replace_process_selection([2002], None);
+        view.replace_process_selection([identity(2002)], None);
         // Make the graph assertion data-backed; RootView starts with an
         // unobserved snapshot and must not turn that state into 0%.
         view.replace_system_snapshot_for_test(taskmanager_core::core::metrics::SystemSnapshot {
@@ -90,15 +101,21 @@ async fn apps_page_snapshot_has_expected_roles_and_values(cx: &mut TestAppContex
 
     // Data-driven cell values (injected process names / cpu / memory).
     let alpha_cell = snapshot
-        .get(&SemanticNodeId::owned("row:1001:cell:name"))
+        .get(&SemanticNodeId::owned(format!(
+            "{}:cell:name",
+            process_row_id(1001).as_str()
+        )))
         .expect("alpha name cell present");
     assert_eq!(alpha_cell.value_text(), Some("alpha"));
     let bravo_cpu_cell = snapshot
-        .get(&SemanticNodeId::owned("row:2002:cell:cpu"))
+        .get(&SemanticNodeId::owned(format!(
+            "{}:cell:cpu",
+            process_row_id(2002).as_str()
+        )))
         .expect("bravo cpu cell present");
     assert!(bravo_cpu_cell.value_text().is_some());
     let bravo_row = snapshot
-        .get(&SemanticNodeId::owned("row:2002"))
+        .get(&process_row_id(2002))
         .expect("bravo row present");
     assert_eq!(bravo_row.state().selected, Some(true));
     assert!(bravo_row.supports_action(SemanticAction::Select));
@@ -161,8 +178,8 @@ async fn snapshot_stays_well_formed_with_edge_values_and_modal_open(cx: &mut Tes
             ..Default::default()
         });
         view.show_run_task();
-        view.open_process_details(3, ProcessDetailsSection::Overview);
-        assert_eq!(view.process_properties_pid(), Some(3));
+        view.open_process_details(identity(3), ProcessDetailsSection::Overview);
+        assert_eq!(view.process_properties_identity(), Some(identity(3)));
     });
     let busy = snapshot_of(cx, &root, 2);
     let graph = busy
@@ -195,7 +212,7 @@ async fn pending_termination_confirmation_is_published_to_the_live_region(cx: &m
         view.mark_telemetry_frame_ready();
         view.page = TopPage::Apps;
         view.replace_processes_for_test(vec![process(3, "hog"), process(4, "idle")]);
-        view.request_process_termination(ProcessTerminationAction::EndTask, 3);
+        view.request_process_termination(ProcessTerminationAction::EndTask, identity(3));
     });
 
     let snapshot = snapshot_of(cx, &root, 11);

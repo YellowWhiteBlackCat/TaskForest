@@ -17,7 +17,10 @@ use taskmanager_platform_contract::{
 };
 
 use super::gpu_engine_rows::GpuEngineRowsRequestPort;
+use super::msr_readout::MsrReadoutRequestPort;
 use super::npu_inventory::NpuInventoryRequestPort;
+use super::rapl_power::RaplPowerRequestPort;
+use super::smbios_memory::SmbiosMemoryRequestPort;
 
 /// Application-owned generation correlating one six-domain refresh.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -273,6 +276,9 @@ pub struct SystemFacets {
     containers: Option<Arc<ContainerRollupRequestPort>>,
     gpu_engine_rows: Option<Arc<GpuEngineRowsRequestPort>>,
     npu_inventory: Option<Arc<NpuInventoryRequestPort>>,
+    smbios_memory: Option<Arc<SmbiosMemoryRequestPort>>,
+    rapl_power: Option<Arc<RaplPowerRequestPort>>,
+    msr_readout: Option<Arc<MsrReadoutRequestPort>>,
 }
 
 impl SystemFacets {
@@ -337,6 +343,24 @@ impl SystemFacets {
     }
 
     #[must_use]
+    pub fn with_smbios_memory(mut self, port: Arc<SmbiosMemoryRequestPort>) -> Self {
+        self.smbios_memory = Some(port);
+        self
+    }
+
+    #[must_use]
+    pub fn with_rapl_power(mut self, port: Arc<RaplPowerRequestPort>) -> Self {
+        self.rapl_power = Some(port);
+        self
+    }
+
+    #[must_use]
+    pub fn with_msr_readout(mut self, port: Arc<MsrReadoutRequestPort>) -> Self {
+        self.msr_readout = Some(port);
+        self
+    }
+
+    #[must_use]
     pub fn host(&self) -> Option<&HostTelemetryRequestPort> {
         self.host.as_deref()
     }
@@ -384,5 +408,20 @@ impl SystemFacets {
     #[must_use]
     pub fn npu_inventory(&self) -> Option<&NpuInventoryRequestPort> {
         self.npu_inventory.as_deref()
+    }
+
+    #[must_use]
+    pub fn smbios_memory(&self) -> Option<&SmbiosMemoryRequestPort> {
+        self.smbios_memory.as_deref()
+    }
+
+    #[must_use]
+    pub fn rapl_power(&self) -> Option<&RaplPowerRequestPort> {
+        self.rapl_power.as_deref()
+    }
+
+    #[must_use]
+    pub fn msr_readout(&self) -> Option<&MsrReadoutRequestPort> {
+        self.msr_readout.as_deref()
     }
 }

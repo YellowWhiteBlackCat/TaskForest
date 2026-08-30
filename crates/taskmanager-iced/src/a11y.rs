@@ -17,7 +17,8 @@
 
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
-use taskmanager_shell::{ProcessRowId, ShellApp};
+use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::{ProcessRowId, ShellApp, process_semantic_key};
 use taskmanager_ui_contract::{
     AlertRuleInput, GraphSummary, ModalInput, ProcessRowInput, SemanticSnapshot,
     SemanticSnapshotBuilder,
@@ -94,7 +95,7 @@ fn base_builder(shell: &ShellApp) -> SemanticSnapshotBuilder {
             process.name.clone()
         };
         builder = builder.process_row(ProcessRowInput {
-            id: process.pid.to_string(),
+            id: process_semantic_key(process),
             name,
             cpu_percent: process
                 .current_cpu_percentage()
@@ -102,10 +103,8 @@ fn base_builder(shell: &ShellApp) -> SemanticSnapshotBuilder {
                 .map(|value| f64::from(value.clamp(0.0, 100.0))),
             memory_percent: memory_percentage(process.current_memory_bytes(), memory_total),
             selected: match shell.selected_row {
-                Some(ProcessRowId::Process(identity)) => {
-                    taskmanager_shell::ProcessRowIdentity::from_process(process)
-                        .is_some_and(|row_identity| row_identity == identity)
-                }
+                Some(ProcessRowId::Process(identity)) => ProcessLiveKey::from_process(process)
+                    .is_some_and(|row_identity| row_identity == identity),
                 Some(ProcessRowId::Application(_) | ProcessRowId::Category(_)) => false,
                 None => index == shell.selected,
             } || shell.is_process_selected(process),

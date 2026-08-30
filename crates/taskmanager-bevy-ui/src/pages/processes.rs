@@ -52,15 +52,17 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes, optional_nice, start_clock_local};
+use taskmanager_shell::process_semantic_key;
 use taskmanager_shell::{ShellApp, SortCol, SortDir};
 use taskmanager_ui_contract::ProcessColumnSpec;
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
+use crate::input_contract::SemanticAddress;
 use crate::palette::{UiPalette, space_8, space_24};
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::widgets::table::{
@@ -122,7 +124,9 @@ pub(crate) fn sort_projection(sort: (SortCol, SortDir)) -> Option<SortProjection
 fn cell_text(process: &ProcessItem, column: &str) -> String {
     match column {
         "Name" => process.name.clone(),
-        "User" => process.current_user().unwrap_or_default(),
+        "User" => process
+            .current_user()
+            .unwrap_or_else(|| MISSING_VALUE.to_owned()),
         "PID" => process.pid.to_string(),
         "Threads" => process
             .current_threads()
@@ -183,7 +187,8 @@ fn row_cells(process: &ProcessItem, columns: &[&ProcessColumnSpec], selected: bo
 pub(crate) struct ProcessRowView {
     /// Visible-set index of the row (the shell cursor's coordinate space).
     pub(crate) index: usize,
-    pub(crate) pid: u32,
+    /// Core-backed incarnation key for semantic and accessibility identity.
+    pub(crate) semantic_id: String,
     pub(crate) name: String,
     pub(crate) cells: Vec<String>,
     pub(crate) selected: bool,
@@ -217,7 +222,7 @@ pub(crate) fn rows_projection(
             let index = window.first + offset;
             ProcessRowView {
                 index,
-                pid: process.pid,
+                semantic_id: process_semantic_key(process),
                 name: process.name.clone(),
                 cells: row_cells(process, &columns, Some(index) == selected),
                 selected: Some(index) == selected,
@@ -275,19 +280,9 @@ pub(crate) fn empty_state_text(query: &str) -> String {
     }
 }
 
-/// The selected row's identity for the details-panel seam.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ProcessRowIdentity {
-    pub(crate) pid: u32,
-    pub(crate) name: String,
-}
-
-fn selected_identity(shell: &ShellApp) -> Option<ProcessRowIdentity> {
+fn selected_identity(shell: &ShellApp) -> Option<ProcessLiveKey> {
     let process = shell.visible_process_at(shell.selected)?;
-    Some(ProcessRowIdentity {
-        pid: process.pid,
-        name: process.name.clone(),
-    })
+    ProcessLiveKey::from_process(process)
 }
 
 // ---- page state, seams, and markers --------------------------------------
@@ -343,7 +338,7 @@ pub(crate) struct ProcessSelectionChanged(
     /// milestone); the headless tests read the payload to prove what the page
     /// publishes — the same shape as `RouteChanged`'s reserved payload.
     #[allow(dead_code)]
-    pub(crate) Option<ProcessRowIdentity>,
+    pub(crate) Option<ProcessLiveKey>,
 );
 
 /// The virtual scroll surface: exactly one node under the mounted page.
@@ -568,7 +563,10 @@ fn row_wrapper_scene(
     let fill = row_fill(row.selected, palette);
     let index = row.index;
     let cells = row.cells.clone();
-    let accessibility = crate::semantic::process_row_node(&row.name, row.pid);
+    let accessibility = crate::semantic::process_row_node(&row.name, &row.semantic_id);
+    let semantic = crate::input_contract::SemanticAddress(
+        crate::input_contract::stable_semantic_address("process-row", &row.semantic_id),
+    );
     let inner = row_scene(&cells, columns);
     Box::new(bsn! {
         Node {
@@ -581,6 +579,7 @@ fn row_wrapper_scene(
         ControlVisual(ControlTone::Surface, { row.selected })
         Button
         on(input::on_row_activated)
+        SemanticAddress({ semantic.0.clone() })
         template_value(accessibility)
         Children [
             ( { inner } ),

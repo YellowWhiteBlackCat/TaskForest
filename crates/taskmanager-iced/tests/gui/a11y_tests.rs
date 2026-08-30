@@ -1,8 +1,21 @@
 use super::*;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::process_semantic_key;
 use taskmanager_ui_contract::{SemanticAction, SemanticNodeId, SemanticRole};
 
 use crate::app::{AlertsMessage, Message};
+
+fn process_row_id(pid: u32) -> SemanticNodeId {
+    SemanticNodeId::owned(format!(
+        "row:process:pid:{pid}:start:{}",
+        taskmanager_test_support::fixture_start_token(pid)
+    ))
+}
+
+fn process_cell_id(pid: u32, cell: &str) -> SemanticNodeId {
+    SemanticNodeId::owned(format!("{}:cell:{cell}", process_row_id(pid).as_str()))
+}
 
 #[test]
 fn alerts_route_publishes_rule_switches_while_open() {
@@ -130,10 +143,15 @@ fn demo_shell_projects_process_rows_graph_and_selection() {
             .count(),
         shell.visible_process_count()
     );
+    let selected_process = shell
+        .visible_processes()
+        .into_iter()
+        .nth(shell.selected)
+        .expect("selected demo process");
+    let selected_id =
+        SemanticNodeId::owned(format!("row:{}", process_semantic_key(selected_process)));
     assert_eq!(
-        snapshot
-            .get(&SemanticNodeId::owned("row:1810"))
-            .map(|node| node.state().selected),
+        snapshot.get(&selected_id).map(|node| node.state().selected),
         Some(Some(true))
     );
 }
@@ -145,7 +163,7 @@ fn application_aggregate_never_fabricates_a_selected_process_semantic() {
     let root = shell.visible_processes()[1];
     shell.selected_row = root
         .current_start_token()
-        .and_then(|token| taskmanager_shell::ProcessRowIdentity::from_parts(root.pid, token))
+        .and_then(|token| ProcessLiveKey::from_parts(root.pid, token))
         .map(taskmanager_shell::ProcessRowId::Application);
     shell.selected_rows.clear();
 
@@ -189,13 +207,13 @@ fn first_loading_frame_omits_unobserved_graph_and_keeps_row_scalars_honest() {
     );
     assert_eq!(
         snapshot
-            .get(&SemanticNodeId::owned("row:77:cell:cpu"))
+            .get(&process_cell_id(77, "cpu"))
             .and_then(|node| node.value_text()),
         Some("Unavailable")
     );
     assert_eq!(
         snapshot
-            .get(&SemanticNodeId::owned("row:77:cell:memory"))
+            .get(&process_cell_id(77, "memory"))
             .and_then(|node| node.value_text()),
         Some("Unavailable")
     );

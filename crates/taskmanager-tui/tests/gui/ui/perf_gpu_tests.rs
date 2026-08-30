@@ -1,3 +1,4 @@
+use super::perf_gpu_support::gpu_fact_lines;
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -142,6 +143,35 @@ fn full_fact_strip_names_proven_graphics_apis_and_pci_slot() {
     assert!(!unproven_text.contains(t("gpu.opengl_version")));
     assert!(!unproven_text.contains(t("gpu.vulkan_version")));
     assert!(!unproven_text.contains(t("gpu.pci_slot")));
+}
+
+// test-intent: behavior
+/// The driver version is a proven release string next to the driver name
+/// (GPUI gpu_stats parity): a proven version renders its labeled row, and a
+/// driver name without a proven release omits the row instead of a dash.
+#[test]
+fn full_fact_strip_names_a_proven_driver_version() {
+    taskmanager_test_support::pin_english();
+    let mut proven = observed_gpu();
+    proven.driver_version = Some("566.36".into());
+    let text = joined(&gpu_fact_lines(
+        std::slice::from_ref(&proven),
+        GpuFactDensity::Full,
+    ));
+    assert!(
+        text.contains(&format!("{} 566.36", t("gpu.driver_version"))),
+        "GPU fact strip lost the proven driver version:\n{text}"
+    );
+
+    let unproven_text = joined(&gpu_fact_lines(&[observed_gpu()], GpuFactDensity::Full));
+    assert!(
+        !unproven_text.contains(t("gpu.driver_version")),
+        "an unproven driver version must omit its row, never render a dash:\n{unproven_text}"
+    );
+    assert!(
+        unproven_text.contains(&format!("{} xe", t("common.driver"))),
+        "the driver name row is independent of the version row:\n{unproven_text}"
+    );
 }
 
 // test-intent: behavior

@@ -150,7 +150,7 @@ impl gpui::Render for TestUsageContainer {
                 &v.theme,
                 &disk,
                 v.directory_usage(),
-                DisplayUnits::default(),
+                UnitPreferences::default(),
                 cx,
             )
         })

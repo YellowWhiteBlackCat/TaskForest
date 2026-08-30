@@ -38,6 +38,13 @@ pub(super) fn collect_nvidia_procfs_samples(
         std::io::ErrorKind::NotFound => DeviceStatus::Unsupported,
         _ => DeviceStatus::Stale,
     })?;
+    // System-wide procfs fact: `/proc/driver/nvidia/version` names the loaded
+    // release once for every board. It is read once per collection and
+    // attached to each row; NVML supplies the same fact when its userspace
+    // runtime is available.
+    let driver_version = fs::read_to_string(nvidia_base.join("version"))
+        .ok()
+        .and_then(|raw| parse_nvrm_driver_version(&raw));
     let mut samples = Vec::new();
     for gpu_entry in gpu_entries {
         let gpu_entry = gpu_entry.map_err(|error| match error.kind() {
@@ -68,9 +75,14 @@ pub(super) fn collect_nvidia_procfs_samples(
             status: DeviceStatus::Healthy,
             last_success_ms: None,
         };
+        let mut fields = vec![GpuMetricField::Identity, GpuMetricField::Brand];
+        if let Some(version) = driver_version.clone() {
+            metrics.driver_version = Some(version);
+            fields.push(GpuMetricField::DriverVersion);
+        }
         samples.push(GpuProviderSample {
             metrics,
-            fields: vec![GpuMetricField::Identity, GpuMetricField::Brand],
+            fields,
             field_failures: Vec::new(),
         });
     }
@@ -91,6 +103,11 @@ pub(super) fn collect_nvidia_nvml() -> Result<Vec<GpuProviderSample>, DeviceStat
     use nvml_wrapper::Nvml;
 
     let nvml = Nvml::init().map_err(|error| classify_error(&error).device_status())?;
+    // System-wide NVML fact: the driver version is shared by every device the
+    // runtime owns, so it is read once per collection and attached to each row.
+    let sys_driver_version = nvml
+        .sys_driver_version()
+        .map_err(|error| classify_error(&error));
     let count = nvml
         .device_count()
         .map_err(|error| classify_error(&error).device_status())?;
@@ -108,7 +125,7 @@ pub(super) fn collect_nvidia_nvml() -> Result<Vec<GpuProviderSample>, DeviceStat
                 continue;
             }
         };
-        let assembly = assemble_nvml_device(read_nvml_device(&device));
+        let assembly = assemble_nvml_device(read_nvml_device(&device, sys_driver_version.clone()));
         for failure in assembly.failures {
             tracing::trace!(
                 field = ?failure.field,
@@ -145,6 +162,7 @@ struct NvmlDeviceReadout {
     decoder_pct: Result<f32, NvmlFailureKind>,
     fan_speed_pct: Result<f32, NvmlFailureKind>,
     throttle_reasons: Result<Vec<GpuThrottleReason>, NvmlFailureKind>,
+    sys_driver_version: Result<String, NvmlFailureKind>,
 }
 
 #[cfg(feature = "nvidia")]
@@ -162,7 +180,10 @@ struct NvmlDeviceAssembly {
 }
 
 #[cfg(feature = "nvidia")]
-fn read_nvml_device(device: &nvml_wrapper::Device<'_>) -> NvmlDeviceReadout {
+fn read_nvml_device(
+    device: &nvml_wrapper::Device<'_>,
+    sys_driver_version: Result<String, NvmlFailureKind>,
+) -> NvmlDeviceReadout {
     use nvml_wrapper::enum_wrappers::device::{Clock, TemperatureSensor};
 
     NvmlDeviceReadout {
@@ -206,6 +227,7 @@ fn read_nvml_device(device: &nvml_wrapper::Device<'_>) -> NvmlDeviceReadout {
             .map_err(|error| classify_error(&error)),
         fan_speed_pct: read_maximum_fan_speed(device),
         throttle_reasons: read_throttle_reasons(device),
+        sys_driver_version,
     }
 }
 
@@ -425,6 +447,20 @@ fn assemble_nvml_device(readout: NvmlDeviceReadout) -> NvmlDeviceAssembly {
         }
         Err(kind) => failures.push(NvmlFieldFailure {
             field: GpuMetricField::Throttle,
+            kind,
+        }),
+    }
+    match readout.sys_driver_version {
+        Ok(version) if !version.trim().is_empty() => {
+            metrics.driver_version = Some(version);
+            fields.push(GpuMetricField::DriverVersion);
+        }
+        Ok(_) => failures.push(NvmlFieldFailure {
+            field: GpuMetricField::DriverVersion,
+            kind: NvmlFailureKind::Transient,
+        }),
+        Err(kind) => failures.push(NvmlFieldFailure {
+            field: GpuMetricField::DriverVersion,
             kind,
         }),
     }

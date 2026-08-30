@@ -50,11 +50,63 @@ struct ProcessItemWire {
     nice: Option<i32>,
     #[serde(default)]
     scalar_observations: ProcessScalarObservations,
+    #[serde(
+        default,
+        serialize_with = "serialize_history",
+        deserialize_with = "deserialize_history"
+    )]
     cpu_history: Vec<f32>,
+    #[serde(
+        default,
+        serialize_with = "serialize_history",
+        deserialize_with = "deserialize_history"
+    )]
     mem_history: Vec<f32>,
+    #[serde(
+        default,
+        serialize_with = "serialize_history",
+        deserialize_with = "deserialize_history"
+    )]
     disk_history: Vec<f32>,
+    #[serde(
+        default,
+        serialize_with = "serialize_history",
+        deserialize_with = "deserialize_history"
+    )]
     disk_read_history: Vec<f32>,
+    #[serde(
+        default,
+        serialize_with = "serialize_history",
+        deserialize_with = "deserialize_history"
+    )]
     disk_write_history: Vec<f32>,
+}
+
+/// Encode a process-history gap as JSON `null`. JSON has no representation for
+/// `NaN`/infinity, while the in-memory history keeps those values as aligned
+/// non-finite slots so a missing sample cannot compress time.
+fn serialize_history<S>(history: &Vec<f32>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    use serde::ser::SerializeSeq;
+
+    let mut sequence = serializer.serialize_seq(Some(history.len()))?;
+    for value in history {
+        sequence.serialize_element(&value.is_finite().then_some(*value))?;
+    }
+    sequence.end()
+}
+
+fn deserialize_history<'de, D>(deserializer: D) -> Result<Vec<f32>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let values = Vec::<Option<f32>>::deserialize(deserializer)?;
+    Ok(values
+        .into_iter()
+        .map(|value| value.unwrap_or(f32::NAN))
+        .collect())
 }
 
 impl Serialize for ProcessItem {

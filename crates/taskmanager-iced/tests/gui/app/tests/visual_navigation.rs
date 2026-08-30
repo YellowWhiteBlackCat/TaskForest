@@ -5,6 +5,7 @@ use crate::app::SettingsChange;
 use crate::test_support::temp_dir;
 use taskmanager_application::{AppPage, ConfigStore, KeyCode, Modifiers};
 
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ShellKeyEvent;
 
 fn grouped_fixture(
@@ -134,10 +135,17 @@ fn visual_left_right_toggles_category_tree_subtrees_and_left_goes_up_to_parent()
 
     // Visual 0 is the category header; move to the root at visual 1.
     let _ = app.update(key(KeyCode::ArrowDown));
-    assert!(!app.process_presentation.expanded_tree.contains(&100));
+    let root_identity = ProcessLiveKey::from_parts(100, 1001).expect("fixture process identity");
+    assert!(
+        !app.process_presentation
+            .expanded_tree
+            .contains(&root_identity)
+    );
     let _ = app.update(key(KeyCode::ArrowRight));
     assert!(
-        !app.process_presentation.expanded_tree.contains(&100),
+        !app.process_presentation
+            .expanded_tree
+            .contains(&root_identity),
         "root is already expanded"
     );
     let _ = app.update(key(KeyCode::ArrowDown));
@@ -147,7 +155,9 @@ fn visual_left_right_toggles_category_tree_subtrees_and_left_goes_up_to_parent()
     assert_eq!(app.process_presentation.visual_cursor, 2);
     let _ = app.update(key(KeyCode::ArrowLeft));
     assert!(
-        app.process_presentation.expanded_tree.contains(&101),
+        app.process_presentation
+            .expanded_tree
+            .contains(&ProcessLiveKey::from_parts(101, 1011).expect("fixture process identity"),),
         "Left collapses the expanded subtree"
     );
     // Left again: the node is already collapsed, so the cursor moves to its
@@ -159,7 +169,11 @@ fn visual_left_right_toggles_category_tree_subtrees_and_left_goes_up_to_parent()
     );
     // Right re-expands the subtree.
     let _ = app.update(key(KeyCode::ArrowRight));
-    assert!(!app.process_presentation.expanded_tree.contains(&101));
+    assert!(
+        !app.process_presentation
+            .expanded_tree
+            .contains(&ProcessLiveKey::from_parts(101, 1011).expect("fixture process identity"),)
+    );
 }
 
 #[test]

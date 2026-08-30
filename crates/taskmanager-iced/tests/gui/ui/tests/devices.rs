@@ -58,6 +58,7 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
         ..Default::default()
     };
     gpu.driver = Some("nvidia".into());
+    gpu.driver_version = Some("566.36".into());
     gpu.engines = vec![
         GpuEngine {
             name: "Render/3D".into(),
@@ -105,6 +106,7 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
             ("Temperature", "61 °C"),
             ("Power", "95.0 W"),
             ("Driver", "nvidia"),
+            ("Driver version", "566.36"),
             ("Render/3D", "77%"),
             // A measured-idle engine stays 0% — never suppressed into "—".
             ("Copy", "0%"),
@@ -744,6 +746,7 @@ fn network_summary_projects_wireless_ssid_signal_and_utilization() {
         .current_rx_bytes_per_sec(5 * MIB)
         .current_tx_bytes_per_sec(MIB)
         .current_utilization_pct(22.0)
+        .link_up_observation(ScalarObservation::available(true, 1))
         .link_speed_observation(match Some(866) {
             Some(value) => taskmanager_core::core::metrics::ScalarObservation::available(value, 1),
             None => taskmanager_core::core::metrics::ScalarObservation::default(),
@@ -812,9 +815,9 @@ fn network_summary_omits_utilization_without_a_link_and_keeps_dashes_honest() {
             ("Status", "Unsupported"),
             ("Receive", "—"),
             ("Send", "—"),
-            // No carrier and no assigned address → Disconnected (never a
-            // fabricated "Connected").
-            ("Connection", "Disconnected"),
+            // No carrier observation → unknown, even though the adapter may
+            // later receive an address.
+            ("Connection", "—"),
             // Rate-family totals keep their rows with the shared dash (GPUI
             // parity); only EXISTENCE facts omit rows entirely.
             ("Total received", "—"),

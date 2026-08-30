@@ -1,3 +1,4 @@
+use super::health_support::render_health_overlay;
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

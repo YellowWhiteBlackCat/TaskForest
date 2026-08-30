@@ -6,6 +6,7 @@
 //! the responsive Properties body. The test-only worker exercises the same
 //! capacity-one latest-request semantics without a native provider.
 
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process_telemetry::ProcessTelemetrySnapshot;
 
 mod view;
@@ -27,14 +28,14 @@ pub enum ProcessInsightsErrorKind {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ProcessInsightsError {
-    pub pid: u32,
+    pub identity: Option<ProcessLiveKey>,
     pub kind: ProcessInsightsErrorKind,
     pub last_success_ms: Option<u64>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ProcessInsightsState {
-    Loading { pid: u32 },
+    Loading { identity: ProcessLiveKey },
     Ready(Box<ProcessTelemetrySnapshot>),
     Error(ProcessInsightsError),
 }
@@ -59,7 +60,7 @@ pub(crate) fn state_from_snapshot(snapshot: ProcessTelemetrySnapshot) -> Process
         DeviceStatus::Unsupported => ProcessInsightsErrorKind::Unsupported,
     };
     ProcessInsightsState::Error(ProcessInsightsError {
-        pid: snapshot.identity.pid,
+        identity: ProcessLiveKey::from_identity(snapshot.identity),
         kind,
         last_success_ms: snapshot.state.last_success_ms,
     })

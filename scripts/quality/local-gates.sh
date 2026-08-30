@@ -23,9 +23,11 @@
 # Every stage is bounded by an outer `timeout --kill-after=` deadline and
 # the result is recorded per stage. The default is fail-fast: the first failed
 # stage exits immediately; use `--keep-going` only when collecting a diagnostic
-# batch. Scratch space lives under .tmp/ (repo NVMe, gitignored), never /tmp,
-# and is removed on exit. Parallelism caps at CARGO_BUILD_JOBS (4) so
-# interactive work is not starved.
+# batch. Scratch space lives under .agent-scratch/ beside the repo (same NVMe,
+# never inside $repo: a scratch in the tree gets copied into its own copy by
+# tools that snapshot sources — cargo-mutants — and nests recursively), is
+# swept at startup for runs leaked by hard kills, and is removed on exit.
+# Parallelism caps at CARGO_BUILD_JOBS (4) so interactive work is not starved.
 #
 # Usage:
 #   scripts/quality/local-gates.sh [quick|standard|extended] [--with-gui]
@@ -44,6 +46,8 @@
 #   JOBS=<n>                cargo/test parallelism (default 4)
 #   STAGE_TIMEOUT=<sec>     per-stage deadline (default 3600)
 #   QUICK_TIMEOUT=<sec>     quick-stage deadline (default 300)
+#   TM_SCRATCH_ROOT=<dir>   scratch root (default: .agent-scratch beside the
+#                           repo; it must be outside the repository)
 #   SKIP_INSTALL_MANAGER_SMOKE=1  defer that smoke until the release build
 #                                 has produced its helper binaries
 
@@ -53,7 +57,15 @@ repo="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$repo"
 
 export CARGO_BUILD_JOBS="${JOBS:-4}"
-export TMPDIR="$repo/.tmp/local-gates-$$-$(date +%s)/tmp"
+scratch_root="${TM_SCRATCH_ROOT:-$(dirname "$repo")/.agent-scratch}"
+if ! mkdir -p "$scratch_root" 2>/dev/null; then
+    echo "local-gates: scratch root '$scratch_root' is not writable;" \
+        "set TM_SCRATCH_ROOT to a writable path OUTSIDE the repository" >&2
+    exit 2
+fi
+# Reap runs leaked by hard kills; the EXIT trap cannot fire on SIGKILL.
+find "$scratch_root" -maxdepth 1 -name 'local-gates-*' -mtime +2 -exec rm -rf {} + 2>/dev/null
+export TMPDIR="$scratch_root/local-gates-$$-$(date +%s)/tmp"
 scratch="${TMPDIR%/tmp}"
 mkdir -p "$TMPDIR"
 

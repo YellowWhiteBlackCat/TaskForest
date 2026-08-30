@@ -96,15 +96,17 @@ mod on_demand_dispatch;
 mod process_control;
 #[path = "app/request_sessions.rs"]
 mod request_sessions;
+#[path = "app/row_identity.rs"]
+mod row_identity;
 
 /// Resolve one demo process's validated row identity by pid (fixtures carry
 /// deterministic start tokens).
-fn identity_of(app: &crate::ShellApp, pid: u32) -> ProcessRowIdentity {
+fn identity_of(app: &crate::ShellApp, pid: u32) -> ProcessLiveKey {
     app.projection()
         .processes_slice()
         .iter()
         .find(|process| process.pid == pid)
-        .and_then(ProcessRowIdentity::from_process)
+        .and_then(ProcessLiveKey::from_process)
         .expect("demo process carries a current start token")
 }
 #[path = "app/row_summary.rs"]
@@ -115,12 +117,16 @@ mod search_paste;
 use super::search_input::SEARCH_QUERY_MAX;
 #[path = "app/frame_state.rs"]
 mod frame_state;
+#[path = "app/gpu_engine_rows.rs"]
+mod gpu_engine_rows;
 #[path = "app/service_control.rs"]
 mod service_control;
 #[path = "app/service_log.rs"]
 mod service_log;
 #[path = "app/session_control.rs"]
 mod session_control;
+#[path = "app/smbios_rapl_sessions.rs"]
+mod smbios_rapl_sessions;
 #[path = "app/sort.rs"]
 mod sort;
 #[path = "app/source_status.rs"]
@@ -598,7 +604,7 @@ fn home_and_end_jump_to_the_visible_list_bounds() {
     assert!(app.toggle_row_selection(2));
     assert_eq!(app.selected_identities().len(), 2);
     app.move_selection_to_last();
-    let anchor: std::collections::HashSet<ProcessRowIdentity> =
+    let anchor: std::collections::HashSet<ProcessLiveKey> =
         std::iter::once(identity_of(&app, pids[pids.len() - 1])).collect();
     assert_eq!(app.selected_identities(), &anchor);
 }
@@ -632,7 +638,7 @@ fn multi_select_toggle_extend_and_freeze_the_whole_set() {
 
     // Plain click collapses to a single anchor.
     assert!(app.select_row(0));
-    let one: std::collections::HashSet<ProcessRowIdentity> =
+    let one: std::collections::HashSet<ProcessLiveKey> =
         std::iter::once(identity_of(&app, pids[0])).collect();
     assert_eq!(app.selected_identities(), &one);
 
@@ -640,7 +646,7 @@ fn multi_select_toggle_extend_and_freeze_the_whole_set() {
     // anchor.
     assert!(app.toggle_row_selection(2));
     assert_eq!(app.selected, 2);
-    let two: std::collections::HashSet<ProcessRowIdentity> = [pids[0], pids[2]]
+    let two: std::collections::HashSet<ProcessLiveKey> = [pids[0], pids[2]]
         .iter()
         .map(|&pid| identity_of(&app, pid))
         .collect();
@@ -649,7 +655,7 @@ fn multi_select_toggle_extend_and_freeze_the_whole_set() {
     // Shift-click grows a range from the anchor (2) to 4, folding in pids 2..=4.
     assert!(app.extend_row_selection(4));
     assert_eq!(app.selected, 4);
-    let grown: std::collections::HashSet<ProcessRowIdentity> = [pids[0], pids[2], pids[3], pids[4]]
+    let grown: std::collections::HashSet<ProcessLiveKey> = [pids[0], pids[2], pids[3], pids[4]]
         .iter()
         .map(|&pid| identity_of(&app, pid))
         .collect();
@@ -665,7 +671,7 @@ fn multi_select_toggle_extend_and_freeze_the_whole_set() {
     };
     assert_eq!(intent.action, ProcessBatchAction::Suspend);
     assert_eq!(intent.targets.len(), 4);
-    let frozen: std::collections::HashSet<ProcessRowIdentity> = intent
+    let frozen: std::collections::HashSet<ProcessLiveKey> = intent
         .targets
         .iter()
         .map(|id| identity_of(&app, id.pid))
@@ -703,7 +709,7 @@ fn selected_rows_range_spans_the_display_order_between_two_identities() {
     assert_eq!(reverse[2], third);
 
     // A stale end identity degenerates to the single identity (never a panic).
-    let stale_id = ProcessRowIdentity::from_parts(u32::MAX, 1).expect("non-zero parts");
+    let stale_id = ProcessLiveKey::from_parts(u32::MAX, 1).expect("non-zero parts");
     let stale = selected_rows_range(&rows, first, stale_id);
     assert_eq!(stale, vec![stale_id]);
 }
@@ -752,8 +758,8 @@ fn stale_selected_pids_are_pruned_when_the_process_list_refreshes() {
         .projection()
         .processes_slice()
         .iter()
-        .cloned()
         .filter(|process| process.pid != pids[2])
+        .cloned()
         .collect();
     app.data.processes = Some(surviving.into());
     app.prune_stale_selection();
@@ -1111,77 +1117,4 @@ fn process_status_filter_rebuilds_the_shared_rows_and_resets_selection() {
 
     app.set_process_status_filter(crate::ProcessStatusFilter::All);
     assert_eq!(app.visible_processes().len(), all_count);
-}
-
-fn gpu_engine_rows_event(
-    sequence: u64,
-    snapshot: taskmanager_core::core::metrics::GpuEngineRowsSnapshot,
-) -> taskmanager_application::CorrelatedGpuEngineRowsEvent {
-    CorrelatedEvent::new(
-        PlatformEventContext {
-            request_id: RequestId::new(sequence).expect("non-zero fixture request id"),
-            capability: CapabilityId::TELEMETRY_GPU_ENGINES,
-            provider: None,
-            sequence: EventSequence::new(sequence),
-            observed_at_ms: 10,
-        },
-        taskmanager_application::GpuEngineRowsEvent::Update(snapshot),
-    )
-}
-
-/// The engine-rows lane commits only the active request terminal. A stale
-/// terminal earlier in the same batch cannot overwrite that request's answer,
-/// and a batch carrying no engine-rows events leaves the accepted session
-/// untouched.
-#[test]
-fn gpu_engine_rows_snapshots_commit_only_the_active_request() {
-    use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineMetric, GpuEngineRowsSnapshot};
-    let mut app = ShellApp::new();
-    let attempt = app.begin_gpu_engine_rows_request(DeviceId::new("gpu:0"));
-    assert!(app.accept_gpu_engine_rows_request(
-        attempt,
-        RequestId::new(5).expect("non-zero fixture request id")
-    ));
-    let mut batch = PlatformEventBatch::default();
-    batch.gpu_engine_rows_events.push(gpu_engine_rows_event(
-        4,
-        GpuEngineRowsSnapshot::success(
-            DeviceId::new("gpu:0"),
-            vec![GpuEngineMetric {
-                name: "Render Ring".to_owned(),
-                kind: GpuEngineKind::Unknown,
-                utilization_pct: 40.0,
-            }],
-        ),
-    ));
-    batch.gpu_engine_rows_events.push(gpu_engine_rows_event(
-        5,
-        GpuEngineRowsSnapshot::failed(
-            DeviceId::new("gpu:0"),
-            FailureKind::PermissionDenied,
-            "user dismissed the prompt",
-        ),
-    ));
-
-    app.apply_platform_batch(batch);
-
-    assert!(matches!(
-        app.gpu_engine_rows_state(),
-        taskmanager_application::GpuEngineRowsState::Failed(failed)
-            if failed.device_id == DeviceId::new("gpu:0")
-                && matches!(
-                    &failed.failure,
-                    taskmanager_application::GpuEngineRowsRequestFailure::Provider(failure)
-                        if failure.kind == FailureKind::PermissionDenied
-                )
-    ));
-
-    app.apply_platform_batch(PlatformEventBatch::default());
-    assert!(
-        matches!(
-            app.gpu_engine_rows_state(),
-            taskmanager_application::GpuEngineRowsState::Failed(_)
-        ),
-        "an empty-events batch must leave the request lifecycle untouched"
-    );
 }

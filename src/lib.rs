@@ -3,8 +3,8 @@
 //! Exactly one `ui-*` feature is enabled per build (enforced by build.rs):
 //! `ui-gpui` (default) compiles the GPUI desktop frontend, `ui-tui` the
 //! ratatui frontend, `ui-iced` the iced frontend. The UI-neutral CLI
-//! (`cli`, `--json`, `--suggest-thresholds`, `--gpu-engines`) is compiled in
-//! every shape.
+//! (`cli`, `--json`, `--suggest-thresholds`, `--gpu-engines`,
+//! `--memory-smbios`, `--package-power`, `--msr`) is compiled in every shape.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::wildcard_imports)]
@@ -20,6 +20,9 @@ compile_error!(
 
 pub mod cli;
 pub mod cli_gpu_engines;
+pub mod cli_memory_smbios;
+pub mod cli_msr;
+pub mod cli_package_power;
 pub mod cli_process_gpu;
 pub mod frontend;
 // Mounted for the Linux-only /proc fixture tests that src/*.rs modules pull

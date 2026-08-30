@@ -256,18 +256,114 @@ fn crossing_hands_the_full_pid_and_creation_token_to_the_transport() {
 }
 
 #[test]
-fn non_windows_production_entry_fails_closed_as_unsupported() {
-    // The non-Windows arm of the production entry mirrors the
-    // taskmanager-windows-api "every function has a non-Windows arm"
-    // convention: a typed Unsupported without spawning anything.
-    #[cfg(not(windows))]
-    {
-        assert!(matches!(
-            invoke_uac_foreign_process_control(target(), ForeignProcessControlOperation::Kill),
-            ForeignProcessControlOutcome::Unavailable {
-                reason: EscalationDenialReason::Unsupported,
-                ..
-            }
-        ));
+fn reply_channel_names_are_per_nonce_and_never_reuse_a_scheme() {
+    // ADR-035 decision 4: the reply channel is per-call and randomly named.
+    // The name is pure over the nonce; two distinct nonces must never collide
+    // and the name must stay a single path component (no separators, no
+    // traversal) so it can only ever land inside the caller's temp directory.
+    let first = reply_channel_file_name(0);
+    let second = reply_channel_file_name(1);
+    assert_ne!(first, second);
+    assert_eq!(
+        first,
+        "taskforest-uac-reply-0000000000000000.json".to_owned()
+    );
+    for nonce in [0_u64, 1, u64::MAX, 0x00ff_00ff_00ff_00ff] {
+        let name = reply_channel_file_name(nonce);
+        assert!(!name.contains('/'), "name must be one component: {name}");
+        assert!(!name.contains('\\'), "name must be one component: {name}");
+        assert!(!name.contains(".."), "no traversal: {name}");
+        assert!(name.starts_with("taskforest-uac-reply-"));
+        assert!(name.ends_with(".json"));
     }
+}
+
+#[test]
+fn command_line_quotes_only_what_needs_quoting() {
+    // Fixed numeric/operation arguments pass through verbatim; the
+    // reply-channel path (which may contain spaces in a user's temp dir) is
+    // quoted; embedded quotes escape with backslash-run doubling per the
+    // documented Windows command-line rule.
+    assert_eq!(quote_windows_argument("42"), "42");
+    assert_eq!(quote_windows_argument("priority:-5"), "priority:-5");
+    assert_eq!(
+        quote_windows_argument(r"C:\Temp Reply Dir\r.json"),
+        r#""C:\Temp Reply Dir\r.json""#
+    );
+    let embedded_quote = "a\"b";
+    assert_eq!(quote_windows_argument(embedded_quote), "\"a\\\"b\"");
+    // A backslash run at the END of a quoted argument is doubled so it cannot
+    // escape the closing quote; an unquoted trailing backslash passes through
+    // verbatim because nothing delimits it.
+    let quoted_trailing_backslash = "My Dir\\";
+    assert_eq!(
+        quote_windows_argument(quoted_trailing_backslash),
+        "\"My Dir\\\\\""
+    );
+    let bare_trailing_backslash = "trailing\\";
+    assert_eq!(
+        quote_windows_argument(bare_trailing_backslash),
+        "trailing\\"
+    );
+    assert_eq!(quote_windows_argument(""), "\"\"");
+}
+
+#[test]
+fn runas_command_line_carries_the_fixed_helper_contract_order() {
+    // The helper's fixed argument order is pid, start token, operation wire
+    // form, reply channel — identical to the pkexec crossing plus the
+    // one-shot reply path, so one helper vocabulary serves both transports.
+    let target = ForeignProcessControlTarget::new(4242, 9_000).expect("valid target");
+    let reply = std::path::Path::new("/tmp/taskforest-uac-reply-0000000000000001.json");
+    assert_eq!(
+        runas_command_line(
+            target,
+            &ForeignProcessControlOperation::SetPriority(-5),
+            reply
+        ),
+        "4242 9000 priority:-5 /tmp/taskforest-uac-reply-0000000000000001.json".to_owned()
+    );
+    // A reply path with whitespace stays ONE argument after quoting.
+    let spaced = std::path::Path::new("/tmp/My Dir/r.json");
+    let line = runas_command_line(target, &ForeignProcessControlOperation::Kill, spaced);
+    assert_eq!(line, r#"4242 9000 kill "/tmp/My Dir/r.json""#);
+}
+
+#[test]
+fn a_reply_channel_setup_failure_is_helper_unavailable_not_a_user_fact() {
+    // The channel dying before launch is neither a refusal, nor a protocol
+    // violation, nor a deadline: the crossing never started, and the honest
+    // typed answer is that the crossing infrastructure is unreachable.
+    let transport = FixedTransport::single(UacCrossingObservation::ReplyChannelUnavailable);
+    assert_eq!(
+        unavailable_reason(&transport, ForeignProcessControlOperation::Kill),
+        EscalationDenialReason::HelperUnavailable
+    );
+}
+
+#[test]
+fn an_unwired_transport_composition_fails_closed_as_unsupported() {
+    // Any adapter set that never registered the stage-2 runas driver keeps
+    // the fail-closed default: typed Unsupported, no fabricated crossing.
+    struct UnwiredTransport;
+    impl UacForeignProcessControlTransport for UnwiredTransport {
+        fn cross(
+            &self,
+            _target: ForeignProcessControlTarget,
+            _operation: &ForeignProcessControlOperation,
+        ) -> UacCrossingObservation {
+            UacCrossingObservation::TransportUnwired
+        }
+    }
+    assert!(matches!(
+        invoke_uac_foreign_process_control_with(
+            &UnwiredTransport,
+            target(),
+            ForeignProcessControlOperation::Kill
+        ),
+        ForeignProcessControlOutcome::Unavailable {
+            reason: EscalationDenialReason::Unsupported,
+            ..
+        }
+    ));
 }

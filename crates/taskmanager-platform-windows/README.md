@@ -9,9 +9,15 @@ typed native boundary in `taskmanager-windows-api`.
 
 Provider code never uses PowerShell, CMD or a command interpreter for telemetry.
 Unsupported fields remain typed; native handles and buffers stay inside the
-audited boundary. Foreign-process escalation remains typed `Unsupported` until
-an actual UAC helper transport exists; a normal inherited-token child is never
-treated as elevation.
+audited boundary. Foreign-process escalation crosses the ADR-035 UAC transport:
+`provider::process::uac` pre-creates the one-shot randomly named reply file,
+builds the fixed helper command line with the escalation crate's pure builder,
+and drives the audited `runas` call group; every raw result is classified by
+`taskmanager-escalation::uac`'s typed transport facts. The crossing is
+compile-verified (`x86_64-pc-windows-msvc`) but not yet packaged or on-box
+receipted, so today's installs surface the honest typed `HelperUnavailable`
+for the missing helper. A normal inherited-token child is never treated as
+elevation.
 
 ## Contract and verification
 

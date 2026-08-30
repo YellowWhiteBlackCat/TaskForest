@@ -3,14 +3,26 @@
 use super::super::*;
 use taskmanager_application::AppAction;
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
+
+fn key_with_token(pid: u32, start_token: u64) -> ProcessLiveKey {
+    ProcessLiveKey::from_parts(pid, start_token).expect("fixture identity")
+}
+
+fn key(pid: u32) -> ProcessLiveKey {
+    key_with_token(pid, u64::from(pid))
+}
+
+fn app_key(pid: u32, start_token: u64) -> String {
+    format!("app-tree:{}", key_with_token(pid, start_token).stable_key())
+}
 
 fn expected_key(
-    kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId,
+    kind: fn(ProcessLiveKey) -> taskmanager_shell::ProcessRowId,
     pid: u32,
 ) -> Option<taskmanager_shell::ProcessRowId> {
     // trustworthy_process pins the token to the pid itself
-    taskmanager_shell::ProcessRowIdentity::from_parts(pid, u64::from(pid)).map(kind)
+    ProcessLiveKey::from_parts(pid, u64::from(pid)).map(kind)
 }
 
 fn trustworthy_process(pid: u32, name: &str, parent_pid: Option<u32>) -> ProcessItem {
@@ -95,7 +107,7 @@ fn left_collapses_a_recursive_process_node() {
         &mut app,
         KeyEvent::new(ratatui::crossterm::event::KeyCode::Left, KeyModifiers::NONE),
     );
-    assert!(app.collapsed_tree.contains(&1));
+    assert!(app.collapsed_tree.contains(&key(1)));
     assert_eq!(app.visual_row_count(), 2, "header plus collapsed root");
 }
 
@@ -168,11 +180,11 @@ fn a_process_domain_change_prunes_stale_per_pid_tree_state() {
     // Local tree state: the live root's aggregate stays expanded, its child
     // and an unrelated pid are collapsed, a dead root keeps a stale
     // expansion key, and one category key carries no pid at all.
-    app.expanded_groups.insert("app-tree:1".to_string());
-    app.expanded_groups.insert("app-tree:9".to_string());
+    app.expanded_groups.insert(app_key(1, 1));
+    app.expanded_groups.insert(app_key(9, 9));
     app.expanded_groups
         .insert("category:application".to_string());
-    app.collapsed_tree.extend([2u32, 3]);
+    app.collapsed_tree.extend([key(2), key(3)]);
 
     // The next live batch reports only pid 1: pids 2 and 3 exited (and 9
     // never existed). The fold goes through the TUI's batch entry, exactly
@@ -193,7 +205,7 @@ fn a_process_domain_change_prunes_stale_per_pid_tree_state() {
     app.apply_platform_batch(batch);
 
     assert!(
-        app.expanded_groups.contains("app-tree:1"),
+        app.expanded_groups.contains(&app_key(1, 1)),
         "the still-live root keeps its expansion"
     );
     assert!(
@@ -201,12 +213,12 @@ fn a_process_domain_change_prunes_stale_per_pid_tree_state() {
         "pid-less category keys are never pruned"
     );
     assert!(
-        !app.expanded_groups.contains("app-tree:9"),
+        !app.expanded_groups.contains(&app_key(9, 9)),
         "the dead root's expansion key must be retired"
     );
     assert!(
-        !app.collapsed_tree.contains(&2) && !app.collapsed_tree.contains(&3),
-        "exited pids must not stay collapsed (pid reuse would show them pre-collapsed)"
+        !app.collapsed_tree.contains(&key(2)) && !app.collapsed_tree.contains(&key(3)),
+        "exited live identities must not stay collapsed (pid reuse would show them pre-collapsed)"
     );
 }
 
@@ -228,8 +240,8 @@ fn a_reused_pid_cannot_inherit_old_tree_expansion_state() {
     // Initialize the identity index from the first observation, then attach
     // presentation state to that exact provider token.
     app.prune_stale_tree_state();
-    app.collapsed_tree.insert(7);
-    app.expanded_groups.insert("app-tree:7".to_string());
+    app.collapsed_tree.insert(key_with_token(7, 700));
+    app.expanded_groups.insert(app_key(7, 700));
 
     let mut batch = PlatformEventBatch::default();
     batch.process_events.push(CorrelatedEvent::new(
@@ -250,11 +262,11 @@ fn a_reused_pid_cannot_inherit_old_tree_expansion_state() {
     app.apply_platform_batch(batch);
 
     assert!(
-        !app.collapsed_tree.contains(&7),
+        !app.collapsed_tree.contains(&key_with_token(7, 700)),
         "a PID-reused process must not inherit the old collapse"
     );
     assert!(
-        !app.expanded_groups.contains("app-tree:7"),
+        !app.expanded_groups.contains(&app_key(7, 700)),
         "a PID-reused application root must not inherit old expansion"
     );
 }
@@ -315,10 +327,7 @@ fn canonical_row_digest(row: &crate::process_view::ProcessRow<'_>) -> String {
             memory,
             expanded,
             row_key,
-        } => format!(
-            "G|{name}|{label}|{depth}|{count}|{:?}|{memory}|{expanded}|{row_key:?}",
-            cpu.to_bits()
-        ),
+        } => format!("G|{name}|{label}|{depth}|{count}|{cpu:?}|{memory:?}|{expanded}|{row_key:?}"),
         ProcessRow::TreeNode {
             process,
             depth,
@@ -356,11 +365,16 @@ fn canonical_row_cache_hits_and_invalidates_per_input_staying_equal_to_a_fresh_r
     // visible list, expansion set, collapse set, and sort.
     fn assert_cache_equals_rebuild(app: &TuiApp) {
         let cached = app.process_rows_snapshot();
-        let fresh = crate::process_view::build_process_rows(
+        let fresh = crate::process_view::process_view_support::build_process_rows(
             &app.visible_processes(),
             &app.expanded_groups,
             &app.collapsed_tree,
             app.process_sort,
+            app.shell
+                .projection()
+                .snapshot
+                .as_ref()
+                .map_or(0, |snapshot| snapshot.timestamp_ms),
         );
         let cached: Vec<String> = cached.iter().map(canonical_row_digest).collect();
         let fresh: Vec<String> = fresh.iter().map(canonical_row_digest).collect();
@@ -381,7 +395,7 @@ fn canonical_row_cache_hits_and_invalidates_per_input_staying_equal_to_a_fresh_r
     );
 
     // Input 1 — expand: an application aggregate opens its tree.
-    app.expanded_groups.insert("app-tree:1".to_string());
+    app.expanded_groups.insert(app_key(1, 1));
     assert!(
         !app.canonical_row_cache_is_valid_for_current_inputs(),
         "an expansion change must invalidate the entry"
@@ -389,7 +403,7 @@ fn canonical_row_cache_hits_and_invalidates_per_input_staying_equal_to_a_fresh_r
     assert_cache_equals_rebuild(&app);
 
     // Input 2 — collapse: a collapsed pid hides exactly its subtree.
-    app.collapsed_tree.insert(1);
+    app.collapsed_tree.insert(key(1));
     assert!(!app.canonical_row_cache_is_valid_for_current_inputs());
     assert_cache_equals_rebuild(&app);
     app.collapsed_tree.clear();
@@ -452,12 +466,9 @@ fn anchor_survives_group_toggles_through_the_cached_projection() {
         ])),
     );
     app.application.active_page = AppPage::Applications;
-    app.expanded_groups = [
-        "category:uncategorized".to_string(),
-        "app-tree:1".to_string(),
-    ]
-    .into_iter()
-    .collect();
+    app.expanded_groups = ["category:uncategorized".to_string(), app_key(1, 1)]
+        .into_iter()
+        .collect();
 
     // Park the cursor on the child row and warm the cache.
     let child_row = app
@@ -475,8 +486,8 @@ fn anchor_survives_group_toggles_through_the_cached_projection() {
 
     // Collapse the root through the id-consuming toggle: the anchor must be
     // re-resolved by pid + start-token, not by position.
-    assert!(app.collapse_tree_pid(1));
-    assert_eq!(app.collapsed_tree, [1].into_iter().collect());
+    assert!(app.collapse_tree_identity(key(1)));
+    assert_eq!(app.collapsed_tree, [key(1)].into_iter().collect());
     let landed_pid = {
         let rows = app.process_rows_snapshot();
         let pid_of = |row: &crate::process_view::ProcessRow<'_>| match row {
@@ -499,7 +510,7 @@ fn anchor_survives_group_toggles_through_the_cached_projection() {
     );
 
     // Re-expanding restores the child row by identity.
-    assert!(app.expand_tree_pid(1));
+    assert!(app.expand_tree_identity(key(1)));
     let rows = app.process_rows_snapshot();
     assert!(rows.iter().any(|row| matches!(row,
         crate::process_view::ProcessRow::TreeNode { process, .. } if process.pid == 2)));

@@ -20,7 +20,6 @@ use taskmanager_ui_contract::{
 };
 
 use super::RootView;
-use crate::gpui_app::formatting;
 use taskmanager_application::ProcessTerminationAction;
 
 /// Maximum number of process rows published to the accessibility tree. The
@@ -114,17 +113,16 @@ fn build_snapshot(
         view.processes().iter().collect();
     rows.sort_by(|a, b| {
         b.current_cpu_percentage()
-            .unwrap_or(0.0)
-            .partial_cmp(&a.current_cpu_percentage().unwrap_or(0.0))
+            .partial_cmp(&a.current_cpu_percentage())
             .unwrap_or(Ordering::Equal)
     });
     for item in rows.iter().take(MAX_PUBLISHED_ROWS) {
-        let memory_percent = memory_total.filter(|total| *total > 0).and_then(|total| {
+        let memory_percent = memory_total.and_then(|total| {
             item.current_memory_bytes()
-                .map(|value| formatting::bytes_percent(value, total))
+                .and_then(|value| taskmanager_core::core::units::bytes_percent(value, total))
         });
         builder = builder.process_row(ProcessRowInput {
-            id: item.pid.to_string(),
+            id: taskmanager_shell::process_semantic_key(item),
             name: item.name.clone(),
             cpu_percent: item
                 .current_cpu_percentage()

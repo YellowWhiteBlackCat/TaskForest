@@ -7,11 +7,11 @@ use super::super::*;
 use std::sync::{Arc, Mutex};
 use taskmanager_application::{
     AppPage, CommandLaunchRequest, DirectoryUsageRequest, GpuEngineRowsRequest, IntegrationFacets,
-    PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ProcessAffinityControlRequest,
-    ProcessAffinityRequest, ProcessFacets, ProcessNetworkEscalationRequest,
-    ProcessResourceControlRequest, ServiceDependenciesRequest, ServiceFacets,
-    ServiceLogSnapshotRequest, SetupScriptRequest, SmartControlRequest, StorageFacets,
-    SystemFacets,
+    MsrReadoutRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
+    ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessFacets,
+    ProcessNetworkEscalationRequest, ProcessResourceControlRequest, RaplPowerRequest,
+    ServiceDependenciesRequest, ServiceFacets, ServiceLogSnapshotRequest, SetupScriptRequest,
+    SmartControlRequest, SmbiosMemoryRequest, StorageFacets, SystemFacets,
 };
 use taskmanager_core::core::directory_usage::{
     DirectoryScanBounds, DirectoryScanId, DirectoryScanSpec,
@@ -171,6 +171,60 @@ fn gpu_engine_rows_effect_begins_the_typed_request_session() {
             device_id: pending,
             ..
         } if pending == &device_id
+    ));
+}
+
+#[test]
+fn smbios_memory_effect_begins_the_typed_request_session() {
+    let recorder = Arc::new(RecordingRequests::<SmbiosMemoryRequest>::default());
+    let mut client = client_with(
+        PlatformFacets::default()
+            .with_system(SystemFacets::default().with_smbios_memory(recorder.clone())),
+    );
+    let mut app = crate::demo_app();
+
+    queue_effect(&mut app, &mut client, ShellApp::request_smbios_memory());
+
+    assert_eq!(recorded(&recorder), vec![SmbiosMemoryRequest::Refresh]);
+    assert!(matches!(
+        app.smbios_memory_state(),
+        taskmanager_application::SmbiosMemoryState::Loading { .. }
+    ));
+}
+
+#[test]
+fn rapl_power_effect_begins_the_typed_request_session() {
+    let recorder = Arc::new(RecordingRequests::<RaplPowerRequest>::default());
+    let mut client = client_with(
+        PlatformFacets::default()
+            .with_system(SystemFacets::default().with_rapl_power(recorder.clone())),
+    );
+    let mut app = crate::demo_app();
+
+    queue_effect(&mut app, &mut client, ShellApp::request_rapl_power());
+
+    assert_eq!(recorded(&recorder), vec![RaplPowerRequest::Refresh]);
+    assert!(matches!(
+        app.rapl_power_state(),
+        taskmanager_application::RaplPowerState::Loading { .. }
+    ));
+}
+
+#[test]
+fn msr_readout_effect_begins_the_typed_request_session() {
+    let recorder = Arc::new(RecordingRequests::<MsrReadoutRequest>::default());
+    let mut client = client_with(
+        PlatformFacets::default()
+            .with_system(SystemFacets::default().with_msr_readout(recorder.clone())),
+    );
+    let mut app = crate::demo_app();
+
+    queue_effect(&mut app, &mut client, ShellApp::request_msr_readouts());
+
+    assert_eq!(recorded(&recorder), vec![MsrReadoutRequest::Refresh]);
+    assert!(matches!(
+        app.msr_readout_state(),
+        taskmanager_application::MsrReadoutState::Loading { .. }
     ));
 }
 

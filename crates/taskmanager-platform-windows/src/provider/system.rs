@@ -12,8 +12,9 @@
 
 use taskmanager_application::{
     ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
-    NetworkTelemetryRequest, NpuInventoryRequest, StorageTelemetryRequest,
+    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
+    NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest, SmbiosMemoryRequest,
+    StorageTelemetryRequest,
 };
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
@@ -25,29 +26,38 @@ use taskmanager_core::{
 use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::{
     ContainerRollupProvider, CpuTelemetryProvider, GpuEngineRowsProvider, GpuTelemetryProvider,
-    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider,
-    NetworkTelemetryProvider, NpuInventoryProvider, StorageTelemetryProvider,
+    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider, MsrReadoutProvider,
+    NetworkTelemetryProvider, NpuInventoryProvider, RaplPowerProvider, SmbiosMemoryProvider,
+    StorageTelemetryProvider,
 };
 use taskmanager_platform_runtime::{
-    ProviderRegistration, SystemAuxiliaryExecutors, SystemExecutors, SystemObservationExecutors,
-    SystemProviderBindings, SystemProviderBindingsInput,
+    ProviderRegistration, SystemExecutors, SystemObservationExecutors, SystemProviderBindings,
+    SystemProviderBindingsInput,
 };
 
+mod auxiliary;
 mod cpu_freq;
 mod cpu_info;
 mod disk;
 mod gpu;
 mod hardware_inventory;
+mod msr_readout;
 mod network;
+mod rapl_power;
 mod smbios_info;
+mod smbios_memory;
 mod virtualization;
 mod wsl;
 
+pub use auxiliary::WinSystemAuxiliaryProviders;
 pub use cpu_freq::WinCpuTelemetryProvider;
 pub use disk::WinStorageTelemetryProvider;
 pub use gpu::WinGpuTelemetryProvider;
 pub use hardware_inventory::WinHardwareInventoryProvider;
+pub use msr_readout::PendingMsrReadoutProvider;
 pub use network::WinNetworkTelemetryProvider;
+pub use rapl_power::PendingRaplPowerProvider;
+pub use smbios_memory::PendingSmbiosMemoryProvider;
 
 type HostRegistration = ProviderRegistration<HostTelemetryRequest, Box<dyn HostTelemetryProvider>>;
 type CpuRegistration = ProviderRegistration<CpuTelemetryRequest, Box<dyn CpuTelemetryProvider>>;
@@ -491,6 +501,10 @@ type GpuEngineRowsRegistration =
     ProviderRegistration<GpuEngineRowsRequest, Box<dyn GpuEngineRowsProvider>>;
 type NpuInventoryRegistration =
     ProviderRegistration<NpuInventoryRequest, Box<dyn NpuInventoryProvider>>;
+type SmbiosMemoryRegistration =
+    ProviderRegistration<SmbiosMemoryRequest, Box<dyn SmbiosMemoryProvider>>;
+type RaplPowerRegistration = ProviderRegistration<RaplPowerRequest, Box<dyn RaplPowerProvider>>;
+type MsrReadoutRegistration = ProviderRegistration<MsrReadoutRequest, Box<dyn MsrReadoutProvider>>;
 
 /// Per-engine GPU utilization rows (capability `telemetry.gpu.engines`) from
 /// the unprivileged PDH `\GPU Engine(*)` counters — no helper crossing on
@@ -641,51 +655,8 @@ fn sanitize_setupapi_identity(instance_path: &str) -> String {
         .collect()
 }
 
-/// Hardware operations outside domain observation ownership.
-pub struct WinSystemAuxiliaryProviders {
-    hardware_inventory: HardwareInventoryRegistration,
-    gpu_engine_rows: GpuEngineRowsRegistration,
-    npu_inventory: NpuInventoryRegistration,
-}
-
-impl WinSystemAuxiliaryProviders {
-    #[must_use]
-    pub fn new<P, E, N>(
-        hardware_inventory: ProviderRegistration<HardwareInventoryRequest, P>,
-        gpu_engine_rows: ProviderRegistration<GpuEngineRowsRequest, E>,
-        npu_inventory: ProviderRegistration<NpuInventoryRequest, N>,
-    ) -> Self
-    where
-        P: HardwareInventoryProvider,
-        E: GpuEngineRowsProvider,
-        N: NpuInventoryProvider,
-    {
-        Self {
-            hardware_inventory: hardware_inventory
-                .map_provider(|provider| Box::new(provider) as Box<dyn HardwareInventoryProvider>),
-            gpu_engine_rows: gpu_engine_rows
-                .map_provider(|provider| Box::new(provider) as Box<dyn GpuEngineRowsProvider>),
-            npu_inventory: npu_inventory
-                .map_provider(|provider| Box::new(provider) as Box<dyn NpuInventoryProvider>),
-        }
-    }
-
-    pub(crate) fn into_runtime(self) -> SystemAuxiliaryExecutors {
-        let Self {
-            hardware_inventory,
-            gpu_engine_rows,
-            npu_inventory,
-        } = self;
-        let mut hardware_inventory = hardware_inventory.into_provider();
-        let mut gpu_engine_rows = gpu_engine_rows.into_provider();
-        let mut npu_inventory = npu_inventory.into_provider();
-        SystemAuxiliaryExecutors::new(move || hardware_inventory.refresh())
-            .with_gpu_engine_rows(move |request| {
-                gpu_engine_rows.read_engine_rows(&request.device_id)
-            })
-            .with_npu_inventory(move |observed_at_ms| npu_inventory.read_inventory(observed_at_ms))
-    }
-}
+// Hardware operations outside domain observation ownership live in the
+// `auxiliary` sibling module (split for the workspace line budget).
 
 /// Windows system provider composition grouped by scheduling responsibility.
 pub struct WinSystemProviders {
@@ -718,6 +689,9 @@ impl WinSystemProviders {
         })
         .with_gpu_engine_rows(&self.auxiliary.gpu_engine_rows)
         .with_npu_inventory(&self.auxiliary.npu_inventory)
+        .with_smbios_memory(&self.auxiliary.smbios_memory)
+        .with_rapl_power(&self.auxiliary.rapl_power)
+        .with_msr_readout(&self.auxiliary.msr_readout)
     }
 
     pub(crate) fn into_runtime(self) -> SystemExecutors {

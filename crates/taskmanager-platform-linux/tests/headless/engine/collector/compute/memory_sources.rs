@@ -323,6 +323,8 @@ fn zram_mm_stat_sums_across_devices_into_compression_facts() {
             module_types: Vec::new(),
             module_manufacturers: Vec::new(),
             module_form_factors: Vec::new(),
+            module_part_numbers: Vec::new(),
+            module_serials: Vec::new(),
             status: SourceStatus {
                 provider: ProviderId::borrowed("linux.telemetry.memory.dmi"),
                 outcome: SourceOutcome::Empty,
@@ -512,12 +514,33 @@ fn udev_properties_filter_out_of_spec_and_unspecified_labels() {
         "MEMORY_DEVICE_0_PRESENT=1\n\
          MEMORY_DEVICE_0_TYPE=<OUT OF SPEC>\n\
          MEMORY_DEVICE_0_MANUFACTURER=Not Specified\n\
-         MEMORY_DEVICE_0_FORM_FACTOR=<OUT OF SPEC>\n",
+         MEMORY_DEVICE_0_FORM_FACTOR=<OUT OF SPEC>\n\
+         MEMORY_DEVICE_0_PART_NUMBER=None\n\
+         MEMORY_DEVICE_0_SERIAL_NUMBER=Not Specified\n",
     )
     .expect("fixture parses");
     assert_eq!(devices.modules[0].module_type, None);
     assert_eq!(devices.modules[0].manufacturer, None);
     assert_eq!(devices.modules[0].form_factor, None);
+    assert_eq!(devices.modules[0].part_number, None);
+    assert_eq!(devices.modules[0].serial_number, None);
+}
+
+#[test]
+fn udev_all_zero_serial_stays_an_honest_absence() {
+    // The all-zero serial is the standard unprogrammed SPD state, not a
+    // module identity; it must filter exactly like a sentinel.
+    let devices = parse_udev_memory_properties(
+        "MEMORY_DEVICE_0_PRESENT=1\n\
+         MEMORY_DEVICE_0_SERIAL_NUMBER=00000000\n\
+         MEMORY_DEVICE_0_PART_NUMBER=M425R4GA3PB0\n",
+    )
+    .expect("fixture parses");
+    assert_eq!(devices.modules[0].serial_number, None);
+    assert_eq!(
+        devices.modules[0].part_number.as_deref(),
+        Some("M425R4GA3PB0")
+    );
 }
 
 #[test]
@@ -549,6 +572,8 @@ fn observe_dmi_memory_prefers_udev_speed_type_and_slots() {
         module_types: Vec::new(),
         module_manufacturers: Vec::new(),
         module_form_factors: Vec::new(),
+        module_part_numbers: Vec::new(),
+        module_serials: Vec::new(),
         status: SourceStatus {
             provider: ProviderId::borrowed("linux.telemetry.memory.dmi"),
             outcome: SourceOutcome::Empty,
@@ -578,6 +603,8 @@ fn observe_dmi_memory_prefers_udev_speed_type_and_slots() {
         module_types: Vec::new(),
         module_manufacturers: Vec::new(),
         module_form_factors: Vec::new(),
+        module_part_numbers: Vec::new(),
+        module_serials: Vec::new(),
         status: SourceStatus {
             provider: ProviderId::borrowed("linux.telemetry.memory.dmi"),
             outcome: SourceOutcome::Available,

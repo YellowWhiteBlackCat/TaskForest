@@ -12,7 +12,7 @@ use taskmanager_application::{
     ProjectedProcessInsights, request_submission_failure,
 };
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_platform_contract::SubmissionErrorKind;
 
 use super::{ProcessDetailsSection, RootView, platform_submission_time_ms};
@@ -91,11 +91,13 @@ impl ProcessInsightsLifecycle {
         target: FrozenProcessIdentity,
         kind: ProcessInsightsErrorKind,
     ) {
-        let pid = target.pid;
+        let Some(identity) = target.live_key() else {
+            return;
+        };
         *self = Self::Failed {
             attempt: ProcessInsightsAttempt::BeforeSubmission(target),
             error: ProcessInsightsError {
-                pid,
+                identity: Some(identity),
                 kind,
                 last_success_ms: None,
             },
@@ -113,11 +115,13 @@ impl ProcessInsightsLifecycle {
             return false;
         };
         let request = request.clone();
-        let pid = request.target.pid;
+        let Some(identity) = request.target.live_key() else {
+            return false;
+        };
         *self = Self::Failed {
             attempt: ProcessInsightsAttempt::Submitted(request),
             error: ProcessInsightsError {
-                pid,
+                identity: Some(identity),
                 kind,
                 last_success_ms: None,
             },
@@ -179,11 +183,12 @@ impl ProcessInsightsLifecycle {
         };
     }
 
-    pub(super) fn is_ready_for(&self, pid: u32) -> bool {
+    pub(super) fn is_ready_for(&self, identity: ProcessLiveKey) -> bool {
         matches!(
             self,
             Self::Ready { request, snapshot }
-                if request.target.pid == pid && snapshot.identity.pid == pid
+                if request.target.live_key() == Some(identity)
+                    && ProcessLiveKey::from_identity(snapshot.identity) == Some(identity)
         )
     }
 }
@@ -217,8 +222,12 @@ impl RootView {
         cx.notify();
     }
 
-    pub fn open_process_details(&mut self, pid: u32, section: ProcessDetailsSection) {
-        let Some(target) = self.frozen_process(pid) else {
+    pub fn open_process_details(
+        &mut self,
+        identity: ProcessLiveKey,
+        section: ProcessDetailsSection,
+    ) {
+        let Some(target) = self.frozen_process(identity) else {
             return;
         };
         if self.process_insights.target() != Some(&target) {
@@ -233,10 +242,10 @@ impl RootView {
     /// non-blocking request to the platform observation facet; collection never
     /// occurs from `Render` or the GPUI thread.
     pub(crate) fn poll_process_insights(&mut self) -> bool {
-        let Some(pid) = self.process_properties_pid() else {
+        let Some(identity) = self.process_properties_identity() else {
             return self.process_insights.clear();
         };
-        let Some(target) = self.frozen_process(pid) else {
+        let Some(target) = self.frozen_process(identity) else {
             // Keep a real target only when the application interaction still
             // owns one. If the row disappeared before we could freeze it,
             // retain the exact target from the open surface for diagnostics.

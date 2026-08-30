@@ -25,6 +25,7 @@ use crate::gpui_app::formatting;
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::{LayoutProfile, PageLayoutBudget};
 use taskmanager_application::i18n;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
 
@@ -44,6 +45,8 @@ pub struct AppHistoryViewProps<'a> {
     pub entity: Entity<RootView>,
     pub ui_size: taskmanager_theme::tokens::UiSize,
     pub columns: AppHistoryColumns,
+    /// Presentation unit preferences for the peak-memory column.
+    pub units: UnitPreferences,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,6 +85,7 @@ pub fn render_app_history(props: AppHistoryViewProps<'_>) -> Div {
             scroll.clone(),
             props.ui_size,
             props.columns,
+            props.units,
         ),
         ApplicationHistoryStatus::Disabled => state_panel(
             theme,
@@ -134,6 +138,7 @@ fn history_table(
     scroll: UniformListScrollHandle,
     ui_size: taskmanager_theme::tokens::UiSize,
     columns: AppHistoryColumns,
+    units: UnitPreferences,
 ) -> AnyElement {
     let row_count = rows.len();
     let row_theme = *theme;
@@ -161,7 +166,7 @@ fn history_table(
                     range
                         .filter_map(|index| {
                             rows.get(index).map(|row| {
-                                row_for_projected(&row_theme, row, index, ui_size, columns)
+                                row_for_projected(&row_theme, row, index, ui_size, columns, units)
                             })
                         })
                         .collect::<Vec<_>>()
@@ -309,6 +314,7 @@ fn row_for_projected(
     row_index: usize,
     ui_size: taskmanager_theme::tokens::UiSize,
     columns: AppHistoryColumns,
+    units: UnitPreferences,
 ) -> Div {
     let cpu = row
         .peak_cpu_usage
@@ -318,7 +324,11 @@ fn row_for_projected(
         .peak_memory_bytes
         .filter(|value| value.is_finite() && *value >= 0.0)
         .map_or_else(formatting::missing_value, |value| {
-            formatting::format_decimal_memory(value.min(u64::MAX as f64) as u64)
+            units.format_quantity(
+                value.min(u64::MAX as f64) as u64,
+                QuantityFamily::Memory,
+                false,
+            )
         });
     let count = row
         .peak_process_count

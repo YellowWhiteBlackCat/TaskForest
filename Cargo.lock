@@ -9509,7 +9509,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager"
-version = "0.1.0-rc.5"
+version = "0.1.0-rc6"
 dependencies = [
  "chrono",
  "crossbeam-channel",
@@ -9700,6 +9700,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "taskmanager-msr-helper"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "taskmanager-net-launcher"
 version = "0.1.0"
 dependencies = [
@@ -9764,6 +9772,7 @@ dependencies = [
  "taskmanager-platform-portable",
  "taskmanager-platform-provider",
  "taskmanager-platform-runtime",
+ "taskmanager-smbios-tables",
  "taskmanager-test-support",
  "tracing",
  "wayland-backend",
@@ -9890,6 +9899,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "taskmanager-rapl-helper"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "taskmanager-setup-helper"
 version = "0.1.0"
 
@@ -9904,6 +9921,19 @@ dependencies = [
  "taskmanager-test-support",
  "taskmanager-ui-contract",
 ]
+
+[[package]]
+name = "taskmanager-smbios-helper"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taskmanager-smbios-tables",
+]
+
+[[package]]
+name = "taskmanager-smbios-tables"
+version = "0.1.0"
 
 [[package]]
 name = "taskmanager-telemetry-store"

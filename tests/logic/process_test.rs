@@ -1,8 +1,9 @@
 use taskmanager_core::core::ScalarObservation;
+use taskmanager_core::core::process::group_aggregate::aggregate_apps_typed;
 use taskmanager_core::core::process::{
     ProcessApplicationIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessBatchTargetResult,
-    ProcessItem, ProcessMetadataObservation, ProcessScalarObservations, ProcessSortKey,
-    aggregate_apps, build_process_tree, execute_process_batch_with, fuzzy_filter_processes,
+    ProcessItem, ProcessLiveKey, ProcessMetadataObservation, ProcessScalarObservations,
+    ProcessSortKey, build_process_tree, execute_process_batch_with, fuzzy_filter_processes,
     fuzzy_match, normalize_app_name, sort_processes,
 };
 
@@ -302,28 +303,44 @@ fn test_aggregate_apps() {
             .build(),
     ];
 
-    let apps = aggregate_apps(&refs(&items));
+    let apps = aggregate_apps_typed(&refs(&items), 1);
     assert_eq!(apps.len(), 3);
 
     // Chrome should be first due to highest total CPU usage (40.0%)
     let chrome_group = &apps[0];
-    assert_eq!(chrome_group.name, "Google Chrome");
-    assert_eq!(chrome_group.main_pid, 1000);
-    assert_eq!(chrome_group.process_count, 3);
-    assert_eq!(chrome_group.pids, vec![1000, 1001, 1002]);
-    assert!((chrome_group.total_cpu_usage - 40.0).abs() < f32::EPSILON);
+    assert_eq!(chrome_group.name(), "Google Chrome");
     assert_eq!(
-        chrome_group.total_memory_bytes,
-        (200 + 100 + 300) * 1024 * 1024
+        chrome_group.main_identity(),
+        Some(ProcessLiveKey::from_parts(1000, 10_001).expect("fixture identity"))
+    );
+    assert_eq!(chrome_group.process_count(), 3);
+    assert_eq!(
+        chrome_group.member_identities(),
+        &[
+            ProcessLiveKey::from_parts(1000, 10_001).expect("fixture identity"),
+            ProcessLiveKey::from_parts(1001, 10_011).expect("fixture identity"),
+            ProcessLiveKey::from_parts(1002, 10_021).expect("fixture identity"),
+        ]
+    );
+    assert_eq!(chrome_group.cpu().current_value(), Some(&40.0));
+    assert_eq!(
+        chrome_group.memory().current_value().copied(),
+        Some((200 + 100 + 300) * 1024 * 1024)
     );
 
-    let vscode_group = apps.iter().find(|g| g.name == "VS Code").unwrap();
-    assert_eq!(vscode_group.main_pid, 2000);
-    assert_eq!(vscode_group.process_count, 1);
+    let vscode_group = apps.iter().find(|g| g.name() == "VS Code").unwrap();
+    assert_eq!(
+        vscode_group.main_identity(),
+        Some(ProcessLiveKey::from_parts(2000, 20_001).expect("fixture identity"))
+    );
+    assert_eq!(vscode_group.process_count(), 1);
 
-    let zed_group = apps.iter().find(|g| g.name == "Zed").unwrap();
-    assert_eq!(zed_group.main_pid, 3000);
-    assert_eq!(zed_group.process_count, 1);
+    let zed_group = apps.iter().find(|g| g.name() == "Zed").unwrap();
+    assert_eq!(
+        zed_group.main_identity(),
+        Some(ProcessLiveKey::from_parts(3000, 30_001).expect("fixture identity"))
+    );
+    assert_eq!(zed_group.process_count(), 1);
 }
 
 #[test]
@@ -352,13 +369,12 @@ fn verified_desktop_identity_drives_app_group_name_without_fabricating_icon_stat
         10,
     ));
     let refs = vec![&process];
-    let groups = aggregate_apps(&refs);
+    let groups = aggregate_apps_typed(&refs, 1);
     assert_eq!(groups.len(), 1);
-    assert_eq!(groups[0].name, "Example Editor");
+    assert_eq!(groups[0].name(), "Example Editor");
     assert_eq!(
         groups[0]
-            .application_identity
-            .as_ref()
+            .application_identity()
             .and_then(|identity| identity.icon_token.as_deref()),
         Some("example-editor")
     );
@@ -487,7 +503,8 @@ fn process_batch_freeze_excludes_rows_without_exact_identity_authority() {
             .build(),
     ];
 
-    let intent = ProcessBatchIntent::freeze(&processes, [41, 42], ProcessBatchAction::Suspend);
+    let selected = processes.iter().filter_map(ProcessLiveKey::from_process);
+    let intent = ProcessBatchIntent::freeze(&processes, selected, ProcessBatchAction::Suspend);
 
     assert_eq!(intent.targets.len(), 1);
     let result = execute_process_batch_with(intent, &processes, |_, target| {

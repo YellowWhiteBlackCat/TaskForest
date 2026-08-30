@@ -32,6 +32,10 @@
 //! imperative bulk spawn.
 
 use bevy::app::{App, Plugin, Update};
+
+#[cfg(test)]
+#[path = "../tests/headless/app_support.rs"]
+pub(crate) mod app_support;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
@@ -155,22 +159,6 @@ pub(crate) enum Page {
 }
 
 impl Page {
-    /// The full route surface, for the page-signature reservation test walk.
-    /// The rendered strip shows only [`crate::app::NAV_TABS`]; this list keeps
-    /// every route (including Alerts/Settings) under the shared-order law.
-    #[cfg(test)]
-    pub(crate) const ALL: &'static [Page] = &[
-        Page::Processes,
-        Page::Performance,
-        Page::Services,
-        Page::System,
-        Page::Startup,
-        Page::Sessions,
-        Page::Alerts,
-        Page::Settings,
-        Page::AppHistory,
-    ];
-
     /// Rail label through the shared tab vocabulary — the same label fold
     /// every frontend uses (ARCH §8 semantic-parity law; Processes renders
     /// the Applications tab word, exactly like GPUI's nav). Locale keys:

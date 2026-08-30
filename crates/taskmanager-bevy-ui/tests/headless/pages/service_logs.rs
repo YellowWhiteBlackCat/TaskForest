@@ -85,7 +85,7 @@ fn the_open_affordance_targets_the_selected_service_and_submits_one_follow() {
     // The page selection points at the SECOND row; the open affordance must
     // freeze THAT identity, not the first row.
     let target = {
-        let track = app.world().non_send_resource::<crate::app::FrontendTrack>();
+        let track = app.world().non_send::<crate::app::FrontendTrack>();
         track
             .shell
             .sorted_services()
@@ -103,7 +103,7 @@ fn the_open_affordance_targets_the_selected_service_and_submits_one_follow() {
         .trigger(crate::pages::services::log_panel::ServiceLogsRequested);
     app.world_mut().flush();
 
-    let track = app.world().non_send_resource::<crate::app::FrontendTrack>();
+    let track = app.world().non_send::<crate::app::FrontendTrack>();
     let open = track.shell.service_log.as_ref().expect("stream open");
     assert_eq!(
         open.service_id(),
@@ -138,10 +138,8 @@ fn folded_snapshots_grow_visible_entries_without_cursor_duplicates() {
 
     let now = 1_000;
     if let Some(open) = shell.service_log.as_mut() {
-        open.feed.apply_at(
-            stream_snapshot(&query, (0..3).map(|i| entry(i)).collect()),
-            now,
-        );
+        open.feed
+            .apply_at(stream_snapshot(&query, (0..3).map(entry).collect()), now);
     }
     assert_eq!(
         shell
@@ -156,7 +154,7 @@ fn folded_snapshots_grow_visible_entries_without_cursor_duplicates() {
     // unique, and only genuinely new lines append.
     if let Some(open) = shell.service_log.as_mut() {
         open.feed.apply_at(
-            stream_snapshot(&query, (2..6).map(|i| entry(i)).collect()),
+            stream_snapshot(&query, (2..6).map(entry).collect()),
             now + 2_000,
         );
     }

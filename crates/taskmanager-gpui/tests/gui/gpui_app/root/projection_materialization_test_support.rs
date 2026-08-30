@@ -8,6 +8,7 @@ use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::npu::NpuInventorySnapshot;
 use taskmanager_core::core::power::PowerSupplySnapshot;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process_telemetry::ContainerRollup;
 use taskmanager_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_core::core::services::ServiceItem;
@@ -19,12 +20,16 @@ use taskmanager_core::core::storage_health::FilesystemHealthSnapshot;
 
 impl RootView {
     pub fn replace_process_insights_for_test(&mut self, state: ProcessInsightsState) {
-        let pid = match &state {
-            ProcessInsightsState::Loading { pid } => *pid,
-            ProcessInsightsState::Ready(snapshot) => snapshot.identity.pid,
-            ProcessInsightsState::Error(error) => error.pid,
+        let identity = match &state {
+            ProcessInsightsState::Loading { identity } => Some(*identity),
+            ProcessInsightsState::Ready(snapshot) => {
+                ProcessLiveKey::from_identity(snapshot.identity)
+            }
+            ProcessInsightsState::Error(error) => error.identity,
         };
-        if let Some(target) = self.frozen_process(pid) {
+        if let Some(identity) = identity
+            && let Some(target) = self.frozen_process(identity)
+        {
             self.process_insights.install_capture_state(target, state);
         }
     }
@@ -113,8 +118,11 @@ impl RootView {
 
     pub fn replace_processes_for_test(&mut self, processes: Vec<ProcessItem>) {
         let revision = self.processes_generation().saturating_add(1);
-        self.materialized
-            .replace_processes(revision, std::sync::Arc::new(processes));
+        self.materialized.replace_processes(
+            revision,
+            std::sync::Arc::new(processes),
+            self.processes_observed_at_ms(),
+        );
     }
 
     pub fn processes_mut_for_test(&mut self) -> &mut Vec<ProcessItem> {

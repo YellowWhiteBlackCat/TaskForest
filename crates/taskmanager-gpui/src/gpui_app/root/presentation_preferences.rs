@@ -7,13 +7,13 @@
 
 use gpui::{Context, Pixels, SharedString};
 
-use crate::gpui_app::formatting::DisplayUnits;
 use crate::gpui_app::graph::DEFAULT_GRAPH_DATA_POINTS_CONFIG;
 use taskmanager_application::i18n;
 use taskmanager_core::core::config::{
     COLOR_SCHEME_SYSTEM, STARTUP_PAGE_REMEMBER, SidebarDeviceOverrideConfig,
     TEXT_RENDERING_PLATFORM_DEFAULT,
 };
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::tokens::UiSize;
 use taskmanager_theme::{FontPreference, Skin};
@@ -189,7 +189,7 @@ impl Default for SidebarPreferences {
 pub struct PresentationSnapshot {
     pub(crate) appearance: AppearancePreferences,
     pub(crate) devices: DeviceVisibilityPreferences,
-    pub(crate) units: DisplayUnits,
+    pub(crate) units: UnitPreferences,
     pub(crate) graphs: GraphPreferences,
     pub(crate) sidebar: SidebarPreferences,
     pub(crate) gray_zero_values: bool,
@@ -202,7 +202,7 @@ impl Default for PresentationSnapshot {
         Self {
             appearance: AppearancePreferences::default(),
             devices: DeviceVisibilityPreferences::default(),
-            units: DisplayUnits::default(),
+            units: UnitPreferences::default(),
             graphs: GraphPreferences::default(),
             sidebar: SidebarPreferences::default(),
             gray_zero_values: false,
@@ -367,7 +367,7 @@ impl PresentationPreferences {
         self.snapshot.devices
     }
 
-    pub(super) const fn units(&self) -> DisplayUnits {
+    pub(super) const fn units(&self) -> UnitPreferences {
         self.snapshot.units
     }
 

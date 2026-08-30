@@ -5,7 +5,7 @@ use gpui::{AppContext, Context, Entity};
 use taskmanager_application::ProcessControlRequest;
 use taskmanager_core::core::process::ProcessSignal;
 
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 
 use super::{Hover, ProcMenuAction, ProcessDetailsSection, RootView};
 use crate::gpui_app::root::dispatch::apply_search_online;
@@ -87,7 +87,7 @@ impl RootView {
     /// by type rather than by keeping two `0..=8` match arms in sync.
     pub(crate) fn apply_proc_action(
         &mut self,
-        pid: u32,
+        identity: ProcessLiveKey,
         action: ProcMenuAction,
         cx: &mut Context<Self>,
     ) {
@@ -100,7 +100,7 @@ impl RootView {
             // Properties: open the typed process-details surface for the
             // context-menu target (or dismiss it when the target is absent).
             ProcMenuAction::Properties => {
-                self.open_process_details(pid, ProcessDetailsSection::Overview);
+                self.open_process_details(identity, ProcessDetailsSection::Overview);
                 cx.notify();
                 return;
             }
@@ -108,14 +108,14 @@ impl RootView {
             // the resource-reveal facet. Provider-specific path resolution and
             // desktop integration stay outside GPUI.
             ProcMenuAction::OpenLocation => {
-                self.request_reveal_process(pid, cx);
+                self.request_reveal_process(identity, cx);
                 cx.notify();
                 return;
             }
             // Search online: dispatched to the body in `dispatch.rs`
             // (apply_search_online), which sets `local_feedback_toast` for failure cases.
             ProcMenuAction::SearchOnline => {
-                apply_search_online(self, pid, cx);
+                apply_search_online(self, identity, cx);
                 cx.notify();
                 return;
             }
@@ -125,32 +125,32 @@ impl RootView {
             // A transient local_feedback_toast toast confirms what was copied (or reports
             // there was nothing to copy — e.g. the item vanished between ticks).
             ProcMenuAction::CopyName => {
-                let (text, what) = self.copy_field(pid, |i| i.name.clone(), "name");
+                let (text, what) = self.copy_field(identity, |i| i.name.clone(), "name");
                 self.finish_copy(text, what, cx);
                 return;
             }
             ProcMenuAction::CopyPid => {
-                let (text, what) = self.copy_field(pid, |i| i.pid.to_string(), "PID");
+                let (text, what) = self.copy_field(identity, |i| i.pid.to_string(), "PID");
                 self.finish_copy(text, what, cx);
                 return;
             }
             ProcMenuAction::CopyCmdline => {
-                let (text, what) = self.copy_field(pid, |i| i.cmdline.clone(), "command line");
+                let (text, what) = self.copy_field(identity, |i| i.cmdline.clone(), "command line");
                 self.finish_copy(text, what, cx);
                 return;
             }
             ProcMenuAction::EndTask => {
-                self.request_process_termination(ProcessTerminationAction::EndTask, pid);
+                self.request_process_termination(ProcessTerminationAction::EndTask, identity);
                 cx.notify();
                 return;
             }
             ProcMenuAction::EndProcessTree => {
-                self.request_process_tree_termination(pid);
+                self.request_process_tree_termination(identity);
                 cx.notify();
                 return;
             }
             ProcMenuAction::Kill => {
-                self.request_process_termination(ProcessTerminationAction::ForceKill, pid);
+                self.request_process_termination(ProcessTerminationAction::ForceKill, identity);
                 cx.notify();
                 return;
             }
@@ -159,10 +159,10 @@ impl RootView {
             ProcMenuAction::Signal(s) => Some(MenuControlRequest::Signal(s)),
         };
         if let Some(control) = control
-            && let Some(target) = self.frozen_process(pid)
+            && let Some(target) = self.frozen_process(identity)
         {
             let (request, feedback_action) = menu_control_submission(control, target);
-            self.submit_process_control(request, feedback_action, pid, cx);
+            self.submit_process_control(request, feedback_action, identity, cx);
         }
         cx.notify();
     }

@@ -35,7 +35,7 @@ pub(super) fn apply_root_persisted_projection(
         network_other: cfg.show_network_other,
         gpus: cfg.show_gpus,
     };
-    next.units = crate::gpui_app::formatting::DisplayUnits {
+    next.units = taskmanager_core::core::units::UnitPreferences {
         memory_use_bytes: cfg.memory_use_bytes,
         memory_use_base2: cfg.memory_use_base2,
         drive_use_bytes: cfg.drive_use_bytes,

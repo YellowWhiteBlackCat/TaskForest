@@ -22,6 +22,9 @@ impl PrivilegeGate for PolkitGate {
             EscalationFeature::IntelPmu => probe_intel_pmu(),
             EscalationFeature::PerProcessNet => probe_net_launcher(),
             EscalationFeature::ForeignProcessControl => probe_foreign_process_control(),
+            EscalationFeature::MemorySmbios => probe_smbios_helper(),
+            EscalationFeature::PackagePowerRapl => probe_rapl_helper(),
+            EscalationFeature::CpuMsr => probe_msr_helper(),
             // Features without an operational helper stay on the honest
             // unprivileged default rather than claiming a helper we lack.
             other => EscalationAvailability::RequiresEscalation(other),
@@ -72,13 +75,28 @@ fn probe_intel_pmu() -> EscalationAvailability {
 /// `pkexec` action by the annotated helper path, so an installed helper
 /// without its action is unusable.
 #[cfg(target_os = "linux")]
-const NET_LAUNCHER_ACTION_INSTALLED: &str = "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy";
+const NET_LAUNCHER_ACTION_INSTALLED: &str =
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy";
 
 #[cfg(target_os = "linux")]
-const PERF_HELPER_ACTION_INSTALLED: &str = "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy";
+const PERF_HELPER_ACTION_INSTALLED: &str =
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy";
 
 #[cfg(target_os = "linux")]
-const PROCESS_CONTROL_ACTION_INSTALLED: &str = "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy";
+const PROCESS_CONTROL_ACTION_INSTALLED: &str =
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy";
+
+#[cfg(target_os = "linux")]
+const SMBIOS_ACTION_INSTALLED: &str =
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy";
+
+#[cfg(target_os = "linux")]
+const RAPL_ACTION_INSTALLED: &str =
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy";
+
+#[cfg(target_os = "linux")]
+const MSR_ACTION_INSTALLED: &str =
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy";
 
 #[cfg(target_os = "linux")]
 fn probe_net_launcher() -> EscalationAvailability {
@@ -93,6 +111,60 @@ fn probe_net_launcher() -> EscalationAvailability {
 
 #[cfg(not(target_os = "linux"))]
 fn probe_net_launcher() -> EscalationAvailability {
+    EscalationAvailability::Denied {
+        reason: EscalationDenialReason::Unsupported,
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn probe_smbios_helper() -> EscalationAvailability {
+    probe_installed_crossing_at(
+        EscalationFeature::MemorySmbios,
+        pkexec_location(),
+        std::path::Path::new(SMBIOS_ACTION_INSTALLED),
+        std::path::Path::new(super::smbios::SMBIOS_HELPER_PATH),
+        0,
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn probe_smbios_helper() -> EscalationAvailability {
+    EscalationAvailability::Denied {
+        reason: EscalationDenialReason::Unsupported,
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn probe_rapl_helper() -> EscalationAvailability {
+    probe_installed_crossing_at(
+        EscalationFeature::PackagePowerRapl,
+        pkexec_location(),
+        std::path::Path::new(RAPL_ACTION_INSTALLED),
+        std::path::Path::new(super::rapl::RAPL_HELPER_PATH),
+        0,
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn probe_rapl_helper() -> EscalationAvailability {
+    EscalationAvailability::Denied {
+        reason: EscalationDenialReason::Unsupported,
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn probe_msr_helper() -> EscalationAvailability {
+    probe_installed_crossing_at(
+        EscalationFeature::CpuMsr,
+        pkexec_location(),
+        std::path::Path::new(MSR_ACTION_INSTALLED),
+        std::path::Path::new(super::msr::MSR_HELPER_PATH),
+        0,
+    )
+}
+
+#[cfg(not(target_os = "linux"))]
+fn probe_msr_helper() -> EscalationAvailability {
     EscalationAvailability::Denied {
         reason: EscalationDenialReason::Unsupported,
     }

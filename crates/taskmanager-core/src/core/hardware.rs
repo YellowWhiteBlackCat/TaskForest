@@ -131,6 +131,147 @@ pub struct KernelInfo {
     /// This excludes `version` and never carries an unparsed provider record,
     /// path-specific syntax, or an operating-system-specific prefix.
     pub build: Option<String>,
+    /// Kernel compiler description supplied by the native adapter, e.g.
+    /// `"gcc 14.2.0"`. Absent when the platform exposes no compiler record —
+    /// never parsed from the build string by a frontend.
+    #[serde(default)]
+    pub compiler: Option<String>,
+}
+
+/// CPUID version identity for the processor (leaf-0 vendor string plus the
+/// leaf-1 `EAX` version fields).
+///
+/// The numeric fields are the raw CPUID fields, not their display
+/// combination: combining them for presentation is a pure rule below, so one
+/// authority owns the SDM arithmetic. Every field is absent together when the
+/// platform cannot probe the identity (non-x86 host, synthetic fixture root);
+/// partial presence only arises from legacy snapshots and renders per field.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct CpuIdentity {
+    /// Native CPUID vendor string, e.g. `"GenuineIntel"` or `"AuthenticAMD"`.
+    #[serde(default)]
+    pub vendor_id: Option<String>,
+    /// CPUID leaf-1 base family field (bits 8-11).
+    #[serde(default)]
+    pub family: Option<u8>,
+    /// CPUID leaf-1 extended family field (bits 20-27).
+    #[serde(default)]
+    pub ext_family: Option<u8>,
+    /// CPUID leaf-1 base model field (bits 4-7).
+    #[serde(default)]
+    pub model: Option<u8>,
+    /// CPUID leaf-1 extended model field (bits 16-19).
+    #[serde(default)]
+    pub ext_model: Option<u8>,
+    /// CPUID leaf-1 stepping field (bits 0-3).
+    #[serde(default)]
+    pub stepping: Option<u8>,
+}
+
+impl CpuIdentity {
+    /// Assemble the identity from the raw leaf-1 version fields supplied by
+    /// the native CPUID reader. The `EAX` bit layout stays in the platform
+    /// adapter; only these typed fields cross into the domain.
+    #[must_use]
+    pub fn from_cpuid_parts(
+        vendor_id: Option<String>,
+        family: u8,
+        ext_family: u8,
+        model: u8,
+        ext_model: u8,
+        stepping: u8,
+    ) -> Self {
+        Self {
+            vendor_id,
+            family: Some(family),
+            ext_family: Some(ext_family),
+            model: Some(model),
+            ext_model: Some(ext_model),
+            stepping: Some(stepping),
+        }
+    }
+
+    /// Display family per the SDM combination rule: the base family, plus the
+    /// extended family when the base field is exhausted (`0xF`). `None` for an
+    /// exhausted base field whose extension the source did not report — a bare
+    /// `15` would misidentify every modern processor.
+    #[must_use]
+    pub fn display_family(&self) -> Option<u32> {
+        match self.family {
+            None => None,
+            Some(0xF) => self
+                .ext_family
+                .map(|ext| u32::from(0xF_u8) + u32::from(ext)),
+            Some(family) => Some(u32::from(family)),
+        }
+    }
+
+    /// Display model per the SDM combination rule: the base model, plus the
+    /// extended model shifted into place when the *base* family field is `6`
+    /// or `0xF`. Extended-model absence on those families leaves the model
+    /// unavailable rather than presenting a truncated identity.
+    #[must_use]
+    pub fn display_model(&self) -> Option<u32> {
+        let model = u32::from(self.model?);
+        match self.family {
+            Some(0x6) | Some(0xF) => self.ext_model.map(|ext| (u32::from(ext) << 4) + model),
+            _ => Some(model),
+        }
+    }
+
+    /// Compact one-line identity code, e.g. `"6 / 183 / 2"` (display family,
+    /// display model, stepping). `None` while the family/model pair cannot be
+    /// derived; stepping is appended only when reported.
+    #[must_use]
+    pub fn code(&self) -> Option<String> {
+        let family = self.display_family()?;
+        let model = self.display_model()?;
+        match self.stepping {
+            Some(stepping) => Some(format!("{family} / {model} / {stepping}")),
+            None => Some(format!("{family} / {model}")),
+        }
+    }
+
+    /// Marketing codename for the probed identity (e.g. "Raptor Lake-S/HX
+    /// (13th/14th gen)"), from the shared codename table. `None` for an
+    /// uncovered pair or vendor — never a guess from the brand string.
+    #[must_use]
+    pub fn codename(&self) -> Option<&'static str> {
+        let vendor =
+            crate::core::cpu_codename::CpuVendor::from_vendor_id(self.vendor_id.as_deref()?)?;
+        crate::core::cpu_codename::classify_cpu_codename(
+            vendor,
+            self.display_family()?,
+            self.display_model()?,
+        )
+        .map(|(codename, _)| codename)
+    }
+
+    /// Process node for the probed identity (e.g. "Intel 7", "TSMC N4"),
+    /// from the shared codename table. `None` alongside an absent codename.
+    #[must_use]
+    pub fn process_node(&self) -> Option<&'static str> {
+        let vendor =
+            crate::core::cpu_codename::CpuVendor::from_vendor_id(self.vendor_id.as_deref()?)?;
+        crate::core::cpu_codename::classify_cpu_codename(
+            vendor,
+            self.display_family()?,
+            self.display_model()?,
+        )
+        .map(|(_, node)| node)
+    }
+
+    /// Whether any identity field was observed. Absent everywhere is the
+    /// honest "not probed" state on non-x86 hosts and fixture roots.
+    #[must_use]
+    pub fn is_present(&self) -> bool {
+        self.vendor_id.is_some()
+            || self.family.is_some()
+            || self.ext_family.is_some()
+            || self.model.is_some()
+            || self.ext_model.is_some()
+            || self.stepping.is_some()
+    }
 }
 
 /// Static compute topology. Live frequency, temperature and power readings do
@@ -152,6 +293,11 @@ pub struct ComputeTopology {
     /// unreported feature is absent from this list; providers never guess.
     #[serde(default)]
     pub instruction_features: Vec<CpuInstructionFeature>,
+    /// CPUID version identity (vendor string plus raw family/model/stepping
+    /// fields). Absent together when the platform cannot probe it; never
+    /// inferred from the marketing brand string.
+    #[serde(default)]
+    pub cpu_identity: CpuIdentity,
 }
 
 /// Optional firmware and machine identity facts.
@@ -176,6 +322,15 @@ pub struct FirmwareInfo {
     /// Motherboard/baseboard model when the native source exposes one.
     #[serde(default)]
     pub motherboard_model: Option<String>,
+    /// Motherboard/baseboard revision (DMI `board_version`) when the native
+    /// source exposes one. Absence is honest — never a guessed "rev 1".
+    #[serde(default)]
+    pub motherboard_version: Option<String>,
+    /// Platform/chipset model (e.g. `"Z690 Chipset"`) when the native source
+    /// can prove it from its own PCI/DMI tables. Absence is honest — never a
+    /// guess from the CPU brand or vendor name.
+    #[serde(default)]
+    pub chipset: Option<String>,
     /// Firmware release date (e.g. DMI `bios_date`) when the native source
     /// exposes one. Absence is honest — never a fabricated date.
     #[serde(default)]
@@ -314,6 +469,10 @@ pub struct HardwareInfo {
     /// the native adapter. Frontends must not parse provider-specific records.
     #[serde(default)]
     pub kernel_build: Option<String>,
+    /// Kernel compiler description from the kernel fragment, e.g.
+    /// `"gcc 14.2.0"`. `None` when the platform exposes no compiler record.
+    #[serde(default)]
+    pub kernel_compiler: Option<String>,
     #[serde(default)]
     pub hostname: Option<String>,
     /// Login shell reported by the active user session.
@@ -385,6 +544,10 @@ pub struct HardwareInfo {
     /// Missing when the adapter cannot read a native feature source.
     #[serde(default)]
     pub instruction_features: Vec<CpuInstructionFeature>,
+    /// CPUID version identity from the topology source (vendor, family,
+    /// model, stepping fields). Absent when the platform cannot probe it.
+    #[serde(default)]
+    pub cpu_identity: CpuIdentity,
     /// Hypervisor label (e.g. "KVM", "Hyper-V", "VMware", "VirtualBox", "Xen",
     /// or the raw native provider label). `None` on bare metal.
     #[serde(default)]
@@ -415,6 +578,13 @@ pub struct HardwareInfo {
     /// Firmware release date. `None` when unavailable.
     #[serde(default)]
     pub firmware_release_date: Option<String>,
+    /// Motherboard/baseboard revision from the firmware fragment.
+    #[serde(default)]
+    pub motherboard_version: Option<String>,
+    /// Platform/chipset model from the firmware fragment. `None` when the
+    /// platform exposes no provable chipset identity source.
+    #[serde(default)]
+    pub chipset: Option<String>,
     /// Secure Boot state. `None` when the platform exposes no safe source.
     #[serde(default)]
     pub secure_boot: Option<bool>,
@@ -479,6 +649,7 @@ impl HardwareInfo {
             kernel_modules_count: kernel.modules_count,
             kernel_cmdline: kernel.command_line,
             kernel_build: kernel.build,
+            kernel_compiler: kernel.compiler,
             hostname: host.hostname,
             shell: host.shell,
             terminal: host.terminal,
@@ -503,6 +674,7 @@ impl HardwareInfo {
             cpu_types: topology.cpu_types,
             base_freq_mhz: topology.base_frequency_mhz,
             instruction_features: topology.instruction_features,
+            cpu_identity: topology.cpu_identity,
             virt: firmware.virtualization,
             product_name: firmware.product_name,
             product_version: firmware.product_version,
@@ -511,6 +683,8 @@ impl HardwareInfo {
             architecture: Some(Self::HOST_ARCH.to_string()),
             motherboard_vendor: firmware.motherboard_vendor,
             motherboard_model: firmware.motherboard_model,
+            motherboard_version: firmware.motherboard_version,
+            chipset: firmware.chipset,
             firmware_release_date: firmware.firmware_release_date,
             secure_boot: firmware.secure_boot,
             displays,

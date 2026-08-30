@@ -6,6 +6,7 @@
 
 use super::{ProcMenuAction, RootView, TopPage};
 use gpui::Entity;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem};
 
 use crate::gpui_app::sidebar::SelectedDevice;
@@ -53,25 +54,25 @@ pub fn initial_selected() -> SelectedDevice {
 /// keep in sync).
 ///
 /// The `PopupMenuState` is assembled by the caller (the `context_menu` builder
-/// in `processes_view::rows::cells.rs`) from these entries; the caller is
-/// passes its frozen row pid into every action closure and also synchronizes
+/// in `processes_view::rows::cells.rs`) from these entries; the caller passes
+/// its frozen live identity into every action closure and also synchronizes
 /// visual selection before the popup opens.
 ///
 /// The gc "Copy" submenu has no submenu variant in the own popup layer
 /// (compile-time exclusion in the owned component boundary), so its three
 /// items are flattened under a non-interactive label row; the items, i18n
 /// labels, and `CopyName`/`CopyPid`/`CopyCmdline` dispatch are unchanged.
-pub fn build_proc_menu(entity: Entity<RootView>, pid: u32) -> Vec<MenuEntry> {
+pub fn build_proc_menu(entity: Entity<RootView>, identity: ProcessLiveKey) -> Vec<MenuEntry> {
     fn item(
         items: &mut Vec<MenuEntry>,
         entity: &Entity<RootView>,
-        pid: u32,
+        identity: ProcessLiveKey,
         label: &'static str,
         action: ProcMenuAction,
     ) {
         let e = entity.clone();
         items.push(MenuEntry::Item(MenuItem::new(label, move |_, cx| {
-            e.update(cx, |v, cx| v.apply_proc_action(pid, action, cx));
+            e.update(cx, |v, cx| v.apply_proc_action(identity, action, cx));
         })));
     }
 
@@ -79,35 +80,35 @@ pub fn build_proc_menu(entity: Entity<RootView>, pid: u32) -> Vec<MenuEntry> {
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("proc.end_task"),
         ProcMenuAction::EndTask,
     );
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("proc.end_process_tree"),
         ProcMenuAction::EndProcessTree,
     );
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("proc.kill"),
         ProcMenuAction::Kill,
     );
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("proc.suspend"),
         ProcMenuAction::Suspend,
     );
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("proc.resume"),
         ProcMenuAction::Resume,
     );
@@ -117,28 +118,28 @@ pub fn build_proc_menu(entity: Entity<RootView>, pid: u32) -> Vec<MenuEntry> {
         item(
             &mut items,
             &entity,
-            pid,
+            identity,
             "Send SIGHUP",
             ProcMenuAction::Signal(ProcessSignal::Hangup),
         );
         item(
             &mut items,
             &entity,
-            pid,
+            identity,
             "Send SIGINT",
             ProcMenuAction::Signal(ProcessSignal::Interrupt),
         );
         item(
             &mut items,
             &entity,
-            pid,
+            identity,
             "Send SIGUSR1",
             ProcMenuAction::Signal(ProcessSignal::User1),
         );
         item(
             &mut items,
             &entity,
-            pid,
+            identity,
             "Send SIGUSR2",
             ProcMenuAction::Signal(ProcessSignal::User2),
         );
@@ -150,21 +151,21 @@ pub fn build_proc_menu(entity: Entity<RootView>, pid: u32) -> Vec<MenuEntry> {
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("proc.open_location"),
         ProcMenuAction::OpenLocation,
     );
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("proc.search_online"),
         ProcMenuAction::SearchOnline,
     );
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("dialog.properties"),
         ProcMenuAction::Properties,
     );
@@ -177,21 +178,21 @@ pub fn build_proc_menu(entity: Entity<RootView>, pid: u32) -> Vec<MenuEntry> {
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("menu.copy_name"),
         ProcMenuAction::CopyName,
     );
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("menu.copy_pid"),
         ProcMenuAction::CopyPid,
     );
     item(
         &mut items,
         &entity,
-        pid,
+        identity,
         taskmanager_application::i18n::t("menu.copy_command_line"),
         ProcMenuAction::CopyCmdline,
     );
@@ -202,11 +203,15 @@ pub fn build_proc_menu(entity: Entity<RootView>, pid: u32) -> Vec<MenuEntry> {
 /// in the default browser via `xdg-open`. The name is percent-encoded per RFC 3986
 /// (`url_encode_query`) so spaces / `/` / `&` / non-ASCII don't corrupt the URL.
 /// Sets a transient feedback when there's no name to search or the launch fails.
-pub fn apply_search_online(v: &mut RootView, pid: u32, cx: &mut gpui::Context<RootView>) {
+pub fn apply_search_online(
+    v: &mut RootView,
+    identity: ProcessLiveKey,
+    cx: &mut gpui::Context<RootView>,
+) {
     let Some(name) = v
         .processes()
         .iter()
-        .find(|process| process.pid == pid)
+        .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
         .map(|process| process.name.clone())
     else {
         return;

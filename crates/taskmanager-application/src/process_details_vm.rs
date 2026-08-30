@@ -1,6 +1,7 @@
 //! Neutral process-details row ViewModel (ARCH.md §8.1 data layer).
 //!
-//! The single fold from a typed [`ProcessItem`] observation to the
+//! The single fold from a typed
+//! [`taskmanager_core::core::process::ProcessItem`] observation to the
 //! label/value rows every frontend's process-details panel and
 //! process-properties dialog renders. Before this module the TUI
 //! (`ui/process_details.rs` + `ui/process_properties.rs`), the Iced
@@ -45,7 +46,8 @@
 //!
 //! # Adjudicated formats
 //!
-//! * Byte quantities go through the neutral [`crate::units`] ladder with the
+//! * Byte quantities go through the neutral
+//!   [`taskmanager_core::core::units`] ladder with the
 //!   caller's `core::units::UnitPreferences`: memory family for `Memory`/`Pss`/`Swap`,
 //!   drive family for the four disk fields (rates append `/s`). With the
 //!   Mission-Center-parity default (bytes, base-2) this matches the

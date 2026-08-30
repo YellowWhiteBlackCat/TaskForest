@@ -219,6 +219,33 @@ impl NpuInventoryProvider for FakeProvider {
     }
 }
 
+impl SmbiosMemoryProvider for FakeProvider {
+    fn read_memory_smbios(&mut self) -> Result<SmbiosMemorySnapshot, ProviderFailure> {
+        // One bounded immediate call: the contract fixture only needs the
+        // smbios lane wired so the capability is published; no privileged
+        // helper is ever spawned here.
+        Ok(SmbiosMemorySnapshot::success(0, 0, Vec::new(), None))
+    }
+}
+
+impl RaplPowerProvider for FakeProvider {
+    fn read_package_power(&mut self) -> Result<RaplPowerSnapshot, ProviderFailure> {
+        // One bounded immediate call: the contract fixture only needs the
+        // rapl lane wired so the capability is published; no privileged
+        // helper is ever spawned here.
+        Ok(RaplPowerSnapshot::success(0, Vec::new()))
+    }
+}
+
+impl MsrReadoutProvider for FakeProvider {
+    fn read_msr_readouts(&mut self) -> Result<MsrReadoutSnapshot, ProviderFailure> {
+        // One bounded immediate call: the contract fixture only needs the
+        // msr lane wired so the capability is published; no privileged
+        // helper is ever spawned here.
+        Ok(MsrReadoutSnapshot::success(Vec::new()))
+    }
+}
+
 impl HardwareInventoryProvider for FakeProvider {
     fn refresh(&mut self) -> Result<CompositeSourceSnapshot<HardwareInfo>, ProviderFailure> {
         Ok(CompositeSourceSnapshot::new(

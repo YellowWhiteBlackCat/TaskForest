@@ -13,7 +13,6 @@ use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
-use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
@@ -197,7 +196,7 @@ fn entry_stamp(entry: &ServiceLogEntry) -> String {
 
 // ---- scenes ----------------------------------------------------------------
 
-fn entry_row_scene(entry: &ServiceLogEntry, palette: &UiPalette) -> impl Scene + use<> {
+fn entry_row_scene(entry: &ServiceLogEntry, _palette: &UiPalette) -> impl Scene + use<> {
     bsn! {
         Node {
             width: percent(100.0),

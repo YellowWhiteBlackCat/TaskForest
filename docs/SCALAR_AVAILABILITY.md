@@ -18,15 +18,15 @@ baseline，不得伪造速率。No hardware-vendor feature is part of this contr
 
 ## 迁移矩阵
 
-| Domain | Compatibility only | Typed vertical | Remaining |
+| Domain | External input only | Typed vertical | Remaining |
 |---|---|---|---|
-| CPU | 旧标量只在 typed truth 为 `Unknown` 时读取 | 利用率、频率、温度、功耗与逐核 group | macOS/Windows 与目标硬件 receipt |
-| GPU | 旧利用率、显存和温度字段只作兼容 | 利用率、显存、时钟、温度、功耗、风扇、idle | 多卡、权限、驱动恢复 receipt |
-| Memory | 旧数值与旧 Option 只作兼容 | total/used/swap、组成、模块、压缩 | 跨平台硬件 receipt |
-| Disk | 旧容量、速率与 I/O 字段只作兼容 | 容量、挂载空间、速率、IOPS、延迟、SMART 分层 | 多文件系统、计数器复位、热插拔 |
-| Network | 旧 totals/rates/link/SSID 只作兼容 | counter、rate、carrier、link、wireless optional | 重命名、无线、跨平台恢复 |
-| Sensors | 旧 kind/value 只作兼容 | unit、source scale、reading 与生命周期分离 | cooling、IPMI/Redfish、热插拔 |
-| Power | 旧 BatteryInfo/batteries 只作兼容 | capacity、voltage、power、cycle、Battery/UPS kind | 外围电源和目标机恢复 |
+| CPU | 旧标量只在私有 ingress 且 typed truth 为 `Unknown` 时 canonicalize | 利用率、频率、温度、功耗与逐核 group | macOS/Windows 与目标硬件 receipt |
+| GPU | 旧利用率、显存和温度字段只在私有 ingress canonicalize | 利用率、显存、时钟、温度、功耗、风扇、idle | 多卡、权限、驱动恢复 receipt |
+| Memory | 旧数值与旧 Option 只在私有 ingress canonicalize | total/used/swap、组成、模块、压缩 | 跨平台硬件 receipt |
+| Disk | 旧容量、速率与 I/O 字段只在私有 ingress canonicalize | 容量、挂载空间、速率、IOPS、延迟、SMART 分层 | 多文件系统、计数器复位、热插拔 |
+| Network | 旧 totals/rates/link/SSID 只在私有 ingress canonicalize | counter、rate、carrier、link、wireless optional | 重命名、无线、跨平台恢复 |
+| Sensors | 旧 kind/value 只在私有 ingress canonicalize | unit、source scale、reading 与生命周期分离 | cooling、IPMI/Redfish、热插拔 |
+| Power | 旧 BatteryInfo/batteries 只在私有 ingress canonicalize | capacity、voltage、power、cycle、Battery/UPS kind | 外围电源和目标机恢复 |
 
 ## 当前能力项
 
@@ -75,7 +75,8 @@ Battery、UPS 和外围电源拥有独立 kind 与 generation；capacity、volta
 ### Recovery (`CORE-AVAIL-10`)
 
 失败→恢复必须保留 sequence、generation、last-success 和 gap；前端只能消费 current
-projection。旧 JSON 读取可兼容，但新写出必须使用 typed 语义。
+ projection。外部旧 JSON 若属于已发布数据格式，只能在私有 ingress canonicalize；新写出必须
+ 使用 typed 语义。
 
 ## 下一层
 

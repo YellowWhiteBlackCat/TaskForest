@@ -3,9 +3,9 @@
 use gpui::{Context, Div, Entity, IntoElement, ParentElement, Styled, div};
 
 use crate::gpui_app::elements::pill;
-use crate::gpui_app::formatting::DisplayUnits;
 use crate::gpui_app::root::{Hover, RootView};
 use taskmanager_application::i18n;
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -50,7 +50,7 @@ struct UnitRowSpec {
 pub(super) fn units_group(
     t: &Theme,
     ent: Entity<RootView>,
-    units: DisplayUnits,
+    units: UnitPreferences,
     hovered: Option<&Hover>,
     cx: &mut Context<RootView>,
 ) -> Div {

@@ -1,4 +1,5 @@
-use super::{DashboardState, EventCenterState, EventKind};
+use super::{DashboardState, EventCenterState};
+use taskmanager_core::core::AlertEventKind;
 use taskmanager_shell::{ProcessStatusFilter, SortCol};
 
 #[test]
@@ -7,7 +8,7 @@ fn event_center_reads_shared_history_and_tracks_local_read_state() {
     let events = EventCenterState::capture_event_fixture();
     let visible = center.visible_events(&events);
     assert_eq!(visible.len(), 2);
-    assert_eq!(visible[0].kind, EventKind::Cleared);
+    assert_eq!(visible[0].kind, AlertEventKind::Cleared);
     assert_eq!(center.unread_count(&events), 2);
     center.mark_all_read(&events);
     assert_eq!(center.unread_count(&events), 0);

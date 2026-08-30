@@ -7,6 +7,7 @@ use super::{ActionBtnProps, action_btn};
 use crate::gpui_app::elements;
 use crate::gpui_app::root::{Hover, RootView};
 use taskmanager_application::i18n;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -20,7 +21,7 @@ pub(super) fn logical_cpu_count() -> usize {
 pub(super) struct AffinityOverlayProps<'a> {
     pub theme: &'a Theme,
     pub hovered: Option<&'a Hover>,
-    pub pid: u32,
+    pub identity: ProcessLiveKey,
     pub state: &'a taskmanager_application::ProcessAffinityState,
     pub cpus: &'a HashSet<u32>,
     pub hover_chip: Option<usize>,
@@ -34,7 +35,7 @@ pub(super) fn affinity_overlay(
     let AffinityOverlayProps {
         theme,
         hovered,
-        pid,
+        identity,
         state,
         cpus,
         hover_chip,
@@ -43,23 +44,29 @@ pub(super) fn affinity_overlay(
     let count = logical_cpu_count();
     let close_entity = entity.clone();
     let content = match state {
-        taskmanager_application::ProcessAffinityState::Ready(ready) if ready.target.pid == pid => {
+        taskmanager_application::ProcessAffinityState::Ready(ready)
+            if ready.target.live_key() == Some(identity) =>
+        {
             affinity_content(theme, count, cpus, hover_chip, hovered, &entity, cx)
         }
         taskmanager_application::ProcessAffinityState::Failed { failure, .. } => {
-            affinity_status_content(theme, pid, Some(*failure), hovered, cx)
+            affinity_status_content(theme, identity, Some(*failure), hovered, cx)
         }
         taskmanager_application::ProcessAffinityState::Closed
         | taskmanager_application::ProcessAffinityState::Loading { .. }
         | taskmanager_application::ProcessAffinityState::Ready(_) => {
-            affinity_status_content(theme, pid, None, hovered, cx)
+            affinity_status_content(theme, identity, None, hovered, cx)
         }
     };
     elements::dialog_overlay(
         theme,
         window,
         cx,
-        format!("{} \u{2014} PID {pid}", i18n::t("dialog.cpu_affinity")),
+        format!(
+            "{} \u{2014} PID {}",
+            i18n::t("dialog.cpu_affinity"),
+            identity.pid()
+        ),
         move |_, cx| {
             close_entity.update(cx, |view, cx| {
                 view.dismiss_window_surface(
@@ -75,7 +82,7 @@ pub(super) fn affinity_overlay(
 
 fn affinity_status_content(
     theme: &Theme,
-    pid: u32,
+    identity: ProcessLiveKey,
     failure: Option<taskmanager_core::core::failure::FailureKind>,
     hovered: Option<&Hover>,
     cx: &mut Context<RootView>,
@@ -95,7 +102,7 @@ fn affinity_status_content(
                 hovered,
                 enabled: true,
                 action: move |view: &mut RootView, cx: &mut Context<RootView>| {
-                    view.request_process_affinity(pid, cx);
+                    view.request_process_affinity(identity, cx);
                     cx.notify();
                 },
             },
@@ -202,8 +209,8 @@ fn affinity_content(
                                 .copied()
                                 .collect();
                             cpus.sort_unstable();
-                            if let Some(pid) = view.process_affinity_pid() {
-                                view.submit_process_affinity(pid, cpus, cx);
+                            if let Some(identity) = view.process_affinity_identity() {
+                                view.submit_process_affinity(identity, cpus, cx);
                             }
                             view.dismiss_window_surface(
                                 crate::gpui_app::root::WindowSurfaceKind::ProcessAffinity,

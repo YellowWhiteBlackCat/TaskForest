@@ -8,7 +8,7 @@
 use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::NetworkMetrics;
 
-use crate::gpui_app::formatting::{DisplayUnits, UnitKind};
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::{device_status_i18n_key, rate_str};
@@ -29,7 +29,7 @@ pub(super) fn vital_line(network: &NetworkMetrics) -> String {
 pub(super) fn network_stats(
     n: &NetworkMetrics,
     is_wireless: bool,
-    units: DisplayUnits,
+    units: UnitPreferences,
 ) -> Vec<StatRow> {
     let mut stats = vec![
         StatRow::text(
@@ -48,30 +48,23 @@ pub(super) fn network_stats(
         ),
         StatRow::text(
             i18n::t("net.connection"),
-            // Authoritative signal is the kernel carrier (current_link_up);
-            // fall back to ANY assigned address (IPv4 OR IPv6) when carrier is
-            // unknown. Previously this keyed on IPv4 only, so an IPv6-only link
-            // (common on IPv6-only networks) wrongly showed "disconnected".
-            Some(
-                if match n.current_link_up() {
-                    Some(up) => up,
-                    None => n.ipv4_addr.is_some() || n.ipv6_addr.is_some(),
-                } {
+            n.current_link_up().map(|up| {
+                if up {
                     i18n::t("common.connected").into()
                 } else {
                     i18n::t("common.disconnected").into()
-                },
-            ),
+                }
+            }),
         ),
         StatRow::text(
             i18n::t("net.total_received"),
             n.current_total_rx_bytes()
-                .map(|value| units.format(value, UnitKind::Network, false)),
+                .map(|value| units.format_quantity(value, QuantityFamily::Network, false)),
         ),
         StatRow::text(
             i18n::t("net.total_sent"),
             n.current_total_tx_bytes()
-                .map(|value| units.format(value, UnitKind::Network, false)),
+                .map(|value| units.format_quantity(value, QuantityFamily::Network, false)),
         ),
         StatRow::text(
             i18n::t("common.type"),

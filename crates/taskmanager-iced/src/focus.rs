@@ -451,6 +451,18 @@ pub(crate) fn selectable_row_with_menu<'a>(
     selectable_row_base(theme_snapshot, page, index, content, Some(on_right_press))
 }
 
+/// Build a keyboard-reachable process row that has no actionable live
+/// identity. It remains selectable, but deliberately has no context menu:
+/// unavailable identity authority must not be replaced with a PID hint.
+pub(crate) fn selectable_row<'a>(
+    theme_snapshot: &taskmanager_theme::Theme,
+    page: taskmanager_application::AppPage,
+    index: usize,
+    content: Element<'a, Message, iced::Theme, iced::Renderer>,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    selectable_row_base(theme_snapshot, page, index, content, None)
+}
+
 /// Wrap an arbitrary interactive control (e.g. the Alerts rule-row checkbox
 /// cluster) in the focusable shell. The inner control keeps the pointer path
 /// (`activate_on_pointer = false`: a click focuses the stop, then the inner

@@ -1,7 +1,7 @@
 //! Root-owned interaction vocabulary and per-window text-input initialization.
 
 use gpui::{AppContext, Context, Entity};
-use taskmanager_core::core::process::ProcessSignal;
+use taskmanager_core::core::process::{ProcessLiveKey, ProcessSignal};
 use taskmanager_ui::inputs::text_input::{InputEvent, TextInputState};
 
 use crate::gpui_app::sidebar::SelectedDevice;
@@ -12,12 +12,12 @@ use super::RootView;
 
 /// Single-slot hover tracker. Only the topmost element under the pointer is hovered at
 /// any instant, so one slot covers both static chrome (identified by a unique
-/// `&'static str` id) and dynamic list rows (sidebar device / process pid / service name).
+/// `&'static str` id) and dynamic list rows (sidebar device / process identity / service name).
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Hover {
     Static(&'static str),
     Device(SelectedDevice),
-    Proc(u32),
+    Proc(ProcessLiveKey),
     Service(String),
     Startup(StartupEntryId),
     User(String),

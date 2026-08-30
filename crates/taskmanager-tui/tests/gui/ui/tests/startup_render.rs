@@ -4,7 +4,7 @@
 
 use super::frame_text;
 use crate::TuiTheme;
-use crate::ui::confirmations::render_startup_control_confirmation;
+use crate::ui::confirmations::confirmations_support::render_startup_control_confirmation;
 use crate::ui::pages::{startup_impact_text, startup_source_text};
 use crate::ui::startup_menu;
 
@@ -103,7 +103,7 @@ fn startup_menu_and_confirmation_render_without_panicking() {
             // The test-only entry takes the committed focus plan explicitly:
             // this fixture mirrors the live StartupMenu surface addressing
             // item 0, exactly as the frame plan would project it.
-            startup_menu::render_startup_menu(
+            startup_menu::startup_menu_support::render_startup_menu(
                 frame,
                 &menu,
                 theme,

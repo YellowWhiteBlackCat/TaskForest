@@ -7,7 +7,7 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use taskmanager_application::{AppAction, AppPage, ConfigStore};
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessMetadataObservations, ProcessOwner};
+use taskmanager_core::core::process::{ProcessLiveKey, ProcessMetadataObservations, ProcessOwner};
 use taskmanager_shell::{SortCol, SortDir};
 
 use crate::ui::*;
@@ -181,6 +181,7 @@ fn process_menu_resolve_action_routes_through_platform_ports_not_direct_spawn() 
     // Search-online builds a percent-encoded OpenUrl effect (no spawn).
     let search = resolve_action(&ProcessMenuTarget {
         item: item.clone(),
+        identity: ProcessLiveKey::from_process(&item).expect("fixture identity"),
         selection: ProcessMenuAction::SearchOnline as usize,
     })
     .expect("search resolves");
@@ -195,6 +196,7 @@ fn process_menu_resolve_action_routes_through_platform_ports_not_direct_spawn() 
     // identity + cached executable (the provider owns the spawn).
     let reveal = resolve_action(&ProcessMenuTarget {
         item: item.clone(),
+        identity: ProcessLiveKey::from_process(&item).expect("fixture identity"),
         selection: ProcessMenuAction::OpenLocation as usize,
     })
     .expect("reveal resolves");
@@ -230,8 +232,11 @@ fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
     let text = frame_text(&app, 140, 40);
 
     assert!(text.contains("PSS"));
-    assert!(text.contains("512.0 MiB"));
-    assert!(text.contains("PSS / Swap"));
+    assert!(text.contains("Swap"));
+    assert!(
+        text.contains("512.0 Mi"),
+        "typed PSS must render its measured value"
+    );
     assert!(
         text.contains("0 B"),
         "measured zero swap must remain visible"

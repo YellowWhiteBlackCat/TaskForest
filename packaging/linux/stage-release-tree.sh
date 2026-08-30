@@ -15,9 +15,10 @@
 #
 # Prerequisites: release binaries must exist under target/release —
 # taskforest-g, taskmanager-setup-helper,
-# taskmanager-privilege-helper, taskmanager-net-launcher, and
-# taskmanager-process-control-helper (the PKGBUILD build() set) — plus
-# python3, which regenerates the third-party notices file.
+# taskmanager-privilege-helper, taskmanager-net-launcher,
+# taskmanager-process-control-helper, taskmanager-smbios-helper,
+# taskmanager-rapl-helper, and taskmanager-msr-helper (the PKGBUILD build()
+# set) — plus python3, which regenerates the third-party notices file.
 #
 # Usage: packaging/linux/stage-release-tree.sh OUTPUT_DIR
 set -euo pipefail

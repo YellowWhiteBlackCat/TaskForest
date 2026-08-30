@@ -5,6 +5,7 @@ use super::super::process_sparkline::{ProcessCpuSparkline, process_sparkline_poi
 use iced::Size;
 use std::collections::HashSet;
 use std::rc::Rc;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{SortCol, SortDir};
 
 const SPARK_SIZE: Size = Size::new(48.0, 16.0);
@@ -32,18 +33,21 @@ fn samples_auto_range_and_spread_across_the_available_width() {
 fn fingerprint_changes_only_when_process_history_identity_changes() {
     let color = iced::Color::WHITE;
     let samples: Rc<[f32]> = Rc::from([1.0, 2.0, 3.0].as_slice());
-    let base = ProcessCpuSparkline::new(Rc::clone(&samples), color, 11);
+    let identity = ProcessLiveKey::from_parts(11, 111).expect("fixture identity");
+    let replacement = ProcessLiveKey::from_parts(12, 121).expect("fixture identity");
+    let base = ProcessCpuSparkline::new(Rc::clone(&samples), color, identity);
     assert_eq!(
         base.fingerprint(),
-        ProcessCpuSparkline::new(Rc::clone(&samples), iced::Color::BLACK, 11).fingerprint()
+        ProcessCpuSparkline::new(Rc::clone(&samples), iced::Color::BLACK, identity).fingerprint()
     );
     assert_ne!(
         base.fingerprint(),
-        ProcessCpuSparkline::new(Rc::from([1.0, 2.0, 4.0].as_slice()), color, 11).fingerprint()
+        ProcessCpuSparkline::new(Rc::from([1.0, 2.0, 4.0].as_slice()), color, identity,)
+            .fingerprint()
     );
     assert_ne!(
         base.fingerprint(),
-        ProcessCpuSparkline::new(samples, color, 12).fingerprint()
+        ProcessCpuSparkline::new(samples, color, replacement).fingerprint()
     );
 }
 
@@ -67,6 +71,7 @@ fn canonical_process_nodes_carry_hierarchy_depth() {
         &HashSet::from(["category:uncategorized".to_string()]),
         &HashSet::new(),
         &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        0,
     );
     let depths: Vec<_> = projection
         .rows()

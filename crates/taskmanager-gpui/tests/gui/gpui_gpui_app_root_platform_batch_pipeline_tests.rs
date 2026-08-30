@@ -135,18 +135,18 @@ async fn process_materialization_is_single_fold_and_shared_by_render_and_input(
 
             let process_snapshot = view.processes_arc().clone();
             let (render_rows, _, _) = view.processes_projection();
-            let rendered_pid = render_rows
+            let rendered_identity = render_rows
                 .iter()
-                .find_map(|row| row.process_pid)
+                .find_map(|row| row.process_identity)
                 .expect("canonical category tree includes the process row");
-            assert_eq!(rendered_pid, 4242);
+            assert_eq!(rendered_identity.pid(), 4242);
 
-            view.select_process_single(4242);
-            view.request_process_termination(ProcessTerminationAction::EndTask, 4242);
+            view.select_process_single(rendered_identity);
+            view.request_process_termination(ProcessTerminationAction::EndTask, rendered_identity);
             let confirmation = view
                 .process_termination_confirmation()
                 .expect("input path freezes the visible process");
-            assert_eq!(confirmation.root.pid, rendered_pid);
+            assert_eq!(confirmation.root.pid, rendered_identity.pid());
             assert_eq!(view.processes_generation(), generation);
 
             let unrelated =

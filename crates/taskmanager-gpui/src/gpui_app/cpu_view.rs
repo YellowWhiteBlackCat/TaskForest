@@ -2,18 +2,39 @@
 //! elastic per-core matrix, plus the shared pinned details surface.
 
 mod details_panel;
+mod msr_readouts;
+mod package_power;
 mod per_core;
 mod per_core_grid;
 mod stats;
 
-// Single source for the P/E/LP core-class row projection and the socket-count
-// fold: the CPU page's details panel and the System page's CPU section both
-// consume them (ADR-020). The pure spec-row builder `cpu_spec_rows` stays
-// CPU-page-internal until a second surface genuinely shares its formats.
-pub(super) use details_panel::{heterogeneous_core_rows, sockets_row};
+pub(crate) use msr_readouts::MsrReadoutsInputs;
+pub(crate) use package_power::PackagePowerInputs;
 
-use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
+use msr_readouts::MsrReadoutsModel;
+use package_power::PackagePowerModel;
+
+/// The escalation-backed readout subsections of the CPU details panel,
+/// projected once per render and painted in a fixed order (package power,
+/// then MSR readouts). One argument so the pinned renderer stays inside the
+/// shared argument budget.
+pub(crate) struct EscalationReadouts {
+    pub package_power: PackagePowerModel,
+    pub msr_readouts: MsrReadoutsModel,
+}
+
+// Single source for the CPUID identity rows, the P/E/LP core-class row
+// projection and the socket-count fold: the CPU page's details panel and the
+// System page's CPU section all consume them (ADR-020). The pure spec-row
+// builder `cpu_spec_rows` stays CPU-page-internal until a second surface
+// genuinely shares its formats.
+pub(super) use details_panel::{cpu_identity_rows, heterogeneous_core_rows, sockets_row};
+
+use gpui::{Context, Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_telemetry_store::TelemetryStore;
+
+use crate::gpui_app::root::RootView;
 
 use crate::gpui_app::formatting::{self, GraphUnit};
 use crate::gpui_app::graph::GraphHover;
@@ -106,9 +127,21 @@ pub(crate) struct CpuViewProps<'a> {
     pub hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
     pub graph_settings: crate::gpui_app::graph::GraphSettings,
     pub layout: PerformancePageBudget,
+    /// Presentation unit preferences for the details panel spec list.
+    pub units: UnitPreferences,
+    /// Shared package-power request session + lane capability for the
+    /// details panel's package-power subsection.
+    pub package_power: PackagePowerInputs<'a>,
+    /// Shared MSR-readout request session + lane capability for the details
+    /// panel's MSR subsection.
+    pub msr_readouts: MsrReadoutsInputs<'a>,
 }
 
-pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryCache) -> Div {
+pub(crate) fn render_cpu(
+    props: CpuViewProps<'_>,
+    core_history: &mut CpuHistoryCache,
+    cx: &mut Context<RootView>,
+) -> Div {
     let CpuViewProps {
         theme,
         stats_scroll,
@@ -118,7 +151,16 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
         hover_slot,
         graph_settings,
         layout,
+        units,
+        package_power,
+        msr_readouts,
     } = props;
+    let package_model = package_power::package_power_model(&package_power);
+    let msr_model = msr_readouts::msr_readouts_model(&msr_readouts);
+    let escalation = EscalationReadouts {
+        package_power: package_model,
+        msr_readouts: msr_model,
+    };
     let cpu = &snap.cpu;
     let stats = CpuLiveStats::from_snapshot(snap);
     let chart_layout = CpuChartLayout::for_inventory(layout.chart_inventory);
@@ -165,7 +207,15 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
         header_extra: Some(readout_band(theme, &stats).into_any_element()),
         headline: HeadlineSurface::Charts(vec![headline]),
         below,
-        stats: details_panel::render_pinned(theme, snap, hardware, &stats.details),
+        stats: details_panel::render_pinned(
+            theme,
+            snap,
+            hardware,
+            &stats.details,
+            units,
+            &escalation,
+            cx,
+        ),
         stats_footer: None,
         hover_slot,
         graph_settings,

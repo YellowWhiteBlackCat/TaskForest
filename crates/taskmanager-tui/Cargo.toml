@@ -29,3 +29,10 @@ taskmanager-telemetry-store = { path = "../taskmanager-telemetry-store" }
 [lib]
 name = "taskmanager_tui"
 path = "src/lib.rs"
+
+# The standalone allocation-budget binary needs its own process-global
+# counting allocator, so it cannot be registered as a library module like
+# the other test trees; it links only this crate's public API.
+[[test]]
+name = "perf_budget_alloc"
+path = "tests/headless/perf_budget_alloc_tests.rs"

@@ -1,6 +1,6 @@
 use super::{
     FailureKind, FrozenProcessIdentity, ProcessBatchIntent, ProcessBatchResult,
-    ProcessBatchTargetResult, ProcessGroupScope, ProcessItem,
+    ProcessBatchTargetResult, ProcessGroupScope, ProcessItem, ProcessLiveKey,
     parse_process_batch_failure_wire_code, process_batch_failure_wire_code,
 };
 use crate::core::metrics::ScalarObservation;
@@ -82,11 +82,17 @@ fn deserialized_pid_zero_with_a_token_still_fails_closed() {
 #[test]
 fn freeze_keeps_only_live_selected_pids_in_sorted_order() {
     let processes = [live(2), live(1), live(3)];
-    let intent = ProcessBatchIntent::freeze(
-        &processes,
-        [3, 1, 3, 99], // 99 does not exist; 3 duplicated
-        ProcessBatchAction::Suspend,
-    );
+    let identity_for = |pid| {
+        processes
+            .iter()
+            .find(|process| process.pid == pid)
+            .and_then(ProcessLiveKey::from_process)
+    };
+    let selected = [3, 1, 3]
+        .into_iter()
+        .filter_map(identity_for)
+        .chain([ProcessLiveKey::from_parts(99, 1).expect("unknown identity")]);
+    let intent = ProcessBatchIntent::freeze(&processes, selected, ProcessBatchAction::Suspend);
     let pids: Vec<_> = intent.targets.iter().map(|f| f.pid).collect();
     assert_eq!(pids, vec![1, 3], "only live pids, deduped, sorted");
 }

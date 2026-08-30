@@ -16,8 +16,8 @@ fn live(pid: u32) -> taskmanager_core::core::process::ProcessItem {
     )
 }
 
-fn id(pid: u32) -> ProcessRowIdentity {
-    ProcessRowIdentity::from_process(&live(pid)).expect("fixture carries a current token")
+fn id(pid: u32) -> ProcessLiveKey {
+    ProcessLiveKey::from_process(&live(pid)).expect("fixture carries a current token")
 }
 
 #[test]
@@ -59,7 +59,7 @@ fn ctrl_toggle_flips_membership_and_tracks_the_anchor() {
 
 #[test]
 fn shift_click_spans_the_display_order_between_anchor_and_end() {
-    let display: Vec<ProcessRowIdentity> = [5, 6, 7, 8, 9].iter().map(|&pid| id(pid)).collect();
+    let display: Vec<ProcessLiveKey> = [5, 6, 7, 8, 9].iter().map(|&pid| id(pid)).collect();
     let mut selection = ProcessSelection::default();
     selection.select_single(id(6));
     selection.extend_range(&display, id(8));
@@ -77,7 +77,7 @@ fn shift_click_spans_the_display_order_between_anchor_and_end() {
 
 #[test]
 fn a_stale_range_endpoint_inserts_nothing() {
-    let display: Vec<ProcessRowIdentity> = [5, 6, 7].iter().map(|&pid| id(pid)).collect();
+    let display: Vec<ProcessLiveKey> = [5, 6, 7].iter().map(|&pid| id(pid)).collect();
     let stale = id(u32::MAX);
     let mut selection = ProcessSelection::default();
     selection.select_single(id(6));
@@ -127,18 +127,18 @@ fn batch_identities_prefer_the_sorted_set_and_fall_back_to_the_anchor() {
 
 #[test]
 fn identity_range_handles_reversed_and_missing_endpoints() {
-    let display: Vec<ProcessRowIdentity> = [4, 5, 6].iter().map(|&pid| id(pid)).collect();
+    let display: Vec<ProcessLiveKey> = [4, 5, 6].iter().map(|&pid| id(pid)).collect();
     assert_eq!(
         identity_range(&display, id(6), id(4)),
         vec![id(4), id(5), id(6)]
     );
     assert_eq!(
         identity_range(&display, id(4), id(99)),
-        Vec::<ProcessRowIdentity>::new()
+        Vec::<ProcessLiveKey>::new()
     );
     assert_eq!(
         identity_range(&display, id(99), id(4)),
-        Vec::<ProcessRowIdentity>::new()
+        Vec::<ProcessLiveKey>::new()
     );
 }
 

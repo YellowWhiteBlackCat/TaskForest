@@ -20,7 +20,7 @@
 
 use std::collections::HashSet;
 
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 use taskmanager_gpui::gpui_app::processes_view::{
     VisibleRow, category_tree_rows, default_category_expansions,
 };
@@ -42,23 +42,30 @@ fn refs(items: &[ProcessItem]) -> Vec<&ProcessItem> {
     items.iter().collect()
 }
 
+fn key(pid: u32) -> ProcessLiveKey {
+    ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+        .expect("fixture identity")
+}
+
 /// Project the only runtime hierarchy and retain its selectable process rows.
 /// Structural category headers deliberately stay out of PID-order assertions.
 fn canonical_process_rows(
     processes: &[&ProcessItem],
     column: SortCol,
     ascending: bool,
-    collapsed: &HashSet<u32>,
+    collapsed: &HashSet<ProcessLiveKey>,
 ) -> Vec<VisibleRow> {
     category_tree_rows(
         processes,
+        1,
         column,
         ascending,
         &default_category_expansions(),
         collapsed,
+        taskmanager_core::core::units::UnitPreferences::default(),
     )
     .into_iter()
-    .filter(|row| row.process_pid.is_some())
+    .filter(|row| row.process_identity.is_some())
     .collect()
 }
 
@@ -219,7 +226,7 @@ fn canonical_tree_orders_each_sortcol_asc_and_desc() {
     for &(col, asc_want, desc_want) in expected_orders() {
         let got_asc: Vec<u32> = canonical_process_rows(&refs(&procs), col, true, &collapsed)
             .iter()
-            .map(|r| r.pid)
+            .map(|r| r.process_identity.expect("process row identity").pid())
             .collect();
         assert_eq!(
             got_asc, asc_want,
@@ -227,7 +234,7 @@ fn canonical_tree_orders_each_sortcol_asc_and_desc() {
         );
         let got_desc: Vec<u32> = canonical_process_rows(&refs(&procs), col, false, &collapsed)
             .iter()
-            .map(|r| r.pid)
+            .map(|r| r.process_identity.expect("process row identity").pid())
             .collect();
         assert_eq!(
             got_desc, desc_want,
@@ -250,11 +257,11 @@ fn canonical_tree_tiebreak_contract_on_equal_primary_keys() {
     for &(col, _, _) in expected_orders() {
         let asc: Vec<u32> = canonical_process_rows(&refs(&procs), col, true, &collapsed)
             .iter()
-            .map(|r| r.pid)
+            .map(|r| r.process_identity.expect("process row identity").pid())
             .collect();
         let desc: Vec<u32> = canonical_process_rows(&refs(&procs), col, false, &collapsed)
             .iter()
-            .map(|r| r.pid)
+            .map(|r| r.process_identity.expect("process row identity").pid())
             .collect();
         match col {
             SortCol::Pid | SortCol::Swap => {
@@ -288,7 +295,7 @@ fn canonical_tree_all_roots_share_the_recursive_sort_contract() {
     for &(col, asc_want, desc_want) in expected_orders() {
         let got_asc: Vec<u32> = canonical_process_rows(&refs(&procs), col, true, &collapsed)
             .iter()
-            .map(|r| r.pid)
+            .map(|r| r.process_identity.expect("process row identity").pid())
             .collect();
         assert_eq!(
             got_asc, asc_want,
@@ -296,7 +303,7 @@ fn canonical_tree_all_roots_share_the_recursive_sort_contract() {
         );
         let got_desc: Vec<u32> = canonical_process_rows(&refs(&procs), col, false, &collapsed)
             .iter()
-            .map(|r| r.pid)
+            .map(|r| r.process_identity.expect("process row identity").pid())
             .collect();
         assert_eq!(
             got_desc, desc_want,
@@ -354,14 +361,14 @@ fn canonical_tree_sorts_per_level_and_flattens_depth_first() {
     // DFS emits each parent immediately followed by its (sorted) children.
     let pids: Vec<u32> = canonical_process_rows(&refs(&procs), SortCol::Name, true, &collapsed)
         .iter()
-        .map(|r| r.pid)
+        .map(|r| r.process_identity.expect("process row identity").pid())
         .collect();
     assert_eq!(pids, vec![200, 202, 201, 100, 300]);
 
     // Name desc: roots reversed, children reversed.
     let pids: Vec<u32> = canonical_process_rows(&refs(&procs), SortCol::Name, false, &collapsed)
         .iter()
-        .map(|r| r.pid)
+        .map(|r| r.process_identity.expect("process row identity").pid())
         .collect();
     assert_eq!(pids, vec![300, 100, 200, 201, 202]);
 
@@ -370,7 +377,7 @@ fn canonical_tree_sorts_per_level_and_flattens_depth_first() {
     // children of 200 by user [u_y(202), u_z(201)].
     let pids: Vec<u32> = canonical_process_rows(&refs(&procs), SortCol::User, true, &collapsed)
         .iter()
-        .map(|r| r.pid)
+        .map(|r| r.process_identity.expect("process row identity").pid())
         .collect();
     assert_eq!(pids, vec![300, 100, 200, 202, 201]);
 }
@@ -382,30 +389,58 @@ fn canonical_tree_depth_and_affordance_fields_include_category_offset() {
     let rows = canonical_process_rows(&refs(&procs), SortCol::Name, true, &collapsed);
 
     // Parent root: depth 1 below the category, has_children true, not collapsed.
-    let r200 = rows.iter().find(|r| r.pid == 200).unwrap();
+    let r200 = rows
+        .iter()
+        .find(|r| {
+            r.process_identity
+                .is_some_and(|identity| identity.pid() == 200)
+        })
+        .unwrap();
     assert_eq!(r200.depth, 1);
     assert!(r200.has_children);
     assert!(!r200.collapsed);
 
     // Leaf child: depth 2, no children.
-    let r202 = rows.iter().find(|r| r.pid == 202).unwrap();
+    let r202 = rows
+        .iter()
+        .find(|r| {
+            r.process_identity
+                .is_some_and(|identity| identity.pid() == 202)
+        })
+        .unwrap();
     assert_eq!(r202.depth, 2);
     assert!(!r202.has_children);
     assert!(!r202.collapsed);
 
     // Childless roots report has_children = false.
-    assert!(!rows.iter().find(|r| r.pid == 100).unwrap().has_children);
-    assert!(!rows.iter().find(|r| r.pid == 300).unwrap().has_children);
+    assert!(
+        !rows
+            .iter()
+            .find(|r| r
+                .process_identity
+                .is_some_and(|identity| identity.pid() == 100))
+            .unwrap()
+            .has_children
+    );
+    assert!(
+        !rows
+            .iter()
+            .find(|r| r
+                .process_identity
+                .is_some_and(|identity| identity.pid() == 300))
+            .unwrap()
+            .has_children
+    );
 }
 
 #[test]
 fn canonical_tree_collapse_set_hides_descendants_but_keeps_parent() {
     let procs = tree_sample();
-    let collapsed: HashSet<u32> = [200].into_iter().collect();
+    let collapsed: HashSet<ProcessLiveKey> = [key(200)].into_iter().collect();
 
     let pids: Vec<u32> = canonical_process_rows(&refs(&procs), SortCol::Name, true, &collapsed)
         .iter()
-        .map(|r| r.pid)
+        .map(|r| r.process_identity.expect("process row identity").pid())
         .collect();
     // parent_a(200) is still emitted (collapsed parents stay visible) but its
     // descendants 201/202 are pruned by flatten_tree_visible.
@@ -413,7 +448,13 @@ fn canonical_tree_collapse_set_hides_descendants_but_keeps_parent() {
 
     // The collapsed parent row reports collapsed = true (drives the chevron glyph).
     let rows = canonical_process_rows(&refs(&procs), SortCol::Name, true, &collapsed);
-    let r200 = rows.iter().find(|r| r.pid == 200).unwrap();
+    let r200 = rows
+        .iter()
+        .find(|r| {
+            r.process_identity
+                .is_some_and(|identity| identity.pid() == 200)
+        })
+        .unwrap();
     assert!(r200.collapsed);
     assert!(r200.has_children);
 }
@@ -801,7 +842,13 @@ fn visible_rows_carry_canonical_typed_observations() {
     ];
 
     let rows = canonical_process_rows(&refs(&procs), SortCol::Name, true, &HashSet::new());
-    let typed = rows.iter().find(|r| r.pid == 1).expect("typed row");
+    let typed = rows
+        .iter()
+        .find(|r| {
+            r.process_identity
+                .is_some_and(|identity| identity.pid() == 1)
+        })
+        .expect("typed row");
     assert_eq!(typed.cpu, Some(5.0));
     assert_eq!(typed.mem, Some(200));
     assert_eq!(typed.threads, Some(4));
@@ -809,7 +856,13 @@ fn visible_rows_carry_canonical_typed_observations() {
     assert_eq!(typed.nice, Some(-3));
     assert_eq!(typed.cpu_time_secs, Some(120));
 
-    let denied = rows.iter().find(|r| r.pid == 2).expect("denied row");
+    let denied = rows
+        .iter()
+        .find(|r| {
+            r.process_identity
+                .is_some_and(|identity| identity.pid() == 2)
+        })
+        .expect("denied row");
     assert_eq!(denied.cpu, None);
     assert_eq!(denied.threads, None);
     assert_eq!(denied.mem, None);
@@ -847,21 +900,21 @@ fn typed_sorting_places_unavailable_values_first_ascending_and_last_descending()
     let asc_cpu: Vec<u32> =
         canonical_process_rows(&refs(&procs), SortCol::Cpu, true, &HashSet::new())
             .iter()
-            .map(|r| r.pid)
+            .map(|r| r.process_identity.expect("process row identity").pid())
             .collect();
     // None (unavailable) sorts before every measured value; ties stable.
     assert_eq!(asc_cpu, vec![2, 3, 1]);
     let desc_cpu: Vec<u32> =
         canonical_process_rows(&refs(&procs), SortCol::Cpu, false, &HashSet::new())
             .iter()
-            .map(|r| r.pid)
+            .map(|r| r.process_identity.expect("process row identity").pid())
             .collect();
     assert_eq!(desc_cpu, vec![1, 3, 2]);
 
     let asc_threads: Vec<u32> =
         canonical_process_rows(&refs(&procs), SortCol::Threads, true, &HashSet::new())
             .iter()
-            .map(|r| r.pid)
+            .map(|r| r.process_identity.expect("process row identity").pid())
             .collect();
     assert_eq!(asc_threads, vec![2, 3, 1]);
 }
@@ -893,14 +946,16 @@ fn canonical_category_root_sums_only_available_members() {
 
     let rows = category_tree_rows(
         &refs(&procs),
+        1,
         SortCol::Name,
         true,
         &default_category_expansions(),
         &HashSet::new(),
+        taskmanager_core::core::units::UnitPreferences::default(),
     );
     let aggregate = rows
         .iter()
-        .find(|row| row.depth == 0 && row.process_pid.is_none())
+        .find(|row| row.depth == 0 && row.process_identity.is_none())
         .expect("category aggregate row");
     assert_eq!(aggregate.cpu, Some(30.0));
     assert_eq!(aggregate.mem, Some(300));
@@ -911,7 +966,7 @@ fn canonical_category_root_sums_only_available_members() {
 
     let instances: Vec<_> = rows
         .iter()
-        .filter(|row| row.depth == 1 && row.process_pid.is_some())
+        .filter(|row| row.depth == 1 && row.process_identity.is_some())
         .collect();
     assert_eq!(instances.len(), 2);
     assert_eq!(instances[0].threads, Some(3));
@@ -938,17 +993,19 @@ fn visible_rows_precomputes_name_highlight_ranges_for_the_active_query() {
     fn props<'a>(
         query: &'a str,
         processes: &'a [&'a ProcessItem],
-        collapsed: &'a HashSet<u32>,
+        collapsed: &'a HashSet<ProcessLiveKey>,
         expanded_apps: &'a HashSet<String>,
     ) -> VisibleRowsProps<'a> {
         VisibleRowsProps {
             processes,
+            observed_at_ms: 1,
             query,
             sort_col: SortCol::Name,
             sort_asc: true,
             filter: ProcessStatusFilter::All,
             collapsed,
             expanded_apps,
+            units: taskmanager_core::core::units::UnitPreferences::default(),
         }
     }
 
@@ -959,7 +1016,7 @@ fn visible_rows_precomputes_name_highlight_ranges_for_the_active_query() {
     let rows = visible_rows(props("  alph  ", &proc_refs, &empty_collapsed, &expanded));
     let alpha = rows
         .iter()
-        .find(|row| row.process_pid.is_some())
+        .find(|row| row.process_identity.is_some())
         .expect("filtered canonical process row");
     assert_eq!(
         rows.len(),
@@ -973,7 +1030,7 @@ fn visible_rows_precomputes_name_highlight_ranges_for_the_active_query() {
     let rows = visible_rows(props("HaR", &proc_refs, &empty_collapsed, &expanded));
     let charlie = rows
         .iter()
-        .find(|row| row.process_pid.is_some())
+        .find(|row| row.process_identity.is_some())
         .expect("filtered canonical process row");
     assert_eq!(rows.len(), 2);
     assert_eq!(charlie.name, "charlie");
@@ -985,7 +1042,7 @@ fn visible_rows_precomputes_name_highlight_ranges_for_the_active_query() {
     let rows = visible_rows(props("charlie", &proc_refs, &empty_collapsed, &expanded));
     assert_eq!(
         rows.iter()
-            .find(|row| row.process_pid.is_some())
+            .find(|row| row.process_identity.is_some())
             .expect("filtered canonical process row")
             .name_highlights,
         vec![0..7],

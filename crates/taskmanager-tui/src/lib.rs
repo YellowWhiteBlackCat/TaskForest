@@ -58,6 +58,7 @@ pub use ui::session_menu::SessionMenuTarget;
 pub use ui::settings::SettingsForm;
 pub use ui::startup_menu::StartupMenuTarget;
 
+use std::collections::HashSet;
 use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 
@@ -71,7 +72,7 @@ use taskmanager_core::core::directory_usage::{
 };
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InputDispatch, ShellKeyEvent, SortCol,
 };
@@ -152,21 +153,16 @@ pub struct TuiApp {
     /// header (Enter / Right). Re-seeded for the canonical category tree when
     /// the product selector is activated.
     pub expanded_groups: std::collections::HashSet<String>,
-    /// The PIDs whose tree nodes are currently COLLAPSED on the Applications
+    /// The core-owned live identities whose tree nodes are currently COLLAPSED on the Applications
     /// page in the canonical category tree. Mirrors
-    /// the `flatten_tree_visible` contract: the set holds collapsed pids, so
+    /// the `flatten_tree_visible` contract: the set holds collapsed live keys, so
     /// an empty set means every node expanded. Toggled by Enter / Right
     /// (expand) and Left (collapse) on a node with children.
-    pub collapsed_tree: std::collections::HashSet<u32>,
+    pub collapsed_tree: HashSet<ProcessLiveKey>,
     /// Bounded presentation cache for the Applications visual-row count.
     /// Its key contains every UI input that affects tree shape; it stores no
     /// borrowed process facts.
     pub(crate) visual_row_count_cache: std::cell::RefCell<Option<selection::VisualRowCountCache>>,
-    /// The last provider start-token observed for each process PID. This
-    /// TUI-local index prevents a reused PID from inheriting old tree
-    /// presentation state; exact control authority remains
-    /// `FrozenProcessIdentity` in the application layer.
-    tree_identity_by_pid: std::collections::HashMap<u32, Option<u64>>,
     /// The table columns the user HID through the column menu (`C` on the
     /// Applications page). PID and Name are identity columns and can never be
     /// hidden; every other column is toggleable. The renderer (header, cells,
@@ -250,12 +246,6 @@ impl TuiApp {
     }
 
     fn shell_default(shell: taskmanager_shell::ShellApp) -> Self {
-        let tree_identity_by_pid = shell
-            .projection()
-            .processes_slice()
-            .iter()
-            .map(|process| (process.pid, process.current_start_token()))
-            .collect();
         Self {
             shell,
             local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(
@@ -280,7 +270,6 @@ impl TuiApp {
             expanded_groups: default_category_expansions(),
             collapsed_tree: std::collections::HashSet::new(),
             visual_row_count_cache: std::cell::RefCell::new(None),
-            tree_identity_by_pid,
             hidden_columns: std::collections::HashSet::new(),
             focus_panel: FocusPanel::Table,
             help_scroll: 0,

@@ -1,8 +1,8 @@
-use crate::gpui_app::formatting::DisplayUnits;
 use taskmanager_core::core::metrics::{
     GpuMetrics, GpuScalarObservations, NetworkAdapterType, NetworkScalarObservations,
     NetworkWirelessObservations, OptionalObservation, ScalarObservation, SystemSnapshot,
 };
+use taskmanager_core::core::units::UnitPreferences;
 
 use super::{
     NetworkVisibility, cpu_caption, gpu_caption_line1, gpu_caption_line2, nic_caption_line2,
@@ -71,8 +71,8 @@ fn vram_captions_follow_current_dedicated_observations() {
         ..Default::default()
     });
     assert_eq!(
-        gpu_caption_line1(&wired_zero_but_observed, DisplayUnits::default()),
-        "VRAM 2.00 GiB / 8.00 GiB"
+        gpu_caption_line1(&wired_zero_but_observed, UnitPreferences::default()),
+        "VRAM 2.0 GiB / 8.0 GiB"
     );
     assert!(gpu_caption_line2(&wired_zero_but_observed).contains("VRAM 25%"));
 
@@ -85,8 +85,8 @@ fn vram_captions_follow_current_dedicated_observations() {
         ),
         ..Default::default()
     });
-    assert!(gpu_caption_line1(&stale_dedicated, DisplayUnits::default()).is_empty());
-    assert!(!gpu_caption_line1(&stale_dedicated, DisplayUnits::default()).contains("VRAM"));
+    assert!(gpu_caption_line1(&stale_dedicated, UnitPreferences::default()).is_empty());
+    assert!(!gpu_caption_line1(&stale_dedicated, UnitPreferences::default()).contains("VRAM"));
     assert!(!gpu_caption_line2(&stale_dedicated).contains("VRAM"));
 }
 

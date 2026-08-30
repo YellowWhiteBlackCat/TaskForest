@@ -43,7 +43,7 @@ impl ProcessResourcesProvider for WinProcessResourcesProvider {
         validate_process_target_after(target, expected)?;
         let snapshot = resource_snapshot(memory_usage_bytes, observed_at_ms);
         Ok(ProcessInsightSnapshot {
-            identity: snapshot_identity(target),
+            identity: snapshot_identity(target)?,
             value: snapshot,
         })
     }
@@ -194,7 +194,7 @@ impl ProcessGpuProvider for WinProcessGpuProvider {
         };
         validate_process_target_after(target, expected)?;
         Ok(ProcessInsightSnapshot {
-            identity: snapshot_identity(target),
+            identity: snapshot_identity(target)?,
             value: ProcessGpuSnapshot {
                 state: DeviceState::healthy(observed_at_ms),
                 devices,
@@ -306,7 +306,7 @@ impl ProcessNetworkProvider for WinProcessNetworkProvider {
             validate_process_target_after(target, expected)?;
 
             Ok(ProcessInsightSnapshot {
-                identity: snapshot_identity(target),
+                identity: snapshot_identity(target)?,
                 value: snapshot,
             })
         }
@@ -371,7 +371,7 @@ impl ProcessIsolationProvider for WinProcessIsolationProvider {
             };
 
             Ok(ProcessInsightSnapshot {
-                identity: snapshot_identity(target),
+                identity: snapshot_identity(target)?,
                 value,
             })
         }

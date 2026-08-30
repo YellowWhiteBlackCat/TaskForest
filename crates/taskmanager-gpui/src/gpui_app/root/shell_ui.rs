@@ -12,6 +12,7 @@ use taskmanager_platform_contract::{
 };
 
 use taskmanager_application::i18n;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use super::clipboard::process_failure_message;
 use super::{RootView, platform_submission_time_ms};
@@ -60,8 +61,12 @@ impl RootView {
         self.finish_shell_submission(attempt, result, cx)
     }
 
-    pub(super) fn request_reveal_process(&mut self, pid: u32, cx: &mut Context<Self>) -> bool {
-        let Some(target) = self.frozen_process(pid) else {
+    pub(super) fn request_reveal_process(
+        &mut self,
+        identity: ProcessLiveKey,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(target) = self.frozen_process(identity) else {
             self.show_local_feedback(
                 format!(
                     "{}: process identity unavailable",
@@ -74,7 +79,7 @@ impl RootView {
         let cached_executable = self
             .processes()
             .iter()
-            .find(|process| process.pid == pid)
+            .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
             .and_then(|process| process.current_exe_path().map(ToOwned::to_owned));
         let request = ResourceRevealRequest {
             target,

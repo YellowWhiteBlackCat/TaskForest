@@ -152,17 +152,17 @@ jobs:
         run: |
           packaging/debian/build-deb.sh staging \
             "${{ steps.version.outputs.version }}" \
-            "taskforest_${{ steps.version.outputs.version }}_${DEB_ARCH}.deb" \
+            "TaskForest-G-${{ steps.version.outputs.version }}-${{ matrix.arch }}.deb" \
             "$DEB_ARCH"
       - name: Build RPM
         run: |
           packaging/rpm/build-rpm.sh staging \
             "${{ steps.version.outputs.version }}" \
-            "taskforest-${{ steps.version.outputs.version }}-1.${RPM_ARCH}.rpm"
+            "TaskForest-G-${{ steps.version.outputs.version }}-${{ matrix.arch }}.rpm"
       - name: Validate DEB package
         run: |
           set -euo pipefail
-          deb=$(find . -maxdepth 1 -type f -name "taskforest_*_${DEB_ARCH}.deb" -print -quit)
+          deb=$(find . -maxdepth 1 -type f -name "TaskForest-G-*-${{ matrix.arch }}.deb" -print -quit)
           test -n "$deb"
           test "$(dpkg-deb --field "$deb" Architecture)" = "$DEB_ARCH"
           dpkg-deb --info "$deb"
@@ -171,7 +171,7 @@ jobs:
       - name: Validate RPM package
         run: |
           set -euo pipefail
-          rpm_file=$(find . -maxdepth 1 -type f -name "taskforest-*.*.${RPM_ARCH}.rpm" -print -quit)
+          rpm_file=$(find . -maxdepth 1 -type f -name "TaskForest-G-*-${{ matrix.arch }}.rpm" -print -quit)
           test -n "$rpm_file"
           test "$(rpm -qp --queryformat '%{ARCH}\n' "$rpm_file")" = "$RPM_ARCH"
           rpm -qp --info "$rpm_file"
@@ -182,8 +182,8 @@ jobs:
         run: |
           set -euo pipefail
           files=(
-            "$(find . -maxdepth 1 -type f -name "taskforest_*_${DEB_ARCH}.deb" -print -quit)"
-            "$(find . -maxdepth 1 -type f -name "taskforest-*.*.${RPM_ARCH}.rpm" -print -quit)"
+            "$(find . -maxdepth 1 -type f -name "TaskForest-G-*-${{ matrix.arch }}.deb" -print -quit)"
+            "$(find . -maxdepth 1 -type f -name "TaskForest-G-*-${{ matrix.arch }}.rpm" -print -quit)"
           )
           for file in "${files[@]}"; do test -n "$file" && test -f "$file"; done
           sha256sum "${files[@]}" > "checksums-sha256-linux-${{ matrix.arch }}.txt"
@@ -194,8 +194,8 @@ jobs:
           if-no-files-found: error
           retention-days: ${{ inputs.publish && 90 || 3 }}
           path: |
-            taskforest_*_${{ matrix.deb_arch }}.deb
-            taskforest-*.*.${{ matrix.rpm_arch }}.rpm
+            TaskForest-G-*-${{ matrix.arch }}.deb
+            TaskForest-G-*-${{ matrix.arch }}.rpm
             checksums-sha256-linux-${{ matrix.arch }}.txt
 
   windows:
@@ -256,8 +256,11 @@ jobs:
           wix eula accept wix7
           wix extension add --global WixToolset.UI.wixext/7.0.0
           wix extension list --global
-      # MSI ProductVersion is numeric x.y.z: strip any prerelease suffix; the
-      # package architecture is explicit so arm64 cannot receive an x64 MSI.
+      # MSI ProductVersion is numeric x.y.z: strip any prerelease suffix for the
+      # ProductVersion property, but keep the FULL Cargo version in `full` so
+      # the release FILE NAME matches the unified
+      # TaskForest-<UI>-<version>-<platform> convention (rc suffix included).
+      # The package architecture is explicit so arm64 cannot receive an x64 MSI.
       - name: Resolve numeric MSI version
         id: version
         shell: bash
@@ -268,18 +271,20 @@ jobs:
           fi
           numeric=$(printf '%s' "$version" | sed 's/-[^-]*$//')
           echo "version=$numeric" >>"$GITHUB_OUTPUT"
+          echo "full=$version" >>"$GITHUB_OUTPUT"
       - name: Build MSI
         shell: bash
         run: |
           packaging/windows/build-msi.sh msi-stage \
             "${{ steps.version.outputs.version }}" \
             "$MSI_ARCH" \
-            "TaskForest-${{ steps.version.outputs.version }}-${{ matrix.arch }}.msi"
+            "TaskForest-G-${{ steps.version.outputs.full }}-${{ matrix.arch }}.msi" \
+            "${{ steps.version.outputs.full }}"
       - name: Validate MSI database and payload references
         shell: bash
         run: |
           set -euo pipefail
-          msi=$(find . -maxdepth 1 -type f -name "TaskForest-*-${{ matrix.arch }}.msi" -print -quit)
+          msi=$(find . -maxdepth 1 -type f -name "TaskForest-G-*-${{ matrix.arch }}.msi" -print -quit)
           test -n "$msi"
           test -s "$msi"
           rm -rf msi-decompile
@@ -289,6 +294,9 @@ jobs:
           test -s msi-decompile/taskforest.wxs
           grep -Eiq 'taskforest-g\.exe' msi-decompile/taskforest.wxs
           grep -Eiq 'license' msi-decompile/taskforest.wxs
+          # The full Cargo version (rcN included) must ride inside the package,
+          # not just in the file name.
+          grep -Fq '${{ steps.version.outputs.full }}' msi-decompile/taskforest.wxs
       # Sign ONLY when an Authenticode PFX cert secret exists; until then the
       # MSI ships unsigned (SmartScreen will warn) per the owner decision.
       - name: signtool (when WINDOWS_CERT_B64 secret present)
@@ -299,13 +307,13 @@ jobs:
           signtool sign /fd sha256 /td sha256 \
             /tr https://time.certum.pl \
             /f cert.pfx /p "${{ secrets.WINDOWS_CERT_PASSWORD }}" \
-            "TaskForest-${{ steps.version.outputs.version }}-${{ matrix.arch }}.msi"
+            "TaskForest-G-${{ steps.version.outputs.full }}-${{ matrix.arch }}.msi"
           rm -f cert.pfx
       - name: Emit sha256 checksums
         shell: bash
         # MSYS sha256sum marks output as binary mode (`hash *name`); normalize
         # to GNU text format so every platform's manifest has one shape.
-        run: sha256sum "TaskForest-${{ steps.version.outputs.version }}-${{ matrix.arch }}.msi" | sed 's/ \*/  /' > checksums-sha256-windows-${{ matrix.arch }}.txt
+        run: sha256sum "TaskForest-G-${{ steps.version.outputs.full }}-${{ matrix.arch }}.msi" | sed 's/ \*/  /' > checksums-sha256-windows-${{ matrix.arch }}.txt
       - uses: actions/upload-artifact@v4
         with:
           name: windows-${{ matrix.arch }}-artifacts
@@ -313,7 +321,7 @@ jobs:
           if-no-files-found: error
           retention-days: ${{ inputs.publish && 90 || 3 }}
           path: |
-            TaskForest-*-${{ matrix.arch }}.msi
+            TaskForest-G-*-${{ matrix.arch }}.msi
             checksums-sha256-windows-${{ matrix.arch }}.txt
 
   publish:
@@ -333,12 +341,12 @@ jobs:
         working-directory: release-artifacts
         run: |
           set -euo pipefail
-          deb_amd64=$(find . -maxdepth 1 -type f -name 'taskforest_*_amd64.deb' -print -quit)
-          deb_arm64=$(find . -maxdepth 1 -type f -name 'taskforest_*_arm64.deb' -print -quit)
-          rpm_x86_64=$(find . -maxdepth 1 -type f -name 'taskforest-*.*.x86_64.rpm' -print -quit)
-          rpm_aarch64=$(find . -maxdepth 1 -type f -name 'taskforest-*.*.aarch64.rpm' -print -quit)
-          msi_x64=$(find . -maxdepth 1 -type f -name 'TaskForest-*-x64.msi' -print -quit)
-          msi_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-*-arm64.msi' -print -quit)
+          deb_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-x64.deb' -print -quit)
+          deb_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-arm64.deb' -print -quit)
+          rpm_x86_64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-x64.rpm' -print -quit)
+          rpm_aarch64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-arm64.rpm' -print -quit)
+          msi_x64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-x64.msi' -print -quit)
+          msi_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-arm64.msi' -print -quit)
           for package in "$deb_amd64" "$deb_arm64" "$rpm_x86_64" "$rpm_aarch64" "$msi_x64" "$msi_arm64"; do
             test -n "$package"
             test -s "$package"
@@ -374,10 +382,10 @@ jobs:
           prerelease: ${{ inputs.prerelease }}
           generate_release_notes: true
           files: |
-            release-artifacts/taskforest_*_amd64.deb
-            release-artifacts/taskforest_*_arm64.deb
-            release-artifacts/taskforest-*.*.x86_64.rpm
-            release-artifacts/taskforest-*.*.aarch64.rpm
-            release-artifacts/TaskForest-*-x64.msi
-            release-artifacts/TaskForest-*-arm64.msi
+            release-artifacts/TaskForest-G-*-x64.deb
+            release-artifacts/TaskForest-G-*-arm64.deb
+            release-artifacts/TaskForest-G-*-x64.rpm
+            release-artifacts/TaskForest-G-*-arm64.rpm
+            release-artifacts/TaskForest-G-*-x64.msi
+            release-artifacts/TaskForest-G-*-arm64.msi
             release-artifacts/checksums-sha256-*.txt

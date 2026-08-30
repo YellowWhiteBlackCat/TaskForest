@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TaskForest per-feature escalation policy (ADR-023). This action authorizes
+  one read-only RAPL package-power sample per helper invocation; it does not
+  run the main TaskForest application as root.
+
+  Install paths:
+    this file   -> /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy
+    helper bin -> /usr/libexec/taskforest-rapl-helper
+
+  The annotated path MUST match the path passed to pkexec exactly.
+-->
+<policyconfig>
+  <action id="io.github.YellowWhiteBlackCat.TaskForest.rapl-helper">
+    <description>Sample CPU package power (RAPL) for TaskForest</description>
+    <message>TaskForest needs authorization to read the Intel RAPL package energy counters, which the kernel exposes root-only. The helper only reads the counters over one fixed sample window and reports the derived watt figures.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>auth_admin_keep</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/taskforest-rapl-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

@@ -9,7 +9,9 @@ use gpui::{
 use taskmanager_telemetry_store::TelemetryStore;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::formatting::{DisplayUnits, GraphUnit, PerformanceSettings, UnitKind};
+use crate::gpui_app::formatting::{
+    GraphUnit, PerformanceSettings, format_drive_graph_megabytes, format_network_graph_megabytes,
+};
 use crate::gpui_app::graph::GraphHover;
 use crate::gpui_app::history_samples::{
     f32_history_samples, network_rate_samples, network_rx_rate_samples, network_tx_rate_samples,
@@ -25,6 +27,7 @@ use std::rc::Rc;
 use taskmanager_application::i18n;
 use taskmanager_core::core::DirectoryUsageSnapshot;
 use taskmanager_core::core::metrics::{NetworkAdapterType, SystemSnapshot};
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::Theme;
 
 mod directory_usage;
@@ -93,42 +96,50 @@ pub(super) fn badge_pct(v: f32) -> String {
     format!("{v:.0}%")
 }
 fn badge_network_bytes_decimal(v: f32) -> String {
-    DisplayUnits {
-        network_use_bytes: true,
-        network_use_base2: false,
-        ..DisplayUnits::default()
-    }
-    .format_network_graph_megabytes(v)
+    format_network_graph_megabytes(
+        UnitPreferences {
+            network_use_bytes: true,
+            network_use_base2: false,
+            ..UnitPreferences::default()
+        },
+        v,
+    )
 }
 
 fn badge_network_bytes_binary(v: f32) -> String {
-    DisplayUnits {
-        network_use_bytes: true,
-        network_use_base2: true,
-        ..DisplayUnits::default()
-    }
-    .format_network_graph_megabytes(v)
+    format_network_graph_megabytes(
+        UnitPreferences {
+            network_use_bytes: true,
+            network_use_base2: true,
+            ..UnitPreferences::default()
+        },
+        v,
+    )
 }
 
 fn badge_network_bits_decimal(v: f32) -> String {
-    DisplayUnits {
-        network_use_bytes: false,
-        network_use_base2: false,
-        ..DisplayUnits::default()
-    }
-    .format_network_graph_megabytes(v)
+    format_network_graph_megabytes(
+        UnitPreferences {
+            network_use_bytes: false,
+            network_use_base2: false,
+            ..UnitPreferences::default()
+        },
+        v,
+    )
 }
 
 fn badge_network_bits_binary(v: f32) -> String {
-    DisplayUnits {
-        network_use_bytes: false,
-        network_use_base2: true,
-        ..DisplayUnits::default()
-    }
-    .format_network_graph_megabytes(v)
+    format_network_graph_megabytes(
+        UnitPreferences {
+            network_use_bytes: false,
+            network_use_base2: true,
+            ..UnitPreferences::default()
+        },
+        v,
+    )
 }
 
-pub(super) fn network_badge_format(units: DisplayUnits) -> fn(f32) -> String {
+pub(super) fn network_badge_format(units: UnitPreferences) -> fn(f32) -> String {
     match (units.network_use_bytes, units.network_use_base2) {
         (true, false) => badge_network_bytes_decimal,
         (true, true) => badge_network_bytes_binary,
@@ -138,45 +149,53 @@ pub(super) fn network_badge_format(units: DisplayUnits) -> fn(f32) -> String {
 }
 
 fn badge_drive_bytes_decimal(v: f32) -> String {
-    DisplayUnits {
-        drive_use_bytes: true,
-        drive_use_base2: false,
-        ..DisplayUnits::default()
-    }
-    .format_drive_graph_megabytes(v)
+    format_drive_graph_megabytes(
+        UnitPreferences {
+            drive_use_bytes: true,
+            drive_use_base2: false,
+            ..UnitPreferences::default()
+        },
+        v,
+    )
 }
 
 fn badge_drive_bytes_binary(v: f32) -> String {
-    DisplayUnits {
-        drive_use_bytes: true,
-        drive_use_base2: true,
-        ..DisplayUnits::default()
-    }
-    .format_drive_graph_megabytes(v)
+    format_drive_graph_megabytes(
+        UnitPreferences {
+            drive_use_bytes: true,
+            drive_use_base2: true,
+            ..UnitPreferences::default()
+        },
+        v,
+    )
 }
 
 fn badge_drive_bits_decimal(v: f32) -> String {
-    DisplayUnits {
-        drive_use_bytes: false,
-        drive_use_base2: false,
-        ..DisplayUnits::default()
-    }
-    .format_drive_graph_megabytes(v)
+    format_drive_graph_megabytes(
+        UnitPreferences {
+            drive_use_bytes: false,
+            drive_use_base2: false,
+            ..UnitPreferences::default()
+        },
+        v,
+    )
 }
 
 fn badge_drive_bits_binary(v: f32) -> String {
-    DisplayUnits {
-        drive_use_bytes: false,
-        drive_use_base2: true,
-        ..DisplayUnits::default()
-    }
-    .format_drive_graph_megabytes(v)
+    format_drive_graph_megabytes(
+        UnitPreferences {
+            drive_use_bytes: false,
+            drive_use_base2: true,
+            ..UnitPreferences::default()
+        },
+        v,
+    )
 }
 
 /// The value-badge formatter for the Drive-rate graph family, mirroring
 /// [`network_badge_format`]'s unit-pair resolution on the drive preference
 /// fields.
-pub(super) fn drive_badge_format(units: DisplayUnits) -> fn(f32) -> String {
+pub(super) fn drive_badge_format(units: UnitPreferences) -> fn(f32) -> String {
     match (units.drive_use_bytes, units.drive_use_base2) {
         (true, false) => badge_drive_bytes_decimal,
         (true, true) => badge_drive_bytes_binary,
@@ -668,12 +687,12 @@ fn finite_graph_summary(samples: &[f32]) -> Option<taskmanager_shell::presentati
     taskmanager_shell::presentation::graph_summary(samples)
 }
 
-pub(super) fn rate_str(units: DisplayUnits, bytes_per_sec: u64) -> String {
-    units.format(bytes_per_sec, UnitKind::Network, true)
+pub(super) fn rate_str(units: UnitPreferences, bytes_per_sec: u64) -> String {
+    units.format_quantity(bytes_per_sec, QuantityFamily::Network, true)
 }
 
-pub(super) fn drive_rate_str(units: DisplayUnits, bytes_per_sec: u64) -> String {
-    units.format(bytes_per_sec, UnitKind::Drive, true)
+pub(super) fn drive_rate_str(units: UnitPreferences, bytes_per_sec: u64) -> String {
+    units.format_quantity(bytes_per_sec, QuantityFamily::Drive, true)
 }
 
 #[cfg(test)]

@@ -41,11 +41,14 @@ fn shell_with(items: Vec<ProcessItem>) -> ShellApp {
 }
 
 fn row_id(pid: u32) -> SemanticNodeId {
-    SemanticNodeId::owned(format!("row:process:{pid}"))
+    SemanticNodeId::owned(format!(
+        "row:process:pid:{pid}:start:{}",
+        u64::from(pid) * 10_000
+    ))
 }
 
 fn cell_id(pid: u32, cell: &str) -> SemanticNodeId {
-    SemanticNodeId::owned(format!("row:process:{pid}:cell:{cell}"))
+    SemanticNodeId::owned(format!("{}:cell:{cell}", row_id(pid).as_str()))
 }
 
 #[test]

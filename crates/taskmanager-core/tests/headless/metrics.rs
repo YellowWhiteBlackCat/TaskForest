@@ -167,7 +167,8 @@ fn legacy_cpu_identity_and_topology_scalars_deserialize_as_observed_values() {
     fields.insert("brand".into(), serde_json::json!("Example CPU"));
     fields.insert("physical_cores".into(), serde_json::json!(8));
     fields.insert("logical_cores".into(), serde_json::json!(16));
-    fields.insert("l1_cache_kb".into(), serde_json::json!(512));
+    fields.insert("l1d_cache_kb".into(), serde_json::json!(512));
+    fields.insert("l1i_cache_kb".into(), serde_json::json!(256));
     fields.insert("l2_cache_kb".into(), serde_json::json!(8_192));
     fields.insert("l3_cache_kb".into(), serde_json::json!(32_768));
 
@@ -177,7 +178,8 @@ fn legacy_cpu_identity_and_topology_scalars_deserialize_as_observed_values() {
     assert_eq!(decoded.brand.as_deref(), Some("Example CPU"));
     assert_eq!(decoded.physical_cores, Some(8));
     assert_eq!(decoded.logical_cores, Some(16));
-    assert_eq!(decoded.l1_cache_kb, Some(512));
+    assert_eq!(decoded.l1d_cache_kb, Some(512));
+    assert_eq!(decoded.l1i_cache_kb, Some(256));
     assert_eq!(decoded.l2_cache_kb, Some(8_192));
     assert_eq!(decoded.l3_cache_kb, Some(32_768));
 }

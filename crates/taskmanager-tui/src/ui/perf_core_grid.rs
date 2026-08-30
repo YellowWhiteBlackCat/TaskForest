@@ -24,7 +24,6 @@ use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::hardware::CpuType;
 use taskmanager_core::core::metrics::CpuMetrics;
-use taskmanager_shell::presentation::missing_value;
 
 use super::sparkline::{recent_window_with, sparkline_in};
 use crate::{TuiApp, TuiGlyphMode, TuiTheme};
@@ -241,42 +240,14 @@ fn core_cell(
         .rev()
         .find(|value| value.is_finite())
         .map(|value| value.clamp(0.0, 100.0));
-    let readout = [
-        usage_text(cpu.and_then(|cpu| cpu.current_core_usage_pct(core_index))),
-        ghz_text(cpu.and_then(|cpu| cpu.current_core_frequency_mhz(core_index))),
-        celsius_text(cpu.and_then(|cpu| cpu.current_core_temperature_c(core_index))),
-    ]
-    .join(" · ");
+    // The three-segment readout folds the core's current typed observations
+    // in the page's data layer; paint only joins the trend with it.
+    let readout = super::perf_data::core_cell_readout(cpu, core_index);
     CoreCell {
         trend,
         readout,
         utilization,
     }
-}
-
-/// The utilization segment: whole percent, dash when unobserved.
-fn usage_text(usage: Option<f32>) -> String {
-    usage
-        .filter(|value| value.is_finite())
-        .map_or_else(missing_value, |value| format!("{value:.0}%"))
-}
-
-/// The frequency segment in GHz — the shared per-core cell spelling (mirrors
-/// gpui `formatting::optional_ghz`): two decimals, dash when unobserved, so
-/// an uncollected clock never renders as a fabricated `0.00 GHz`.
-fn ghz_text(frequency_mhz: Option<u64>) -> String {
-    frequency_mhz.map_or_else(missing_value, |mhz| {
-        format!("{:.2} GHz", mhz as f64 / 1000.0)
-    })
-}
-
-/// The temperature segment through the shell's single °C spelling (ADR-020),
-/// dash when unobserved.
-fn celsius_text(temperature_c: Option<f32>) -> String {
-    temperature_c.filter(|value| value.is_finite()).map_or_else(
-        missing_value,
-        taskmanager_shell::presentation::temperature_c,
-    )
 }
 
 /// The load-tier color for one core's latest utilization: green below

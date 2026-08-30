@@ -107,7 +107,7 @@ fn escalation_seam_exposes_the_documented_contract_types() {
     use taskmanager_escalation::EscalationFeature;
     assert_eq!(
         EscalationFeature::ALL.len(),
-        7,
+        8,
         "EscalationFeature::ALL must list every Boundary-3 escalation-column feature",
     );
 }

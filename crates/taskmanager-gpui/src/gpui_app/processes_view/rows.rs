@@ -320,18 +320,19 @@ pub fn process_column_step(
 /// drifting as the row projection evolves.
 fn set_expansion(view: &mut RootView, toggle: &Toggle, expanded: bool) {
     match toggle {
-        Toggle::TreePid(pid) => {
+        Toggle::Tree(identity) => {
             if expanded {
-                view.processes_state.collapsed.remove(pid);
+                view.processes_state.collapsed.remove(identity);
             } else {
-                view.processes_state.collapsed.insert(*pid);
+                view.processes_state.collapsed.insert(*identity);
             }
         }
-        Toggle::GroupApp(name) => {
+        Toggle::GroupApp(identity) => {
+            let name = format!("app-tree:{}", identity.stable_key());
             if expanded {
-                view.processes_state.expanded_apps.insert(name.clone());
+                view.processes_state.expanded_apps.insert(name);
             } else {
-                view.processes_state.expanded_apps.remove(name);
+                view.processes_state.expanded_apps.remove(&name);
             }
         }
         // Category headers share the hierarchy expansion set with application
@@ -350,8 +351,11 @@ fn set_expansion(view: &mut RootView, toggle: &Toggle, expanded: bool) {
 
 fn toggle_expansion(view: &mut RootView, toggle: &Toggle) {
     let expanded = match toggle {
-        Toggle::TreePid(pid) => !view.processes_state.collapsed.contains(pid),
-        Toggle::GroupApp(name) => view.processes_state.expanded_apps.contains(name),
+        Toggle::Tree(identity) => !view.processes_state.collapsed.contains(identity),
+        Toggle::GroupApp(identity) => view
+            .processes_state
+            .expanded_apps
+            .contains(&format!("app-tree:{}", identity.stable_key())),
         Toggle::GroupCategory(category) => view
             .processes_state
             .expanded_apps
@@ -402,7 +406,7 @@ pub fn proc_row_with_layout(
         is_sel,
         is_hov,
         entity,
-        pids,
+        process_identities,
         row_keys,
         rows,
         gray_zero_values,
@@ -427,27 +431,28 @@ pub fn proc_row_with_layout(
     } else {
         Color::TRANSPARENT
     };
-    let process_pid = row.process_pid;
     let selection_key = row.selection_key;
+    let process_identity = selection_key
+        .filter(|key| key.is_process())
+        .and_then(ProcessRowId::live_key);
     let ent_click = entity.clone();
     let ent_hover = entity.clone();
     let ent_toggle = entity.clone();
     let ent_key = entity.clone();
-    // Keyboard-nav capture: the ordered PID list (ArrowUp/Down moves selection by
+    // Keyboard-nav capture: the ordered identity list (ArrowUp/Down moves selection by
     // index) + this row's tree/group affordance (bare ArrowLeft/Right run the
     // iced-parity tree matrix: collapse / expand / climb to the parent; leaf
     // rows and Alt/Shift keep the column-cursor stepping).
     // Each handler reads the LIVE `selected_process_row` from RootView, so
     // consecutive arrow presses keep advancing even though gpui focus stays on
     // the originally-clicked row.
-    let key_pids = pids;
-    let click_pids = key_pids.clone();
+    let click_identities = process_identities;
     let nav_rows = row_keys;
     // Full projection snapshot for the bare Left/Right structural resolver:
     // the acted-on row is the LIVE selection (focus and selection diverge
     // after Home/End/PageUp), so the handler needs to find it among all rows,
     // not just this focused one. Owned `Rc` — the same per-row clone cost the
-    // `pids`/`nav_rows` captures already pay.
+    // `process_identities`/`nav_rows` captures already pay.
     let all_rows = rows;
     let key_has_children = row.has_children;
     let key_collapsed = row.collapsed;
@@ -582,18 +587,18 @@ pub fn proc_row_with_layout(
         .on_click(move |ev, _win, cx: &mut App| {
             ent_click.update(cx, |v, cx| {
                 let modifiers = ev.modifiers();
-                if let Some(pid) = process_pid {
+                if let Some(ProcessRowId::Process(identity)) = selection_key {
                     if modifiers.shift {
                         // The shell-owned selection resolves the anchor→end span
-                        // against the live display-order pid projection.
-                        v.extend_process_selection(&click_pids, pid);
+                        // against the live display-order identity projection.
+                        v.extend_process_selection(&click_identities, identity);
                     } else if modifiers.control || modifiers.platform {
-                        v.toggle_process_selection(pid);
+                        v.toggle_process_selection(identity);
                     } else {
-                        v.select_process_single(pid);
+                        v.select_process_single(identity);
                     }
                 } else if let Some(ProcessRowId::Application(root)) = selection_key {
-                    v.select_application_root(root.pid());
+                    v.select_application_root(root);
                 }
                 // Mission Center treats a primary double-click on an aggregate/tree
                 // row as the same expand/collapse operation as its chevron. Keep the
@@ -609,7 +614,7 @@ pub fn proc_row_with_layout(
             ent_hover.update(cx, |v, cx| {
                 v.set_hover(
                     if *is_hov {
-                        process_pid.map(Hover::Proc)
+                        process_identity.map(Hover::Proc)
                     } else {
                         None
                     },
@@ -808,7 +813,7 @@ pub fn proc_row_with_layout(
             theme,
             row,
             row_idx,
-            pid: process_pid,
+            identity: process_identity,
             hidden_cols,
             col_widths,
             entity,

@@ -15,7 +15,7 @@ use taskmanager_ui::inputs::slider::SliderState;
 use taskmanager_ui::inputs::text_input::TextInputState;
 use taskmanager_ui::primitives::button::ButtonState;
 
-use taskmanager_core::core::process::ProcessBatchHistory;
+use taskmanager_core::core::process::{ProcessBatchHistory, ProcessLiveKey};
 use taskmanager_core::core::startup::StartupEntryId;
 
 use crate::gpui_app::containers_view;
@@ -482,13 +482,14 @@ impl RootView {
         &mut self,
     ) -> (
         std::rc::Rc<Vec<processes_view::rows::VisibleRow>>,
-        std::rc::Rc<Vec<u32>>,
+        std::rc::Rc<Vec<ProcessLiveKey>>,
         String,
     ) {
         let (sort_col, sort_dir) = self.shell.processes.sort();
         let sort_asc = matches!(sort_dir, taskmanager_shell::SortDir::Asc);
         let filter = self.shell.processes.status_filter();
         let query = self.shell.processes.query().trim().to_owned();
+        let units = self.display_units();
         if let Some(cache) = self.projection_caches.processes()
             && cache.processes_generation == self.processes_generation()
             && cache.query == query
@@ -498,8 +499,13 @@ impl RootView {
             && cache.collapsed == self.processes_state.collapsed
             && cache.expanded_apps == self.processes_state.expanded_apps
             && cache.local_time_rules == self.local_time_rules.cache_key()
+            && cache.units == units
         {
-            return (cache.rows.clone(), cache.pids.clone(), cache.query.clone());
+            return (
+                cache.rows.clone(),
+                cache.process_identities.clone(),
+                cache.query.clone(),
+            );
         }
         let procs_refs: Vec<&taskmanager_core::core::process::ProcessItem> =
             self.processes().iter().collect();
@@ -507,19 +513,24 @@ impl RootView {
         let rows = processes_view::rows::visible_rows_with_local_time(
             processes_view::rows::VisibleRowsProps {
                 processes: &procs_refs,
+                observed_at_ms: self.processes_observed_at_ms(),
                 query: &query,
                 sort_col,
                 sort_asc,
                 filter,
                 collapsed: &self.processes_state.collapsed,
                 expanded_apps: &self.processes_state.expanded_apps,
+                units,
             },
             &self.local_time_rules,
         );
         let rows = std::rc::Rc::new(rows);
-        let pids = std::rc::Rc::new(
+        let process_identities = std::rc::Rc::new(
             rows.iter()
-                .filter_map(|row| row.process_pid)
+                .filter_map(|row| match row.selection_key {
+                    Some(taskmanager_shell::ProcessRowId::Process(identity)) => Some(identity),
+                    _ => None,
+                })
                 .collect::<Vec<_>>(),
         );
         self.projection_caches
@@ -532,11 +543,12 @@ impl RootView {
                 collapsed: self.processes_state.collapsed.clone(),
                 expanded_apps: self.processes_state.expanded_apps.clone(),
                 local_time_rules: self.local_time_rules.cache_key(),
+                units,
                 rows: rows.clone(),
-                pids: pids.clone(),
+                process_identities: process_identities.clone(),
                 application_count,
             });
-        (rows, pids, query)
+        (rows, process_identities, query)
     }
 
     /// Cached application-root count for the current process generation.

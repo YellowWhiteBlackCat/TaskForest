@@ -1,3 +1,8 @@
+//! DRM sysfs GPU telemetry provider: per-card utilization, VRAM, and
+//! temperature reads plus the module-declared driver-version fact (in-tree
+//! DRM drivers declare no version, so that field stays honestly absent
+//! there; NVML overrides for the proprietary stack).
+
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
@@ -10,11 +15,12 @@ pub(super) const DRM_PROVIDER_ID: ProviderId = ProviderId::borrowed("linux.gpu.d
 
 pub(super) struct DrmSysfsGpuProvider {
     root: PathBuf,
+    module_root: PathBuf,
 }
 
 impl DrmSysfsGpuProvider {
-    pub(super) fn new(root: PathBuf) -> Self {
-        Self { root }
+    pub(super) fn new(root: PathBuf, module_root: PathBuf) -> Self {
+        Self { root, module_root }
     }
 }
 
@@ -36,7 +42,8 @@ impl GpuTelemetryProvider for DrmSysfsGpuProvider {
         Ok(scan_drm_cards(&self.root)
             .into_iter()
             .map(|(card_name, device_path)| {
-                let metrics = build_drm_identity_metrics(&card_name, &device_path);
+                let metrics =
+                    build_drm_identity_metrics(&card_name, &device_path, &self.module_root);
                 let fields = fields_for_drm_identity(&metrics);
                 GpuProviderSample {
                     metrics,
@@ -52,6 +59,9 @@ fn fields_for_drm_identity(metric: &GpuMetrics) -> Vec<GpuMetricField> {
     let mut fields = vec![GpuMetricField::Identity, GpuMetricField::Brand];
     if metric.driver.is_some() {
         fields.push(GpuMetricField::Driver);
+    }
+    if metric.driver_version.is_some() {
+        fields.push(GpuMetricField::DriverVersion);
     }
     fields
 }

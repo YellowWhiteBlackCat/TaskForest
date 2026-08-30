@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use super::{ProcessTerminationAction, snapshot_process_tree};
 use taskmanager_core::core::ScalarObservation;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
 
 fn process(pid: u32, parent_pid: Option<u32>, name: &str, start: u64) -> ProcessItem {
     taskmanager_test_support::ProcessItemFixtureBuilder::new()
@@ -17,6 +17,10 @@ fn process(pid: u32, parent_pid: Option<u32>, name: &str, start: u64) -> Process
         .build()
 }
 
+fn identity(pid: u32, start: u64) -> ProcessLiveKey {
+    ProcessLiveKey::from_parts(pid, start * 10).expect("fixture identity")
+}
+
 #[test]
 fn tree_snapshot_is_leaf_first_deterministic_and_frozen() {
     let mut processes = vec![
@@ -27,7 +31,7 @@ fn tree_snapshot_is_leaf_first_deterministic_and_frozen() {
         process(9, None, "unrelated", 900),
     ];
 
-    let intent = snapshot_process_tree(&processes, 1).expect("complete frozen tree");
+    let intent = snapshot_process_tree(&processes, identity(1, 100)).expect("complete frozen tree");
     assert_eq!(intent.action, ProcessTerminationAction::EndProcessTree);
     assert_eq!(intent.root.name, "root");
     assert_eq!(intent.root.start_time_secs, 100);
@@ -50,7 +54,8 @@ fn tree_snapshot_terminates_on_cycles_and_never_duplicates_root() {
         process(11, Some(10), "child", 11),
         process(12, Some(11), "cycle", 12),
     ];
-    let intent = snapshot_process_tree(&processes, 10).expect("complete frozen cycle");
+    let intent =
+        snapshot_process_tree(&processes, identity(10, 10)).expect("complete frozen cycle");
     let pids = intent.execution_pids();
     assert_eq!(pids, vec![12, 11, 10]);
     let unique: HashSet<u32> = pids.iter().copied().collect();
@@ -66,5 +71,5 @@ fn tree_snapshot_of_an_unknown_root_fails_closed_like_the_core_freeze() {
         process(1, None, "root", 100),
         process(2, Some(99), "orphan", 200),
     ];
-    assert!(snapshot_process_tree(&processes, 99).is_none());
+    assert!(snapshot_process_tree(&processes, identity(99, 990)).is_none());
 }

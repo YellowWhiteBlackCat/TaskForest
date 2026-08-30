@@ -7,6 +7,7 @@
 use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::services::{
     ServiceItem, ServiceLogLevelFilter, ServiceLogState, ServiceLogTimeFilter, ServiceRelationKind,
 };
@@ -77,32 +78,33 @@ pub(super) fn render(app: &IcedApp) -> Element<'_, Message, iced::Theme, iced::R
     ]
     .spacing(8)
     .align_y(iced::Alignment::Center);
-    let matching_pid = app
+    let matching_process = app
         .shell
         .projection()
         .processes
         .as_deref()
         .and_then(|procs| {
             let service_stem = item.name.strip_suffix(".service").unwrap_or(&item.name);
-            procs
-                .iter()
-                .find(|p| {
-                    p.name.eq_ignore_ascii_case(service_stem)
-                        || p.name.eq_ignore_ascii_case(&item.name)
-                        || p.cmdline.contains(service_stem)
+            procs.iter().find_map(|process| {
+                (process.name.eq_ignore_ascii_case(service_stem)
+                    || process.name.eq_ignore_ascii_case(&item.name)
+                    || process.cmdline.contains(service_stem))
+                .then(|| {
+                    ProcessLiveKey::from_process(process).map(|identity| (identity, process.pid))
                 })
-                .map(|p| p.pid)
+                .flatten()
+            })
         });
 
     let lifecycle_content: Element<'_, Message, iced::Theme, iced::Renderer> =
-        if let Some(pid) = matching_pid {
+        if let Some((identity, pid)) = matching_process {
             column![
                 key_value_rows(service_rows(&item, Some(pid))),
                 focus::dynamic_button(
                     app.theme(),
                     FocusTarget::ServiceDetailsJumpToProcess,
                     format!("{} (PID {pid})", t("svc.jump_to_process")),
-                    Message::JumpToProcess { pid },
+                    Message::JumpToProcess { identity },
                     false,
                 ),
             ]

@@ -10,6 +10,7 @@ use crate::ui::applications::{
     applications_table_rows_range, process_view_selector,
 };
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{SortCol, SortDir};
 
 use super::super::process_projection::ProcessProjection;
@@ -29,6 +30,7 @@ fn rendered_row_count(app: &crate::IcedApp) -> usize {
         &app.process_presentation.expanded_groups,
         &app.process_presentation.expanded_tree,
         &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        0,
     );
     let hidden_columns = std::collections::HashSet::new();
     let ctx = RowRender {
@@ -43,7 +45,7 @@ fn rendered_row_count(app: &crate::IcedApp) -> usize {
         gray_zero: app.preferences().gray_zero_values,
         hidden_columns: std::rc::Rc::new(hidden_columns),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
-        open_menu_pid: None,
+        open_menu_identity: None,
     };
     applications_table_rows(&ctx, &projection).len()
 }
@@ -63,7 +65,7 @@ fn applications_lazy_body_key_tracks_only_visual_invalidations() {
         gray_zero: false,
         hidden_columns: std::rc::Rc::new(std::collections::HashSet::new()),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
-        open_menu_pid: None,
+        open_menu_identity: None,
     };
     let base = applications_table_key(7, &render);
     assert_eq!(base, applications_table_key(7, &render));
@@ -73,11 +75,8 @@ fn applications_lazy_body_key_tracks_only_visual_invalidations() {
     render.query.clear();
     let mut selected = std::collections::HashSet::new();
     selected.insert(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            1,
-            taskmanager_test_support::fixture_start_token(1),
-        )
-        .expect("non-zero parts"),
+        ProcessLiveKey::from_parts(1, taskmanager_test_support::fixture_start_token(1))
+            .expect("non-zero parts"),
     );
     render.selected_identities = std::rc::Rc::new(selected);
     assert_ne!(base, applications_table_key(7, &render));
@@ -91,16 +90,16 @@ fn applications_lazy_body_key_tracks_only_visual_invalidations() {
     // Right-clicking a row opens its context menu ON that row: the table
     // body must rebuild so the row can host the floating panel, and closing
     // the menu (or switching it to another row) must rebuild again.
-    render.open_menu_pid = Some(4242);
+    render.open_menu_identity = ProcessLiveKey::from_parts(4242, 4242);
     let open_on_row = applications_table_key(7, &render);
     assert_ne!(base, open_on_row);
-    render.open_menu_pid = Some(909);
+    render.open_menu_identity = ProcessLiveKey::from_parts(909, 909);
     assert_ne!(
         open_on_row,
         applications_table_key(7, &render),
         "moving the open menu to another row re-hosts a different one"
     );
-    render.open_menu_pid = None;
+    render.open_menu_identity = None;
     assert_ne!(
         open_on_row,
         applications_table_key(7, &render),
@@ -166,6 +165,7 @@ fn applications_row_materialization_is_bounded_to_the_virtual_window() {
         &expanded,
         &std::collections::HashSet::new(),
         &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        0,
     );
     let ctx = RowRender {
         theme: *app.theme(),
@@ -179,7 +179,7 @@ fn applications_row_materialization_is_bounded_to_the_virtual_window() {
         gray_zero: false,
         hidden_columns: std::rc::Rc::new(std::collections::HashSet::new()),
         column_widths: std::rc::Rc::new(crate::app::ColumnWidthOverrides::default()),
-        open_menu_pid: None,
+        open_menu_identity: None,
     };
     let window = VirtualWindow::for_rows(
         projection.len(),
@@ -291,8 +291,6 @@ fn category_tree_groups_processes_without_an_alternate_selector() {
     // Toggling the category header hides and reveals its recursive children.
     let _ = app.update(Message::ToggleGroupExpansion {
         name: category.into(),
-        main_pid: 100,
-        flat_index: 0,
         row_key: None,
     });
     assert!(!app.is_group_expanded(category));
@@ -303,8 +301,6 @@ fn category_tree_groups_processes_without_an_alternate_selector() {
     );
     let _ = app.update(Message::ToggleGroupExpansion {
         name: category.into(),
-        main_pid: 100,
-        flat_index: 0,
         row_key: None,
     });
     assert!(app.is_group_expanded(category));
@@ -339,8 +335,6 @@ fn category_tree_keeps_one_first_level_category_axis() {
     // Kernel grouping is created by the product selector.
     let _ = app.update(Message::ToggleGroupExpansion {
         name: category.into(),
-        main_pid: 200,
-        flat_index: 0,
         row_key: None,
     });
     assert!(!app.is_group_expanded(category));

@@ -10,10 +10,8 @@ use ratatui::crossterm::event::{
 use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage};
 
-use super::{
-    EventReaction, RefreshPacing, TerminalEventSource, apply_terminal_event,
-    apply_terminal_event_with_plan, run_event_loop,
-};
+use super::seam_support::{apply_terminal_event, run_event_loop};
+use super::{EventReaction, RefreshPacing, TerminalEventSource, apply_terminal_event_with_plan};
 use crate::TuiApp;
 use crate::ui::TuiFramePlan;
 
@@ -347,12 +345,14 @@ fn click_selects_the_painted_row_through_the_shared_selection_entry() {
                 app.shell.move_selection(1);
             }
             let frame = Rect::new(0, 0, 120, 40);
-            let panel = crate::ui::table_hit::table_panel_projection(&app, frame)
-                .unwrap_or_else(|| panic!("{page:?} must expose a table panel"));
+            let panel =
+                crate::ui::table_hit::table_hit_support::table_panel_projection(&app, frame)
+                    .unwrap_or_else(|| panic!("{page:?} must expose a table panel"));
             let column = panel.area.x + 2;
             let painted = painted_highlight_row(&app, 120, 40)
                 .unwrap_or_else(|| panic!("{page:?} must paint a highlight"));
-            let clicked = crate::ui::table_hit::row_at(&app, frame, column, painted);
+            let clicked =
+                crate::ui::table_hit::table_hit_support::row_at(&app, frame, column, painted);
             assert_eq!(
                 clicked,
                 Some(app.shell.selected),
@@ -400,7 +400,7 @@ fn pages_without_a_keyboard_addressable_table_are_click_transparent() {
         let mut app = crate::demo_app();
         let _ = app.apply_action(AppAction::SelectPage(page));
         assert!(
-            crate::ui::table_hit::table_panel_projection(&app, frame).is_none(),
+            crate::ui::table_hit::table_hit_support::table_panel_projection(&app, frame).is_none(),
             "{page:?} must not expose pointer row selection"
         );
         let reaction = apply_terminal_event(&mut app, click(10, 10), frame);
@@ -410,7 +410,7 @@ fn pages_without_a_keyboard_addressable_table_are_click_transparent() {
     // same pointer mapper used by keyboard navigation.
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
-    assert!(crate::ui::table_hit::table_panel_projection(&app, frame).is_some());
+    assert!(crate::ui::table_hit::table_hit_support::table_panel_projection(&app, frame).is_some());
 }
 
 #[test]
@@ -418,7 +418,8 @@ fn clicks_on_headers_borders_and_outside_the_panel_are_no_ops() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Users));
     let frame = Rect::new(0, 0, 120, 40);
-    let panel = crate::ui::table_hit::table_panel_projection(&app, frame).expect("users");
+    let panel = crate::ui::table_hit::table_hit_support::table_panel_projection(&app, frame)
+        .expect("users");
     let before = app.shell.selected;
     // Header row, header margin, top border, footer, and a column far
     // right of the panel never select.
@@ -456,7 +457,8 @@ fn clicks_while_a_surface_owns_the_keyboard_are_no_ops() {
         taskmanager_core::core::session::SessionControlAction::Lock
     ));
     let frame = Rect::new(0, 0, 120, 40);
-    let panel = crate::ui::table_hit::table_panel_projection(&app, frame).expect("users");
+    let panel = crate::ui::table_hit::table_hit_support::table_panel_projection(&app, frame)
+        .expect("users");
     assert_eq!(
         apply_terminal_event(&mut app, click(10, panel.area.y + 5), frame),
         EventReaction::default(),

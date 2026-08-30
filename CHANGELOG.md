@@ -8,12 +8,59 @@
 
 ## [Unreleased]
 
+## [0.1.0-rc6] — 2026-08-31
+
+### 新增
+
+- SMBIOS 内存明细提权链：新增 `--memory-smbios` CLI 表面与请求 lane，经
+  pkexec 专用只读 helper（`taskforest-smbios-helper`）读取 root-only 的
+  type-17 记录（插槽占用、实时配置频率、颗粒详情），缺数据保持 typed 不可用，
+  绝不伪造；免特权侧的 DMI 探针改与 helper 共用同一纯解析器
+  （`taskmanager-smbios-tables`），两读者永不漂移。同一 helper 与 lane 现已
+  覆盖 type 0/1/2 身份表（系统/主板序列号、产品 UUID、资产标签、SKU——这些
+  `/sys/class/dmi/id` 节点为 root-only），系统页硬件区按需授权后展示。
+- CPU 页与系统页新增授权面板：性能→CPU 详情的"封装功耗"区与系统页的
+  "内存清单"卡片，均由对应请求 lane 供数；数据不可得时给出类型化原因，
+  需提权时提供单发"授权"按钮（一次点击恰触发一次请求，不自动轮询、不自动
+  弹授权框）。
+- CPU 封装功耗提权链：新增 `--package-power` CLI 表面与请求 lane，经
+  `taskforest-rapl-helper` 对 root-only RAPL energy 计数做一次定窗采样并给出
+  每封装瓦数；两条链均配套 polkit action、包安装清单与安装器事务
+  （`smbios` / `rapl`）。
+- Intel MSR 读数族（ADR-048）：新增 `--msr` CLI 表面与
+  `taskforest-msr-helper`（对 root-only `/dev/cpu/*/msr` 做纯 pread 文件读，
+  不新增 unsafe 信任根），给出封装温度、当前/最小/最大倍频与核心电压；
+  CPU 详情页新增 MSR 读数区（单发授权按钮，与封装功耗同一交互纪律）。
+  基频 BCLK 采用 CPUID leaf 0x16 总线参考频率（内核 tsc.c 同源判定；sysfs
+  base_frequency ÷ 效率比与 TSC 计时 ÷ 比两条路径经实测证明产出错误数值，
+  已在 ADR-048 记录否决）。AMD Zen 1–3 倍频/电压经 RDMSR P-state 寄存器
+  实装（ADR-049）；SMN 遥测需写副作用/MMIO，安全 Rust 下结构性不可达，
+  AMD 温度继续走免特权 k10temp 路径。
+- Windows UAC 提权通道 stage 2（ADR-035）：外进程控制的越权路径改经
+  `ShellExecuteExW("runas")` + 一次性回执文件（调用落在审计边界
+  windows-api 内，业务 crate 保持全安全 Rust），取消/缺装/超时/协议损坏
+  各自类型化；macOS 授权词表与纯分类层就绪，Security 框架调用以待签名
+  helper 的打包 ADR 为界如实保持未接。
+- Linux GPU 驱动版本扩展：模块自报版本的 DRM 驱动与 NVIDIA procfs
+  `NVRM` 版本进入"驱动版本"行；Mesa 用户态版本因不存在免 GL-loader 的
+  稳定数据源保持类型化缺失（结论已记录）。
+- GPU 驱动版本成为 core 类型化事实：Linux NVML 与 Windows 适配器版本号贯通
+  四前端"驱动版本"行；Windows 侧旧有"版本冒充驱动名"的交叉接线移除。
+- 芯片组型号：Linux 经 PCI 主桥/PCH ISA 桥 + pci.ids（hwdata）解析出芯片组
+  营销名，系统页三前端展示；pci.ids 查询提升为共享模块，GPU 路径不再私持。
+
+### 修复
+
+- 修正 `--help` 中 `--gpu-engines` 描述被后续条目截断的排版；未知参数的用法
+  提示补上 `--snapshot` 与 `--capture-window`。
+
 ### 工程与流程
 
 - 为 0.1.0 正式版建立对外流程基线：贡献指南、安全上报策略、issue 与 PR 模板；
-- 明确分支与发布线生命周期、预发布准出条件（见 docs/RELEASE.md）。
+- 明确分支与发布线生命周期、预发布准出条件（见 docs/RELEASE.md）；
+- 权限模型 Boundary 3 补记 SMBIOS/RAPL 两个既有提权 feature 的文档缺口。
 
-## [0.1.0-rc.5] — 2026-08-28
+## [0.1.0-rc5] — 2026-08-28
 
 ### 修复
 
@@ -25,7 +72,8 @@
 - Iced 前端的"性能"页面对齐 GPUI 布局权威；
 - 采集测试与真实桌面完全隔离，避免嵌套采集影响宿主环境。
 
-> 内部曾组装 rc.4 构建但未打 tag 发布，其内容已全部并入 rc.5；该编号不回收。
+> 自 rc5 起预发布后缀统一连写（`rcN`，无点）。内部曾组装 rc4 构建但未打 tag
+> 发布，其内容已全部并入 rc5；该编号不回收。
 
 ## [0.1.0-rc.3] — 2026-08-27
 

@@ -117,8 +117,15 @@ impl super::RootView {
             TopPage::Containers => {
                 self.request_refresh(taskmanager_application::RefreshRequest::Containers)
             }
-            TopPage::Performance
-            | TopPage::Apps
+            // The CPU page's pinned details (base clock, sockets, the P/E/LP
+            // core-class breakdown) consume the hardware inventory. Under the
+            // Dashboard automatic profile hardware is not background work, so
+            // the page requests its own copy when it becomes visible — one
+            // static fetch, never a schedule.
+            TopPage::Performance => {
+                self.request_refresh(taskmanager_application::RefreshRequest::HardwareInventory)
+            }
+            TopPage::Apps
             | TopPage::Services
             | TopPage::Startup
             | TopPage::Users

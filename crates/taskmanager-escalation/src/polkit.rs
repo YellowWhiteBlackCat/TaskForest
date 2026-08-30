@@ -472,6 +472,29 @@ pub use process_control::{
 mod gate;
 pub use gate::PolkitGate;
 
+// ---------------------------------------------------------------------------
+// SMBIOS memory + RAPL package-power helper crossings (ADR-023 Boundary 2) —
+// sibling modules so this file stays under the workspace file-line budget and
+// each crossing (contract types + parser + process seam) lives in one place.
+// ---------------------------------------------------------------------------
+mod smbios;
+pub use smbios::{
+    DmiIdentityFacts, PkexecSmbiosHelper, SmbiosHelperError, SmbiosHelperErrorKind,
+    SmbiosHelperOutcome, SmbiosHelperProcess, SmbiosMemorySuccess, SmbiosModuleReading,
+    invoke_smbios_helper, invoke_smbios_helper_with,
+};
+mod rapl;
+pub use rapl::{
+    PkexecRaplHelper, RaplHelperError, RaplHelperErrorKind, RaplHelperOutcome, RaplHelperProcess,
+    RaplPackageReading, RaplPowerSuccess, invoke_rapl_helper, invoke_rapl_helper_with,
+};
+// ADR-048: the MSR readout helper crossing — same sibling-module shape.
+mod msr;
+pub use msr::{
+    MsrHelperError, MsrHelperErrorKind, MsrHelperOutcome, MsrHelperProcess, MsrPackageReading,
+    MsrReadoutSuccess, PkexecMsrHelper, invoke_msr_helper, invoke_msr_helper_with,
+};
+
 /// Cap a non-contract stdout in a detail string so a giant/garbage blob does
 /// not balloon the diagnostic. Cuts at the newest UTF-8 char boundary at or
 /// before `LIMIT` bytes so a multibyte helper stdout can never panic the

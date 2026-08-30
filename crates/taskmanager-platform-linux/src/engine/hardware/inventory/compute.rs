@@ -51,6 +51,11 @@ impl InventorySource for ComputeTopologySource {
                 Vec::new()
             }
         };
+        let cpu_identity = context
+            .paths
+            .uses_native_cpu_root()
+            .then(probe_cpu_identity)
+            .unwrap_or_default();
         let logical_cpu_count_value = logical_cpu_count.unwrap_or_default();
         let (core_breakdown, cpu_types, socket_count) =
             if cpu_root_available && context.paths.uses_native_cpu_root() {
@@ -89,7 +94,8 @@ impl InventorySource for ComputeTopologySource {
         let observed = base_observed + usize::from(cpu_root_available) * 3;
         let item_count = observed
             + usize::from(base_frequency_mhz.is_some())
-            + usize::from(!instruction_features.is_empty());
+            + usize::from(!instruction_features.is_empty())
+            + usize::from(cpu_identity.is_present());
 
         SourceFragment::new(
             ComputeTopology {
@@ -101,6 +107,7 @@ impl InventorySource for ComputeTopologySource {
                 cpu_types,
                 base_frequency_mhz,
                 instruction_features,
+                cpu_identity,
             },
             TOPOLOGY_PROVIDER,
             required_source_outcome(observed, 6, &failures),
@@ -196,6 +203,43 @@ fn advertised_frequencies_mhz() -> (Option<u64>, Option<u64>) {
     )))]
     {
         (None, None)
+    }
+}
+
+/// Read the CPUID version identity (leaf-0 vendor string, leaf-1 `EAX` fields)
+/// from the safe CPUID wrapper. Only the typed fields cross into the domain;
+/// the `EAX` bit layout stays in this adapter. Fixture roots must not leak the
+/// test runner's CPU facts into a synthetic inventory, so callers gate this on
+/// the native host path exactly like [`advertised_frequencies_mhz`].
+fn probe_cpu_identity() -> CpuIdentity {
+    #[cfg(all(
+        any(target_arch = "x86", target_arch = "x86_64"),
+        not(target_env = "sgx")
+    ))]
+    {
+        let cpuid = raw_cpuid::CpuId::new();
+        let vendor = cpuid
+            .get_vendor_info()
+            .map(|vendor| vendor.as_str().to_string());
+        cpuid
+            .get_feature_info()
+            .map_or_else(CpuIdentity::default, |info| {
+                CpuIdentity::from_cpuid_parts(
+                    vendor,
+                    info.base_family_id(),
+                    info.extended_family_id(),
+                    info.base_model_id(),
+                    info.extended_model_id(),
+                    info.stepping_id(),
+                )
+            })
+    }
+    #[cfg(not(all(
+        any(target_arch = "x86", target_arch = "x86_64"),
+        not(target_env = "sgx")
+    )))]
+    {
+        CpuIdentity::default()
     }
 }
 

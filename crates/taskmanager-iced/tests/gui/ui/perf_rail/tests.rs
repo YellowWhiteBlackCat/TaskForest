@@ -12,8 +12,6 @@ use taskmanager_core::core::sensors::{
     SensorDescriptor, SensorMagnitude, SensorMeasurementObservation, SensorQuantity, SensorScale,
 };
 
-use taskmanager_telemetry_store::live_graph::MetricSeries;
-
 fn rail_key(app: &crate::IcedApp, theme: &Theme) -> u64 {
     let devices = [PerfDevice::Cpu];
     let window = VirtualWindow::for_rows(1, 0.0, RAIL_CARD_HEIGHT, RAIL_CARD_HEIGHT, 0.0);

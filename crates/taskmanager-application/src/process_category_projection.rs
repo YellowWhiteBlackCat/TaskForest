@@ -8,29 +8,32 @@
 //! presentation policy stay in each frontend.
 //!
 //! Fixed semantics (the "same" every frontend consumes):
-//! - Buckets are emitted in the fixed [`ProcessCategory::ALL`] order
+//! - Buckets are emitted in the fixed
+//!   [`taskmanager_core::core::process::ProcessCategory::ALL`] order
 //!   (Application → Background → Uncategorized).
 //! - An empty bucket is omitted entirely (no fabricated header).
 //! - Each bucket keeps its members in INPUT order — the caller passes the
 //!   already-sorted visible list ("group members follow the active sort");
 //!   this module never re-sorts.
-//! - Aggregation is closure-driven: `CategoryBucketProjection::sum_f32`
-//!   sums the available values and skips members whose extractor returns
-//!   `None` (the `filter_map().sum()` header-CPU% convention every frontend
-//!   used), and `CategoryBucketProjection::sum_u64` is its saturating u64
-//!   counterpart. Callers needing a different fold (all-or-nothing `Option`
-//!   sums, PSS-preferred memory, ...) fold
-//!   `CategoryBucketProjection::members` themselves with their own metric
-//!   closure.
+//! - Aggregation is typed: `CategoryBucketProjection::aggregate_f32` and
+//!   `CategoryBucketProjection::aggregate_u64` delegate to core's
+//!   availability-preserving
+//!   [`taskmanager_core::core::process::aggregate::AggregateMetric`] folds. A missing member is
+//!   therefore not silently converted into a successful zero. Callers choose
+//!   the typed observation field, while core remains the sole authority for
+//!   coverage, freshness, failure, and saturating-add semantics.
 //! - The expansion key is `category:<stable_key>` — locale-neutral (a
 //!   language switch never orphans an expansion) and collision-free with any
 //!   normalized app-group name or type label.
 //!
 //! Frontends reach this projection through `taskmanager-application` and
-//! import the underlying [`ProcessCategory`] facts directly from their owner
+//! import the underlying
+//! [`taskmanager_core::core::process::ProcessCategory`] facts directly from their owner
 //! module in `taskmanager-core`.
 
-use taskmanager_core::core::process::ProcessCategory;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::aggregate::{AggregateMetric, aggregate_f32, aggregate_u64};
+use taskmanager_core::core::process::{ProcessCategory, ProcessItem};
 
 /// Prefix of every category expansion key (see [`category_expansion_key`]).
 pub const CATEGORY_EXPANSION_KEY_PREFIX: &str = "category:";
@@ -74,22 +77,107 @@ impl<T> CategoryBucketProjection<'_, T> {
         self.members.len()
     }
 
-    /// Sum one optional `f32` metric over the members, skipping members whose
-    /// extractor returns `None` — an unavailable observation contributes
-    /// nothing (the header CPU% convention every frontend used).
+    /// Aggregate one typed `f32` observation over the members.
+    ///
+    /// `observed_at_ms` must come from the accepted owning snapshot. The
+    /// returned [`AggregateMetric`] preserves the distinction between a
+    /// measured zero, partial coverage, stale history, unavailable data, and
+    /// an unknown observation.
     #[must_use]
-    pub fn sum_f32(&self, value: impl Fn(&T) -> Option<f32>) -> f32 {
-        self.members.iter().filter_map(|member| value(member)).sum()
+    pub fn aggregate_f32(
+        &self,
+        observed_at_ms: u64,
+        observation: impl Fn(&T) -> &ScalarObservation<f32>,
+    ) -> Option<AggregateMetric<f32>> {
+        aggregate_f32(
+            self.members.iter().map(|member| observation(*member)),
+            observed_at_ms,
+        )
     }
 
-    /// Saturating sum of one optional `u64` metric over the members, skipping
-    /// members whose extractor returns `None`.
+    /// Aggregate one typed `u64` observation over the members with core's
+    /// saturating addition. See [`Self::aggregate_f32`] for availability
+    /// semantics.
     #[must_use]
-    pub fn sum_u64(&self, value: impl Fn(&T) -> Option<u64>) -> u64 {
-        self.members
-            .iter()
-            .filter_map(|member| value(member))
-            .fold(0, u64::saturating_add)
+    pub fn aggregate_u64(
+        &self,
+        observed_at_ms: u64,
+        observation: impl Fn(&T) -> &ScalarObservation<u64>,
+    ) -> Option<AggregateMetric<u64>> {
+        aggregate_u64(
+            self.members.iter().map(|member| observation(*member)),
+            observed_at_ms,
+        )
+    }
+}
+
+impl CategoryBucketProjection<'_, ProcessItem> {
+    /// Aggregate the process members' typed CPU observations.
+    ///
+    /// This is the canonical CPU metric for category headers. The caller
+    /// supplies the timestamp of the accepted process snapshot; the fold
+    /// itself remains owned by core.
+    #[must_use]
+    pub fn aggregate_process_cpu(&self, observed_at_ms: u64) -> Option<AggregateMetric<f32>> {
+        self.aggregate_f32(observed_at_ms, |process| {
+            &process.scalar_observations().cpu_percentage
+        })
+    }
+
+    /// Aggregate the process members' resident-set-size observations.
+    #[must_use]
+    pub fn aggregate_process_memory_rss(
+        &self,
+        observed_at_ms: u64,
+    ) -> Option<AggregateMetric<u64>> {
+        self.aggregate_u64(observed_at_ms, |process| {
+            &process.scalar_observations().memory_bytes
+        })
+    }
+
+    /// Aggregate the process members' PSS observations without changing the
+    /// measurement kind when PSS is unavailable.
+    #[must_use]
+    pub fn aggregate_process_memory_pss(
+        &self,
+        observed_at_ms: u64,
+    ) -> Option<AggregateMetric<u64>> {
+        self.aggregate_u64(observed_at_ms, |process| {
+            &process.scalar_observations().memory_pss_bytes
+        })
+    }
+
+    /// Aggregate the product's PSS-preferred memory display metric.
+    ///
+    /// A process uses current PSS when it is present and otherwise uses its
+    /// typed RSS observation. This selection is an application display rule;
+    /// each selected value still goes through core's typed aggregate fold, so
+    /// unavailable/stale/partial coverage cannot be collapsed into zero.
+    #[must_use]
+    pub fn aggregate_process_memory_for_display(
+        &self,
+        observed_at_ms: u64,
+    ) -> Option<AggregateMetric<u64>> {
+        self.aggregate_u64(observed_at_ms, process_memory_observation_for_display)
+    }
+}
+
+/// Select the typed memory observation used by the Applications display.
+///
+/// PSS is preferred only while it has a current value. A stale or unavailable
+/// PSS observation does not masquerade as current PSS; the display falls back
+/// to the process' independently typed RSS observation instead.
+#[must_use]
+pub fn process_memory_observation_for_display(process: &ProcessItem) -> &ScalarObservation<u64> {
+    if process
+        .scalar_observations()
+        .memory_pss_bytes
+        .current_value()
+        .is_some()
+    {
+        &process.scalar_observations().memory_pss_bytes
+    } else {
+        &process.scalar_observations().memory_bytes
     }
 }
 

@@ -2,6 +2,7 @@
 
 use super::*;
 use std::collections::HashSet;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 /// A primary double-click on a category aggregate row must expand and
 /// collapse the same stable-keyed bucket as the chevron and directional keys,
@@ -172,8 +173,8 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
     );
     view.update(cx, |v, _cx| {
         let (rows, _, _) = v.processes_projection();
-        assert_eq!(rows[0].process_pid, None);
-        assert_eq!(rows[1].process_pid, None);
+        assert_eq!(rows[0].process_identity, None);
+        assert_eq!(rows[1].process_identity, None);
         assert_eq!(rows[1].cell_text.pid, "");
         assert_eq!(rows[1].name, "Mission Center");
     });
@@ -192,7 +193,9 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
         click_count: 2,
     });
     assert!(view.read_with(cx, |v, _| {
-        v.processes_state.expanded_apps.contains("app-tree:100")
+        v.processes_state
+            .expanded_apps
+            .contains("app-tree:pid:100:start:1001")
     }));
     assert!(view.read_with(cx, |v, _| v.selected_process_count() == 0));
     assert_eq!(
@@ -205,7 +208,9 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
     view.update(cx, |v, _cx| {
         let (rows, _, _) = v.processes_projection();
         assert_eq!(
-            rows.iter().map(|row| row.process_pid).collect::<Vec<_>>(),
+            rows.iter()
+                .map(|row| row.process_identity.map(ProcessLiveKey::pid))
+                .collect::<Vec<_>>(),
             [None, None, Some(100), Some(102), Some(101)]
         );
         assert_eq!(rows[2].cpu, Some(10.0));
@@ -213,24 +218,9 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
     });
 }
 
-/// The expected row id of one fixture process (token from
-/// `fixture_start_token`, the builder's single source).
-fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
-    taskmanager_shell::ProcessRowId::Process(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            pid,
-            taskmanager_test_support::fixture_start_token(pid),
-        )
-        .expect("fixture pid and token are non-zero"),
-    )
-}
-
 fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
     taskmanager_shell::ProcessRowId::Application(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            pid,
-            taskmanager_test_support::fixture_start_token(pid),
-        )
-        .expect("fixture pid and token are non-zero"),
+        ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+            .expect("fixture pid and token are non-zero"),
     )
 }

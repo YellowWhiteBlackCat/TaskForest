@@ -4,6 +4,7 @@ use std::fs::{self, File, OpenOptions};
 use std::io::{Read, Seek, Write};
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::Duration;
 
 use crate::HistoryStoreError;
 use crate::bounded_io;
@@ -41,8 +42,25 @@ impl Drop for RootLockOwnership {
         let Ok(current) = bounded_io::read_file(&self.path, MAX_LOCK_CLAIM_BYTES) else {
             return;
         };
-        if current == self.token.as_bytes() {
-            let _ = fs::remove_file(&self.path);
+        if current != self.token.as_bytes() {
+            return;
+        }
+        // Windows transiently refuses deletion right after a handle closes
+        // (indexer or antivirus sharing violations), stranding the claim on
+        // disk. Bounded backoff keeps the release best-effort: a claim that
+        // still survives names this process, so the next generation's
+        // winning try_lock retakes it instead of failing closed.
+        for wait in [
+            Duration::ZERO,
+            Duration::from_millis(5),
+            Duration::from_millis(15),
+        ] {
+            if !wait.is_zero() {
+                std::thread::sleep(wait);
+            }
+            if fs::remove_file(&self.path).is_ok() {
+                return;
+            }
         }
     }
 }
@@ -127,7 +145,12 @@ fn acquire_existing_claim(
     file.try_lock()
         .map_err(|error| locked_io_error(&path, "another owner holds the claim", error.into()))?;
     let observed = read_claim_fail_closed(&mut file, &path)?;
-    if !holder_is_gone(observed.pid) {
+    // A claim naming this very process cannot be a concurrent holder:
+    // in-process generations are mutually exclusive through the file lock
+    // above, so a winning try_lock against our own PID proves the previous
+    // generation released and only its claim file was stranded (Windows
+    // delete races). Foreign claims stay fail-closed even with a free lock.
+    if observed.pid != std::process::id() && !holder_is_gone(observed.pid) {
         return Err(locked_error(&path, "another live instance owns"));
     }
     write_claim(&mut file, &token).map_err(|error| {

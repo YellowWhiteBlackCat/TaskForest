@@ -32,7 +32,7 @@ const MAX_ENGINE_VIEWPORT_HEIGHT: u16 = 8;
 const STANDARD_LAYOUT_HEIGHT: u16 = 20;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum GpuFactDensity {
+pub(crate) enum GpuFactDensity {
     Compact,
     Full,
 }
@@ -183,7 +183,7 @@ pub(super) fn render_gpu_section(
         app.projection()
             .capability_status(&taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES),
     );
-    let engine_lines = gpu_engine_lines(gpus, &app, theme, app.prefs.graph_points, engine_rows);
+    let engine_lines = gpu_engine_lines(gpus, app, theme, app.prefs.graph_points, engine_rows);
     let layout = GpuPanelLayout::resolve(
         area,
         compact_facts.len(),
@@ -206,7 +206,7 @@ pub(super) fn render_gpu_section(
         .shell
         .gpu_chart_metric_projection(&taskmanager_shell::gpu_chart_metric_gate(gpus.first()))
         .selected;
-    render_gpu_metric_chart(frame, gpus, &app, theme, layout.graph(), metric);
+    render_gpu_metric_chart(frame, gpus, app, theme, layout.graph(), metric);
     if let Some(engine_area) = layout.engines() {
         render_gpu_engine_viewport(
             frame,
@@ -216,11 +216,6 @@ pub(super) fn render_gpu_section(
             app.gpu_engine_scroll,
         );
     }
-}
-
-#[cfg(test)]
-fn gpu_fact_lines(gpus: &[GpuMetrics], density: GpuFactDensity) -> Vec<Line<'static>> {
-    gpu_fact_lines_with_theme(gpus, TuiTheme::default(), density)
 }
 
 fn gpu_fact_lines_with_theme(
@@ -335,6 +330,19 @@ fn gpu_fact_lines_with_theme(
                 }
                 if let Some(driver) = gpu.driver.as_deref() {
                     lines.push(Line::from(format!("  {} {}", t("common.driver"), driver,)));
+                }
+                // Driver version (registry DriverVersion / NVML sys version).
+                // An unproven version omits the row, never a dash (GPUI parity).
+                if let Some(version) = gpu
+                    .driver_version
+                    .as_deref()
+                    .filter(|value| !value.is_empty())
+                {
+                    lines.push(Line::from(format!(
+                        "  {} {}",
+                        t("gpu.driver_version"),
+                        version,
+                    )));
                 }
                 // Raw PCI function identity (GPUI gpu_stats tail row). An
                 // unattached/unprobed GPU omits the row instead of a dash.
@@ -573,3 +581,7 @@ fn render_gpu_engine_viewport(
 #[cfg(test)]
 #[path = "../../tests/gui/ui/perf_gpu_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/perf_gpu_support.rs"]
+pub(crate) mod perf_gpu_support;

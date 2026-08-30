@@ -27,33 +27,19 @@ use gpui::{
     VisualTestContext, Window, WindowHandle, div, px, size,
 };
 use std::rc::Rc;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::gpui_app::root::{RootView, TopPage};
 use taskmanager_core::core::process::{
     ApplicationIconAsset, ApplicationIconFormat, ProcessApplicationIdentity,
     ProcessMetadataObservation,
 };
-use taskmanager_shell::ProcessRowId;
-
 /// The expected row id of one fixture process (token from
 /// `fixture_start_token`, the builder's single source).
 fn row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
     taskmanager_shell::ProcessRowId::Process(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            pid,
-            taskmanager_test_support::fixture_start_token(pid),
-        )
-        .expect("fixture pid and token are non-zero"),
-    )
-}
-
-fn application_row_id(pid: u32) -> taskmanager_shell::ProcessRowId {
-    taskmanager_shell::ProcessRowId::Application(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            pid,
-            taskmanager_test_support::fixture_start_token(pid),
-        )
-        .expect("fixture pid and token are non-zero"),
+        ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+            .expect("fixture pid and token are non-zero"),
     )
 }
 
@@ -341,7 +327,8 @@ async fn compact_apps_action_bar_prioritizes_the_table_without_hiding_commands(
                 })
                 .collect(),
         );
-        v.select_process_single(1);
+        let identity = ProcessLiveKey::from_parts(1, 1).expect("fixture identity");
+        v.select_process_single(identity);
         cx.notify();
     });
     draw(cx, win);
@@ -629,8 +616,8 @@ async fn apps_column_navigation_moves_without_losing_row_selection(cx: &mut Test
         "Right must move the Apps column cursor from Name to User"
     );
     assert_eq!(
-        view.read_with(cx, |v, _| v.selected_pid()),
-        Some(101),
+        view.read_with(cx, |v, _| v.selected_process_identity()),
+        ProcessLiveKey::from_parts(101, 1011),
         "column navigation must preserve the selected process row"
     );
     assert_eq!(
@@ -661,7 +648,9 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
                     is_sel: false,
                     is_hov: false,
                     entity: &self.entity,
-                    pids: Rc::new(vec![4242]),
+                    process_identities: Rc::new(vec![
+                        ProcessLiveKey::from_parts(4242, 42421).expect("fixture identity"),
+                    ]),
                     row_keys: Rc::new(vec![row_id(4242)]),
                     rows: Rc::new(Vec::new()),
                     gray_zero_values: false,
@@ -680,8 +669,7 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
             row: VisibleRow {
                 name: "important-worker".into(),
                 selection_key: Some(row_id(4242)),
-                process_pid: Some(4242),
-                pid: 4242,
+                process_identity: Some(row_id(4242).live_key().expect("fixture identity")),
                 application_identity: Some(
                     ProcessApplicationIdentity::new(
                         "org.example.Editor.desktop",
@@ -694,6 +682,8 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
                 status: "S".into(),
                 cpu: Some(1.5),
                 mem: Some(1024),
+                cpu_aggregate: None,
+                memory_aggregate: None,
                 swap: None,
                 disk_read: None,
                 disk_write: None,
@@ -755,7 +745,9 @@ async fn mc03_app_icon_case_verified_application_asset_mounts_as_a_gpui_image(
                     is_sel: false,
                     is_hov: false,
                     entity: &self.entity,
-                    pids: Rc::new(vec![4243]),
+                    process_identities: Rc::new(vec![
+                        ProcessLiveKey::from_parts(4243, 42431).expect("fixture identity"),
+                    ]),
                     row_keys: Rc::new(vec![row_id(4243)]),
                     rows: Rc::new(Vec::new()),
                     gray_zero_values: false,
@@ -786,13 +778,14 @@ async fn mc03_app_icon_case_verified_application_asset_mounts_as_a_gpui_image(
             row: VisibleRow {
                 name: "image-editor".into(),
                 selection_key: Some(row_id(4243)),
-                process_pid: Some(4243),
-                pid: 4243,
+                process_identity: Some(row_id(4243).live_key().expect("fixture identity")),
                 application_identity: Some(identity),
                 user: "root".into(),
                 status: "S".into(),
                 cpu: Some(1.0),
                 mem: Some(1024),
+                cpu_aggregate: None,
+                memory_aggregate: None,
                 swap: None,
                 disk_read: None,
                 disk_write: None,
@@ -873,7 +866,9 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
                     is_sel: self.selected,
                     is_hov: false,
                     entity: &self.entity,
-                    pids: Rc::new(vec![4242]),
+                    process_identities: Rc::new(vec![
+                        ProcessLiveKey::from_parts(4242, 42421).expect("fixture identity"),
+                    ]),
                     row_keys: Rc::new(vec![row_id(4242)]),
                     rows: Rc::new(Vec::new()),
                     gray_zero_values: false,
@@ -889,13 +884,14 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
     let row = || VisibleRow {
         name: "rail-worker".into(),
         selection_key: Some(row_id(4242)),
-        process_pid: Some(4242),
-        pid: 4242,
+        process_identity: Some(row_id(4242).live_key().expect("fixture identity")),
         application_identity: None,
         user: "root".into(),
         status: "S".into(),
         cpu: Some(2.0),
         mem: Some(2048),
+        cpu_aggregate: None,
+        memory_aggregate: None,
         swap: None,
         disk_read: None,
         disk_write: None,

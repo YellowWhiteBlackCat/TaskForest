@@ -23,7 +23,9 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
     let shell = &app.shell;
     let theme_snapshot = app.theme();
     let hardware = shell.projection().hardware.as_ref();
-    let hardware_rows = hardware.map(hardware_info_rows).unwrap_or_default();
+    let hardware_rows = hardware
+        .map(|hw| hardware_info_rows(hw, shell.projection().snapshot.as_ref().map(|s| &s.cpu)))
+        .unwrap_or_default();
     let hardware_panel: Element<'_, Message, iced::Theme, iced::Renderer> =
         match hardware_list_state(hardware, &hardware_rows) {
             ListState::Loading => message_panel(theme_snapshot, t("hardware.inventory_waiting")),
@@ -91,7 +93,8 @@ pub(crate) fn format_system_spec_export(
     let mut lines = Vec::new();
     lines.push("# System Specifications".to_string());
     if let Some(hw) = hardware {
-        for row in hardware_info_rows(hw) {
+        let cpu = snapshot.map(|snap: &SystemSnapshot| &snap.cpu);
+        for row in hardware_info_rows(hw, cpu) {
             lines.push(format!("- {}: {}", row.label, row.value));
         }
     }
@@ -165,7 +168,10 @@ pub(super) fn hardware_list_state(
     }
 }
 
-pub(crate) fn hardware_info_rows(hardware: &HardwareInfo) -> Vec<SystemInfoRow> {
+pub(crate) fn hardware_info_rows(
+    hardware: &HardwareInfo,
+    cpu: Option<&taskmanager_core::core::metrics::CpuMetrics>,
+) -> Vec<SystemInfoRow> {
     let mut rows = Vec::new();
     push_text(
         &mut rows,
@@ -186,6 +192,11 @@ pub(crate) fn hardware_info_rows(hardware: &HardwareInfo) -> Vec<SystemInfoRow> 
         &mut rows,
         t("system.field.kernel_build"),
         hardware.kernel_build.as_deref(),
+    );
+    push_text(
+        &mut rows,
+        t("system.field.kernel_compiler"),
+        hardware.kernel_compiler.as_deref(),
     );
     push_text(
         &mut rows,
@@ -281,6 +292,26 @@ pub(crate) fn hardware_info_rows(hardware: &HardwareInfo) -> Vec<SystemInfoRow> 
         );
     }
     push_text(&mut rows, t("common.cpu"), hardware.cpu_brand.as_deref());
+    push_text(
+        &mut rows,
+        t("system.cpu_codename"),
+        hardware.cpu_identity.codename(),
+    );
+    push_text(
+        &mut rows,
+        t("system.cpu_process"),
+        hardware.cpu_identity.process_node(),
+    );
+    push_text(
+        &mut rows,
+        t("system.cpu_vendor"),
+        hardware.cpu_identity.vendor_id.as_deref(),
+    );
+    push_value(
+        &mut rows,
+        t("system.cpu_identity"),
+        hardware.cpu_identity.code(),
+    );
     push_value(&mut rows, t("common.logical_cores"), hardware.cpu_cores);
     push_value(&mut rows, t("system.field.sockets"), hardware.sockets);
     push_value(
@@ -292,6 +323,12 @@ pub(crate) fn hardware_info_rows(hardware: &HardwareInfo) -> Vec<SystemInfoRow> 
         &mut rows,
         t("system.field.base_frequency"),
         hardware.base_freq_mhz.map(|value| format!("{value} MHz")),
+    );
+    push_value(
+        &mut rows,
+        t("cpu.multiplier"),
+        cpu.and_then(|cpu| cpu.clock_multiplier(hardware.base_freq_mhz))
+            .map(|multiplier| format!("\u{00d7}{multiplier:.1}")),
     );
 
     let breakdown = hardware.core_breakdown;
@@ -355,10 +392,21 @@ pub(crate) fn hardware_info_rows(hardware: &HardwareInfo) -> Vec<SystemInfoRow> 
         t("system.field.motherboard_vendor"),
         hardware.motherboard_vendor.as_deref(),
     );
+    let motherboard_model = hardware.motherboard_model.as_deref().map(|model| {
+        match hardware.motherboard_version.as_deref() {
+            Some(version) if !version.is_empty() => format!("{model} ({version})"),
+            _ => model.to_owned(),
+        }
+    });
     push_text(
         &mut rows,
         t("system.field.motherboard_model"),
-        hardware.motherboard_model.as_deref(),
+        motherboard_model.as_deref(),
+    );
+    push_text(
+        &mut rows,
+        t("system.field.chipset"),
+        hardware.chipset.as_deref(),
     );
     push_text(
         &mut rows,

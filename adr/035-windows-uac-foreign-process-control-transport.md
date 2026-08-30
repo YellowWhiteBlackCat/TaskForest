@@ -48,13 +48,23 @@ Windows 上对不同用户或受保护进程的控制不能依赖普通继承 to
 
 ## 当前发布边界
 
-传输尚未进入生产接线，Windows foreign-process control 仍返回
-`Unsupported`。Windows MSI 只安装 GPUI 应用和 LICENSE，不安装该 helper、
-服务或自启动项；Windows 签名与打包策略不构成 UAC 行为已经完成的证明。
+Stage 2 已完成代码接线（2026-08-30）：runas call group 进入
+`taskmanager-windows-api`（`runas` 模块，含 interactive-session 守卫），生产 driver 位于
+`taskmanager-platform-windows::provider::process::uac`（一次性随机命名回传文件 + 固定
+helper 命令行 + 有界等待），helper 复用可选的第四个回传文件参数，fact→outcome 映射的
+唯一权威保持在 `taskmanager-escalation::uac`。该接线已通过
+`cargo check --target x86_64-pc-windows-msvc` 交叉编译验证；尚未在真实 Windows 桌面
+验证，也尚未打包。Windows MSI 仍只安装 GPUI 应用和 LICENSE，不安装该 helper、
+服务或自启动项——因此在现装机器上跨界以 `ERROR_FILE_NOT_FOUND` 失败并映射为 typed
+`HelperUnavailable`（不再是无差别 `Unsupported`；缺失是可修复的安装事实）。
+Windows 签名与打包策略不构成 UAC 行为已经完成的证明；成功/拒绝/超时/无提示/
+协议损坏/PID 复用的行为验证与真实交互桌面 receipt 仍是接线闭合前的必要条件。
 
 ## 验证
 
-契约测试覆盖当前 `Unsupported`、身份复核、失败分类和 stale completion 拒绝。
-未来接线必须增加 Windows 原生 API 的安全边界审计、固定 helper 的安装清单、
-成功/拒绝/超时/无提示/协议损坏/PID 复用的行为测试，以及真实交互桌面验证。
-Linux CI、fixture、交叉编译和 MSI 文件存在性检查都不能替代这些验证。
+契约测试覆盖当前 `Unsupported` 兜底、身份复核、失败分类和 stale completion 拒绝；
+stage 2 的纯逻辑（命令行构造/引号规则、回传文件命名、HRESULT→Win32 提取、有界回传
+读取）在任意 host 上单测。真实接线验收仍需：Windows 原生 API 的安全边界审计复查、
+固定 helper 的安装清单、成功/拒绝/超时/无提示/协议损坏/PID 复用的行为测试，以及
+真实交互桌面验证。Linux CI、fixture、交叉编译（包括 msvc `cargo check` 通过）和 MSI
+文件存在性检查都不能替代这些验证。

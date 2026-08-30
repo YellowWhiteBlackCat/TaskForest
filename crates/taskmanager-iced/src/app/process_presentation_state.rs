@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::SortCol;
 
 use super::DetailsSection;
@@ -10,7 +10,7 @@ use super::DetailsSection;
 pub(crate) struct ProcessPresentationState {
     pub(crate) affinity_cpus: Option<HashSet<u32>>,
     pub(crate) expanded_groups: HashSet<String>,
-    pub(crate) expanded_tree: HashSet<u32>,
+    pub(crate) expanded_tree: HashSet<ProcessLiveKey>,
     pub(crate) visual_cursor: usize,
     pub(crate) env_filter: String,
     pub(crate) last_insights_target: Option<FrozenProcessIdentity>,

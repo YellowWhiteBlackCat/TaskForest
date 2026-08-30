@@ -22,6 +22,7 @@ use gpui::{
     ParentElement, Render, Stateful, Styled, Window, div, ease_in_out, px,
 };
 use taskmanager_core::core::SystemSnapshot;
+use taskmanager_shell::ProcessRowId;
 use taskmanager_theme::gpui::window_chrome_state;
 use taskmanager_theme::tokens;
 use taskmanager_ui::{focus::restore_modal, layout::page_viewport};
@@ -60,10 +61,22 @@ fn schedule_system_npu_capture(
     }
     view.page = TopPage::System;
     view.dashboard.section = SystemSection::Hardware;
+    let inventory_visible = system_view::memory_inventory_card_is_visible(
+        &system_view::MemoryInventoryInputs {
+            state: view.shell.smbios_memory_state(),
+            capability: view.projection().capability_status(
+                &taskmanager_platform_contract::CapabilityId::TELEMETRY_MEMORY_SMBIOS,
+            ),
+        },
+        view.display_units(),
+    );
     let Some(item) = system_view::graphics_scroll_item(
         view.hardware_rc(),
         view.system_snapshot(),
         view.npu_inventory(),
+        view.shell.smbios_memory_state(),
+        view.display_units(),
+        inventory_visible,
     ) else {
         return;
     };
@@ -230,7 +243,7 @@ impl Render for RootView {
         let snap = self.system_snapshot_rc().clone();
         let telemetry = self.telemetry.clone();
         let selected = self.selected;
-        let sel_pid = self.selected_pid();
+        let selected_identity = self.selected_process_row().and_then(ProcessRowId::live_key);
         // Snapshot the hover slot once: `.as_ref()` for synchronous helpers (titlebar,
         // sidebar, settings), `.clone()` for the uniform_list row builders (Apps/Services).
         let hovered = self.hovered.clone();
@@ -238,7 +251,7 @@ impl Render for RootView {
         // names / long descriptions get a cursor-following tooltip). Derived from
         // the live hover slot — no per-view wiring needed.
         let tooltip_text: Option<String> = match &hovered {
-            Some(Hover::Proc(pid)) => self.process_tooltip_text(*pid),
+            Some(Hover::Proc(identity)) => self.process_tooltip_text(*identity),
             Some(Hover::Service(name)) => self
                 .services()
                 .iter()
@@ -318,7 +331,7 @@ impl Render for RootView {
                 selected,
                 frame: frame_budget,
                 corner_radius_factor,
-                selected_pid: sel_pid,
+                selected_identity,
             },
         );
 

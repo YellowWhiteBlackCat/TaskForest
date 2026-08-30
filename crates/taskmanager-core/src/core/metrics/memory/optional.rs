@@ -93,6 +93,15 @@ observation_group! {
         /// Module form-factor label(s), e.g. `"SO-DIMM"`, joined across distinct
         /// values (out-of-spec sentinels filtered by the source).
         form_factor: OptionalObservation<String>,
+        /// Module part number(s) (the SPD/DIMM label product code), joined
+        /// across distinct values. An unprogrammed part number is an honest
+        /// absence, never a fabricated placeholder.
+        #[serde(default)]
+        part_number: OptionalObservation<String>,
+        /// Module serial number(s), joined across distinct values. An
+        /// unprogrammed (all-zero/sentinel) serial is an honest absence.
+        #[serde(default)]
+        serial_number: OptionalObservation<String>,
     }
 }
 
@@ -272,6 +281,27 @@ impl MemoryMetrics {
         self.optional_observations
             .modules
             .form_factor
+            .current_value()
+            .map(String::as_str)
+    }
+    /// Module part number(s) (the SPD/DIMM product code), joined across
+    /// distinct values.
+    #[must_use]
+    pub fn current_module_part_number(&self) -> Option<&str> {
+        self.optional_observations
+            .modules
+            .part_number
+            .current_value()
+            .map(String::as_str)
+    }
+
+    /// Module serial number(s), joined across distinct values; `None` when
+    /// the source reported none or only unprogrammed sentinels.
+    #[must_use]
+    pub fn current_module_serial_number(&self) -> Option<&str> {
+        self.optional_observations
+            .modules
+            .serial_number
             .current_value()
             .map(String::as_str)
     }

@@ -6,6 +6,7 @@ use taskmanager_application::{
     PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle, ProcessControlRequest,
     ProcessFacets, TelemetryRefreshPolicy,
 };
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::ProcessSignal;
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
@@ -156,7 +157,11 @@ async fn menu_suspend_resume_submit_the_neutral_request(cx: &mut gpui::TestAppCo
     for (menu, _) in &cases {
         view.update(cx, |view, cx| {
             view.replace_processes_for_test(vec![item.clone()]);
-            view.apply_proc_action(42, *menu, cx);
+            view.apply_proc_action(
+                ProcessLiveKey::from_parts(42, 1_000).expect("fixture identity"),
+                *menu,
+                cx,
+            );
         });
     }
 

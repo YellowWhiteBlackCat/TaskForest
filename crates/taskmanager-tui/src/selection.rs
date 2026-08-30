@@ -10,14 +10,20 @@
 //! (behavior unchanged — every method stays reachable on `TuiApp`, impl
 //! blocks may live in any module of the defining crate).
 
+use std::collections::HashSet;
+
 use taskmanager_application::{AppPage, PlatformEffect};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_core::core::startup::StartupEntryId;
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_shell::{InfoTable, ProcessRowId};
 
 use crate::TuiApp;
 use crate::process_view;
+
+#[cfg(test)]
+#[path = "../tests/headless/selection_support.rs"]
+pub(crate) mod selection_support;
 
 /// The Applications cursor's stable anchor. Structural category rows use
 /// their locale-neutral expansion key; actionable process/application rows
@@ -67,7 +73,7 @@ pub(crate) struct VisualRowCountKey {
     status_filter: taskmanager_shell::ProcessStatusFilter,
     sort: (taskmanager_shell::SortCol, taskmanager_shell::SortDir),
     expanded_groups: Vec<String>,
-    collapsed_tree: Vec<u32>,
+    collapsed_tree: Vec<ProcessLiveKey>,
 }
 
 /// The TUI's one presentation cache for the Applications canonical-row
@@ -280,9 +286,7 @@ impl TuiApp {
                     target_pid.and_then(|pid| {
                         let root_key = self
                             .process_start_token_for_pid(pid)
-                            .and_then(|token| {
-                                taskmanager_shell::ProcessRowIdentity::from_parts(pid, token)
-                            })
+                            .and_then(|token| ProcessLiveKey::from_parts(pid, token))
                             .map(ProcessRowId::Application);
                         root_key.and_then(|key| {
                             ids.iter()
@@ -339,20 +343,17 @@ impl TuiApp {
 
     /// Test-visible delegate of the cache-hit probe (see
     /// [`Self::canonical_row_cache_is_valid`]).
-    #[cfg(test)]
-    pub(crate) fn canonical_row_cache_is_valid_for_current_inputs(&self) -> bool {
-        self.canonical_row_cache_is_valid()
-    }
-
     /// The pure O(N) rebuild of the owned canonical row-id slice from the
     /// live projection. The only producer of cache entries.
     fn build_canonical_rows(&self) -> Vec<process_view::CanonicalRowId> {
         let visible = self.visible_processes();
+        let observed_at_ms = self.shell.projection().processes_observed_at_ms;
         process_view::build_canonical_row_ids(
             &visible,
             &self.expanded_groups,
             &self.collapsed_tree,
             self.process_sort,
+            observed_at_ms,
         )
     }
 
@@ -448,7 +449,7 @@ impl TuiApp {
     fn visual_row_count_key(&self) -> VisualRowCountKey {
         let mut expanded_groups: Vec<String> = self.expanded_groups.iter().cloned().collect();
         expanded_groups.sort_unstable();
-        let mut collapsed_tree: Vec<u32> = self.collapsed_tree.iter().copied().collect();
+        let mut collapsed_tree: Vec<ProcessLiveKey> = self.collapsed_tree.iter().copied().collect();
         collapsed_tree.sort_unstable();
         VisualRowCountKey {
             process_revision: self.shell.projection().process_revision,
@@ -543,9 +544,9 @@ impl TuiApp {
     /// Expand a resolved Tree node pid: remove it from the collapsed set and
     /// re-sync the application selection. The mutate tail for the reuse path
     /// (the resolver `tree_children_at` already confirmed the node has children).
-    pub(crate) fn expand_tree_pid(&mut self, pid: u32) -> bool {
+    pub(crate) fn expand_tree_identity(&mut self, identity: ProcessLiveKey) -> bool {
         let anchor = self.selected_application_row_anchor();
-        self.collapsed_tree.remove(&pid);
+        self.collapsed_tree.remove(&identity);
         self.reconcile_application_row_anchor(anchor);
         true
     }
@@ -553,9 +554,9 @@ impl TuiApp {
     /// Collapse a resolved Tree node pid: insert it, re-clamp the cursor (a
     /// collapse removes rows below the node), and re-sync. The mutate tail for
     /// the reuse path.
-    pub(crate) fn collapse_tree_pid(&mut self, pid: u32) -> bool {
+    pub(crate) fn collapse_tree_identity(&mut self, identity: ProcessLiveKey) -> bool {
         let anchor = self.selected_application_row_anchor();
-        self.collapsed_tree.insert(pid);
+        self.collapsed_tree.insert(identity);
         self.reconcile_application_row_anchor(anchor);
         true
     }
@@ -657,35 +658,32 @@ impl TuiApp {
         self.reconcile_application_row_anchor(anchor);
     }
 
-    /// Prune the TUI-local per-pid tree state against the live process set —
+    /// Prune the TUI-local tree state against the live process set —
     /// the frontend-local equivalent of the shell's
     /// [`ShellApp::prune_stale_selection`], hung on the same "process domain
     /// changed" timing. `collapsed_tree` entries and
-    /// `app-tree:<pid>` expansion keys whose pid exited are dropped, so a
-    /// reused pid cannot inherit a stale collapse state; category expansion
-    /// keys carry no pid and survive untouched.
+    /// `app-tree:<live-key>` expansion keys are validated against the current
+    /// core-owned identities, so a reused pid cannot inherit stale expansion
+    /// state; category expansion keys carry no process identity and survive
+    /// untouched.
     pub(crate) fn prune_stale_tree_state(&mut self) {
-        let current: std::collections::HashMap<u32, Option<u64>> = self
+        let current: HashSet<ProcessLiveKey> = self
             .shell
             .projection()
             .processes_slice()
             .iter()
-            .map(|process| (process.pid, process.current_start_token()))
+            .filter_map(ProcessLiveKey::from_process)
             .collect();
-        let previous = &self.tree_identity_by_pid;
         self.collapsed_tree
-            .retain(|pid| tree_identity_matches(previous, &current, *pid));
+            .retain(|identity| current.contains(identity));
         self.expanded_groups.retain(|key| {
-            match key.strip_prefix(process_view::APP_TREE_EXPANSION_KEY_PREFIX) {
-                // A malformed app-tree tail can never be regenerated by the
-                // projection (pids are numeric), so dropping it is honest.
-                Some(pid) => pid
-                    .parse::<u32>()
-                    .is_ok_and(|pid| tree_identity_matches(previous, &current, pid)),
-                None => true,
-            }
+            key.strip_prefix(process_view::APP_TREE_EXPANSION_KEY_PREFIX)
+                .is_none_or(|suffix| {
+                    current
+                        .iter()
+                        .any(|identity| identity.stable_key() == suffix)
+                })
         });
-        self.tree_identity_by_pid = current;
     }
 
     /// Resolve the selected Applications row to the single process the details
@@ -709,15 +707,6 @@ impl TuiApp {
     /// and feed it to this resolver plus the cursor-motion path. Retained as
     /// the materialized-row reference resolver the snapshot-parity tests
     /// compare the cached id path against.
-    #[cfg(test)]
-    #[must_use]
-    pub(crate) fn selected_detail_process_rows(
-        &self,
-        rows: &[process_view::ProcessRow<'_>],
-    ) -> Option<ProcessItem> {
-        process_view::process_at(rows, self.selected).cloned()
-    }
-
     /// Re-sync the shared application selection from the cursor's current
     /// visual row. The shell's `sync_application_selection` maps the cursor
     /// directly onto `visible_processes()[selected]`, which is wrong in the
@@ -811,8 +800,8 @@ impl TuiApp {
         key.live_key().map(|identity| identity.start_token())
     }
 
-    /// The current provider start token at one pid, resolved against the
-    /// accepted snapshot (used only by pid-addressed fallbacks).
+    /// The current provider start token at one PID lookup hint, resolved
+    /// against the accepted snapshot (used only by compatibility fallbacks).
     fn process_start_token_for_pid(&self, pid: u32) -> Option<u64> {
         self.shell
             .projection()
@@ -865,22 +854,4 @@ impl TuiApp {
             _ => false,
         }
     }
-}
-
-/// Keep per-PID tree presentation state only when both observations carry the
-/// same provider start-token. Missing tokens fail closed: the UI may forget a
-/// collapse, but it must never make a new process look like the old one.
-fn tree_identity_matches(
-    previous: &std::collections::HashMap<u32, Option<u64>>,
-    current: &std::collections::HashMap<u32, Option<u64>>,
-    pid: u32,
-) -> bool {
-    let Some(previous_token) = previous.get(&pid).copied().flatten() else {
-        return false;
-    };
-    current
-        .get(&pid)
-        .copied()
-        .flatten()
-        .is_some_and(|current_token| current_token == previous_token)
 }

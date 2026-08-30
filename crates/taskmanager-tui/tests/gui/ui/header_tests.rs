@@ -1,4 +1,5 @@
-use super::{bounded_header_label, header_tab_text};
+use super::bounded_header_label;
+use super::header_support::header_tab_text;
 use taskmanager_ui_contract::IconId;
 
 #[test]

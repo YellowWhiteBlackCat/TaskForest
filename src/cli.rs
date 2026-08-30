@@ -72,6 +72,21 @@ pub enum CliMode {
     /// JSON. The main app is NOT elevated; the prompt fires only because this
     /// flag was passed.
     GpuEngines,
+    /// Drive the per-feature SMBIOS memory escalation (ADR-023): invoke the
+    /// polkit/pkexec memory helper ON DEMAND and print the typed slot/module
+    /// inventory (or a typed honest denial) as JSON. Same discipline as
+    /// [`CliMode::GpuEngines`] — the main app stays unprivileged.
+    MemorySmbios,
+    /// Drive the per-feature RAPL package-power escalation (ADR-023): invoke
+    /// the polkit/pkexec power helper ON DEMAND and print the typed per-package
+    /// watt readings (or a typed honest denial) as JSON. Same discipline as
+    /// [`CliMode::GpuEngines`] — the main app stays unprivileged.
+    PackagePower,
+    /// Drive the per-feature MSR readout escalation (ADR-048): invoke the
+    /// polkit/pkexec MSR helper ON DEMAND and print the typed per-node MSR
+    /// readouts (or a typed honest denial) as JSON. Same discipline as
+    /// [`CliMode::GpuEngines`] — the main app stays unprivileged.
+    Msr,
     /// Windows+GPUI evidence mode: open the real app window, capture its own
     /// composited frames once (Windows.Graphics.Capture through zed-scap), and
     /// write `capture.png` + metadata + a manifest line into `out`, then exit.
@@ -113,7 +128,7 @@ impl fmt::Display for CliArgError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnknownArgument => formatter.write_str(
-                "unknown argument; use --app-id/-a, --demo, --json, --suggest-thresholds, --gpu-engines, --help (or no flag to launch the GUI)",
+                "unknown argument; use --app-id/-a, --demo, --json, --suggest-thresholds, --gpu-engines, --memory-smbios, --package-power, --msr, --snapshot, --capture-window, --help (or no flag to launch the GUI)",
             ),
             Self::MissingApplicationId => {
                 formatter.write_str("--app-id/-a requires an application ID")
@@ -141,9 +156,13 @@ impl Error for CliArgError {}
 /// fixture data; `--snapshot [W H]` renders headless TUI text-frame evidence;
 /// `--json`/`-j` request a JSON snapshot;
 /// `--suggest-thresholds` requests per-metric threshold suggestions as JSON;
-/// `--help`/`-h` requests help; no flag launches the compiled-in UI. Any other
-/// token, or a trailing argument after a mode flag, is rejected so a scripting
-/// typo cannot silently produce output the caller did not ask for.
+/// `--gpu-engines` drives the on-demand per-feature PMU escalation;
+/// `--memory-smbios`, `--package-power` and `--msr` drive the SMBIOS memory,
+/// RAPL package-power and MSR readout escalations the same way;
+/// `--capture-window DIR` captures the app window once (Windows+GPUI evidence
+/// mode); `--help`/`-h` requests help; no flag launches the compiled-in UI.
+/// Any other token, or a trailing argument after a mode flag, is rejected so a
+/// scripting typo cannot silently produce output the caller did not ask for.
 pub fn parse_args<I>(args: I) -> Result<CliMode, CliArgError>
 where
     I: IntoIterator<Item = String>,
@@ -193,6 +212,18 @@ where
         },
         Some("--gpu-engines") => match args.next() {
             None => Ok(CliMode::GpuEngines),
+            Some(_) => Err(CliArgError::UnknownArgument),
+        },
+        Some("--memory-smbios") => match args.next() {
+            None => Ok(CliMode::MemorySmbios),
+            Some(_) => Err(CliArgError::UnknownArgument),
+        },
+        Some("--package-power") => match args.next() {
+            None => Ok(CliMode::PackagePower),
+            Some(_) => Err(CliArgError::UnknownArgument),
+        },
+        Some("--msr") => match args.next() {
+            None => Ok(CliMode::Msr),
             Some(_) => Err(CliArgError::UnknownArgument),
         },
         Some("--capture-window") => {
@@ -565,19 +596,47 @@ pub fn print_help_to(writer: &mut impl Write) -> io::Result<()> {
     )?;
     writeln!(
         writer,
-        "  {binary} --demo            run the compiled-in UI with fixture data (no host I/O)"
-    )?;
-    writeln!(
-        writer,
-        "  {binary} --snapshot [W H]  headless text-frame evidence (ui-tui shape; default 120x36)"
-    )?;
-    writeln!(
-        writer,
         "                             per-feature helper (prompts once via pkexec) and print"
     )?;
     writeln!(
         writer,
         "                             typed JSON; the main app stays unprivileged"
+    )?;
+    writeln!(
+        writer,
+        "  {binary} --memory-smbios  read the SMBIOS memory slot/module inventory via"
+    )?;
+    writeln!(
+        writer,
+        "                             the polkit per-feature helper (pkexec prompt)"
+    )?;
+    writeln!(
+        writer,
+        "  {binary} --package-power   sample CPU package power (RAPL) via the polkit"
+    )?;
+    writeln!(
+        writer,
+        "                             per-feature helper (pkexec prompt)"
+    )?;
+    writeln!(
+        writer,
+        "  {binary} --msr            read Intel MSR readouts (temperature, multipliers,"
+    )?;
+    writeln!(
+        writer,
+        "                             core voltage) via the polkit per-feature helper"
+    )?;
+    writeln!(
+        writer,
+        "                             (pkexec prompt); unverified fields stay null"
+    )?;
+    writeln!(
+        writer,
+        "  {binary} --demo            run the compiled-in UI with fixture data (no host I/O)"
+    )?;
+    writeln!(
+        writer,
+        "  {binary} --snapshot [W H]  headless text-frame evidence (ui-tui shape; default 120x36)"
     )?;
     writeln!(writer, "  {binary} --capture-window DIR")?;
     writeln!(

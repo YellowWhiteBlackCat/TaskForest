@@ -10,6 +10,7 @@
 
 use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage, ConfirmationKind, SurfaceKind};
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::TuiApp;
 use crate::ui::frame_plan::{TuiFocusControl, TuiFocusTarget, TuiFramePlan};
@@ -90,10 +91,9 @@ fn batch_menu_plan_tracks_the_highlighted_item() {
         .selected_detail_process()
         .expect("the demo exposes a selected process")
         .pid;
-    if let Some(identity) = taskmanager_shell::ProcessRowIdentity::from_parts(
-        pid,
-        taskmanager_test_support::fixture_start_token(pid),
-    ) {
+    if let Some(identity) =
+        ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
+    {
         app.shell.toggle_selected_identity(identity);
     }
     assert!(app.open_batch_menu(), "a marked row enables the batch menu");

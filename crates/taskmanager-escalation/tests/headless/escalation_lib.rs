@@ -3,7 +3,7 @@ use super::*;
 /// The complete escalation-column set, matching Boundary 3 of
 /// `docs/PERMISSION_MODEL.md`. Delegates to the single source of truth
 /// (`EscalationFeature::ALL`) so this list and the enum cannot drift.
-const ALL_FEATURES: [EscalationFeature; 7] = EscalationFeature::ALL;
+const ALL_FEATURES: [EscalationFeature; 8] = EscalationFeature::ALL;
 
 #[test]
 fn unprivileged_gate_requires_escalation_for_every_feature() {

@@ -437,6 +437,25 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             "taskmanager-process-control-helper",
             &["taskmanager-windows-api", "taskmanager-fd-bridge"][..],
         ),
+        // ADR-023 C1: ONE authority for SMBIOS record parsing — a pure-safe
+        // zero-dependency leaf consumed by BOTH the unprivileged Linux
+        // adapter's raw-DMI probe and the pkexec-escalated memory helper, so
+        // the two readers can never drift on offsets or sentinel semantics.
+        ("taskmanager-smbios-tables", &[][..]),
+        // ADR-023 C1: the SMBIOS memory helper reaches ONLY the shared
+        // format leaf (serde/serde_json are non-workspace deps) — minimal
+        // privileged attack surface, mirroring the perf helper's rule.
+        (
+            "taskmanager-smbios-helper",
+            &["taskmanager-smbios-tables"][..],
+        ),
+        // ADR-023 C1: the RAPL package-power helper reads fixed powercap
+        // sysfs nodes with std only — no workspace deps at all.
+        ("taskmanager-rapl-helper", &[][..]),
+        // ADR-048: the MSR readout helper preads the five verified MSR
+        // registers from /dev/cpu/*/msr with std only (MSR reads are plain
+        // file I/O — no fifth unsafe trust root) — no workspace deps.
+        ("taskmanager-msr-helper", &[][..]),
         (
             "taskmanager-platform-linux",
             &[
@@ -449,6 +468,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-platform-portable",
                 "taskmanager-platform-provider",
                 "taskmanager-platform-runtime",
+                "taskmanager-smbios-tables",
             ][..],
         ),
         (

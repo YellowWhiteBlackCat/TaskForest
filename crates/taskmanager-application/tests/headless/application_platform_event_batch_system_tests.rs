@@ -6,8 +6,8 @@ use taskmanager_platform_contract::{
 };
 
 use super::super::super::{
-    HardwareInventoryEvent, NpuInventoryEvent, PlatformEvent, SystemTelemetryDomainEvent,
-    SystemTelemetryRevision,
+    HardwareInventoryEvent, MsrReadoutEvent, NpuInventoryEvent, PlatformEvent, RaplPowerEvent,
+    SmbiosMemoryEvent, SystemTelemetryDomainEvent, SystemTelemetryRevision,
 };
 use super::super::{PlatformEventBatch, PlatformEventContext, test_support::test_event_context};
 
@@ -90,4 +90,60 @@ fn npu_only_batch_is_observable_work() {
 
     assert!(!batch.is_empty());
     assert_eq!(batch.npu_inventory_events.len(), 1);
+}
+
+#[test]
+fn smbios_memory_update_lands_in_its_own_correlated_lane() {
+    let mut batch = PlatformEventBatch::default();
+    batch.merge(
+        test_event_context(
+            RequestId::new(5).expect("non-zero fixture request"),
+            CapabilityId::TELEMETRY_MEMORY_SMBIOS,
+        ),
+        PlatformEvent::SmbiosMemory(SmbiosMemoryEvent::Update(
+            taskmanager_core::SmbiosMemorySnapshot::success(4, 2, Vec::new(), None),
+        )),
+    );
+
+    assert!(!batch.is_empty());
+    assert_eq!(batch.smbios_memory_events.len(), 1);
+    assert!(batch.rapl_power_events.is_empty());
+    assert!(batch.hardware_inventory_events.is_empty());
+}
+
+#[test]
+fn rapl_power_update_lands_in_its_own_correlated_lane() {
+    let mut batch = PlatformEventBatch::default();
+    batch.merge(
+        test_event_context(
+            RequestId::new(6).expect("non-zero fixture request"),
+            CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+        ),
+        PlatformEvent::RaplPower(RaplPowerEvent::Update(
+            taskmanager_core::RaplPowerSnapshot::success(250, Vec::new()),
+        )),
+    );
+
+    assert!(!batch.is_empty());
+    assert_eq!(batch.rapl_power_events.len(), 1);
+    assert!(batch.smbios_memory_events.is_empty());
+}
+
+#[test]
+fn msr_readout_update_lands_in_its_own_correlated_lane() {
+    let mut batch = PlatformEventBatch::default();
+    batch.merge(
+        test_event_context(
+            RequestId::new(7).expect("non-zero fixture request"),
+            CapabilityId::TELEMETRY_CPU_MSR,
+        ),
+        PlatformEvent::MsrReadout(MsrReadoutEvent::Update(
+            taskmanager_core::MsrReadoutSnapshot::success(Vec::new()),
+        )),
+    );
+
+    assert!(!batch.is_empty());
+    assert_eq!(batch.msr_readout_events.len(), 1);
+    assert!(batch.rapl_power_events.is_empty());
+    assert!(batch.smbios_memory_events.is_empty());
 }

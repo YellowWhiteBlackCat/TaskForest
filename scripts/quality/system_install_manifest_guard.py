@@ -37,12 +37,12 @@ PATH_ANNOTATION = re.compile(
 PKG_DESTINATION = re.compile(r"\$pkgdir(/[^\s\"]+)")
 SETUP_RULE = re.compile(r'const RULE_PATH: &str = "([^\"]+)";')
 MANAGER_DESTINATIONS = (
-    "/usr/libexec/taskmanager-privilege-helper",
-    "/usr/share/polkit-1/actions/com.taskforest.perf-helper.policy",
-    "/usr/libexec/taskmanager-net-launcher",
-    "/usr/share/polkit-1/actions/com.taskforest.net-launcher.policy",
-    "/usr/lib/taskforest-process-control-helper",
-    "/usr/share/polkit-1/actions/com.taskforest.process-control.policy",
+    "/usr/libexec/taskforest-privilege-helper",
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy",
+    "/usr/libexec/taskforest-net-launcher",
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy",
+    "/usr/libexec/taskforest-process-control-helper",
+    "/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy",
 )
 
 

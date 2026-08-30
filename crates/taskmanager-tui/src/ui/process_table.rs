@@ -8,6 +8,7 @@ use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::widgets::{Cell, Paragraph, Row};
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_ui_contract::IconId;
 
 use crate::TuiApp;
@@ -248,8 +249,8 @@ pub(super) fn render_processes(
                     Row::new(process_details::group_header_cells(
                         &label,
                         count,
-                        cpu,
-                        memory,
+                        cpu.current_value().copied(),
+                        memory.current_value().copied(),
                         expanded,
                         columns,
                         process_details::SearchHighlight {
@@ -291,7 +292,7 @@ pub(super) fn render_processes(
                         row,
                         app,
                         theme,
-                        taskmanager_shell::ProcessRowIdentity::from_process(process),
+                        ProcessLiveKey::from_process(process),
                         process.pid,
                         anchor_pid,
                     )
@@ -328,7 +329,7 @@ fn multi_select_style<'a>(
     row: Row<'a>,
     app: &TuiApp,
     theme: TuiTheme,
-    identity: Option<taskmanager_shell::ProcessRowIdentity>,
+    identity: Option<ProcessLiveKey>,
     pid: u32,
     anchor_pid: Option<u32>,
 ) -> Row<'a> {

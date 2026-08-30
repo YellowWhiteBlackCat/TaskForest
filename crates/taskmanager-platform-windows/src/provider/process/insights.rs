@@ -45,13 +45,13 @@ struct ThreadCpuBaselines {
 /// rate is never a believable zero.
 fn thread_rows_with_rates(
     target: &FrozenProcessIdentity,
+    start_token: u64,
     details: Vec<taskmanager_windows_api::WindowsThreadDetail>,
     observed_at_ms: u64,
 ) -> Vec<ProcessThreadInfo> {
     let mut details = details;
     details.sort_by_key(|detail| detail.tid);
 
-    let token = target.authoritative_start_token().unwrap_or(0);
     let mut baselines = match THREAD_CPU_BASELINES.lock() {
         Ok(baselines) => baselines,
         Err(poisoned) => poisoned.into_inner(),
@@ -62,11 +62,11 @@ fn thread_rows_with_rates(
     let entry = baselines
         .entry(target.pid)
         .or_insert_with(|| ThreadCpuBaselines {
-            start_token: token,
+            start_token,
             per_tid: HashMap::new(),
         });
-    if entry.start_token != token {
-        entry.start_token = token;
+    if entry.start_token != start_token {
+        entry.start_token = start_token;
         entry.per_tid.clear();
     }
 
@@ -137,7 +137,7 @@ impl ProcessThreadsProvider for WinProcessThreadsProvider {
             })?;
         validate_process_target_after(target, expected)?;
 
-        let threads = thread_rows_with_rates(target, details, observed_at_ms);
+        let threads = thread_rows_with_rates(target, expected, details, observed_at_ms);
 
         let value = ProcessThreads {
             state: DeviceState::healthy(observed_at_ms),
@@ -145,7 +145,7 @@ impl ProcessThreadsProvider for WinProcessThreadsProvider {
         };
 
         Ok(ProcessInsightSnapshot {
-            identity: snapshot_identity(target),
+            identity: snapshot_identity(target)?,
             value,
         })
     }
@@ -175,7 +175,7 @@ impl ProcessOpenFilesProvider for WinProcessOpenFilesProvider {
 
             let value = open_files_value_from_boundary(raw_entries, observed_at_ms);
             Ok(ProcessInsightSnapshot {
-                identity: snapshot_identity(target),
+                identity: snapshot_identity(target)?,
                 value,
             })
         }
@@ -259,7 +259,7 @@ impl ProcessEnvironmentProvider for WinProcessEnvironmentProvider {
 
             let value = environment_value_from_boundary(raw, observed_at_ms);
             Ok(ProcessInsightSnapshot {
-                identity: snapshot_identity(target),
+                identity: snapshot_identity(target)?,
                 value,
             })
         }

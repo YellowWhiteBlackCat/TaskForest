@@ -217,7 +217,7 @@ pub const FOCUS_RING_WIDTH: f32 = 2.0;
 /// that decision in the ring's alpha (alpha = 0 → no ring).
 ///
 /// The visibility source is the renderer-local input modality
-/// ([`crate::input_modality`]): only keyboard input keeps the ring opaque,
+/// (`crate::input_modality`): only keyboard input keeps the ring opaque,
 /// the same strict policy the GPUI shell derives from its root input-modality
 /// tracker. `destructive` controls ring in the danger token under the same
 /// visibility rule — the irreversible-action affordance stays, and a

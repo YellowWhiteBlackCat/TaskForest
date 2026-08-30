@@ -260,7 +260,7 @@ fn cpu_observation_always_carries_all_granular_sources() {
     let observation = collect_cpu(
         &system,
         &mut previous_rapl,
-        (None, None, None),
+        (None, None, None, None),
         1u64 << 32,
         Instant::now(),
         100,

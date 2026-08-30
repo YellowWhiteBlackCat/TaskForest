@@ -7,6 +7,7 @@ pub mod alerts;
 pub mod appearance;
 pub mod config;
 pub use config::Config;
+pub mod cpu_codename;
 pub mod cpu_features;
 pub mod device_state;
 pub mod diagnostics;
@@ -46,6 +47,7 @@ pub use alerts::{
     SuggestedThreshold, SuggestionBasis, SuggestionConfidence, export_alert_events_json,
 };
 pub use appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
+pub use cpu_codename::{CpuVendor, classify_cpu_codename};
 pub use cpu_features::CpuInstructionFeature;
 pub use device_state::{
     DEFAULT_DEVICE_ABSENCE_RETENTION_MS, DeviceLifecycle, DeviceLifecycleDelta,
@@ -64,8 +66,8 @@ pub use directory_usage::{
 };
 pub use failure::FailureKind;
 pub use hardware::{
-    ComputeTopology, CoreBreakdown, CpuType, DisplayInfo, DisplayRuntimeInfo, FirmwareInfo,
-    HardwareInfo, HostIdentity, KernelInfo, classify_hypervisor_vendor,
+    ComputeTopology, CoreBreakdown, CpuIdentity, CpuType, DisplayInfo, DisplayRuntimeInfo,
+    FirmwareInfo, HardwareInfo, HostIdentity, KernelInfo, classify_hypervisor_vendor,
 };
 pub use history::{
     ApplicationHistoryIdentity, HistoricalSample, HistoricalSeries, HistoryMetric,
@@ -75,18 +77,21 @@ pub use identity::{DeviceGeneration, DeviceId, ProviderId};
 pub use metrics::{
     CounterDelta, CpuFrequencySource, CpuMetrics, CpuPerformancePolicy, CpuScalarObservations,
     CpuTelemetryObservation, CpuTemperatureSource, CumulativeCounter, DiskMetrics, DiskPartition,
-    DiskPartitionScalarObservations, DiskScalarObservations, GpuEngine, GpuEngineKind,
-    GpuEngineMetric, GpuEngineMetricPoint, GpuEngineRowsFailure, GpuEngineRowsSnapshot,
-    GpuGraphicsApi, GpuMetricField, GpuMetricProvenance, GpuMetrics, GpuScalarObservations,
-    GpuTelemetryObservation, GpuThrottleReason, HostRuntimeFacts, HostRuntimeObservation,
-    MAX_TRACKED_LOGICAL_CPUS, MemoryCompositionObservations, MemoryCompressionObservations,
-    MemoryMetrics, MemoryModuleObservations, MemoryOptionalObservations, MemoryScalarObservations,
-    MemoryTelemetryObservation, NetworkAdapterType, NetworkMetrics, NetworkScalarObservations,
-    NetworkTelemetryObservation, NetworkWirelessObservations, ObservationWireError,
-    OptionalObservation, OptionalObservationState, ProviderRuntimeState, ScalarAvailability,
-    ScalarObservation, ScalarObservationGroup, ScalarObservationSlot, SmartAvailability,
-    StorageTelemetryObservation, SystemObservationState, SystemSnapshot, SystemTelemetryDomains,
-    VirtualMemoryCommitObservations, cpu_usage_pct_observation,
+    DiskPartitionScalarObservations, DiskScalarObservations, DmiIdentityFacts, GpuEngine,
+    GpuEngineKind, GpuEngineMetric, GpuEngineMetricPoint, GpuEngineRowsFailure,
+    GpuEngineRowsSnapshot, GpuGraphicsApi, GpuMetricField, GpuMetricProvenance, GpuMetrics,
+    GpuScalarObservations, GpuTelemetryObservation, GpuThrottleReason, HostRuntimeFacts,
+    HostRuntimeObservation, MAX_TRACKED_LOGICAL_CPUS, MemoryCompositionObservations,
+    MemoryCompressionObservations, MemoryMetrics, MemoryModuleObservations,
+    MemoryOptionalObservations, MemoryScalarObservations, MemoryTelemetryObservation,
+    MsrPackageReadout, MsrReadoutFailure, MsrReadoutSnapshot, NetworkAdapterType, NetworkMetrics,
+    NetworkScalarObservations, NetworkTelemetryObservation, NetworkWirelessObservations,
+    ObservationWireError, OptionalObservation, OptionalObservationState, ProviderRuntimeState,
+    RaplPackageRow, RaplPowerFailure, RaplPowerSnapshot, ScalarAvailability, ScalarObservation,
+    ScalarObservationGroup, ScalarObservationSlot, SmartAvailability, SmbiosMemoryFailure,
+    SmbiosMemorySnapshot, SmbiosModuleRow, StorageTelemetryObservation, SystemObservationState,
+    SystemSnapshot, SystemTelemetryDomains, VirtualMemoryCommitObservations,
+    cpu_usage_pct_observation,
 };
 pub use npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventoryFailure, NpuInventorySnapshot,
@@ -97,16 +102,16 @@ pub use power::{
     PowerSupplySnapshot,
 };
 pub use process::{
-    AppGroup, ApplicationIconAsset, ApplicationIconFormat, FlatTreeNode, FrozenProcessIdentity,
+    ApplicationIconAsset, ApplicationIconFormat, FlatTreeNode, FrozenProcessIdentity,
     MAX_APPLICATION_ICON_BYTES, PriorityTier, ProcessApplicationIdentity, ProcessBatchAction,
     ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessCategory,
     ProcessGroupScope, ProcessHistorySample, ProcessHistorySnapshot, ProcessHistoryStore,
-    ProcessItem, ProcessMetadataAvailability, ProcessMetadataFailure, ProcessMetadataObservation,
-    ProcessMetadataObservations, ProcessNode, ProcessOwner, ProcessOwnerIdentity,
-    ProcessScalarObservations, ProcessSignal, ProcessSortKey, aggregate_apps, aggregate_by_type,
+    ProcessItem, ProcessLiveKey, ProcessMetadataAvailability, ProcessMetadataFailure,
+    ProcessMetadataObservation, ProcessMetadataObservations, ProcessNode, ProcessOwner,
+    ProcessOwnerIdentity, ProcessScalarObservations, ProcessSignal, ProcessSortKey,
     application_group_name, build_process_tree, compare_process_items, execute_process_batch_with,
     flatten_tree_visible, fuzzy_filter_processes, fuzzy_match, normalize_app_name,
-    process_category, sort_apps, sort_nodes, sort_processes,
+    process_category, sort_nodes, sort_processes,
 };
 pub use process_telemetry::{
     ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey, ConnectionState,

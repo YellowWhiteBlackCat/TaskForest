@@ -26,7 +26,9 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::metrics::{CpuMetrics, MemoryMetrics, SystemSnapshot};
-use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+use taskmanager_core::core::process::{
+    ProcessApplicationIdentity, ProcessLiveKey, ProcessMetadataObservation,
+};
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
@@ -90,7 +92,12 @@ impl TreeFixture {
             groups.insert(format!(
                 "{}{}",
                 APP_TREE_EXPANSION_KEY_PREFIX,
-                root_pid(index)
+                ProcessLiveKey::from_parts(
+                    root_pid(index),
+                    taskmanager_test_support::fixture_start_token(root_pid(index)),
+                )
+                .expect("fixture identity")
+                .stable_key()
             ));
         }
         groups
@@ -274,29 +281,41 @@ fn canonical_rows_follow_the_pure_count_formula_at_10k() {
         .copied()
         .map(category_expansion_key)
         .collect();
-    let rows = build_process_rows(
+    let rows = process_view_support::build_process_rows(
         &refs,
         &default_groups,
         &HashSet::new(),
         (SortCol::Cpu, SortDir::Desc),
+        10,
     );
     assert_eq!(rows.len(), fixture.rows_default());
 
     // Fully expanded: every application aggregate opens its recursive tree.
     let expanded = fixture.all_expanded_groups();
-    let rows = build_process_rows(
+    let rows = process_view_support::build_process_rows(
         &refs,
         &expanded,
         &HashSet::new(),
         (SortCol::Cpu, SortDir::Desc),
+        10,
     );
     assert_eq!(rows.len(), fixture.rows_all_expanded());
 
     // Collapsing the first application root hides exactly its child subtree;
     // the aggregate header and the root row stay visible (flatten emits the
     // node itself, then gates the children on the collapsed set).
-    let collapsed: HashSet<u32> = HashSet::from([root_pid(0)]);
-    let rows = build_process_rows(&refs, &expanded, &collapsed, (SortCol::Cpu, SortDir::Desc));
+    let collapsed: HashSet<ProcessLiveKey> = HashSet::from([ProcessLiveKey::from_parts(
+        root_pid(0),
+        taskmanager_test_support::fixture_start_token(root_pid(0)),
+    )
+    .expect("fixture identity")]);
+    let rows = process_view_support::build_process_rows(
+        &refs,
+        &expanded,
+        &collapsed,
+        (SortCol::Cpu, SortDir::Desc),
+        10,
+    );
     assert_eq!(
         rows.len(),
         fixture.rows_all_expanded() - fixture.children_per_app
@@ -317,11 +336,12 @@ fn canonical_slice_at_50k_stays_a_pure_o_n_function_of_the_inputs() {
     assert_eq!(fixture.process_count(), 50_000);
     let refs: Vec<&ProcessItem> = fixture.processes.iter().collect();
 
-    let rows = build_process_rows(
+    let rows = process_view_support::build_process_rows(
         &refs,
         &fixture.all_expanded_groups(),
         &HashSet::new(),
         (SortCol::Cpu, SortDir::Desc),
+        10,
     );
     // The canonical slice grows with N (55_005 rows for 50_000 processes, the
     // same pure formula the 10k fixture satisfies) — the bounded paint window
@@ -344,13 +364,24 @@ fn visual_row_count_matches_the_canonical_slice_and_invalidates_per_input() {
         app.expanded_groups.insert(format!(
             "{}{}",
             APP_TREE_EXPANSION_KEY_PREFIX,
-            root_pid(index)
+            ProcessLiveKey::from_parts(
+                root_pid(index),
+                taskmanager_test_support::fixture_start_token(root_pid(index)),
+            )
+            .expect("fixture identity")
+            .stable_key()
         ));
     }
     assert_eq!(app.visual_row_count(), fixture.rows_all_expanded());
 
     // Tree input: collapsing one root hides exactly its child subtree.
-    app.collapsed_tree.insert(root_pid(0));
+    app.collapsed_tree.insert(
+        ProcessLiveKey::from_parts(
+            root_pid(0),
+            taskmanager_test_support::fixture_start_token(root_pid(0)),
+        )
+        .expect("fixture identity"),
+    );
     assert_eq!(
         app.visual_row_count(),
         fixture.rows_all_expanded() - fixture.children_per_app
@@ -573,7 +604,7 @@ impl SteppedEventSource {
     }
 }
 
-impl crate::runtime::TerminalEventSource for SteppedEventSource {
+impl crate::runtime::runtime_support::TerminalEventSource for SteppedEventSource {
     fn poll(&mut self, timeout: Duration) -> io::Result<bool> {
         if timeout > Duration::ZERO {
             // A fresh blocking wait: the next scripted window's events become
@@ -614,7 +645,7 @@ fn driven_draw_count(steps: Vec<ScriptStep>) -> io::Result<usize> {
     let fixture = tree_fixture(4, 5, 10, 6);
     let mut app = seeded_app(&fixture);
     let mut terminal = Terminal::new(DrawCountingBackend::new(80, 24)).expect("test terminal");
-    let outcome = crate::runtime::run_event_loop(
+    let outcome = crate::runtime::runtime_support::run_event_loop(
         &mut terminal,
         &mut app,
         None,

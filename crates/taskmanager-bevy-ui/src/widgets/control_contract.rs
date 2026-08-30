@@ -13,10 +13,11 @@ use bevy::scene::{Scene, bsn};
 use bevy::ui::prelude::{BackgroundColor, Node, percent};
 
 use crate::palette::UiPalette;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum ControlTarget {
-    Process(u32),
+    Process(ProcessLiveKey),
     Service(String),
     Startup(String),
     Session(String),
@@ -26,7 +27,7 @@ impl ControlTarget {
     #[must_use]
     pub(crate) fn stable_key(&self) -> String {
         match self {
-            Self::Process(pid) => format!("process:{pid}"),
+            Self::Process(identity) => format!("process:{}", identity.stable_key()),
             Self::Service(name) => format!("service:{name}"),
             Self::Startup(name) => format!("startup:{name}"),
             Self::Session(name) => format!("session:{name}"),

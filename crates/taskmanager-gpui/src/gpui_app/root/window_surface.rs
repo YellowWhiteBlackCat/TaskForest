@@ -12,7 +12,7 @@ use taskmanager_application::{
     ProcessTerminationConfirmation, ServiceControlTarget, SurfaceDismissReason, SurfaceKind,
     SurfaceTransition,
 };
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent, ProcessLiveKey};
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::target::ServiceId;
 
@@ -59,7 +59,7 @@ pub(crate) enum WindowSurface {
     ServiceDetails(ServiceId),
     DiskSmart(usize),
     DashboardPanel(DashboardPanel),
-    ProcessAffinity(u32),
+    ProcessAffinity(ProcessLiveKey),
 }
 
 impl WindowSurface {
@@ -413,11 +413,11 @@ impl super::RootView {
     }
 
     #[must_use]
-    pub fn process_properties_pid(&self) -> Option<u32> {
+    pub fn process_properties_identity(&self) -> Option<ProcessLiveKey> {
         self.shell
             .interaction
             .process_properties()
-            .map(|target| target.pid)
+            .and_then(FrozenProcessIdentity::live_key)
     }
 
     #[must_use]
@@ -502,9 +502,9 @@ impl super::RootView {
     }
 
     #[must_use]
-    pub fn process_affinity_pid(&self) -> Option<u32> {
+    pub fn process_affinity_identity(&self) -> Option<ProcessLiveKey> {
         match self.window_surface.active() {
-            Some(WindowSurface::ProcessAffinity(pid)) => Some(*pid),
+            Some(WindowSurface::ProcessAffinity(identity)) => Some(*identity),
             _ => None,
         }
     }
@@ -559,8 +559,8 @@ impl super::RootView {
         self.open_window_surface(WindowSurface::DashboardPanel(panel));
     }
 
-    pub fn show_process_affinity(&mut self, pid: u32) {
-        self.open_window_surface(WindowSurface::ProcessAffinity(pid));
+    pub fn show_process_affinity(&mut self, identity: ProcessLiveKey) {
+        self.open_window_surface(WindowSurface::ProcessAffinity(identity));
     }
 }
 

@@ -1,0 +1,24 @@
+[package]
+name = "taskmanager-rapl-helper"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+authors = ["TaskForest"]
+license = "Apache-2.0"
+description = "Privileged helper binary: samples Intel RAPL package energy counters and emits a typed JSON envelope (TaskForest permission-model Boundary 2, ADR-023)."
+publish = false
+
+# This is one feature-specific privileged piece of TaskForest (ADR-023,
+# docs/PERMISSION_MODEL.md Boundary 2). It performs exactly ONE operation: a
+# two-sample read of /sys/class/powercap/intel-rapl:*/ (top-level packages
+# only — name, max_energy_range_uj, energy_uj twice, 1000 ms apart), reduced
+# to per-package watts with wraparound handling. It emits ONE JSON object to
+# stdout then exits. There are NO flags and NO file access beyond that
+# powercap tree — minimal privileged attack surface (energy_uj is 0400
+# root-owned, which is exactly the unprivileged gap this helper fills).
+# Missing or permission-denied data is reported as a typed ERROR envelope —
+# NEVER a fabricated or zeroed power figure.
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

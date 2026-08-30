@@ -26,19 +26,31 @@ trap cleanup EXIT
 trap 'exit 130' INT TERM
 
 mkdir -p "$STAGE/usr/lib" "$STAGE/usr/libexec" "$STAGE/usr/share/polkit-1/actions"
-for feature in perf net process; do
+for feature in perf net process smbios rapl msr; do
     case "$feature" in
         perf)
-            helper="/usr/libexec/taskmanager-privilege-helper"
-            policy="/usr/share/polkit-1/actions/com.taskforest.perf-helper.policy"
+            helper="/usr/libexec/taskforest-privilege-helper"
+            policy="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy"
             ;;
         net)
-            helper="/usr/libexec/taskmanager-net-launcher"
-            policy="/usr/share/polkit-1/actions/com.taskforest.net-launcher.policy"
+            helper="/usr/libexec/taskforest-net-launcher"
+            policy="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy"
             ;;
         process)
-            helper="/usr/lib/taskforest-process-control-helper"
-            policy="/usr/share/polkit-1/actions/com.taskforest.process-control.policy"
+            helper="/usr/libexec/taskforest-process-control-helper"
+            policy="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy"
+            ;;
+        smbios)
+            helper="/usr/libexec/taskforest-smbios-helper"
+            policy="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy"
+            ;;
+        rapl)
+            helper="/usr/libexec/taskforest-rapl-helper"
+            policy="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy"
+            ;;
+        msr)
+            helper="/usr/libexec/taskforest-msr-helper"
+            policy="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy"
             ;;
     esac
     CONFLICT_STAGE="$(mktemp -d "$SCRATCH_ROOT/system-install-conflict.XXXXXX")"

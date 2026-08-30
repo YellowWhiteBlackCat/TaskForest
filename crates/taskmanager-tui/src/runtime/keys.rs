@@ -20,6 +20,7 @@
 
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use taskmanager_application::{AppPage, Modifiers, PlatformEffect};
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoTable, InputDispatch,
 };
@@ -455,10 +456,10 @@ fn execute_tui_local_direct(
 }
 
 fn toggle_marked_process(app: &mut TuiApp) {
-    if let Some(process) = app.selected_detail_process() {
-        if let Some(identity) = taskmanager_shell::ProcessRowIdentity::from_process(&process) {
-            app.shell.toggle_selected_identity(identity);
-        }
+    if let Some(process) = app.selected_detail_process()
+        && let Some(identity) = ProcessLiveKey::from_process(&process)
+    {
+        app.shell.toggle_selected_identity(identity);
     }
     let marked = app.shell.selected_identities().len();
     let text = if marked == 0 {
@@ -533,10 +534,10 @@ fn selection_extension_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch
     let previously_marked = app.shell.selected_identities().clone();
     let effect = app.move_nonflat_selection_oneshot(delta);
     app.shell.selected_rows.extend(previously_marked);
-    if let Some(process) = app.selected_detail_process() {
-        if let Some(identity) = taskmanager_shell::ProcessRowIdentity::from_process(&process) {
-            app.shell.selected_rows.insert(identity);
-        }
+    if let Some(process) = app.selected_detail_process()
+        && let Some(identity) = ProcessLiveKey::from_process(&process)
+    {
+        app.shell.selected_rows.insert(identity);
     }
     InputDispatch::consumed(effect)
 }
@@ -575,8 +576,8 @@ fn expand_nonflat_row(app: &mut TuiApp) -> InputDispatch {
         let rows = app.process_rows_snapshot();
         crate::process_view::category_tree_children_at(&rows, app.selected)
     };
-    if let Some(pid) = tree_pid {
-        app.expand_tree_pid(pid);
+    if let Some(identity) = tree_pid {
+        app.expand_tree_identity(identity);
         return InputDispatch::Consumed;
     }
     let name = {
@@ -590,12 +591,12 @@ fn expand_nonflat_row(app: &mut TuiApp) -> InputDispatch {
 }
 
 fn collapse_nonflat_row(app: &mut TuiApp) -> InputDispatch {
-    let pid = {
+    let identity = {
         let rows = app.process_rows_snapshot();
         crate::process_view::category_tree_children_at(&rows, app.selected)
     };
-    pid.map_or(InputDispatch::Unhandled, |pid| {
-        app.collapse_tree_pid(pid);
+    identity.map_or(InputDispatch::Unhandled, |identity| {
+        app.collapse_tree_identity(identity);
         InputDispatch::Consumed
     })
 }

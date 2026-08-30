@@ -16,6 +16,7 @@
 use super::super::*;
 use ratatui::crossterm::event::KeyModifiers;
 use taskmanager_application::{AppAction, AppPage};
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::command_palette::{TUI_LOCAL_COMMANDS, TuiDirectScope};
 
@@ -303,8 +304,7 @@ fn capital_c_opens_the_column_menu_only_on_applications() {
 fn m_toggles_the_marked_batch_set_of_the_selected_row() {
     let mut app = app_on_processes();
     let selected = app.selected_detail_process().expect("a selected row");
-    let expected =
-        taskmanager_shell::ProcessRowIdentity::from_process(&selected).expect("live identity");
+    let expected = ProcessLiveKey::from_process(&selected).expect("live identity");
     assert!(app.shell.selected_identities().is_empty());
     let _ = press_char(&mut app, 'm');
     assert!(

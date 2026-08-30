@@ -22,6 +22,5 @@ run_gate() {
     printf 'ISOLATED[bevy] %s: PASS\n' "$name"
 }
 
-run_gate "bsn-guard" timeout --kill-after=10s 120s \
-    python3 scripts/quality/bevy_bsn_guard.py --mode enforce
+run_gate "bsn-guard" timeout --kill-after=10s 120s python3 scripts/quality/bevy_bsn_guard.py --mode enforce
 run_gate "interactions" bash scripts/accept-bevy-interactions.sh

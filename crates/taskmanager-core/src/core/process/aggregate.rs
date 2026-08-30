@@ -1,9 +1,9 @@
 //! Availability-preserving aggregation for process groups.
 //!
-//! The legacy [`super::AppGroup`] shape stores bare totals and remains
-//! available for compatibility. New projections should use the helpers here:
-//! an aggregate must preserve the difference between a measured zero, a
-//! partial sum, stale history, and no observation at all.
+//! Group projections use the helpers here and
+//! [`super::group_aggregate::ProcessGroupAggregate`] / its typed sibling
+//! group APIs, so an aggregate preserves the difference between a measured
+//! zero, a partial sum, stale history, and no observation at all.
 
 use std::borrow::Borrow;
 
@@ -89,6 +89,65 @@ pub fn aggregate_u64<'a>(
     observed_at_ms: u64,
 ) -> Option<AggregateMetric<u64>> {
     aggregate(observations, observed_at_ms, u64::saturating_add)
+}
+
+/// Fold u32 observations widened to u64 in input order with saturating
+/// addition.
+///
+/// Counters published as u32 (threads, file descriptors) widen without
+/// losing their per-member availability: a widened member keeps its
+/// current/partial/stale state and its own last-success time, only falling
+/// back to `observed_at_ms` when the source never reported one.
+#[must_use]
+pub fn aggregate_u32_widened<'a>(
+    observations: impl IntoIterator<Item = &'a ScalarObservation<u32>>,
+    observed_at_ms: u64,
+) -> Option<AggregateMetric<u64>> {
+    let widened: Vec<ScalarObservation<u64>> = observations
+        .into_iter()
+        .map(|observation| widen_u32_observation(observation, observed_at_ms))
+        .collect();
+    aggregate_u64(widened.iter(), observed_at_ms)
+}
+
+fn widen_u32_observation(
+    observation: &ScalarObservation<u32>,
+    observed_at_ms: u64,
+) -> ScalarObservation<u64> {
+    match observation.availability() {
+        ScalarAvailability::Unknown => ScalarObservation::default(),
+        ScalarAvailability::Available => {
+            observation
+                .current_value()
+                .map_or_else(ScalarObservation::default, |value| {
+                    ScalarObservation::available(
+                        u64::from(*value),
+                        observation.last_success_ms().unwrap_or(observed_at_ms),
+                    )
+                })
+        }
+        ScalarAvailability::Partial(failure) => observation.current_value().map_or_else(
+            || ScalarObservation::unavailable(failure),
+            |value| {
+                ScalarObservation::partial(
+                    u64::from(*value),
+                    observation.last_success_ms().unwrap_or(observed_at_ms),
+                    failure,
+                )
+            },
+        ),
+        ScalarAvailability::Stale(failure) => observation.last_known_value().map_or_else(
+            || ScalarObservation::unavailable(failure),
+            |value| {
+                ScalarObservation::stale(
+                    u64::from(*value),
+                    observation.last_success_ms().unwrap_or(observed_at_ms),
+                    failure,
+                )
+            },
+        ),
+        ScalarAvailability::Unavailable(failure) => ScalarObservation::unavailable(failure),
+    }
 }
 
 fn aggregate<T, I, F>(

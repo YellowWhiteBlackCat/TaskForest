@@ -48,10 +48,13 @@ This document does not copy host counts, audit dates or receipt status.
 | Group | Files and responsibility | Owner / removal authority |
 |---|---|---|
 | Package base | `/usr/bin/taskmanager` compatibility entry, the `taskforest-g` GPUI binary, the TaskForestG `.desktop` entry, AppStream metadata, SVG icon, setup payload, setup polkit policy, and the generated third-party notices under `/usr/share/licenses/taskforest/` | Root package transaction — the same staged tree ships as the Arch package, the `.deb`, and the `.rpm` (layout authority: `packaging/arch/PKGBUILD`); remove with `pacman -Rns taskforest-git` / `dpkg -r taskforest` / `rpm -e taskforest`, never ad hoc `rm` |
-| Optional RAPL setup | `/etc/udev/rules.d/99-taskmanager.rules` | Root, but only through `taskmanager-setup-helper install/revert`; exact content and atomic rollback |
-| GPU PMU optional capability | `taskmanager-privilege-helper` plus `com.taskforest.perf-helper.policy` | Package transaction or [`scripts/manage-polkit-install.sh`](../scripts/manage-polkit-install.sh) `perf` transaction |
-| Per-process network optional capability | `taskmanager-net-launcher` plus `com.taskforest.net-launcher.policy` | Package transaction or the same manager's `net` transaction |
-| Process-control capability | `taskmanager-process-control-helper` plus `com.taskforest.process-control.policy` | Package transaction or the same manager's `process` transaction |
+| Optional RAPL setup | `/etc/udev/rules.d/99-taskforest.rules` | Root, but only through `taskforest-setup-helper install/revert`; exact content and atomic rollback |
+| GPU PMU optional capability | `taskforest-privilege-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy` | Package transaction or [`scripts/manage-polkit-install.sh`](../scripts/manage-polkit-install.sh) `perf` transaction |
+| Per-process network optional capability | `taskforest-net-launcher` plus `io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy` | Package transaction or the same manager's `net` transaction |
+| Process-control capability | `taskforest-process-control-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.process-control.policy` | Package transaction or the same manager's `process` transaction |
+| SMBIOS memory optional capability | `taskforest-smbios-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy` | Package transaction or the same manager's `smbios` transaction |
+| RAPL package-power optional capability | `taskforest-rapl-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy` | Package transaction or the same manager's `rapl` transaction |
+| MSR readout optional capability | `taskforest-msr-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy` | Package transaction or the same manager's `msr` transaction |
 | Developer user integration | User-local TaskForestG/TaskForestI `.desktop` entries, shared SVG, conditional `index.theme`, and one ownership receipt | [`scripts/dev-install-frontends.sh`](../scripts/dev-install-frontends.sh); user-owned and separate from root package files |
 
 The full path, artifact, permission, conflict, and removal fields are kept in
@@ -59,7 +62,8 @@ the TSV instead of being inferred from this summary table.
 
 ## Polkit helper installation procedure
 
-The manager accepts exactly one feature token: `perf`, `net`, or `process`.
+The manager accepts exactly one feature token: `perf`, `net`, `process`,
+`smbios`, `rapl`, or `msr`.
 Each transaction owns only that feature's helper and policy pair. For the GPU
 PMU feature shown in the UI:
 
@@ -74,15 +78,16 @@ timeout --kill-after=10s 30s scripts/manage-polkit-install.sh verify perf
 `install` writes exactly these two destinations:
 
 ```text
-/usr/libexec/taskmanager-privilege-helper
-/usr/share/polkit-1/actions/com.taskforest.perf-helper.policy
+/usr/libexec/taskforest-privilege-helper
+/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy
 ```
 
 It does not create a daemon, edit a service, reload polkit, change ownership
 of any other file, or touch `/etc/udev`. It refuses package-owned paths,
 different existing content, symlinks and missing standard parents. After
 installation, record both hashes and metadata in the local receipt. Use the
-corresponding Cargo package and feature token for `net` or `process`.
+corresponding Cargo package and feature token for `net`, `process`, `smbios`,
+`rapl`, or `msr`.
 
 ## Removal procedure
 

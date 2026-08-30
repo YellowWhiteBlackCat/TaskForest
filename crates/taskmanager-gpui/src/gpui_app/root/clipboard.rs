@@ -4,7 +4,7 @@ use super::RootView;
 use gpui::{ClipboardItem, Context};
 use taskmanager_application::i18n;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 
 impl RootView {
     /// Look up the process captured by the menu action and apply `f` to its
@@ -14,11 +14,15 @@ impl RootView {
     /// used in the feedback line ("name" / "PID" / "command line").
     pub(super) fn copy_field(
         &self,
-        pid: u32,
+        identity: ProcessLiveKey,
         f: impl Fn(&ProcessItem) -> String,
         what: &'static str,
     ) -> (Option<String>, &'static str) {
-        let text = self.processes().iter().find(|p| p.pid == pid).map(f);
+        let text = self
+            .processes()
+            .iter()
+            .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
+            .map(f);
         (text, what)
     }
 

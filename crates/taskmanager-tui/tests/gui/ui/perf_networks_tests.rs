@@ -191,8 +191,8 @@ fn network_status_row_expresses_degraded_health_beyond_the_link_verdict() {
         status: DeviceStatus::Stale,
         last_success_ms: Some(1),
     };
-    // An assigned address keeps the carrier fallback Connected even while the
-    // device health is degraded — exactly the combination up/down cannot name.
+    // An assigned address does not replace the missing carrier observation;
+    // device health and link state remain independent typed facts.
     stale.ipv4_addr = Some("192.168.1.10".into());
     let texts: Vec<String> = network_lines(
         &[&stale],
@@ -218,8 +218,8 @@ fn network_status_row_expresses_degraded_health_beyond_the_link_verdict() {
         .find(|text| text.contains("Connection"))
         .expect("the link/connection row stays present");
     assert!(
-        connection_row.contains("Connected"),
-        "the carrier verdict stays independent of device health: {connection_row:?}"
+        connection_row.contains("—"),
+        "an unknown carrier must stay an honest gap: {connection_row:?}"
     );
     assert!(
         !connection_row.contains("Stale"),

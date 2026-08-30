@@ -18,7 +18,7 @@
 
 ## Product surfaces
 
-- [GPUI](taskmanager-gpui/README.md) · [Iced](taskmanager-iced/README.md) · [TUI](taskmanager-tui/README.md)
+- [GPUI](taskmanager-gpui/README.md) · [Iced](taskmanager-iced/README.md) · [TUI](taskmanager-tui/README.md) · [Bevy](taskmanager-bevy-ui/README.md)
 - [UI components](taskmanager-ui/README.md) · [theme](taskmanager-theme/README.md)
 - [icons](taskmanager-icons/README.md) · [assets](taskmanager-assets/README.md) · [tray](taskmanager-tray-muda/README.md)
 
@@ -29,6 +29,14 @@
 - [escalation](taskmanager-escalation/README.md) · [net launcher](taskmanager-net-launcher/README.md)
 - [privilege helper](taskmanager-privilege-helper/README.md) · [process-control helper](taskmanager-process-control-helper/README.md)
 - [setup helper](taskmanager-setup-helper/README.md)
+- [smbios tables](taskmanager-smbios-tables/README.md) — the ONE pure parser for SMBIOS records, shared by the unprivileged DMI probe and the helper
+- [smbios helper](taskmanager-smbios-helper/README.md) · [rapl helper](taskmanager-rapl-helper/README.md) · [msr helper](taskmanager-msr-helper/README.md)
+
+## Test support
+
+- [test support](taskmanager-test-support/README.md) — dev-only typed fixture
+  builders for behavior tests; consumed only through dev-dependencies, never a
+  product dependency.
 
 The fuzz workspaces have their own manifests and remain test-only; they do not define product
 architecture or a runtime capability.

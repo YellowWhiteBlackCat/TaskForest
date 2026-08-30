@@ -40,6 +40,7 @@ mod control;
 mod insights;
 mod list;
 pub(crate) mod target_observation;
+mod uac;
 
 pub use control::*;
 pub use insights::{
@@ -135,11 +136,14 @@ fn validate_process_target_after(
     }
 }
 
-fn snapshot_identity(target: &FrozenProcessIdentity) -> ProcessIdentity {
-    ProcessIdentity {
+fn snapshot_identity(target: &FrozenProcessIdentity) -> Result<ProcessIdentity, ProviderFailure> {
+    let start_token = target
+        .authoritative_start_token()
+        .ok_or(ProviderFailure::IdentityChanged)?;
+    Ok(ProcessIdentity {
         pid: target.pid,
-        start_token: target.authoritative_start_token().unwrap_or(0),
-    }
+        start_token,
+    })
 }
 
 /// Windows process provider composition grouped by scheduling responsibility.

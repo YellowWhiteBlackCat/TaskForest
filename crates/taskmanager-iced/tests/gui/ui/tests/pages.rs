@@ -426,7 +426,7 @@ fn system_projection_keeps_fixture_facts_and_telemetry_separate() {
         .hardware
         .as_ref()
         .expect("demo hardware fixture");
-    let hardware_rows = hardware_info_rows(hardware);
+    let hardware_rows = hardware_info_rows(hardware, None);
 
     assert_eq!(
         hardware_list_state(Some(hardware), &hardware_rows),
@@ -466,7 +466,7 @@ fn system_projection_distinguishes_unloaded_and_empty_hardware() {
     assert_eq!(hardware_list_state(None, &[]), ListState::Loading);
 
     let empty = HardwareInfo::default();
-    let rows = hardware_info_rows(&empty);
+    let rows = hardware_info_rows(&empty, None);
     assert!(rows.is_empty());
     assert_eq!(hardware_list_state(Some(&empty), &rows), ListState::Empty);
 
@@ -474,7 +474,7 @@ fn system_projection_distinguishes_unloaded_and_empty_hardware() {
         cpu_cores: Some(0),
         ..HardwareInfo::default()
     };
-    let rows = hardware_info_rows(&facts);
+    let rows = hardware_info_rows(&facts, None);
     assert_eq!(
         rows.iter()
             .find(|row| row.label == t("common.logical_cores"))
@@ -502,7 +502,7 @@ fn system_projection_keeps_display_identity_and_mode_in_one_row() {
         }],
         ..HardwareInfo::default()
     };
-    let rows = hardware_info_rows(&hardware);
+    let rows = hardware_info_rows(&hardware, None);
     let value = rows
         .iter()
         .find(|row| row.label == t("system.display"))

@@ -11,6 +11,7 @@ use taskmanager_ui_contract::IconId;
 use crate::gpui_app::root::{Hover, RootView};
 use taskmanager_application::ProcessTerminationAction;
 use taskmanager_application::i18n;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::{self, UiSize};
@@ -25,7 +26,7 @@ use taskmanager_shell::SortCol;
 /// policy, so this component cannot make a second availability decision.
 pub(super) struct ProcessActionBarProps<'a> {
     pub(super) theme: &'a Theme,
-    pub(super) selected: Option<u32>,
+    pub(super) selected_identity: Option<ProcessLiveKey>,
     pub(super) selected_target_count: usize,
     pub(super) application_selected: bool,
     pub(super) hidden_cols: &'a HashSet<SortCol>,
@@ -133,13 +134,13 @@ impl ProcessToolbarAction {
             }
             Self::Affinity => {
                 if view.selected_application_root().is_none()
-                    && view.selected_process_pids().len() <= 1
-                    && let Some(pid) = view.selected_pid()
+                    && view.batch_process_identities().len() <= 1
+                    && let Some(identity) = view.selected_process_identity()
                 {
-                    view.show_process_affinity(pid);
+                    view.show_process_affinity(identity);
                     view.processes_state.affinity_editor.cpus.clear();
                     view.processes_state.affinity_editor.hover = None;
-                    view.request_process_affinity(pid, cx);
+                    view.request_process_affinity(identity, cx);
                     cx.notify();
                 }
             }
@@ -154,20 +155,21 @@ fn submit_batch_or_single(
     termination: Option<ProcessTerminationAction>,
     cx: &mut Context<RootView>,
 ) {
-    let submitted =
-        if view.selected_application_root().is_some() || view.selected_process_pids().len() > 1 {
-            view.request_process_batch(batch_action);
-            true
-        } else if let Some(pid) = view.selected_pid() {
-            if let Some(termination) = termination {
-                view.request_process_termination(termination, pid);
-            } else {
-                view.submit_process_batch_immediate(batch_action, pid, cx);
-            }
-            true
+    let submitted = if view.selected_application_root().is_some()
+        || view.batch_process_identities().len() > 1
+    {
+        view.request_process_batch(batch_action);
+        true
+    } else if let Some(identity) = view.selected_process_identity() {
+        if let Some(termination) = termination {
+            view.request_process_termination(termination, identity);
         } else {
-            false
-        };
+            view.submit_process_batch_immediate(batch_action, identity, cx);
+        }
+        true
+    } else {
+        false
+    };
     if submitted {
         cx.notify();
     }
@@ -316,7 +318,7 @@ fn action_divider(theme: &Theme) -> Div {
 pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<RootView>) -> Div {
     let ProcessActionBarProps {
         theme,
-        selected,
+        selected_identity,
         selected_target_count,
         application_selected,
         hidden_cols,
@@ -330,15 +332,15 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     let selected_count = if application_selected {
         selected_target_count
     } else if selected_target_count == 0 {
-        usize::from(selected.is_some())
+        usize::from(selected_identity.is_some())
     } else {
         selected_target_count
     };
     let hint = if selected_count > 1 {
         i18n::t("proc.batch_selected").replace("{count}", &selected_count.to_string())
     } else {
-        match selected {
-            Some(pid) => format!("{} {}", i18n::t("hint.selected_pid"), pid),
+        match selected_identity {
+            Some(identity) => format!("{} {}", i18n::t("hint.selected_pid"), identity.pid()),
             None => i18n::t("hint.select_process").to_string(),
         }
     };

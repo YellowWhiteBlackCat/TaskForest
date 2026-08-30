@@ -19,11 +19,13 @@ impl RootView {
     ) -> bool {
         match effect {
             PlatformEffect::EndTask(target) => {
-                let pid = target.pid;
+                let Some(identity) = target.live_key() else {
+                    return false;
+                };
                 self.submit_process_control(
                     ProcessControlRequest::EndTask(target),
                     ProcessControlAction::EndTask,
-                    pid,
+                    identity,
                     cx,
                 )
             }
@@ -48,7 +50,10 @@ impl RootView {
             }
             // StopTracking is an immediate lifecycle action, not a dangerous
             // confirmation output. Every other effect family is likewise
-            // outside the shared primary-interaction reducer.
+            // outside the shared primary-interaction reducer; the SMBIOS
+            // memory, RAPL package-power, and MSR readout lanes are
+            // user-initiated panel requests (like GpuEngineRows), never
+            // confirmation outputs.
             PlatformEffect::SmartControl(SmartControlRequest::StopTracking(_))
             | PlatformEffect::Refresh(_)
             | PlatformEffect::ProcessSignal { .. }
@@ -61,6 +66,9 @@ impl RootView {
             | PlatformEffect::DirectoryUsage(_)
             | PlatformEffect::GpuEngineRows(_)
             | PlatformEffect::NpuInventory(_)
+            | PlatformEffect::SmbiosMemory(_)
+            | PlatformEffect::RaplPower(_)
+            | PlatformEffect::MsrReadout(_)
             | PlatformEffect::ServiceDependencies(_)
             | PlatformEffect::ServiceLogSnapshot(_)
             | PlatformEffect::ProcessAffinity(_)

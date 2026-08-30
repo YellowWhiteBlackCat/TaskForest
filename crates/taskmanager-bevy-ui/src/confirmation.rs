@@ -74,7 +74,10 @@ impl PendingConfirmationView {
                     body: format!("{headline}\n{}", t("confirm.recheck_body")),
                     confirm_label: t("common.confirm").to_owned(),
                     cancel_label: t("common.cancel").to_owned(),
-                    target_key: format!("process:{}", target.pid),
+                    target_key: target.live_key().map_or_else(
+                        || format!("process:pid:{}:unknown", target.pid),
+                        |identity| format!("process:{}", identity.stable_key()),
+                    ),
                 })
             }
             PendingConfirmation::ProcessBatch(intent) => {
@@ -96,10 +99,7 @@ impl PendingConfirmationView {
                     body: format!("{headline}\n{}", t("confirm.frozen_body")),
                     confirm_label: t("common.confirm").to_owned(),
                     cancel_label: t("common.cancel").to_owned(),
-                    target_key: format!(
-                        "batch:{}",
-                        frozen_pid_key(targets.iter().map(|target| target.pid))
-                    ),
+                    target_key: format!("batch:{}", frozen_process_key(targets.iter())),
                 })
             }
             PendingConfirmation::ServiceControl(target) => {
@@ -210,11 +210,21 @@ fn service_action_token(action: taskmanager_core::core::services::ServiceAction)
 }
 
 /// Stable, order-independent key over the frozen target set.
-fn frozen_pid_key(pids: impl Iterator<Item = u32>) -> String {
-    let mut pids: Vec<u32> = pids.collect();
-    pids.sort_unstable();
-    pids.iter()
-        .map(u32::to_string)
+fn frozen_process_key<'a>(
+    targets: impl Iterator<Item = &'a taskmanager_core::core::process::FrozenProcessIdentity>,
+) -> String {
+    let mut identities: Vec<String> = targets
+        .map(|target| {
+            target.live_key().map_or_else(
+                || format!("pid:{}:unknown", target.pid),
+                |identity| identity.stable_key(),
+            )
+        })
+        .collect();
+    identities.sort_unstable();
+    identities
+        .iter()
+        .map(String::as_str)
         .collect::<Vec<_>>()
         .join("-")
 }

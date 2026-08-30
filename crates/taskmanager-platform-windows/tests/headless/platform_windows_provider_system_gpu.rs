@@ -32,10 +32,17 @@ fn mixed_nvml_and_dxgi_keeps_complete_luid_inventory_and_enriches_exact_match() 
         utilization_pct: ScalarObservation::available(37.0, 1),
         ..taskmanager_core::GpuScalarObservations::default()
     });
-    nvml_metrics.provenance = vec![GpuMetricProvenance {
-        field: GpuMetricField::Utilization,
-        provider: GPU_TELEMETRY_PROVIDER,
-    }];
+    nvml_metrics.driver_version = Some("566.36".into());
+    nvml_metrics.provenance = vec![
+        GpuMetricProvenance {
+            field: GpuMetricField::Utilization,
+            provider: GPU_TELEMETRY_PROVIDER,
+        },
+        GpuMetricProvenance {
+            field: GpuMetricField::DriverVersion,
+            provider: GPU_TELEMETRY_PROVIDER,
+        },
+    ];
     let nvml = vec![NvmlGpuSample {
         pci_address: nvidia_address,
         metrics: nvml_metrics,
@@ -46,6 +53,15 @@ fn mixed_nvml_and_dxgi_keeps_complete_luid_inventory_and_enriches_exact_match() 
     assert_eq!(rows.len(), 2, "NVML must not suppress the Intel adapter");
     assert_eq!(rows[0].device_id, "windows:gpu:dxgi:0000000000000010");
     assert_eq!(rows[0].current_utilization_pct(), Some(37.0));
+    assert_eq!(
+        rows[0].driver_version.as_deref(),
+        Some("566.36"),
+        "the NVML sys driver version enriches the exact DXGI match"
+    );
+    assert_eq!(
+        rows[1].driver_version, None,
+        "the version must never copy to a sibling adapter"
+    );
     assert_eq!(rows[1].device_id, "windows:gpu:dxgi:0000000000000020");
     assert_eq!(rows[1].brand, "Intel Arc B390");
     assert!(
@@ -192,11 +208,12 @@ fn live_win_gpu_provider_refresh() {
         eprintln!("LIVE WIN GPU TELEMETRY: gpus count = {}", gpus.len());
         for gpu in gpus {
             eprintln!(
-                "  DEVICE: id={}, brand={}, usage_pct={:?}, driver={:?}, dedicated_vram={}, shared_vram={}, engines={:?}",
+                "  DEVICE: id={}, brand={}, usage_pct={:?}, driver={:?}, driver_version={:?}, dedicated_vram={}, shared_vram={}, engines={:?}",
                 gpu.device_id,
                 gpu.brand,
                 gpu.current_utilization_pct(),
                 gpu.driver,
+                gpu.driver_version,
                 gpu.current_dedicated_vram_total_bytes().unwrap_or_default(),
                 gpu.current_shared_vram_total_bytes().unwrap_or_default(),
                 gpu.engines,

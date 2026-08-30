@@ -11,20 +11,33 @@ use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_platform_contract::{RequestId, SubmissionErrorKind};
 
 mod gpu_engine_rows;
+mod msr_readout;
 mod network_escalation;
+mod rapl_power;
 mod shell_ui_action;
+mod smbios_memory;
 
 pub use gpu_engine_rows::{
     GpuEngineRowsFailed, GpuEngineRowsReady, GpuEngineRowsRequestFailure, GpuEngineRowsSession,
     GpuEngineRowsState,
 };
+pub use msr_readout::{
+    MsrReadoutFailed, MsrReadoutReady, MsrReadoutRequestFailure, MsrReadoutSession, MsrReadoutState,
+};
 pub use network_escalation::{
     NetworkEscalationFailed, NetworkEscalationReady, NetworkEscalationSession,
     NetworkEscalationState,
 };
+pub use rapl_power::{
+    RaplPowerFailed, RaplPowerReady, RaplPowerRequestFailure, RaplPowerSession, RaplPowerState,
+};
 pub use shell_ui_action::{
     ShellUiActionFailed, ShellUiActionIntent, ShellUiActionReady, ShellUiActionReceipt,
     ShellUiActionSession, ShellUiActionState,
+};
+pub use smbios_memory::{
+    SmbiosMemoryFailed, SmbiosMemoryReady, SmbiosMemoryRequestFailure, SmbiosMemorySession,
+    SmbiosMemoryState,
 };
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

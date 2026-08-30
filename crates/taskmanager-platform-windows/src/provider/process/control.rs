@@ -83,7 +83,16 @@ pub(crate) fn finish_with_escalation(
     }) else {
         return Err(ProviderFailure::IdentityChanged);
     };
-    match taskmanager_escalation::polkit::invoke_foreign_process_control(helper_target, operation) {
+    // ADR-035 stage 2: the Windows crossing is the UAC runas transport
+    // (ShellExecuteExW via the audited boundary + the one-shot reply
+    // channel), classified by the same escalation outcome vocabulary as the
+    // Linux pkexec crossing.
+    let outcome = taskmanager_escalation::uac::invoke_uac_foreign_process_control_with(
+        &super::uac::RunasUacTransport::new(),
+        helper_target,
+        operation,
+    );
+    match outcome {
         taskmanager_escalation::polkit::ForeignProcessControlOutcome::Applied => Ok(()),
         taskmanager_escalation::polkit::ForeignProcessControlOutcome::Failed { kind, .. } => {
             Err(map_foreign_control_failure(kind))

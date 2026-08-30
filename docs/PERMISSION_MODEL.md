@@ -30,9 +30,15 @@ perf-ioctl 的 `#[repr(C)]` 布局）无攻击者可控输入，豁免 fuzz、�
 ## Boundary 2 — Default unprivileged
 
 主程序永远以普通用户启动，不使用主二进制 blanket `setcap`/`setuid`。需要权限的能力只在
-用户主动使用时，按 feature 经 OS 原生授权进入：Linux polkit/pkexec；Windows UAC 与 macOS
-native authorization 仅在专用 transport 接线后启用。当前未接线的 Windows foreign-process
-control 必须返回 typed `Unsupported`，不得把普通同 token 子进程宣称为提权。用户拒绝、授权
+用户主动使用时，按 feature 经 OS 原生授权进入：Linux polkit/pkexec 已接线；Windows UAC
+`runas` 传输已在代码层接线（ADR-035 stage 2：`taskmanager-windows-api` 的
+`ShellExecuteExW("runas")` + 有界等待 call group，`taskmanager-platform-windows` 的
+driver 加一次性随机命名回传文件），并已通过 `x86_64-pc-windows-msvc` 交叉编译验证，
+但 helper 尚未打包、没有目标机 receipt——现装机器上仍以 typed `HelperUnavailable`
+诚实失败，不伪造提权。macOS native authorization 的 typed 词汇与纯映射已落地
+（`taskmanager-escalation::authorization`），Security-framework 跨界保持未接线
+（typed `Unsupported`），等待 signed privileged-helper 的 ADR。不得把普通同 token
+子进程宣称为提权。用户拒绝、授权
 未完成、helper 缺失、helper 协议违约和不支持必须是互斥的 typed outcome；Linux 仅把
 `pkexec` 126 解释为明确拒绝。目标机实测取消也可能返回 127，因此 127 使用中性的
 `AuthorizationUnavailable`/“授权未完成”，不得臆测是用户拒绝或授权服务故障。
@@ -42,7 +48,7 @@ control 必须返回 typed `Unsupported`，不得把普通同 token 子进程宣
 | 类别 | 典型能力 | 拒绝后的产品语义 |
 |---|---|---|
 | Direct | 进程/CPU/内存/磁盘/网络聚合、sysfs、cgroup-v2 | 字段级 unavailable/partial |
-| Requires escalation | Intel PMU、AF_PACKET、foreign-uid control、受保护 SMART/服务控制 | `RequiresEscalation`、`PermissionDenied`、`AuthorizationUnavailable`、`HelperUnavailable` 或 `HelperProtocolViolation` |
+| Requires escalation | Intel PMU、AF_PACKET、foreign-uid control、受保护 SMART/服务控制、SMBIOS 明细（type-17 内存 + type 0/1/2 身份表，entries 与 id 序列号/UUID 节点 root-only）、RAPL 包功耗（energy_uj 0400）、MSR 读数（/dev/cpu/*/msr 0600） | `RequiresEscalation`、`PermissionDenied`、`AuthorizationUnavailable`、`HelperUnavailable` 或 `HelperProtocolViolation` |
 | Unsupported | 没有稳定 safe/native seam 的 provider | `Unsupported`，不伪造数字 |
 
 每个请求必须携带 capability、稳定 identity/generation、边界和取消语义；控制前后复核
@@ -50,8 +56,11 @@ control 必须返回 typed `Unsupported`，不得把普通同 token 子进程宣
 
 ## 当前 helper 规则
 
-- `taskmanager-privilege-helper`、`taskmanager-net-launcher`、`taskmanager-process-control-helper`
+- `taskmanager-privilege-helper`、`taskmanager-net-launcher`、`taskmanager-process-control-helper`、
+  `taskmanager-smbios-helper`、`taskmanager-rapl-helper`、`taskmanager-msr-helper`
   和 `taskmanager-setup-helper` 都是固定参数、单次、有界 helper；不是 shell、daemon 或通用 root API。
+  `taskmanager-process-control-helper` 额外接受可选的第四个参数——UAC 传输的一次性
+  回传文件（必须已由应用侧独占创建，helper 只截断重写固定 JSON envelope，绝不新建路径）。
 - `PolkitGate` 对每项已接线能力精确验证 `pkexec + policy + executable helper`；provider 注册
   和实际请求复用这一权威，缺安装时不得发起无效授权。
 - helper 的安装、polkit policy、授权拒绝、成功、恢复和卸载分别验收；代码链闭合不等于

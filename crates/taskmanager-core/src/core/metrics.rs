@@ -7,7 +7,10 @@ mod disk;
 mod gpu;
 mod gpu_engine_rows;
 mod memory;
+mod msr_readout;
 mod network;
+mod rapl_power;
+mod smbios_memory;
 mod system;
 
 pub use availability::{
@@ -33,8 +36,13 @@ pub use memory::{
     MemoryModuleObservations, MemoryOptionalObservations, MemoryScalarObservations,
     VirtualMemoryCommitObservations,
 };
+pub use msr_readout::{MsrPackageReadout, MsrReadoutFailure, MsrReadoutSnapshot};
 pub use network::{
     NetworkAdapterType, NetworkMetrics, NetworkScalarObservations, NetworkWirelessObservations,
+};
+pub use rapl_power::{RaplPackageRow, RaplPowerFailure, RaplPowerSnapshot};
+pub use smbios_memory::{
+    DmiIdentityFacts, SmbiosMemoryFailure, SmbiosMemorySnapshot, SmbiosModuleRow,
 };
 pub use system::{
     CpuTelemetryObservation, GpuTelemetryObservation, HostRuntimeFacts, HostRuntimeObservation,

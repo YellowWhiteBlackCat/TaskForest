@@ -1,0 +1,27 @@
+[package]
+name = "taskmanager-smbios-helper"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+authors = ["TaskForest"]
+license = "Apache-2.0"
+description = "Privileged helper binary: reads SMBIOS memory-device entries and emits a typed JSON envelope (TaskForest permission-model Boundary 2, ADR-023)."
+publish = false
+
+# This is one feature-specific privileged piece of TaskForest (ADR-023,
+# docs/PERMISSION_MODEL.md Boundary 2). It performs exactly ONE operation: a
+# walk of /sys/firmware/dmi/entries/17-*/raw, decoded through the ONE SMBIOS
+# format authority (taskmanager-smbios-tables — pure, safe, zero-dependency),
+# producing the populated-memory-module list. It emits ONE JSON object to
+# stdout then exits. There are NO flags and NO file access beyond that
+# entries directory — minimal privileged attack surface. Missing or
+# permission-denied data is reported as a typed ERROR envelope — NEVER a
+# fabricated or zeroed module field.
+
+[dependencies]
+# The ONE authority for SMBIOS record parsing; the helper never re-implements
+# the format. Pure safe Rust with zero dependencies, so the dependency
+# firewall stays intact and this remains the helper's only workspace edge.
+taskmanager-smbios-tables = { path = "../taskmanager-smbios-tables" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

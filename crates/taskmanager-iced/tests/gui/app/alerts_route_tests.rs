@@ -1,5 +1,6 @@
 use super::*;
 use crate::app::Message;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 #[test]
 fn typed_route_transitions_are_idempotent_and_shared_page_selection_closes_alerts() {
@@ -41,17 +42,17 @@ fn modal_input_precedence_keeps_the_alerts_route_under_the_modal() {
 #[test]
 fn jump_to_process_selects_the_shared_route() {
     let mut app = crate::IcedApp::demo();
-    let pid = app
+    let identity = app
         .shell
         .projection()
         .processes
         .as_ref()
         .and_then(|processes| processes.first())
-        .map(|process| process.pid)
-        .expect("demo process");
+        .and_then(ProcessLiveKey::from_process)
+        .expect("demo process identity");
     app.open_alerts_page();
 
-    let _ = app.update(Message::JumpToProcess { pid });
+    let _ = app.update(Message::JumpToProcess { identity });
 
     assert!(!app.alerts_page_open());
     assert_eq!(

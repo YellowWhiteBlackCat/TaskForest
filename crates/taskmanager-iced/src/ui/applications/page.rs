@@ -6,9 +6,9 @@ use crate::saved_views::{PresetsRibbonState, presets_ribbon};
 use iced::widget::scrollable::{Direction, Scrollbar};
 use iced::widget::{column, text_input};
 use iced::{Alignment, Element, Length, Renderer, Theme};
-use taskmanager_core::core::process::{ProcessBatchAction, descendant_pids};
+use taskmanager_core::core::process::{ProcessBatchAction, descendant_live_keys};
 
-use taskmanager_shell::SortDir;
+use taskmanager_shell::{ProcessRowId, SortDir};
 
 /// Owned inputs for the lazy Applications body. The projection owns the
 /// preformatted cells and the process facts/history required by row widgets;
@@ -144,7 +144,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         gray_zero: app.preferences().gray_zero_values,
         hidden_columns: Rc::new(app.process_presentation.hidden_columns.clone()),
         column_widths,
-        open_menu_pid: app.process_menu_pid(),
+        open_menu_identity: app.process_menu_identity(),
     };
     let row_height = application_row_height(row_context.compact);
     let (scroll_y, viewport_height) = app.applications_virtual_scroll();
@@ -188,137 +188,135 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         Message::ApplicationsScrolled,
     );
 
-    let action_bar: Element<'_, Message, Theme, Renderer> =
-        if let Some(intent) = shell.pending_batch() {
-            tables::confirm_batch_bar(theme_snapshot, intent)
-        } else if let Some(target) = shell.pending_end() {
-            tables::confirm_bar(theme_snapshot, target)
-        } else {
-            let selected_application_root = shell
-                .selected_row
-                .and_then(taskmanager_shell::ProcessRowId::application_root)
-                .map(taskmanager_shell::ProcessRowIdentity::pid);
-            let selected_target_count = selected_application_root
-                .and_then(|root_pid| {
-                    shell
-                        .projection()
-                        .processes
-                        .as_deref()
-                        .map(|processes| descendant_pids(processes, root_pid).len())
-                })
-                .unwrap_or_else(|| shell.selected_identities().len());
-            let mut actions: Vec<Element<'_, Message, Theme, Renderer>> = Vec::new();
-            if selected_application_root.is_none() {
-                actions.push(focus::button(
-                    theme_snapshot,
-                    FocusTarget::EndTask,
-                    t("proc.end_task"),
-                    Message::RequestEndTask,
-                    true,
-                ));
-            }
+    let action_bar: Element<'_, Message, Theme, Renderer> = if let Some(intent) =
+        shell.pending_batch()
+    {
+        tables::confirm_batch_bar(theme_snapshot, intent)
+    } else if let Some(target) = shell.pending_end() {
+        tables::confirm_bar(theme_snapshot, target)
+    } else {
+        let selected_application_root = shell.selected_row.and_then(ProcessRowId::application_root);
+        let selected_target_count = selected_application_root
+            .and_then(|root| {
+                shell
+                    .projection()
+                    .processes
+                    .as_deref()
+                    .map(|processes| descendant_live_keys(processes, root).len())
+            })
+            .unwrap_or_else(|| shell.selected_identities().len());
+        let mut actions: Vec<Element<'_, Message, Theme, Renderer>> = Vec::new();
+        if selected_application_root.is_none() {
             actions.push(focus::button(
                 theme_snapshot,
-                FocusTarget::KillProcess,
-                t("proc.kill"),
-                Message::RequestProcessBatch(ProcessBatchAction::Kill),
+                FocusTarget::EndTask,
+                t("proc.end_task"),
+                Message::RequestEndTask,
                 true,
             ));
-            if selected_application_root.is_none() {
-                actions.push(focus::button(
-                    theme_snapshot,
-                    FocusTarget::OpenProcessLocation,
-                    t("proc.open_location"),
-                    Message::OpenProcessLocation,
-                    false,
-                ));
-                actions.push(focus::button(
-                    theme_snapshot,
-                    FocusTarget::SearchProcessOnline,
-                    t("proc.search_online"),
-                    Message::SearchProcessOnline,
-                    false,
-                ));
-            }
+        }
+        actions.push(focus::button(
+            theme_snapshot,
+            FocusTarget::KillProcess,
+            t("proc.kill"),
+            Message::RequestProcessBatch(ProcessBatchAction::Kill),
+            true,
+        ));
+        if selected_application_root.is_none() {
             actions.push(focus::button(
                 theme_snapshot,
-                FocusTarget::SuspendProcess,
-                t("proc.suspend"),
-                Message::RequestProcessBatch(ProcessBatchAction::Suspend),
+                FocusTarget::OpenProcessLocation,
+                t("proc.open_location"),
+                Message::OpenProcessLocation,
                 false,
             ));
             actions.push(focus::button(
                 theme_snapshot,
-                FocusTarget::ResumeProcess,
-                t("proc.resume"),
-                Message::RequestProcessBatch(ProcessBatchAction::Resume),
+                FocusTarget::SearchProcessOnline,
+                t("proc.search_online"),
+                Message::SearchProcessOnline,
                 false,
             ));
-            if selected_application_root.is_none() {
-                actions.push(focus::button(
-                    theme_snapshot,
-                    FocusTarget::ProcessAffinityOpen,
-                    t("proc.affinity"),
-                    Message::OpenProcessAffinity,
-                    false,
-                ));
-            }
-            let columns_trigger = focus::button(
+        }
+        actions.push(focus::button(
+            theme_snapshot,
+            FocusTarget::SuspendProcess,
+            t("proc.suspend"),
+            Message::RequestProcessBatch(ProcessBatchAction::Suspend),
+            false,
+        ));
+        actions.push(focus::button(
+            theme_snapshot,
+            FocusTarget::ResumeProcess,
+            t("proc.resume"),
+            Message::RequestProcessBatch(ProcessBatchAction::Resume),
+            false,
+        ));
+        if selected_application_root.is_none() {
+            actions.push(focus::button(
                 theme_snapshot,
-                FocusTarget::ProcessColumnsTrigger,
-                t("proc.choose_columns"),
-                Message::OpenProcessColumnsMenu,
+                FocusTarget::ProcessAffinityOpen,
+                t("proc.affinity"),
+                Message::OpenProcessAffinity,
                 false,
-            );
-            // The column chooser floats on its trigger: anchored below the
-            // button and dismissed by an outside press, instead of shoving
-            // the page column down while it is open.
-            actions.push(if app.process_columns_menu_open() {
-                crate::ui::components::Popover::new(
-                    columns_trigger,
-                    super::column_menu::render(app, theme_snapshot),
-                    Message::CloseProcessColumnsMenu,
+            ));
+        }
+        let columns_trigger = focus::button(
+            theme_snapshot,
+            FocusTarget::ProcessColumnsTrigger,
+            t("proc.choose_columns"),
+            Message::OpenProcessColumnsMenu,
+            false,
+        );
+        // The column chooser floats on its trigger: anchored below the
+        // button and dismissed by an outside press, instead of shoving
+        // the page column down while it is open.
+        actions.push(if app.process_columns_menu_open() {
+            crate::ui::components::Popover::new(
+                columns_trigger,
+                super::column_menu::render(app, theme_snapshot),
+                Message::CloseProcessColumnsMenu,
+            )
+            .into()
+        } else {
+            columns_trigger
+        });
+        actions.push(focus::ghost_button(
+            theme_snapshot,
+            FocusTarget::RunTaskOpen,
+            t("proc.run_new_task"),
+            Message::OpenRunTask,
+        ));
+        actions.push(
+            row![
+                text(t("proc.priority"))
+                    .size(f32::from(taskmanager_theme::tokens::FONT_CAPTION))
+                    .color(theme::muted_text_color(theme_snapshot)),
+                iced::widget::pick_list(
+                    &PriorityChoice::ALL[..],
+                    None::<PriorityChoice>,
+                    |choice: PriorityChoice| Message::RequestProcessBatch(choice.action()),
                 )
+                .placeholder(t("proc.choose_priority")),
+            ]
+            .spacing(4)
+            .align_y(Alignment::Center)
+            .into(),
+        );
+        actions.push(text(selection_hint(selected_target_count)).into());
+        if app.compact_layout() {
+            // Keep the action strip one bounded line so the Applications
+            // table retains a real row viewport. The full action vocabulary
+            // remains reachable through its own horizontal scroll axis.
+            scrollable(row(actions).spacing(8))
+                .direction(Direction::Horizontal(Scrollbar::default()))
+                .height(Length::Fixed(40.0))
+                .width(Length::Fill)
                 .into()
-            } else {
-                columns_trigger
-            });
-            actions.push(focus::ghost_button(
-                theme_snapshot,
-                FocusTarget::RunTaskOpen,
-                t("proc.run_new_task"),
-                Message::OpenRunTask,
-            ));
-            actions.push(
-                row![
-                    text(t("proc.priority"))
-                        .size(f32::from(taskmanager_theme::tokens::FONT_CAPTION))
-                        .color(theme::muted_text_color(theme_snapshot)),
-                    iced::widget::pick_list(
-                        &PriorityChoice::ALL[..],
-                        None::<PriorityChoice>,
-                        |choice: PriorityChoice| Message::RequestProcessBatch(choice.action()),
-                    )
-                    .placeholder(t("proc.choose_priority")),
-                ]
-                .spacing(4)
-                .align_y(Alignment::Center)
-                .into(),
-            );
-            actions.push(text(selection_hint(selected_target_count)).into());
-            if app.compact_layout() {
-                // Keep the action strip one bounded line so the Applications
-                // table retains a real row viewport. The full action vocabulary
-                // remains reachable through its own horizontal scroll axis.
-                scrollable(row(actions).spacing(8))
-                    .direction(Direction::Horizontal(Scrollbar::default()))
-                    .height(Length::Fixed(40.0))
-                    .width(Length::Fill)
-                    .into()
-            } else {
-                row(actions).spacing(8).into()
-            }
-        };
+        } else {
+            row(actions).spacing(8).into()
+        }
+    };
 
     let view_selector = process_view_selector(theme_snapshot);
     let status_selector =

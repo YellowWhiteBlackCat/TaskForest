@@ -14,8 +14,8 @@
 //! 1. [`build_canonical_row_ids`] — the O(N) walk over the visible processes
 //!    that emits a fully OWNED [`CanonicalRowId`] slice. The slice carries no
 //!    borrowed process facts (only stable indices into the visible list plus
-//!    precomputed header aggregates), so it can be cached across frames keyed
-//!    by the same presentation inputs as the visual-row-count cache.
+//!    precomputed typed header aggregates), so it can be cached across frames
+//!    keyed by the same presentation inputs as the visual-row-count cache.
 //! 2. [`materialize_row`] / [`materialize_rows`] — the O(1)-per-row conversion
 //!    of one owned id back into the borrowed [`ProcessRow`] view the renderer
 //!    consumes, re-fetching the process through the id's visible-list index.
@@ -32,21 +32,28 @@
 use std::collections::{HashMap, HashSet};
 
 use taskmanager_application::process_category_projection::{
-    category_buckets, category_expansion_key,
+    category_buckets, category_expansion_key, process_memory_observation_for_display,
 };
+use taskmanager_application::process_sort::compare_processes;
+use taskmanager_core::core::process::aggregate::AggregateMetric;
+use taskmanager_core::core::process::aggregate::aggregate_u32_widened;
 use taskmanager_core::core::process::{
-    ProcessCategory, ProcessItem, ProcessNode, build_process_tree, flatten_tree_visible,
-    process_category,
+    ProcessCategory, ProcessItem, ProcessLiveKey, ProcessNode, build_process_tree,
+    flatten_tree_visible, process_category,
 };
-use taskmanager_shell::{ProcessRowId, SortCol, SortDir};
+use taskmanager_shell::{ProcessRowId, SortCol, SortDir, sort_axis};
+
+#[cfg(test)]
+#[path = "../tests/headless/process_view_support.rs"]
+pub(crate) mod process_view_support;
 
 /// One row of the Applications category tree.
 ///
-/// `Group` is only ever emitted for a group with more than one member: it
-/// carries the aggregated metrics for display plus the group `name` that keys
-/// [`TuiApp::expanded_groups`] (for the category buckets this is the
-/// locale-neutral `category:<stable_key>` token) and the English `label` the
-/// renderer draws. `TreeNode` is a process row in the recursive hierarchy,
+/// `Group` is emitted for every non-empty bucket or application subtree: it
+/// carries availability-preserving typed aggregates for display plus the group
+/// `name` that keys [`TuiApp::expanded_groups`] (for the category buckets this
+/// is the locale-neutral `category:<stable_key>` token) and the English `label`
+/// the renderer draws. `TreeNode` is a process row in the recursive hierarchy,
 /// carrying its render metadata (depth for the
 /// indentation and the expansion chevron, `collapsed` mirroring the node's
 /// membership in [`TuiApp::collapsed_tree`] so the renderer never re-queries
@@ -63,8 +70,8 @@ pub(crate) enum ProcessRow<'a> {
         label: String,
         depth: usize,
         count: usize,
-        cpu: f32,
-        memory: u64,
+        cpu: AggregateMetric<f32>,
+        memory: AggregateMetric<u64>,
         expanded: bool,
         row_key: Option<ProcessRowId>,
     },
@@ -208,7 +215,7 @@ fn expansion_key_on<'a, L: ?Sized + VisibleLookup<'a>>(
         CanonicalRowId::Category { category, .. } => Some(category_expansion_key(*category)),
         CanonicalRowId::AppRoot { visible_index, .. } => {
             let root = visible.lookup(*visible_index)?;
-            Some(format!("{}{}", APP_TREE_EXPANSION_KEY_PREFIX, root.pid))
+            Some(app_expansion_key(root))
         }
         CanonicalRowId::Process { .. } => None,
     }
@@ -262,8 +269,8 @@ fn materialize_row_on<'a, L: ?Sized + VisibleLookup<'a>>(
             label: category_label(*category).to_owned(),
             depth: 0,
             count: *count,
-            cpu: *cpu,
-            memory: *memory,
+            cpu: cpu.clone(),
+            memory: memory.clone(),
             expanded: *expanded,
             row_key: None,
         }),
@@ -276,15 +283,15 @@ fn materialize_row_on<'a, L: ?Sized + VisibleLookup<'a>>(
         } => {
             let root = visible.lookup(*visible_index)?;
             Some(ProcessRow::Group {
-                name: format!("{}{}", APP_TREE_EXPANSION_KEY_PREFIX, root.pid),
+                name: app_expansion_key(root),
                 label: root
                     .current_application_name()
                     .unwrap_or(&root.name)
                     .to_owned(),
                 depth: 1,
                 count: *count,
-                cpu: *cpu,
-                memory: *memory,
+                cpu: cpu.clone(),
+                memory: memory.clone(),
                 expanded: *expanded,
                 row_key: ProcessRowId::application_of(root),
             })
@@ -325,19 +332,19 @@ pub(crate) enum CanonicalRowId {
         category: ProcessCategory,
         expanded: bool,
         count: usize,
-        cpu: f32,
-        memory: u64,
+        cpu: AggregateMetric<f32>,
+        memory: AggregateMetric<u64>,
     },
     /// One application aggregate header (depth 1). `visible_index` addresses
     /// the aggregate's root process in the visible list, so the label, the
-    /// pid-keyed expansion key and the actionable row key are re-fetched from
+    /// live-key expansion key and the actionable row key are re-fetched from
     /// the single authoritative process at materialize time.
     AppRoot {
         visible_index: usize,
         expanded: bool,
         count: usize,
-        cpu: f32,
-        memory: u64,
+        cpu: AggregateMetric<f32>,
+        memory: AggregateMetric<u64>,
     },
     /// One recursive process node.
     Process {
@@ -348,21 +355,17 @@ pub(crate) enum CanonicalRowId {
     },
 }
 
-impl CanonicalRowId {
-    /// The process this row addresses when it is a recursive process node,
-    /// else `None` (a group header aggregates but never resolves to one
-    /// process — same rule as [`process_at`]). Test-side reference resolver:
-    /// production consumers resolve through the [`VisibleProcesses`] accessor.
-    #[cfg(test)]
-    pub(crate) fn process<'a>(&self, visible: &[&'a ProcessItem]) -> Option<&'a ProcessItem> {
-        process_id_on(self, visible)
-    }
-}
-
 /// Expansion-set key prefix for one application aggregate header
-/// (`app-tree:<root pid>`). Declared here so the generator and the stale-key
+/// (`app-tree:<live-key>`). Declared here so the generator and the stale-key
 /// pruner share one spelling and can never drift.
 pub(crate) const APP_TREE_EXPANSION_KEY_PREFIX: &str = "app-tree:";
+
+fn app_expansion_key(process: &ProcessItem) -> String {
+    let identity = ProcessLiveKey::from_process(process)
+        .map(|identity| identity.stable_key())
+        .unwrap_or_else(|| format!("pid:{}:unknown", process.pid));
+    format!("{APP_TREE_EXPANSION_KEY_PREFIX}{identity}")
+}
 
 /// English display label for one category bucket.
 const fn category_label(category: ProcessCategory) -> &'static str {
@@ -382,19 +385,21 @@ const fn category_label(category: ProcessCategory) -> &'static str {
 /// Header aggregates are computed here (once per key change) instead of at
 /// materialize time: summing a bucket or an application subtree costs
 /// O(members), and the point of the id slice is a per-frame cost that only
-/// follows the visible window.
+/// follows the visible window. `observed_at_ms` is the timestamp of the
+/// accepted process snapshot, so the typed aggregate's freshness is never
+/// inferred from a renderer frame.
 ///
 /// The ids address processes by their visible-list index through a pid →
-/// index map. That reuses the feature's existing pid identity contract (the
-/// tree builder, the `app-tree:<pid>` expansion keys and the collapse set are
-/// all pid-keyed); the map is last-wins for a pid, matching the tree
-/// builder's own pid map.
+/// index map. The map is last-wins for a pid, matching the tree builder's
+/// within-snapshot topology; persistent row/expansion identity is carried by
+/// the core-owned live key instead of the PID alone.
 #[must_use]
 pub(crate) fn build_canonical_row_ids(
     processes: &[&ProcessItem],
     expanded: &HashSet<String>,
-    collapsed: &HashSet<u32>,
+    collapsed: &HashSet<ProcessLiveKey>,
     sort: (SortCol, SortDir),
+    observed_at_ms: u64,
 ) -> Vec<CanonicalRowId> {
     let visible_index_by_pid: HashMap<u32, usize> = processes
         .iter()
@@ -406,12 +411,22 @@ pub(crate) fn build_canonical_row_ids(
         let members: Vec<&ProcessItem> = bucket.members().iter().map(|member| **member).collect();
         let key = category_expansion_key(bucket.category());
         let is_expanded = expanded.contains(&key);
+        let (Some(cpu), Some(memory)) = (
+            bucket.aggregate_f32(observed_at_ms, |process| {
+                &process.scalar_observations().cpu_percentage
+            }),
+            bucket.aggregate_u64(observed_at_ms, |process| {
+                &process.scalar_observations().memory_bytes
+            }),
+        ) else {
+            continue;
+        };
         ids.push(CanonicalRowId::Category {
             category: bucket.category(),
             expanded: is_expanded,
             count: bucket.member_count(),
-            cpu: bucket.sum_f32(|process| process.current_cpu_percentage()),
-            memory: bucket.sum_u64(|process| process.current_memory_bytes()),
+            cpu,
+            memory,
         });
         if !is_expanded {
             continue;
@@ -419,9 +434,12 @@ pub(crate) fn build_canonical_row_ids(
         let mut tree = build_process_tree(&members);
         sort_tree_nodes(&mut tree, sort);
         if bucket.category() == ProcessCategory::Application {
+            tree = sort_application_roots(tree, sort, observed_at_ms);
             for root in &tree {
-                let (count, cpu, memory) = tree_totals(root);
-                let app_key = format!("{}{}", APP_TREE_EXPANSION_KEY_PREFIX, root.item.pid);
+                let Some(totals) = tree_totals(root, observed_at_ms) else {
+                    continue;
+                };
+                let app_key = app_expansion_key(root.item);
                 let app_expanded = expanded.contains(&app_key);
                 ids.push(CanonicalRowId::AppRoot {
                     visible_index: visible_index_by_pid
@@ -429,9 +447,9 @@ pub(crate) fn build_canonical_row_ids(
                         .copied()
                         .unwrap_or(usize::MAX),
                     expanded: app_expanded,
-                    count,
-                    cpu,
-                    memory,
+                    count: totals.process_count,
+                    cpu: totals.cpu,
+                    memory: totals.memory,
                 });
                 if app_expanded {
                     push_tree_ids(
@@ -456,11 +474,14 @@ pub(crate) fn build_canonical_row_ids(
 fn push_tree_ids(
     ids: &mut Vec<CanonicalRowId>,
     tree: &[ProcessNode<'_>],
-    collapsed: &HashSet<u32>,
+    collapsed: &HashSet<ProcessLiveKey>,
     visible_index_by_pid: &HashMap<u32, usize>,
     depth_offset: usize,
 ) {
     for node in flatten_tree_visible(tree, collapsed) {
+        let Some(identity) = ProcessLiveKey::from_process(node.item) else {
+            continue;
+        };
         ids.push(CanonicalRowId::Process {
             visible_index: visible_index_by_pid
                 .get(&node.item.pid)
@@ -468,7 +489,7 @@ fn push_tree_ids(
                 .unwrap_or(usize::MAX),
             depth: node.depth.saturating_add(depth_offset),
             has_children: node.has_children,
-            collapsed: collapsed.contains(&node.item.pid),
+            collapsed: collapsed.contains(&identity),
         });
     }
 }
@@ -517,18 +538,6 @@ pub(crate) fn materialize_rows<'a>(
 /// fresh-rebuild REFERENCE chain: the cached id slice must produce
 /// item-for-item identical rows under the same key (test-enforced), so the
 /// invalidation tests rebuild through here and compare against the cache.
-#[cfg(test)]
-#[must_use]
-pub(crate) fn build_process_rows<'a>(
-    processes: &[&'a ProcessItem],
-    expanded: &HashSet<String>,
-    collapsed: &HashSet<u32>,
-    sort: (SortCol, SortDir),
-) -> Vec<ProcessRow<'a>> {
-    let ids = build_canonical_row_ids(processes, expanded, collapsed, sort);
-    materialize_rows(&ids, processes)
-}
-
 /// The group NAME at `index` when that visual row is a toggleable group
 /// header, else `None` (a process row, a tree row, or out of bounds). The
 /// returned slice borrows from `rows`, not from the original process data, so
@@ -556,15 +565,6 @@ pub(crate) fn row_key_at(rows: &[ProcessRow<'_>], index: usize) -> Option<Proces
 /// borrows from the visible list the ids index into, not from the ids.
 /// Test-side reference resolver: production consumers resolve through the
 /// [`VisibleProcesses`] accessor.
-#[cfg(test)]
-pub(crate) fn id_process<'a>(
-    ids: &[CanonicalRowId],
-    visible: &[&'a ProcessItem],
-    index: usize,
-) -> Option<&'a ProcessItem> {
-    ids.get(index)?.process(visible)
-}
-
 /// The process at `index` when that visual row is a recursive process node,
 /// else `None` (a
 /// group header or out of bounds). The returned reference borrows from the
@@ -588,10 +588,149 @@ pub(crate) fn process_at<'a>(rows: &[ProcessRow<'a>], index: usize) -> Option<&'
 fn sort_tree_nodes<'a>(nodes: &mut [ProcessNode<'a>], sort: (SortCol, SortDir)) {
     let (column, direction) = sort;
     let ascending = matches!(direction, SortDir::Asc);
-    let axis = taskmanager_shell::sort_axis(column);
+    let axis = sort_axis(column);
     sort_tree_nodes_by(nodes, &|left, right| {
-        taskmanager_application::process_sort::compare_processes(left, right, axis, ascending)
+        compare_processes(left, right, axis, ascending)
     });
+}
+
+fn compare_optional_f32(left: Option<&f32>, right: Option<&f32>) -> std::cmp::Ordering {
+    match (left, right) {
+        (Some(left), Some(right)) => left.partial_cmp(right).unwrap_or(std::cmp::Ordering::Equal),
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (Some(_), None) => std::cmp::Ordering::Greater,
+        (None, None) => std::cmp::Ordering::Equal,
+    }
+}
+
+fn compare_optional_u64(left: Option<&u64>, right: Option<&u64>) -> std::cmp::Ordering {
+    match (left, right) {
+        (Some(left), Some(right)) => left.cmp(right),
+        (None, Some(_)) => std::cmp::Ordering::Less,
+        (Some(_), None) => std::cmp::Ordering::Greater,
+        (None, None) => std::cmp::Ordering::Equal,
+    }
+}
+
+/// Sort application roots by the aggregate value represented by their header.
+/// Sorting the roots by the first process in each tree made a grouped view
+/// disagree with its own CPU/memory headers; the recursive children still use
+/// the ordinary process comparator.
+fn sort_application_roots<'a>(
+    tree: Vec<ProcessNode<'a>>,
+    sort: (SortCol, SortDir),
+    observed_at_ms: u64,
+) -> Vec<ProcessNode<'a>> {
+    let (column, direction) = sort;
+    let ascending = matches!(direction, SortDir::Asc);
+    let mut roots: Vec<_> = tree
+        .into_iter()
+        .map(|root| {
+            let totals = tree_totals(&root, observed_at_ms);
+            (root, totals)
+        })
+        .collect();
+    roots.sort_by(|(left_root, left_totals), (right_root, right_totals)| {
+        let ordering = match column {
+            SortCol::Cpu => compare_optional_f32(
+                left_totals
+                    .as_ref()
+                    .and_then(|totals| totals.cpu.current_value()),
+                right_totals
+                    .as_ref()
+                    .and_then(|totals| totals.cpu.current_value()),
+            ),
+            SortCol::Memory => compare_optional_u64(
+                left_totals
+                    .as_ref()
+                    .and_then(|totals| totals.memory.current_value()),
+                right_totals
+                    .as_ref()
+                    .and_then(|totals| totals.memory.current_value()),
+            ),
+            SortCol::Pss => compare_optional_u64(
+                left_totals
+                    .as_ref()
+                    .and_then(|totals| totals.pss.current_value()),
+                right_totals
+                    .as_ref()
+                    .and_then(|totals| totals.pss.current_value()),
+            ),
+            SortCol::Swap => compare_optional_u64(
+                left_totals
+                    .as_ref()
+                    .and_then(|totals| totals.swap.current_value()),
+                right_totals
+                    .as_ref()
+                    .and_then(|totals| totals.swap.current_value()),
+            ),
+            SortCol::DiskRead => compare_optional_u64(
+                left_totals
+                    .as_ref()
+                    .and_then(|totals| totals.disk_read.current_value()),
+                right_totals
+                    .as_ref()
+                    .and_then(|totals| totals.disk_read.current_value()),
+            ),
+            SortCol::DiskWrite => compare_optional_u64(
+                left_totals
+                    .as_ref()
+                    .and_then(|totals| totals.disk_write.current_value()),
+                right_totals
+                    .as_ref()
+                    .and_then(|totals| totals.disk_write.current_value()),
+            ),
+            SortCol::CpuTime => compare_optional_u64(
+                left_totals
+                    .as_ref()
+                    .and_then(|totals| totals.cpu_time.current_value()),
+                right_totals
+                    .as_ref()
+                    .and_then(|totals| totals.cpu_time.current_value()),
+            ),
+            SortCol::Threads => compare_optional_u64(
+                left_totals
+                    .as_ref()
+                    .and_then(|totals| totals.threads.current_value()),
+                right_totals
+                    .as_ref()
+                    .and_then(|totals| totals.threads.current_value()),
+            ),
+            SortCol::Fds => compare_optional_u64(
+                left_totals
+                    .as_ref()
+                    .and_then(|totals| totals.fds.current_value()),
+                right_totals
+                    .as_ref()
+                    .and_then(|totals| totals.fds.current_value()),
+            ),
+            _ => compare_processes(
+                left_root.item,
+                right_root.item,
+                sort_axis(column),
+                ascending,
+            ),
+        };
+        if !matches!(
+            column,
+            SortCol::Pid
+                | SortCol::Name
+                | SortCol::User
+                | SortCol::State
+                | SortCol::StartTime
+                | SortCol::Nice
+        ) {
+            let directed = if ascending {
+                ordering
+            } else {
+                ordering.reverse()
+            };
+            directed.then_with(|| left_root.item.pid.cmp(&right_root.item.pid))
+        } else {
+            ordering
+        }
+    });
+    roots.into_iter().map(|(root, _)| root).collect()
 }
 
 fn sort_tree_nodes_by<'a, F>(nodes: &mut [ProcessNode<'a>], cmp: &F)
@@ -604,32 +743,84 @@ where
     }
 }
 
-fn tree_totals(root: &ProcessNode<'_>) -> (usize, f32, u64) {
-    fn fold(node: &ProcessNode<'_>, count: &mut usize, cpu: &mut f32, memory: &mut u64) {
-        *count = count.saturating_add(1);
-        *cpu += node.item.current_cpu_percentage().unwrap_or(0.0);
-        *memory = memory.saturating_add(node.item.current_memory_bytes().unwrap_or(0));
+struct TreeTotals {
+    process_count: usize,
+    cpu: AggregateMetric<f32>,
+    memory: AggregateMetric<u64>,
+    pss: AggregateMetric<u64>,
+    swap: AggregateMetric<u64>,
+    disk_read: AggregateMetric<u64>,
+    disk_write: AggregateMetric<u64>,
+    cpu_time: AggregateMetric<u64>,
+    threads: AggregateMetric<u64>,
+    fds: AggregateMetric<u64>,
+}
+
+fn tree_totals(root: &ProcessNode<'_>, observed_at_ms: u64) -> Option<TreeTotals> {
+    fn collect<'a>(node: &ProcessNode<'a>, members: &mut Vec<&'a ProcessItem>) {
+        members.push(node.item);
         for child in &node.children {
-            fold(child, count, cpu, memory);
+            collect(child, members);
         }
     }
 
-    let (mut count, mut cpu, mut memory) = (0, 0.0, 0);
-    fold(root, &mut count, &mut cpu, &mut memory);
-    (count, cpu, memory)
+    let mut members = Vec::new();
+    collect(root, &mut members);
+    let bucket = category_buckets(&members, |_| ProcessCategory::Application)
+        .into_iter()
+        .next()?;
+    Some(TreeTotals {
+        process_count: members.len(),
+        cpu: bucket.aggregate_f32(observed_at_ms, |process| {
+            &process.scalar_observations().cpu_percentage
+        })?,
+        memory: bucket.aggregate_u64(observed_at_ms, |process| {
+            process_memory_observation_for_display(process)
+        })?,
+        pss: bucket.aggregate_u64(observed_at_ms, |process| {
+            &process.scalar_observations().memory_pss_bytes
+        })?,
+        swap: bucket.aggregate_u64(observed_at_ms, |process| {
+            &process.scalar_observations().swap_bytes
+        })?,
+        disk_read: bucket.aggregate_u64(observed_at_ms, |process| {
+            &process.scalar_observations().disk_read_bytes_per_sec
+        })?,
+        disk_write: bucket.aggregate_u64(observed_at_ms, |process| {
+            &process.scalar_observations().disk_write_bytes_per_sec
+        })?,
+        cpu_time: bucket.aggregate_u64(observed_at_ms, |process| {
+            &process.scalar_observations().cpu_time_secs
+        })?,
+        threads: aggregate_u32_widened(
+            members
+                .iter()
+                .map(|process| &process.scalar_observations().threads),
+            observed_at_ms,
+        )?,
+        fds: aggregate_u32_widened(
+            members
+                .iter()
+                .map(|process| &process.scalar_observations().fds),
+            observed_at_ms,
+        )?,
+    })
 }
 
 /// The category-first projection carries tree nodes in the same visual row
 /// list as its headers. This resolver lets the keyboard path reuse the same
 /// row model for Left/Right without rebuilding a second tree projection.
 #[must_use]
-pub(crate) fn category_tree_children_at(rows: &[ProcessRow<'_>], index: usize) -> Option<u32> {
+pub(crate) fn category_tree_children_at(
+    rows: &[ProcessRow<'_>],
+    index: usize,
+) -> Option<ProcessLiveKey> {
     match rows.get(index) {
         Some(ProcessRow::TreeNode {
             process,
             has_children: true,
             ..
-        }) => Some(process.pid),
+        }) => ProcessLiveKey::from_process(process),
         _ => None,
     }
 }

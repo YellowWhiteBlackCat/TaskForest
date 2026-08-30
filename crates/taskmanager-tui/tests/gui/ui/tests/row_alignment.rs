@@ -22,7 +22,7 @@ use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage, PlatformEffect};
 use taskmanager_ui_contract::SemanticRole;
 
-use crate::runtime::apply_terminal_event_with_plan;
+use crate::runtime::runtime_support::apply_terminal_event_with_plan;
 use crate::ui::frame_plan::TABLE_DATA_ROW_OFFSET;
 use crate::ui::{TuiFramePlan, TuiHitTarget, render_with_plan};
 
@@ -150,7 +150,7 @@ fn row_identity_needle(app: &crate::TuiApp, page: AppPage, index: usize) -> Stri
 fn expected_semantic_id(app: &crate::TuiApp, index: usize) -> String {
     let rows = app.process_rows_snapshot();
     if let Some(process) = crate::process_view::process_at(&rows, index) {
-        return format!("row:{}", process.pid);
+        return format!("row:{}", taskmanager_shell::process_semantic_key(process));
     }
     let name = crate::process_view::group_name_at(&rows, index)
         .unwrap_or_else(|| panic!("visual row {index} is outside the Applications projection"));

@@ -18,16 +18,16 @@ fn measured_memory() -> MemoryMetrics {
 
 #[test]
 fn summary_tiles_fold_measured_and_missing_memory_states() {
-    let units = crate::gpui_app::formatting::DisplayUnits::default();
+    let units = taskmanager_core::core::units::UnitPreferences::default();
     let tiles = summary_tiles(&measured_memory(), units);
-    assert_eq!(tiles.used, "4.00 GiB");
+    assert_eq!(tiles.used, "4.0 GiB");
     assert_eq!(tiles.used_note, "50%");
-    assert_eq!(tiles.available, "4.00 GiB");
+    assert_eq!(tiles.available, "4.0 GiB");
     assert_eq!(
         tiles.available_note,
-        format!("{} 8.00 GiB", taskmanager_application::i18n::t("mem.of"))
+        format!("{} 8.0 GiB", taskmanager_application::i18n::t("mem.of"))
     );
-    assert_eq!(tiles.swap, "1.00 GiB");
+    assert_eq!(tiles.swap, "1.0 GiB");
     assert_eq!(tiles.swap_note, "50%");
 
     let missing = summary_tiles(&MemoryMetrics::default(), units);
@@ -52,7 +52,7 @@ fn overview_stats_fold_totals_and_swap_presence() {
 
 #[test]
 fn swap_bar_label_composes_zram_and_zswap_annotations() {
-    let units = crate::gpui_app::formatting::DisplayUnits::default();
+    let units = taskmanager_core::core::units::UnitPreferences::default();
     let memory = MemoryMetricsFixtureBuilder::from_item(measured_memory())
         .compressed_swap_used_bytes(512 * MIB)
         .compressed_swap_cache_enabled(true)
@@ -62,17 +62,17 @@ fn swap_bar_label_composes_zram_and_zswap_annotations() {
     assert_eq!(stats.used_share, 0.5);
     assert_eq!(
         stats.label,
-        "Swap  1.00 GiB / 2.00 GiB  (50%)   ·   zram 512 MiB   ·   zswap on"
+        "Swap  1.0 GiB / 2.0 GiB  (50%)   ·   zram 512.0 MiB   ·   zswap on"
     );
 
     let bare = swap_bar_stats(&measured_memory(), units).expect("measured swap renders");
     assert_eq!(bare.used_share, 0.5);
-    assert_eq!(bare.label, "Swap  1.00 GiB / 2.00 GiB  (50%)");
+    assert_eq!(bare.label, "Swap  1.0 GiB / 2.0 GiB  (50%)");
 }
 
 #[test]
 fn swap_bar_label_appends_the_guarded_zram_compression_depth() {
-    let units = crate::gpui_app::formatting::DisplayUnits::default();
+    let units = taskmanager_core::core::units::UnitPreferences::default();
     let memory = MemoryMetricsFixtureBuilder::from_item(measured_memory())
         .compressed_swap_used_bytes(512 * MIB)
         .compressed_swap_original_bytes(3 * GIB)
@@ -86,7 +86,7 @@ fn swap_bar_label_appends_the_guarded_zram_compression_depth() {
     assert_eq!(
         stats.label,
         format!(
-            "Swap  1.00 GiB / 2.00 GiB  (50%)   ·   zram 512 MiB   ·   {} 256 MiB   ·   {} 3.0:1 · {} 3.00 GiB → {} 1.00 GiB",
+            "Swap  1.0 GiB / 2.0 GiB  (50%)   ·   zram 512.0 MiB   ·   {} 256.0 MiB   ·   {} 3.0:1 · {} 3.0 GiB → {} 1.0 GiB",
             taskmanager_application::i18n::t("mem.zram_ram_used"),
             taskmanager_application::i18n::t("mem.compression_ratio"),
             taskmanager_application::i18n::t("mem.compression_original"),
@@ -106,19 +106,19 @@ fn swap_bar_label_appends_the_guarded_zram_compression_depth() {
         swap_bar_stats(&zero, units)
             .expect("measured swap renders")
             .label,
-        "Swap  1.00 GiB / 2.00 GiB  (50%)   ·   zram 512 MiB"
+        "Swap  1.0 GiB / 2.0 GiB  (50%)   ·   zram 512.0 MiB"
     );
 }
 
 #[test]
 fn available_tile_layers_the_zfs_arc_onto_kernel_availability() {
-    let units = crate::gpui_app::formatting::DisplayUnits::default();
+    let units = taskmanager_core::core::units::UnitPreferences::default();
     let memory = MemoryMetricsFixtureBuilder::from_item(measured_memory())
         .zfs_arc_bytes(2 * GIB)
         .build();
 
     let tiles = summary_tiles(&memory, units);
-    assert_eq!(tiles.available, "6.00 GiB");
+    assert_eq!(tiles.available, "6.0 GiB");
     // The kernel fact underneath is untouched.
     assert_eq!(memory.current_available_bytes(), Some(4 * GIB));
 }

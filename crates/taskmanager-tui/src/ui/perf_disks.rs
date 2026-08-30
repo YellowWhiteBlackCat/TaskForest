@@ -65,7 +65,7 @@ pub(super) fn render_disk_section(
     }
     let lines = disk_lines(
         disks,
-        &app,
+        app,
         theme,
         app.prefs.units[2],
         app.prefs.units[3],

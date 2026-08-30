@@ -2,13 +2,13 @@
 //!
 //! Native adapters provide a verified process identity, typed current sample,
 //! and one monotonic timestamp per refresh. This module owns the trailing
-//! window, PID-reuse reset, hard capacity, synchronized projections, and stale
-//! PID pruning.
+//! window, identity replacement, hard capacity, synchronized projections, and
+//! stale identity pruning.
 
 use std::collections::{HashMap, VecDeque};
 use std::time::Duration;
 
-use super::ProcessItem;
+use super::{ProcessItem, ProcessLiveKey};
 
 const PROCESS_HISTORY_WINDOW: Duration = Duration::from_secs(60);
 const PROCESS_HISTORY_MAX_SAMPLES: usize = 121;
@@ -50,11 +50,10 @@ pub struct ProcessHistorySnapshot {
     pub disk_write: Vec<f32>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 struct ProcessHistoryRing {
     samples: VecDeque<TimedProcessHistorySample>,
     last_seen: u64,
-    start_token: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -63,37 +62,7 @@ struct TimedProcessHistorySample {
     observed_at: Duration,
 }
 
-impl Default for ProcessHistoryRing {
-    fn default() -> Self {
-        Self {
-            // Most processes are observed only a handful of times during
-            // startup. Grow lazily instead of reserving 121 samples for
-            // every PID up front; the hard window/capacity remains enforced
-            // by `push` once a process is long-lived.
-            samples: VecDeque::new(),
-            last_seen: 0,
-            start_token: None,
-        }
-    }
-}
-
 impl ProcessHistoryRing {
-    fn note_identity(&mut self, start_token: Option<u64>) {
-        let Some(start_token) = start_token else {
-            self.samples.clear();
-            self.start_token = None;
-            return;
-        };
-        if self.start_token.is_none() && !self.samples.is_empty()
-            || self
-                .start_token
-                .is_some_and(|current| current != start_token)
-        {
-            self.samples.clear();
-        }
-        self.start_token = Some(start_token);
-    }
-
     fn push(&mut self, sample: ProcessHistorySample, tick: u64, observed_at: Duration) {
         while self.samples.front().is_some_and(|oldest| {
             observed_at.saturating_sub(oldest.observed_at) > PROCESS_HISTORY_WINDOW
@@ -115,42 +84,42 @@ impl ProcessHistoryRing {
             cpu: self
                 .samples
                 .iter()
-                .filter_map(|sample| sample.value.cpu)
+                .map(|sample| sample.value.cpu.unwrap_or(f32::NAN))
                 .collect(),
             memory: self
                 .samples
                 .iter()
-                .filter_map(|sample| sample.value.memory)
+                .map(|sample| sample.value.memory.unwrap_or(f32::NAN))
                 .collect(),
             disk: self
                 .samples
                 .iter()
-                .filter_map(|sample| {
+                .map(|sample| {
                     sample
                         .value
                         .disk_read
                         .zip(sample.value.disk_write)
-                        .map(|(read, write)| read + write)
+                        .map_or(f32::NAN, |(read, write)| read + write)
                 })
                 .collect(),
             disk_read: self
                 .samples
                 .iter()
-                .filter_map(|sample| sample.value.disk_read)
+                .map(|sample| sample.value.disk_read.unwrap_or(f32::NAN))
                 .collect(),
             disk_write: self
                 .samples
                 .iter()
-                .filter_map(|sample| sample.value.disk_write)
+                .map(|sample| sample.value.disk_write.unwrap_or(f32::NAN))
                 .collect(),
         }
     }
 }
 
-/// Bounded histories keyed by PID and guarded by provider-native start token.
+/// Bounded histories keyed by the complete provider-issued live identity.
 #[derive(Debug, Clone, Default)]
 pub struct ProcessHistoryStore {
-    rings: HashMap<u32, ProcessHistoryRing>,
+    rings: HashMap<ProcessLiveKey, ProcessHistoryRing>,
     tick: u64,
     observed_at: Duration,
 }
@@ -162,15 +131,15 @@ impl ProcessHistoryStore {
         self.observed_at = observed_at;
     }
 
-    /// Reset on unprovable/replaced identity, then append the current sample.
+    /// Append the current sample under its exact live identity. A PID reuse
+    /// produces a different key and therefore starts a new trajectory without
+    /// any secondary compatibility check.
     pub fn record(
         &mut self,
-        pid: u32,
-        start_token: Option<u64>,
+        identity: ProcessLiveKey,
         sample: ProcessHistorySample,
     ) -> ProcessHistorySnapshot {
-        let ring = self.rings.entry(pid).or_default();
-        ring.note_identity(start_token);
+        let ring = self.rings.entry(identity).or_default();
         ring.push(sample, self.tick, self.observed_at);
         ring.snapshot()
     }
@@ -178,12 +147,11 @@ impl ProcessHistoryStore {
     /// Materialize one retained process history on demand.
     ///
     /// Native adapters normally call [`Self::record`] and immediately receive
-    /// the current projection. This read path exists for the rare inventory
-    /// failure fallback, so the process identity cache does not have to keep a
-    /// second copy of every history vector between refreshes.
+    /// the current projection. This read path is used when a provider must
+    /// materialize a retained row after a refresh failure.
     #[must_use]
-    pub fn snapshot_for(&self, pid: u32) -> ProcessHistorySnapshot {
-        self.rings.get(&pid).map_or_else(
+    pub fn snapshot_for(&self, identity: ProcessLiveKey) -> ProcessHistorySnapshot {
+        self.rings.get(&identity).map_or_else(
             ProcessHistorySnapshot::default,
             ProcessHistoryRing::snapshot,
         )

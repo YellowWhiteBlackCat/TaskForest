@@ -19,8 +19,9 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{PlatformEffect, ResourceRevealRequest, UrlOpenRequest};
-use taskmanager_core::core::process::PriorityTier;
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, PriorityTier, ProcessItem, ProcessLiveKey,
+};
 use taskmanager_shell::presentation::search_url_for;
 use taskmanager_ui_contract::IconId;
 
@@ -32,6 +33,7 @@ use crate::bindings::{ACTION_MENU_HINTS, menu_hint_pairs};
 #[derive(Clone, Debug)]
 pub struct ProcessMenuTarget {
     pub item: ProcessItem,
+    pub identity: ProcessLiveKey,
     pub selection: usize,
 }
 
@@ -113,8 +115,7 @@ pub fn action_label(action: ProcessMenuAction) -> &'static str {
 pub fn resolve_action(target: &ProcessMenuTarget) -> Option<PlatformEffect> {
     match MENU_ACTIONS.get(target.selection).copied() {
         Some(ProcessMenuAction::OpenLocation) => {
-            let identity =
-                taskmanager_core::core::process::FrozenProcessIdentity::from_process(&target.item)?;
+            let identity = FrozenProcessIdentity::from_process(&target.item)?;
             Some(PlatformEffect::RevealResource(ResourceRevealRequest {
                 target: identity,
                 cached_executable: target.item.current_exe_path().map(ToOwned::to_owned),

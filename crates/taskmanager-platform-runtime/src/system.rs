@@ -6,13 +6,15 @@ use crossbeam_channel::Receiver;
 use taskmanager_application::{
     ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsEvent,
     GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryEvent, HardwareInventoryRequest,
-    HostTelemetryRequest, MemoryTelemetryRequest, NetworkTelemetryRequest, NpuInventoryEvent,
-    NpuInventoryRequest, PlatformEvent, StorageTelemetryRequest, SystemTelemetryDomainEvent,
+    HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest, NetworkTelemetryRequest,
+    NpuInventoryEvent, NpuInventoryRequest, PlatformEvent, RaplPowerRequest, SmbiosMemoryRequest,
+    StorageTelemetryRequest, SystemTelemetryDomainEvent,
 };
 use taskmanager_core::{
     ContainerRollup, CpuTelemetryObservation, GpuEngineRowsSnapshot, GpuTelemetryObservation,
-    HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation, NetworkTelemetryObservation,
-    NpuInventorySnapshot, StorageTelemetryObservation,
+    HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation, MsrReadoutSnapshot,
+    NetworkTelemetryObservation, NpuInventorySnapshot, RaplPowerSnapshot, SmbiosMemorySnapshot,
+    StorageTelemetryObservation,
 };
 use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
 
@@ -21,6 +23,8 @@ use crate::health::CapabilityHealth;
 use crate::{
     Queued, RuntimeEventPublisher, WorkerRuntime, WorkerSpawnError, spawn_lazy_observation_lane,
 };
+
+mod snapshot_lanes;
 
 type HostExecutor =
     dyn FnMut(u64) -> Result<HostRuntimeObservation, ProviderFailure> + Send + 'static;
@@ -43,6 +47,11 @@ type GpuEngineRowsExecutor = dyn FnMut(&GpuEngineRowsRequest) -> Result<GpuEngin
     + 'static;
 type NpuInventoryExecutor =
     dyn FnMut(u64) -> Result<NpuInventorySnapshot, ProviderFailure> + Send + 'static;
+type SmbiosMemoryExecutor =
+    dyn FnMut() -> Result<SmbiosMemorySnapshot, ProviderFailure> + Send + 'static;
+type RaplPowerExecutor = dyn FnMut() -> Result<RaplPowerSnapshot, ProviderFailure> + Send + 'static;
+type MsrReadoutExecutor =
+    dyn FnMut() -> Result<MsrReadoutSnapshot, ProviderFailure> + Send + 'static;
 
 /// Six blocking observations that execute on physically independent lanes.
 pub struct SystemObservationExecutors {
@@ -95,6 +104,9 @@ pub struct SystemAuxiliaryExecutors {
     hardware_inventory: Box<HardwareInventoryExecutor>,
     gpu_engine_rows: Option<Box<GpuEngineRowsExecutor>>,
     npu_inventory: Option<Box<NpuInventoryExecutor>>,
+    smbios_memory: Option<Box<SmbiosMemoryExecutor>>,
+    rapl_power: Option<Box<RaplPowerExecutor>>,
+    msr_readout: Option<Box<MsrReadoutExecutor>>,
 }
 
 impl SystemAuxiliaryExecutors {
@@ -109,6 +121,9 @@ impl SystemAuxiliaryExecutors {
             hardware_inventory: Box::new(hardware_inventory),
             gpu_engine_rows: None,
             npu_inventory: None,
+            smbios_memory: None,
+            rapl_power: None,
+            msr_readout: None,
         }
     }
 
@@ -135,6 +150,40 @@ impl SystemAuxiliaryExecutors {
         N: FnMut(u64) -> Result<NpuInventorySnapshot, ProviderFailure> + Send + 'static,
     {
         self.npu_inventory = Some(Box::new(npu_inventory));
+        self
+    }
+
+    /// Attach the optional SMBIOS memory-inventory executor (mirrors the
+    /// optional binding; absence means the capability is honestly
+    /// unavailable).
+    #[must_use]
+    pub fn with_smbios_memory<S>(mut self, smbios_memory: S) -> Self
+    where
+        S: FnMut() -> Result<SmbiosMemorySnapshot, ProviderFailure> + Send + 'static,
+    {
+        self.smbios_memory = Some(Box::new(smbios_memory));
+        self
+    }
+
+    /// Attach the optional CPU package-power executor (mirrors the optional
+    /// binding; absence means the capability is honestly unavailable).
+    #[must_use]
+    pub fn with_rapl_power<R>(mut self, rapl_power: R) -> Self
+    where
+        R: FnMut() -> Result<RaplPowerSnapshot, ProviderFailure> + Send + 'static,
+    {
+        self.rapl_power = Some(Box::new(rapl_power));
+        self
+    }
+
+    /// Attach the optional CPU MSR-readout executor (mirrors the optional
+    /// binding; absence means the capability is honestly unavailable).
+    #[must_use]
+    pub fn with_msr_readout<M>(mut self, msr_readout: M) -> Self
+    where
+        M: FnMut() -> Result<MsrReadoutSnapshot, ProviderFailure> + Send + 'static,
+    {
+        self.msr_readout = Some(Box::new(msr_readout));
         self
     }
 }
@@ -196,6 +245,9 @@ pub struct PendingSystemAuxiliaryLanes {
     pub hardware_inventory_rx: Option<Receiver<Queued<HardwareInventoryRequest>>>,
     pub gpu_engine_rows_rx: Option<Receiver<Queued<GpuEngineRowsRequest>>>,
     pub npu_inventory_rx: Option<Receiver<Queued<NpuInventoryRequest>>>,
+    pub smbios_memory_rx: Option<Receiver<Queued<SmbiosMemoryRequest>>>,
+    pub rapl_power_rx: Option<Receiver<Queued<RaplPowerRequest>>>,
+    pub msr_readout_rx: Option<Receiver<Queued<MsrReadoutRequest>>>,
 }
 
 impl PendingSystemAuxiliaryLanes {
@@ -204,11 +256,17 @@ impl PendingSystemAuxiliaryLanes {
         hardware_inventory_rx: Option<Receiver<Queued<HardwareInventoryRequest>>>,
         gpu_engine_rows_rx: Option<Receiver<Queued<GpuEngineRowsRequest>>>,
         npu_inventory_rx: Option<Receiver<Queued<NpuInventoryRequest>>>,
+        smbios_memory_rx: Option<Receiver<Queued<SmbiosMemoryRequest>>>,
+        rapl_power_rx: Option<Receiver<Queued<RaplPowerRequest>>>,
+        msr_readout_rx: Option<Receiver<Queued<MsrReadoutRequest>>>,
     ) -> Self {
         Self {
             hardware_inventory_rx,
             gpu_engine_rows_rx,
             npu_inventory_rx,
+            smbios_memory_rx,
+            rapl_power_rx,
+            msr_readout_rx,
         }
     }
 }
@@ -291,6 +349,9 @@ impl PendingSystemRuntimeLanes {
                     hardware_inventory_rx: Some(hardware_inventory),
                     gpu_engine_rows_rx,
                     npu_inventory_rx,
+                    smbios_memory_rx,
+                    rapl_power_rx,
+                    msr_readout_rx,
                 },
         } = self
         else {
@@ -310,6 +371,9 @@ impl PendingSystemRuntimeLanes {
                 hardware_inventory,
                 gpu_engine_rows: gpu_engine_rows_rx,
                 npu_inventory: npu_inventory_rx,
+                smbios_memory: smbios_memory_rx,
+                rapl_power: rapl_power_rx,
+                msr_readout: msr_readout_rx,
             },
         })
     }
@@ -334,6 +398,9 @@ struct SystemAuxiliaryLanes {
     hardware_inventory: Receiver<Queued<HardwareInventoryRequest>>,
     gpu_engine_rows: Option<Receiver<Queued<GpuEngineRowsRequest>>>,
     npu_inventory: Option<Receiver<Queued<NpuInventoryRequest>>>,
+    smbios_memory: Option<Receiver<Queued<SmbiosMemoryRequest>>>,
+    rapl_power: Option<Receiver<Queued<RaplPowerRequest>>>,
+    msr_readout: Option<Receiver<Queued<MsrReadoutRequest>>>,
 }
 
 /// Attach every system operation to its own typed worker.
@@ -360,6 +427,9 @@ pub fn spawn_system_lanes(
                 hardware_inventory,
                 gpu_engine_rows,
                 npu_inventory,
+                smbios_memory,
+                rapl_power,
+                msr_readout,
             },
     } = lanes;
     let SystemExecutors {
@@ -378,6 +448,9 @@ pub fn spawn_system_lanes(
                 hardware_inventory: mut execute_hardware_inventory,
                 gpu_engine_rows: execute_gpu_engine_rows,
                 npu_inventory: execute_npu_inventory,
+                smbios_memory: execute_smbios_memory,
+                rapl_power: execute_rapl_power,
+                msr_readout: execute_msr_readout,
             },
     } = executors;
 
@@ -477,6 +550,15 @@ pub fn spawn_system_lanes(
     }
     if let (Some(receiver), Some(execute)) = (npu_inventory, execute_npu_inventory) {
         spawn_npu_inventory_lane(workers, receiver, events.clone(), execute, clock_ms)?;
+    }
+    if let (Some(receiver), Some(execute)) = (smbios_memory, execute_smbios_memory) {
+        snapshot_lanes::spawn_smbios_memory_lane(workers, receiver, events.clone(), execute)?;
+    }
+    if let (Some(receiver), Some(execute)) = (rapl_power, execute_rapl_power) {
+        snapshot_lanes::spawn_rapl_power_lane(workers, receiver, events.clone(), execute)?;
+    }
+    if let (Some(receiver), Some(execute)) = (msr_readout, execute_msr_readout) {
+        snapshot_lanes::spawn_msr_readout_lane(workers, receiver, events.clone(), execute)?;
     }
     spawn_lazy_observation_lane(
         workers,

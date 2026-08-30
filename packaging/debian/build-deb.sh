@@ -26,7 +26,7 @@ output=$3
 deb_arch=${4:-amd64}
 
 # Debian sorts a plain revision above the no-revision upstream version, so a
-# Cargo prerelease like 0.1.0-rc.1 becomes 0.1.0~rc.1 — below the final
+# Cargo prerelease like 0.1.0-rc5 becomes 0.1.0~rc5 — below the final
 # release, matching the rpm conversion in build-rpm.sh. The replacement is
 # quoted: an unquoted bare '~' inside ${//} expands to $HOME.
 deb_version=${version//'-'/'~'}

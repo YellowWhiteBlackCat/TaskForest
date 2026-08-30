@@ -259,6 +259,56 @@ fn standard_registry_contains_generic_and_all_compiled_enhancement_providers() {
     assert!(ids.iter().any(|id| id == &NVML_PROVIDER_ID));
 }
 
+/// A module-declared driver version is a DRM identity fact: the authoritative
+/// DRM provider owns both the value and its provenance receipt, so the merged
+/// row credits `linux.gpu.drm-sysfs` for `DriverVersion` exactly as it does
+/// for the driver name.
+#[cfg(unix)]
+#[test]
+fn drm_provider_owns_module_declared_driver_version() {
+    let base = crate::test_support::repo_temp_dir().join(format!(
+        "tm_gpu_provider_modver_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos()
+    ));
+    let root = base.join("drm");
+    let module_root = base.join("module");
+    let device = root.join("card0").join("device");
+    let module_dir = module_root.join("nvidia");
+    std::fs::create_dir_all(&module_dir).expect("fixture module directory");
+    std::fs::create_dir_all(&device).expect("fixture device directory");
+    std::fs::write(device.join("vendor"), "0x10de\n").expect("vendor node");
+    std::fs::write(device.join("uevent"), "PCI_SLOT_NAME=0000:01:00.0\n").expect("slot node");
+    std::fs::write(module_dir.join("version"), "550.90.07\n").expect("module version node");
+    // The `driver` symlink's basename names the kernel driver.
+    std::os::unix::fs::symlink(&module_dir, device.join("driver")).expect("driver symlink");
+
+    let mut registry = GpuProviderRegistry {
+        entries: Vec::new(),
+        scalar_tracker: Default::default(),
+    };
+    registry.register(DrmSysfsGpuProvider::new(root, module_root));
+
+    let snapshot = registry.collect(Instant::now(), 10);
+    assert_eq!(snapshot.metrics.len(), 1);
+    let metric = &snapshot.metrics[0];
+    assert_eq!(metric.driver.as_deref(), Some("nvidia"));
+    assert_eq!(metric.driver_version.as_deref(), Some("550.90.07"));
+    assert_eq!(
+        metric
+            .provenance
+            .iter()
+            .find(|item| item.field == GpuMetricField::DriverVersion)
+            .map(|item| item.provider.as_str()),
+        Some(DRM_PROVIDER_ID.as_str())
+    );
+
+    std::fs::remove_dir_all(&base).ok();
+}
+
 #[test]
 fn amd_runtime_nodes_enrich_generic_drm_identity_with_field_provenance() {
     let root = crate::test_support::repo_temp_dir().join(format!(
@@ -301,7 +351,10 @@ fn amd_runtime_nodes_enrich_generic_drm_identity_with_field_provenance() {
         entries: Vec::new(),
         scalar_tracker: Default::default(),
     };
-    registry.register(DrmSysfsGpuProvider::new(root.clone()));
+    registry.register(DrmSysfsGpuProvider::new(
+        root.clone(),
+        root.join("absent_module_root"),
+    ));
     registry.register(AmdSysfsGpuProvider::new(root.clone()));
 
     let snapshot = registry.collect(Instant::now(), 500);
@@ -451,7 +504,10 @@ fn amd_partial_field_failures_are_exact_and_successful_siblings_remain_current()
         entries: Vec::new(),
         scalar_tracker: Default::default(),
     };
-    registry.register(DrmSysfsGpuProvider::new(root.clone()));
+    registry.register(DrmSysfsGpuProvider::new(
+        root.clone(),
+        root.join("absent_module_root"),
+    ));
     registry.register(AmdSysfsGpuProvider::new(root.clone()));
     let snapshot = registry.collect(Instant::now(), 600);
     let metric = &snapshot.metrics[0];
@@ -578,7 +634,10 @@ fn amd_field_failure_retains_only_its_prior_value_and_then_recovers() {
         entries: Vec::new(),
         scalar_tracker: Default::default(),
     };
-    registry.register(DrmSysfsGpuProvider::new(root.clone()));
+    registry.register(DrmSysfsGpuProvider::new(
+        root.clone(),
+        root.join("absent_module_root"),
+    ));
     registry.register(AmdSysfsGpuProvider::new(root.clone()));
     let started_at = Instant::now();
 
@@ -642,8 +701,14 @@ fn intel_runtime_provider_owns_frequency_and_rc6_not_drm_inventory() {
         entries: Vec::new(),
         scalar_tracker: Default::default(),
     };
-    registry.register(DrmSysfsGpuProvider::new(root.clone()));
-    registry.register(IntelSysfsGpuProvider::new(root.clone()));
+    registry.register(DrmSysfsGpuProvider::new(
+        root.clone(),
+        root.join("absent_module_root"),
+    ));
+    registry.register(IntelSysfsGpuProvider::new(
+        root.clone(),
+        root.join("absent_module_root"),
+    ));
     let started_at = Instant::now();
 
     let first = registry.collect(started_at, 100);

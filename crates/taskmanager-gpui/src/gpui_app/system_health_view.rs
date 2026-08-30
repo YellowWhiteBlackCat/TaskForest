@@ -3,17 +3,13 @@
 //! This module consumes typed snapshots and emits typed confirmation requests.
 //! It performs no collection, filesystem access, or SMART command execution.
 
-use gpui::{
-    AnyElement, App, Div, InteractiveElement, IntoElement, ParentElement, ScrollHandle, Stateful,
-    Styled, Window, div, px, relative,
-};
+use gpui::{App, Div, ParentElement, ScrollHandle, Stateful, Styled, Window, div, px, relative};
 use std::rc::Rc;
 use taskmanager_application::SourceStateKind;
 
-use crate::gpui_app::elements;
-use crate::gpui_app::formatting;
 use crate::gpui_app::root::responsive::{SystemPageBudget, SystemSurfacePresentation};
-use taskmanager_core::core::metrics::{DiskMetrics, SmartAvailability};
+use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_core::core::{
     DeviceGeneration, DeviceId, DeviceState, DeviceStatus, FilesystemHealth,
     FilesystemHealthSnapshot, FilesystemHealthStatus, SensorCenterSnapshot, SensorQuantity,
@@ -29,7 +25,9 @@ mod capture;
 pub use capture::{SystemHealthCaptureFixture, capture_english_text, capture_fixture};
 mod localized;
 pub use localized::localized_text;
+mod self_test;
 mod stats;
+use self_test::self_test_card;
 use stats::{filesystem_capacity, sensor_value_vm};
 use taskmanager_theme::Theme;
 
@@ -115,7 +113,7 @@ impl SystemHealthCallbacks {
     }
 }
 
-fn state_color(theme: &Theme, status: DeviceStatus) -> Color {
+pub(crate) fn state_color(theme: &Theme, status: DeviceStatus) -> Color {
     source_state_color(theme, SourceStateKind::from_device_status(status))
 }
 
@@ -140,7 +138,7 @@ fn filesystem_color(theme: &Theme, status: FilesystemHealthStatus) -> Color {
     }
 }
 
-fn badge(theme: &Theme, label: String, color: Color) -> Div {
+pub(crate) fn badge(theme: &Theme, label: String, color: Color) -> Div {
     div()
         .px(tokens::SPACE_7)
         .py(tokens::SPACE_3)
@@ -151,7 +149,7 @@ fn badge(theme: &Theme, label: String, color: Color) -> Div {
         .child(label)
 }
 
-fn metric(theme: &Theme, label: String, value: String) -> Div {
+pub(crate) fn metric(theme: &Theme, label: String, value: String) -> Div {
     div()
         .flex_1()
         .min_w(px(118.0))
@@ -170,8 +168,8 @@ fn metric(theme: &Theme, label: String, value: String) -> Div {
         )
 }
 
-fn format_bytes(bytes: u64) -> String {
-    formatting::format_gib_mib(bytes)
+fn format_bytes(units: UnitPreferences, bytes: u64) -> String {
+    units.format_quantity(bytes, QuantityFamily::Drive, false)
 }
 
 fn filesystem_row(
@@ -179,6 +177,7 @@ fn filesystem_row(
     filesystem: &FilesystemHealth,
     disk: Option<&DiskMetrics>,
     copy: &dyn Fn(SystemHealthText) -> String,
+    units: UnitPreferences,
 ) -> Div {
     let unavailable = || copy(SystemHealthText::Unavailable);
     let source = filesystem
@@ -199,7 +198,7 @@ fn filesystem_row(
         .map(|(used_pct, available)| {
             format!(
                 "{used_pct:.1}% · {} {}",
-                format_bytes(available),
+                format_bytes(units, available),
                 copy(SystemHealthText::Free)
             )
         })
@@ -256,196 +255,29 @@ fn filesystem_row(
         )
 }
 
-fn disabled_action(theme: &Theme, label: String, id: &'static str) -> Stateful<Div> {
-    div()
-        .id(id)
-        .px(tokens::SPACE_10)
-        .py(tokens::SPACE_6)
-        .rounded(tokens::control_radius(theme))
-        .border_1()
-        .border_color(theme.border)
-        .text_size(tokens::FONT_12)
-        .text_color(theme.fg_dim)
-        .child(label)
-}
-
-fn self_test_action(
-    theme: &Theme,
-    label: String,
-    id: &'static str,
-    kind: SmartSelfTestKind,
-    disk: Option<&DiskMetrics>,
-    enabled: bool,
-    callbacks: &SystemHealthCallbacks,
-) -> AnyElement {
-    let Some(disk) = disk.filter(|_| enabled) else {
-        return disabled_action(theme, label, id).into_any_element();
-    };
-    let request = SmartSelfTestConfirmationRequest {
-        device_id: DeviceId::new(disk.device_id.clone()),
-        device_generation: disk.device_generation,
-        disk_name: disk.name.clone(),
-        disk_label: if disk.model.is_empty() {
-            disk.name.clone()
-        } else {
-            disk.model.clone()
-        },
-        kind,
-    };
-    let callback = callbacks.request_confirmation.clone();
-    elements::pill(
-        theme,
-        id,
-        &label,
-        false,
-        false,
-        move |window, cx| callback(request.clone(), window, cx),
-        |_, _, _| {},
-    )
-    .into_any_element()
-}
-
-fn self_test_card(
-    theme: &Theme,
-    disk: Option<&DiskMetrics>,
-    report: Option<&SmartSelfTestReport>,
-    copy: &dyn Fn(SystemHealthText) -> String,
-    callbacks: &SystemHealthCallbacks,
-) -> Div {
-    let phase = report
-        .map(|report| copy(SystemHealthText::SmartPhase(report.phase)))
-        .unwrap_or_else(|| copy(SystemHealthText::Unavailable));
-    let state = report.map_or(DeviceStatus::Unsupported, |report| report.state.status);
-    let can_request = disk
-        .is_some_and(|disk| disk.smart_availability == SmartAvailability::Available)
-        && report.is_none_or(|report| report.phase != SmartSelfTestPhase::Running);
-    let mut details = div()
-        .mt(tokens::SPACE_7)
-        .flex()
-        .flex_row()
-        .flex_wrap()
-        .gap(tokens::SPACE_8);
-    if let Some(report) = report {
-        details = details
-            .child(metric(theme, copy(SystemHealthText::Status), phase))
-            .child(metric(
-                theme,
-                copy(SystemHealthText::Progress),
-                report
-                    .progress_pct
-                    .map(|progress| format!("{progress:.0}%"))
-                    .unwrap_or_else(|| copy(SystemHealthText::Unavailable)),
-            ))
-            .child(metric(
-                theme,
-                copy(SystemHealthText::LifetimeHours),
-                report
-                    .lifetime_hours
-                    .map(|hours| hours.to_string())
-                    .unwrap_or_else(|| copy(SystemHealthText::Unavailable)),
-            ))
-            .child(metric(
-                theme,
-                copy(SystemHealthText::FirstErrorLba),
-                report
-                    .first_error_lba
-                    .map(|lba| lba.to_string())
-                    .unwrap_or_else(|| copy(SystemHealthText::Unavailable)),
-            ));
-        if let Some(kind) = report.kind {
-            details = details.child(metric(
-                theme,
-                copy(SystemHealthText::SmartSelfTest),
-                copy(SystemHealthText::SmartKind(kind)),
-            ));
-        }
-        if let Some(failure) = report.failure {
-            details = details.child(metric(
-                theme,
-                copy(SystemHealthText::Errors),
-                copy(SystemHealthText::SmartFailure(failure)),
-            ));
-        }
-    } else {
-        details = details.child(metric(theme, copy(SystemHealthText::Status), phase));
-    }
-    div()
-        .mt(tokens::SPACE_9)
-        .p(tokens::SPACE_9)
-        .rounded(tokens::control_radius(theme))
-        .border_1()
-        .border_color(theme.border)
-        .bg(theme.sidebar_card_bg)
-        .child(
-            div()
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .items_center()
-                .justify_between()
-                .gap(tokens::SPACE_6)
-                .child(
-                    div()
-                        .font_weight(tokens::FONT_WEIGHT_HEADER.into())
-                        .child(copy(SystemHealthText::SmartSelfTest)),
-                )
-                .child(badge(
-                    theme,
-                    copy(SystemHealthText::DeviceStatus(state)),
-                    state_color(theme, state),
-                )),
-        )
-        .child(details)
-        .child(
-            div()
-                .mt(tokens::SPACE_8)
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
-                .child(copy(SystemHealthText::ConfirmationRequired)),
-        )
-        .child(
-            div()
-                .mt(tokens::SPACE_6)
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .gap(tokens::SPACE_6)
-                .child(self_test_action(
-                    theme,
-                    copy(SystemHealthText::ShortTest),
-                    "health-short-test",
-                    SmartSelfTestKind::Short,
-                    disk,
-                    can_request,
-                    callbacks,
-                ))
-                .child(self_test_action(
-                    theme,
-                    copy(SystemHealthText::ExtendedTest),
-                    "health-extended-test",
-                    SmartSelfTestKind::Extended,
-                    disk,
-                    can_request,
-                    callbacks,
-                )),
-        )
+/// Storage-section data bundle: the health snapshot with its optional
+/// selected-disk pair, grouped so the builder stays under the argument
+/// ratchet once unit preferences joined the parameter list.
+struct StorageSectionData<'a> {
+    filesystems: &'a FilesystemHealthSnapshot,
+    disk: Option<&'a DiskMetrics>,
+    report: Option<&'a SmartSelfTestReport>,
 }
 
 fn storage_section(
     theme: &Theme,
-    snapshot: &FilesystemHealthSnapshot,
-    disk: Option<&DiskMetrics>,
-    report: Option<&SmartSelfTestReport>,
+    data: StorageSectionData<'_>,
     layout: SystemPageBudget,
     copy: &dyn Fn(SystemHealthText) -> String,
     callbacks: &SystemHealthCallbacks,
+    units: UnitPreferences,
 ) -> Div {
     let mut rows = div()
         .mt(tokens::SPACE_8)
         .flex()
         .flex_col()
         .gap(tokens::SPACE_7);
-    if snapshot.filesystems.is_empty() {
+    if data.filesystems.filesystems.is_empty() {
         rows = rows.child(
             div()
                 .py(tokens::SPACE_14)
@@ -453,16 +285,22 @@ fn storage_section(
                 .child(copy(SystemHealthText::NoFilesystems)),
         );
     } else {
-        for filesystem in &snapshot.filesystems {
-            rows = rows.child(filesystem_row(theme, filesystem, disk, copy));
+        for filesystem in &data.filesystems.filesystems {
+            rows = rows.child(filesystem_row(theme, filesystem, data.disk, copy, units));
         }
     }
     section_shell(
         theme,
         copy(SystemHealthText::StorageHealth),
-        snapshot.state,
+        data.filesystems.state,
         layout,
-        rows.child(self_test_card(theme, disk, report, copy, callbacks)),
+        rows.child(self_test_card(
+            theme,
+            data.disk,
+            data.report,
+            copy,
+            callbacks,
+        )),
         copy,
     )
 }
@@ -635,6 +473,8 @@ pub struct SystemHealthViewProps<'a> {
     pub layout: SystemPageBudget,
     pub copy: &'a dyn Fn(SystemHealthText) -> String,
     pub callbacks: &'a SystemHealthCallbacks,
+    /// Presentation unit preferences for the capacity readouts.
+    pub units: UnitPreferences,
 }
 
 pub fn render_system_health(props: SystemHealthViewProps<'_>) -> Stateful<Div> {
@@ -648,6 +488,7 @@ pub fn render_system_health(props: SystemHealthViewProps<'_>) -> Stateful<Div> {
         layout,
         copy,
         callbacks,
+        units,
     } = props;
     scroll_region_with_rail(
         "system-health-scroll",
@@ -668,12 +509,15 @@ pub fn render_system_health(props: SystemHealthViewProps<'_>) -> Stateful<Div> {
             .gap(tokens::SPACE_10)
             .child(storage_section(
                 theme,
-                filesystems,
-                selected_disk,
-                smart_report,
+                StorageSectionData {
+                    filesystems,
+                    disk: selected_disk,
+                    report: smart_report,
+                },
                 layout,
                 copy,
                 callbacks,
+                units,
             ))
             .child(sensor_section(theme, sensors, layout, copy)),
     )

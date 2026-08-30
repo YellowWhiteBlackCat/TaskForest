@@ -1,3 +1,4 @@
+use super::help_support::render_help_overlay;
 use super::*;
 use crate::demo_app;
 use ratatui::Terminal;

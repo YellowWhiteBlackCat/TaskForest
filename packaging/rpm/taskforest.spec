@@ -45,19 +45,25 @@ tar -xf %{SOURCE0} -C %{buildroot}
 %files
 /usr/bin/taskmanager
 /usr/bin/taskforest-g
-/usr/libexec/taskmanager-setup-helper
-/usr/libexec/taskmanager-privilege-helper
-/usr/libexec/taskmanager-net-launcher
-/usr/lib/taskforest-process-control-helper
+/usr/libexec/taskforest-setup-helper
+/usr/libexec/taskforest-privilege-helper
+/usr/libexec/taskforest-net-launcher
+/usr/libexec/taskforest-process-control-helper
+/usr/libexec/taskforest-smbios-helper
+/usr/libexec/taskforest-rapl-helper
+/usr/libexec/taskforest-msr-helper
 /usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestG.desktop
 /usr/share/metainfo/io.github.YellowWhiteBlackCat.TaskForestG.metainfo.xml
 /usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg
-%dir /usr/share/taskmanager
-%dir /usr/share/taskmanager/setup
-/usr/share/taskmanager/setup/99-taskmanager.rules
-/usr/share/polkit-1/actions/com.taskforest.perf-helper.policy
-/usr/share/polkit-1/actions/com.taskforest.net-launcher.policy
-/usr/share/polkit-1/actions/com.taskforest.process-control.policy
+%dir /usr/share/taskforest
+%dir /usr/share/taskforest/setup
+/usr/share/taskforest/setup/99-taskforest.rules
+/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy
+/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy
+/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy
+/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy
+/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy
+/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy
 /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.setup.policy
 %dir /usr/share/licenses/taskforest
 /usr/share/licenses/taskforest/LICENSE

@@ -8,11 +8,17 @@ Per-feature privilege-escalation seam with the unprivileged default policy.
 
 The crate owns capability requests, authorization state, exact installed-helper
 readiness and the fixed Linux polkit/pkexec crossings. It does not grant blanket
-privilege or execute provider I/O. The Windows UAC transport seam (ADR-035)
-owns the typed transport-fact vocabulary, the pure fact→outcome mapping, and
-the install-fact readiness probe; the `runas` crossing itself stays unwired
-(typed `Unsupported`) until ADR-035 stage 2. macOS authorization remains typed
-unsupported/unwired.
+privilege or execute provider I/O. The Windows UAC transport seam (ADR-035
+stage 2) owns the typed transport-fact vocabulary, the pure fact→outcome
+mapping, the install-fact readiness probe, and the pure launch layer (helper
+command-line builder + one-shot reply-channel naming); the runas call group
+lives in the audited `taskmanager-windows-api` boundary and the production
+driver in `taskmanager-platform-windows`, both feeding this mapping — the
+crossing is compile-verified for `x86_64-pc-windows-msvc` but not yet packaged
+or on-box receipted. macOS authorization is typed in the `authorization` module
+(transport facts, pure mappings, install probe; `aarch64-apple-darwin`
+cross-check passes for this crate); the Security-framework crossing itself
+stays unwired (`Unsupported`) until a signed privileged-helper ADR exists.
 
 ## Contract and verification
 

@@ -37,6 +37,7 @@ pub(super) const INTEL_SYSFS_PROVIDER_ID: ProviderId =
 /// Runtime Intel enrichment shared by i915 and xe; DRM remains authoritative.
 pub(super) struct IntelSysfsGpuProvider {
     root: PathBuf,
+    module_root: PathBuf,
     rc6: IntelRc6Tracker,
     #[cfg(target_os = "linux")]
     engines: IntelEngineTracker,
@@ -45,9 +46,10 @@ pub(super) struct IntelSysfsGpuProvider {
 }
 
 impl IntelSysfsGpuProvider {
-    pub(super) fn new(root: PathBuf) -> Self {
+    pub(super) fn new(root: PathBuf, module_root: PathBuf) -> Self {
         Self {
             root,
+            module_root,
             rc6: IntelRc6Tracker::default(),
             #[cfg(target_os = "linux")]
             engines: IntelEngineTracker::default(),
@@ -72,7 +74,8 @@ impl GpuTelemetryProvider for IntelSysfsGpuProvider {
         let mut samples = Vec::new();
 
         for (card_name, device_path) in scan_drm_cards(&self.root) {
-            let mut metrics = build_drm_identity_metrics(&card_name, &device_path);
+            let mut metrics =
+                build_drm_identity_metrics(&card_name, &device_path, &self.module_root);
             let is_intel = metrics.brand.starts_with("Intel")
                 || matches!(metrics.driver.as_deref(), Some("i915" | "xe"));
             if !is_intel {

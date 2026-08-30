@@ -106,3 +106,40 @@ fn u64_aggregation_saturates() {
 
     assert_eq!(aggregate.current_value(), Some(&u64::MAX));
 }
+
+#[test]
+fn widened_u32_aggregation_keeps_member_availability() {
+    let values = [
+        ScalarObservation::available(7_u32, 1),
+        ScalarObservation::unavailable(FailureKind::PermissionDenied),
+    ];
+    let aggregate = aggregate_u32_widened(values.iter(), 2).expect("members produce an aggregate");
+
+    assert_eq!(aggregate.member_count(), 2);
+    assert_eq!(aggregate.current_member_count(), 1);
+    assert_eq!(
+        aggregate.availability(),
+        ScalarAvailability::Partial(FailureKind::PermissionDenied)
+    );
+    assert_eq!(aggregate.current_value(), Some(&7));
+}
+
+#[test]
+fn widened_u32_aggregation_saturates_and_preserves_staleness() {
+    let saturating = [
+        ScalarObservation::available(u32::MAX, 1),
+        ScalarObservation::available(1, 1),
+    ];
+    let aggregate =
+        aggregate_u32_widened(saturating.iter(), 2).expect("members produce an aggregate");
+    assert_eq!(aggregate.current_value(), Some(&(u32::MAX as u64 + 1)));
+
+    let stale = [ScalarObservation::<u32>::stale(3, 1, FailureKind::TimedOut)];
+    let aggregate = aggregate_u32_widened(stale.iter(), 2).expect("member produces an aggregate");
+    assert_eq!(aggregate.current_value(), None);
+    assert_eq!(aggregate.last_known_value(), Some(&3));
+    assert!(matches!(
+        aggregate.availability(),
+        ScalarAvailability::Stale(_)
+    ));
+}

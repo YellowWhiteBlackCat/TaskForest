@@ -53,7 +53,7 @@ pub(super) fn render_battery_section(
         super::render_empty_panel(frame, theme, area, t("common.battery"), t("battery.empty"));
         return;
     }
-    let lines = battery_lines(&supplies.batteries, &app, theme, app.prefs.graph_points);
+    let lines = battery_lines(&supplies.batteries, app, theme, app.prefs.graph_points);
     frame.render_widget(
         Paragraph::new(lines)
             .block(super::panel(t("common.battery"), theme))

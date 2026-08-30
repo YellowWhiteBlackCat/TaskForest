@@ -6,12 +6,13 @@
 //! of GPUI's `complete_process_control` (root/process_control.rs:173-209): a
 //! latest-wins correlation between the envelope request id the platform
 //! client allocated at submission and the frozen target, fail-closed
-//! acceptance of completions (both the request id AND the pid must echo),
+//! acceptance of completions (both the request id AND the complete live row
+//! identity must echo),
 //! one typed completion emitted to the batch fold, and the post-completion
 //! process-list refresh request GPUI issues.
 use super::SystemProjectionStore;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessSignal};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey, ProcessSignal};
 use taskmanager_core::core::process_telemetry::ResourceGroupLimitRequest;
 use taskmanager_platform_contract::{CapabilityId, OperationFailure, RequestId};
 
@@ -55,9 +56,9 @@ pub(crate) struct PendingProcessControl {
 /// Latest-wins correlation for process-control completions, keyed by the
 /// platform envelope request id echoed in `CorrelatedProcessEvent`.
 /// Acceptance is fail-closed like GPUI's `take_matching_process_control`:
-/// a completion must echo BOTH the request id and the target pid, so a
-/// malformed, stale, or mismatched outcome can never consume an unrelated
-/// pending submission.
+/// a completion must echo BOTH the request id and the target's complete live
+/// row identity, so a malformed, stale, or PID-reuse outcome can never consume
+/// an unrelated pending submission.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct LatestProcessControlRequest {
     pending: Option<PendingProcessControl>,
@@ -77,15 +78,17 @@ impl LatestProcessControlRequest {
         });
     }
 
-    /// Accept only a completion echoing the pending request id AND pid;
-    /// removes and returns the pending submission.
+    /// Accept only a completion echoing the pending request id AND the exact
+    /// live row identity (PID plus provider start token); removes and returns
+    /// the pending submission.
     pub(crate) fn accept(
         &mut self,
         request_id: RequestId,
-        completed_pid: u32,
+        completed_target: &FrozenProcessIdentity,
     ) -> Option<PendingProcessControl> {
         if !self.pending.as_ref().is_some_and(|pending| {
-            pending.request_id == request_id && pending.target.pid == completed_pid
+            pending.request_id == request_id
+                && same_live_identity(&pending.target, completed_target)
         }) {
             return None;
         }
@@ -105,6 +108,22 @@ impl LatestProcessControlRequest {
         }
         None
     }
+}
+
+fn same_live_identity(left: &FrozenProcessIdentity, right: &FrozenProcessIdentity) -> bool {
+    let Some(left_token) = left.authoritative_start_token() else {
+        return false;
+    };
+    let Some(right_token) = right.authoritative_start_token() else {
+        return false;
+    };
+    let Some(left) = ProcessLiveKey::from_parts(left.pid, left_token) else {
+        return false;
+    };
+    let Some(right) = ProcessLiveKey::from_parts(right.pid, right_token) else {
+        return false;
+    };
+    left == right
 }
 
 impl SystemProjectionStore {
@@ -135,8 +154,9 @@ impl SystemProjectionStore {
         request_id: RequestId,
         target: FrozenProcessIdentity,
     ) -> Option<ProcessControlFeedback> {
-        let Some(pending) = self.process_control_requests.accept(request_id, target.pid) else {
-            // Unknown / superseded / mismatched-pid outcome: change nothing.
+        let Some(pending) = self.process_control_requests.accept(request_id, &target) else {
+            // Unknown / superseded / mismatched live identity outcome: change
+            // nothing.
             return None;
         };
         let feedback = ProcessControlFeedback {

@@ -1,3 +1,4 @@
+use super::about_support::render_about_overlay;
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;

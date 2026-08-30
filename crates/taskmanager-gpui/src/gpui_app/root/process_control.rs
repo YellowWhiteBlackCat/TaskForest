@@ -7,7 +7,7 @@ use taskmanager_application::{
     ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
 };
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_platform_contract::{SubmissionError, SubmissionErrorKind};
 
 use taskmanager_shell::ProcessControlKind;
@@ -28,13 +28,13 @@ impl RootView {
     pub fn record_process_control_result(
         &mut self,
         action: ProcessControlAction,
-        pid: u32,
+        identity: ProcessLiveKey,
         result: Result<(), FailureKind>,
         cx: &mut Context<Self>,
     ) {
         let succeeded = result.is_ok();
         self.report_process_control_notice(
-            process_control_feedback(action, pid, result),
+            process_control_feedback(action, identity.pid(), result),
             succeeded,
         );
         cx.notify();
@@ -59,10 +59,10 @@ impl RootView {
         );
     }
 
-    pub(crate) fn frozen_process(&self, pid: u32) -> Option<FrozenProcessIdentity> {
+    pub(crate) fn frozen_process(&self, identity: ProcessLiveKey) -> Option<FrozenProcessIdentity> {
         self.processes()
             .iter()
-            .find(|process| process.pid == pid)
+            .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
             .and_then(FrozenProcessIdentity::from_process)
     }
 
@@ -70,7 +70,7 @@ impl RootView {
         &mut self,
         request: ProcessControlRequest,
         action: ProcessControlAction,
-        pid: u32,
+        identity: ProcessLiveKey,
         cx: &mut Context<Self>,
     ) -> bool {
         let result = self.platform.as_mut().map_or_else(
@@ -118,14 +118,18 @@ impl RootView {
                 true
             }
             Err(kind) => {
-                self.record_process_control_result(action, pid, Err(kind), cx);
+                self.record_process_control_result(action, identity, Err(kind), cx);
                 false
             }
         }
     }
 
-    pub(crate) fn request_process_affinity(&mut self, pid: u32, cx: &mut Context<Self>) -> bool {
-        let Some(target) = self.frozen_process(pid) else {
+    pub(crate) fn request_process_affinity(
+        &mut self,
+        identity: ProcessLiveKey,
+        cx: &mut Context<Self>,
+    ) -> bool {
+        let Some(target) = self.frozen_process(identity) else {
             return false;
         };
         let attempt = self.shell.begin_process_affinity_read(target.clone());
@@ -155,7 +159,7 @@ impl RootView {
 
     pub(crate) fn submit_process_affinity(
         &mut self,
-        pid: u32,
+        identity: ProcessLiveKey,
         cpus: Vec<u32>,
         cx: &mut Context<Self>,
     ) -> bool {
@@ -164,17 +168,17 @@ impl RootView {
         else {
             self.record_process_control_result(
                 ProcessControlAction::SetAffinity,
-                pid,
+                identity,
                 Err(FailureKind::TemporarilyUnavailable),
                 cx,
             );
             return false;
         };
         let target = ready.target;
-        if self.frozen_process(pid).as_ref() != Some(&target) {
+        if self.frozen_process(identity).as_ref() != Some(&target) {
             self.record_process_control_result(
                 ProcessControlAction::SetAffinity,
-                pid,
+                identity,
                 Err(FailureKind::IdentityChanged),
                 cx,
             );
@@ -208,7 +212,7 @@ impl RootView {
             Err(kind) => {
                 self.record_process_control_result(
                     ProcessControlAction::SetAffinity,
-                    pid,
+                    identity,
                     Err(kind),
                     cx,
                 );

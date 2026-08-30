@@ -97,7 +97,7 @@ pub(crate) use about::about_copy_payload;
 
 /// Build the root element for one render. The root input observer watches
 /// pointer presses for the focus-visible tracker
-/// ([`crate::input_modality`]) before the tree below handles the same event —
+/// (`crate::input_modality`) before the tree below handles the same event —
 /// the iced counterpart of the GPUI root's capture-phase listeners.
 pub fn view(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     crate::input_modality::Observer::new(view_root(app)).into()

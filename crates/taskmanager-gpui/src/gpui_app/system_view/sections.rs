@@ -5,18 +5,21 @@
 //! exists renders (dash only for a live gap), a fact that does not exist on
 //! this host omits its row, and a section with no facts at all is omitted.
 
+pub(crate) mod memory_inventory;
 mod npu;
 
 use taskmanager_ui_contract::IconId;
 
+use taskmanager_application::SmbiosMemoryState;
 use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
-use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::metrics::{DmiIdentityFacts, SystemSnapshot};
 
 use super::{
     fmt_cache_kb, fmt_clock_ghz, fmt_observed_clock_ghz, joined_optional_text, kernel_display,
     optional_text, truncate_cmdline,
 };
 use taskmanager_application::i18n;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 
 /// One horizontal progress meter inside a section card (memory in use,
 /// battery charge). `pct` is 0..=100; the renderer clamps.
@@ -55,11 +58,33 @@ impl SystemSection {
     }
 }
 
+/// The identity facts of the SMBIOS lane's accepted payload. A `Ready`
+/// session supplies its snapshot; a refresh in flight keeps the last accepted
+/// payload visible (the same rule the memory subsection applies, so the two
+/// regions never flicker apart). `Closed`/first-load/failed sessions carry no
+/// identity rows — the facts stay absent, not dashed.
+fn accepted_identity(smbios: &SmbiosMemoryState) -> Option<&DmiIdentityFacts> {
+    match smbios {
+        SmbiosMemoryState::Ready(ready) => ready.snapshot.identity.as_ref(),
+        SmbiosMemoryState::Loading {
+            last_good: Some(ready),
+            ..
+        } => ready.snapshot.identity.as_ref(),
+        SmbiosMemoryState::Loading {
+            last_good: None, ..
+        }
+        | SmbiosMemoryState::Failed(_)
+        | SmbiosMemoryState::Closed => None,
+    }
+}
+
 /// Host identity + OS + kernel + firmware + desktop session. The newly surfaced
 /// adapter facts (product version, package manager + version, desktop
 /// environment, windowing system) are conditional rows — present only when the
-/// native adapter actually reported them.
-pub(super) fn device_section(hw: &HardwareInfo) -> SystemSection {
+/// native adapter actually reported them. The serial/UUID/asset-tag/SKU rows
+/// come from the SMBIOS request lane's accepted payload (root-only DMI facts,
+/// ADR-023 Boundary 2) — a row renders only when the fact exists.
+pub(super) fn device_section(hw: &HardwareInfo, smbios: &SmbiosMemoryState) -> SystemSection {
     let mut s = SystemSection::new(IconId::System, "system.section.device");
     s.rows.push((
         i18n::t("system.os").to_string(),
@@ -71,6 +96,12 @@ pub(super) fn device_section(hw: &HardwareInfo) -> SystemSection {
         i18n::t("system.kernel").to_string(),
         kernel_display(hw.kernel_version.as_deref(), hw.kernel_build.as_deref()),
     ));
+    if let Some(compiler) = hw.kernel_compiler.as_deref() {
+        s.rows.push((
+            i18n::t("system.field.kernel_compiler").to_string(),
+            compiler.to_string(),
+        ));
+    }
     // Kernel boot facts stay directly beneath the Kernel row (modules count,
     // then boot args), hidden when absent — the Windows/macOS providers report
     // no module count, so a permanent dash would be a platform leak.
@@ -103,6 +134,41 @@ pub(super) fn device_section(hw: &HardwareInfo) -> SystemSection {
                 i18n::t("system.product_version").to_string(),
                 version.to_string(),
             ));
+        }
+    }
+    // Platform/chipset model sits with the board identity; a host whose
+    // adapter proved no chipset omits the row rather than showing a dash.
+    if let Some(chipset) = hw
+        .chipset
+        .as_deref()
+        .map(str::trim)
+        .filter(|chipset| !chipset.is_empty())
+    {
+        s.rows.push((
+            i18n::t("system.field.chipset").to_string(),
+            chipset.to_string(),
+        ));
+    }
+    // Root-only DMI identity facts from the SMBIOS lane's accepted snapshot
+    // (the same payload the memory subsection renders). Each row is omitted
+    // when the fact is `None` on this host — never a fabricated value, never
+    // a dash pretending to be an absence.
+    if let Some(identity) = accepted_identity(smbios) {
+        for (key, value) in [
+            (
+                "system.field.system_serial",
+                identity.system_serial.as_deref(),
+            ),
+            ("system.field.product_uuid", identity.system_uuid.as_deref()),
+            (
+                "system.field.asset_tag",
+                identity.board_asset_tag.as_deref(),
+            ),
+            ("system.field.system_sku", identity.system_sku.as_deref()),
+        ] {
+            if let Some(value) = value.map(str::trim).filter(|value| !value.is_empty()) {
+                s.rows.push((i18n::t(key).to_string(), value.to_string()));
+            }
         }
     }
     s.rows.push((
@@ -237,12 +303,18 @@ fn display_hdr_capability(display: &DisplayInfo) -> Option<String> {
 }
 
 /// CPU topology + clocks + caches; the instruction set renders as chips.
-pub(super) fn cpu_section(hw: &HardwareInfo, snap: &SystemSnapshot) -> SystemSection {
+pub(super) fn cpu_section(
+    hw: &HardwareInfo,
+    snap: &SystemSnapshot,
+    units: UnitPreferences,
+) -> SystemSection {
     let mut s = SystemSection::new(IconId::Cpu, "system.section.cpu");
     s.rows.push((
         i18n::t("common.cpu").to_string(),
         optional_text(hw.cpu_brand.as_deref()),
     ));
+    s.rows
+        .extend(crate::gpui_app::cpu_view::cpu_identity_rows(hw));
     s.rows.push((
         i18n::t("common.cores").to_string(),
         format!(
@@ -275,20 +347,32 @@ pub(super) fn cpu_section(hw: &HardwareInfo, snap: &SystemSnapshot) -> SystemSec
         fmt_clock_ghz(hw.base_freq_mhz),
     ));
     s.rows.push((
+        i18n::t("cpu.multiplier").to_string(),
+        snap.cpu
+            .clock_multiplier(hw.base_freq_mhz)
+            .map_or_else(crate::gpui_app::formatting::missing_value, |multiplier| {
+                format!("\u{00d7}{multiplier:.1}")
+            }),
+    ));
+    s.rows.push((
         i18n::t("system.max_clock").to_string(),
         fmt_observed_clock_ghz(snap.cpu.current_max_frequency_mhz().filter(|mhz| *mhz > 0)),
     ));
     s.rows.push((
-        i18n::t("common.l1_cache").to_string(),
-        fmt_cache_kb(snap.cpu.l1_cache_kb),
+        i18n::t("common.l1_data_cache").to_string(),
+        fmt_cache_kb(snap.cpu.l1d_cache_kb, units),
+    ));
+    s.rows.push((
+        i18n::t("common.l1_instruction_cache").to_string(),
+        fmt_cache_kb(snap.cpu.l1i_cache_kb, units),
     ));
     s.rows.push((
         i18n::t("common.l2_cache").to_string(),
-        fmt_cache_kb(snap.cpu.l2_cache_kb),
+        fmt_cache_kb(snap.cpu.l2_cache_kb, units),
     ));
     s.rows.push((
         i18n::t("common.l3_cache").to_string(),
-        fmt_cache_kb(snap.cpu.l3_cache_kb),
+        fmt_cache_kb(snap.cpu.l3_cache_kb, units),
     ));
     // Instruction-set features become chips (compact, glanceable) instead of
     // one long joined string. Absent feature list → no chips, no row.
@@ -305,14 +389,18 @@ pub(super) fn cpu_section(hw: &HardwareInfo, snap: &SystemSnapshot) -> SystemSec
 /// The System page is an inventory surface. Live used/available memory belongs
 /// to the Performance page; keeping it out of this section prevents the
 /// hardware card from changing every telemetry tick.
-pub(super) fn memory_section(hw: &HardwareInfo, snap: &SystemSnapshot) -> SystemSection {
+pub(super) fn memory_section(
+    hw: &HardwareInfo,
+    snap: &SystemSnapshot,
+    units: UnitPreferences,
+) -> SystemSection {
     use crate::gpui_app::formatting;
     let mut s = SystemSection::new(IconId::Memory, "system.section.memory");
     let m = &snap.memory;
     let installed = hw
         .total_memory_mb
         .and_then(|mb| mb.checked_mul(1024 * 1024))
-        .map(formatting::format_mib_whole)
+        .map(|bytes| units.format_quantity(bytes, QuantityFamily::Memory, false))
         .unwrap_or_else(formatting::missing_value);
     s.rows
         .push((i18n::t("common.memory").to_string(), installed));
@@ -322,7 +410,7 @@ pub(super) fn memory_section(hw: &HardwareInfo, snap: &SystemSnapshot) -> System
     {
         s.rows.push((
             i18n::t("mem.swap").to_string(),
-            formatting::format_gib(total),
+            units.format_quantity(total, QuantityFamily::Memory, false),
         ));
     }
     // RAM speed (from smbios/hwmon). Only when a non-zero speed was detected.
@@ -352,6 +440,18 @@ pub(super) fn memory_section(hw: &HardwareInfo, snap: &SystemSnapshot) -> System
             form_factor.to_owned(),
         ));
     }
+    if let Some(part_number) = m.current_module_part_number() {
+        s.rows.push((
+            i18n::t("system.memory_part_number").to_string(),
+            part_number.to_owned(),
+        ));
+    }
+    if let Some(serial) = m.current_module_serial_number() {
+        s.rows.push((
+            i18n::t("system.memory_serial").to_string(),
+            serial.to_owned(),
+        ));
+    }
     if let (Some(used), Some(total)) = (m.current_slots_used(), m.current_slots_total()) {
         s.rows.push((
             i18n::t("system.memory_slots").to_string(),
@@ -369,6 +469,7 @@ pub(super) fn memory_section(hw: &HardwareInfo, snap: &SystemSnapshot) -> System
 pub(super) fn graphics_section(
     snap: &SystemSnapshot,
     npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
+    units: UnitPreferences,
 ) -> SystemSection {
     let mut s = SystemSection::new(IconId::Gpu, "system.section.graphics");
     let gpu_count = snap.gpu.len();
@@ -408,7 +509,7 @@ pub(super) fn graphics_section(
             };
             s.rows.push((
                 memory_label,
-                crate::gpui_app::formatting::bytes_to_human(memory),
+                units.format_quantity(memory, QuantityFamily::Memory, false),
             ));
         }
         if let Some(slot) = g.pci_slot.as_deref().filter(|slot| !slot.trim().is_empty()) {
@@ -418,13 +519,13 @@ pub(super) fn graphics_section(
             ));
         }
     }
-    s.rows.extend(npu::inventory_rows(npu_inventory));
+    s.rows.extend(npu::inventory_rows(npu_inventory, units));
     s
 }
 
 /// Static storage identity/capacity parameters. Filesystem free space and I/O
 /// rates remain exclusively on the Performance storage page.
-pub(super) fn storage_section(snap: &SystemSnapshot) -> SystemSection {
+pub(super) fn storage_section(snap: &SystemSnapshot, units: UnitPreferences) -> SystemSection {
     let mut s = SystemSection::new(IconId::Disk, "system.section.storage");
     let disk_count = snap.disks.len();
     for (index, disk) in snap.disks.iter().enumerate() {
@@ -445,7 +546,7 @@ pub(super) fn storage_section(snap: &SystemSnapshot) -> SystemSection {
             details.push(disk.disk_type.trim().to_string());
         }
         if let Some(capacity) = disk.current_capacity_bytes() {
-            details.push(crate::gpui_app::formatting::bytes_to_human(capacity));
+            details.push(units.format_quantity(capacity, QuantityFamily::Drive, false));
         }
         s.rows.push((label, details.join(" · ")));
         if let Some(revision) = disk
@@ -474,13 +575,15 @@ pub(super) fn build_sections(
     hw: &HardwareInfo,
     snap: &SystemSnapshot,
     npu_inventory: Option<&taskmanager_core::core::npu::NpuInventorySnapshot>,
+    smbios: &SmbiosMemoryState,
+    units: UnitPreferences,
 ) -> Vec<SystemSection> {
     let sections = vec![
-        device_section(hw),
-        cpu_section(hw, snap),
-        memory_section(hw, snap),
-        storage_section(snap),
-        graphics_section(snap, npu_inventory),
+        device_section(hw, smbios),
+        cpu_section(hw, snap, units),
+        memory_section(hw, snap, units),
+        storage_section(snap, units),
+        graphics_section(snap, npu_inventory, units),
     ];
     sections.into_iter().filter(|s| !s.is_empty()).collect()
 }
@@ -515,7 +618,11 @@ fn compact_cpu_label(value: Option<&str>) -> String {
 /// No live utilization, process count, uptime, temperature, or free-space
 /// value is read here. The tile row is the hardware summary; live values stay
 /// on the Performance pages.
-pub(super) fn build_tiles(hw: &HardwareInfo, snap: &SystemSnapshot) -> Vec<SystemTile> {
+pub(super) fn build_tiles(
+    hw: &HardwareInfo,
+    snap: &SystemSnapshot,
+    units: UnitPreferences,
+) -> Vec<SystemTile> {
     use crate::gpui_app::formatting;
     let cpu_value = compact_cpu_label(hw.cpu_brand.as_deref());
     let mut cpu_note = Vec::new();
@@ -532,7 +639,7 @@ pub(super) fn build_tiles(hw: &HardwareInfo, snap: &SystemSnapshot) -> Vec<Syste
     let memory_value = hw
         .total_memory_mb
         .and_then(|mb| mb.checked_mul(1024 * 1024))
-        .map(formatting::format_mib_whole)
+        .map(|bytes| units.format_quantity(bytes, QuantityFamily::Memory, false))
         .unwrap_or_else(formatting::missing_value);
     let memory_note = snap
         .memory
@@ -564,7 +671,7 @@ pub(super) fn build_tiles(hw: &HardwareInfo, snap: &SystemSnapshot) -> Vec<Syste
         .filter_map(|disk| disk.current_capacity_bytes())
         .fold(0_u64, u64::saturating_add);
     let storage_note = if storage_total > 0 {
-        formatting::bytes_to_human(storage_total)
+        units.format_quantity(storage_total, QuantityFamily::Drive, false)
     } else {
         formatting::missing_value()
     };
@@ -593,7 +700,7 @@ pub(super) fn build_tiles(hw: &HardwareInfo, snap: &SystemSnapshot) -> Vec<Syste
             Some(memory) => format!(
                 "{graphics_count} {} · {}",
                 i18n::t("common.gpu"),
-                formatting::bytes_to_human(memory)
+                units.format_quantity(memory, QuantityFamily::Memory, false)
             ),
             None => format!("{graphics_count} {}", i18n::t("common.gpu")),
         }

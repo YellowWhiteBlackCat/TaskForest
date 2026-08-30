@@ -32,6 +32,28 @@ impl CapabilityId {
     /// `telemetry.gpu`; this capability exists only where a provider can reach
     /// the PMU seam. Unregistered or pending adapters leave it absent/typed.
     pub const TELEMETRY_GPU_ENGINES: Self = Self::borrowed("telemetry.gpu.engines");
+    /// On-demand SMBIOS memory slot/module inventory plus system/board
+    /// identity facts via the privileged memory helper seam (ADR-023,
+    /// permission-model Boundary 2).
+    /// Frontend-paced request/response lane: the unprivileged periodic path
+    /// (udev + world-readable DMI) stays `telemetry.memory`; this capability
+    /// exists only where a provider can reach the SMBIOS helper seam, and the
+    /// prompt fires only on an explicit user request.
+    pub const TELEMETRY_MEMORY_SMBIOS: Self = Self::borrowed("telemetry.memory.smbios");
+    /// On-demand CPU package power via the privileged RAPL helper seam
+    /// (ADR-023, permission-model Boundary 2). The unprivileged periodic
+    /// `power_w` projection stays on `telemetry.cpu`; this lane reads the
+    /// root-only `energy_uj` counters through one bounded helper sample per
+    /// explicit user request.
+    pub const TELEMETRY_CPU_PACKAGE_POWER: Self = Self::borrowed("telemetry.cpu.package_power");
+    /// On-demand CPU MSR readouts (package temperature, multipliers, Vcore)
+    /// via the privileged MSR helper seam (ADR-023/048, permission-model
+    /// Boundary 2). Frontend-paced request/response lane: the unprivileged
+    /// periodic `telemetry.cpu` projections stay unchanged; this lane reads
+    /// the root-only `/dev/cpu/N/msr` registers through one bounded helper
+    /// invocation per explicit user request. Register fields the CPU does
+    /// not implement stay typed-absent, never zero.
+    pub const TELEMETRY_CPU_MSR: Self = Self::borrowed("telemetry.cpu.msr");
     /// NPU/AI accelerator device inventory (discovery-first).
     /// Enumerates accelerator devices with typed per-fact availability; live
     /// utilization stays typed inside the device model until a stable kernel

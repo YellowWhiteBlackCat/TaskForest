@@ -35,9 +35,10 @@ use taskmanager_core::core::session::SessionItem;
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_platform_contract::{CapabilitySnapshot, RequestId};
 
-use super::process_rows::{ProcessRowId, ProcessRowIdentity};
+use super::process_rows::ProcessRowId;
 use super::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
 use crate::ProcessStatusFilter;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 mod inventory_sort;
 mod process_selection;
@@ -75,8 +76,8 @@ pub struct ProcessViewing {
 /// batch target and the anchor is the fallback target when the set is empty.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ProcessSelection {
-    rows: HashSet<ProcessRowIdentity>,
-    anchor: Option<ProcessRowIdentity>,
+    rows: HashSet<ProcessLiveKey>,
+    anchor: Option<ProcessLiveKey>,
     active_row: Option<ProcessRowId>,
 }
 
@@ -468,6 +469,98 @@ impl DirectTrackState {
     #[must_use]
     pub const fn gpu_engine_rows_state(&self) -> &taskmanager_application::GpuEngineRowsState {
         self.request_sessions.gpu_engine_rows()
+    }
+
+    #[must_use]
+    pub fn begin_smbios_memory_request(&mut self) -> taskmanager_application::RequestAttemptId {
+        self.request_sessions.begin_smbios_memory()
+    }
+
+    pub fn accept_smbios_memory_request(
+        &mut self,
+        attempt: taskmanager_application::RequestAttemptId,
+        request_id: RequestId,
+    ) -> bool {
+        self.request_sessions
+            .accept_smbios_memory(attempt, request_id)
+    }
+
+    pub fn reject_smbios_memory_request(
+        &mut self,
+        attempt: taskmanager_application::RequestAttemptId,
+        failure: FailureKind,
+    ) -> bool {
+        self.request_sessions.reject_smbios_memory(attempt, failure)
+    }
+
+    pub fn close_smbios_memory_request(&mut self) {
+        self.request_sessions.close_smbios_memory();
+    }
+
+    #[must_use]
+    pub const fn smbios_memory_state(&self) -> &taskmanager_application::SmbiosMemoryState {
+        self.request_sessions.smbios_memory()
+    }
+
+    #[must_use]
+    pub fn begin_rapl_power_request(&mut self) -> taskmanager_application::RequestAttemptId {
+        self.request_sessions.begin_rapl_power()
+    }
+
+    pub fn accept_rapl_power_request(
+        &mut self,
+        attempt: taskmanager_application::RequestAttemptId,
+        request_id: RequestId,
+    ) -> bool {
+        self.request_sessions.accept_rapl_power(attempt, request_id)
+    }
+
+    pub fn reject_rapl_power_request(
+        &mut self,
+        attempt: taskmanager_application::RequestAttemptId,
+        failure: FailureKind,
+    ) -> bool {
+        self.request_sessions.reject_rapl_power(attempt, failure)
+    }
+
+    pub fn close_rapl_power_request(&mut self) {
+        self.request_sessions.close_rapl_power();
+    }
+
+    #[must_use]
+    pub const fn rapl_power_state(&self) -> &taskmanager_application::RaplPowerState {
+        self.request_sessions.rapl_power()
+    }
+
+    #[must_use]
+    pub fn begin_msr_readout_request(&mut self) -> taskmanager_application::RequestAttemptId {
+        self.request_sessions.begin_msr_readout()
+    }
+
+    pub fn accept_msr_readout_request(
+        &mut self,
+        attempt: taskmanager_application::RequestAttemptId,
+        request_id: RequestId,
+    ) -> bool {
+        self.request_sessions
+            .accept_msr_readout(attempt, request_id)
+    }
+
+    pub fn reject_msr_readout_request(
+        &mut self,
+        attempt: taskmanager_application::RequestAttemptId,
+        failure: FailureKind,
+    ) -> bool {
+        self.request_sessions.reject_msr_readout(attempt, failure)
+    }
+
+    pub fn close_msr_readout_request(&mut self) {
+        self.request_sessions.close_msr_readout();
+    }
+
+    #[must_use]
+    pub const fn msr_readout_state(&self) -> &taskmanager_application::MsrReadoutState {
+        self.request_sessions.msr_readout()
     }
 
     /// Per-tick chart-metric fold (ADR-034 stage 2) — the GPUI twin of

@@ -28,7 +28,8 @@ use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{
-    ProcessItem, ProcessMetadataObservations, ProcessOwner, ProcessScalarObservations,
+    ProcessItem, ProcessLiveKey, ProcessMetadataObservations, ProcessOwner,
+    ProcessScalarObservations,
 };
 
 use taskmanager_shell::ShellApp;
@@ -37,10 +38,10 @@ use taskmanager_theme::Theme;
 
 use super::details::ProcessDetailsRoot;
 use super::{
-    ProcessCountLine, ProcessQueryCommit, ProcessRowIdentity, ProcessRowLink, ProcessRowsRoot,
-    ProcessScrollIntent, ProcessScrollState, ProcessSelectStep, ProcessSelectionChanged,
-    TABLE_VIEWPORT_HEIGHT_PX, centered_scroll_top, content, count_line_text, empty_state_text,
-    rows_projection, sort_projection,
+    ProcessCountLine, ProcessQueryCommit, ProcessRowLink, ProcessRowsRoot, ProcessScrollIntent,
+    ProcessScrollState, ProcessSelectStep, ProcessSelectionChanged, TABLE_VIEWPORT_HEIGHT_PX,
+    centered_scroll_top, content, count_line_text, empty_state_text, rows_projection,
+    sort_projection,
 };
 use crate::app::{FrontendTrack, Page, PageContext};
 use crate::palette::{UiPalette, ui_palette};
@@ -51,7 +52,13 @@ use crate::window::WindowPalette;
 /// A process with exactly the observations the test names — every other
 /// scalar stays honestly absent so the dash cells are exercised for free.
 fn process(pid: u32, name: &str) -> ProcessItem {
-    ProcessItem::new(pid, name)
+    ProcessItem::new(pid, name).with_scalar_observations(ProcessScalarObservations {
+        // A process row needs the provider-issued live token before the shell
+        // can accept it as a selectable identity. This fixture still leaves
+        // every displayed resource scalar unavailable.
+        start_token: ScalarObservation::available(u64::from(pid), 1),
+        ..ProcessScalarObservations::default()
+    })
 }
 
 fn with_cpu(process: &mut ProcessItem, cpu: f32) {
@@ -136,10 +143,10 @@ where
 
 /// Test-only recorder for the published selection-identity seam.
 #[derive(Default, Resource)]
-struct SelectionLog(Vec<Option<ProcessRowIdentity>>);
+struct SelectionLog(Vec<Option<ProcessLiveKey>>);
 
 fn record_selection(change: On<ProcessSelectionChanged>, mut log: ResMut<SelectionLog>) {
-    log.0.push(change.event().0.clone());
+    log.0.push(change.event().0);
 }
 
 fn rows_root(app: &mut App) -> Entity {
@@ -444,10 +451,7 @@ fn selection_step_moves_the_cursor_publishes_identity_and_styles_the_row() {
     let log = app.world().resource::<SelectionLog>();
     assert_eq!(
         log.0,
-        vec![Some(ProcessRowIdentity {
-            pid: 20,
-            name: "beta".to_owned(),
-        })],
+        vec![Some(ProcessLiveKey::new(20, 20).expect("fixture identity"))],
         "the identity change is published exactly once"
     );
 

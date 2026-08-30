@@ -31,8 +31,16 @@ pub fn assert_process_rows_consistent(rows: &[ProcessItem]) -> Result<(), String
                 ));
             }
         }
-        if !row.cpu_history.iter().all(|value| value.is_finite()) {
-            violations.push(format!("pid {} reported non-finite CPU history", row.pid));
+        // The history projection renders a missing channel as a NaN typed gap
+        // (charts break the line instead of plotting a fabricated zero), so
+        // only an infinite value — corrupt arithmetic, never an honest
+        // measurement — is a violation here. The current-sample check above
+        // still pins measured magnitudes.
+        if row.cpu_history.iter().any(|value| value.is_infinite()) {
+            violations.push(format!(
+                "pid {} reported an infinite CPU history value",
+                row.pid
+            ));
         }
         if row.parent_pid == Some(row.pid) {
             violations.push(format!("pid {} is its own parent", row.pid));

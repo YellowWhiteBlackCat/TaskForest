@@ -18,10 +18,11 @@ use std::time::{Duration, Instant};
 
 use taskmanager_application::{
     CommandLaunchRequest, ContainerRollupEvent, DesktopNotificationRequest, LatestControlRequest,
-    PlatformClient, PlatformEventBatch, ProcessAffinityControlRequest, ProcessControlRequest,
-    ProcessResourceControlRequest, RefreshRequest, ResourceRevealRequest, ServiceControlOutcome,
-    ServiceControlRequest, ServiceEvent, ServiceUpdate, SessionControlOutcome,
-    SessionControlRequest, SessionEvent, SetupScriptRequest, SmartObservationBatch,
+    PlatformClient, PlatformEventBatch, PlatformFacets, ProcessAffinityControlRequest,
+    ProcessControlRequest, ProcessResourceControlRequest, RefreshRequest, ResourceRevealRequest,
+    ServiceControlOutcome, ServiceControlRequest, ServiceEvent, ServiceUpdate,
+    SessionControlOutcome, SessionControlRequest, SessionEvent, SetupScriptRequest,
+    SmartObservationBatch,
 };
 use taskmanager_core::DeviceStatus;
 use taskmanager_core::core::alerts::AlertSeverity;
@@ -34,7 +35,7 @@ use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_platform_contract::{
-    CapabilityId, CapabilityStatus, OperationFailure, RetryDisposition,
+    CapabilityId, CapabilitySnapshot, CapabilityStatus, OperationFailure, RetryDisposition,
 };
 use taskmanager_platform_macos::MacOsPlatformRuntime;
 
@@ -106,15 +107,24 @@ const STANDARD_SURFACE: &[(&str, &str)] = &[
     ),
     ("telemetry.gpu.engines", "macos.system.gpu-engines"),
     ("accelerator.npu", "macos.accelerator.npu"),
+    ("telemetry.memory.smbios", "macos.telemetry.memory.smbios"),
+    (
+        "telemetry.cpu.package_power",
+        "macos.telemetry.cpu.package-power",
+    ),
+    ("telemetry.cpu.msr", "macos.telemetry.cpu.msr"),
 ];
 
 /// Capabilities with NO safe macOS source: they must complete with a typed
-/// unsupported outcome everywhere (ADR-019). The last three are the
+/// unsupported outcome everywhere (ADR-019). The leading five are the
 /// registered-pending optional facets (G-05): present in the catalog, honest
 /// `Unsupported` on submission.
 const PENDING_CAPABILITIES: &[&str] = &[
     "telemetry.gpu.engines",
     "accelerator.npu",
+    "telemetry.memory.smbios",
+    "telemetry.cpu.package_power",
+    "telemetry.cpu.msr",
     "containers.rollup",
     // macOS does not currently expose an authoritative process start token
     // through the safe provider boundary. Target mutation/read/reveal must
@@ -299,11 +309,7 @@ fn assert_honest_failure(failure: &OperationFailure) {
     );
 }
 
-#[test]
-fn complete_standard_surface_composes_with_descriptors_and_facets() {
-    let handle = MacOsPlatformRuntime::spawn().expect("complete macOS composition");
-
-    let snapshot = handle.capabilities().snapshot();
+fn assert_standard_descriptors(snapshot: &CapabilitySnapshot) {
     assert_eq!(
         snapshot.iter().count(),
         STANDARD_SURFACE.len(),
@@ -325,8 +331,9 @@ fn complete_standard_surface_composes_with_descriptors_and_facets() {
         );
         assert!(descriptor.last_success_at_ms.is_none());
     }
+}
 
-    let facets = handle.facets();
+fn assert_complete_facets(facets: &PlatformFacets) {
     assert!(facets.system().host().is_some());
     assert!(facets.system().cpu().is_some());
     assert!(facets.system().memory().is_some());
@@ -334,10 +341,10 @@ fn complete_standard_surface_composes_with_descriptors_and_facets() {
     assert!(facets.system().network().is_some());
     assert!(facets.system().gpu().is_some());
     assert!(facets.system().hardware_inventory().is_some());
-    assert!(
-        facets.system().containers().is_some(),
-        "containers port must be present"
-    );
+    assert!(facets.system().smbios_memory().is_some());
+    assert!(facets.system().rapl_power().is_some());
+    assert!(facets.system().msr_readout().is_some());
+    assert!(facets.system().containers().is_some());
     assert!(facets.process().list().is_some());
     assert!(facets.process().control().is_some());
     assert!(facets.process().network().is_some());
@@ -348,10 +355,7 @@ fn complete_standard_surface_composes_with_descriptors_and_facets() {
     assert!(facets.process().affinity().is_some());
     assert!(facets.process().affinity_control().is_some());
     assert!(facets.process().resource_control().is_some());
-    assert!(
-        facets.process().open_files().is_some(),
-        "the registered-pending open-files facet must expose its request port"
-    );
+    assert!(facets.process().open_files().is_some());
     assert!(facets.service().inventory().is_some());
     assert!(facets.service().dependencies().is_some());
     assert!(facets.service().control().is_some());
@@ -366,19 +370,22 @@ fn complete_standard_surface_composes_with_descriptors_and_facets() {
     assert!(facets.integration().resource_reveal().is_some());
     assert!(facets.integration().url_open().is_some());
     assert!(facets.integration().desktop_appearance().is_some());
-    assert!(
-        facets.integration().desktop_notification().is_some(),
-        "the registered-pending notification facet must expose its request port"
-    );
-    assert!(
-        facets.integration().setup_script().is_some(),
-        "the registered-pending setup facet must expose its request port"
-    );
+    assert!(facets.integration().desktop_notification().is_some());
+    assert!(facets.integration().setup_script().is_some());
     assert!(facets.storage().health().is_some());
     assert!(facets.storage().smart_observation().is_some());
     assert!(facets.storage().smart_control().is_some());
     assert!(facets.sensor().observation().is_some());
     assert!(facets.power().supplies().is_some());
+}
+
+#[test]
+fn complete_standard_surface_composes_with_descriptors_and_facets() {
+    let handle = MacOsPlatformRuntime::spawn().expect("complete macOS composition");
+
+    let snapshot = handle.capabilities().snapshot();
+    assert_standard_descriptors(&snapshot);
+    assert_complete_facets(handle.facets());
 }
 
 #[test]

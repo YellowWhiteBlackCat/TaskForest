@@ -24,11 +24,13 @@
 
 ## 本地补丁依赖
 
-`[patch]` 覆盖的两个上游 crate 以补丁副本参与构建，源码保留各自原始许可证：
+`[patch]` 覆盖的三个上游 crate 以补丁副本参与构建，源码保留各自原始许可证：
 
 - **gpui**（Apache-2.0，`patches/gpui`）：上游无条件同时启用 xkbcommon 的 wayland+x11
   feature，导致 wayland-only 构建仍链接 X11；补丁将 x11 移入 dev-only feature，生产
   二进制零 X11 链接。
+- **cryoglyph**（MIT OR Apache-2.0 OR Zlib，`patches/cryoglyph`）：上游 0.1.0 固定
+  `lru` 0.16；补丁副本只把依赖下限提到 0.18.2，API 不变（ADR-045）。
 - **proc-macro-error2**（Apache-2.0 OR MIT，`patches/proc-macro-error2`）：仓库内补丁副本。
 
 ## 平台采集与系统集成

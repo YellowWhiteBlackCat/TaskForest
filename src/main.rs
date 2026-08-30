@@ -84,6 +84,33 @@ fn main() {
                 std::process::exit(1);
             }
         }
+        CliMode::MemorySmbios => {
+            // Same per-feature escalation discipline as --gpu-engines: the
+            // SMBIOS memory helper crossing, prompted only because this flag
+            // was passed; the typed outcome prints as JSON.
+            if let Err(error) = taskmanager::cli_memory_smbios::run_memory_smbios() {
+                eprintln!("taskmanager --memory-smbios: {error}");
+                std::process::exit(1);
+            }
+        }
+        CliMode::PackagePower => {
+            // Same per-feature escalation discipline as --gpu-engines: the
+            // RAPL package-power helper crossing, prompted only because this
+            // flag was passed; the typed outcome prints as JSON.
+            if let Err(error) = taskmanager::cli_package_power::run_package_power() {
+                eprintln!("taskmanager --package-power: {error}");
+                std::process::exit(1);
+            }
+        }
+        CliMode::Msr => {
+            // Same per-feature escalation discipline as --gpu-engines: the
+            // MSR readout helper crossing (ADR-048), prompted only because
+            // this flag was passed; the typed outcome prints as JSON.
+            if let Err(error) = taskmanager::cli_msr::run_msr() {
+                eprintln!("taskmanager --msr: {error}");
+                std::process::exit(1);
+            }
+        }
         CliMode::Snapshot { width, height } => {
             #[cfg(feature = "ui-tui")]
             {

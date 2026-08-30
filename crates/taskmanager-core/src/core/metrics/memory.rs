@@ -192,6 +192,10 @@ struct MemoryMetricsWire {
     module_manufacturer: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     module_form_factor: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    module_part_number: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    module_serial_number: Option<String>,
     #[serde(default, flatten)]
     virtual_memory_commit: VirtualMemoryCommit,
     #[serde(default, flatten)]
@@ -232,6 +236,8 @@ impl Serialize for MemoryMetrics {
             module_type: legacy_optional_projection(&optional.modules.module_type),
             module_manufacturer: legacy_optional_projection(&optional.modules.manufacturer),
             module_form_factor: legacy_optional_projection(&optional.modules.form_factor),
+            module_part_number: legacy_optional_projection(&optional.modules.part_number),
+            module_serial_number: legacy_optional_projection(&optional.modules.serial_number),
             virtual_memory_commit: VirtualMemoryCommit {
                 committed_bytes: legacy_optional_projection(
                     &optional.virtual_memory_commit.committed_bytes,
@@ -316,6 +322,8 @@ impl<'de> Deserialize<'de> for MemoryMetrics {
                 modules.module_type <- nonempty(wire.module_type),
                 modules.manufacturer <- nonempty(wire.module_manufacturer),
                 modules.form_factor <- nonempty(wire.module_form_factor),
+                modules.part_number <- nonempty(wire.module_part_number),
+                modules.serial_number <- nonempty(wire.module_serial_number),
                 virtual_memory_commit.committed_bytes
                     <- wire.virtual_memory_commit.committed_bytes,
                 virtual_memory_commit.limit_bytes <- wire.virtual_memory_commit.limit_bytes,

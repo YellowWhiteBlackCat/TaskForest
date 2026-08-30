@@ -5,7 +5,7 @@ use std::num::NonZeroU64;
 
 use serde::{Deserialize, Serialize};
 
-use super::ProcessItem;
+use super::{ProcessItem, ProcessLiveKey};
 use crate::core::FailureKind;
 
 /// Platform-neutral scheduling priority tier (ARCH.md §8.1).
@@ -165,10 +165,10 @@ impl ProcessBatchIntent {
     #[must_use]
     pub fn freeze(
         processes: &[ProcessItem],
-        selected_pids: impl IntoIterator<Item = u32>,
+        selected_identities: impl IntoIterator<Item = ProcessLiveKey>,
         action: ProcessBatchAction,
     ) -> Self {
-        let mut selected: Vec<_> = selected_pids.into_iter().collect();
+        let mut selected: Vec<_> = selected_identities.into_iter().collect();
         selected.sort_unstable();
         selected.dedup();
         Self {
@@ -176,7 +176,11 @@ impl ProcessBatchIntent {
             scope: ProcessGroupScope::PidAdjacency,
             targets: selected
                 .into_iter()
-                .filter_map(|pid| processes.iter().find(|process| process.pid == pid))
+                .filter_map(|identity| {
+                    processes
+                        .iter()
+                        .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
+                })
                 .filter_map(FrozenProcessIdentity::from_process)
                 .collect(),
         }
@@ -191,49 +195,52 @@ impl ProcessBatchIntent {
     #[must_use]
     pub fn freeze_tree(
         processes: &[ProcessItem],
-        root_pid: u32,
+        root: ProcessLiveKey,
         action: ProcessBatchAction,
     ) -> Self {
-        let by_pid: HashMap<u32, &ProcessItem> = processes
-            .iter()
-            .map(|process| (process.pid, process))
-            .collect();
         Self {
             action,
             scope: ProcessGroupScope::PidAdjacency,
-            targets: descendant_pids(processes, root_pid)
+            targets: descendant_live_keys(processes, root)
                 .into_iter()
-                .filter_map(|pid| {
-                    by_pid
-                        .get(&pid)
-                        .and_then(|process| FrozenProcessIdentity::from_process(process))
+                .filter_map(|identity| {
+                    processes
+                        .iter()
+                        .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
                 })
+                .filter_map(FrozenProcessIdentity::from_process)
                 .collect(),
         }
     }
 }
 
-/// The ONE parent_pid tree traversal (同一律): the leaf-first PID closure of
-/// `root_pid` — every descendant, deepest first, ending with `root_pid`
+/// The ONE parent_pid tree traversal (同一律): the leaf-first live-identity
+/// closure of `root` — every descendant, deepest first, ending with `root`
 /// itself — shared by [`ProcessBatchIntent::freeze_tree`] and the frontends'
-/// pre-freeze tree previews (GPUI's confirmation dialog snapshots names for
-/// the same order without a second DFS). Siblings are PID-sorted so the order
-/// is deterministic, and the visited set makes the walk total on cyclic
-/// `parent_pid` chains. An unknown `root_pid` yields an EMPTY vector (fail
-/// closed — a control intent over a dead root has no honest targets).
+/// pre-freeze tree previews. Siblings are PID-sorted for deterministic order;
+/// the returned values are still exact live identities, never PID targets.
+/// The visited set makes the walk total on cyclic `parent_pid` chains. An
+/// unknown or identity-less root yields an EMPTY vector (fail closed — a
+/// control intent over a dead row has no honest targets).
 #[must_use]
-pub fn descendant_pids(processes: &[ProcessItem], root_pid: u32) -> Vec<u32> {
+pub fn descendant_live_keys(
+    processes: &[ProcessItem],
+    root: ProcessLiveKey,
+) -> Vec<ProcessLiveKey> {
+    let Some(root_process) = processes
+        .iter()
+        .find(|process| ProcessLiveKey::from_process(process) == Some(root))
+    else {
+        return Vec::new();
+    };
     let by_pid: HashMap<u32, &ProcessItem> = processes
         .iter()
         .map(|process| (process.pid, process))
         .collect();
-    if !by_pid.contains_key(&root_pid) {
-        return Vec::new();
-    }
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for process in processes {
         if let Some(parent) = process.parent_pid
-            && process.pid != root_pid
+            && process.pid != root.pid()
         {
             children.entry(parent).or_default().push(process.pid);
         }
@@ -246,21 +253,33 @@ pub fn descendant_pids(processes: &[ProcessItem], root_pid: u32) -> Vec<u32> {
         pid: u32,
         children: &HashMap<u32, Vec<u32>>,
         visited: &mut HashSet<u32>,
-        order: &mut Vec<u32>,
+        by_pid: &HashMap<u32, &ProcessItem>,
+        order: &mut Vec<ProcessLiveKey>,
     ) {
         if !visited.insert(pid) {
             return;
         }
         if let Some(child_pids) = children.get(&pid) {
             for child_pid in child_pids {
-                visit(*child_pid, children, visited, order);
+                visit(*child_pid, children, visited, by_pid, order);
             }
         }
-        order.push(pid);
+        if let Some(identity) = by_pid
+            .get(&pid)
+            .and_then(|process| ProcessLiveKey::from_process(process))
+        {
+            order.push(identity);
+        }
     }
 
     let mut order = Vec::new();
-    visit(root_pid, &children, &mut HashSet::new(), &mut order);
+    visit(
+        root_process.pid,
+        &children,
+        &mut HashSet::new(),
+        &by_pid,
+        &mut order,
+    );
     order
 }
 

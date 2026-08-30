@@ -19,6 +19,7 @@ use crate::gpui_app::processes_view::rows::ProjectionCache;
 use crate::gpui_app::services_view::ServiceFilter;
 use crate::gpui_app::startup_view::StartupFilter;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 struct ServicesEntry {
     generation: u64,
@@ -49,7 +50,7 @@ struct AppHistoryEntry {
 
 struct ProcessDetailsEntry {
     snapshot: Arc<Vec<ProcessItem>>,
-    pid: u32,
+    identity: ProcessLiveKey,
     item: Rc<ProcessItem>,
     histories: Rc<ProcessHistories>,
 }
@@ -187,24 +188,24 @@ impl GpuiProjectionCaches {
     pub(super) fn process_details(
         &self,
         snapshot: &Arc<Vec<ProcessItem>>,
-        pid: u32,
+        identity: ProcessLiveKey,
     ) -> Option<(Rc<ProcessItem>, Rc<ProcessHistories>)> {
         let cache = self.process_details.borrow();
         let entry = cache.as_ref()?;
-        (entry.pid == pid && Arc::ptr_eq(&entry.snapshot, snapshot))
+        (entry.identity == identity && Arc::ptr_eq(&entry.snapshot, snapshot))
             .then(|| (Rc::clone(&entry.item), Rc::clone(&entry.histories)))
     }
 
     pub(super) fn replace_process_details(
         &self,
         snapshot: Arc<Vec<ProcessItem>>,
-        pid: u32,
+        identity: ProcessLiveKey,
         item: Rc<ProcessItem>,
         histories: Rc<ProcessHistories>,
     ) {
         *self.process_details.borrow_mut() = Some(ProcessDetailsEntry {
             snapshot,
-            pid,
+            identity,
             item,
             histories,
         });

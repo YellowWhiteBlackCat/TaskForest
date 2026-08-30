@@ -33,9 +33,8 @@ use keys::handle_key;
 /// production loop with a counting backend + scripted event source to pin the
 /// dirty-repaint contract (idle cycles must not draw at all).
 #[cfg(test)]
-pub(crate) use seam::{
-    EventReaction, TerminalEventSource, apply_terminal_event_with_plan, run_event_loop,
-};
+#[path = "../tests/headless/runtime/runtime_support.rs"]
+pub(crate) mod runtime_support;
 
 const EVENT_POLL: Duration = Duration::from_millis(100);
 /// Upper bound on how many ready terminal events one loop cycle drains after

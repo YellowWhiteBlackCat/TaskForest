@@ -6,9 +6,9 @@ use gpui::{Div, ParentElement, Styled, div, px, relative};
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::formatting::{self, DisplayUnits, UnitKind};
 use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::MemoryMetrics;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, bytes_to_gib};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme, with_alpha};
 
@@ -89,9 +89,9 @@ fn composition_legend(
     theme: &Theme,
     segments: &[CompositionSegment],
     total_bytes: u64,
-    units: DisplayUnits,
+    units: UnitPreferences,
 ) -> Div {
-    let total = formatting::bytes_to_gib(total_bytes.max(1));
+    let total = bytes_to_gib(total_bytes.max(1));
     let mut column = div().flex().flex_col().gap(tokens::SPACE_5).w_full();
     let mut shown = false;
     for (color, _, label, bytes) in segments {
@@ -99,7 +99,7 @@ fn composition_legend(
             continue;
         }
         shown = true;
-        let percent = (formatting::bytes_to_gib(*bytes) / total * 100.0).clamp(0.0, 100.0);
+        let percent = (bytes_to_gib(*bytes) / total * 100.0).clamp(0.0, 100.0);
         column = column.child(
             div()
                 .flex()
@@ -131,14 +131,19 @@ fn composition_legend(
                         .w(px(74.0))
                         .text_size(tokens::FONT_12)
                         .text_color(theme.fg)
-                        .child(units.format(*bytes, UnitKind::Memory, false)),
+                        .child(units.format_quantity(*bytes, QuantityFamily::Memory, false)),
                 ),
         );
     }
     if shown { column } else { div() }
 }
 
-fn swap_bar(theme: &Theme, memory: &MemoryMetrics, units: DisplayUnits, with_label: bool) -> Div {
+fn swap_bar(
+    theme: &Theme,
+    memory: &MemoryMetrics,
+    units: UnitPreferences,
+    with_label: bool,
+) -> Div {
     let Some(stats) = swap_bar_stats(memory, units) else {
         return div();
     };
@@ -195,7 +200,7 @@ fn metric_tile(theme: &Theme, title: &str, value: String, note: String) -> Div {
         )
 }
 
-fn summary_metrics(theme: &Theme, memory: &MemoryMetrics, units: DisplayUnits) -> Div {
+fn summary_metrics(theme: &Theme, memory: &MemoryMetrics, units: UnitPreferences) -> Div {
     let tiles = summary_tiles(memory, units);
 
     div()
@@ -249,7 +254,7 @@ pub(crate) const MEMORY_DETAIL_COMPACT_MIN_HEIGHT: f32 = 110.0;
 pub(super) fn composition_block(
     theme: &Theme,
     memory: &MemoryMetrics,
-    units: DisplayUnits,
+    units: UnitPreferences,
     mode: MemoryDetailMode,
 ) -> Div {
     let overview = overview_stats(memory);
@@ -274,7 +279,7 @@ pub(super) fn composition_block(
     if mode == MemoryDetailMode::Full {
         column = column.child(summary_metrics(theme, memory, units));
     }
-    let mut caption = div()
+    let caption = div()
         .flex()
         .flex_row()
         .items_baseline()
@@ -303,16 +308,16 @@ pub(super) fn composition_block(
                 )),
         );
     #[cfg(any(test, feature = "test-support"))]
-    {
+    let caption = {
         let full = mode == MemoryDetailMode::Full;
-        caption = caption.debug_selector(move || {
+        caption.debug_selector(move || {
             if full {
                 "tm-mem-detail-full".into()
             } else {
                 "tm-mem-detail-compact".into()
             }
-        });
-    }
+        })
+    };
     column = column
         .child(caption)
         .child(stacked_bar(theme, &bar_segments, &labels.pair, 20.0));

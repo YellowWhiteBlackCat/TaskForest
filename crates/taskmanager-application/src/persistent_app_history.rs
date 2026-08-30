@@ -7,12 +7,13 @@
 
 use std::sync::Arc;
 
+use taskmanager_core::core::process::group_aggregate::{
+    ProcessGroupAggregate, aggregate_apps_typed,
+};
 use taskmanager_core::{
     ApplicationHistoryIdentity, HistoricalSample, HistoryMetric, HistoryRecordSink,
-    HistorySeriesKey,
+    HistorySeriesKey, ProcessItem,
 };
-
-use taskmanager_core::{AppGroup, ProcessItem, aggregate_apps};
 
 /// Leaves room inside the history store's global series ceiling for system,
 /// device and per-core facts. Each admitted application currently owns three
@@ -56,7 +57,7 @@ impl PersistentApplicationHistoryRecorder {
         revision: u64,
         observed_at_ms: u64,
     ) -> PersistentApplicationRecordReport {
-        let groups = aggregate(processes);
+        let groups = aggregate(processes, observed_at_ms);
         if revision == 0 {
             return PersistentApplicationRecordReport {
                 observed_applications: groups.len(),
@@ -85,23 +86,27 @@ impl PersistentApplicationHistoryRecorder {
                 measured_at_ms: Some(observed_at_ms),
                 value: Some(value),
             };
-            self.sink.record_sample(
-                HistorySeriesKey::for_application(
-                    HistoryMetric::ApplicationCpuUsagePct,
-                    identity.clone(),
-                ),
-                sample(f64::from(group.total_cpu_usage)),
-            );
-            self.sink.record_sample(
-                HistorySeriesKey::for_application(
-                    HistoryMetric::ApplicationMemoryBytes,
-                    identity.clone(),
-                ),
-                sample(group.total_memory_bytes as f64),
-            );
+            if let Some(value) = group.cpu().current_value().copied() {
+                self.sink.record_sample(
+                    HistorySeriesKey::for_application(
+                        HistoryMetric::ApplicationCpuUsagePct,
+                        identity.clone(),
+                    ),
+                    sample(f64::from(value)),
+                );
+            }
+            if let Some(value) = group.memory().current_value().copied() {
+                self.sink.record_sample(
+                    HistorySeriesKey::for_application(
+                        HistoryMetric::ApplicationMemoryBytes,
+                        identity.clone(),
+                    ),
+                    sample(value as f64),
+                );
+            }
             self.sink.record_sample(
                 HistorySeriesKey::for_application(HistoryMetric::ApplicationProcessCount, identity),
-                sample(group.process_count as f64),
+                sample(group.process_count() as f64),
             );
             recorded = recorded.saturating_add(1);
         }
@@ -114,17 +119,17 @@ impl PersistentApplicationHistoryRecorder {
     }
 }
 
-fn aggregate(processes: &[ProcessItem]) -> Vec<AppGroup> {
+fn aggregate(processes: &[ProcessItem], observed_at_ms: u64) -> Vec<ProcessGroupAggregate> {
     let refs = processes.iter().collect::<Vec<_>>();
-    aggregate_apps(&refs)
+    aggregate_apps_typed(&refs, observed_at_ms)
 }
 
-fn history_identity(group: &AppGroup) -> Option<ApplicationHistoryIdentity> {
-    match group.application_identity.as_ref() {
+fn history_identity(group: &ProcessGroupAggregate) -> Option<ApplicationHistoryIdentity> {
+    match group.application_identity() {
         Some(identity) => {
             ApplicationHistoryIdentity::verified_launcher(identity.launcher_id.clone())
         }
-        None => ApplicationHistoryIdentity::unverified_process_name(group.name.clone()),
+        None => ApplicationHistoryIdentity::unverified_process_name(group.name().to_owned()),
     }
 }
 

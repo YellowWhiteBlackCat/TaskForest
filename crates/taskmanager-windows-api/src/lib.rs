@@ -32,6 +32,7 @@ mod power;
 mod process;
 mod process_network;
 mod process_tree;
+mod runas;
 mod sessions;
 mod single_instance;
 mod smbios;
@@ -123,6 +124,7 @@ pub use process_network::{
     query_process_network_connections,
 };
 pub use process_tree::{WindowsProcessJob, assign_and_resume_suspended_process};
+pub use runas::{RunasLaunchOutcome, interactive_session_available, run_elevated_and_wait};
 pub use sessions::{
     WindowsSession, WindowsSessionState, enumerate_sessions, lock_workstation, logoff_session,
 };

@@ -1,4 +1,5 @@
 use super::super::{CaptureEvidence, CaptureScenario, SystemSnapshot, TopPage};
+use super::PROCESSES_OBSERVED_AT_MS;
 use taskmanager_core::core::metrics::DiskPartition;
 use taskmanager_core::core::{
     BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceState, PowerSupplySnapshot,
@@ -11,7 +12,11 @@ fn live_battery_capture_waits_for_real_data_and_never_inserts_a_fixture() {
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
     let mut processes = Vec::new();
-    assert!(evidence.on_processes_update(true, &mut processes).is_none());
+    assert!(
+        evidence
+            .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
+            .is_none()
+    );
 
     let mut page = TopPage::Apps;
     let mut power_supplies = PowerSupplySnapshot::default();
@@ -43,7 +48,11 @@ fn live_partition_capture_waits_for_two_real_children_and_never_inserts_them() {
     assert!(!evidence.scenario_ready);
 
     let mut processes = Vec::new();
-    assert!(evidence.on_processes_update(true, &mut processes).is_none());
+    assert!(
+        evidence
+            .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
+            .is_none()
+    );
     assert!(!evidence.scenario_ready);
 
     snapshot.disks = vec![

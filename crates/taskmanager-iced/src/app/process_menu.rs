@@ -8,10 +8,12 @@ use taskmanager_core::core::process::ProcessSignal;
 
 use iced::Task;
 use taskmanager_application::{AppAction, PlatformEffect, ResourceRevealRequest, UrlOpenRequest};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchAction};
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessItem, ProcessLiveKey,
+};
 
 use taskmanager_shell::presentation::search_url_for;
-use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 
 use super::{IcedApp, Message};
 
@@ -34,17 +36,16 @@ pub enum ProcessMenuAction {
 
 impl IcedApp {
     /// Apply one renderer-local menu choice after re-resolving the selected
-    /// pid against the current process snapshot. The re-resolution is the
-    /// Iced equivalent of GPUI's `menu_pid` + frozen identity path: a refresh
-    /// cannot silently retarget an action to a different process.
+    /// live identity against the current process snapshot. A refresh cannot
+    /// silently retarget an action to a different process incarnation.
     pub(super) fn apply_process_menu_action(
         &mut self,
         action: ProcessMenuAction,
         clipboard_task: &mut Option<Task<Message>>,
     ) -> Option<PlatformEffect> {
-        let pid = self.process_menu_pid()?;
+        let identity = self.process_menu_identity()?;
         self.close_context_menus();
-        let Some(index) = self.shell.visible_process_index_of_pid(pid) else {
+        if !self.shell.select_row_id(ProcessRowId::Process(identity)) {
             self.shell.report_notice(
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,
@@ -52,12 +53,14 @@ impl IcedApp {
                 taskmanager_application::i18n::t("feedback.process_gone"),
             );
             return None;
-        };
-        let _ = self.shell.select_row(index);
+        }
 
         match action {
             ProcessMenuAction::EndTask => self.shell.apply_action(AppAction::RequestEndTask),
-            ProcessMenuAction::EndProcessTree => self.shell.request_process_tree_end(pid),
+            ProcessMenuAction::EndProcessTree => {
+                self.shell.request_process_tree_end(identity);
+                None
+            }
             ProcessMenuAction::Kill => self.shell.request_process_batch(ProcessBatchAction::Kill),
             ProcessMenuAction::Suspend => self
                 .shell
@@ -71,7 +74,7 @@ impl IcedApp {
             ProcessMenuAction::Properties => self.shell.apply_action(AppAction::OpenProperties),
             ProcessMenuAction::CopyName => {
                 self.copy_process_field(
-                    pid,
+                    identity,
                     "menu.copy_name",
                     |process| process.name.clone(),
                     clipboard_task,
@@ -80,7 +83,7 @@ impl IcedApp {
             }
             ProcessMenuAction::CopyPid => {
                 self.copy_process_field(
-                    pid,
+                    identity,
                     "menu.copy_pid",
                     |process| process.pid.to_string(),
                     clipboard_task,
@@ -89,7 +92,7 @@ impl IcedApp {
             }
             ProcessMenuAction::CopyCommandLine => {
                 self.copy_process_field(
-                    pid,
+                    identity,
                     "menu.copy_command_line",
                     |process| process.cmdline.clone(),
                     clipboard_task,
@@ -101,12 +104,12 @@ impl IcedApp {
 
     fn copy_process_field(
         &mut self,
-        pid: u32,
+        identity: ProcessLiveKey,
         label_key: &'static str,
-        value: impl FnOnce(&taskmanager_core::core::process::ProcessItem) -> String,
+        value: impl FnOnce(&ProcessItem) -> String,
         clipboard_task: &mut Option<Task<Message>>,
     ) {
-        let Some(process) = self.shell.visible_process_by_pid(pid) else {
+        let Some(process) = self.shell.visible_process_by_identity(identity) else {
             self.shell.report_notice(
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,

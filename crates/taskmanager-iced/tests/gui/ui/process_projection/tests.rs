@@ -1,16 +1,14 @@
 use super::*;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 /// Expected row id for a fixture process (single source: the fixture
 /// builder's default start token).
 fn expected_row_key(
-    kind: fn(taskmanager_shell::ProcessRowIdentity) -> taskmanager_shell::ProcessRowId,
+    kind: fn(ProcessLiveKey) -> taskmanager_shell::ProcessRowId,
     pid: u32,
 ) -> Option<taskmanager_shell::ProcessRowId> {
-    taskmanager_shell::ProcessRowIdentity::from_parts(
-        pid,
-        taskmanager_test_support::fixture_start_token(pid),
-    )
-    .map(kind)
+    ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid)).map(kind)
 }
 
 fn proc(pid: u32, name: &str, parent_pid: Option<u32>) -> ProcessItem {
@@ -35,7 +33,7 @@ fn app_proc(pid: u32, name: &str) -> ProcessItem {
 fn project(
     items: &[ProcessItem],
     expanded_groups: &HashSet<String>,
-    collapsed: &HashSet<u32>,
+    collapsed: &HashSet<ProcessLiveKey>,
 ) -> ProcessProjection {
     let refs: Vec<_> = items.iter().collect();
     ProcessProjection::project_with_local_time(
@@ -44,6 +42,7 @@ fn project(
         expanded_groups,
         collapsed,
         &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        0,
     )
 }
 
@@ -81,7 +80,7 @@ fn application_total_and_recursive_process_rows_keep_distinct_identity() {
     let items = [app_proc(10, "editor")];
     let expanded = HashSet::from([
         "category:application".to_string(),
-        "app-tree:10".to_string(),
+        "app-tree:pid:10:start:101".to_string(),
     ]);
     let projection = project(&items, &expanded, &HashSet::new());
     assert_eq!(
@@ -102,7 +101,11 @@ fn collapsed_tree_node_hides_only_its_descendants() {
         proc(3, "grandchild", Some(2)),
     ];
     let expanded = HashSet::from(["category:uncategorized".to_string()]);
-    let projection = project(&items, &expanded, &HashSet::from([1]));
+    let projection = project(
+        &items,
+        &expanded,
+        &HashSet::from([ProcessLiveKey::from_parts(1, 11).expect("fixture identity")]),
+    );
     let pids: Vec<_> = projection
         .rows()
         .iter()
@@ -167,7 +170,7 @@ fn fingerprint_changes_for_every_runtime_projection_input() {
             (SortCol::Memory, SortDir::Asc),
             "needle",
             &groups,
-            &HashSet::from([1]),
+            &HashSet::from([ProcessLiveKey::from_parts(1, 11).expect("fixture identity")]),
         )
     );
 }
@@ -187,4 +190,29 @@ fn row_cells_keep_unavailable_values_honest() {
     assert_eq!(cells.pid, "7");
     assert_eq!(cells.memory, taskmanager_shell::presentation::MISSING_VALUE);
     assert_eq!(cells.pss, taskmanager_shell::presentation::MISSING_VALUE);
+}
+
+#[test]
+fn aggregate_groups_sort_disk_columns_by_their_own_typed_metrics() {
+    fn group(pid: u32, memory: u64, disk_read: u64, disk_write: u64) -> GroupProjection {
+        let mut process = proc(pid, "app", None);
+        let mut observations = *process.scalar_observations();
+        observations.memory_bytes = ScalarObservation::available(memory, 10);
+        observations.disk_read_bytes_per_sec = ScalarObservation::available(disk_read, 10);
+        observations.disk_write_bytes_per_sec = ScalarObservation::available(disk_write, 10);
+        process.apply_scalar_observations(observations);
+        let members = [&process];
+        GroupProjection {
+            name: format!("app-{pid}"),
+            main_pid: pid,
+            process_count: 1,
+            metrics: aggregate_group_metrics(&members, 10).expect("non-empty group metrics"),
+        }
+    }
+
+    let mut groups = [group(1, 900, 100, 900), group(2, 100, 900, 100)];
+    sort_groups(&mut groups, (SortCol::DiskRead, SortDir::Desc));
+    assert_eq!(groups[0].main_pid, 2);
+    sort_groups(&mut groups, (SortCol::DiskWrite, SortDir::Desc));
+    assert_eq!(groups[0].main_pid, 1);
 }

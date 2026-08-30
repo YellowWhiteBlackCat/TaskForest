@@ -47,7 +47,10 @@ pub struct WindowsProcessorTopology {
     /// Logical core classification for each logical processor (0..N).
     pub cpu_types: Vec<WindowsCpuType>,
     /// Sum of distinct Windows cache relationship records by level, in KiB.
-    pub l1_cache_kb: Option<u64>,
+    /// L1 is split by kind (`CacheData`/`CacheUnified` → data slot,
+    /// `CacheInstruction` → instruction slot).
+    pub l1d_cache_kb: Option<u64>,
+    pub l1i_cache_kb: Option<u64>,
     pub l2_cache_kb: Option<u64>,
     pub l3_cache_kb: Option<u64>,
 }
@@ -78,9 +81,10 @@ pub fn processor_topology() -> Result<WindowsProcessorTopology, WindowsApiError>
             socket_count,
             core_breakdown,
             cpu_types,
-            l1_cache_kb: cache[0],
-            l2_cache_kb: cache[1],
-            l3_cache_kb: cache[2],
+            l1d_cache_kb: cache[0],
+            l1i_cache_kb: cache[1],
+            l2_cache_kb: cache[2],
+            l3_cache_kb: cache[3],
         })
     }
     #[cfg(not(windows))]
@@ -261,8 +265,9 @@ fn parse_core_records(
 fn parse_cache_records(
     bytes: &[u8],
     relationship: i32,
-) -> Result<[Option<u64>; 3], WindowsApiError> {
-    let mut totals = [None; 3];
+) -> Result<[Option<u64>; 4], WindowsApiError> {
+    // index 0 = L1 data (incl. unified), 1 = L1 instruction, 2 = L2, 3 = L3.
+    let mut totals = [None; 4];
     visit_records(bytes, relationship, |record| {
         if record.len() < CACHE_FIXED_BYTES {
             return Err(WindowsApiError::QueryFailed);
@@ -280,11 +285,20 @@ fn parse_cache_records(
         if !(0..=2).contains(&cache_type) {
             return Ok(());
         }
+        // L1 splits by kind exactly once per relationship record; a unified
+        // L1 reports into the data slot (shown once, never double-counted).
+        let slot = match (level, cache_type) {
+            (1, 0) | (1, 2) => 0,
+            (1, 1) => 1,
+            (2, _) => 2,
+            (3, _) => 3,
+            _ => return Ok(()),
+        };
         if cache_bytes == 0 {
             return Ok(());
         }
         let cache_kb = cache_bytes.div_ceil(1024);
-        let slot = &mut totals[level - 1];
+        let slot = &mut totals[slot];
         *slot = Some(
             slot.unwrap_or(0_u64)
                 .checked_add(cache_kb)

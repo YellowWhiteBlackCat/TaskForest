@@ -80,6 +80,10 @@ pub(super) fn system_sections(
             hardware.and_then(|item| item.kernel_build.as_deref()),
         ),
         (
+            "system.field.kernel_compiler",
+            hardware.and_then(|item| item.kernel_compiler.as_deref()),
+        ),
+        (
             "system.hostname",
             hardware.and_then(|item| item.hostname.as_deref()),
         ),
@@ -151,6 +155,15 @@ pub(super) fn system_sections(
     ] {
         device.push_optional_text(key, value);
     }
+    // Platform/chipset model belongs with the board/firmware identity; a host
+    // whose adapter proved no chipset omits the row instead of dashing it.
+    if let Some(chipset) = hardware
+        .and_then(|item| item.chipset.as_deref())
+        .map(str::trim)
+        .filter(|chipset| !chipset.is_empty())
+    {
+        device.push(t("system.field.chipset"), chipset);
+    }
     device.push(
         t("system.field.package_count"),
         hardware
@@ -178,6 +191,18 @@ pub(super) fn system_sections(
         "common.cpu",
         hardware.and_then(|item| item.cpu_brand.as_deref()),
     );
+    if let Some(codename) = hardware.and_then(|item| item.cpu_identity.codename()) {
+        cpu.push(t("system.cpu_codename"), codename);
+    }
+    if let Some(process) = hardware.and_then(|item| item.cpu_identity.process_node()) {
+        cpu.push(t("system.cpu_process"), process);
+    }
+    if let Some(vendor) = hardware.and_then(|item| item.cpu_identity.vendor_id.clone()) {
+        cpu.push(t("system.cpu_vendor"), vendor);
+    }
+    if let Some(code) = hardware.and_then(|item| item.cpu_identity.code()) {
+        cpu.push(t("system.cpu_identity"), code);
+    }
     cpu.push(
         t("common.logical_cores"),
         hardware
@@ -195,6 +220,19 @@ pub(super) fn system_sections(
         hardware
             .and_then(|item| item.base_freq_mhz)
             .map_or_else(missing_value, |mhz| format!("{mhz} MHz")),
+    );
+    cpu.push(
+        t("cpu.multiplier"),
+        hardware
+            .and_then(|item| item.base_freq_mhz)
+            .zip(snapshot.and_then(|snap| snap.cpu.current_frequency_mhz()))
+            .map_or_else(missing_value, |(base, current)| {
+                if base == 0 {
+                    missing_value()
+                } else {
+                    format!("\u{00d7}{:.1}", current as f32 / base as f32)
+                }
+            }),
     );
     cpu.push(
         t("common.virtualization"),

@@ -422,17 +422,41 @@ fn polkit_gate_probe_process_control_is_typed_without_overclaiming() {
 }
 
 #[test]
+fn polkit_gate_probe_smbios_rapl_and_msr_are_typed_without_overclaiming() {
+    // MemorySmbios / PackagePowerRapl / CpuMsr have real filesystem probes
+    // (gate:: probe_smbios_helper / probe_rapl_helper / probe_msr_helper):
+    // an installed crossing reports RequiresEscalation, a missing one
+    // HelperUnavailable, non-Linux Unsupported — never Available (a probe
+    // escalates nothing).
+    let gate = PolkitGate::new();
+    for feature in [
+        EscalationFeature::MemorySmbios,
+        EscalationFeature::PackagePowerRapl,
+        EscalationFeature::CpuMsr,
+    ] {
+        match gate.probe(feature) {
+            EscalationAvailability::RequiresEscalation(current) if current == feature => {}
+            EscalationAvailability::Denied {
+                reason: EscalationDenialReason::HelperUnavailable,
+            }
+            | EscalationAvailability::Denied {
+                reason: EscalationDenialReason::Unsupported,
+            } => {}
+            other => panic!("probe({feature:?}) over-claimed availability: {other:?}"),
+        }
+    }
+}
+
+#[test]
 fn polkit_gate_probe_unwired_features_defer_to_requires_escalation() {
-    // PerProcessNet is NOT here: it has a real probe (`gate::
-    // probe_net_launcher`, fixture-tested in `gate.rs`) that distinguishes
-    // "prompt available" from HelperUnavailable, so its result depends on
-    // host state instead of deferring to the default.
+    // PerProcessNet, ForeignProcessControl, MemorySmbios, PackagePowerRapl,
+    // and CpuMsr are NOT here: they have real probes that distinguish "prompt
+    // available" from HelperUnavailable, so their results depend on host
+    // state instead of deferring to the default.
     let gate = PolkitGate::new();
     for feature in [
         EscalationFeature::AtaSmart,
         EscalationFeature::SystemServiceControl,
-        EscalationFeature::MemorySmbios,
-        EscalationFeature::PackagePowerRapl,
     ] {
         assert_eq!(
             gate.probe(feature),
@@ -449,9 +473,8 @@ fn polkit_gate_probe_unwired_features_defer_to_requires_escalation() {
 /// (`polkit/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy.in`);
 /// from this crate that is `../../polkit/...`.
 fn policy_in_path() -> std::path::PathBuf {
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-        "../../polkit/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy.in",
-    )
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../polkit/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy.in")
 }
 
 #[test]
@@ -506,9 +529,8 @@ fn polkit_policy_template_is_well_formed_and_complete() {
 #[cfg(target_os = "linux")]
 #[test]
 fn net_launcher_policy_template_is_well_formed_and_complete() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-        "../../polkit/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy.in",
-    );
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../polkit/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy.in");
     let content = std::fs::read_to_string(&path).unwrap_or_else(|error| {
         panic!(
             "net-launcher policy template should be readable at {}: {error}",
@@ -542,9 +564,8 @@ fn net_launcher_policy_template_is_well_formed_and_complete() {
 #[cfg(target_os = "linux")]
 #[test]
 fn process_control_policy_template_matches_the_fixed_helper_path() {
-    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
-        "../../polkit/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy.in",
-    );
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../polkit/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy.in");
     let content = std::fs::read_to_string(&path).unwrap_or_else(|error| {
         panic!(
             "process-control policy template should be readable at {}: {error}",
@@ -568,6 +589,99 @@ fn process_control_policy_template_matches_the_fixed_helper_path() {
         process_control::PROCESS_CONTROL_HELPER_PATH,
         "/usr/libexec/taskforest-process-control-helper",
         "process-control helper path must match the policy annotation"
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn smbios_helper_policy_template_matches_the_fixed_helper_path() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../polkit/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy.in");
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|error| {
+        panic!(
+            "smbios-helper policy template should be readable at {}: {error}",
+            path.display()
+        )
+    });
+    for fragment in [
+        "<?xml version=\"1.0\"",
+        "<policyconfig>",
+        "<action id=\"io.github.YellowWhiteBlackCat.TaskForest.smbios-helper\">",
+        "auth_admin_keep",
+        "/usr/libexec/taskforest-smbios-helper",
+        "</policyconfig>",
+    ] {
+        assert!(
+            content.contains(fragment),
+            "smbios-helper policy lost required fragment: {fragment}",
+        );
+    }
+    assert_eq!(
+        smbios::SMBIOS_HELPER_PATH,
+        "/usr/libexec/taskforest-smbios-helper",
+        "smbios helper path must match the policy annotation"
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn rapl_helper_policy_template_matches_the_fixed_helper_path() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../polkit/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy.in");
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|error| {
+        panic!(
+            "rapl-helper policy template should be readable at {}: {error}",
+            path.display()
+        )
+    });
+    for fragment in [
+        "<?xml version=\"1.0\"",
+        "<policyconfig>",
+        "<action id=\"io.github.YellowWhiteBlackCat.TaskForest.rapl-helper\">",
+        "auth_admin_keep",
+        "/usr/libexec/taskforest-rapl-helper",
+        "</policyconfig>",
+    ] {
+        assert!(
+            content.contains(fragment),
+            "rapl-helper policy lost required fragment: {fragment}",
+        );
+    }
+    assert_eq!(
+        rapl::RAPL_HELPER_PATH,
+        "/usr/libexec/taskforest-rapl-helper",
+        "rapl helper path must match the policy annotation"
+    );
+}
+
+#[cfg(target_os = "linux")]
+#[test]
+fn msr_helper_policy_template_matches_the_fixed_helper_path() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../polkit/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy.in");
+    let content = std::fs::read_to_string(&path).unwrap_or_else(|error| {
+        panic!(
+            "msr-helper policy template should be readable at {}: {error}",
+            path.display()
+        )
+    });
+    for fragment in [
+        "<?xml version=\"1.0\"",
+        "<policyconfig>",
+        "<action id=\"io.github.YellowWhiteBlackCat.TaskForest.msr-helper\">",
+        "auth_admin_keep",
+        "/usr/libexec/taskforest-msr-helper",
+        "</policyconfig>",
+    ] {
+        assert!(
+            content.contains(fragment),
+            "msr-helper policy lost required fragment: {fragment}",
+        );
+    }
+    assert_eq!(
+        msr::MSR_HELPER_PATH,
+        "/usr/libexec/taskforest-msr-helper",
+        "msr helper path must match the policy annotation"
     );
 }
 

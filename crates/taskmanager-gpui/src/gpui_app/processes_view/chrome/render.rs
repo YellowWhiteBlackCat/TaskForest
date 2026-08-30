@@ -28,7 +28,8 @@ use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
 
 use taskmanager_application::i18n;
-use taskmanager_shell::{ProcessRowId, ProcessRowIdentity, ProcessStatusFilter};
+use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::{ProcessRowId, ProcessStatusFilter};
 
 /// All straight-through processes-page render inputs (design-debt #1 props
 /// consolidation); `window`/`cx` stay explicit render-lifetime handles.
@@ -39,15 +40,15 @@ pub struct ProcessesViewProps<'a> {
     pub search_input: &'a gpui::Entity<TextInputState>,
     pub rows: &'a Rc<Vec<VisibleRow>>,
     pub query: &'a str,
-    pub selected: Option<u32>,
+    pub selected_identity: Option<ProcessLiveKey>,
     pub selected_row: Option<ProcessRowId>,
     pub selected_target_count: usize,
-    pub selected_identities: &'a HashSet<ProcessRowIdentity>,
+    pub selected_identities: &'a HashSet<ProcessLiveKey>,
     pub hovered: Option<Hover>,
     pub sort_col: SortCol,
     pub sort_asc: bool,
     pub filter: ProcessStatusFilter,
-    pub affinity_pid: Option<u32>,
+    pub affinity_identity: Option<ProcessLiveKey>,
     pub affinity_state: &'a taskmanager_application::ProcessAffinityState,
     pub affinity_cpus: &'a HashSet<u32>,
     pub affinity_hover: Option<usize>,
@@ -137,7 +138,7 @@ pub fn render_processes(
         search_input,
         rows,
         query,
-        selected,
+        selected_identity,
         selected_row,
         selected_target_count,
         selected_identities,
@@ -145,7 +146,7 @@ pub fn render_processes(
         sort_col,
         sort_asc,
         filter,
-        affinity_pid,
+        affinity_identity,
         affinity_state,
         affinity_cpus,
         affinity_hover,
@@ -243,9 +244,12 @@ pub fn render_processes(
         // walk PROCESS rows only (the same filtered list `move_process_page`
         // consumes). Structural aggregate rows have no process identity and
         // must not capture selection/navigation.
-        let nav_pids = std::rc::Rc::new(
+        let process_identities = std::rc::Rc::new(
             rows.iter()
-                .filter_map(|row| row.process_pid)
+                .filter_map(|row| match row.selection_key {
+                    Some(ProcessRowId::Process(identity)) => Some(identity),
+                    _ => None,
+                })
                 .collect::<Vec<_>>(),
         );
         let nav_rows = std::rc::Rc::new(
@@ -264,8 +268,7 @@ pub fn render_processes(
                         selected_row == Some(key)
                             || key.live_key().is_some_and(|identity| {
                                 selected_identities.contains(&identity)
-                                    || (selected_identities.is_empty()
-                                        && selected == Some(identity.pid()))
+                                    || selected_identity == Some(identity)
                             })
                     });
                     proc_row_with_layout(
@@ -276,10 +279,14 @@ pub fn render_processes(
                             is_sel: selected,
                             is_hov: !selected
                                 && row
-                                    .process_pid
-                                    .is_some_and(|pid| hovered_for_rows == Some(Hover::Proc(pid))),
+                                    .selection_key
+                                    .and_then(|key| key.is_process().then_some(key))
+                                    .and_then(ProcessRowId::live_key)
+                                    .is_some_and(|identity| {
+                                        hovered_for_rows == Some(Hover::Proc(identity))
+                                    }),
                             entity: &entity_for_rows,
-                            pids: nav_pids.clone(),
+                            process_identities: process_identities.clone(),
                             row_keys: nav_rows.clone(),
                             rows: rows_owned.clone(),
                             gray_zero_values,
@@ -414,7 +421,7 @@ pub fn render_processes(
         .child(process_control_chrome(
             ProcessControlChromeProps {
                 theme: &theme,
-                selected,
+                selected_identity,
                 selected_target_count,
                 application_selected: selected_row
                     .is_some_and(|row| row.application_root().is_some()),
@@ -430,12 +437,12 @@ pub fn render_processes(
             cx,
         ))
         .child(table_scroll);
-    if let Some(affinity_pid) = affinity_pid {
+    if let Some(affinity_identity) = affinity_identity {
         view.child(affinity_overlay(
             AffinityOverlayProps {
                 theme: &theme,
                 hovered: affinity_hovered.as_ref(),
-                pid: affinity_pid,
+                identity: affinity_identity,
                 state: affinity_state,
                 cpus: affinity_cpus,
                 hover_chip: affinity_hover,

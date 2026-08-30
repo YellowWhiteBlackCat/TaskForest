@@ -2,14 +2,12 @@
 
 use std::rc::Rc;
 
-use iced::widget::canvas;
-use iced::{Color, Length, Point, Rectangle, Size, mouse};
-use taskmanager_application::i18n::t;
-use taskmanager_telemetry_store::live_graph::MetricSeries;
-
 use super::scale::summary_value;
 use super::*;
 use crate::perf_chart::ReadoutColors;
+use iced::widget::canvas;
+use iced::{Color, Length, Point, Rectangle, Size, mouse};
+use taskmanager_application::i18n::t;
 
 /// Build one hover-capable test chart; `hover` switches the readout on/off.
 fn hover_chart(hover: bool) -> DeviceChart {

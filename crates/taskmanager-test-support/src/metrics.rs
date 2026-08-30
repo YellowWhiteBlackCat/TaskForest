@@ -569,6 +569,11 @@ impl NetworkMetricsFixtureBuilder {
         self
     }
     #[must_use]
+    pub fn link_up_observation(mut self, value: ScalarObservation<bool>) -> Self {
+        self.scalars.link_up = value;
+        self
+    }
+    #[must_use]
     pub fn ssid_observation(mut self, value: OptionalObservation<Arc<str>>) -> Self {
         if value.current_value().is_some() && self.wireless.association.current_value().is_none() {
             self.wireless.association = OptionalObservation::present(true, FIXTURE_OBSERVED_AT);

@@ -11,7 +11,7 @@
 //! - [`theme`] — the neutral skin registry mapped onto iced colors.
 //! - [`keys`] — iced keyboard events normalized into the shared shell
 //!   key vocabulary.
-//! - [`input_modality`] — the renderer-local input-modality tracker (the
+//! - `input_modality` — the renderer-local input-modality tracker (the
 //!   focus-visible source) and the root pointer-press observer.
 //! - [`focus`] — the real Iced `operation::Focusable` adapter for modal
 //!   controls.

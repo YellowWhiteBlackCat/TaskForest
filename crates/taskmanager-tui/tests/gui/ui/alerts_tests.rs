@@ -1,4 +1,4 @@
-use super::*;
+use super::alerts_support::render_suggestions_overlay;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use taskmanager_application::{AppAction, AppPage};

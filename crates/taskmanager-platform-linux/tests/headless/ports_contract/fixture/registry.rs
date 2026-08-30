@@ -49,6 +49,18 @@ pub fn fake_registry(provider: FakeProvider) -> LinuxProviderRegistry {
                     ProviderId::borrowed("fixture.system.npu-inventory"),
                     provider.clone(),
                 ),
+                ProviderRegistration::new(
+                    ProviderId::borrowed("fixture.system.smbios-memory"),
+                    provider.clone(),
+                ),
+                ProviderRegistration::new(
+                    ProviderId::borrowed("fixture.system.rapl-power"),
+                    provider.clone(),
+                ),
+                ProviderRegistration::new(
+                    ProviderId::borrowed("fixture.system.msr-readout"),
+                    provider.clone(),
+                ),
             ),
         ),
         ProcessProviders::new(

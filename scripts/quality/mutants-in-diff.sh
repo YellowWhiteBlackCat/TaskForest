@@ -69,7 +69,15 @@ if [[ -z "$base" ]]; then
     fi
 fi
 
-scratch="$(mktemp -d "$repo/.tmp/mutants-XXXXXX")"
+scratch_root="${TM_SCRATCH_ROOT:-$(dirname "$repo")/.agent-scratch}"
+if ! mkdir -p "$scratch_root" 2>/dev/null; then
+    echo "mutants-in-diff: scratch root '$scratch_root' is not writable;" \
+        "set TM_SCRATCH_ROOT to a writable path outside the repository" >&2
+    exit 2
+fi
+# Reap runs leaked by hard kills; the EXIT trap cannot fire on SIGKILL.
+find "$scratch_root" -maxdepth 1 -name 'mutants-*' -mtime +2 -exec rm -rf {} + 2>/dev/null
+scratch="$(mktemp -d "$scratch_root/mutants-XXXXXX")"
 
 cleanup() {
     local rc=$?

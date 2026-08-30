@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 #[test]
 fn confirmation_freezes_target_while_navigation_changes_only_verb() {
@@ -28,7 +29,7 @@ fn confirmation_freezes_target_while_navigation_changes_only_verb() {
 #[test]
 fn disabled_action_is_visible_but_never_authorized() {
     let mut session = ControlSession::new(
-        ControlTarget::Process(42),
+        ControlTarget::Process(ProcessLiveKey::from_parts(42, 420).expect("live process key")),
         vec![ControlChoice::disabled(ControlVerb::Terminate)],
     );
     assert_eq!(session.advance(ControlInput::Confirm), None);

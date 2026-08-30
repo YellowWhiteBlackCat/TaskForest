@@ -5,9 +5,10 @@ use taskmanager_platform_contract::{CapabilityId, RequestId, SubmissionError};
 
 use crate::platform::{
     ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
-    NetworkTelemetryRequest, NpuInventoryRequest, StorageTelemetryRequest, SystemTelemetryDomain,
-    SystemTelemetrySubmission, SystemTelemetrySubmissionError, SystemTelemetryUnavailable,
+    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
+    NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest, SmbiosMemoryRequest,
+    StorageTelemetryRequest, SystemTelemetryDomain, SystemTelemetrySubmission,
+    SystemTelemetrySubmissionError, SystemTelemetryUnavailable,
 };
 
 use super::{PendingSystemTelemetryRequest, PlatformClient, submit_request};
@@ -338,6 +339,64 @@ impl PlatformClient {
         submit_request(
             id,
             self.handle.facets().system().npu_inventory(),
+            submitted_at_ms,
+            request,
+        )?;
+        Ok(id)
+    }
+
+    /// Submit a SMBIOS memory-inventory read (capability
+    /// `telemetry.memory.smbios`). The provider performs ONE bounded privileged
+    /// helper invocation per request; real slot/module rows or a typed failure
+    /// arrive as an `SmbiosMemoryEvent` publication in the next event batch.
+    pub fn submit_smbios_memory(
+        &mut self,
+        request: SmbiosMemoryRequest,
+        submitted_at_ms: u64,
+    ) -> Result<RequestId, SubmissionError> {
+        let id = self.request_ids.next_id();
+        submit_request(
+            id,
+            self.handle.facets().system().smbios_memory(),
+            submitted_at_ms,
+            request,
+        )?;
+        Ok(id)
+    }
+
+    /// Submit a CPU package-power read (capability
+    /// `telemetry.cpu.package_power`). The provider performs ONE bounded RAPL
+    /// helper sample per request; real per-package watt figures or a typed
+    /// failure arrive as a `RaplPowerEvent` publication in the next event
+    /// batch.
+    pub fn submit_rapl_power(
+        &mut self,
+        request: RaplPowerRequest,
+        submitted_at_ms: u64,
+    ) -> Result<RequestId, SubmissionError> {
+        let id = self.request_ids.next_id();
+        submit_request(
+            id,
+            self.handle.facets().system().rapl_power(),
+            submitted_at_ms,
+            request,
+        )?;
+        Ok(id)
+    }
+
+    /// Submit a CPU MSR readout (capability `telemetry.cpu.msr`). The
+    /// provider performs ONE bounded MSR helper invocation per request; real
+    /// per-node register rows or a typed failure arrive as an
+    /// `MsrReadoutEvent` publication in the next event batch.
+    pub fn submit_msr_readout(
+        &mut self,
+        request: MsrReadoutRequest,
+        submitted_at_ms: u64,
+    ) -> Result<RequestId, SubmissionError> {
+        let id = self.request_ids.next_id();
+        submit_request(
+            id,
+            self.handle.facets().system().msr_readout(),
             submitted_at_ms,
             request,
         )?;

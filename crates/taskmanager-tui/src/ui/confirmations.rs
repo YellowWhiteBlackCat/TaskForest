@@ -14,6 +14,11 @@ use super::{service_menu, session_menu};
 use crate::TuiApp;
 use crate::TuiTheme;
 
+#[cfg(test)]
+#[allow(dead_code)]
+#[path = "../../tests/headless/ui/confirmations_support.rs"]
+pub(crate) mod confirmations_support;
+
 /// The confirmation family's shared confirm/dismiss hint line: the
 /// black-on-danger `y` chord and the black-on-white `n / Esc` chord over the
 /// default-foreground labels the popups have always painted, routed through
@@ -34,33 +39,6 @@ fn confirm_hint_line(theme: TuiTheme) -> Line<'static> {
             ),
         ],
     )
-}
-
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn render_end_confirmation(
-    frame: &mut Frame<'_>,
-    _app: &TuiApp,
-    theme: TuiTheme,
-    name: &str,
-    pid: u32,
-    area: Rect,
-) {
-    render_end_confirmation_at(
-        frame,
-        _app,
-        theme,
-        name,
-        pid,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::EndTask,
-                ),
-            ),
-        ),
-    );
 }
 
 pub(super) fn render_end_confirmation_at(
@@ -95,31 +73,6 @@ pub(super) fn render_end_confirmation_at(
 /// Shared confirmation overlay for a gated service action (Stop / Restart).
 /// The request is only emitted by `ConfirmServiceControl` (y); n / Esc clear
 /// the pending target without submitting.
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn render_service_control_confirmation(
-    frame: &mut Frame<'_>,
-    _app: &TuiApp,
-    theme: TuiTheme,
-    pending: &taskmanager_application::ServiceControlTarget,
-    area: Rect,
-) {
-    render_service_control_confirmation_at(
-        frame,
-        _app,
-        theme,
-        pending,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::ServiceControl,
-                ),
-            ),
-        ),
-    );
-}
-
 pub(super) fn render_service_control_confirmation_at(
     frame: &mut Frame<'_>,
     _app: &TuiApp,
@@ -154,29 +107,6 @@ pub(super) fn render_service_control_confirmation_at(
 /// (`ShellApp::select_session_control`); the platform request is produced by
 /// `ShellApp::confirm_session_control` only on confirm (y), and n / Esc clear
 /// the pending gate without submitting.
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn render_session_control_confirmation(
-    frame: &mut Frame<'_>,
-    theme: TuiTheme,
-    pending: &taskmanager_application::SessionControlConfirmation,
-    area: Rect,
-) {
-    render_session_control_confirmation_at(
-        frame,
-        theme,
-        pending,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::SessionControl,
-                ),
-            ),
-        ),
-    );
-}
-
 pub(super) fn render_session_control_confirmation_at(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
@@ -209,29 +139,6 @@ pub(super) fn render_session_control_confirmation_at(
 /// The gated startup Enable/Disable confirmation overlay. The request is only
 /// emitted by the shell's `confirm_startup_control` (y); n / Esc clear the
 /// pending gate without submitting.
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn render_startup_control_confirmation(
-    frame: &mut Frame<'_>,
-    theme: TuiTheme,
-    pending: &taskmanager_application::StartupControlRequest,
-    area: Rect,
-) {
-    render_startup_control_confirmation_at(
-        frame,
-        theme,
-        pending,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::StartupControl,
-                ),
-            ),
-        ),
-    );
-}
-
 pub(super) fn render_startup_control_confirmation_at(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
@@ -269,29 +176,6 @@ pub(super) fn render_startup_control_confirmation_at(
 /// the pending intent without submitting. The target scope shows the full
 /// frozen set so a multi-select Kill reads as "N processes" rather than the
 /// single first row.
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn render_batch_confirmation(
-    frame: &mut Frame<'_>,
-    theme: TuiTheme,
-    intent: &taskmanager_core::core::process::ProcessBatchIntent,
-    area: Rect,
-) {
-    render_batch_confirmation_at(
-        frame,
-        theme,
-        intent,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::ProcessBatch,
-                ),
-            ),
-        ),
-    );
-}
-
 pub(super) fn render_batch_confirmation_at(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
@@ -325,29 +209,6 @@ pub(super) fn render_batch_confirmation_at(
         .alignment(Alignment::Center)
         .wrap(Wrap { trim: true }),
         inner,
-    );
-}
-
-#[cfg(test)]
-#[allow(dead_code)]
-pub(super) fn render_smart_self_test_confirmation(
-    frame: &mut Frame<'_>,
-    theme: TuiTheme,
-    intent: &taskmanager_core::core::system_health::SmartSelfTestIntent,
-    area: Rect,
-) {
-    render_smart_self_test_confirmation_at(
-        frame,
-        theme,
-        intent,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::Confirmation(
-                    taskmanager_application::ConfirmationKind::SmartSelfTest,
-                ),
-            ),
-        ),
     );
 }
 

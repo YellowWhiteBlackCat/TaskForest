@@ -9,10 +9,10 @@
 use std::collections::HashSet;
 
 use taskmanager_application::AppPage;
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 
 use super::ShellApp;
-use super::process_rows::{ProcessRowId, ProcessRowIdentity};
+use super::process_rows::{ProcessRowAnchor, ProcessRowId};
 use super::sorting::{SortCol, SortDir};
 use crate::ProcessStatusFilter;
 
@@ -63,68 +63,167 @@ impl ShellApp {
         self.data.processes.as_deref()?.get(raw_index)
     }
 
-    /// Find a visible process by PID without allocating the full borrowed-row
-    /// vector. The scan is reserved for menu/detail actions; renderers should
-    /// use [`Self::visible_process_indices`] for their row projection.
+    /// Resolve one exact live identity against the accepted process snapshot.
     #[must_use]
-    pub fn visible_process_by_pid(&self, pid: u32) -> Option<&ProcessItem> {
-        let processes = self.data.processes.as_deref()?;
-        self.visible_processes_indices()
+    pub fn process_by_identity(&self, identity: ProcessLiveKey) -> Option<&ProcessItem> {
+        self.data
+            .processes_slice()
             .iter()
-            .find_map(|&raw_index| {
-                processes
-                    .get(raw_index)
-                    .filter(|process| process.pid == pid)
-            })
+            .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
     }
 
-    /// Find the visible-row position for a PID without allocating borrowed
-    /// row references. Used by renderer-local menu actions before they route
-    /// back through the shared selection reducer.
+    /// Resolve one exact live identity against the visible projection.
     #[must_use]
-    pub fn visible_process_index_of_pid(&self, pid: u32) -> Option<usize> {
+    pub fn visible_process_by_identity(&self, identity: ProcessLiveKey) -> Option<&ProcessItem> {
         let processes = self.data.processes.as_deref()?;
         self.visible_processes_indices()
             .iter()
-            .position(|&raw_index| processes.get(raw_index).is_some_and(|p| p.pid == pid))
+            .filter_map(|&raw_index| processes.get(raw_index))
+            .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
+    }
+
+    /// Find the visible-row position for a stable identity. A PID-reuse
+    /// impostor never matches.
+    #[must_use]
+    pub fn visible_process_index_of_identity(&self, identity: ProcessLiveKey) -> Option<usize> {
+        let processes = self.data.processes.as_deref()?;
+        self.visible_processes_indices()
+            .iter()
+            .position(|&raw_index| {
+                processes
+                    .get(raw_index)
+                    .is_some_and(|process| ProcessLiveKey::from_process(process) == Some(identity))
+            })
     }
 
     /// The validated live identity at one visible-row position, when the row
     /// carries a current provider start token.
     #[must_use]
-    pub fn row_identity_at(&self, index: usize) -> Option<ProcessRowIdentity> {
+    pub fn row_identity_at(&self, index: usize) -> Option<ProcessLiveKey> {
         self.visible_process_at(index)
-            .and_then(ProcessRowIdentity::from_process)
+            .and_then(ProcessLiveKey::from_process)
+    }
+
+    /// The stable semantic row id at one flat visible-row position.
+    #[must_use]
+    pub fn row_id_at(&self, index: usize) -> Option<ProcessRowId> {
+        self.row_identity_at(index).map(ProcessRowId::Process)
+    }
+
+    /// The stable row id plus the accepted process projection generation.
+    /// Delayed renderer events should carry this value rather than a bare
+    /// numeric cursor or PID.
+    #[must_use]
+    pub fn row_anchor_at(&self, index: usize) -> Option<ProcessRowAnchor> {
+        self.row_id_at(index)
+            .map(|id| ProcessRowAnchor::new(id, self.data.process_projection_generation()))
     }
 
     /// The visible-row position of one exact live identity (pid AND start
     /// token); a pid-reuse impostor never matches.
     #[must_use]
-    pub fn visible_position_of_identity(&self, identity: ProcessRowIdentity) -> Option<usize> {
-        let processes = self.data.processes.as_deref()?;
-        self.visible_processes_indices()
-            .iter()
-            .position(|&raw_index| {
-                processes.get(raw_index).is_some_and(|process| {
-                    process.pid == identity.pid()
-                        && process.current_start_token() == Some(identity.start_token())
-                })
-            })
+    pub fn visible_position_of_identity(&self, identity: ProcessLiveKey) -> Option<usize> {
+        self.visible_process_index_of_identity(identity)
     }
 
     /// Whether one process row is part of the batch set, by exact live
     /// identity.
     #[must_use]
     pub fn is_process_selected(&self, process: &ProcessItem) -> bool {
-        ProcessRowIdentity::from_process(process)
+        ProcessLiveKey::from_process(process)
             .is_some_and(|identity| self.selected_rows.contains(&identity))
     }
 
     /// The authoritative multi-select identity set (renderers highlight
     /// members; batch intents freeze from this).
     #[must_use]
-    pub fn selected_identities(&self) -> &HashSet<ProcessRowIdentity> {
+    pub fn selected_identities(&self) -> &HashSet<ProcessLiveKey> {
         &self.selected_rows
+    }
+
+    /// The selected semantic row paired with the current projection
+    /// generation. `None` means there is no actionable row selection.
+    #[must_use]
+    pub fn selected_row_anchor(&self) -> Option<ProcessRowAnchor> {
+        self.selected_row
+            .map(|id| ProcessRowAnchor::new(id, self.data.process_projection_generation()))
+    }
+
+    /// Select a semantic row that was resolved from the current projection.
+    /// Process and application rows must still resolve by their full live
+    /// identity; category rows remain structural and never create a process
+    /// target.
+    #[must_use]
+    pub fn select_row_id(&mut self, row: ProcessRowId) -> bool {
+        match row {
+            ProcessRowId::Category(category) => {
+                self.selected_rows.clear();
+                self.selected_row = Some(ProcessRowId::Category(category));
+                self.application.selected_process = None;
+                self.process_selection_invalidated = false;
+                true
+            }
+            ProcessRowId::Application(identity) => {
+                if self.page() != AppPage::Applications {
+                    return false;
+                }
+                let Some(index) = self.visible_process_index_of_identity(identity) else {
+                    return false;
+                };
+                self.selected = index;
+                self.selected_rows.clear();
+                self.selected_row = Some(ProcessRowId::Application(identity));
+                self.process_selection_invalidated = false;
+                self.application.selected_process = None;
+                true
+            }
+            ProcessRowId::Process(identity) => {
+                if self.page() != AppPage::Applications {
+                    return false;
+                }
+                let Some(index) = self.visible_process_index_of_identity(identity) else {
+                    return false;
+                };
+                self.selected = index;
+                self.selected_rows.clear();
+                self.selected_row = Some(ProcessRowId::Process(identity));
+                self.process_selection_invalidated = false;
+                self.selected_rows.insert(identity);
+                self.application.selected_process = self
+                    .process_by_identity(identity)
+                    .and_then(FrozenProcessIdentity::from_process);
+                true
+            }
+        }
+    }
+
+    /// Select a row anchor emitted by the current projection. A delayed
+    /// anchor from an older process revision is rejected before its identity
+    /// can affect selection.
+    #[must_use]
+    pub fn select_row_anchor(&mut self, anchor: ProcessRowAnchor) -> bool {
+        if !anchor.belongs_to(self.data.process_projection_generation()) {
+            return false;
+        }
+        self.select_row_id(anchor.id())
+    }
+
+    /// Promote the current positional compatibility cursor to a stable row
+    /// identity once. This is used only by legacy callers that still assign
+    /// `selected`; all new selection paths enter through row ids/anchors.
+    pub(super) fn ensure_process_row_at_cursor(&mut self) {
+        if self.page() != AppPage::Applications
+            || self.selected_row.is_some()
+            || self.process_selection_invalidated
+        {
+            return;
+        }
+        let Some(identity) = self.row_identity_at(self.selected) else {
+            return;
+        };
+        self.selected_row = Some(ProcessRowId::Process(identity));
+        self.selected_rows.clear();
+        self.selected_rows.insert(identity);
     }
 }
 
@@ -139,8 +238,11 @@ impl ShellApp {
             .selected
             .saturating_add_signed(delta)
             .min(length.saturating_sub(1));
-        self.sync_application_selection();
-        self.collapse_selection_to_anchor();
+        if self.page() == AppPage::Applications {
+            let _ = self.select_row(self.selected);
+        } else {
+            self.clear_non_process_selection();
+        }
     }
 
     pub fn move_selection_to_first(&mut self) {
@@ -149,8 +251,11 @@ impl ShellApp {
             return;
         }
         self.selected = 0;
-        self.sync_application_selection();
-        self.collapse_selection_to_anchor();
+        if self.page() == AppPage::Applications {
+            let _ = self.select_row(self.selected);
+        } else {
+            self.clear_non_process_selection();
+        }
     }
 
     pub fn move_selection_to_last(&mut self) {
@@ -160,8 +265,11 @@ impl ShellApp {
             return;
         }
         self.selected = length - 1;
-        self.sync_application_selection();
-        self.collapse_selection_to_anchor();
+        if self.page() == AppPage::Applications {
+            let _ = self.select_row(self.selected);
+        } else {
+            self.clear_non_process_selection();
+        }
     }
 
     #[must_use]
@@ -169,66 +277,63 @@ impl ShellApp {
         if index >= self.active_row_count() {
             return false;
         }
-        self.selected = index;
-        self.sync_application_selection();
-        self.collapse_selection_to_anchor();
-        true
-    }
-
-    #[must_use]
-    pub fn select_application_row(&mut self, root_pid: u32, flat_index: usize) -> bool {
-        let Some(root) = (self.page() == AppPage::Applications)
-            .then(|| self.visible_process_at(flat_index))
-            .flatten()
-            .filter(|process| process.pid == root_pid)
-            .and_then(ProcessRowIdentity::from_process)
-        else {
+        if self.page() != AppPage::Applications {
+            self.selected = index;
+            self.clear_non_process_selection();
+            return true;
+        }
+        let Some(anchor) = self.row_anchor_at(index) else {
             return false;
         };
-        self.selected = flat_index;
-        self.selected_rows.clear();
-        self.selected_row = Some(ProcessRowId::Application(root));
-        self.application.selected_process = None;
-        true
+        self.select_row_anchor(anchor)
     }
 
     #[must_use]
     pub fn toggle_row_selection(&mut self, index: usize) -> bool {
+        if self.page() != AppPage::Applications {
+            return false;
+        }
         let Some(identity) = self.row_identity_at(index) else {
             return false;
         };
         self.selected = index;
         self.selected_row = Some(ProcessRowId::Process(identity));
+        self.process_selection_invalidated = false;
         self.toggle_selected_identity(identity);
         self.sync_application_selection();
         true
     }
 
-    pub fn toggle_selected_identity(&mut self, identity: ProcessRowIdentity) {
+    pub fn toggle_selected_identity(&mut self, identity: ProcessLiveKey) {
         if !self.selected_rows.insert(identity) {
             self.selected_rows.remove(&identity);
         }
         self.selected_row = Some(ProcessRowId::Process(identity));
+        self.process_selection_invalidated = false;
     }
 
     #[must_use]
     pub fn extend_row_selection(&mut self, index: usize) -> bool {
+        if self.page() != AppPage::Applications {
+            return false;
+        }
         let rows = self.visible_processes();
         let Some(end) = rows
             .get(index)
-            .and_then(|row| ProcessRowIdentity::from_process(row))
+            .and_then(|row| ProcessLiveKey::from_process(row))
         else {
             return false;
         };
         let anchor = rows
             .get(self.selected)
-            .and_then(|row| ProcessRowIdentity::from_process(row))
+            .and_then(|row| ProcessLiveKey::from_process(row))
             .unwrap_or(end);
         let range = selected_rows_range(&rows, anchor, end);
         drop(rows);
         self.selected_rows.extend(range);
         self.selected = index;
         self.selected_row = Some(ProcessRowId::Process(end));
+        self.process_selection_invalidated = false;
         self.sync_application_selection();
         true
     }
@@ -241,9 +346,9 @@ impl ShellApp {
     /// the nearest-survivor clamp path.
     pub fn prune_stale_selection(&mut self) {
         let processes = self.data.processes_slice();
-        let live: HashSet<ProcessRowIdentity> = processes
+        let live: HashSet<ProcessLiveKey> = processes
             .iter()
-            .filter_map(ProcessRowIdentity::from_process)
+            .filter_map(ProcessLiveKey::from_process)
             .collect();
         self.selected_rows
             .retain(|identity| live.contains(identity));
@@ -251,14 +356,19 @@ impl ShellApp {
             Some(ProcessRowId::Application(root) | ProcessRowId::Process(root))
                 if live.contains(&root) =>
             {
+                self.process_selection_invalidated = false;
                 if let Some(position) = self.visible_position_of_identity(root) {
                     self.selected = position;
                 }
             }
             Some(ProcessRowId::Application(_) | ProcessRowId::Process(_)) => {
                 self.selected_row = None;
+                self.process_selection_invalidated = true;
             }
-            Some(ProcessRowId::Category(_)) | None => {}
+            Some(ProcessRowId::Category(_)) => {
+                self.process_selection_invalidated = false;
+            }
+            None => self.ensure_process_row_at_cursor(),
         }
         if let Some(frozen) = self.selected_process_identity() {
             self.application.selected_process = Some(frozen);
@@ -271,6 +381,7 @@ impl ShellApp {
         self.selected_rows.clear();
         self.selected_row = None;
         self.application.selected_process = None;
+        self.process_selection_invalidated = true;
     }
 
     pub fn push_search_char(&mut self, character: char) {
@@ -286,12 +397,18 @@ impl ShellApp {
     }
 
     pub(super) fn collapse_selection_to_anchor(&mut self) {
+        if self.page() != AppPage::Applications {
+            self.clear_non_process_selection();
+            return;
+        }
         self.selected_rows.clear();
         if let Some(identity) = self.row_identity_at(self.selected) {
             self.selected_rows.insert(identity);
             self.selected_row = Some(ProcessRowId::Process(identity));
+            self.process_selection_invalidated = false;
         } else {
             self.selected_row = None;
+            self.process_selection_invalidated = true;
         }
     }
 
@@ -299,6 +416,14 @@ impl ShellApp {
         self.selected = 0;
         self.selected_rows.clear();
         self.selected_row = None;
+        self.process_selection_invalidated = true;
+    }
+
+    fn clear_non_process_selection(&mut self) {
+        self.selected_rows.clear();
+        self.selected_row = None;
+        self.application.selected_process = None;
+        self.process_selection_invalidated = false;
     }
 
     fn reset_selection_after_query_change(&mut self) {
@@ -318,12 +443,12 @@ impl ShellApp {
 #[must_use]
 pub fn selected_rows_range(
     rows: &[&ProcessItem],
-    anchor: ProcessRowIdentity,
-    end: ProcessRowIdentity,
-) -> Vec<ProcessRowIdentity> {
-    let identities: Vec<ProcessRowIdentity> = rows
+    anchor: ProcessLiveKey,
+    end: ProcessLiveKey,
+) -> Vec<ProcessLiveKey> {
+    let identities: Vec<ProcessLiveKey> = rows
         .iter()
-        .filter_map(|row| ProcessRowIdentity::from_process(row))
+        .filter_map(|row| ProcessLiveKey::from_process(row))
         .collect();
     let start = identities.iter().position(|identity| *identity == anchor);
     let end_pos = identities.iter().position(|identity| *identity == end);

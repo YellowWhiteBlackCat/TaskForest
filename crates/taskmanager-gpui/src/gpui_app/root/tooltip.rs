@@ -4,11 +4,11 @@
 use std::collections::HashMap;
 use std::{rc::Rc, sync::Arc};
 
-use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
 
 use super::RootView;
 
-/// Lazy PID index for cursor tooltips. The process table already owns the
+/// Lazy live-key index for cursor tooltips. The process table already owns the
 /// authoritative `Arc<Vec<ProcessItem>>`; retaining that same `Arc` lets the
 /// index detect a new snapshot without relying on every test/capture fixture
 /// to remember a generation bump. The map is built only when a process tooltip
@@ -16,31 +16,29 @@ use super::RootView;
 #[derive(Default)]
 pub(crate) struct ProcessTooltipIndex {
     processes: Option<Arc<Vec<ProcessItem>>>,
-    by_pid: HashMap<u32, usize>,
+    by_identity: HashMap<ProcessLiveKey, usize>,
 }
 
 impl ProcessTooltipIndex {
     pub(super) fn index_for(
         &mut self,
         processes: &Arc<Vec<ProcessItem>>,
-        pid: u32,
+        identity: ProcessLiveKey,
     ) -> Option<usize> {
         let snapshot_changed = self
             .processes
             .as_ref()
             .is_none_or(|cached| !Arc::ptr_eq(cached, processes));
         if snapshot_changed {
-            self.by_pid.clear();
-            self.by_pid.reserve(processes.len());
-            self.by_pid.extend(
-                processes
-                    .iter()
-                    .enumerate()
-                    .map(|(index, process)| (process.pid, index)),
-            );
+            self.by_identity.clear();
+            self.by_identity.reserve(processes.len());
+            self.by_identity
+                .extend(processes.iter().enumerate().filter_map(|(index, process)| {
+                    ProcessLiveKey::from_process(process).map(|identity| (identity, index))
+                }));
             self.processes = Some(processes.clone());
         }
-        self.by_pid.get(&pid).copied()
+        self.by_identity.get(&identity).copied()
     }
 }
 
@@ -60,9 +58,9 @@ pub(crate) struct ProcessHistories {
 impl RootView {
     /// Resolve a process tooltip without scanning the live snapshot for every
     /// hover transition. Clone the command line only when it is displayed.
-    pub(crate) fn process_tooltip_text(&mut self, pid: u32) -> Option<String> {
+    pub(crate) fn process_tooltip_text(&mut self, identity: ProcessLiveKey) -> Option<String> {
         let processes = Arc::clone(self.processes_arc());
-        let index = self.process_tooltip_index.index_for(&processes, pid)?;
+        let index = self.process_tooltip_index.index_for(&processes, identity)?;
         let process = processes.get(index)?;
         (process.cmdline.len() > process.name.len()).then(|| process.cmdline.clone())
     }
@@ -71,17 +69,17 @@ impl RootView {
     /// scan + full clone: the cached `Rc<ProcessItem>` (plus the memoized
     /// shared-series pack the Performance section consumes, see
     /// [`ProcessHistories`]) is rebuilt only when the snapshot `Rc` or the
-    /// requested pid changes. A process refreshed out of the snapshot returns
+    /// requested live identity changes. A process refreshed out of the snapshot returns
     /// `None` (the caller clears the dialog slot).
     pub(crate) fn process_details_target(
         &mut self,
-        pid: u32,
+        identity: ProcessLiveKey,
     ) -> Option<(Rc<ProcessItem>, Rc<ProcessHistories>)> {
         let processes = Arc::clone(self.processes_arc());
-        if let Some(cached) = self.projection_caches.process_details(&processes, pid) {
+        if let Some(cached) = self.projection_caches.process_details(&processes, identity) {
             return Some(cached);
         }
-        let index = self.process_tooltip_index.index_for(&processes, pid)?;
+        let index = self.process_tooltip_index.index_for(&processes, identity)?;
         let item = processes.get(index)?;
         let item = Rc::new(item.clone());
         let histories = Rc::new(ProcessHistories {
@@ -92,7 +90,7 @@ impl RootView {
         });
         self.projection_caches.replace_process_details(
             processes,
-            pid,
+            identity,
             Rc::clone(&item),
             Rc::clone(&histories),
         );

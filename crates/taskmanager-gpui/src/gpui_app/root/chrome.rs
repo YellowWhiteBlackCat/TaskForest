@@ -510,6 +510,7 @@ pub(crate) struct DetailsPanelProps<'a> {
     pub(crate) net_escalation: taskmanager_application::NetworkEscalationState,
     pub(crate) entity: Entity<RootView>,
     pub(crate) local_time_rules: &'a taskmanager_core::core::time::LocalTimeRulesObservation,
+    pub(crate) units: taskmanager_core::core::units::UnitPreferences,
 }
 
 /// Properties content split into explicit Overview / Performance / Command
@@ -525,6 +526,7 @@ pub(crate) fn details_panel_content(props: DetailsPanelProps<'_>) -> Div {
         net_escalation,
         entity,
         local_time_rules,
+        units,
     } = props;
     let section = match active {
         ProcessDetailsSection::Overview => details_overview(t, item, local_time_rules),
@@ -539,6 +541,7 @@ pub(crate) fn details_panel_content(props: DetailsPanelProps<'_>) -> Div {
             available_width,
             net_escalation,
             entity.clone(),
+            units,
         ),
     };
     div()

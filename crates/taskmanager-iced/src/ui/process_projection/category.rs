@@ -1,6 +1,8 @@
 //! Canonical category-first process-tree projection.
 
 use super::*;
+use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::presentation::missing_value;
 
 fn collect_tree_members<'a>(node: &ProcessNode<'a>, members: &mut Vec<&'a ProcessItem>) {
     members.push(node.item);
@@ -9,28 +11,23 @@ fn collect_tree_members<'a>(node: &ProcessNode<'a>, members: &mut Vec<&'a Proces
     }
 }
 
-fn app_group_from_tree_root(root: &ProcessNode<'_>) -> AppGroup {
+fn app_group_from_tree_root<'a>(
+    root: &ProcessNode<'a>,
+    observed_at_ms: u64,
+) -> Option<GroupProjection> {
     let mut members = Vec::new();
     collect_tree_members(root, &mut members);
-    AppGroup {
+    let metrics = aggregate_group_metrics(&members, observed_at_ms)?;
+    Some(GroupProjection {
         name: root
             .item
             .current_application_name()
             .map(str::to_owned)
             .unwrap_or_else(|| root.item.name.clone()),
         main_pid: root.item.pid,
-        application_identity: root.item.current_application_identity().cloned(),
-        pids: members.iter().map(|process| process.pid).collect(),
-        total_cpu_usage: members
-            .iter()
-            .filter_map(|process| process.current_cpu_percentage())
-            .sum(),
-        total_memory_bytes: members
-            .iter()
-            .filter_map(|process| process.current_memory_bytes())
-            .sum(),
         process_count: members.len(),
-    }
+        metrics,
+    })
 }
 
 fn category_label(category: ProcessCategory) -> &'static str {
@@ -46,7 +43,8 @@ pub(super) fn category_rows(
     by_pid: &HashMap<u32, usize>,
     sort: (SortCol, SortDir),
     expanded_groups: &HashSet<String>,
-    expanded_tree: &HashSet<u32>,
+    expanded_tree: &HashSet<ProcessLiveKey>,
+    observed_at_ms: u64,
 ) -> Vec<ProjectedRow> {
     let mut rows = Vec::new();
     for bucket in category_buckets(flat, |process| process_category(process)) {
@@ -55,14 +53,17 @@ pub(super) fn category_rows(
         let expanded = expanded_groups.contains(&key);
         let mut pids: Vec<u32> = members.iter().map(|process| process.pid).collect();
         pids.sort_unstable();
-        let group = AppGroup {
+        let Some(main_pid) = pids.first().copied() else {
+            continue;
+        };
+        let Some(metrics) = aggregate_group_metrics(&members, observed_at_ms) else {
+            continue;
+        };
+        let group = GroupProjection {
             name: key.clone(),
-            main_pid: pids.first().copied().unwrap_or(0),
-            application_identity: None,
-            total_cpu_usage: bucket.sum_f32(|process| process.current_cpu_percentage()),
-            total_memory_bytes: bucket.sum_u64(|process| process.current_memory_bytes()),
+            main_pid,
             process_count: bucket.member_count(),
-            pids,
+            metrics,
         };
         push_group_header(
             &mut rows,
@@ -86,11 +87,14 @@ pub(super) fn category_rows(
             push_application_trees(
                 &mut rows,
                 &tree,
-                expanded_groups,
-                expanded_tree,
-                by_pid,
-                flat,
-                sort,
+                ApplicationTreeContext {
+                    expanded_groups,
+                    expanded_tree,
+                    by_pid,
+                    flat,
+                    sort,
+                    observed_at_ms,
+                },
             );
         } else {
             flatten_with_parents(&tree, expanded_tree, by_pid, &mut rows, 1, None);
@@ -99,22 +103,41 @@ pub(super) fn category_rows(
     rows
 }
 
+struct ApplicationTreeContext<'a> {
+    expanded_groups: &'a HashSet<String>,
+    expanded_tree: &'a HashSet<ProcessLiveKey>,
+    by_pid: &'a HashMap<u32, usize>,
+    flat: &'a [&'a ProcessItem],
+    sort: (SortCol, SortDir),
+    observed_at_ms: u64,
+}
+
 fn push_application_trees(
     rows: &mut Vec<ProjectedRow>,
     tree: &[ProcessNode<'_>],
-    expanded_groups: &HashSet<String>,
-    expanded_tree: &HashSet<u32>,
-    by_pid: &HashMap<u32, usize>,
-    flat: &[&ProcessItem],
-    sort: (SortCol, SortDir),
+    context: ApplicationTreeContext<'_>,
 ) {
-    let mut groups: Vec<AppGroup> = tree.iter().map(app_group_from_tree_root).collect();
-    sort_groups(&mut groups, by_pid, flat, sort);
+    let ApplicationTreeContext {
+        expanded_groups,
+        expanded_tree,
+        by_pid,
+        flat,
+        sort,
+        observed_at_ms,
+    } = context;
+    let mut groups: Vec<GroupProjection> = tree
+        .iter()
+        .filter_map(|root| app_group_from_tree_root(root, observed_at_ms))
+        .collect();
+    sort_groups(&mut groups, sort);
     for group in groups {
         let Some(root) = tree.iter().find(|node| node.item.pid == group.main_pid) else {
             continue;
         };
-        let expansion_key = format!("app-tree:{}", group.main_pid);
+        let Some(root_identity) = ProcessLiveKey::from_process(root.item) else {
+            continue;
+        };
+        let expansion_key = format!("app-tree:{}", root_identity.stable_key());
         let expanded = expanded_groups.contains(&expansion_key);
         push_group_header(
             rows,
@@ -150,15 +173,18 @@ struct GroupHeaderInput<'a> {
     flat: &'a [&'a ProcessItem],
 }
 
-fn push_group_header(rows: &mut Vec<ProjectedRow>, group: &AppGroup, input: GroupHeaderInput<'_>) {
-    let totals = group_totals(group, input.by_pid, input.flat);
+fn push_group_header(
+    rows: &mut Vec<ProjectedRow>,
+    group: &GroupProjection,
+    input: GroupHeaderInput<'_>,
+) {
     let (user, status, nice, start_time_secs) = input
         .by_pid
         .get(&group.main_pid)
         .and_then(|index| input.flat.get(*index))
         .map(|process| {
             (
-                process.current_user().unwrap_or_default(),
+                process.current_user().unwrap_or_else(missing_value),
                 process.status.clone(),
                 process.current_nice(),
                 process.current_start_time_secs(),
@@ -173,15 +199,7 @@ fn push_group_header(rows: &mut Vec<ProjectedRow>, group: &AppGroup, input: Grou
         expansion_key: input.expansion_key,
         member_count: group.process_count,
         expanded: input.expanded,
-        cpu: group.total_cpu_usage,
-        pss: totals.pss,
-        memory_rss: totals.memory_rss,
-        swap: totals.swap,
-        disk_read: totals.disk_read,
-        disk_write: totals.disk_write,
-        threads: totals.threads,
-        cpu_time: totals.cpu_time,
-        fds: totals.fds,
+        metrics: Box::new(group.metrics.clone()),
         user,
         status,
         nice,

@@ -61,6 +61,22 @@ pub(super) fn merge_udev_into_dmi(
     form_factors.sort();
     form_factors.dedup();
     observation.module_form_factors = form_factors;
+    let mut part_numbers = devices
+        .modules
+        .iter()
+        .filter_map(|module| module.part_number.clone())
+        .collect::<Vec<_>>();
+    part_numbers.sort();
+    part_numbers.dedup();
+    observation.module_part_numbers = part_numbers;
+    let mut serials = devices
+        .modules
+        .iter()
+        .filter_map(|module| module.serial_number.clone())
+        .collect::<Vec<_>>();
+    serials.sort();
+    serials.dedup();
+    observation.module_serials = serials;
     if provided_any {
         observation.status = SourceStatus {
             provider: ProviderId::borrowed(DMI_PROVIDER),
@@ -98,6 +114,19 @@ pub(crate) struct UdevMemoryDevices {
     pub slots_total: usize,
 }
 
+/// A udev module label is programmed (worth surfacing) only when it carries
+/// real content: the DMI "not specified" sentinels and empty strings are the
+/// unprogrammed state, not a fact.
+fn is_programmed_module_label(value: &str) -> bool {
+    !value.is_empty() && value != "<OUT OF SPEC>" && value != "Not Specified" && value != "None"
+}
+
+/// An all-zero serial is the standard unprogrammed SPD state (never a real
+/// module identity), so it stays an honest absence.
+fn is_all_zero_serial(value: &str) -> bool {
+    value.len() >= 4 && value.chars().all(|ch| ch == '0')
+}
+
 /// Parse `MEMORY_DEVICE_<n>_<PROP>=<value>` lines (the udev DMI database
 /// properties). Present modules are `PRESENT=1`; absent slots are skipped
 /// entirely. Returns `None` when no memory-device properties exist at all.
@@ -125,6 +154,8 @@ pub(crate) fn parse_udev_memory_properties(text: &str) -> Option<UdevMemoryDevic
                 module_type: None,
                 manufacturer: None,
                 form_factor: None,
+                part_number: None,
+                serial_number: None,
                 speed_mts: None,
                 configured_speed_mts: None,
                 rank: None,
@@ -145,6 +176,12 @@ pub(crate) fn parse_udev_memory_properties(text: &str) -> Option<UdevMemoryDevic
             }
             "FORM_FACTOR" if !value.is_empty() && value != "<OUT OF SPEC>" => {
                 module.form_factor = Some(value.to_owned())
+            }
+            "PART_NUMBER" if is_programmed_module_label(value) => {
+                module.part_number = Some(value.to_owned())
+            }
+            "SERIAL_NUMBER" if is_programmed_module_label(value) && !is_all_zero_serial(value) => {
+                module.serial_number = Some(value.to_owned())
             }
             "SPEED_MTS" => module.speed_mts = value.parse().ok(),
             "CONFIGURED_SPEED_MTS" => module.configured_speed_mts = value.parse().ok(),

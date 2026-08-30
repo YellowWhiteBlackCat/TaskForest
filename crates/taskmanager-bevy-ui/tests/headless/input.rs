@@ -23,7 +23,7 @@ use bevy::input::keyboard::{Key, KeyCode, KeyboardInput, NativeKey};
 use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::ScenePlugin;
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
+use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
@@ -157,13 +157,13 @@ fn arrows_move_the_shell_cursor_and_the_details_seam_follows() {
     // only through the published selection identity. The recorder proves the
     // arrow press actually tells it which process is on the cursor.
     #[derive(Resource, Default)]
-    struct SelectionLog(Vec<Option<crate::pages::processes::ProcessRowIdentity>>);
+    struct SelectionLog(Vec<Option<ProcessLiveKey>>);
 
     fn record_selection(
         change: bevy::ecs::observer::On<crate::pages::processes::ProcessSelectionChanged>,
         mut log: ResMut<SelectionLog>,
     ) {
-        log.0.push(change.event().0.clone());
+        log.0.push(change.event().0);
     }
 
     let mut app = input_app(shell_with_selection());
@@ -185,9 +185,9 @@ fn arrows_move_the_shell_cursor_and_the_details_seam_follows() {
         .flatten()
         .expect("the move publishes the selection identity");
     assert_eq!(
-        (landed.pid, landed.name.as_str()),
-        (200, "beta"),
-        "the details seam learns the process the cursor landed on"
+        landed.pid(),
+        200,
+        "the details seam learns the process identity the cursor landed on"
     );
 }
 

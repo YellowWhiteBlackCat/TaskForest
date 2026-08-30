@@ -35,7 +35,7 @@ pub mod process_filter;
 pub mod viewmodel;
 
 pub use app::process_rows::{
-    ProcessProjectionGeneration, ProcessRowAnchor, ProcessRowId, ProcessRowIdentity,
+    ProcessProjectionGeneration, ProcessRowAnchor, ProcessRowId, process_semantic_key,
 };
 pub use app::{
     BatchFoldChanges, BatchFoldOutput, DirectTrackState, FeedbackBatchLifetime, FeedbackLifecycle,

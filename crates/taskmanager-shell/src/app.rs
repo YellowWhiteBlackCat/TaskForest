@@ -19,7 +19,7 @@ use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::{
     ContainerRollup, DirectoryUsageSnapshot, FrozenProcessIdentity, HardwareInfo,
     NpuInventorySnapshot, PowerSupplySnapshot, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
-    ProcessSignal, SensorCenterSnapshot, ServiceAction, ServiceItem, SessionItem,
+    ProcessLiveKey, ProcessSignal, SensorCenterSnapshot, ServiceAction, ServiceItem, SessionItem,
     StartupBootEvidenceSnapshot, StartupEntry, SystemSnapshot,
 };
 use taskmanager_platform_contract::{
@@ -77,7 +77,7 @@ pub use self::lifecycle::{
 };
 pub use self::platform_feedback::process_control_notice_text;
 pub use self::process_control::{ProcessControlFeedback, ProcessControlKind};
-use self::process_rows::{ProcessProjectionGeneration, ProcessRowId, ProcessRowIdentity};
+use self::process_rows::{ProcessProjectionGeneration, ProcessRowId};
 pub use self::service_log::OpenServiceLog;
 pub use self::sort_axis::{aggregate_sort_key, sort_axis};
 pub use self::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
@@ -114,6 +114,11 @@ pub struct SystemProjectionStore {
     pub hardware_source: Option<Vec<SourceStatus>>,
     /// One immutable process snapshot shared by all frontend adapters.
     pub processes: Option<Arc<Vec<ProcessItem>>>,
+    /// Timestamp of the accepted process snapshot that supplied `processes`.
+    /// Zero until the first snapshot arrives. Aggregate consumers pass this
+    /// value as `observed_at_ms`; the system snapshot refreshes on its own
+    /// cadence and must not stand in for the process facet.
+    pub processes_observed_at_ms: u64,
     pub services: Option<Vec<ServiceItem>>,
     pub startup_entries: Option<Vec<StartupEntry>>,
     pub sessions: Option<Vec<SessionItem>>,
@@ -297,10 +302,15 @@ pub struct ShellApp {
     /// `request_process_batch` freezes the whole set exactly so a batch verb
     /// (Kill / Suspend / Resume / SetPriority) reaches every selected row and
     /// never a pid-reuse impostor.
-    pub selected_rows: std::collections::HashSet<ProcessRowIdentity>,
+    pub selected_rows: std::collections::HashSet<ProcessLiveKey>,
     /// Semantic primary row. PID-less application aggregates live here
     /// without being rewritten into the root process identity.
     pub selected_row: Option<ProcessRowId>,
+    /// Blocks the positional compatibility lookup after the selected identity
+    /// disappears or is replaced. A stale selection must fail closed until an
+    /// explicit new row selection arrives; otherwise the old numeric cursor
+    /// could silently retarget a neighboring process.
+    process_selection_invalidated: bool,
     pub query: String,
     /// The active Applications state bucket. The renderer owns the segmented
     /// control; the shell owns the filtered row set consumed by every action
@@ -393,6 +403,11 @@ impl ShellApp {
         self.data.snapshot = seed.snapshot;
         self.data.hardware = seed.hardware;
         self.data.processes = seed.processes.map(Arc::new);
+        self.data.processes_observed_at_ms = self
+            .data
+            .snapshot
+            .as_ref()
+            .map_or(0, |snapshot| snapshot.timestamp_ms);
         self.data.services = seed.services;
         self.data.startup_entries = seed.startup_entries;
         self.data.sessions = seed.sessions;
@@ -404,10 +419,12 @@ impl ShellApp {
             .snapshot
             .as_ref()
             .map_or(0, |snapshot| snapshot.timestamp_ms);
+        self.prune_stale_selection();
     }
 
     pub(crate) fn seed_fixture_fact(&mut self, fact: crate::fixture::ProjectionSeedFact) {
         use crate::fixture::ProjectionSeedFact;
+        let is_process_fact = matches!(&fact, ProjectionSeedFact::Processes(_));
         match fact {
             ProjectionSeedFact::Snapshot(value) => {
                 self.data.snapshot = *value;
@@ -419,6 +436,11 @@ impl ShellApp {
             }
             ProjectionSeedFact::Processes(value) => {
                 self.data.processes = value.map(Arc::new);
+                self.data.processes_observed_at_ms = self
+                    .data
+                    .snapshot
+                    .as_ref()
+                    .map_or(0, |snapshot| snapshot.timestamp_ms);
                 self.data.process_revision = self.data.process_revision.saturating_add(1);
             }
             ProjectionSeedFact::Services(value) => {
@@ -471,6 +493,9 @@ impl ShellApp {
             },
             ProjectionSeedFact::AdvanceRefresh => {}
         }
+        if is_process_fact {
+            self.prune_stale_selection();
+        }
         self.data.refresh_count = self.data.refresh_count.saturating_add(1);
     }
 
@@ -489,6 +514,7 @@ impl ShellApp {
         self.data.processes = processes.map(Arc::new);
         self.data.process_revision = self.data.process_revision.saturating_add(1);
         self.data.refresh_count = self.data.refresh_count.saturating_add(1);
+        self.prune_stale_selection();
     }
 
     pub(crate) fn edit_fixture_hardware(&mut self, edit: impl FnOnce(&mut Option<HardwareInfo>)) {
@@ -758,8 +784,10 @@ impl ShellApp {
                     .and_then(FrozenProcessIdentity::from_process)
             }
             Some(ProcessRowId::Application(_)) | Some(ProcessRowId::Category(_)) => None,
+            None if self.process_selection_invalidated => None,
             None => self
-                .visible_process_at(self.selected)
+                .row_identity_at(self.selected)
+                .and_then(|identity| self.process_by_identity(identity))
                 .and_then(FrozenProcessIdentity::from_process),
         }
     }

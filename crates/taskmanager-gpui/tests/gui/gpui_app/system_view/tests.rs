@@ -54,9 +54,27 @@ mod tests_inner {
 
     #[test]
     fn cache_readout_distinguishes_unknown_from_measured_zero() {
-        assert_eq!(fmt_cache_kb(None), "—");
-        assert_eq!(fmt_cache_kb(Some(0)), "0 KiB");
-        assert_eq!(fmt_cache_kb(Some(2048)), "2 MiB");
+        assert_eq!(
+            fmt_cache_kb(
+                None,
+                taskmanager_core::core::units::UnitPreferences::default()
+            ),
+            "—"
+        );
+        assert_eq!(
+            fmt_cache_kb(
+                Some(0),
+                taskmanager_core::core::units::UnitPreferences::default()
+            ),
+            "0 B"
+        );
+        assert_eq!(
+            fmt_cache_kb(
+                Some(2048),
+                taskmanager_core::core::units::UnitPreferences::default()
+            ),
+            "2.0 MiB"
+        );
     }
 
     #[test]

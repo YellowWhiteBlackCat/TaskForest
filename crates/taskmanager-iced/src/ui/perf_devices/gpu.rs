@@ -185,6 +185,18 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
     if let Some(driver) = gpu.driver.as_deref() {
         rows.push(StatRow::text(t("common.driver"), Some(driver.to_string())));
     }
+    // Driver version (registry DriverVersion / NVML sys version). Absent on
+    // drivers that expose no versioned release — omit the row (GPUI parity).
+    if let Some(version) = gpu
+        .driver_version
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        rows.push(StatRow::text(
+            t("gpu.driver_version"),
+            Some(version.to_owned()),
+        ));
+    }
 
     for engine in &gpu.engines {
         if !engine.name.trim().is_empty() && engine.usage_pct.is_finite() {

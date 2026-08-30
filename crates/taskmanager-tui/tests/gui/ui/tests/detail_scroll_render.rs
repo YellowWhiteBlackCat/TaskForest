@@ -9,10 +9,10 @@ use ratatui::backend::TestBackend;
 use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage};
 
-use crate::ui::process_details::{clamped_scroll, render_process_details, wrapped_content_height};
-use crate::ui::process_properties::{
-    ProcessDetailsSection, ProcessPropertiesTarget, render_process_properties,
-};
+use crate::ui::process_details::process_details_support::render_process_details;
+use crate::ui::process_details::{clamped_scroll, wrapped_content_height};
+use crate::ui::process_properties::process_properties_support::render_process_properties;
+use crate::ui::process_properties::{ProcessDetailsSection, ProcessPropertiesTarget};
 use crate::{TuiApp, TuiTheme};
 
 /// Pin English + serialize against the language-flipping i18n test, then render
@@ -29,7 +29,13 @@ fn detail_panel_text(app: &TuiApp, width: u16, height: u16) -> String {
     terminal
         .draw(|frame| {
             let area = Rect::new(0, 0, width, height);
-            render_process_details(frame, app, TuiTheme::default(), area);
+            render_process_details(
+                frame,
+                app,
+                TuiTheme::default(),
+                area,
+                app.focus_panel == crate::FocusPanel::Details,
+            );
         })
         .expect("draw");
     terminal.backend().to_string()

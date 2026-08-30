@@ -8,7 +8,7 @@
 | 事实或生命周期 | 唯一 owner | 唯一写入口 | 消费边界 |
 |---|---|---|---|
 | Canonical domain fact | `taskmanager-core` 私有 typed model | named constructor / transition / apply | current/last-known 只读 accessor |
-| 已发布 wire 兼容 | 私有 read/write DTO | read migration；canonical serializer projection | 不进入 provider/frontend state |
+| 已发布外部 payload ingress | 私有 read DTO / serializer | ingress canonicalization；canonical serializer | 不进入 provider/frontend state，不形成兼容 API |
 | 全局配置 | app-host 的单一 `ConfigCoordinator` | base→local typed submission | revisioned immutable snapshot |
 | 危险确认 | application `InteractionState` | arm/replace/confirm/dismiss reducer | 三前端只投影或提交 intent |
 | 相关异步请求 | application typed request session；每条 shell track 一个实例 | begin/accept/reject/terminal/close | frontend 只读状态；terminal payload 仅接受一次 |
@@ -22,7 +22,7 @@
 | 本地时区规则 | app-host `StartupLocalTimeCache` | 宿主启动时一次捕获 | cloned host 共享同一 `Arc` observation |
 | 窗口事件时间 | frontend window-time component | tick/event 注入 | renderer filter/format，只读 |
 | renderer projection cache | 对应 frontend component | revision/fingerprint miss | owned `Rc`/value，不返回可变 guard |
-| 进程视图兼容 token | config/preset 私有 read DTO | deserialize migration | canonical 只有一套 category/tree projection |
+| 外部 saved-view 输入 | config/preset 私有 read DTO | ingress canonicalization | canonical 只有一套 category/tree projection |
 
 GPU engine、网络提权及 command/reveal/open-url correlation 同样走该 request session owner；前端
 不得另存 request map、pending bool、error 或 accepted payload。一个事实不得同时出现在 domain
@@ -81,12 +81,13 @@ struct 字段顺序或 toolkit 消息排列隐式决定业务结果。
 - 窗口时间缓存按窗口隔离，由 tick/event 注入。app-host 时区缓存策略固定为
   `HostRestartOnly`；当前版本不伪装支持运行期时区 watcher。
 
-## 兼容与退役
+## Core 硬切换与外部输入
 
-兼容只存在于读取边界。旧进程视图 mode、legacy scalar、旧 service relation 和旧 wire 标量可被
-私有 DTO 导入；canonical model、新写出、fixture、export 和 frontend 不得持有它们。新实现上线时
-同步删除旧 writer、旧 renderer state、旧 shortcut、旧测试夹具与 living 文档，不设置反向门等待
-后人清理。具体 wire 退出矩阵只见 [`WIRE_DOMAIN_BOUNDARIES.md`](WIRE_DOMAIN_BOUNDARIES.md)。
+每次 core 演进都是同一变更内的硬切换：所有旧 API、alias、wrapper、fallback、renderer state、
+shortcut、fixture、demo/capture 和 caller 必须同步删除或迁移。禁止 deprecated 入口、兼容 facade、
+双栈状态和等待后续清理的反向门。已发布外部 payload 如因产品数据合同必须继续读取，只能在私有
+ingress DTO 解析后立即 canonicalize；它不进入 provider/frontend state，也不成为 live implementation
+path。具体输入与输出规则见 [`WIRE_DOMAIN_BOUNDARIES.md`](WIRE_DOMAIN_BOUNDARIES.md)。
 
 ## 验证
 

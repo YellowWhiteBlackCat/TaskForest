@@ -32,6 +32,10 @@ use super::containers::Modal;
 use super::kv;
 use super::process_details::vm_text;
 use crate::TuiApp;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/process_properties_support.rs"]
+pub(crate) mod process_properties_support;
 use crate::TuiTheme;
 
 /// The active Properties section. Mirrors GPUI's `ProcessDetailsSection`
@@ -109,30 +113,6 @@ pub struct ProcessPropertiesTarget {
 /// Render the Process Properties modal centred over `area`.  Test-only entry:
 /// the caller supplies the committed focus plan so the highlighted tab stays
 /// the plan's decision, not the frozen target state's.
-#[cfg(test)]
-pub fn render_process_properties(
-    frame: &mut Frame<'_>,
-    target: &ProcessPropertiesTarget,
-    app: &TuiApp,
-    theme: TuiTheme,
-    focus: super::TuiFocusPlan,
-    area: Rect,
-) {
-    render_process_properties_at(
-        frame,
-        target,
-        app,
-        theme,
-        focus,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::SharedSurface(
-                taskmanager_application::SurfaceKind::ProcessProperties,
-            ),
-        ),
-    );
-}
-
 /// Render the Process Properties modal from the committed focus plan. The
 /// highlighted tab is the plan's `PropertiesTab` control; any other control
 /// paints every tab dim (fail-closed).

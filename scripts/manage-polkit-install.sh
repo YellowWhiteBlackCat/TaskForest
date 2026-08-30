@@ -44,7 +44,7 @@ trap 'exit 130' INT TERM
 
 usage() {
     printf '%s\n' \
-        "usage: $0 {status|verify|install|uninstall} {perf|net|process} [--staging DIR]" \
+        "usage: $0 {status|verify|install|uninstall} {perf|net|process|smbios|rapl|msr} [--staging DIR]" \
         "  status    read-only host inspection" \
         "  verify    require both exact artifacts to be installed" \
         "  install   root-only, conflict-safe installation" \
@@ -56,27 +56,51 @@ configure_feature() {
     case "$1" in
         perf)
             HELPER_SRC="$REPO_ROOT/target/release/taskmanager-privilege-helper"
-            POLICY_SRC="$REPO_ROOT/polkit/com.taskforest.perf-helper.policy.in"
-            HELPER_CANONICAL_DST="/usr/libexec/taskmanager-privilege-helper"
-            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/com.taskforest.perf-helper.policy"
+            POLICY_SRC="$REPO_ROOT/polkit/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy.in"
+            HELPER_CANONICAL_DST="/usr/libexec/taskforest-privilege-helper"
+            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy"
             HELPER_ID="POLKIT-PERF-HELPER"
             POLICY_ID="POLKIT-PERF-POLICY"
             ;;
         net)
             HELPER_SRC="$REPO_ROOT/target/release/taskmanager-net-launcher"
-            POLICY_SRC="$REPO_ROOT/polkit/com.taskforest.net-launcher.policy.in"
-            HELPER_CANONICAL_DST="/usr/libexec/taskmanager-net-launcher"
-            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/com.taskforest.net-launcher.policy"
+            POLICY_SRC="$REPO_ROOT/polkit/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy.in"
+            HELPER_CANONICAL_DST="/usr/libexec/taskforest-net-launcher"
+            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy"
             HELPER_ID="POLKIT-NET-HELPER"
             POLICY_ID="POLKIT-NET-POLICY"
             ;;
         process)
             HELPER_SRC="$REPO_ROOT/target/release/taskmanager-process-control-helper"
-            POLICY_SRC="$REPO_ROOT/polkit/com.taskforest.process-control.policy.in"
-            HELPER_CANONICAL_DST="/usr/lib/taskforest-process-control-helper"
-            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/com.taskforest.process-control.policy"
+            POLICY_SRC="$REPO_ROOT/polkit/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy.in"
+            HELPER_CANONICAL_DST="/usr/libexec/taskforest-process-control-helper"
+            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy"
             HELPER_ID="POLKIT-PROCESS-HELPER"
             POLICY_ID="POLKIT-PROCESS-POLICY"
+            ;;
+        smbios)
+            HELPER_SRC="$REPO_ROOT/target/release/taskmanager-smbios-helper"
+            POLICY_SRC="$REPO_ROOT/polkit/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy.in"
+            HELPER_CANONICAL_DST="/usr/libexec/taskforest-smbios-helper"
+            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy"
+            HELPER_ID="POLKIT-SMBIOS-HELPER"
+            POLICY_ID="POLKIT-SMBIOS-POLICY"
+            ;;
+        rapl)
+            HELPER_SRC="$REPO_ROOT/target/release/taskmanager-rapl-helper"
+            POLICY_SRC="$REPO_ROOT/polkit/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy.in"
+            HELPER_CANONICAL_DST="/usr/libexec/taskforest-rapl-helper"
+            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy"
+            HELPER_ID="POLKIT-RAPL-HELPER"
+            POLICY_ID="POLKIT-RAPL-POLICY"
+            ;;
+        msr)
+            HELPER_SRC="$REPO_ROOT/target/release/taskmanager-msr-helper"
+            POLICY_SRC="$REPO_ROOT/polkit/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy.in"
+            HELPER_CANONICAL_DST="/usr/libexec/taskforest-msr-helper"
+            POLICY_CANONICAL_DST="/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy"
+            HELPER_ID="POLKIT-MSR-HELPER"
+            POLICY_ID="POLKIT-MSR-POLICY"
             ;;
         *)
             usage >&2

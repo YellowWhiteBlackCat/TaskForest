@@ -85,13 +85,13 @@ Windows telemetry、测试和 helper 不使用 PowerShell 或其他命令解释�
 
 ## 5. 发布物门禁
 
-tag 发布必须同时构建并验证：
+tag 发布必须同时构建并验证（命名约定见 PRODUCT_IDENTITY.md，`<ver>` 为 Cargo 版本）：
 
-- `taskforest_<ver>_amd64.deb` 与 `taskforest_<ver>_arm64.deb`：`dpkg-deb --info` 和
+- `TaskForest-G-<ver>-x64.deb` 与 `TaskForest-G-<ver>-arm64.deb`：`dpkg-deb --info` 和
   `--contents`；
-- `taskforest-<ver>-1.x86_64.rpm` 与 `taskforest-<ver>-1.aarch64.rpm`：`rpm -qp --info`、
+- `TaskForest-G-<ver>-x64.rpm` 与 `TaskForest-G-<ver>-arm64.rpm`：`rpm -qp --info`、
   `--list` 和 `--requires`；
-- `TaskForest-<ver>-x64.msi` 与 `TaskForest-<ver>-arm64.msi`：WiX 构建、MSI 数据库反编译和
+- `TaskForest-G-<ver>-x64.msi` 与 `TaskForest-G-<ver>-arm64.msi`：WiX 构建、MSI 数据库反编译和
   payload 引用检查；
 - 每个架构独立的 Linux/Windows SHA-256 清单。
 

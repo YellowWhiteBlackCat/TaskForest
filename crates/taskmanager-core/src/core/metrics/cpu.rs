@@ -293,9 +293,13 @@ pub struct CpuMetrics {
     /// Logical-processor topology, distinct from the number of utilization
     /// samples that happened to arrive during this tick.
     pub logical_cores: Option<usize>,
-    /// Aggregate cache capacities in KiB. Missing topology is not encoded as
-    /// zero; an observed zero would remain `Some(0)`.
-    pub l1_cache_kb: Option<u64>,
+    /// Aggregate cache capacities in KiB. L1 is split by kind — data and
+    /// instruction — because x86 L1 is always split and a unified sum would
+    /// hide which side is missing. A unified L1 (rare, non-x86) reports into
+    /// the data slot. Missing topology is not encoded as zero; an observed
+    /// zero would remain `Some(0)`.
+    pub l1d_cache_kb: Option<u64>,
+    pub l1i_cache_kb: Option<u64>,
     pub l2_cache_kb: Option<u64>,
     pub l3_cache_kb: Option<u64>,
     /// Active CPU performance-policy metadata from the selected native adapter.
@@ -332,7 +336,9 @@ struct CpuMetricsWire {
     #[serde(default)]
     logical_cores: Option<usize>,
     #[serde(default)]
-    l1_cache_kb: Option<u64>,
+    l1d_cache_kb: Option<u64>,
+    #[serde(default)]
+    l1i_cache_kb: Option<u64>,
     #[serde(default)]
     l2_cache_kb: Option<u64>,
     #[serde(default)]
@@ -368,7 +374,8 @@ impl Serialize for CpuMetrics {
             ),
             physical_cores: self.physical_cores,
             logical_cores: self.logical_cores,
-            l1_cache_kb: self.l1_cache_kb,
+            l1d_cache_kb: self.l1d_cache_kb,
+            l1i_cache_kb: self.l1i_cache_kb,
             l2_cache_kb: self.l2_cache_kb,
             l3_cache_kb: self.l3_cache_kb,
             temperature_c: legacy_scalar_projection(&self.scalar_observations.temperature_c),
@@ -456,7 +463,8 @@ impl<'de> Deserialize<'de> for CpuMetrics {
             temperature_source: wire.temperature_source,
             physical_cores: wire.physical_cores,
             logical_cores: wire.logical_cores,
-            l1_cache_kb: wire.l1_cache_kb,
+            l1d_cache_kb: wire.l1d_cache_kb,
+            l1i_cache_kb: wire.l1i_cache_kb,
             l2_cache_kb: wire.l2_cache_kb,
             l3_cache_kb: wire.l3_cache_kb,
             performance_policy: wire.performance_policy,
@@ -504,7 +512,17 @@ impl CpuMetrics {
             .map_or(0, <[ScalarObservation<f32>]>::len)
     }
 
+    /// Current core-clock multiplier against the advertised static base
+    /// clock (the CPU-Z "base × multiplier" decomposition): current
+    /// frequency ÷ base. Guarded — an absent live frequency or a non-positive
+    /// base yields `None` rather than a fabricated ratio.
     #[must_use]
+    pub fn clock_multiplier(&self, base_frequency_mhz: Option<u64>) -> Option<f32> {
+        let base = base_frequency_mhz.filter(|base| *base > 0)?;
+        let current = self.current_frequency_mhz()?;
+        Some(current as f32 / base as f32)
+    }
+
     pub const fn current_frequency_mhz(&self) -> Option<u64> {
         self.scalar_observations
             .frequency_mhz

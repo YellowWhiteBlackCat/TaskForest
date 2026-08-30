@@ -15,6 +15,7 @@ fn live_key_round_trips_and_distinguishes_pid_reuse() {
 
     assert_eq!(first.pid(), 42);
     assert_eq!(first.start_token(), 100);
+    assert_eq!(first.stable_key(), "pid:42:start:100");
     assert_eq!(first.into_identity().pid, 42);
     assert!(first.matches(first.into_identity()));
     assert_ne!(first, reused);

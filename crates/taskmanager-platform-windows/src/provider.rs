@@ -19,13 +19,13 @@
 use taskmanager_application::{
     ContainerRollupRequest, CpuTelemetryRequest, DesktopNotificationRequest, GpuEngineRowsRequest,
     GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
-    NetworkTelemetryRequest, NpuInventoryRequest, ProcessAffinityControlRequest,
+    MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, ProcessAffinityControlRequest,
     ProcessAffinityRequest, ProcessControlRequest, ProcessEnvironmentRequest, ProcessGpuRequest,
     ProcessIsolationRequest, ProcessListRequest, ProcessNetworkEscalationRequest,
     ProcessNetworkRequest, ProcessOpenFilesRequest, ProcessResourceControlRequest,
-    ProcessResourcesRequest, ProcessThreadsRequest, SessionControlRequest, SessionInventoryRequest,
-    SetupScriptRequest, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
-    StorageTelemetryRequest,
+    ProcessResourcesRequest, ProcessThreadsRequest, RaplPowerRequest, SessionControlRequest,
+    SessionInventoryRequest, SetupScriptRequest, SmbiosMemoryRequest, StartupControlRequest,
+    StartupEvidenceRequest, StartupInventoryRequest, StorageTelemetryRequest,
 };
 use taskmanager_core::ProviderId;
 use taskmanager_platform_runtime::ProviderRegistration;
@@ -82,6 +82,7 @@ pub use sensor::WinSensorProviders;
 pub use service::WinServiceProviders;
 pub use storage::WinStorageProviders;
 pub use system::{
+    PendingMsrReadoutProvider, PendingRaplPowerProvider, PendingSmbiosMemoryProvider,
     WinGpuEngineRowsProvider, WinNpuInventoryProvider, WinSystemAuxiliaryProviders,
     WinSystemObservationProviders, WinSystemProviders,
 };
@@ -94,6 +95,9 @@ const NETWORK_TELEMETRY_PROVIDER: ProviderId = ProviderId::borrowed("windows.sys
 const GPU_TELEMETRY_PROVIDER: ProviderId = ProviderId::borrowed("windows.system.gpu");
 const GPU_ENGINE_ROWS_PROVIDER: ProviderId = ProviderId::borrowed("windows.system.gpu-engines");
 const NPU_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("windows.accelerator.npu");
+const SMBIOS_MEMORY_PROVIDER: ProviderId = ProviderId::borrowed("windows.telemetry.memory.smbios");
+const RAPL_POWER_PROVIDER: ProviderId = ProviderId::borrowed("windows.telemetry.cpu.package-power");
+const MSR_READOUT_PROVIDER: ProviderId = ProviderId::borrowed("windows.telemetry.cpu.msr");
 const HARDWARE_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("windows.hardware.inventory");
 const CONTAINER_ROLLUP_PROVIDER: ProviderId = ProviderId::borrowed("windows.containers.wsl");
 const PROCESS_LIST_PROVIDER: ProviderId = ProviderId::borrowed("windows.process.list");
@@ -237,6 +241,18 @@ pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {
                 ProviderRegistration::<NpuInventoryRequest, _>::new(
                     NPU_INVENTORY_PROVIDER.clone(),
                     WinNpuInventoryProvider::new(),
+                ),
+                ProviderRegistration::<SmbiosMemoryRequest, _>::new(
+                    SMBIOS_MEMORY_PROVIDER.clone(),
+                    PendingSmbiosMemoryProvider,
+                ),
+                ProviderRegistration::<RaplPowerRequest, _>::new(
+                    RAPL_POWER_PROVIDER.clone(),
+                    PendingRaplPowerProvider,
+                ),
+                ProviderRegistration::<MsrReadoutRequest, _>::new(
+                    MSR_READOUT_PROVIDER.clone(),
+                    PendingMsrReadoutProvider,
                 ),
             ),
         ),

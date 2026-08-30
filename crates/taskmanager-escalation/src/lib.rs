@@ -8,10 +8,13 @@
 //! an unprivileged user lacks — the escalation column of Boundary 3. Those
 //! features are reached through ONE cross-platform seam: a small privileged
 //! helper invoked via the OS-native escalation prompt (polkit `.policy` +
-//! `pkexec` on Linux; Windows UAC and macOS authorization remain unwired) that
-//! performs ONLY the privileged op and returns safe typed data. Unwired native
-//! crossings fail closed as typed `Unsupported` and never spawn a normal child
-//! while claiming elevation.
+//! `pkexec` on Linux; Windows UAC via the [`uac`] transport facts with the
+//! runas call group in `taskmanager-windows-api` and the driver in
+//! `taskmanager-platform-windows`; macOS authorization typed in
+//! [`authorization`] with the Security-framework crossing unwired pending a
+//! signed-helper ADR) that performs ONLY the privileged op and returns safe
+//! typed data. Unwired native crossings fail closed as typed `Unsupported`
+//! and never spawn a normal child while claiming elevation.
 //!
 //! This crate is the FOUNDATION of that framework — the seam types plus the
 //! honest default gate. It contains:
@@ -23,16 +26,21 @@
 //! * [`UnprivilegedGate`] — the honest default: `RequiresEscalation` for every
 //!   variant, because a freshly started TaskForest has escalated nothing yet.
 //!
-//! The actual OS-native prompt invocation for the Intel PMU helper lives in
+//! The actual OS-native prompt invocations for the privileged helpers live in
 //! the [`polkit`] submodule (the operational crossing): it drives `pkexec` and
-//! parses the helper's typed JSON contract. The SEAM in THIS file stays pure —
-//! no capability grant, no elevated-process launch — so the workspace gate that
+//! parses each helper's typed JSON contract (perf PMU, net launcher, foreign
+//! process control, SMBIOS memory, RAPL package power). The SEAM in THIS file
+//! stays pure — no capability grant, no elevated-process launch — so the
+//! workspace gate that
 //! requires `lib.rs` itself to be free of `pkexec`/`Command::new` keeps
 //! holding. The privileged helper binary is owned by a separate boundary
-//! artifact; see ADR-023. The Windows UAC transport seam ([`uac`], ADR-035
-//! stage 1) is the symmetric scaffolding for the `runas` crossing: typed
-//! transport facts and pure fact→outcome mappings, with the crossing itself
-//! honestly unwired (`Unsupported`) until stage 2 wires the real driver.
+//! artifact; see ADR-023. The Windows UAC transport seam ([`uac`], ADR-035)
+//! supplies the typed transport facts, the pure fact→outcome mappings, and
+//! the stage-2 pure launch layer; because this crate is zero-dependency
+//! safe Rust, the raw runas call group lives in the audited
+//! `taskmanager-windows-api` boundary and the production driver in
+//! `taskmanager-platform-windows`, which feeds those facts back through
+//! [`uac::invoke_uac_foreign_process_control_with`].
 //!
 //! Honesty red line: missing/unavailable data is reported as a typed
 //! [`EscalationAvailability`] variant, never a fabricated value.
@@ -46,11 +54,22 @@
 /// `lib.rs` remains the pure, zero-dependency, capability-free seam.
 pub mod polkit;
 
-/// The Windows UAC transport seam for foreign-process control (ADR-035): the
-/// typed transport-fact vocabulary, the pure fact→outcome mapping, the
-/// install-fact readiness probe, and the `cfg(windows)` skeleton driver —
-/// unwired (typed `Unsupported`) until stage 2 registers the runas call group.
+/// The Windows UAC transport seam for foreign-process control (ADR-035):
+/// the typed transport-fact vocabulary, the pure fact→outcome mapping, the
+/// install-fact readiness probe, and the stage-2 pure launch layer (helper
+/// command-line builder + one-shot reply-channel naming). The runas call
+/// group lives in the audited `taskmanager-windows-api` boundary and the
+/// production driver in `taskmanager-platform-windows`; both feed this
+/// mapping through [`uac::invoke_uac_foreign_process_control_with`].
 pub mod uac;
+
+/// The macOS native-authorization transport seam for foreign-process
+/// control: typed transport facts, the pure fact→outcome mapping, the
+/// install-fact readiness probe, and the injectable transport trait. The
+/// Security-framework crossing itself stays unwired (`Unsupported`) until a
+/// signed privileged-helper ADR exists — `AuthorizationExecuteWithPrivileges`
+/// is deprecated and `osascript` is a command-interpreter path.
+pub mod authorization;
 
 /// The escalation-column features from permission-model Boundary 3.
 ///
@@ -94,12 +113,23 @@ pub enum EscalationFeature {
     /// `/sys/firmware/dmi/entries/17-*/raw` parse is correct but those `raw`
     /// nodes are mode 0400 (root-only) on mainline kernels, so the unprivileged
     /// read fails and the metric renders as unavailable until the user escalates
-    /// (the helper reads the same files as root). Mirrors `IntelPmu`: classify
-    /// the denial as escalatable, do not fetch from the refresh tick.
+    /// (the `taskforest-smbios-helper` binary reads the same files as root; the
+    /// crossing is [`polkit::invoke_smbios_helper`]). Mirrors `IntelPmu`:
+    /// classify the denial as escalatable, do not fetch from the refresh tick.
     MemorySmbios,
     /// CPU package power via RAPL `/sys/class/powercap/intel-rapl:*/energy_uj`.
-    /// Same root-only (0400) situation as `MemorySmbios`; classify-and-escalate.
+    /// Same root-only (0400) situation as `MemorySmbios`; classify-and-escalate
+    /// through the `taskforest-rapl-helper` binary
+    /// ([`polkit::invoke_rapl_helper`]).
     PackagePowerRapl,
+    /// CPU MSR readouts (package temperature, P-state multipliers, P-state
+    /// core voltage) via the root-only (0600) `/dev/cpu/*/msr` nodes. MSR
+    /// reads are plain file I/O (open + pread), so the
+    /// `taskforest-msr-helper` binary is safe Rust with no new `unsafe`
+    /// trust root (ADR-048); the crossing is
+    /// [`polkit::invoke_msr_helper`]. Unimplemented registers and the
+    /// unverifiable base clock decode to honest per-field nulls.
+    CpuMsr,
 }
 
 impl EscalationFeature {
@@ -111,7 +141,7 @@ impl EscalationFeature {
     /// cover "all escalation features" can never again drift to different
     /// counts (a prior workspace gate hardcoded 5 of 7 variants and silently
     /// missed two). Adding a variant requires appending it here too.
-    pub const ALL: [EscalationFeature; 7] = [
+    pub const ALL: [EscalationFeature; 8] = [
         EscalationFeature::IntelPmu,
         EscalationFeature::PerProcessNet,
         EscalationFeature::AtaSmart,
@@ -119,6 +149,7 @@ impl EscalationFeature {
         EscalationFeature::SystemServiceControl,
         EscalationFeature::MemorySmbios,
         EscalationFeature::PackagePowerRapl,
+        EscalationFeature::CpuMsr,
     ];
 }
 

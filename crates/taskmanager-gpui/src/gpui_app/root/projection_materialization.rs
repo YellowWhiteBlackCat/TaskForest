@@ -93,6 +93,9 @@ pub(super) struct ProjectionMaterialization {
     /// GPUI window. The shell projection remains the shared authority consumed
     /// by the other frontends.
     processes: Materialized<Arc<Vec<ProcessItem>>>,
+    /// Accepted-snapshot timestamp paired with `processes`; both advance in
+    /// one `replace_processes` call so aggregate rows never mix generations.
+    processes_observed_at_ms: u64,
     running_process_count: usize,
     services: SourcedMaterialized<Rc<Vec<ServiceItem>>>,
     startup_entries: SourcedMaterialized<Rc<Vec<StartupEntry>>>,
@@ -114,12 +117,18 @@ impl ProjectionMaterialization {
         let _ = self.snapshot.replace(revision, Rc::new(snapshot));
     }
 
-    pub(super) fn replace_processes(&mut self, revision: u64, processes: Arc<Vec<ProcessItem>>) {
+    pub(super) fn replace_processes(
+        &mut self,
+        revision: u64,
+        processes: Arc<Vec<ProcessItem>>,
+        observed_at_ms: u64,
+    ) {
         let running_process_count = processes
             .iter()
             .filter(|process| process.status == "Running")
             .count();
         if self.processes.replace(revision, processes) {
+            self.processes_observed_at_ms = observed_at_ms;
             self.running_process_count = running_process_count;
         }
     }
@@ -247,6 +256,10 @@ impl ProjectionMaterialization {
 
     pub(super) const fn processes_revision(&self) -> u64 {
         self.processes.revision
+    }
+
+    pub(super) const fn processes_observed_at_ms(&self) -> u64 {
+        self.processes_observed_at_ms
     }
 
     pub(super) const fn running_process_count(&self) -> usize {
@@ -413,6 +426,14 @@ impl super::RootView {
     #[must_use]
     pub const fn processes_generation(&self) -> u64 {
         self.materialized.processes_revision()
+    }
+
+    /// Timestamp of the accepted process snapshot behind [`Self::processes`].
+    /// Aggregate projections pass this as `observed_at_ms`; the system
+    /// snapshot refreshes on its own cadence and must not stand in for it.
+    #[must_use]
+    pub const fn processes_observed_at_ms(&self) -> u64 {
+        self.materialized.processes_observed_at_ms()
     }
 
     #[must_use]
@@ -605,8 +626,10 @@ impl super::RootView {
         processes_updated: bool,
     ) -> Option<super::CaptureProcessAction> {
         let (capture_evidence, materialized) = (&mut self.capture_evidence, &mut self.materialized);
+        let processes_observed_at_ms = materialized.processes_observed_at_ms();
         let action = capture_evidence.on_processes_update(
             processes_updated,
+            processes_observed_at_ms,
             Arc::make_mut(&mut materialized.processes.value),
         );
         if processes_updated {

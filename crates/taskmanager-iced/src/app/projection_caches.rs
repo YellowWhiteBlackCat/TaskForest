@@ -122,14 +122,14 @@ impl IcedProjectionCaches {
     ) -> ProcessPerfHistorySnapshot {
         let mut cache = self.process_performance.borrow_mut();
         if let Some(entry) = cache.as_ref()
-            && entry.pid == history.pid()
+            && entry.identity == history.identity()
             && entry.revision == history.revision()
         {
             return entry.snapshot.clone();
         }
         let snapshot = history.snapshot();
         *cache = Some(ProcessPerfHistoryCache {
-            pid: history.pid(),
+            identity: history.identity(),
             revision: history.revision(),
             snapshot: snapshot.clone(),
         });

@@ -6,19 +6,18 @@
 //! the confirmation dialog; the renderer never stores the frozen payload.
 
 use super::{ProcessControlAction, RootView};
+use crate::gpui_app::elements;
 use gpui::{
     AnyElement, App, Context, Entity, IntoElement, ParentElement, Styled, Window, div, px, relative,
 };
-use std::collections::HashMap;
-
-use crate::gpui_app::elements;
 use taskmanager_application::i18n;
 use taskmanager_application::{
     ConfirmationKind, PendingConfirmation, SurfaceDismissReason, SurfaceKind,
 };
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::FrozenProcessIdentity;
-use taskmanager_core::core::process::{ProcessItem, descendant_pids};
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessItem, ProcessLiveKey, descendant_live_keys,
+};
 use taskmanager_theme::Theme;
 
 use taskmanager_application::{ProcessTerminationAction, ProcessTerminationConfirmation};
@@ -67,12 +66,12 @@ fn button_label(action: ProcessTerminationAction) -> &'static str {
 
 pub(super) fn snapshot_single_process(
     action: ProcessTerminationAction,
-    pid: u32,
+    identity: ProcessLiveKey,
     procs: &[ProcessItem],
 ) -> Option<ProcessTerminationConfirmation> {
     let root = procs
         .iter()
-        .find(|process| process.pid == pid)
+        .find(|process| ProcessLiveKey::from_process(process) == Some(identity))
         .and_then(FrozenProcessIdentity::from_process)?;
     Some(ProcessTerminationConfirmation {
         action,
@@ -82,34 +81,32 @@ pub(super) fn snapshot_single_process(
 }
 
 /// Snapshot a root and every currently-known descendant without issuing process
-/// control. The PID order comes from the ONE shared leaf-first traversal
-/// (`core::process::descendant_pids`, the same walk `freeze_tree` freezes);
-/// this dialog only adds its own name lookup for the confirmation preview.
+/// control. The live-identity order comes from the ONE shared leaf-first
+/// traversal (`core::process::descendant_live_keys`, the same walk
+/// `freeze_tree` freezes); this dialog only adds its own name lookup for the
+/// confirmation preview.
 pub fn snapshot_process_tree(
     procs: &[ProcessItem],
-    root_pid: u32,
+    root: ProcessLiveKey,
 ) -> Option<ProcessTerminationConfirmation> {
-    let by_pid: HashMap<u32, &ProcessItem> = procs.iter().map(|item| (item.pid, item)).collect();
-    let closure = descendant_pids(procs, root_pid);
-    let (root, descendants_leaf_first) = match closure.split_last() {
-        Some((&closure_root, descendant_pids)) => {
-            let root = by_pid
-                .get(&closure_root)
-                .copied()
-                .and_then(FrozenProcessIdentity::from_process)?;
-            let descendants = descendant_pids
-                .iter()
-                .map(|pid| {
-                    by_pid
-                        .get(pid)
-                        .copied()
-                        .and_then(FrozenProcessIdentity::from_process)
-                })
-                .collect::<Option<Vec<_>>>()?;
-            (root, descendants)
-        }
+    let closure = descendant_live_keys(procs, root);
+    let (root_identity, descendant_identities) = match closure.split_last() {
+        Some((root_identity, descendant_identities)) => (root_identity, descendant_identities),
         None => return None,
     };
+    let root = procs
+        .iter()
+        .find(|process| ProcessLiveKey::from_process(process) == Some(*root_identity))
+        .and_then(FrozenProcessIdentity::from_process)?;
+    let descendants_leaf_first = descendant_identities
+        .iter()
+        .map(|identity| {
+            procs
+                .iter()
+                .find(|process| ProcessLiveKey::from_process(process) == Some(*identity))
+                .and_then(FrozenProcessIdentity::from_process)
+        })
+        .collect::<Option<Vec<_>>>()?;
     Some(ProcessTerminationConfirmation {
         action: ProcessTerminationAction::EndProcessTree,
         root,
@@ -120,16 +117,20 @@ pub fn snapshot_process_tree(
 impl RootView {
     /// Open the shared process-termination confirmation dialog. Action bar,
     /// context menu, and Delete all call this method with the same typed intent.
-    pub fn request_process_termination(&mut self, action: ProcessTerminationAction, pid: u32) {
-        if let Some(intent) = snapshot_single_process(action, pid, self.processes()) {
+    pub fn request_process_termination(
+        &mut self,
+        action: ProcessTerminationAction,
+        identity: ProcessLiveKey,
+    ) {
+        if let Some(intent) = snapshot_single_process(action, identity, self.processes()) {
             self.arm_confirmation(PendingConfirmation::ProcessTermination(intent));
         }
     }
 
     /// Snapshot the selected process tree now; later refreshes cannot add, drop,
     /// or rename targets in the pending confirmation.
-    pub fn request_process_tree_termination(&mut self, pid: u32) {
-        if let Some(intent) = snapshot_process_tree(self.processes(), pid) {
+    pub fn request_process_tree_termination(&mut self, identity: ProcessLiveKey) {
+        if let Some(intent) = snapshot_process_tree(self.processes(), identity) {
             self.arm_confirmation(PendingConfirmation::ProcessTermination(intent));
         }
     }
@@ -159,9 +160,11 @@ impl RootView {
             return false;
         };
         let feedback_action = feedback_action(intent.action);
-        let root_pid = intent.root.pid;
+        let Some(root_identity) = intent.root.live_key() else {
+            return false;
+        };
         let result = execute(effect);
-        self.record_process_control_result(feedback_action, root_pid, result, cx);
+        self.record_process_control_result(feedback_action, root_identity, result, cx);
         true
     }
 

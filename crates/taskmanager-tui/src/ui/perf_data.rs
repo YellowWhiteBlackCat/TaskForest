@@ -7,16 +7,132 @@
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::directory_usage::{DirectoryUsageEntry, DirectoryUsageSnapshot};
 use taskmanager_core::core::metrics::{
-    DiskMetrics, DiskPartition, GpuMetrics, MemoryMetrics, NetworkAdapterType, NetworkMetrics,
+    CpuMetrics, DiskMetrics, DiskPartition, GpuMetrics, MemoryMetrics, NetworkAdapterType,
+    NetworkMetrics,
 };
 use taskmanager_core::core::power::BatteryInfo;
+use taskmanager_core::core::units::format_quantity_with;
 use taskmanager_shell::memory::{self, MemSegment, SwapBreakdown};
-use taskmanager_shell::presentation::{MISSING_VALUE, missing_value, optional_bytes};
+use taskmanager_shell::presentation::{
+    MISSING_VALUE, missing_value, optional_bytes, temperature_c,
+};
 
 use super::units::{
-    observed_frequency, observed_percentage, observed_temperature, quantity_text_optional,
+    memory_text_pref, observed_frequency, observed_percentage, observed_temperature,
+    quantity_text_optional,
 };
 use taskmanager_shell::presentation::duration;
+
+/// Bytes in one mebibyte — the signed memory usage rate is published in
+/// MiB/s and rendered through the shared byte ladder.
+const MIB_BYTES: u64 = 1024 * 1024;
+
+/// Below this absolute rate (MiB/s) the usage-rate row reports the shared
+/// dash instead of a sub-tick value, mirroring the gpui row gate
+/// (`memory_stats.rs`): a rate the kernel cannot distinguish from zero is
+/// honest absence, not a fabricated `+0 MiB/s`.
+const USAGE_RATE_NOISE_FLOOR_MIB_PER_SEC: f32 = 0.05;
+
+/// One core grid cell's three-segment readout, folded from the core's
+/// current typed observations (utilization · frequency · temperature). A
+/// segment whose observation is unobserved or non-finite renders the shared
+/// dash, never a fabricated zero; the renderer only joins this with the trend.
+pub(super) fn core_cell_readout(cpu: Option<&CpuMetrics>, core_index: usize) -> String {
+    [
+        cpu.and_then(|cpu| cpu.current_core_usage_pct(core_index))
+            .filter(|value| value.is_finite())
+            .map_or_else(missing_value, |value| format!("{value:.0}%")),
+        cpu.and_then(|cpu| cpu.current_core_frequency_mhz(core_index))
+            .map_or_else(missing_value, |mhz| {
+                format!("{:.2} GHz", mhz as f64 / 1000.0)
+            }),
+        cpu.and_then(|cpu| cpu.current_core_temperature_c(core_index))
+            .filter(|value| value.is_finite())
+            .map_or_else(missing_value, temperature_c),
+    ]
+    .join(" · ")
+}
+
+/// The number of labelled memory-stats rows this snapshot carries: the six
+/// fixed rows stay labelled with an honest dash when their fact is
+/// unavailable, while the Buffers row keeps the gpui conditional-row
+/// semantics (only when the host reports the counter).
+pub(super) fn memory_stats_row_count(memory: &MemoryMetrics) -> u16 {
+    6 + u16::from(memory.current_buffers_bytes().is_some())
+}
+
+/// The labelled memory-stats row set (`perf_views/memory_stats.rs` parity):
+/// every value routes through the same typed `MemoryMetrics` accessors the
+/// gpui rows read, so an unavailable observation resolves to the shared dash
+/// here and the renderer only styles the pair.
+pub(super) fn memory_stats_rows(
+    memory: &MemoryMetrics,
+    use_bytes: bool,
+    use_base2: bool,
+) -> Vec<(String, String)> {
+    let readout = |value: u64| memory_text_pref(value, use_bytes, use_base2);
+    let slots = match (memory.current_slots_used(), memory.current_slots_total()) {
+        (Some(used), Some(total)) => format!("{used} / {total}"),
+        _ => missing_value(),
+    };
+    // The gpui committed readout only reports the pair once a real limit
+    // exists; a committed counter without a limit stays a dash.
+    let committed = match (
+        memory.current_committed_bytes(),
+        memory.current_commit_limit_bytes(),
+    ) {
+        (Some(committed), Some(limit)) if limit > 0 => {
+            format!("{} / {}", readout(committed), readout(limit))
+        }
+        _ => missing_value(),
+    };
+    let usage_rate = memory
+        .current_used_rate_mib_per_sec()
+        .filter(|rate| rate.abs() >= USAGE_RATE_NOISE_FLOOR_MIB_PER_SEC)
+        .map_or_else(missing_value, |rate| {
+            signed_memory_rate_readout(rate, use_bytes, use_base2)
+        });
+
+    let mut rows: Vec<(String, String)> = vec![
+        (
+            t("mem.available").to_string(),
+            memory
+                .projected_available_bytes()
+                .map_or_else(missing_value, readout),
+        ),
+        (
+            t("mem.hardware_reserved").to_string(),
+            memory
+                .current_hardware_reserved_bytes()
+                .map_or_else(missing_value, readout),
+        ),
+        (
+            t("common.speed").to_string(),
+            memory
+                .current_speed_mhz()
+                .map_or_else(missing_value, |speed| format!("{speed} MT/s")),
+        ),
+        (t("mem.slots").to_string(), slots),
+        (t("mem.committed").to_string(), committed),
+        (t("mem.usage_rate").to_string(), usage_rate),
+    ];
+    if let Some(buffers) = memory.current_buffers_bytes() {
+        rows.push((t("mem.buffers").to_string(), readout(buffers)));
+    }
+    rows
+}
+
+/// The signed memory usage-rate readout: an explicit `+`/`-` sign (ASCII, so
+/// every terminal profile keeps one cell per glyph) over the shared byte
+/// ladder formatted as a per-second quantity.
+fn signed_memory_rate_readout(rate_mib_per_sec: f32, use_bytes: bool, use_base2: bool) -> String {
+    let sign = if rate_mib_per_sec < 0.0 { '-' } else { '+' };
+    let magnitude_bytes = (f64::from(rate_mib_per_sec.abs()) * MIB_BYTES as f64).round() as u64;
+    format!(
+        "{sign}{}",
+        format_quantity_with(magnitude_bytes, use_bytes, use_base2, true)
+    )
+}
 
 pub(super) struct BatteryData {
     pub(super) capacity: String,
@@ -269,16 +385,6 @@ pub(super) fn network_data(
 ) -> NetworkData {
     let total_rx = network.current_total_rx_bytes();
     let total_tx = network.current_total_tx_bytes();
-    let established = network.current_link_up().unwrap_or_else(|| {
-        network
-            .ipv4_addr
-            .as_deref()
-            .is_some_and(|address| !address.is_empty())
-            || network
-                .ipv6_addr
-                .as_deref()
-                .is_some_and(|address| !address.is_empty())
-    });
     let wireless = (network.adapter_type() == NetworkAdapterType::WiFi).then(|| {
         let mut details = Vec::new();
         if let Some(protocol) = network.current_protocol() {
@@ -315,11 +421,15 @@ pub(super) fn network_data(
         link: network
             .current_link_speed_mbps()
             .map_or_else(missing_value, |mbps| format!("{mbps} Mbps")),
-        connection: if established {
-            t("common.connected").to_owned()
-        } else {
-            t("common.disconnected").to_owned()
-        },
+        connection: network
+            .current_link_up()
+            .map_or_else(missing_value, |established| {
+                if established {
+                    t("common.connected").to_owned()
+                } else {
+                    t("common.disconnected").to_owned()
+                }
+            }),
         totals: (total_rx.is_some() || total_tx.is_some()).then(|| {
             (
                 quantity_text_optional(total_rx, use_bytes, use_base2),

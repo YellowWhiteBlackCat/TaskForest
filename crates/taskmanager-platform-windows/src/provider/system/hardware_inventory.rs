@@ -11,7 +11,8 @@
 
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
-    ComputeTopology, DisplayInfo, FailureKind, HardwareInfo, HostIdentity, KernelInfo, ProviderId,
+    ComputeTopology, CpuIdentity, DisplayInfo, FailureKind, HardwareInfo, HostIdentity, KernelInfo,
+    ProviderId,
 };
 use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::HardwareInventoryProvider;
@@ -59,6 +60,7 @@ impl HardwareInventoryProvider for WinHardwareInventoryProvider {
             build: None,
             modules_count: None,
             command_line: None,
+            compiler: None,
         };
         let cpu_brand = self
             .system
@@ -112,6 +114,7 @@ impl HardwareInventoryProvider for WinHardwareInventoryProvider {
             total_memory_mb: Some(self.system.total_memory() / 1024),
             base_frequency_mhz,
             instruction_features: super::cpu_info::detected_instruction_features(),
+            cpu_identity: CpuIdentity::default(),
         };
         let mut sources = vec![available_source(HARDWARE_INVENTORY_PROVIDER, 1)];
         if native_topology.is_some() || base_frequency_mhz.is_some() {

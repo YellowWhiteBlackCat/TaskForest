@@ -3,6 +3,7 @@
 use std::collections::{HashMap, HashSet};
 
 use gpui::Pixels;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::gpui_app::{processes_view, services_view, startup_view};
 
@@ -51,7 +52,7 @@ pub struct ProcessAffinityEditorState {
 
 #[derive(Clone)]
 pub struct ProcessesState {
-    pub collapsed: HashSet<u32>,
+    pub collapsed: HashSet<ProcessLiveKey>,
     pub expanded_apps: HashSet<String>,
     pub affinity_editor: ProcessAffinityEditorState,
     /// Columns hidden by the user. Name is never inserted.

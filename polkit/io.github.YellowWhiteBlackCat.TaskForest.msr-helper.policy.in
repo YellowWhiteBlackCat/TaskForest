@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TaskForest per-feature escalation policy (ADR-023/048). This action authorizes
+  one read-only MSR readout sweep per helper invocation; it does not run the
+  main TaskForest application as root.
+
+  Install paths:
+    this file   -> /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy
+    helper bin -> /usr/libexec/taskforest-msr-helper
+
+  The annotated path MUST match the path passed to pkexec exactly.
+-->
+<policyconfig>
+  <action id="io.github.YellowWhiteBlackCat.TaskForest.msr-helper">
+    <description>Read CPU MSR readouts for TaskForest</description>
+    <message>TaskForest needs authorization to read the per-CPU MSR registers (/dev/cpu/*/msr), which the kernel exposes root-only. The helper only reads the verified temperature, multiplier and voltage registers and reports the decoded values.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>auth_admin_keep</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/taskforest-msr-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

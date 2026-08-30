@@ -15,6 +15,7 @@ use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage};
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::ui::{TuiFramePlan, TuiHitTarget};
 
@@ -129,7 +130,7 @@ fn service_menu_row_click_walks_the_keyboard_confirmation_gate() {
     let popup = plan.overlay().expect("service menu popup").popup;
 
     // Click the second action row ("Stop").
-    let reaction = crate::runtime::apply_terminal_event_with_plan(
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         click(popup.x + 5, menu_row(popup, 1)),
         &plan,
@@ -166,7 +167,7 @@ fn process_menu_click_routes_control_and_gated_rows_like_enter() {
     let popup = plan.overlay().expect("process menu popup").popup;
 
     // Click "Suspend" (direct batch row).
-    let reaction = crate::runtime::apply_terminal_event_with_plan(
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         click(popup.x + 5, menu_row(popup, 3)),
         &plan,
@@ -187,7 +188,7 @@ fn process_menu_click_routes_control_and_gated_rows_like_enter() {
     assert!(app.open_process_menu());
     let plan = TuiFramePlan::build(&app, FRAME);
     let popup = plan.overlay().expect("process menu popup").popup;
-    let reaction = crate::runtime::apply_terminal_event_with_plan(
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         click(popup.x + 5, menu_row(popup, 0)),
         &plan,
@@ -218,7 +219,7 @@ fn session_menu_row_click_arms_the_session_gate() {
     let popup = plan.overlay().expect("session menu popup").popup;
 
     // Click "Lock" (the second action row).
-    let reaction = crate::runtime::apply_terminal_event_with_plan(
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         click(popup.x + 5, menu_row(popup, 1)),
         &plan,
@@ -245,18 +246,15 @@ fn batch_menu_row_click_routes_through_the_shared_batch_path() {
     // One marked process is enough to open the batch menu (the count is
     // frozen at open time; the shell owns the live set).
     app.shell.selected_rows.insert(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            4242,
-            taskmanager_test_support::fixture_start_token(4242),
-        )
-        .expect("non-zero parts"),
+        ProcessLiveKey::from_parts(4242, taskmanager_test_support::fixture_start_token(4242))
+            .expect("non-zero parts"),
     );
     assert!(app.open_batch_menu(), "a marked set opens the batch menu");
     let plan = TuiFramePlan::build(&app, FRAME);
     let popup = plan.overlay().expect("batch menu popup").popup;
 
     // Click "Clear selection" (the last action row).
-    let reaction = crate::runtime::apply_terminal_event_with_plan(
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         click(popup.x + 5, menu_row(popup, 7)),
         &plan,
@@ -282,7 +280,7 @@ fn column_menu_row_click_toggles_that_column() {
 
     // The column menu paints its rows directly at the body top (no frozen
     // target line): border row + index. Click row 0 (the CPU column).
-    let reaction = crate::runtime::apply_terminal_event_with_plan(
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         click(popup.x + 5, popup.y + 1),
         &plan,
@@ -327,7 +325,7 @@ fn command_palette_row_click_runs_the_selected_command() {
     let plan = TuiFramePlan::build(&app, FRAME);
     let popup = plan.overlay().expect("palette popup").popup;
     // The palette paints a 3-row filter field above the first command row.
-    let reaction = crate::runtime::apply_terminal_event_with_plan(
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         click(popup.x + 10, popup.y + 1 + 3),
         &plan,
@@ -370,12 +368,15 @@ fn a_stale_overlay_plan_fail_closed_after_a_surface_switch() {
     // ...but applying the click must be a no-op: the palette owns the
     // keyboard, so the click may neither arm the dead menu nor run a palette
     // command through geometry that never painted the palette.
-    let reaction = crate::runtime::apply_terminal_event_with_plan(
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         click(popup.x + 5, menu_row(popup, 1)),
         &plan,
     );
-    assert_eq!(reaction, crate::runtime::EventReaction::default());
+    assert_eq!(
+        reaction,
+        crate::runtime::runtime_support::EventReaction::default()
+    );
     assert!(app.shell.pending_service_control().is_none());
     let palette = app
         .command_palette()
@@ -391,12 +392,15 @@ fn a_stale_overlay_plan_fail_closed_after_a_surface_switch() {
         plan.hit_target(background.0, background.1),
         Some(TuiHitTarget::TableRow { .. })
     ));
-    let reaction = crate::runtime::apply_terminal_event_with_plan(
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
         &mut app,
         click(background.0, background.1),
         &plan,
     );
-    assert_eq!(reaction, crate::runtime::EventReaction::default());
+    assert_eq!(
+        reaction,
+        crate::runtime::runtime_support::EventReaction::default()
+    );
     assert_eq!(app.shell.selected, selected_before);
 }
 
@@ -428,9 +432,15 @@ fn confirmation_and_viewport_popups_stay_blocked_no_ops() {
             scope: overlay.scope,
         })
     );
-    let reaction =
-        crate::runtime::apply_terminal_event_with_plan(&mut app, click(center.0, center.1), &plan);
-    assert_eq!(reaction, crate::runtime::EventReaction::default());
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
+        &mut app,
+        click(center.0, center.1),
+        &plan,
+    );
+    assert_eq!(
+        reaction,
+        crate::runtime::runtime_support::EventReaction::default()
+    );
     assert!(
         matches!(
             app.shell.pending_confirmation(),
@@ -459,8 +469,14 @@ fn confirmation_and_viewport_popups_stay_blocked_no_ops() {
             scope: overlay.scope,
         })
     );
-    let reaction =
-        crate::runtime::apply_terminal_event_with_plan(&mut app, click(center.0, center.1), &plan);
-    assert_eq!(reaction, crate::runtime::EventReaction::default());
+    let reaction = crate::runtime::runtime_support::apply_terminal_event_with_plan(
+        &mut app,
+        click(center.0, center.1),
+        &plan,
+    );
+    assert_eq!(
+        reaction,
+        crate::runtime::runtime_support::EventReaction::default()
+    );
     assert!(app.shell.help_open(), "the help overlay stays open");
 }

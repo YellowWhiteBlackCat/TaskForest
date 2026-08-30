@@ -37,6 +37,10 @@ use taskmanager_ui_contract::IconId;
 use super::frame_plan::TablePanelProjection;
 use super::{panel, render_empty_panel};
 use crate::TuiApp;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/containers_support.rs"]
+pub(crate) mod containers_support;
 use crate::TuiTheme;
 use crate::ui::{DeviceHealth, classify_device_state};
 
@@ -300,20 +304,6 @@ pub(super) fn render_windowed_table<'a>(
 }
 
 /// Render the containers overlay centred over `area`.
-#[cfg(test)]
-#[allow(dead_code)]
-pub fn render_containers_overlay(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
-    render_containers_overlay_at(
-        frame,
-        app,
-        theme,
-        super::planned_popup(
-            area,
-            crate::TuiInputScope::LocalSurface(crate::TuiSurfaceKind::Containers),
-        ),
-    );
-}
-
 pub(super) fn render_containers_overlay_at(
     frame: &mut Frame<'_>,
     app: &TuiApp,

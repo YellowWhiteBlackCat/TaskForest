@@ -1,6 +1,6 @@
 //! Dialog content for dashboard rule, event, and saved-view management.
 
-use super::{DashboardPanel, DashboardState, EventFilter, EventKind};
+use super::{DashboardPanel, DashboardState, EventFilter};
 use crate::gpui_app::elements;
 use crate::gpui_app::processes_view::rows::header_label;
 use crate::gpui_app::root::RootView;
@@ -10,6 +10,7 @@ use gpui::{
 };
 use taskmanager_application::ManagedAlertRule;
 use taskmanager_application::i18n;
+use taskmanager_core::core::AlertEventKind;
 use taskmanager_core::core::{AlertEvent, AlertMetric, AlertSeverity};
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_theme::Theme;
@@ -466,10 +467,10 @@ fn event_filter_label(filter: EventFilter) -> &'static str {
     }
 }
 
-fn event_kind_label(kind: EventKind) -> &'static str {
+fn event_kind_label(kind: AlertEventKind) -> &'static str {
     match kind {
-        EventKind::Activated => i18n::t("events.activated"),
-        EventKind::Cleared => i18n::t("events.cleared"),
+        AlertEventKind::Activated => i18n::t("events.activated"),
+        AlertEventKind::Cleared => i18n::t("events.cleared"),
     }
 }
 

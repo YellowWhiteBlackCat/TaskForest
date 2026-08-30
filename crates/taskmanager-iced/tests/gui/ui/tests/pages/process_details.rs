@@ -3,6 +3,7 @@
 //! keep both files under the source-line ceiling.
 
 use super::*;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 #[test]
 fn process_details_overlay_projects_frozen_and_live_facts() {
@@ -16,7 +17,18 @@ fn process_details_overlay_projects_frozen_and_live_facts() {
     let _view = view(&app);
 
     let shell = taskmanager_shell::demo_app();
-    let rows = overlays::property_rows(4201, &shell);
+    let identity = shell
+        .projection()
+        .processes
+        .as_deref()
+        .and_then(|processes| {
+            processes
+                .iter()
+                .find(|process| process.pid == 4201)
+                .and_then(ProcessLiveKey::from_process)
+        })
+        .expect("demo process identity");
+    let rows = overlays::property_rows(identity, &shell);
     assert_eq!(
         rows.iter()
             .find(|(label, _)| label == "Name")
@@ -36,8 +48,11 @@ fn process_details_overlay_projects_frozen_and_live_facts() {
         Some("devuser")
     );
 
-    // A stale pid yields frozen facts only — never a fabricated row.
-    let stale = overlays::property_rows(999_999, &shell);
+    // A stale identity yields frozen facts only — never a fabricated row.
+    let stale = overlays::property_rows(
+        ProcessLiveKey::from_parts(999_999, 1).expect("stale identity"),
+        &shell,
+    );
     assert_eq!(
         stale
             .iter()
@@ -62,7 +77,8 @@ fn process_details_rows_read_canonical_observations() {
 
     // The live rows keep only their current typed measurements. Fields not
     // observed by the demo fixture render "—".
-    let rows = overlays::property_rows(zed.pid, &shell);
+    let zed_identity = ProcessLiveKey::from_process(zed).expect("zed identity");
+    let rows = overlays::property_rows(zed_identity, &shell);
     let value = |label: &str| {
         rows.iter()
             .find(|(row_label, _)| row_label == label)
@@ -112,7 +128,8 @@ fn process_details_rows_read_canonical_observations() {
             taskmanager_shell::fixture::ProjectionSeedDomain::Processes,
         ),
     );
-    let bare_rows = overlays::property_rows(bare.pid, &shell_bare);
+    let bare_identity = ProcessLiveKey::from_process(&bare).expect("bare identity");
+    let bare_rows = overlays::property_rows(bare_identity, &shell_bare);
     let bare_value = |label: &str| {
         bare_rows
             .iter()

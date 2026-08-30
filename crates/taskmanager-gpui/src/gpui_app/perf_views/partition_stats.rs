@@ -6,10 +6,10 @@ use gpui::{Div, ParentElement, Styled, div, px, relative};
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::formatting::{DisplayUnits, UnitKind};
 use taskmanager_application::i18n;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::metrics::DiskPartition;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::device_status_i18n_key;
 use taskmanager_theme::Theme;
 use taskmanager_ui::primitives::card_surface::CardSurface;
@@ -22,7 +22,7 @@ use taskmanager_theme::tokens;
 pub(super) fn partition_panel(
     theme: &Theme,
     partitions: &[DiskPartition],
-    units: DisplayUnits,
+    units: UnitPreferences,
 ) -> Div {
     let mut panel = CardSurface::new(theme.palette())
         .background(theme.sidebar_card_bg)
@@ -96,7 +96,7 @@ fn with_partition_selector(row: Div, _index: usize) -> Div {
 fn partition_row(
     theme: &Theme,
     partition: &DiskPartition,
-    units: DisplayUnits,
+    units: UnitPreferences,
     index: usize,
 ) -> Div {
     let label = partition_label(partition);
@@ -108,8 +108,8 @@ fn partition_row(
             (
                 format!(
                     "{}  ·  {} {}  ·  {:.0}%",
-                    units.format_pair(used, total, UnitKind::Drive, false),
-                    units.format(free, UnitKind::Drive, false),
+                    units.format_quantity_pair(used, total, QuantityFamily::Drive, false),
+                    units.format_quantity(free, QuantityFamily::Drive, false),
                     i18n::t("disk.free"),
                     percent
                 ),

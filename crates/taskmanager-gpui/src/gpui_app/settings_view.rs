@@ -19,13 +19,13 @@ use self::density::density_row;
 use self::ui_size::ui_size_row;
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::first_run::{self, FirstRunUiState};
-use crate::gpui_app::formatting::DisplayUnits;
 use crate::gpui_app::graph::GraphSettings;
 use crate::gpui_app::root::{Hover, RootView};
 use taskmanager_application::i18n;
 use taskmanager_core::core::config::{
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
 };
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{
@@ -102,7 +102,7 @@ pub(crate) struct SettingsViewProps<'a> {
     pub show_network_virtual: bool,
     pub show_network_other: bool,
     pub show_gpus: bool,
-    pub units: DisplayUnits,
+    pub units: UnitPreferences,
     pub graph_settings: GraphSettings,
     pub graph_points_slider: Entity<SliderState>,
     pub gray_zero_values: bool,

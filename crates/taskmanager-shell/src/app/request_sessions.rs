@@ -5,11 +5,13 @@
 //! removes stale or duplicate terminals before any renderer sees them.
 
 use taskmanager_application::{
-    GpuEngineRowsEvent, GpuEngineRowsSession, GpuEngineRowsState, NetworkEscalationSession,
-    NetworkEscalationState, PlatformEventBatch, ProcessAffinitySession, ProcessAffinityState,
-    ProcessBatchSession, ProcessBatchState, ProcessEvent, RequestAttemptId, ShellEvent,
-    ShellUiActionIntent, ShellUiActionSession, ShellUiActionState, SmartSelfTestSession,
-    SmartSelfTestState,
+    GpuEngineRowsEvent, GpuEngineRowsSession, GpuEngineRowsState, MsrReadoutEvent,
+    MsrReadoutSession, MsrReadoutState, NetworkEscalationSession, NetworkEscalationState,
+    PlatformEventBatch, ProcessAffinitySession, ProcessAffinityState, ProcessBatchSession,
+    ProcessBatchState, ProcessEvent, RaplPowerEvent, RaplPowerSession, RaplPowerState,
+    RequestAttemptId, ShellEvent, ShellUiActionIntent, ShellUiActionSession, ShellUiActionState,
+    SmartSelfTestSession, SmartSelfTestState, SmbiosMemoryEvent, SmbiosMemorySession,
+    SmbiosMemoryState,
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::DeviceId;
@@ -27,6 +29,9 @@ pub(crate) struct RequestSessions {
     gpu_engine_rows: GpuEngineRowsSession,
     shell_ui_action: ShellUiActionSession,
     network_escalation: NetworkEscalationSession,
+    smbios_memory: SmbiosMemorySession,
+    rapl_power: RaplPowerSession,
+    msr_readout: MsrReadoutSession,
 }
 
 impl ShellApp {
@@ -79,6 +84,98 @@ impl ShellApp {
 
     pub fn close_gpu_engine_rows_request(&mut self) {
         self.request_sessions.close_gpu_engine_rows();
+    }
+
+    #[must_use]
+    pub const fn smbios_memory_state(&self) -> &SmbiosMemoryState {
+        self.request_sessions.smbios_memory()
+    }
+
+    #[must_use]
+    pub fn begin_smbios_memory_request(&mut self) -> RequestAttemptId {
+        self.request_sessions.begin_smbios_memory()
+    }
+
+    pub fn accept_smbios_memory_request(
+        &mut self,
+        attempt: RequestAttemptId,
+        request_id: RequestId,
+    ) -> bool {
+        self.request_sessions
+            .accept_smbios_memory(attempt, request_id)
+    }
+
+    pub fn reject_smbios_memory_request(
+        &mut self,
+        attempt: RequestAttemptId,
+        failure: FailureKind,
+    ) -> bool {
+        self.request_sessions.reject_smbios_memory(attempt, failure)
+    }
+
+    pub fn close_smbios_memory_request(&mut self) {
+        self.request_sessions.close_smbios_memory();
+    }
+
+    #[must_use]
+    pub const fn rapl_power_state(&self) -> &RaplPowerState {
+        self.request_sessions.rapl_power()
+    }
+
+    #[must_use]
+    pub fn begin_rapl_power_request(&mut self) -> RequestAttemptId {
+        self.request_sessions.begin_rapl_power()
+    }
+
+    pub fn accept_rapl_power_request(
+        &mut self,
+        attempt: RequestAttemptId,
+        request_id: RequestId,
+    ) -> bool {
+        self.request_sessions.accept_rapl_power(attempt, request_id)
+    }
+
+    pub fn reject_rapl_power_request(
+        &mut self,
+        attempt: RequestAttemptId,
+        failure: FailureKind,
+    ) -> bool {
+        self.request_sessions.reject_rapl_power(attempt, failure)
+    }
+
+    pub fn close_rapl_power_request(&mut self) {
+        self.request_sessions.close_rapl_power();
+    }
+
+    #[must_use]
+    pub const fn msr_readout_state(&self) -> &MsrReadoutState {
+        self.request_sessions.msr_readout()
+    }
+
+    #[must_use]
+    pub fn begin_msr_readout_request(&mut self) -> RequestAttemptId {
+        self.request_sessions.begin_msr_readout()
+    }
+
+    pub fn accept_msr_readout_request(
+        &mut self,
+        attempt: RequestAttemptId,
+        request_id: RequestId,
+    ) -> bool {
+        self.request_sessions
+            .accept_msr_readout(attempt, request_id)
+    }
+
+    pub fn reject_msr_readout_request(
+        &mut self,
+        attempt: RequestAttemptId,
+        failure: FailureKind,
+    ) -> bool {
+        self.request_sessions.reject_msr_readout(attempt, failure)
+    }
+
+    pub fn close_msr_readout_request(&mut self) {
+        self.request_sessions.close_msr_readout();
     }
 
     #[must_use]
@@ -180,6 +277,16 @@ impl RequestSessions {
     #[must_use]
     pub(crate) const fn gpu_engine_rows(&self) -> &GpuEngineRowsState {
         self.gpu_engine_rows.state()
+    }
+
+    #[must_use]
+    pub(crate) const fn smbios_memory(&self) -> &SmbiosMemoryState {
+        self.smbios_memory.state()
+    }
+
+    #[must_use]
+    pub(crate) const fn rapl_power(&self) -> &RaplPowerState {
+        self.rapl_power.state()
     }
 
     #[must_use]
@@ -292,6 +399,86 @@ impl RequestSessions {
     }
 
     #[must_use]
+    pub(crate) fn begin_smbios_memory(&mut self) -> RequestAttemptId {
+        self.smbios_memory.begin_attempt()
+    }
+
+    pub(crate) fn accept_smbios_memory(
+        &mut self,
+        attempt: RequestAttemptId,
+        request_id: RequestId,
+    ) -> bool {
+        self.smbios_memory.accept_attempt(attempt, request_id)
+    }
+
+    pub(crate) fn reject_smbios_memory(
+        &mut self,
+        attempt: RequestAttemptId,
+        failure: FailureKind,
+    ) -> bool {
+        self.smbios_memory.reject_attempt(attempt, failure)
+    }
+
+    pub(crate) fn close_smbios_memory(&mut self) {
+        self.smbios_memory.close();
+    }
+
+    #[must_use]
+    pub(crate) fn begin_rapl_power(&mut self) -> RequestAttemptId {
+        self.rapl_power.begin_attempt()
+    }
+
+    pub(crate) fn accept_rapl_power(
+        &mut self,
+        attempt: RequestAttemptId,
+        request_id: RequestId,
+    ) -> bool {
+        self.rapl_power.accept_attempt(attempt, request_id)
+    }
+
+    pub(crate) fn reject_rapl_power(
+        &mut self,
+        attempt: RequestAttemptId,
+        failure: FailureKind,
+    ) -> bool {
+        self.rapl_power.reject_attempt(attempt, failure)
+    }
+
+    pub(crate) fn close_rapl_power(&mut self) {
+        self.rapl_power.close();
+    }
+
+    #[must_use]
+    pub(crate) const fn msr_readout(&self) -> &MsrReadoutState {
+        self.msr_readout.state()
+    }
+
+    #[must_use]
+    pub(crate) fn begin_msr_readout(&mut self) -> RequestAttemptId {
+        self.msr_readout.begin_attempt()
+    }
+
+    pub(crate) fn accept_msr_readout(
+        &mut self,
+        attempt: RequestAttemptId,
+        request_id: RequestId,
+    ) -> bool {
+        self.msr_readout.accept_attempt(attempt, request_id)
+    }
+
+    pub(crate) fn reject_msr_readout(
+        &mut self,
+        attempt: RequestAttemptId,
+        failure: FailureKind,
+    ) -> bool {
+        self.msr_readout.reject_attempt(attempt, failure)
+    }
+
+    pub(crate) fn close_msr_readout(&mut self) {
+        self.msr_readout.close();
+    }
+
+    #[must_use]
     pub(crate) fn begin_shell_ui_action(
         &mut self,
         intent: ShellUiActionIntent,
@@ -353,6 +540,30 @@ impl RequestSessions {
             }
             let GpuEngineRowsEvent::Update(snapshot) = &correlated.event;
             self.gpu_engine_rows
+                .complete(correlated.request_id, snapshot.clone())
+        });
+        batch.smbios_memory_events.retain(|correlated| {
+            if correlated.capability != CapabilityId::TELEMETRY_MEMORY_SMBIOS {
+                return false;
+            }
+            let SmbiosMemoryEvent::Update(snapshot) = &correlated.event;
+            self.smbios_memory
+                .complete(correlated.request_id, snapshot.clone())
+        });
+        batch.rapl_power_events.retain(|correlated| {
+            if correlated.capability != CapabilityId::TELEMETRY_CPU_PACKAGE_POWER {
+                return false;
+            }
+            let RaplPowerEvent::Update(snapshot) = &correlated.event;
+            self.rapl_power
+                .complete(correlated.request_id, snapshot.clone())
+        });
+        batch.msr_readout_events.retain(|correlated| {
+            if correlated.capability != CapabilityId::TELEMETRY_CPU_MSR {
+                return false;
+            }
+            let MsrReadoutEvent::Update(snapshot) = &correlated.event;
+            self.msr_readout
                 .complete(correlated.request_id, snapshot.clone())
         });
         batch.process_events.retain(|correlated| {
@@ -423,6 +634,15 @@ impl RequestSessions {
             }
             if failure.capability == CapabilityId::TELEMETRY_GPU_ENGINES {
                 let _ = self.gpu_engine_rows.fail(failure.request_id, failure.kind);
+            }
+            if failure.capability == CapabilityId::TELEMETRY_MEMORY_SMBIOS {
+                let _ = self.smbios_memory.fail(failure.request_id, failure.kind);
+            }
+            if failure.capability == CapabilityId::TELEMETRY_CPU_PACKAGE_POWER {
+                let _ = self.rapl_power.fail(failure.request_id, failure.kind);
+            }
+            if failure.capability == CapabilityId::TELEMETRY_CPU_MSR {
+                let _ = self.msr_readout.fail(failure.request_id, failure.kind);
             }
             if failure.capability == CapabilityId::PROCESS_NETWORK_ESCALATION {
                 let _ = self

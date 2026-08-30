@@ -5,6 +5,10 @@
 //! string onto another row.
 
 use ratatui::Frame;
+
+#[cfg(test)]
+#[path = "../../tests/headless/ui/header_support.rs"]
+pub(crate) mod header_support;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -59,11 +63,6 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
             .wrap(Wrap { trim: true }),
         area,
     );
-}
-
-#[cfg(test)]
-fn header_tab_text(icon: IconId, label: &str, shortcut: &str, width: u16) -> String {
-    header_tab_text_with_theme(icon, label, shortcut, width, TuiTheme::default())
 }
 
 fn header_tab_text_with_theme(

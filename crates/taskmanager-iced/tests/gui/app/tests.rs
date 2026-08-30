@@ -3,6 +3,7 @@ use super::motion::viewport_compact;
 use super::*;
 use taskmanager_application::PlatformClient;
 use taskmanager_application::{FocusDirection, KeyCode, Modifiers};
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use taskmanager_shell::ShellKeyEvent;
 
@@ -174,26 +175,35 @@ fn activate_tree_node_toggles_subtree_and_selects_parent() {
     let _ = app.update(Message::SelectPage(
         taskmanager_application::AppPage::Applications,
     ));
-    assert!(!app.process_presentation.expanded_tree.contains(&1234));
+    let tree_identity = ProcessLiveKey::from_parts(1234, 12341).expect("fixture process identity");
+    assert!(
+        !app.process_presentation
+            .expanded_tree
+            .contains(&tree_identity)
+    );
     assert_eq!(app.shell.selected, 0);
     // One activation collapses the subtree AND selects the parent row (a parent
     // was previously only toggleable, never selectable).
     let _ = app.update(Message::ActivateTreeNode {
-        pid: 1234,
+        identity: Some(tree_identity),
         flat_index: 1,
     });
     assert!(
-        app.process_presentation.expanded_tree.contains(&1234),
+        app.process_presentation
+            .expanded_tree
+            .contains(&tree_identity),
         "first activation collapses the subtree"
     );
     assert_eq!(app.shell.selected, 1, "activation selects the parent row");
     // A second activation re-expands (the collapsed set is a toggle).
     let _ = app.update(Message::ActivateTreeNode {
-        pid: 1234,
+        identity: Some(tree_identity),
         flat_index: 1,
     });
     assert!(
-        !app.process_presentation.expanded_tree.contains(&1234),
+        !app.process_presentation
+            .expanded_tree
+            .contains(&tree_identity),
         "second activation re-expands the subtree"
     );
 }
@@ -222,12 +232,16 @@ fn application_aggregate_selection_stays_pidless() {
 
     let root_row_key = app.shell.visible_processes()[0]
         .current_start_token()
-        .and_then(|token| taskmanager_shell::ProcessRowIdentity::from_parts(root_pid, token))
+        .and_then(|token| ProcessLiveKey::from_parts(root_pid, token))
         .map(taskmanager_shell::ProcessRowId::Application);
     let _ = app.update(Message::ToggleGroupExpansion {
-        name: format!("app-tree:{root_pid}"),
-        main_pid: root_pid,
-        flat_index: 0,
+        name: format!(
+            "app-tree:{}",
+            root_row_key
+                .and_then(|key| key.live_key())
+                .expect("application root identity")
+                .stable_key()
+        ),
         row_key: root_row_key,
     });
 
@@ -381,13 +395,16 @@ fn row_click_branches_on_live_modifier_state() {
     // selection (the demo defaults to Performance, which has no table).
     let mut app = IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Applications));
-    let pids: Vec<u32> = app
+    let identities: Vec<ProcessLiveKey> = app
         .shell
         .visible_processes()
         .iter()
-        .map(|process| process.pid)
+        .filter_map(|process| ProcessLiveKey::from_process(process))
         .collect();
-    assert!(pids.len() >= 4, "demo needs a range to exercise extend");
+    assert!(
+        identities.len() >= 4,
+        "demo needs a range to exercise extend"
+    );
 
     // Plain click collapses to a single anchor.
     let _ = app.update(Message::ModifiersChanged(
@@ -397,7 +414,7 @@ fn row_click_branches_on_live_modifier_state() {
     assert_eq!(app.shell.selected_identities().len(), 1);
     assert!(
         app.shell
-            .visible_process_by_pid(pids[0])
+            .visible_process_by_identity(identities[0])
             .is_some_and(|p| app.shell.is_process_selected(p))
     );
 
@@ -407,7 +424,7 @@ fn row_click_branches_on_live_modifier_state() {
     assert_eq!(app.shell.selected_identities().len(), 2);
     assert!(
         app.shell
-            .visible_process_by_pid(pids[2])
+            .visible_process_by_identity(identities[2])
             .is_some_and(|p| app.shell.is_process_selected(p))
     );
 
@@ -416,7 +433,7 @@ fn row_click_branches_on_live_modifier_state() {
     let _ = app.update(Message::SelectRow(3));
     assert!(
         app.shell
-            .visible_process_by_pid(pids[3])
+            .visible_process_by_identity(identities[3])
             .is_some_and(|p| app.shell.is_process_selected(p))
     );
     assert!(app.shell.selected_identities().len() >= 3);
@@ -429,7 +446,7 @@ fn row_click_branches_on_live_modifier_state() {
     assert_eq!(app.shell.selected_identities().len(), 1);
     assert!(
         app.shell
-            .visible_process_by_pid(pids[1])
+            .visible_process_by_identity(identities[1])
             .is_some_and(|p| app.shell.is_process_selected(p))
     );
 }

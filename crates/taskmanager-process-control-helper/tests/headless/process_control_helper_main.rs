@@ -203,3 +203,124 @@ mod signal_identity {
         cleanup(child);
     }
 }
+
+#[test]
+fn arg_parser_accepts_only_the_fixed_three_or_four_argument_forms() {
+    fn args<'a>(list: &'a [&'a str]) -> impl Iterator<Item = String> + 'a {
+        list.iter().map(|value| (*value).to_owned())
+    }
+
+    let (pid, token, operation, reply) =
+        parse_args(args(&["42", "9000", "kill"])).expect("three-argument form");
+    assert_eq!((pid, token), (42, 9000));
+    assert_eq!(operation, Operation::Kill);
+    assert!(reply.is_none(), "the pkexec crossing passes no channel");
+
+    let (_, _, _, reply) = parse_args(args(&["42", "9000", "priority:-5", "/tmp/r 1.json"]))
+        .expect("four-argument form");
+    assert_eq!(reply.as_deref(), Some(Path::new("/tmp/r 1.json")));
+
+    // An empty or whitespace-only channel path, and any fifth argument, are
+    // usage errors — the helper never guesses a channel.
+    assert!(matches!(
+        parse_args(args(&["42", "9000", "kill", "  "])),
+        Err(HelperError::ArgError(_))
+    ));
+    assert!(matches!(
+        parse_args(args(&["42", "9000", "kill", "/tmp/r.json", "extra"])),
+        Err(HelperError::ArgError(_))
+    ));
+}
+
+#[cfg(any(unix, windows))]
+mod reply_channel {
+    use super::*;
+
+    /// A per-test reply file in the shared temp dir, created exclusively so
+    /// two parallel tests can never share a channel (mirrors the production
+    /// create-new rule the app driver applies).
+    struct Channel(PathBuf);
+
+    impl Channel {
+        fn new(tag: &str) -> Self {
+            let mut attempt = 0_u32;
+            loop {
+                let path = crate::test_support::repo_temp_dir().join(format!(
+                    "taskforest-helper-reply-test-{}-{tag}-{attempt}.json",
+                    std::process::id()
+                ));
+                match std::fs::OpenOptions::new()
+                    .write(true)
+                    .create_new(true)
+                    .open(&path)
+                {
+                    Ok(_) => return Self(path),
+                    Err(error)
+                        if error.kind() == std::io::ErrorKind::AlreadyExists && attempt < 8 =>
+                    {
+                        attempt += 1;
+                    }
+                    Err(_) => panic!("could not create the test reply channel"),
+                }
+            }
+        }
+
+        fn content(&self) -> String {
+            std::fs::read_to_string(&self.0).expect("read the reply channel back")
+        }
+    }
+
+    impl Drop for Channel {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_file(&self.0);
+        }
+    }
+
+    #[test]
+    fn the_same_contract_envelope_crosses_on_the_reply_channel() {
+        let applied = Applied {
+            pid: 42,
+            start_token: 9000,
+            operation: "kill".to_owned(),
+        };
+        let channel = Channel::new("applied");
+        let code = emit(Ok(applied), Some(&channel.0));
+        assert_eq!(code, ExitCode::SUCCESS);
+        assert_eq!(
+            channel.content(),
+            r#"{"schema":1,"status":"applied","pid":42,"start_token":9000,"operation":"kill"}"#
+        );
+
+        let channel = Channel::new("error");
+        let code = emit(
+            Err(HelperError::IdentityChanged("reused".to_owned())),
+            Some(&channel.0),
+        );
+        assert_eq!(code, ExitCode::from(3));
+        assert_eq!(
+            channel.content(),
+            r#"{"schema":1,"status":"error","kind":"identity_changed","detail":"reused"}"#
+        );
+    }
+
+    #[test]
+    fn the_reply_channel_truncates_and_never_mints_a_path() {
+        // A pre-created channel holding a stale larger payload is truncated
+        // to exactly the new envelope, and a channel that was never created
+        // is a typed write failure — the elevated helper cannot be used to
+        // create an arbitrary file.
+        let channel = Channel::new("truncate");
+        std::fs::write(
+            &channel.0,
+            b"stale bytes that must not survive the crossing",
+        )
+        .unwrap();
+        write_reply_channel(&channel.0, br#"{"schema":1}"#).expect("truncate the live channel");
+        assert_eq!(channel.content(), r#"{"schema":1}"#);
+
+        let missing = crate::test_support::repo_temp_dir()
+            .join("taskforest-helper-reply-test-definitely-absent.json");
+        let _ = std::fs::remove_file(&missing);
+        assert!(write_reply_channel(&missing, b"{}").is_err());
+    }
+}

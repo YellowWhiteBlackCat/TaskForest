@@ -8,7 +8,7 @@
 use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::DiskMetrics;
 
-use crate::gpui_app::formatting::{DisplayUnits, UnitKind};
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::{
@@ -21,15 +21,15 @@ use super::{
 /// capacity observations; the paint module only formats the resulting line.
 /// Honest absence — a disk whose capacity or partition facts are uncollected
 /// keeps the dash or omits the segment, never a fabricated zero.
-pub(super) fn vital_line(d: &DiskMetrics, units: DisplayUnits) -> String {
+pub(super) fn vital_line(d: &DiskMetrics, units: UnitPreferences) -> String {
     let mut segments: Vec<String> = Vec::new();
     match (d.current_capacity_bytes(), d.current_available_bytes()) {
         (Some(total), Some(free)) if total > 0 => {
             let used = total.saturating_sub(free).min(total);
             segments.push(format!(
                 "{} / {}",
-                units.format(used, UnitKind::Drive, false),
-                units.format(total, UnitKind::Drive, false),
+                units.format_quantity(used, QuantityFamily::Drive, false),
+                units.format_quantity(total, QuantityFamily::Drive, false),
             ));
         }
         _ => segments.push(crate::gpui_app::formatting::missing_value()),
@@ -46,7 +46,7 @@ pub(super) fn vital_line(d: &DiskMetrics, units: DisplayUnits) -> String {
 
 pub(super) fn disk_stats(
     d: &DiskMetrics,
-    units: DisplayUnits,
+    units: UnitPreferences,
     temperature_samples: &[f32],
 ) -> Vec<StatRow> {
     let mut stats = vec![
@@ -81,12 +81,12 @@ pub(super) fn disk_stats(
         StatRow::text(
             i18n::t("disk.capacity"),
             d.current_capacity_bytes()
-                .map(|value| units.format(value, UnitKind::Drive, false)),
+                .map(|value| units.format_quantity(value, QuantityFamily::Drive, false)),
         ),
         StatRow::text(
             i18n::t("disk.free"),
             d.current_available_bytes()
-                .map(|value| units.format(value, UnitKind::Drive, false)),
+                .map(|value| units.format_quantity(value, QuantityFamily::Drive, false)),
         ),
         StatRow::text(i18n::t("common.type"), Some(d.disk_type.clone())),
         StatRow::text(i18n::t("disk.filesystem"), Some(d.fs_type.clone())),

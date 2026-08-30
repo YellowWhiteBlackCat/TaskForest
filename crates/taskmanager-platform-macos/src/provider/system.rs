@@ -8,16 +8,23 @@
 //! `ifconfig`/`networksetup` shell-outs cached ~10 s; on hosts without those
 //! tools the scalars degrade honestly to typed unavailable states).
 
+mod msr_readout;
 mod network;
+mod rapl_power;
+mod smbios_memory;
 
+pub use msr_readout::PendingMsrReadoutProvider;
 pub use network::MacNetworkTelemetryProvider;
+pub use rapl_power::PendingRaplPowerProvider;
+pub use smbios_memory::PendingSmbiosMemoryProvider;
 
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
     ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
-    NetworkTelemetryRequest, NpuInventoryRequest, StorageTelemetryRequest,
+    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
+    NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest, SmbiosMemoryRequest,
+    StorageTelemetryRequest,
 };
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
@@ -30,8 +37,9 @@ use taskmanager_core::{
 use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
     ContainerRollupProvider, CpuTelemetryProvider, GpuEngineRowsProvider, GpuTelemetryProvider,
-    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider,
-    NetworkTelemetryProvider, NpuInventoryProvider, StorageTelemetryProvider,
+    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider, MsrReadoutProvider,
+    NetworkTelemetryProvider, NpuInventoryProvider, RaplPowerProvider, SmbiosMemoryProvider,
+    StorageTelemetryProvider,
 };
 use taskmanager_platform_runtime::{
     ProviderRegistration, SystemAuxiliaryExecutors, SystemExecutors, SystemObservationExecutors,
@@ -367,6 +375,7 @@ impl HardwareInventoryProvider for MacHardwareInventoryProvider {
             build: None,
             modules_count: None,
             command_line: None,
+            compiler: None,
         };
         let cpu_brand = self
             .system
@@ -620,6 +629,10 @@ type GpuEngineRowsRegistration =
     ProviderRegistration<GpuEngineRowsRequest, Box<dyn GpuEngineRowsProvider>>;
 type NpuInventoryRegistration =
     ProviderRegistration<NpuInventoryRequest, Box<dyn NpuInventoryProvider>>;
+type SmbiosMemoryRegistration =
+    ProviderRegistration<SmbiosMemoryRequest, Box<dyn SmbiosMemoryProvider>>;
+type RaplPowerRegistration = ProviderRegistration<RaplPowerRequest, Box<dyn RaplPowerProvider>>;
+type MsrReadoutRegistration = ProviderRegistration<MsrReadoutRequest, Box<dyn MsrReadoutProvider>>;
 
 /// Registered-pending per-engine GPU utilization provider: macOS has no Intel
 /// PMU helper crossing, so the capability publishes an honest `Unsupported`
@@ -657,19 +670,29 @@ pub struct MacSystemAuxiliaryProviders {
     hardware_inventory: HardwareInventoryRegistration,
     gpu_engine_rows: GpuEngineRowsRegistration,
     npu_inventory: NpuInventoryRegistration,
+    smbios_memory: SmbiosMemoryRegistration,
+    rapl_power: RaplPowerRegistration,
+    msr_readout: MsrReadoutRegistration,
 }
 
 impl MacSystemAuxiliaryProviders {
+    #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new<P, E, N>(
+    pub fn new<P, E, N, S, R, M>(
         hardware_inventory: ProviderRegistration<HardwareInventoryRequest, P>,
         gpu_engine_rows: ProviderRegistration<GpuEngineRowsRequest, E>,
         npu_inventory: ProviderRegistration<NpuInventoryRequest, N>,
+        smbios_memory: ProviderRegistration<SmbiosMemoryRequest, S>,
+        rapl_power: ProviderRegistration<RaplPowerRequest, R>,
+        msr_readout: ProviderRegistration<MsrReadoutRequest, M>,
     ) -> Self
     where
         P: HardwareInventoryProvider,
         E: GpuEngineRowsProvider,
         N: NpuInventoryProvider,
+        S: SmbiosMemoryProvider,
+        R: RaplPowerProvider,
+        M: MsrReadoutProvider,
     {
         Self {
             hardware_inventory: hardware_inventory
@@ -678,6 +701,12 @@ impl MacSystemAuxiliaryProviders {
                 .map_provider(|provider| Box::new(provider) as Box<dyn GpuEngineRowsProvider>),
             npu_inventory: npu_inventory
                 .map_provider(|provider| Box::new(provider) as Box<dyn NpuInventoryProvider>),
+            smbios_memory: smbios_memory
+                .map_provider(|provider| Box::new(provider) as Box<dyn SmbiosMemoryProvider>),
+            rapl_power: rapl_power
+                .map_provider(|provider| Box::new(provider) as Box<dyn RaplPowerProvider>),
+            msr_readout: msr_readout
+                .map_provider(|provider| Box::new(provider) as Box<dyn MsrReadoutProvider>),
         }
     }
 
@@ -686,15 +715,24 @@ impl MacSystemAuxiliaryProviders {
             hardware_inventory,
             gpu_engine_rows,
             npu_inventory,
+            smbios_memory,
+            rapl_power,
+            msr_readout,
         } = self;
         let mut hardware_inventory = hardware_inventory.into_provider();
         let mut gpu_engine_rows = gpu_engine_rows.into_provider();
         let mut npu_inventory = npu_inventory.into_provider();
+        let mut smbios_memory = smbios_memory.into_provider();
+        let mut rapl_power = rapl_power.into_provider();
+        let mut msr_readout = msr_readout.into_provider();
         SystemAuxiliaryExecutors::new(move || hardware_inventory.refresh())
             .with_gpu_engine_rows(move |request| {
                 gpu_engine_rows.read_engine_rows(&request.device_id)
             })
             .with_npu_inventory(move |observed_at_ms| npu_inventory.read_inventory(observed_at_ms))
+            .with_smbios_memory(move || smbios_memory.read_memory_smbios())
+            .with_rapl_power(move || rapl_power.read_package_power())
+            .with_msr_readout(move || msr_readout.read_msr_readouts())
     }
 }
 
@@ -729,6 +767,9 @@ impl MacSystemProviders {
         })
         .with_gpu_engine_rows(&self.auxiliary.gpu_engine_rows)
         .with_npu_inventory(&self.auxiliary.npu_inventory)
+        .with_smbios_memory(&self.auxiliary.smbios_memory)
+        .with_rapl_power(&self.auxiliary.rapl_power)
+        .with_msr_readout(&self.auxiliary.msr_readout)
     }
 
     pub(crate) fn into_runtime(self) -> SystemExecutors {

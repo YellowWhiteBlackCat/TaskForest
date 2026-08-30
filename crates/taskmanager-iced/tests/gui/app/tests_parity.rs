@@ -14,6 +14,7 @@ use super::focus_state::service_control_focus_target;
 use super::*;
 use crate::test_support::temp_dir;
 use taskmanager_application::ConfigStore;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ShellKeyEvent;
 
 #[test]
@@ -84,22 +85,21 @@ fn user_row_menu_renders_only_while_open_with_the_target_session() {
 fn process_row_menu_reuses_shared_identity_safe_actions() {
     let mut app = IcedApp::demo();
     let _ = app.update(Message::SelectPage(AppPage::Applications));
-    let pid = app
+    let identity = app
         .shell
         .visible_processes()
         .get(1)
-        .map(|process| process.pid)
-        .unwrap_or_default();
-    assert_ne!(pid, 0, "the demo process row must have a real pid");
+        .and_then(|process| ProcessLiveKey::from_process(process))
+        .expect("the demo process row must have a live identity");
 
-    let _ = app.update(Message::OpenProcessRowMenu { flat_index: 1, pid });
-    assert_eq!(app.process_menu_pid(), Some(pid));
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
+    assert_eq!(app.process_menu_identity(), Some(identity));
     assert_eq!(app.shell.selected, 1);
 
     // Destructive menu actions use the same shared confirmation slot as the
     // Applications action bar; they do not submit directly from the row UI.
     let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::Kill));
-    assert!(app.process_menu_pid().is_none());
+    assert!(app.process_menu_identity().is_none());
     assert_eq!(
         app.shell.pending_batch().map(|intent| intent.action),
         Some(taskmanager_core::core::process::ProcessBatchAction::Kill)
@@ -108,20 +108,20 @@ fn process_row_menu_reuses_shared_identity_safe_actions() {
 
     // Signals are a separate typed platform effect, still frozen from the
     // selected row and still suppressed honestly in demo mode.
-    let _ = app.update(Message::OpenProcessRowMenu { flat_index: 1, pid });
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
     let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::Signal(
         taskmanager_core::core::process::ProcessSignal::Interrupt,
     )));
-    assert!(app.process_menu_pid().is_none());
+    assert!(app.process_menu_identity().is_none());
     assert!(app.shell.feedback_text().contains("Demo mode"));
 
     // Escape closes an open menu without changing the selected row.
-    let _ = app.update(Message::OpenProcessRowMenu { flat_index: 1, pid });
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
     let _ = app.update(Message::Key(IcedKey::Fixed(ShellKeyEvent::new(
         taskmanager_application::KeyCode::Escape,
         taskmanager_application::Modifiers::NONE,
     ))));
-    assert!(app.process_menu_pid().is_none());
+    assert!(app.process_menu_identity().is_none());
     assert_eq!(app.shell.selected, 1);
 }
 

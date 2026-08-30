@@ -27,8 +27,10 @@ the only reuse and change authority.
   `src/core/export/` own typed product facts.
 - `src/core/process/identity.rs` owns the validated `ProcessLiveKey` used to
   distinguish a provider-issued process incarnation from a reused PID;
-  `src/core/process/aggregate.rs` owns availability-preserving group metric
-  folds while the legacy `AppGroup` shape remains a compatibility surface.
+  `src/core/process/aggregate.rs` owns availability-preserving scalar folds;
+  `src/core/process/group_aggregate.rs` owns the typed application, user, and
+  process-class group aggregates whose totals never collapse unavailable
+  members into a fabricated value.
 - `src/core/alerts/` owns alert rules, active-set transitions and the bounded,
   versioned event export; event history is session-local domain state, not a
   renderer cache.
@@ -48,20 +50,27 @@ for the interval in which it can still affect a verdict. Providers may report
 their full CPU fact vector, while every derived per-core history fan-out shares
 the canonical `MAX_TRACKED_LOGICAL_CPUS` cardinality ceiling.
 
+Core changes are hard cutovers. A new typed contract requires all production
+callers, renderer state, tests, fixtures, demo/capture paths and exports to move
+in the same change; old aliases, wrappers, deprecated methods, fallback APIs and
+dual semantic paths are deleted. A private decoder may parse a mandatory
+published external payload and immediately canonicalize it, but no consumer may
+depend on that decoder or observe the old vocabulary.
+
 Generic scalar, optional, grouped and process-metadata observations keep their
 value/state, availability and success-time fields private. Production writers
 use named constructors and transitions; consumers choose explicit current or
 last-known accessors. Partial scalar groups accept only typed current, partial
 or unavailable slots and stamp all current slots atomically, so callers cannot
-assemble Unknown/Stale children or mismatched refresh times. Lenient Unknown
-hydration exists only behind private serde migration helpers.
+assemble Unknown/Stale children or mismatched refresh times. External old-format
+hydration exists only at a private serde ingress and is immediately converted to
+the current typed observations.
 
 `ServiceDeps` and `ServiceItem` each own one private typed
 `ServiceRelationGraph`; consumers receive only read-only relation accessors.
-Their private serde DTOs share one compatibility helper: four historical
-dependency strings are derived from the graph on write and hydrate only
-relation kinds absent from a typed payload on read. Unknown typed relation
-kinds round-trip unchanged.
+Their private serde ingress/serializer handles four published dependency-string
+fields; the domain only stores the typed relation graph. Input is canonicalized
+immediately, and unknown typed relation kinds round-trip unchanged.
 
 `BatteryInfo` owns a private `BatteryScalarObservations` group exposed through
 typed read accessors and one apply operation. Its four schema-v1 scalar options
@@ -106,7 +115,7 @@ process identity when typed truth is `Unknown`; current accessors are the only
 consumer surface, and serialization projects legacy owner/path from current
 typed truth.
 
-Process-view preset compatibility is read-only: a private read DTO accepts the
-retired mode tokens and maps recognized rows into `ProcessViewPresetConfig`.
-The separate canonical write DTO has no mode field, so saving a migrated
-configuration cannot republish obsolete view state.
+External saved-view input is read-only at the private ingress: recognized old
+tokens are canonicalized into `ProcessViewPresetConfig`. The canonical write
+DTO has no obsolete mode field, so saving a parsed configuration cannot
+republish the old vocabulary.

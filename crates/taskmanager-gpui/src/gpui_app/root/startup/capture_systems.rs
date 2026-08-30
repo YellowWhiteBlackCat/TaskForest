@@ -2,6 +2,7 @@
 
 use gpui::Context;
 use taskmanager_application::{PendingConfirmation, PlatformEventBatch};
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use super::super::{
     CaptureEvidence, CaptureProcessAction, DiagnosticBundleUiState, ProcessDetailsSection,
@@ -48,15 +49,15 @@ fn apply_process_capture(view: &mut RootView, processes_updated: bool, cx: &mut 
             CaptureProcessAction::Termination(intent) => {
                 view.arm_confirmation(PendingConfirmation::ProcessTermination(intent));
             }
-            CaptureProcessAction::ApplicationSelection(root_pid) => {
+            CaptureProcessAction::ApplicationSelection(root_identity) => {
                 view.page = TopPage::Apps;
-                view.select_application_root(root_pid);
+                view.select_application_root(root_identity);
             }
             CaptureProcessAction::Batch(intent) => {
                 view.page = TopPage::Apps;
-                let anchor = intent.targets.last().map(|target| target.pid);
+                let anchor = intent.targets.last().and_then(|target| target.live_key());
                 view.replace_process_selection(
-                    intent.targets.iter().map(|target| target.pid),
+                    intent.targets.iter().filter_map(|target| target.live_key()),
                     anchor,
                 );
                 view.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
@@ -65,18 +66,21 @@ fn apply_process_capture(view: &mut RootView, processes_updated: bool, cx: &mut 
                     view.selected_process_count(),
                 );
             }
-            CaptureProcessAction::Properties(pid, section) => {
-                view.open_process_details(pid, section);
+            CaptureProcessAction::Properties(identity, section) => {
+                view.open_process_details(identity, section);
             }
-            CaptureProcessAction::Insights { pid, state } => {
-                view.open_process_details(pid, ProcessDetailsSection::Insights);
-                if let Some(target) = view.frozen_process(pid) {
+            CaptureProcessAction::Insights { identity, state } => {
+                view.open_process_details(identity, ProcessDetailsSection::Insights);
+                if let Some(target) = view.frozen_process(identity) {
                     view.process_insights.install_capture_state(target, state);
                 }
-                let ready = view.process_properties_pid() == Some(pid)
+                let ready = view.process_properties_identity() == Some(identity)
                     && view.details_section == ProcessDetailsSection::Insights
-                    && view.processes().iter().any(|process| process.pid == pid)
-                    && view.process_insights.is_ready_for(pid);
+                    && view
+                        .processes()
+                        .iter()
+                        .any(|process| ProcessLiveKey::from_process(process) == Some(identity))
+                    && view.process_insights.is_ready_for(identity);
                 view.capture_evidence.mark_process_insights_ready(ready);
             }
         }

@@ -20,7 +20,7 @@ fn cache_records_sum_each_windows_cache_instance() {
     bytes.extend(second);
     assert_eq!(
         parse_cache_records(&bytes, RELATION_CACHE),
-        Ok([Some(32), None, Some(16)])
+        Ok([Some(32), None, None, Some(16)])
     );
 }
 
@@ -45,5 +45,10 @@ fn live_processor_topology_query() {
     let topo = topo.unwrap();
     eprintln!("LIVE PROCESSOR TOPOLOGY: {topo:?}");
     assert!(topo.socket_count.is_some());
-    assert!(topo.l1_cache_kb.is_some() || topo.l2_cache_kb.is_some() || topo.l3_cache_kb.is_some());
+    assert!(
+        topo.l1d_cache_kb.is_some()
+            || topo.l1i_cache_kb.is_some()
+            || topo.l2_cache_kb.is_some()
+            || topo.l3_cache_kb.is_some()
+    );
 }

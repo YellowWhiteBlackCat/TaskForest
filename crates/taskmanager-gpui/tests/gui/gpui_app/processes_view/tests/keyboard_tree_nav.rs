@@ -15,6 +15,7 @@
 //! can lag a count change by one frame, hence the double draw there.
 
 use super::*;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 fn seed_three_level_tree(
     cx: &mut TestAppContext,
@@ -84,7 +85,7 @@ fn assert_selected(cx: &mut TestAppContext, view: &Entity<RootView>, pid: u32) {
             .processes()
             .iter()
             .find(|process| process.pid == pid)
-            .and_then(taskmanager_shell::ProcessRowIdentity::from_process)
+            .and_then(ProcessLiveKey::from_process)
             .map(taskmanager_shell::ProcessRowId::Process);
         assert_eq!(v.selected_process_row(), expected);
     });
@@ -144,14 +145,20 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
     press(cx, win, "left");
     assert_selected(cx, &view, 101);
     assert!(
-        view.read_with(cx, |v, _| v.processes_state.collapsed.contains(&101)),
+        view.read_with(cx, |v, _| {
+            v.processes_state
+                .collapsed
+                .contains(&ProcessLiveKey::from_parts(101, 1_011).expect("fixture identity"))
+        }),
         "Left must record 101 in the collapsed set"
     );
     // The authoritative projection drops the hidden grandchild row entirely.
     view.update(cx, |v, _cx| {
         let (rows, _, _) = v.processes_projection();
         assert_eq!(
-            rows.iter().map(|r| r.process_pid).collect::<Vec<_>>(),
+            rows.iter()
+                .map(|row| row.process_identity.map(ProcessLiveKey::pid))
+                .collect::<Vec<_>>(),
             [None, Some(100), Some(101)],
             "Left on the expanded child hides the grandchild row"
         );
@@ -168,14 +175,18 @@ async fn bare_left_right_runs_the_tree_matrix_on_the_category_tree(cx: &mut Test
     press(cx, win, "down");
     press(cx, win, "right");
     assert!(
-        !view.read_with(cx, |v, _| v.processes_state.collapsed.contains(&101)),
+        !view.read_with(cx, |v, _| {
+            v.processes_state
+                .collapsed
+                .contains(&ProcessLiveKey::from_parts(101, 1_011).expect("fixture identity"))
+        }),
         "Right on the collapsed child re-expands its subtree"
     );
     assert_selected(cx, &view, 101);
     view.update(cx, |v, _cx| {
         let (rows, _, _) = v.processes_projection();
         assert_eq!(rows.len(), 4, "the re-expanded subtree restores all rows");
-        assert_eq!(rows[3].process_pid, Some(102));
+        assert_eq!(rows[3].process_identity.map(ProcessLiveKey::pid), Some(102));
     });
 }
 

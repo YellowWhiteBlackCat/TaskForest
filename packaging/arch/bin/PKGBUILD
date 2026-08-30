@@ -22,18 +22,22 @@ provides=('taskforest')
 conflicts=('taskforest')
 # Keep the installed bytes identical to the checksummed release asset.
 options=('!strip')
-source=("${url}/releases/download/${_tag}/taskforest_${_tag#v}_amd64.deb")
+# Release assets follow the unified convention
+# TaskForest-<UI>-<version>-<platform>.<format> (docs/PRODUCT_IDENTITY.md);
+# the deb payload internally stays Debian arch amd64. Refresh _tag/sha256sums
+# at every release.
+source=("${url}/releases/download/${_tag}/TaskForest-G-${_tag#v}-x64.deb")
 sha256sums=('aa6bea3e8ed5007dc60e236f5d8e31c51fd336f96804c5867c3cf4f10ec467b9')
 # makepkg (bsdtar) unpacks the deb's ar members into srcdir; the data payload
 # was staged by packaging/linux/stage-release-tree.sh replaying the layout
 # authority (packaging/arch/PKGBUILD package()), so extracting it verbatim
 # keeps Arch -bin installs file-for-file identical to the deb/rpm by
 # construction.
-noextract=("taskforest_${_tag#v}_amd64.deb")
+noextract=("TaskForest-G-${_tag#v}-x64.deb")
 
 prepare() {
   cd "$srcdir"
-  bsdtar -xf "taskforest_${_tag#v}_amd64.deb" data.tar.zst
+  bsdtar -xf "TaskForest-G-${_tag#v}-x64.deb" data.tar.zst
 }
 
 package() {

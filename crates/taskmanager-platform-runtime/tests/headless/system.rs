@@ -3,7 +3,9 @@ use std::time::Duration;
 
 use taskmanager_application::{
     ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, MemoryTelemetryRequest,
-    PlatformEvent, StorageTelemetryRequest, SystemTelemetryDomainEvent, SystemTelemetryRevision,
+    MsrReadoutEvent, MsrReadoutRequest, PlatformEvent, RaplPowerEvent, RaplPowerRequest,
+    SmbiosMemoryEvent, SmbiosMemoryRequest, StorageTelemetryRequest, SystemTelemetryDomainEvent,
+    SystemTelemetryRevision,
 };
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::{
@@ -303,4 +305,248 @@ fn container_lane_emits_snapshot_event_carrying_the_provider_rollup() {
         thread::sleep(Duration::from_millis(2));
     }
     panic!("no ContainerRollup snapshot event arrived from the live observation lane");
+}
+
+/// Drive one real `SmbiosMemoryRequest::Refresh` through the typed port: the
+/// lane must run the executor closure once and publish exactly one correlated
+/// `SmbiosMemoryEvent::Update` carrying the provider's snapshot (the same
+/// wire the application client consumes).
+#[test]
+fn smbios_memory_lane_emits_update_event_for_a_refresh_request() {
+    let mut bindings = system_bindings();
+    bindings.system.smbios_memory =
+        ProviderBinding::present(ProviderId::borrowed("fixture.system.smbios-memory"));
+    let runtime = crate::ChannelRuntime::new(bindings, RuntimeConfig::new(fixed_clock));
+    let crate::ChannelRuntime {
+        handle,
+        publisher,
+        lanes,
+        ..
+    } = runtime;
+    let workers = crate::WorkerRuntime::default();
+    spawn_system_lanes(
+        &workers,
+        lanes.system.try_complete().expect("complete system lanes"),
+        SystemExecutors::new(
+            SystemObservationExecutors::new(
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+            ),
+            SystemAuxiliaryExecutors::new(|| Err(ProviderFailure::Unsupported)).with_smbios_memory(
+                || {
+                    Ok(taskmanager_core::SmbiosMemorySnapshot::success(
+                        4,
+                        2,
+                        vec![taskmanager_core::SmbiosModuleRow {
+                            slot: 1,
+                            size_mb: Some(32_768),
+                            ..taskmanager_core::SmbiosModuleRow::default()
+                        }],
+                        None,
+                    ))
+                },
+            ),
+        ),
+        publisher,
+        fixed_clock,
+    )
+    .expect("system workers start");
+
+    handle
+        .facets()
+        .system()
+        .smbios_memory()
+        .expect("smbios port is wired when the binding is present")
+        .try_submit(RequestEnvelope {
+            id: RequestId::new(8).expect("request id"),
+            capability: CapabilityId::TELEMETRY_MEMORY_SMBIOS,
+            submitted_at_ms: 1,
+            payload: SmbiosMemoryRequest::Refresh,
+        })
+        .expect("smbios refresh accepted by the lane");
+
+    for _ in 0..100 {
+        if let Some(event) = handle.events().try_recv().expect("event port") {
+            match event.outcome {
+                Ok(PlatformEvent::SmbiosMemory(SmbiosMemoryEvent::Update(snapshot))) => {
+                    assert!(snapshot.is_success());
+                    assert_eq!(snapshot.slots_total, 4);
+                    assert_eq!(snapshot.slots_used, 2);
+                    assert_eq!(snapshot.modules.len(), 1);
+                    return;
+                }
+                Ok(other) => panic!("expected a SmbiosMemory event, got {other:?}"),
+                Err(failure) => panic!("smbios lane reported a failure: {failure:?}"),
+            }
+        }
+        thread::sleep(Duration::from_millis(2));
+    }
+    panic!("no SmbiosMemory update event arrived from the live lane");
+}
+
+/// Drive one real `RaplPowerRequest::Refresh` through the typed port: the
+/// lane must run the executor closure once and publish exactly one correlated
+/// `RaplPowerEvent::Update` carrying the provider's snapshot.
+#[test]
+fn rapl_power_lane_emits_update_event_for_a_refresh_request() {
+    let mut bindings = system_bindings();
+    bindings.system.rapl_power =
+        ProviderBinding::present(ProviderId::borrowed("fixture.system.rapl-power"));
+    let runtime = crate::ChannelRuntime::new(bindings, RuntimeConfig::new(fixed_clock));
+    let crate::ChannelRuntime {
+        handle,
+        publisher,
+        lanes,
+        ..
+    } = runtime;
+    let workers = crate::WorkerRuntime::default();
+    spawn_system_lanes(
+        &workers,
+        lanes.system.try_complete().expect("complete system lanes"),
+        SystemExecutors::new(
+            SystemObservationExecutors::new(
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+            ),
+            SystemAuxiliaryExecutors::new(|| Err(ProviderFailure::Unsupported)).with_rapl_power(
+                || {
+                    Ok(taskmanager_core::RaplPowerSnapshot::success(
+                        250,
+                        vec![taskmanager_core::RaplPackageRow {
+                            name: "package-1".to_owned(),
+                            power_w: 9.5,
+                            energy_delta_uj: 2_375_000,
+                        }],
+                    ))
+                },
+            ),
+        ),
+        publisher,
+        fixed_clock,
+    )
+    .expect("system workers start");
+
+    handle
+        .facets()
+        .system()
+        .rapl_power()
+        .expect("rapl port is wired when the binding is present")
+        .try_submit(RequestEnvelope {
+            id: RequestId::new(9).expect("request id"),
+            capability: CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+            submitted_at_ms: 1,
+            payload: RaplPowerRequest::Refresh,
+        })
+        .expect("rapl refresh accepted by the lane");
+
+    for _ in 0..100 {
+        if let Some(event) = handle.events().try_recv().expect("event port") {
+            match event.outcome {
+                Ok(PlatformEvent::RaplPower(RaplPowerEvent::Update(snapshot))) => {
+                    assert!(snapshot.is_success());
+                    assert_eq!(snapshot.sample_ms, 250);
+                    assert_eq!(snapshot.packages.len(), 1);
+                    assert_eq!(snapshot.packages[0].power_w, 9.5);
+                    return;
+                }
+                Ok(other) => panic!("expected a RaplPower event, got {other:?}"),
+                Err(failure) => panic!("rapl lane reported a failure: {failure:?}"),
+            }
+        }
+        thread::sleep(Duration::from_millis(2));
+    }
+    panic!("no RaplPower update event arrived from the live lane");
+}
+
+/// Drive one real `MsrReadoutRequest::Refresh` through the typed port: the
+/// lane must run the executor closure once and publish exactly one correlated
+/// `MsrReadoutEvent::Update` carrying the provider's snapshot.
+#[test]
+fn msr_readout_lane_emits_update_event_for_a_refresh_request() {
+    let mut bindings = system_bindings();
+    bindings.system.msr_readout =
+        ProviderBinding::present(ProviderId::borrowed("fixture.system.msr-readout"));
+    let runtime = crate::ChannelRuntime::new(bindings, RuntimeConfig::new(fixed_clock));
+    let crate::ChannelRuntime {
+        handle,
+        publisher,
+        lanes,
+        ..
+    } = runtime;
+    let workers = crate::WorkerRuntime::default();
+    spawn_system_lanes(
+        &workers,
+        lanes.system.try_complete().expect("complete system lanes"),
+        SystemExecutors::new(
+            SystemObservationExecutors::new(
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+            ),
+            SystemAuxiliaryExecutors::new(|| Err(ProviderFailure::Unsupported)).with_msr_readout(
+                || {
+                    Ok(taskmanager_core::MsrReadoutSnapshot::success(vec![
+                        taskmanager_core::MsrPackageReadout {
+                            cpu: 1,
+                            bclk_mhz: None,
+                            temperature_c: Some(54.5),
+                            multiplier: Some(42.0),
+                            multiplier_min: Some(8.0),
+                            multiplier_max: Some(58.0),
+                            vcore_v: Some(1.219),
+                        },
+                    ]))
+                },
+            ),
+        ),
+        publisher,
+        fixed_clock,
+    )
+    .expect("system workers start");
+
+    handle
+        .facets()
+        .system()
+        .msr_readout()
+        .expect("msr port is wired when the binding is present")
+        .try_submit(RequestEnvelope {
+            id: RequestId::new(10).expect("request id"),
+            capability: CapabilityId::TELEMETRY_CPU_MSR,
+            submitted_at_ms: 1,
+            payload: MsrReadoutRequest::Refresh,
+        })
+        .expect("msr refresh accepted by the lane");
+
+    for _ in 0..100 {
+        if let Some(event) = handle.events().try_recv().expect("event port") {
+            match event.outcome {
+                Ok(PlatformEvent::MsrReadout(MsrReadoutEvent::Update(snapshot))) => {
+                    assert!(snapshot.is_success());
+                    assert_eq!(snapshot.packages.len(), 1);
+                    assert_eq!(snapshot.packages[0].cpu, 1);
+                    assert_eq!(snapshot.packages[0].temperature_c, Some(54.5));
+                    assert_eq!(snapshot.packages[0].vcore_v, Some(1.219));
+                    return;
+                }
+                Ok(other) => panic!("expected a MsrReadout event, got {other:?}"),
+                Err(failure) => panic!("msr lane reported a failure: {failure:?}"),
+            }
+        }
+        thread::sleep(Duration::from_millis(2));
+    }
+    panic!("no MsrReadout update event arrived from the live lane");
 }

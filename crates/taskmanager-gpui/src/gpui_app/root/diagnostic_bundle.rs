@@ -73,7 +73,7 @@ impl RootView {
         ];
         let usernames = processes
             .iter()
-            .map(|process| process.current_user().unwrap_or_default());
+            .filter_map(|process| process.current_user());
         let state = match DiagnosticBundlePlan::prepare(sources, usernames) {
             Ok(plan) => DiagnosticBundleUiState::Preview(plan),
             Err(error) => diagnostic_failure_state(error),

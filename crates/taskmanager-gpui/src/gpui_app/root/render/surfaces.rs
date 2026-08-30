@@ -12,6 +12,7 @@ use taskmanager_application::{
     PendingConfirmation, ProcessTerminationAction, ProcessTerminationConfirmation,
     SurfaceDismissReason, SurfaceKind,
 };
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_theme::Theme;
 
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
@@ -69,10 +70,10 @@ fn compose_shared_surface(
 ) -> Stateful<Div> {
     match kind {
         SurfaceKind::ProcessProperties => {
-            let Some(pid) = view.process_properties_pid() else {
+            let Some(identity) = view.process_properties_identity() else {
                 return root;
             };
-            render_process_properties(view, root, theme, pid, window, cx)
+            render_process_properties(view, root, theme, identity, window, cx)
         }
         SurfaceKind::Confirmation(_) => match view.pending_confirmation().cloned() {
             Some(PendingConfirmation::EndTask(target)) => {
@@ -151,7 +152,7 @@ fn render_process_properties(
     view: &mut RootView,
     root: Stateful<Div>,
     theme: &Theme,
-    pid: u32,
+    identity: ProcessLiveKey,
     window: &mut Window,
     cx: &mut Context<RootView>,
 ) -> Stateful<Div> {
@@ -159,7 +160,7 @@ fn render_process_properties(
         .process_properties_target()
         .and_then(|target| target.authoritative_start_token());
     let target = view
-        .process_details_target(pid)
+        .process_details_target(identity)
         .filter(|(item, _)| item.current_start_token() == frozen_start_token);
     let Some((item, histories)) = target else {
         view.dismiss_shared_surface(
@@ -210,6 +211,7 @@ fn render_process_properties(
             net_escalation: *view.shell.network_escalation_state(),
             entity: close_entity,
             local_time_rules: &view.local_time_rules,
+            units: view.display_units(),
         }),
     )
     .into_any_element();

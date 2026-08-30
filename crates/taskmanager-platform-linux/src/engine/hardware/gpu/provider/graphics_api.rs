@@ -15,14 +15,16 @@ pub(super) const GRAPHICS_API_PROVIDER_ID: ProviderId =
 
 pub(super) struct GraphicsApiProvider {
     root: PathBuf,
+    module_root: PathBuf,
     probed: bool,
     facts: Option<taskmanager_core::GpuGraphicsApi>,
 }
 
 impl GraphicsApiProvider {
-    pub(super) fn new(root: PathBuf) -> Self {
+    pub(super) fn new(root: PathBuf, module_root: PathBuf) -> Self {
         Self {
             root,
+            module_root,
             probed: false,
             facts: None,
         }
@@ -54,7 +56,8 @@ impl GpuTelemetryProvider for GraphicsApiProvider {
         let Some((card_name, device_path)) = cards.into_iter().next() else {
             return Ok(Vec::new());
         };
-        let mut metrics: GpuMetrics = build_drm_identity_metrics(&card_name, &device_path);
+        let mut metrics: GpuMetrics =
+            build_drm_identity_metrics(&card_name, &device_path, &self.module_root);
         metrics.graphics_api = Some(facts);
         Ok(vec![GpuProviderSample {
             metrics,

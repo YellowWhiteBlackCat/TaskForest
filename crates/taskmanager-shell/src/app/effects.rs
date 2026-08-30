@@ -214,6 +214,9 @@ impl ShellApp {
                 format!("GPU engine rows queued for {}", request.device_id.as_str())
             }
             PlatformEffect::NpuInventory(_) => "NPU accelerator inventory queued".into(),
+            PlatformEffect::SmbiosMemory(_) => "SMBIOS memory inventory queued".into(),
+            PlatformEffect::RaplPower(_) => "CPU package power queued".into(),
+            PlatformEffect::MsrReadout(_) => "CPU MSR readout queued".into(),
             PlatformEffect::SmartControl(request) => match request {
                 taskmanager_application::SmartControlRequest::StartSelfTest(_) => {
                     "SMART self-test queued".into()

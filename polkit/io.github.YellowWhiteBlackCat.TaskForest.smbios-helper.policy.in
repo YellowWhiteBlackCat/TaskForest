@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  TaskForest per-feature escalation policy (ADR-023). This action authorizes
+  one read-only SMBIOS walk per helper invocation — the memory-device records
+  plus the system/board identity records; it does not run the main TaskForest
+  application as root.
+
+  Install paths:
+    this file   -> /usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy
+    helper bin -> /usr/libexec/taskforest-smbios-helper
+
+  The annotated path MUST match the path passed to pkexec exactly.
+-->
+<policyconfig>
+  <action id="io.github.YellowWhiteBlackCat.TaskForest.smbios-helper">
+    <description>Read the SMBIOS memory-device and system/board identity records for TaskForest</description>
+    <message>TaskForest needs authorization to read the raw SMBIOS memory-device and system/board identity records (module speed, slots, part and serial numbers, board/system serial and UUID), which the kernel exposes root-only. The helper only reads and reports those facts.</message>
+    <defaults>
+      <allow_any>no</allow_any>
+      <allow_inactive>auth_admin_keep</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/libexec/taskforest-smbios-helper</annotate>
+    <annotate key="org.freedesktop.policykit.exec.allow_gui">true</annotate>
+  </action>
+</policyconfig>

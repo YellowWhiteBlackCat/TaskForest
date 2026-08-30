@@ -12,6 +12,7 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use taskmanager_application::i18n::{self, Language};
 use taskmanager_application::{AppAction, AppPage};
+use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::TuiApp;
 
@@ -379,13 +380,15 @@ fn go_to(app: &mut TuiApp, page: AppPage) {
 }
 
 fn mark_one_demo_process(app: &mut TuiApp) {
-    app.shell.selected_rows.insert(
-        taskmanager_shell::ProcessRowIdentity::from_parts(
-            4242,
-            taskmanager_test_support::fixture_start_token(4242),
-        )
-        .expect("non-zero parts"),
-    );
+    app.shell.clear_process_selection();
+    let identity = app
+        .shell
+        .visible_processes()
+        .iter()
+        .find(|process| process.pid == 4201)
+        .and_then(|process| ProcessLiveKey::from_process(process))
+        .expect("demo process has a current row identity");
+    app.shell.toggle_selected_identity(identity);
 }
 
 fn open_settings(app: &mut TuiApp) -> bool {

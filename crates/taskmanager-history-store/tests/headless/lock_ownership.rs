@@ -113,6 +113,68 @@ fn a_parseable_stale_pid_is_recovered_and_replaced_by_a_live_claim() {
 }
 
 #[test]
+fn a_stranded_claim_from_this_process_is_retaken_by_a_winning_try_lock() {
+    let root = fixture_root("same-process-stranded-claim");
+    std::fs::create_dir_all(&root).expect("create history root");
+    let lock = root.join("history.lock");
+    let stranded = format!("{}:1", std::process::id());
+    std::fs::write(&lock, &stranded).expect("write stranded same-process claim");
+
+    // ALIVE insists every holder lives, so the claim text alone can never
+    // authorize this takeover; a winning try_lock is the only proof that
+    // the previous generation released and merely stranded its claim.
+    let owner = PersistentHistoryStore::open(
+        &root,
+        RetentionPolicy::for_tests(TRIM_INTERVAL_MS, u64::MAX),
+        ALIVE,
+    )
+    .expect("a claim stranded by this process is retaken through the file lock");
+    assert_ne!(
+        std::fs::read_to_string(&lock).expect("read replacement claim"),
+        stranded
+    );
+    match PersistentHistoryStore::open(
+        &root,
+        RetentionPolicy::for_tests(TRIM_INTERVAL_MS, u64::MAX),
+        ALIVE,
+    ) {
+        Err(error) => assert_eq!(error.kind(), HistoryStoreErrorKind::Locked),
+        Ok(second) => {
+            drop(second);
+            panic!("the retaken live claim must remain exclusive");
+        }
+    }
+    drop(owner);
+    cleanup(&root);
+}
+
+#[test]
+fn a_foreign_live_claim_with_a_free_file_lock_still_fails_closed() {
+    let root = fixture_root("foreign-live-claim");
+    std::fs::create_dir_all(&root).expect("create history root");
+    let lock = root.join("history.lock");
+    let foreign = "4000000000:2";
+    std::fs::write(&lock, foreign).expect("write foreign live claim");
+
+    match PersistentHistoryStore::open(
+        &root,
+        RetentionPolicy::for_tests(TRIM_INTERVAL_MS, u64::MAX),
+        |pid| pid != 4000000000,
+    ) {
+        Err(error) => assert_eq!(error.kind(), HistoryStoreErrorKind::Locked),
+        Ok(store) => {
+            drop(store);
+            panic!("a foreign claim is not proof that its holder died");
+        }
+    }
+    assert_eq!(
+        std::fs::read_to_string(&lock).expect("foreign claim remains"),
+        foreign
+    );
+    cleanup(&root);
+}
+
+#[test]
 fn torn_or_unparseable_claims_fail_closed_without_being_rewritten() {
     for (tag, content) in [
         ("empty", ""),

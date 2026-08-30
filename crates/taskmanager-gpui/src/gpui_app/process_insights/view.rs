@@ -9,6 +9,7 @@ use taskmanager_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionTransport, IsolationKind, LimitValue, ProcessConnection,
     ProcessTelemetrySnapshot,
 };
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
 
@@ -161,6 +162,7 @@ pub(crate) fn render_process_insights(
     available_width: f32,
     net_escalation: taskmanager_application::NetworkEscalationState,
     entity: gpui::Entity<crate::gpui_app::root::RootView>,
+    units: UnitPreferences,
 ) -> Div {
     let layout = process_insights_layout(available_width);
     let root = div()
@@ -197,8 +199,9 @@ pub(crate) fn render_process_insights(
                     layout.card_width,
                     net_escalation,
                     entity.clone(),
+                    units,
                 ))
-                .child(gpu_card(theme, snapshot, labels, layout.card_width))
+                .child(gpu_card(theme, snapshot, labels, layout.card_width, units))
                 .child(gpu_engines::gpu_engines_card(
                     theme,
                     snapshot,
@@ -210,6 +213,7 @@ pub(crate) fn render_process_insights(
                     project_process_resources(&snapshot.resources),
                     labels,
                     layout.card_width,
+                    units,
                 ))
                 .child(isolation_card(theme, snapshot, labels, layout.card_width))
                 .child(open_files::open_files_card(
@@ -275,6 +279,7 @@ fn network_card(
     width: f32,
     net_escalation: taskmanager_application::NetworkEscalationState,
     entity: gpui::Entity<crate::gpui_app::root::RootView>,
+    units: UnitPreferences,
 ) -> Div {
     let network = &snapshot.network;
     let availability = status_label(network.traffic_state.status, labels);
@@ -324,12 +329,12 @@ fn network_card(
         .child(metric_row(
             theme,
             labels.received,
-            format_rate(network.rx_bytes_per_sec, availability),
+            format_rate(units, network.rx_bytes_per_sec, availability),
         ))
         .child(metric_row(
             theme,
             labels.sent,
-            format_rate(network.tx_bytes_per_sec, availability),
+            format_rate(units, network.tx_bytes_per_sec, availability),
         ))
         .child(escalation_row(theme, network, net_escalation, entity))
         .child(connections)
@@ -389,6 +394,7 @@ fn gpu_card(
     snapshot: &ProcessTelemetrySnapshot,
     labels: &ProcessInsightsLabels,
     width: f32,
+    units: UnitPreferences,
 ) -> Div {
     let mut content = card(theme, labels.gpu, width);
     if snapshot.gpu.devices.is_empty() {
@@ -428,7 +434,7 @@ fn gpu_card(
                     labels.vram,
                     device
                         .memory_bytes
-                        .map(format_bytes)
+                        .map(|bytes| format_bytes(units, bytes))
                         .unwrap_or_else(|| labels.unknown.to_string()),
                 )),
         );
@@ -441,12 +447,15 @@ fn resource_card(
     resources: ProjectedProcessResources<'_>,
     labels: &ProcessInsightsLabels,
     width: f32,
+    units: UnitPreferences,
 ) -> Div {
     let memory = format_pair(
-        resources.memory_usage_bytes.map(format_bytes),
+        resources
+            .memory_usage_bytes
+            .map(|bytes| format_bytes(units, bytes)),
         resources
             .memory_limit
-            .map(|value| format_limit(value, labels.unlimited, format_bytes)),
+            .map(|value| format_limit(value, labels.unlimited, |b| format_bytes(units, b))),
         labels.unknown,
     );
     let cpu = match (
@@ -532,14 +541,15 @@ pub(super) fn format_connection(connection: &ProcessConnection) -> String {
     format!("{transport}  {} → {}", connection.local, connection.remote)
 }
 
-fn format_rate(value: Option<u64>, unavailable: &str) -> String {
-    value
-        .map(|value| format!("{}/s", format_bytes(value)))
-        .unwrap_or_else(|| unavailable.to_string())
+/// Memory-family capacity cell (VRAM, process memory usage and limits).
+fn format_bytes(units: UnitPreferences, bytes: u64) -> String {
+    units.format_quantity(bytes, QuantityFamily::Memory, false)
 }
 
-fn format_bytes(bytes: u64) -> String {
-    crate::gpui_app::formatting::bytes_to_human(bytes)
+fn format_rate(units: UnitPreferences, value: Option<u64>, unavailable: &str) -> String {
+    value
+        .map(|value| units.format_quantity(value, QuantityFamily::Network, true))
+        .unwrap_or_else(|| unavailable.to_string())
 }
 
 fn format_limit(

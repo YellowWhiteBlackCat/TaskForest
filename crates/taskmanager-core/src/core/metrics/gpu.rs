@@ -209,6 +209,7 @@ pub enum GpuMetricField {
     Frequency,
     Throttle,
     Driver,
+    DriverVersion,
 }
 
 /// Provider-neutral reasons why a GPU is currently operating below its
@@ -399,6 +400,10 @@ pub struct GpuMetrics {
     pub engine_provider: Option<ProviderId>,
     /// Native driver or runtime implementation name, when exposed.
     pub driver: Option<String>,
+    /// Native driver version string (e.g. `32.0.101.8974`, NVML `566.36`),
+    /// when a provider proves it. A driver name alone never implies a
+    /// version; absence stays `None` instead of a guessed release.
+    pub driver_version: Option<String>,
     /// Optional runtime graphics API capabilities bound to this GPU.
     pub graphics_api: Option<GpuGraphicsApi>,
 }

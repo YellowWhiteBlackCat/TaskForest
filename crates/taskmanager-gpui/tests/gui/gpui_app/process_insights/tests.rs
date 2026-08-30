@@ -2,6 +2,7 @@ use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window, px,
 
 use taskmanager_application::NetworkEscalationState;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process_telemetry::{ProcessIdentity, ProcessTelemetrySnapshot};
 use taskmanager_theme::Theme;
 
@@ -39,6 +40,7 @@ impl Render for FixtureView {
             available,
             self.net_escalation,
             self.entity.clone(),
+            taskmanager_core::core::units::UnitPreferences::default(),
         )
     }
 }
@@ -59,7 +61,7 @@ fn typed_state_preserves_unavailable_as_an_error_not_zero() {
     assert_eq!(
         state_from_snapshot(snapshot),
         ProcessInsightsState::Error(ProcessInsightsError {
-            pid: 77,
+            identity: ProcessLiveKey::from_parts(77, 1),
             kind: ProcessInsightsErrorKind::PermissionDenied,
             last_success_ms: Some(10),
         })

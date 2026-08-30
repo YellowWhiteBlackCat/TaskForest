@@ -26,7 +26,7 @@ impl TemporaryRulePath {
                 directory.display()
             )
         });
-        let path = directory.join("99-taskmanager.rules");
+        let path = directory.join("99-taskforest.rules");
         Self { directory, path }
     }
 }
@@ -159,7 +159,7 @@ fn atomic_publish_refuses_a_target_that_appears_before_publish() {
 }
 
 /// Every file in `directory` whose name looks like one of this helper's
-/// scratch temporaries (`.99-taskmanager.rules.taskforest-*`).
+/// scratch temporaries (`.99-taskforest.rules.taskforest-*`).
 #[cfg(unix)]
 fn temporary_residue(directory: &Path) -> Vec<String> {
     let mut residue = Vec::new();
@@ -167,7 +167,7 @@ fn temporary_residue(directory: &Path) -> Vec<String> {
         .unwrap_or_else(|error| panic!("could not scan {}: {error}", directory.display()));
     for entry in entries.flatten() {
         if let Some(name) = entry.file_name().to_str()
-            && name.starts_with(".99-taskmanager.rules.taskforest-")
+            && name.starts_with(".99-taskforest.rules.taskforest-")
         {
             residue.push(name.to_owned());
         }
@@ -180,7 +180,7 @@ fn temporary_residue(directory: &Path) -> Vec<String> {
 fn temporary_paths_are_unique_so_a_kill_residue_cannot_block_the_next_run() {
     // Two attempts must never derive the same scratch name; the suffix comes
     // from /dev/urandom (or a clock fallback), never a fixed value.
-    let rule = Path::new("/etc/udev/rules.d/99-taskmanager.rules");
+    let rule = Path::new("/etc/udev/rules.d/99-taskforest.rules");
     let first = temporary_path(rule);
     let second = temporary_path(rule);
     assert_ne!(first, second);
@@ -190,7 +190,7 @@ fn temporary_paths_are_unique_so_a_kill_residue_cannot_block_the_next_run() {
             .and_then(|name| name.to_str())
             .unwrap_or("");
         assert!(
-            name.starts_with(".99-taskmanager.rules.taskforest-"),
+            name.starts_with(".99-taskforest.rules.taskforest-"),
             "unrecognizable temporary name: {name}"
         );
     }
@@ -203,7 +203,7 @@ fn a_stale_temporary_file_never_blocks_a_later_install() {
     // a `kill -9` residue from a previous run, so `create_new` failed and
     // every later install was blocked until an admin cleaned up by hand.
     let temporary = TemporaryRulePath::new();
-    let stale_name = format!(".99-taskmanager.rules.taskforest-{}", std::process::id());
+    let stale_name = format!(".99-taskforest.rules.taskforest-{}", std::process::id());
     let stale = temporary.directory.join(&stale_name);
     fs::write(&stale, b"stale residue from a killed run\n").unwrap_or_else(|error| {
         panic!("could not seed stale residue {}: {error}", stale.display())

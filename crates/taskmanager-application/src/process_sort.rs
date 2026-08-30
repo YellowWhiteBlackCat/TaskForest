@@ -5,9 +5,10 @@
 //! cycles, and persistence are frontend concerns), but the ORDERING SEMANTICS
 //! live here exactly once: every frontend maps its column enum onto
 //! [`crate::process_sort::ProcessSortAxis`] with a compiler-exhaustive match and delegates the
-//! comparison. CPU uses [`ProcessItem::current_cpu_percentage`] with total
+//! comparison. CPU uses
+//! [`taskmanager_core::core::process::ProcessItem::current_cpu_percentage`] with total
 //! `f32` ordering; memory sorts resident RSS through
-//! [`ProcessItem::current_memory_bytes`]; text uses the shared ASCII
+//! [`taskmanager_core::core::process::ProcessItem::current_memory_bytes`]; text uses the shared ASCII
 //! case-insensitive comparator; every optional scalar sorts as `Option`; and
 //! PID is the direction-independent tie-break.
 //!
@@ -18,7 +19,7 @@
 //! measurement kinds (RSS vs PSS vs swap) never stand in for each other.
 //!
 //! Everything here is toolkit-neutral, allocation-free, and panic-free; it
-//! depends only on [`ProcessItem`] and the shared text comparator.
+//! depends only on [`taskmanager_core::core::process::ProcessItem`] and the shared text comparator.
 
 use std::cmp::Ordering;
 

@@ -18,8 +18,8 @@
 //! comparators; tui: `Pid`/`CpuUsage`) are replaced by this one table.
 //!
 //! [`aggregate_sort_key`] carries the ONE documented fallback that remains:
-//! group headers sort per [`taskmanager_application::AppGroup`] aggregates,
-//! which genuinely lack per-axis data for some columns.
+//! group headers sort on aggregate-level keys, which genuinely lack per-axis
+//! data for some columns.
 
 use super::sorting::SortCol;
 use taskmanager_application::process_sort::ProcessSortAxis;
@@ -53,21 +53,20 @@ pub const fn sort_axis(column: SortCol) -> ProcessSortAxis {
     }
 }
 
-/// Map a column onto the legacy data-layer aggregate key used by
-/// [`taskmanager_application::sort_apps`] (group headers / type headers).
-/// This is the one place a column without aggregate meaning degrades, and
-/// the rule is fixed and documented so no frontend re-decides it:
+/// Map a column onto the aggregate-level sort key used for group headers and
+/// type headers. This is the one place a column without aggregate meaning
+/// degrades, and the rule is fixed and documented so no frontend re-decides
+/// it:
 ///
 /// - `Pid` → `Pid` (the group's `main_pid`);
 /// - `Name` → `Name` (the group identity);
-/// - `Cpu`/`CpuTime` → `CpuUsage` — the only CPU aggregate `AppGroup`
+/// - `Cpu`/`CpuTime` → `CpuUsage` — the only CPU aggregate a group header
 ///   carries; cumulative cpu-time rides the usage ranking as its proxy;
 /// - `Memory`/`Pss`/`Swap` → `Memory` — the typed fallback only; frontends
-///   with a metric-sum path intercept these columns before `sort_apps`;
-/// - `DiskRead`/`DiskWrite` → their keys (legacy `sort_apps` folds both onto
-///   `total_memory_bytes`);
-/// - `User`/`State`/`Threads`/`StartTime`/`Fds`/`Nice` → `Name`: an
-///   `AppGroup` has no per-user/per-state/per-thread aggregate, so the group
+///   with a metric-sum path intercept these columns before this mapping;
+/// - `DiskRead`/`DiskWrite` → their own keys;
+/// - `User`/`State`/`Threads`/`StartTime`/`Fds`/`Nice` → `Name`: a group
+///   header has no per-user/per-state/per-thread aggregate, so the group
 ///   identity is the deterministic fallback.
 #[must_use]
 pub const fn aggregate_sort_key(column: SortCol) -> ProcessSortKey {

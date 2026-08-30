@@ -34,7 +34,9 @@ pub(super) fn process_cell_data(
         memory: process.current_memory_bytes(),
         pss: process.current_memory_pss_bytes(),
         swap: process.current_swap_bytes(),
-        user: process.current_user().unwrap_or_default(),
+        user: process
+            .current_user()
+            .unwrap_or_else(|| MISSING_VALUE.to_owned()),
         threads: process
             .current_threads()
             .map_or_else(|| MISSING_VALUE.to_owned(), |value| value.to_string()),

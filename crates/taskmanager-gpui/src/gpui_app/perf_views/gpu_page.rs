@@ -13,7 +13,7 @@ use taskmanager_telemetry_store::CorrelatedSystemTelemetryHistory;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{
-    DisplayUnits, GraphUnit, PerformanceSettings, UnitKind, gpu_identity_text, missing_value,
+    GraphUnit, PerformanceSettings, gpu_identity_text, missing_value,
 };
 use crate::gpui_app::graph::{GraphHover, GraphSettings};
 use crate::gpui_app::history_samples::{gpu_engine_samples, gpu_engine_series_names};
@@ -29,6 +29,7 @@ use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::PerformanceChartInventory;
 use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricAvailability, GpuChartMetricUnit, gpu_chart_metric_history,
 };
@@ -85,7 +86,7 @@ pub(crate) fn gpu_percentage_readout(value: Option<f32>) -> String {
 fn vram_composition_block(
     theme: &Theme,
     vram: Option<&VramCompositionData>,
-    units: DisplayUnits,
+    units: UnitPreferences,
 ) -> Div {
     let Some(vram) = vram else {
         return div();
@@ -122,24 +123,24 @@ fn vram_composition_block(
             theme.gpu,
             "dedicated",
             i18n::t("gpu.dedicated_vram"),
-            units.format(dedicated_used, UnitKind::Memory, false),
-            units.format(dedicated_total, UnitKind::Memory, false),
+            units.format_quantity(dedicated_used, QuantityFamily::Memory, false),
+            units.format_quantity(dedicated_total, QuantityFamily::Memory, false),
         ));
     summary = summary.child(vram_summary_row(
         theme,
         theme.accent,
         "shared",
         i18n::t("gpu.shared_vram"),
-        units.format(shared_used, UnitKind::Memory, false),
-        units.format(shared_total, UnitKind::Memory, false),
+        units.format_quantity(shared_used, QuantityFamily::Memory, false),
+        units.format_quantity(shared_total, QuantityFamily::Memory, false),
     ));
     summary = summary.child(vram_summary_row(
         theme,
         theme.border,
         "total",
         i18n::t("gpu.vram_total"),
-        units.format(total_used, UnitKind::Memory, false),
-        units.format(total_capacity, UnitKind::Memory, false),
+        units.format_quantity(total_used, QuantityFamily::Memory, false),
+        units.format_quantity(total_capacity, QuantityFamily::Memory, false),
     ));
 
     let block =
@@ -344,18 +345,21 @@ fn render_gpu_engine_grid(
 /// The GPU page's undroppable one-line VRAM fact: dedicated and shared
 /// totals when the device reports them. Mirrors the VRAM composition
 /// block's numbers so the two can never disagree.
-fn gpu_vram_vital_line(vram: Option<&VramCompositionData>, units: DisplayUnits) -> Option<String> {
+fn gpu_vram_vital_line(
+    vram: Option<&VramCompositionData>,
+    units: UnitPreferences,
+) -> Option<String> {
     let vram = vram?;
     let mut segments = vec![format!(
         "{} / {}",
-        units.format(vram.dedicated_used, UnitKind::Memory, false),
-        units.format(vram.dedicated_total, UnitKind::Memory, false),
+        units.format_quantity(vram.dedicated_used, QuantityFamily::Memory, false),
+        units.format_quantity(vram.dedicated_total, QuantityFamily::Memory, false),
     )];
     if vram.shared_total > 0 {
         segments.push(format!(
             "{} / {}",
-            units.format(vram.shared_used, UnitKind::Memory, false),
-            units.format(vram.shared_total, UnitKind::Memory, false),
+            units.format_quantity(vram.shared_used, QuantityFamily::Memory, false),
+            units.format_quantity(vram.shared_total, QuantityFamily::Memory, false),
         ));
     }
     Some(segments.join(" · "))

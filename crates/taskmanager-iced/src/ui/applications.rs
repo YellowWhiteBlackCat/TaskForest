@@ -12,6 +12,7 @@ use iced::Length;
 use iced::alignment::Horizontal;
 use iced::widget::{Space, Stack, button, container, mouse_area, row, text};
 use std::rc::Rc;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::{SortCol, SortDir};
 use taskmanager_ui_contract::ProcessColumnSpec;
@@ -51,8 +52,7 @@ pub(crate) fn application_row_height(compact: bool) -> f32 {
 /// iteration order cannot cause spurious rebuilds. Column-width overrides
 /// participate too: a drag must rebuild the materialized rows.
 pub(crate) fn applications_table_key(generation: u64, render: &RowRender) -> u64 {
-    let mut selected: Vec<taskmanager_shell::ProcessRowIdentity> =
-        render.selected_identities.iter().copied().collect();
+    let mut selected: Vec<ProcessLiveKey> = render.selected_identities.iter().copied().collect();
     selected.sort_unstable();
     let mut hidden = render
         .hidden_columns
@@ -78,7 +78,7 @@ pub(crate) fn applications_table_key(generation: u64, render: &RowRender) -> u64
         // The open context menu re-hosts one materialized row, so opening or
         // closing it must rebuild the lazy body exactly like any other visual
         // invalidation.
-        .field(render.open_menu_pid)
+        .field(render.open_menu_identity)
         .field(selected)
         .field(hidden)
         .field(widths)

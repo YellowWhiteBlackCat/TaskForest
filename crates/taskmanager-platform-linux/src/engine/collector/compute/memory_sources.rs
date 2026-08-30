@@ -77,6 +77,12 @@ pub(super) struct DmiMemoryObservation {
     /// Distinct module form-factor labels (SO-DIMM / DIMM / ...), with
     /// out-of-spec sentinels filtered out.
     pub module_form_factors: Vec<String>,
+    /// Distinct module part numbers (the SPD/DIMM product code), with
+    /// unprogrammed sentinels filtered out by the udev source.
+    pub module_part_numbers: Vec<String>,
+    /// Distinct module serial numbers, with unprogrammed (sentinel/all-zero)
+    /// values filtered out by the udev source.
+    pub module_serials: Vec<String>,
     pub status: SourceStatus,
     /// Exact failure per measured field, for consumers that need the precise
     /// receipt instead of the aggregate provider outcome.
@@ -92,6 +98,11 @@ pub(super) struct UdevMemoryModule {
     pub module_type: Option<String>,
     pub manufacturer: Option<String>,
     pub form_factor: Option<String>,
+    /// `PART_NUMBER` (the SPD/DIMM product code), unprogrammed sentinels
+    /// filtered.
+    pub part_number: Option<String>,
+    /// `SERIAL_NUMBER`, unprogrammed (sentinel/all-zero) values filtered.
+    pub serial_number: Option<String>,
     /// `SPEED_MTS` (device maximum).
     pub speed_mts: Option<u32>,
     /// `CONFIGURED_SPEED_MTS` (what the platform actually runs).
@@ -571,6 +582,25 @@ fn module_form_factor_observation(
     super::optional_from_source(joined, &dmi.status, now_ms)
 }
 
+/// Distinct module part numbers joined for display, e.g. `"M425R4GA3PB0"`.
+fn module_part_number_observation(
+    dmi: &DmiMemoryObservation,
+    now_ms: u64,
+) -> OptionalObservation<String> {
+    let joined = (!dmi.module_part_numbers.is_empty()).then(|| dmi.module_part_numbers.join(" / "));
+    super::optional_from_source(joined, &dmi.status, now_ms)
+}
+
+/// Distinct module serial numbers joined for display. Unprogrammed (sentinel
+/// or all-zero) serials never reach this fold.
+fn module_serial_number_observation(
+    dmi: &DmiMemoryObservation,
+    now_ms: u64,
+) -> OptionalObservation<String> {
+    let joined = (!dmi.module_serials.is_empty()).then(|| dmi.module_serials.join(" / "));
+    super::optional_from_source(joined, &dmi.status, now_ms)
+}
+
 /// Assemble the DMI module facts and zram/zswap compression facts into their
 /// typed optional observations, honoring each field's exact failure receipt.
 pub(super) fn assemble_module_and_compression_observations(
@@ -603,6 +633,8 @@ pub(super) fn assemble_module_and_compression_observations(
         module_type: module_type_observation(dmi, now_ms),
         manufacturer: module_manufacturer_observation(dmi, now_ms),
         form_factor: module_form_factor_observation(dmi, now_ms),
+        part_number: module_part_number_observation(dmi, now_ms),
+        serial_number: module_serial_number_observation(dmi, now_ms),
     };
     let compression = MemoryCompressionObservations {
         // Linux zram/zswap are represented separately below and must not

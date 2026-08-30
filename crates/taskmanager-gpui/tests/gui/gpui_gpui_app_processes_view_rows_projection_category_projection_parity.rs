@@ -1,9 +1,13 @@
 use std::collections::HashSet;
 
-use super::{SortCol, Toggle, category_tree_rows, memory_for_display};
-use taskmanager_application::process_category_projection::category_buckets;
+use super::{SortCol, Toggle, category_tree_rows};
 use taskmanager_application::process_category_projection::category_expansion_key;
-use taskmanager_core::core::process::{ProcessCategory, ProcessItem, process_category};
+use taskmanager_application::process_category_projection::{
+    category_buckets, process_memory_observation_for_display,
+};
+use taskmanager_core::core::process::{
+    ProcessCategory, ProcessItem, ProcessLiveKey, process_category,
+};
 use taskmanager_test_support::{
     category_fixture_with_empty_bucket, mixed_availability_category_fixture,
 };
@@ -18,7 +22,15 @@ fn category_rows_match_neutral_buckets_on_the_shared_fixture() {
     let buckets = category_buckets(&refs, |process| process_category(process));
     assert_eq!(buckets.len(), 3, "every fixture bucket is non-empty");
 
-    let rows = category_tree_rows(&refs, SortCol::Cpu, false, &HashSet::new(), &HashSet::new());
+    let rows = category_tree_rows(
+        &refs,
+        42,
+        SortCol::Cpu,
+        false,
+        &HashSet::new(),
+        &HashSet::new(),
+        taskmanager_core::core::units::UnitPreferences::default(),
+    );
     assert_eq!(
         rows.len(),
         buckets.len(),
@@ -37,16 +49,24 @@ fn category_rows_match_neutral_buckets_on_the_shared_fixture() {
         );
         assert_eq!(
             row.cpu,
-            Some(bucket.sum_f32(|process| process.current_cpu_percentage())),
+            bucket
+                .aggregate_f32(42, |process| {
+                    &(*process).scalar_observations().cpu_percentage
+                })
+                .and_then(|metric| metric.current_value().copied()),
             "header CPU% is the neutral bucket sum"
         );
         assert_eq!(
             row.mem,
-            Some(bucket.sum_u64(|process| memory_for_display(process))),
+            bucket
+                .aggregate_u64(42, |process| {
+                    process_memory_observation_for_display(process)
+                })
+                .and_then(|metric| metric.current_value().copied()),
             "header memory is the gpui PSS-preferred fold over the same members"
         );
         assert_eq!(
-            row.process_pid, None,
+            row.process_identity, None,
             "a category aggregate has no representative process PID"
         );
         assert_eq!(row.cell_text.pid, "");
@@ -71,10 +91,18 @@ fn expanded_category_members_match_neutral_bucket_order() {
         .map(|category| category_expansion_key(*category))
         .collect();
     let mut expanded = expanded;
-    expanded.insert("app-tree:11".to_owned());
-    expanded.insert("app-tree:12".to_owned());
+    expanded.insert("app-tree:pid:11:start:111".to_owned());
+    expanded.insert("app-tree:pid:12:start:121".to_owned());
 
-    let rows = category_tree_rows(&refs, SortCol::Cpu, false, &expanded, &HashSet::new());
+    let rows = category_tree_rows(
+        &refs,
+        42,
+        SortCol::Cpu,
+        false,
+        &expanded,
+        &HashSet::new(),
+        taskmanager_core::core::units::UnitPreferences::default(),
+    );
     let mut cursor = 0;
     for bucket in &buckets {
         let Toggle::GroupCategory(category) = &rows[cursor].toggle else {
@@ -91,12 +119,15 @@ fn expanded_category_members_match_neutral_bucket_order() {
             {
                 let row = &rows[cursor];
                 assert_eq!(row.name, expected_name);
-                assert_eq!(row.process_pid, None);
+                assert_eq!(row.process_identity, None);
                 assert_eq!(row.depth, 1, "app aggregate rows indent one level");
                 assert!(matches!(row.toggle, Toggle::GroupApp(_)));
                 assert_eq!(row.cell_text.pid, "");
                 cursor += 1;
-                assert_eq!(rows[cursor].process_pid, Some(member.pid));
+                assert_eq!(
+                    rows[cursor].process_identity.map(ProcessLiveKey::pid),
+                    Some(member.pid)
+                );
                 assert_eq!(
                     rows[cursor].depth, 2,
                     "process rows indent below the app total"
@@ -106,7 +137,11 @@ fn expanded_category_members_match_neutral_bucket_order() {
         } else {
             for member in bucket.members() {
                 let row = &rows[cursor];
-                assert_eq!(row.pid, member.pid, "member order follows the bucket");
+                assert_eq!(
+                    row.process_identity.map(ProcessLiveKey::pid),
+                    Some(member.pid),
+                    "member order follows the bucket"
+                );
                 assert_eq!(row.depth, 1, "members indent one level");
                 assert!(matches!(row.toggle, Toggle::None));
                 cursor += 1;
@@ -124,7 +159,15 @@ fn empty_neutral_bucket_renders_no_header() {
     let refs: Vec<&ProcessItem> = items.iter().collect();
     let buckets = category_buckets(&refs, |process| process_category(process));
     assert_eq!(buckets.len(), 2, "Uncategorized stays empty");
-    let rows = category_tree_rows(&refs, SortCol::Cpu, false, &HashSet::new(), &HashSet::new());
+    let rows = category_tree_rows(
+        &refs,
+        42,
+        SortCol::Cpu,
+        false,
+        &HashSet::new(),
+        &HashSet::new(),
+        taskmanager_core::core::units::UnitPreferences::default(),
+    );
     assert_eq!(
         rows.len(),
         buckets.len(),

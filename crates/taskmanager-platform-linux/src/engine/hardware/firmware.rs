@@ -19,6 +19,7 @@ pub type DmiTextFacts = (
     Option<String>,
     Option<String>,
     Option<String>,
+    Option<String>,
 );
 
 /// Read product/firmware/board DMI facts from one sysfs DMI root.
@@ -33,24 +34,28 @@ pub fn read_dmi_facts(root: &Path, failures: &mut FailureSummary) -> DmiTextFact
         text("board_vendor"),
         text("board_name"),
         text("bios_date"),
+        text("board_version"),
     )
 }
 
-/// Collect the firmware fragment (DMI text facts + Secure Boot probe) and
-/// count the proven fields for the inventory source outcome.
+/// Collect the firmware fragment (DMI text facts + PCI chipset model +
+/// Secure Boot probe) and count the proven fields for the inventory source
+/// outcome.
 #[must_use]
 pub fn collect_firmware_facts(
     virtualization: Option<&str>,
+    chipset: Option<String>,
     dmi_root: Option<&Path>,
     efivars_root: &Path,
     failures: &mut FailureSummary,
 ) -> (FirmwareInfo, usize) {
-    let facts = dmi_root.map_or((None, None, None, None, None, None, None), |root| {
+    let facts = dmi_root.map_or((None, None, None, None, None, None, None, None), |root| {
         read_dmi_facts(root, failures)
     });
     let secure_boot = probe_secure_boot_from(efivars_root);
     let observed = [
         virtualization.is_some(),
+        chipset.is_some(),
         facts.0.is_some(),
         facts.1.is_some(),
         facts.2.is_some(),
@@ -58,6 +63,7 @@ pub fn collect_firmware_facts(
         facts.4.is_some(),
         facts.5.is_some(),
         facts.6.is_some(),
+        facts.7.is_some(),
         secure_boot.is_some(),
     ]
     .into_iter()
@@ -66,6 +72,7 @@ pub fn collect_firmware_facts(
     (
         FirmwareInfo {
             virtualization: virtualization.map(str::to_string),
+            chipset,
             product_name: facts.0,
             product_version: facts.1,
             firmware_vendor: facts.2,
@@ -73,6 +80,7 @@ pub fn collect_firmware_facts(
             motherboard_vendor: facts.4,
             motherboard_model: facts.5,
             firmware_release_date: facts.6,
+            motherboard_version: facts.7,
             secure_boot,
         },
         observed,

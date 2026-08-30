@@ -1,8 +1,9 @@
 //! Pure Memory-page observation projection.
 
-use crate::gpui_app::formatting::{DisplayUnits, UnitKind, missing_value};
+use crate::gpui_app::formatting::{self, missing_value};
 use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::MemoryMetrics;
+use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::memory_details::{compressed_swap_readout, virtual_memory_commit_readout};
@@ -13,7 +14,7 @@ pub(super) struct MemoryPageStats {
     pub has_swap: bool,
 }
 
-pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: DisplayUnits) -> MemoryPageStats {
+pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: UnitPreferences) -> MemoryPageStats {
     let mut rows = vec![
         StatRow::text(
             i18n::t("mem.in_use"),
@@ -23,9 +24,11 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: DisplayUnits) -> 
             ) {
                 (Some(used), Some(percentage)) => Some(format!(
                     "{} ({percentage:.0}%)",
-                    units.format(used, UnitKind::Memory, false)
+                    units.format_quantity(used, QuantityFamily::Memory, false)
                 )),
-                (Some(used), None) => Some(units.format(used, UnitKind::Memory, false)),
+                (Some(used), None) => {
+                    Some(units.format_quantity(used, QuantityFamily::Memory, false))
+                }
                 _ => None,
             },
         ),
@@ -33,19 +36,19 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: DisplayUnits) -> 
             i18n::t("mem.available"),
             memory
                 .projected_available_bytes()
-                .map(|value| units.format(value, UnitKind::Memory, false)),
+                .map(|value| units.format_quantity(value, QuantityFamily::Memory, false)),
         ),
         StatRow::text(
             i18n::t("mem.hardware_reserved"),
             memory
                 .current_hardware_reserved_bytes()
-                .map(|value| units.format(value, UnitKind::Memory, false)),
+                .map(|value| units.format_quantity(value, QuantityFamily::Memory, false)),
         ),
         StatRow::text(
             i18n::t("mem.cached"),
             memory
                 .current_cached_bytes()
-                .map(|value| units.format(value, UnitKind::Memory, false)),
+                .map(|value| units.format_quantity(value, QuantityFamily::Memory, false)),
         ),
         StatRow::pair(
             i18n::t("mem.swap"),
@@ -54,7 +57,7 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: DisplayUnits) -> 
                 memory.current_swap_total_bytes(),
             ) {
                 (Some(used), Some(total)) => {
-                    Some(units.format_pair(used, total, UnitKind::Memory, false))
+                    Some(units.format_quantity_pair(used, total, QuantityFamily::Memory, false))
                 }
                 _ => None,
             },
@@ -78,7 +81,7 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: DisplayUnits) -> 
             4,
             StatRow::text(
                 i18n::t("mem.buffers"),
-                Some(units.format(value, UnitKind::Memory, false)),
+                Some(units.format_quantity(value, QuantityFamily::Memory, false)),
             ),
         );
     }
@@ -93,7 +96,7 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: DisplayUnits) -> 
             insertion,
             StatRow::text(
                 i18n::t("mem.zfs_arc"),
-                Some(units.format(arc, UnitKind::Memory, false)),
+                Some(units.format_quantity(arc, QuantityFamily::Memory, false)),
             ),
         );
     }
@@ -109,7 +112,7 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: DisplayUnits) -> 
     if let Some(ram) = memory.current_compressed_swap_memory_used_bytes() {
         rows.push(StatRow::text(
             i18n::t("mem.zram_ram_used"),
-            Some(units.format(ram, UnitKind::Memory, false)),
+            Some(units.format_quantity(ram, QuantityFamily::Memory, false)),
         ));
     }
     if let Some(enabled) = memory.current_compressed_swap_cache_enabled() {
@@ -128,7 +131,7 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: DisplayUnits) -> 
     {
         rows.push(StatRow::text(
             i18n::t("mem.usage_rate"),
-            Some(units.format_signed_memory_rate_mib(rate)),
+            Some(formatting::format_signed_memory_rate_mib(units, rate)),
         ));
     }
     let swap_total = memory.current_swap_total_bytes();
@@ -139,8 +142,8 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: DisplayUnits) -> 
     }
 }
 
-pub(super) fn optional_memory(value: Option<u64>, units: DisplayUnits) -> String {
+pub(super) fn optional_memory(value: Option<u64>, units: UnitPreferences) -> String {
     value.map_or_else(missing_value, |value| {
-        units.format(value, UnitKind::Memory, false)
+        units.format_quantity(value, QuantityFamily::Memory, false)
     })
 }

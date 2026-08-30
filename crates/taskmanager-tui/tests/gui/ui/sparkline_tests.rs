@@ -103,12 +103,18 @@ fn device_trend_bounds_a_full_ring_to_the_recent_window() {
 fn process_cpu_trend_mirrors_the_device_finite_sample_gate() {
     // Cold-start (<2 samples): the dotted placeholder, never a fabricated
     // single-block line.
-    assert_eq!(process_cpu_trend(&[]), DEVICE_TREND_PLACEHOLDER);
-    assert_eq!(process_cpu_trend(&[42.0]), DEVICE_TREND_PLACEHOLDER);
+    assert_eq!(
+        test_support::process_cpu_trend(&[]),
+        DEVICE_TREND_PLACEHOLDER
+    );
+    assert_eq!(
+        test_support::process_cpu_trend(&[42.0]),
+        DEVICE_TREND_PLACEHOLDER
+    );
 
     // ≥2 samples: a real sparkline made of ramp blocks, never the
     // placeholder mid-dots.
-    let trend = process_cpu_trend(&[10.0, 20.0, 30.0]);
+    let trend = test_support::process_cpu_trend(&[10.0, 20.0, 30.0]);
     assert!(!trend.is_empty());
     assert_ne!(trend, DEVICE_TREND_PLACEHOLDER);
     for c in trend.chars() {
@@ -121,7 +127,7 @@ fn process_cpu_trend_mirrors_the_device_finite_sample_gate() {
     // A full 64-sample ring is bounded to the recent window so the trend
     // column stays a stable width as the ring fills.
     let many: Vec<f32> = (0..128).map(|i| i as f32).collect();
-    let trend = process_cpu_trend(&many);
+    let trend = test_support::process_cpu_trend(&many);
     assert_eq!(
         trend.chars().count(),
         SPARKLINE_MAX_SAMPLES,
@@ -131,16 +137,25 @@ fn process_cpu_trend_mirrors_the_device_finite_sample_gate() {
 
 #[test]
 fn device_summary_uses_latest_average_and_peak_without_gap_fabrication() {
-    let line = device_summary_line("GPU", &[10.0, f32::NAN, 30.0], DeviceSummaryUnit::Percent)
-        .expect("finite samples produce a summary");
+    let line = test_support::device_summary_line(
+        "GPU",
+        &[10.0, f32::NAN, 30.0],
+        DeviceSummaryUnit::Percent,
+    )
+    .expect("finite samples produce a summary");
     assert!(line.contains("30%"), "latest/peak missing: {line}");
     assert!(line.contains("20%"), "average missing: {line}");
     assert_eq!(
-        device_summary_line("GPU", &[f32::NAN], DeviceSummaryUnit::Percent),
+        test_support::device_summary_line("GPU", &[f32::NAN], DeviceSummaryUnit::Percent),
         None
     );
     assert!(
-        device_summary_line("Disk", &[1_048_576.0], DeviceSummaryUnit::BytesPerSecond).is_some(),
+        test_support::device_summary_line(
+            "Disk",
+            &[1_048_576.0],
+            DeviceSummaryUnit::BytesPerSecond
+        )
+        .is_some(),
         "a single real rate sample remains visible"
     );
 }
@@ -149,14 +164,15 @@ fn device_summary_uses_latest_average_and_peak_without_gap_fabrication() {
 /// power/temperature history consumers.
 #[test]
 fn device_series_units_format_watts_and_celsius() {
-    let watts = device_summary_line("GPU", &[8.4, 9.2], DeviceSummaryUnit::Watts)
+    let watts = test_support::device_summary_line("GPU", &[8.4, 9.2], DeviceSummaryUnit::Watts)
         .expect("finite watts window");
     assert!(
         watts.contains("9.2 W") && watts.contains("8.8 W"),
         "watts summary missing: {watts}"
     );
-    let celsius = device_summary_line("GPU", &[63.0, 65.0], DeviceSummaryUnit::Celsius)
-        .expect("finite temperature window");
+    let celsius =
+        test_support::device_summary_line("GPU", &[63.0, 65.0], DeviceSummaryUnit::Celsius)
+            .expect("finite temperature window");
     assert!(
         celsius.contains("65°C") && celsius.contains("64°C"),
         "celsius summary missing: {celsius}"
@@ -303,7 +319,7 @@ fn byte_rate_summary_keeps_the_shared_missing_value_placeholder() {
 /// contract in terminal form).
 #[test]
 fn dual_trend_rows_share_one_scale_across_directions() {
-    let trend = device_dual_trend_with(&[10.0, 20.0, 30.0], &[30.0, 30.0, 30.0], 24);
+    let trend = test_support::device_dual_trend_with(&[10.0, 20.0, 30.0], &[30.0, 30.0, 30.0], 24);
     assert_eq!(
         trend.primary, "▁▅█",
         "rising direction spans the shared ramp"
@@ -321,7 +337,8 @@ fn dual_trend_rows_share_one_scale_across_directions() {
 /// drop to the baseline block.
 #[test]
 fn dual_trend_renders_nan_as_a_gap_glyph_not_a_baseline_block() {
-    let trend = device_dual_trend_with(&[10.0, f32::NAN, 30.0], &[20.0, 20.0, 20.0], 24);
+    let trend =
+        test_support::device_dual_trend_with(&[10.0, f32::NAN, 30.0], &[20.0, 20.0, 20.0], 24);
     assert_eq!(trend.primary, "▁·█");
     assert_eq!(trend.secondary, "▅▅▅");
 }
@@ -334,7 +351,7 @@ fn dual_trend_renders_nan_as_a_gap_glyph_not_a_baseline_block() {
 /// blanks or fabricates the other.
 #[test]
 fn dual_trend_directions_gate_independently_on_finite_samples() {
-    let partial = device_dual_trend_with(&[f32::NAN, 42.0], &[10.0, 20.0], 24);
+    let partial = test_support::device_dual_trend_with(&[f32::NAN, 42.0], &[10.0, 20.0], 24);
     assert_eq!(partial.primary, DEVICE_TREND_PLACEHOLDER);
     for c in partial.secondary.chars() {
         assert!(
@@ -342,7 +359,7 @@ fn dual_trend_directions_gate_independently_on_finite_samples() {
             "non-ramp char {c:?} in live companion row"
         );
     }
-    let cold = device_dual_trend_with(&[], &[], 24);
+    let cold = test_support::device_dual_trend_with(&[], &[], 24);
     assert_eq!(cold.primary, DEVICE_TREND_PLACEHOLDER);
     assert_eq!(cold.secondary, DEVICE_TREND_PLACEHOLDER);
 }
@@ -354,7 +371,7 @@ fn dual_trend_directions_gate_independently_on_finite_samples() {
 fn dual_trend_bounds_each_row_to_the_window() {
     let rising: Vec<f32> = (0..128).map(|i| i as f32).collect();
     let falling: Vec<f32> = (0..128).map(|i| 127.0 - i as f32).collect();
-    let trend = device_dual_trend_with(&rising, &falling, 24);
+    let trend = test_support::device_dual_trend_with(&rising, &falling, 24);
     assert_eq!(trend.primary.chars().count(), 24);
     assert_eq!(trend.secondary.chars().count(), 24);
 }
@@ -410,7 +427,7 @@ fn unicode_mode_output_stays_byte_identical_to_the_block_ramp() {
     );
     assert_eq!(
         dual,
-        device_dual_trend_with(&[10.0, f32::NAN, 30.0], &[20.0, 20.0, 20.0], 24)
+        test_support::device_dual_trend_with(&[10.0, f32::NAN, 30.0], &[20.0, 20.0, 20.0], 24)
     );
     assert_eq!(dual.primary, "▁·█");
     assert_eq!(dual.secondary, "▅▅▅");

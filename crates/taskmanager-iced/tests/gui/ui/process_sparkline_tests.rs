@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::process::ProcessLiveKey;
 
 const SIZE: Size = Size::new(48.0, 16.0);
 
@@ -71,15 +72,20 @@ fn all_zero_window_uses_the_floor_and_stays_on_the_baseline() {
 
 /// The fingerprint combines pid and immutable snapshot generation.
 #[test]
-fn fingerprint_equality_keys_on_pid_and_snapshot_generation() {
+fn fingerprint_equality_keys_on_identity_and_snapshot_generation() {
     let samples: Rc<[f32]> = Rc::from([1.0, 2.0, 9.0].as_slice());
-    let base = SparklineFingerprint::from_samples(7, &samples);
-    assert_eq!(base, SparklineFingerprint::from_samples(7, &samples));
-    assert_ne!(base, SparklineFingerprint::from_samples(8, &samples));
+    let identity = ProcessLiveKey::from_parts(7, 71).expect("fixture identity");
+    let replacement = ProcessLiveKey::from_parts(8, 81).expect("fixture identity");
+    let base = SparklineFingerprint::from_samples(identity, &samples);
+    assert_eq!(base, SparklineFingerprint::from_samples(identity, &samples));
+    assert_ne!(
+        base,
+        SparklineFingerprint::from_samples(replacement, &samples)
+    );
     let same_len_same_tail: Rc<[f32]> = Rc::from([8.0, 2.0, 9.0].as_slice());
     assert_ne!(
         base,
-        SparklineFingerprint::from_samples(7, &same_len_same_tail),
+        SparklineFingerprint::from_samples(identity, &same_len_same_tail),
         "a shifted history must invalidate even when len/tail agree"
     );
 }
@@ -87,32 +93,34 @@ fn fingerprint_equality_keys_on_pid_and_snapshot_generation() {
 /// The program's `fingerprint()` mirrors `SparklineFingerprint::from_samples`
 /// — the seam `draw()` keys the cache-clear gate on — so a process whose
 /// history did not change reuses last frame's geometry, and a changed
-/// history (or a different pid at the same tree position) rebuilds.
+/// history (or a different identity at the same tree position) rebuilds.
 #[test]
-fn program_fingerprint_tracks_pid_and_history() {
+fn program_fingerprint_tracks_identity_and_history() {
     let color = Color::WHITE;
     let samples: Rc<[f32]> = Rc::from([1.0, 2.0, 3.0].as_slice());
-    let a = ProcessCpuSparkline::new(Rc::clone(&samples), color, 11);
+    let identity = ProcessLiveKey::from_parts(11, 111).expect("fixture identity");
+    let replacement = ProcessLiveKey::from_parts(12, 121).expect("fixture identity");
+    let a = ProcessCpuSparkline::new(Rc::clone(&samples), color, identity);
     assert_eq!(
         a.fingerprint(),
-        ProcessCpuSparkline::new(Rc::clone(&samples), color, 11).fingerprint()
+        ProcessCpuSparkline::new(Rc::clone(&samples), color, identity).fingerprint()
     );
     let changed: Rc<[f32]> = Rc::from([9.0, 2.0, 3.0].as_slice());
     assert_ne!(
         a.fingerprint(),
-        ProcessCpuSparkline::new(changed, color, 11).fingerprint()
+        ProcessCpuSparkline::new(changed, color, identity).fingerprint()
     );
-    // Same history but a different pid → different fingerprint (a reshuffled
+    // Same history but a different identity → different fingerprint (a reshuffled
     // row never reuses another process's cached geometry).
     assert_ne!(
         a.fingerprint(),
-        ProcessCpuSparkline::new(Rc::clone(&samples), color, 12).fingerprint()
+        ProcessCpuSparkline::new(Rc::clone(&samples), color, replacement).fingerprint()
     );
     // Color is NOT part of the fingerprint — a theme switch is rare and a
     // stale-color frame on theme change is acceptable (matches the gpui
     // sparkline, which rebuilds its paint closure each render anyway).
     assert_eq!(
         a.fingerprint(),
-        ProcessCpuSparkline::new(samples, Color::BLACK, 11).fingerprint()
+        ProcessCpuSparkline::new(samples, Color::BLACK, identity).fingerprint()
     );
 }

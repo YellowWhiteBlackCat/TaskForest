@@ -59,36 +59,50 @@ impl ShellApp {
     #[must_use]
     pub fn request_process_batch(&mut self, action: ProcessBatchAction) -> Option<PlatformEffect> {
         let destructive = matches!(action, ProcessBatchAction::Kill | ProcessBatchAction::End);
-        let processes = self.data.processes.as_deref()?;
         // Prefer the multi-select set; fall back to the keyboard anchor for
         // single-select callers (the TUI arrow path keeps the set at one row).
         if let Some(ProcessRowId::Application(root)) = self.selected_row {
-            let intent = ProcessBatchIntent::freeze_tree(processes, root.pid(), action);
+            let Some(intent) = self.freeze_tree_for_identity(root, action) else {
+                self.report_process_identity_unavailable();
+                return None;
+            };
             if destructive {
                 self.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
                 return None;
             }
             return Some(PlatformEffect::ExecuteBatch(intent));
         }
-        let pids: Vec<u32> = if self.selected_rows.is_empty() {
-            let target_pid = processes.get(self.selected)?.pid;
-            vec![target_pid]
-        } else {
-            // Exact-identity resolution: a pid-reuse impostor never matches.
-            self.selected_rows
-                .iter()
-                .filter_map(|identity| {
-                    processes
-                        .iter()
-                        .find(|process| {
-                            process.pid == identity.pid()
-                                && process.current_start_token() == Some(identity.start_token())
-                        })
-                        .map(|process| process.pid)
-                })
-                .collect()
+        // A legacy caller may still have assigned the numeric cursor directly.
+        // Resolve that cursor into the stable row authority before building an
+        // intent; after a failed reconciliation the invalidation flag prevents
+        // the cursor from silently targeting a neighboring process.
+        if self.selected_rows.is_empty()
+            && self.selected_row.is_none()
+            && !self.process_selection_invalidated
+            && let Some(identity) = self.row_identity_at(self.selected)
+        {
+            self.selected_row = Some(ProcessRowId::Process(identity));
+            self.selected_rows.insert(identity);
+        }
+        let intent = {
+            let processes = self.data.processes.as_deref()?;
+            let identities = if self.selected_rows.is_empty() {
+                match self.selected_row {
+                    Some(ProcessRowId::Process(identity)) => vec![identity],
+                    Some(ProcessRowId::Application(_) | ProcessRowId::Category(_)) | None => {
+                        Vec::new()
+                    }
+                }
+            } else {
+                self.selected_rows.iter().copied().collect()
+            };
+            (!identities.is_empty())
+                .then(|| ProcessBatchIntent::freeze(processes, identities, action))
         };
-        let intent = ProcessBatchIntent::freeze(processes, pids, action);
+        let Some(intent) = intent else {
+            self.report_process_identity_unavailable();
+            return None;
+        };
         if destructive {
             // Gate a destructive Kill behind a confirmation (mirrors pending_end
             // for End-task). Non-destructive actions (Suspend / Resume /
@@ -105,24 +119,48 @@ impl ShellApp {
         self.confirm_confirmation(ConfirmationKind::ProcessBatch)
     }
 
+    /// Freeze a process tree only after its root's full live row identity has
+    /// been re-resolved in the accepted snapshot. The core tree contract still
+    /// walks parent PIDs, but the PID reaches it only as a lookup hint derived
+    /// from this validated row identity.
+    fn freeze_tree_for_identity(
+        &self,
+        root: ProcessLiveKey,
+        action: ProcessBatchAction,
+    ) -> Option<ProcessBatchIntent> {
+        let processes = self.data.processes.as_deref()?;
+        if !processes
+            .iter()
+            .any(|process| ProcessLiveKey::from_process(process) == Some(root))
+        {
+            return None;
+        }
+        let intent = ProcessBatchIntent::freeze_tree(processes, root, action);
+        intent
+            .targets
+            .iter()
+            .any(|target| target.live_key() == Some(root))
+            .then_some(intent)
+    }
+
+    fn report_process_identity_unavailable(&mut self) {
+        self.report_notice(
+            FeedbackSource::Interaction,
+            FeedbackSeverity::Warning,
+            FeedbackLifecycle::SHORT,
+            "Process row identity is unavailable",
+        );
+    }
+
     /// Snapshot a process tree into the shared batch confirmation slot. The
     /// core intent freezes descendants leaf-first; the renderer only confirms
     /// or dismisses the pending intent and never recomputes its targets.
-    #[must_use]
-    pub fn request_process_tree_end(&mut self, root_pid: u32) -> Option<PlatformEffect> {
-        let processes = self.data.processes.as_deref()?;
-        let intent = ProcessBatchIntent::freeze_tree(processes, root_pid, ProcessBatchAction::End);
-        if intent.targets.iter().all(|target| target.pid != root_pid) {
-            self.report_notice(
-                FeedbackSource::Interaction,
-                FeedbackSeverity::Warning,
-                FeedbackLifecycle::SHORT,
-                "Process tree identity is unavailable",
-            );
-            return None;
-        }
+    pub fn request_process_tree_end(&mut self, root: ProcessLiveKey) {
+        let Some(intent) = self.freeze_tree_for_identity(root, ProcessBatchAction::End) else {
+            self.report_process_identity_unavailable();
+            return;
+        };
         self.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
-        None
     }
 
     /// Open Process Properties for an exact renderer-selected identity.

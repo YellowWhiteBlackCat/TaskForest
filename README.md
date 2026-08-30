@@ -55,7 +55,7 @@ Windows 和 macOS。它强调长时间使用时的视觉舒适度、可信的数
 - RPM `.rpm`：x86_64、aarch64；
 - Windows `.msi`：x64、arm64。
 
-首个公开预发布版本完成前，请从源码构建：
+Linux 与 Windows 的预发布安装包可在 GitHub Releases 获取；也可以从源码构建：
 
 ```bash
 cargo build --locked --release

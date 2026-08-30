@@ -16,6 +16,7 @@ use crate::gpui_app::elements;
 use crate::gpui_app::root::{self, RootView};
 use crate::gpui_app::theme::mono_font_with_fallback;
 use taskmanager_application::i18n;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_theme::tokens::UiSize;
 use taskmanager_theme::{Color, Theme};
@@ -89,7 +90,7 @@ pub(super) struct AppendBodyCellsProps<'a> {
     pub theme: &'a Theme,
     pub row: &'a VisibleRow,
     pub row_idx: usize,
-    pub pid: Option<u32>,
+    pub identity: Option<ProcessLiveKey>,
     pub hidden_cols: &'a HashSet<SortCol>,
     pub col_widths: &'a HashMap<SortCol, Pixels>,
     pub entity: &'a Entity<RootView>,
@@ -105,7 +106,7 @@ pub(super) fn append_body_cells(
         theme,
         row,
         row_idx,
-        pid,
+        identity,
         hidden_cols,
         col_widths,
         entity,
@@ -218,7 +219,7 @@ pub(super) fn append_body_cells(
                 .pr(tokens::SPACE_8),
             )
             .child({
-                if row.process_pid.is_some() {
+                if row.process_identity.is_some() {
                     div()
                         .w(px(56.0))
                         .flex()
@@ -381,7 +382,7 @@ pub(super) fn append_body_cells(
     // right-click (deferred to next frame by the framework). Every action
     // closure captures THIS row's pid; RootView keeps no stale menu-target
     // cache after the popup closes.
-    let Some(pid) = pid else {
+    let Some(identity) = identity else {
         // Aggregate rows intentionally have no process identity. In
         // particular, do not attach a context menu carrying a representative
         // PID: right-click actions must never target an invisible member.
@@ -398,10 +399,10 @@ pub(super) fn append_body_cells(
             // Collapse the shell-owned selection onto this row for visual
             // sync; the menu actions themselves already carry `pid`.
             ent.update(cx, |v, cx| {
-                v.select_process_single(pid);
+                v.select_process_single(identity);
                 cx.notify();
             });
-            PopupMenuState::new(root::build_proc_menu(ent.clone(), pid), cx)
+            PopupMenuState::new(root::build_proc_menu(ent.clone(), identity), cx)
         }
     })
     .into_any_element()

@@ -61,7 +61,7 @@ pub(super) fn render_fan_section(
         super::render_empty_panel(frame, theme, area, t("common.fan"), t("fan.empty"));
         return;
     }
-    let lines = fan_lines(sensors, &app, theme, app.prefs.graph_points);
+    let lines = fan_lines(sensors, app, theme, app.prefs.graph_points);
     frame.render_widget(
         Paragraph::new(lines)
             .block(super::panel(t("common.fan"), theme))

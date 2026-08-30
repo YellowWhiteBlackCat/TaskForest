@@ -99,6 +99,8 @@ fn topology_collect_reads_instruction_features_from_proc_root() {
         dmi_roots: [PathBuf::new(), PathBuf::new()],
         efivars_root: fixture.0.join("efivars"),
         display_root: fixture.0.join("drm"),
+        pci_devices_root: fixture.0.join("pci-devices"),
+        pci_ids_candidates: [fixture.0.join("pci.ids"), PathBuf::new(), PathBuf::new()],
     };
     let fragment = ComputeTopologySource.collect(&context(&SystemProbe::default(), &paths));
     assert_eq!(
@@ -109,6 +111,29 @@ fn topology_collect_reads_instruction_features_from_proc_root() {
             CpuInstructionFeature::AvxVnni
         ]
     );
+}
+
+#[test]
+fn topology_collect_leaves_cpuid_identity_absent_on_fixture_roots() {
+    // The CPUID identity is probed only on the native host path: a synthetic
+    // fixture root must never leak the test runner's CPU facts into the
+    // rendered inventory (same gate as the CPUID frequency fallback).
+    let fixture = FixtureDir::new();
+    fs::write(fixture.0.join("cpuinfo"), "flags: avx2\n").expect("cpuinfo fixture");
+    fs::create_dir_all(fixture.0.join("cpu0")).expect("cpu node");
+    let paths = InventoryPaths {
+        proc_root: fixture.0.clone(),
+        cpu_root: fixture.0.clone(),
+        base_frequency: fixture.0.join("missing-base-frequency"),
+        dmi_roots: [PathBuf::new(), PathBuf::new()],
+        efivars_root: fixture.0.join("efivars"),
+        display_root: fixture.0.join("drm"),
+        pci_devices_root: fixture.0.join("pci-devices"),
+        pci_ids_candidates: [fixture.0.join("pci.ids"), PathBuf::new(), PathBuf::new()],
+    };
+    let fragment = ComputeTopologySource.collect(&context(&SystemProbe::default(), &paths));
+    assert_eq!(fragment.value.cpu_identity, CpuIdentity::default());
+    assert!(!fragment.value.cpu_identity.is_present());
 }
 
 #[test]
@@ -378,6 +403,27 @@ fn linux_kernel_build_parser_removes_release_and_preserves_build_description() {
 }
 
 #[test]
+fn linux_kernel_compiler_parser_extracts_name_and_version_only() {
+    // gcc with the parenthesized qualifier and a trailing date: only the
+    // toolchain identity survives.
+    let raw = "Linux version 6.1.5 (user@host) (gcc (GCC) 13.2.1 20240614) #1 SMP";
+    assert_eq!(parse_linux_kernel_compiler(raw), "gcc 13.2.1");
+    // Plain gcc spelling.
+    let raw = "Linux version 6.6 (build@farm) (gcc 12.3.0) #1";
+    assert_eq!(parse_linux_kernel_compiler(raw), "gcc 12.3.0");
+    // clang spells the version with an explicit `version` word.
+    let raw = "Linux version 6.12 (user@host) (clang version 18.1.8) #1";
+    assert_eq!(parse_linux_kernel_compiler(raw), "clang version 18.1.8");
+    // No recognizable toolchain token: an honest empty absence.
+    assert_eq!(parse_linux_kernel_compiler("Linux version 6.1 #1"), "");
+    // A bare compiler name without a following version is not an identity.
+    assert_eq!(
+        parse_linux_kernel_compiler("Linux version 6.1 (gcc) #1"),
+        ""
+    );
+}
+
+#[test]
 fn linux_kernel_build_parser_rejects_raw_records_without_a_build_tail() {
     assert_eq!(
         parse_linux_kernel_build_description("not a version line"),
@@ -426,12 +472,17 @@ fn readable_but_empty_firmware_root_is_authoritative_empty() {
     let paths = InventoryPaths {
         dmi_roots: [fixture.0.clone(), fixture.0.join("fallback")],
         efivars_root: fixture.0.join("efivars"),
+        // The PCI sysfs tree and pci.ids database are injected too, so this
+        // fixture never reads the host's chipset identity.
+        pci_devices_root: fixture.0.join("pci-devices"),
+        pci_ids_candidates: [fixture.0.join("pci.ids"), PathBuf::new(), PathBuf::new()],
         ..InventoryPaths::default()
     };
 
     let fragment = FirmwareSource.collect(&context(&SystemProbe::default(), &paths));
     assert_eq!(fragment.status.outcome, SourceOutcome::Empty);
     assert_eq!(fragment.status.item_count, 0);
+    assert_eq!(fragment.value.chipset, None);
 }
 
 #[test]

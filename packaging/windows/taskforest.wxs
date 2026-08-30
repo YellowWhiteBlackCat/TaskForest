@@ -24,7 +24,12 @@
            Compressed="yes"
            Language="1033"
            Codepage="65001">
-    <SummaryInformation Description="Eye-friendly native system monitor built with GPUI" />
+    <!-- ProductVersion must stay numeric (Windows Installer hard requirement);
+         the full Cargo version (prerelease rcN included) is carried in the
+         summary metadata, the ARP comments, and the Software\TaskForest
+         Version registry value below. -->
+    <SummaryInformation Description="TaskForest $(var.FullVersion) — eye-friendly native system monitor built with GPUI" />
+    <Property Id="ARPCOMMENTS" Value="TaskForest $(var.FullVersion) — eye-friendly native system monitor (GPUI)" />
     <MajorUpgrade AllowSameVersionUpgrades="yes"
                   DowngradeErrorMessage="A newer version of TaskForest is already installed." />
     <MediaTemplate EmbedCab="yes" />
@@ -61,6 +66,11 @@
                          Type="integer"
                          Value="1"
                          KeyPath="yes" />
+          <RegistryValue Root="HKLM"
+                         Key="Software\TaskForest"
+                         Name="Version"
+                         Type="string"
+                         Value="$(var.FullVersion)" />
         </Component>
       </Directory>
     </StandardDirectory>

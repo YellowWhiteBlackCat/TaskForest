@@ -7,7 +7,7 @@ use super::{
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryFormat,
-    ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
+    ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessLiveKey,
 };
 
 #[gpui::test]
@@ -39,8 +39,8 @@ fn application_root_batch_freezes_the_exact_tree_without_a_representative_pid(
             process(11, Some(10), 110),
             process(12, Some(11), 120),
         ]);
-        view.select_application_root(10);
-        assert_eq!(view.selected_pid(), None);
+        view.select_application_root(ProcessLiveKey::from_parts(10, 100).expect("root identity"));
+        assert_eq!(view.selected_process_identity(), None);
         view.request_process_batch(ProcessBatchAction::End);
     });
 

@@ -21,6 +21,38 @@ Linux 发行包安装的主桌面可执行文件是 `taskforest-g`；兼容 CLI 
 
 公开安装与产品说明只使用上表中的 TaskForest 标识；兼容名称只保留在必要的内部实现边界。
 
+## 发布产物命名
+
+所有 GitHub Release 资产遵循唯一约定：
+
+```
+TaskForest-<UI>-<版本>-<平台>.<格式>
+```
+
+- `<UI>`：发行包前端的单字母后缀（GPUI 为 `G`；Iced 若进入发行包为 `I`）；
+- `<版本>`：完整 Cargo 版本；预发布后缀统一连写为 `rcN`（如 `0.1.0-rc5`，不带点），
+  与 git tag（`v0.1.0-rc5`）逐字一致；
+- `<平台>`：统一为 `x64` / `arm64`，与 DEB `Architecture`（`amd64`/`arm64`）和
+  RPM arch（`x86_64`/`aarch64`）一一对应，包内元数据不改；
+- `<格式>`：`deb` / `rpm` / `msi`（AppImage 若发布为 `AppImage`）。
+
+示例：`TaskForest-G-0.1.0-rc5-x64.deb`。产物矩阵的权威表在
+[RELEASE.md](RELEASE.md)。
+
+## 特权 helper 与 polkit 命名空间
+
+Linux 安装树中的特权面统一使用产品前缀，全部落在 `/usr/libexec/taskforest-*`：
+`taskforest-setup-helper`、`taskforest-privilege-helper`、`taskforest-net-launcher`、
+`taskforest-process-control-helper`（udev 规则资产为
+`/usr/share/taskforest/setup/99-taskforest.rules`）。cargo 构建产物名仍是内部的
+`taskmanager-*`，安装时映射为发行名。
+
+polkit action id 与桌面 app id 共用同一 reverse-DNS 命名空间：
+`io.github.YellowWhiteBlackCat.TaskForest.<feature>`。目前声明的四个 action：
+`perf-helper`、`net-launcher`、`process-control`、`first-run-setup`；前三个的
+`.policy` 安装文件名与 action id 同名（模板在 `polkit/`），`first-run-setup`
+的安装文件是 `packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.setup.policy`。
+
 ## 图标权威
 
 - 应用 SVG：`packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg`

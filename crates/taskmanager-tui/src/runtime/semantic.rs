@@ -18,6 +18,7 @@ use taskmanager_application::AppPage;
 use taskmanager_application::i18n::t;
 use taskmanager_assets::product;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_shell::process_semantic_key;
 use taskmanager_ui_contract::{
     GraphSummary, ModalInput, ProcessGroupRowInput, ProcessRowInput, SemanticSnapshot,
     SemanticSnapshotBuilder,
@@ -93,7 +94,7 @@ impl TuiApp {
                         process.name.clone()
                     };
                     builder = builder.process_row(ProcessRowInput {
-                        id: process.pid.to_string(),
+                        id: process_semantic_key(&process),
                         name,
                         cpu_percent: semantic_cpu_percent(&process),
                         memory_percent: semantic_memory_percent(

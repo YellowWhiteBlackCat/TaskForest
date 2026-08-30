@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::SortCol;
 
 // --- Round-3 ProcessProjection fingerprint cache ---------------------------
@@ -90,6 +91,11 @@ fn projection_cache_hits_on_unchanged_state_and_reuses_the_allocation() {
         &app.process_presentation.expanded_groups,
         &app.process_presentation.expanded_tree,
         &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+        app.shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .map_or(0, |snapshot| snapshot.timestamp_ms),
     );
     let cached = app.projected_rows();
     assert_eq!(
@@ -183,8 +189,6 @@ fn projection_cache_misses_on_each_view_state_change() {
     let collapsed = app.projected_rows().len();
     let _ = app.update(Message::ToggleGroupExpansion {
         name: "category:uncategorized".into(),
-        main_pid: 100,
-        flat_index: 0,
         row_key: None,
     });
     let expanded = app.projected_rows().len();
@@ -246,11 +250,15 @@ fn services_projection_ignores_unrelated_process_revision() {
 #[test]
 fn unrelated_sidebar_state_preserves_every_projection_cache() {
     use std::rc::Rc;
-    use taskmanager_telemetry_store::live_graph::MetricSeries;
-
     let mut app = crate::IcedApp::demo();
     let mut process_history = crate::perf_history::ProcessPerfHistory::new(16);
-    process_history.push(44, Some(12.0), Some(2048), Some(30), Some(40));
+    process_history.push(
+        ProcessLiveKey::from_parts(44, 44).expect("fixture identity"),
+        Some(12.0),
+        Some(2048),
+        Some(30),
+        Some(40),
+    );
     app.performance.process_history = Some(process_history);
 
     let process_perf = app.process_perf_series().unwrap().cpu;

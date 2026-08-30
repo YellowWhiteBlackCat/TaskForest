@@ -28,6 +28,10 @@ use ratatui::backend::Backend;
 use ratatui::crossterm::event::MouseButton;
 use ratatui::crossterm::event::{Event, KeyEvent, KeyEventKind, KeyModifiers, MouseEventKind};
 use ratatui::layout::Rect;
+
+#[cfg(test)]
+#[path = "../../tests/headless/runtime/seam_support.rs"]
+pub(crate) mod seam_support;
 use taskmanager_application::{PlatformClient, PlatformEffect};
 
 use crate::ui::{TuiFramePlan, TuiHitTarget, render_with_plan};
@@ -114,12 +118,6 @@ pub(crate) struct EventReaction {
 /// like PageDown does). Modified scrolls and unsupported pointer gestures are
 /// explicit no-ops. Focus loss releases the mirrored Ctrl hold so switching
 /// terminals cannot strand telemetry in the hold-to-pause state.
-#[cfg(test)]
-pub(crate) fn apply_terminal_event(app: &mut TuiApp, event: Event, frame: Rect) -> EventReaction {
-    let plan = TuiFramePlan::build(app, frame);
-    apply_terminal_event_with_plan(app, event, &plan)
-}
-
 /// Normalize one terminal event against the immutable plan for the frame the
 /// user last saw. Pointer input must not rebuild geometry from an app state
 /// that earlier events in the same burst have already changed.
@@ -415,29 +413,6 @@ impl RefreshPacing {
 /// `pub(crate)` (test-only) so the crate's registered test modules — not only
 /// the runtime module tree — can drive the production loop with a counting
 /// backend and a scripted event source.
-#[cfg(test)]
-pub(crate) fn run_event_loop<B: Backend, E: TerminalEventSource>(
-    terminal: &mut Terminal<B>,
-    app: &mut TuiApp,
-    platform: Option<&mut PlatformClient>,
-    events: E,
-    demo: bool,
-    capture_marker: Option<&OsStr>,
-) -> io::Result<()>
-where
-    B::Error: BackendErrorIntoIo,
-{
-    run_event_loop_with_profile(
-        terminal,
-        app,
-        platform,
-        events,
-        demo,
-        capture_marker,
-        TuiTerminalProfile::default(),
-    )
-}
-
 /// Run the terminal loop with the capability profile resolved by the
 /// composition edge.  The wrapper above keeps existing deterministic tests
 /// on a stable Unicode/true-color profile without touching global env state.

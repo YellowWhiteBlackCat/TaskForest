@@ -293,6 +293,54 @@ pub fn queue_effect_result(
         PlatformEffect::NpuInventory(request) => {
             vec![platform.submit_npu_inventory(request.clone(), now_ms)]
         }
+        PlatformEffect::SmbiosMemory(request) => {
+            let attempt = app.begin_smbios_memory_request();
+            let submission = platform.submit_smbios_memory(*request, now_ms);
+            match &submission {
+                Ok(request_id) => {
+                    app.accept_smbios_memory_request(attempt, *request_id);
+                }
+                Err(error) => {
+                    app.reject_smbios_memory_request(
+                        attempt,
+                        taskmanager_application::request_submission_failure(error.kind),
+                    );
+                }
+            }
+            vec![submission]
+        }
+        PlatformEffect::RaplPower(request) => {
+            let attempt = app.begin_rapl_power_request();
+            let submission = platform.submit_rapl_power(*request, now_ms);
+            match &submission {
+                Ok(request_id) => {
+                    app.accept_rapl_power_request(attempt, *request_id);
+                }
+                Err(error) => {
+                    app.reject_rapl_power_request(
+                        attempt,
+                        taskmanager_application::request_submission_failure(error.kind),
+                    );
+                }
+            }
+            vec![submission]
+        }
+        PlatformEffect::MsrReadout(request) => {
+            let attempt = app.begin_msr_readout_request();
+            let submission = platform.submit_msr_readout(*request, now_ms);
+            match &submission {
+                Ok(request_id) => {
+                    app.accept_msr_readout_request(attempt, *request_id);
+                }
+                Err(error) => {
+                    app.reject_msr_readout_request(
+                        attempt,
+                        taskmanager_application::request_submission_failure(error.kind),
+                    );
+                }
+            }
+            vec![submission]
+        }
         PlatformEffect::SmartControl(request) => {
             let attempt = match request {
                 taskmanager_application::SmartControlRequest::StartSelfTest(intent) => {

@@ -95,6 +95,32 @@ fn graphics_api_facts_roundtrip_as_optional_typed_identity() {
 }
 
 #[test]
+fn driver_version_roundtrips_and_stays_absent_on_legacy_payloads() {
+    let mut gpu = GpuMetrics::new("gpu:pci:0000:01:00.0", "Fixture GPU");
+    gpu.driver = Some("nvidia".into());
+    gpu.driver_version = Some("566.36".into());
+
+    let value = serde_json::to_value(&gpu).expect("GPU driver version serializes");
+    assert_eq!(value["driver"], serde_json::json!("nvidia"));
+    assert_eq!(value["driver_version"], serde_json::json!("566.36"));
+
+    let decoded: GpuMetrics = serde_json::from_value(value).expect("GPU driver version decodes");
+    assert_eq!(decoded.driver.as_deref(), Some("nvidia"));
+    assert_eq!(decoded.driver_version.as_deref(), Some("566.36"));
+
+    // A payload recorded before the field existed must not inherit the driver
+    // name as a guessed release string.
+    let legacy: GpuMetrics = serde_json::from_value(serde_json::json!({
+        "device_id": "gpu:pci:0000:01:00.0",
+        "brand": "Fixture GPU",
+        "driver": "nvidia"
+    }))
+    .expect("pre-version legacy GPU row decodes");
+    assert_eq!(legacy.driver.as_deref(), Some("nvidia"));
+    assert_eq!(legacy.driver_version, None);
+}
+
+#[test]
 fn current_envelope_hydrates_legacy_values_with_exact_field_provenance() {
     let value = serde_json::json!({
         "device_id": "gpu:pci:0000:01:00.0",

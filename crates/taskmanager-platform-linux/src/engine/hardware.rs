@@ -39,6 +39,7 @@ mod firmware;
 pub mod gpu;
 mod inventory;
 pub mod network;
+mod pci_ids;
 pub mod platform;
 
 pub use cpu::*;

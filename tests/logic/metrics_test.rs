@@ -135,6 +135,9 @@ fn test_gpu_metrics_scanning_mock() {
     let root = create_temp_test_dir("gpu_mock");
     let drm_dir = root.join("drm");
     let nvidia_dir = root.join("nvidia");
+    // Module tree with no version nodes: the fixture GPU keeps an honest
+    // absent driver_version (in-tree DRM drivers declare no version).
+    let module_dir = root.join("modules");
 
     let card0_device = drm_dir.join("card0").join("device");
     fs::create_dir_all(&card0_device).unwrap();
@@ -148,7 +151,7 @@ fn test_gpu_metrics_scanning_mock() {
     fs::create_dir_all(&hwmon).unwrap();
     fs::write(hwmon.join("temp1_input"), "62000\n").unwrap();
 
-    let gpus = detect_gpu_metrics_from_paths(&drm_dir, &nvidia_dir);
+    let gpus = detect_gpu_metrics_from_paths(&drm_dir, &nvidia_dir, &module_dir);
     assert_eq!(gpus.len(), 1);
     let gpu = &gpus[0];
     assert_eq!(gpu.brand, "AMD");
@@ -186,7 +189,7 @@ fn test_system_snapshot_with_gpu() {
     cpu.brand = Some("AMD Ryzen 9".to_string());
     cpu.physical_cores = Some(8);
     cpu.logical_cores = Some(16);
-    cpu.l1_cache_kb = Some(512);
+    cpu.l1d_cache_kb = Some(512);
     cpu.l2_cache_kb = Some(8_192);
     cpu.l3_cache_kb = Some(32_768);
     let memory = MemoryMetrics::from_observations(

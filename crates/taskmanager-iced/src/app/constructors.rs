@@ -5,6 +5,7 @@
 use std::path::PathBuf;
 
 use taskmanager_application::PlatformClient;
+use taskmanager_core::core::metrics::ScalarObservation;
 
 use super::*;
 
@@ -310,35 +311,39 @@ fn seed_capture_performance_fixture(app: &mut IcedApp) {
                 .apply_observations(observations, optional_observations);
         }
         if let Some(disk) = snapshot.disks.first_mut() {
+            let current_read = disk.current_read_bytes_per_sec();
+            let current_write = disk.current_write_bytes_per_sec();
             let mut observations = *disk.scalar_observations();
-            observations.read_bytes_per_sec =
-                taskmanager_core::core::metrics::ScalarObservation::available(
-                    (disk.current_read_bytes_per_sec().unwrap_or_default() as f32 * disk_rate
-                        / 84.0) as u64,
+            if let Some(current_read) = current_read {
+                observations.read_bytes_per_sec = ScalarObservation::available(
+                    (current_read as f32 * disk_rate / 84.0) as u64,
                     snapshot.timestamp_ms,
                 );
-            observations.write_bytes_per_sec =
-                taskmanager_core::core::metrics::ScalarObservation::available(
-                    (disk.current_write_bytes_per_sec().unwrap_or_default() as f32 * disk_rate
-                        / 84.0) as u64,
+            }
+            if let Some(current_write) = current_write {
+                observations.write_bytes_per_sec = ScalarObservation::available(
+                    (current_write as f32 * disk_rate / 84.0) as u64,
                     snapshot.timestamp_ms,
                 );
+            }
             disk.apply_scalar_observations(observations);
         }
         if let Some(network) = snapshot.networks.first_mut() {
+            let current_rx = network.current_rx_bytes_per_sec();
+            let current_tx = network.current_tx_bytes_per_sec();
             let mut observations = *network.scalar_observations();
-            observations.rx_bytes_per_sec =
-                taskmanager_core::core::metrics::ScalarObservation::available(
-                    (network.current_rx_bytes_per_sec().unwrap_or_default() as f32 * network_rate
-                        / 12.0) as u64,
+            if let Some(current_rx) = current_rx {
+                observations.rx_bytes_per_sec = ScalarObservation::available(
+                    (current_rx as f32 * network_rate / 12.0) as u64,
                     snapshot.timestamp_ms,
                 );
-            observations.tx_bytes_per_sec =
-                taskmanager_core::core::metrics::ScalarObservation::available(
-                    (network.current_tx_bytes_per_sec().unwrap_or_default() as f32 * network_rate
-                        / 12.0) as u64,
+            }
+            if let Some(current_tx) = current_tx {
+                observations.tx_bytes_per_sec = ScalarObservation::available(
+                    (current_tx as f32 * network_rate / 12.0) as u64,
                     snapshot.timestamp_ms,
                 );
+            }
             let adapter_type = network.adapter_type();
             let wireless_observations = network.wireless_observations().clone();
             network.apply_observations(adapter_type, observations, wireless_observations);

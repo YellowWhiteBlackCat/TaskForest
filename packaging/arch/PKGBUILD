@@ -49,7 +49,10 @@ build() {
     -p taskmanager-setup-helper \
     -p taskmanager-privilege-helper \
     -p taskmanager-net-launcher \
-    -p taskmanager-process-control-helper
+    -p taskmanager-process-control-helper \
+    -p taskmanager-smbios-helper \
+    -p taskmanager-rapl-helper \
+    -p taskmanager-msr-helper
   # The root package enforces one UI feature per build; the default feature
   # set is exactly the GPUI shape, so copy it to its distribution name.
   install -m755 target/release/taskmanager target/release/taskforest-g
@@ -78,27 +81,39 @@ package() {
   install -Dm755 target/release/taskforest-g "$pkgdir/usr/bin/taskmanager"
   install -Dm755 target/release/taskforest-g "$pkgdir/usr/bin/taskforest-g"
   install -Dm755 target/release/taskmanager-setup-helper \
-    "$pkgdir/usr/libexec/taskmanager-setup-helper"
+    "$pkgdir/usr/libexec/taskforest-setup-helper"
   # Per-feature privileged helpers + their polkit actions (ADR-023 Boundary 2).
   # Both the helper binaries and the .policy.in sources carry the absolute
   # exec.path baked in (no @bindir@ substitution needed); install drops the .in
-  # suffix to the canonical action filename. Paths match the manifest rows
-  # POLKIT-PERF-HELPER/POLICY and POLKIT-NET-HELPER/POLICY exactly so the
+  # suffix to the canonical action filename. The installed helper paths use the
+  # taskforest product prefix; the cargo build names stay taskmanager-*
+  # internally. Paths match the manifest rows POLKIT-PERF-HELPER/POLICY,
+  # POLKIT-NET-HELPER/POLICY, and POLKIT-PROCESS-HELPER/POLICY exactly so the
   # system_install_manifest_guard stays green.
   install -Dm755 target/release/taskmanager-privilege-helper \
-    "$pkgdir/usr/libexec/taskmanager-privilege-helper"
-  install -Dm644 polkit/com.taskforest.perf-helper.policy.in \
-    "$pkgdir/usr/share/polkit-1/actions/com.taskforest.perf-helper.policy"
+    "$pkgdir/usr/libexec/taskforest-privilege-helper"
+  install -Dm644 polkit/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy"
   install -Dm755 target/release/taskmanager-net-launcher \
-    "$pkgdir/usr/libexec/taskmanager-net-launcher"
-  install -Dm644 polkit/com.taskforest.net-launcher.policy.in \
-    "$pkgdir/usr/share/polkit-1/actions/com.taskforest.net-launcher.policy"
-  # Process-control helper lands under /usr/lib (matching the exec.path its
-  # policy annotates); rows POLKIT-PROCESS-HELPER/POLICY in the manifest.
+    "$pkgdir/usr/libexec/taskforest-net-launcher"
+  install -Dm644 polkit/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy"
   install -Dm755 target/release/taskmanager-process-control-helper \
-    "$pkgdir/usr/lib/taskforest-process-control-helper"
-  install -Dm644 polkit/com.taskforest.process-control.policy.in \
-    "$pkgdir/usr/share/polkit-1/actions/com.taskforest.process-control.policy"
+    "$pkgdir/usr/libexec/taskforest-process-control-helper"
+  install -Dm644 polkit/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.process-control.policy"
+  install -Dm755 target/release/taskmanager-smbios-helper \
+    "$pkgdir/usr/libexec/taskforest-smbios-helper"
+  install -Dm644 polkit/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.smbios-helper.policy"
+  install -Dm755 target/release/taskmanager-rapl-helper \
+    "$pkgdir/usr/libexec/taskforest-rapl-helper"
+  install -Dm644 polkit/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy"
+  install -Dm755 target/release/taskmanager-msr-helper \
+    "$pkgdir/usr/libexec/taskforest-msr-helper"
+  install -Dm644 polkit/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy.in \
+    "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy"
   install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForestG.desktop \
     "$pkgdir/usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestG.desktop"
   install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForestG.metainfo.xml \
@@ -107,8 +122,8 @@ package() {
     "$pkgdir/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg"
   # First Run owns activation of this optional rule through the fixed helper;
   # ship the audited asset for View/Copy without enabling it at install time.
-  install -Dm644 packaging/linux/99-taskmanager.rules \
-    "$pkgdir/usr/share/taskmanager/setup/99-taskmanager.rules"
+  install -Dm644 packaging/linux/99-taskforest.rules \
+    "$pkgdir/usr/share/taskforest/setup/99-taskforest.rules"
   install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.setup.policy \
     "$pkgdir/usr/share/polkit-1/actions/io.github.YellowWhiteBlackCat.TaskForest.setup.policy"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/taskforest/LICENSE"

@@ -157,12 +157,12 @@ fn runner_timeout_is_reported_as_an_abandoned_crossing() {
 }
 
 #[test]
-fn windows_production_policy_is_unsupported_until_uac_transport_exists() {
+fn windows_polkit_lane_stays_linux_only_and_routes_to_the_uac_transport() {
     assert!(matches!(
         windows_foreign_process_control_unavailable(),
         ForeignProcessControlOutcome::Unavailable {
             reason: EscalationDenialReason::Unsupported,
             detail,
-        } if detail.contains("UAC helper transport")
+        } if detail.contains("UAC transport")
     ));
 }

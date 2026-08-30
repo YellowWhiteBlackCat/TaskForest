@@ -19,13 +19,13 @@ use taskmanager_application::{
     AppAction, AppPage, ConfigClient, PlatformEffect, RefreshRequest, TelemetryInterval,
 };
 use taskmanager_core::core::config::Config;
-use taskmanager_core::core::process::ProcessBatchAction;
+use taskmanager_core::core::process::{ProcessBatchAction, ProcessLiveKey};
 use taskmanager_core::core::services::{ServiceAction, ServiceItem};
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::setup::SetupScriptAction;
 
 use taskmanager_shell::{
-    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable,
+    FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InfoSortCol, InfoTable, ProcessRowId,
     ProcessStatusFilter, ShellApp, SortCol,
 };
 use taskmanager_theme::{FontChoice, HighContrast, LightDark, Skin, Theme};
@@ -120,7 +120,7 @@ pub enum Message {
     ModifiersChanged(iced::keyboard::Modifiers),
     /// A pointer button was pressed anywhere over the root surface. This
     /// feeds only the renderer-local input-modality tracker (see
-    /// [`crate::input_modality`]) — the iced counterpart of the GPUI root's
+    /// `crate::input_modality` — the iced counterpart of the GPUI root's
     /// capture-phase mouse-down listener; it never carries surface semantics.
     PointerPressed,
     /// One selectable value began a selection and claims the window's single
@@ -147,9 +147,7 @@ pub enum Message {
     /// stays in bounds of the visible rows.
     ToggleGroupExpansion {
         name: String,
-        main_pid: u32,
-        flat_index: usize,
-        row_key: Option<taskmanager_shell::ProcessRowId>,
+        row_key: Option<ProcessRowId>,
     },
     /// A recursive process parent was activated — toggle its subtree AND select the
     /// row in one click. The toggle flips membership in the frontend-local
@@ -158,11 +156,14 @@ pub enum Message {
     /// pid's position in the shared process list (stable across collapse —
     /// only descendants appear/disappear — so both can happen on one
     /// activation).
-    ActivateTreeNode { pid: u32, flat_index: usize },
-    /// A process row was right-clicked. The row index selects the shared
-    /// process identity; the pid is retained locally so a later refresh cannot
-    /// make the menu appear attached to a different row.
-    OpenProcessRowMenu { flat_index: usize, pid: u32 },
+    ActivateTreeNode {
+        identity: Option<ProcessLiveKey>,
+        flat_index: usize,
+    },
+    /// A process row was right-clicked. The message carries the exact live
+    /// identity captured by the rendered row; a later refresh cannot retarget
+    /// the menu or its actions to a PID-reuse impostor.
+    OpenProcessRowMenu { identity: ProcessLiveKey },
     /// Close the Applications-row context menu.
     CloseProcessRowMenu,
     /// Apply one action from the Applications-row context menu.
@@ -356,8 +357,9 @@ pub enum Message {
     ExpandAllProcessTree,
     /// Collapse all subtree nodes in Process Tree view.
     CollapseAllProcessTree,
-    /// Jump to the process in Applications view and highlight it.
-    JumpToProcess { pid: u32 },
+    /// Jump to an exact process incarnation in Applications view and
+    /// highlight it.
+    JumpToProcess { identity: ProcessLiveKey },
     /// Copy text to system clipboard with a status label.
     CopyTextToClipboard { label: String, text: String },
     /// The process-properties environment table's key filter changed.

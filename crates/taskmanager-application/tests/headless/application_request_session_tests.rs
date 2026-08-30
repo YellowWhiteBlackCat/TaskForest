@@ -1,13 +1,19 @@
 use taskmanager_application::{
     CommandLaunchRequest, GpuEngineRowsRequestFailure, GpuEngineRowsSession, GpuEngineRowsState,
-    NetworkEscalationSession, NetworkEscalationState, ProcessAffinitySession, ProcessAffinityState,
-    ProcessBatchSession, ProcessBatchState, RequestCorrelation, ResourceRevealRequest, ShellEvent,
-    ShellUiActionIntent, ShellUiActionReceipt, ShellUiActionSession, ShellUiActionState,
-    SmartSelfTestSession, SmartSelfTestState, UrlOpenRequest,
+    MsrReadoutRequestFailure, MsrReadoutSession, MsrReadoutState, NetworkEscalationSession,
+    NetworkEscalationState, ProcessAffinitySession, ProcessAffinityState, ProcessBatchSession,
+    ProcessBatchState, RaplPowerRequestFailure, RaplPowerSession, RaplPowerState,
+    RequestCorrelation, ResourceRevealRequest, ShellEvent, ShellUiActionIntent,
+    ShellUiActionReceipt, ShellUiActionSession, ShellUiActionState, SmartSelfTestSession,
+    SmartSelfTestState, SmbiosMemoryRequestFailure, SmbiosMemorySession, SmbiosMemoryState,
+    UrlOpenRequest,
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
-use taskmanager_core::core::metrics::GpuEngineRowsSnapshot;
+use taskmanager_core::core::metrics::{
+    GpuEngineRowsSnapshot, MsrPackageReadout, MsrReadoutSnapshot, RaplPackageRow,
+    RaplPowerSnapshot, SmbiosMemorySnapshot, SmbiosModuleRow,
+};
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, PriorityTier, ProcessBatchAction, ProcessBatchIntent,
     ProcessBatchResult, ProcessBatchTargetResult, ProcessGroupScope,
@@ -202,6 +208,152 @@ fn gpu_engine_rows_session_correlates_device_replace_close_and_provider_failure(
     ));
     assert!(failed.last_good.is_some());
     assert!(session.retry().is_some());
+}
+
+#[test]
+fn smbios_memory_session_correlates_replace_close_and_provider_failure() {
+    let mut session = SmbiosMemorySession::default();
+
+    let stale_attempt = session.begin_attempt();
+    let active_attempt = session.begin_attempt();
+    assert!(!session.accept_attempt(stale_attempt, request(50)));
+    assert!(session.accept_attempt(active_attempt, request(51)));
+    session.close();
+    assert!(!session.complete(request(51), smbios_success()));
+
+    let attempt = session.begin_attempt();
+    assert!(session.accept_attempt(attempt, request(52)));
+    assert!(session.complete(request(52), smbios_success()));
+    assert!(!session.complete(request(52), smbios_success()));
+
+    // A provider failure must stay a typed terminal and retain last_good.
+    let refresh = session.begin_attempt();
+    assert!(session.accept_attempt(refresh, request(53)));
+    assert!(session.complete(
+        request(53),
+        SmbiosMemorySnapshot::failed(FailureKind::PermissionDenied, "permission prompt dismissed",),
+    ));
+    let SmbiosMemoryState::Failed(failed) = session.state() else {
+        panic!("provider failure must be a typed terminal")
+    };
+    assert!(matches!(
+        failed.failure,
+        SmbiosMemoryRequestFailure::Provider(_)
+    ));
+    assert!(failed.last_good.is_some());
+    let retry = session.retry().expect("failed read can be retried");
+    assert!(matches!(
+        session.state(),
+        SmbiosMemoryState::Loading { correlation, .. }
+            if *correlation == RequestCorrelation::Attempt(retry)
+    ));
+    // System-scoped sessions have no target identity, so a replacement
+    // attempt inherits the last-good inventory.
+    assert!(matches!(
+        session.state(),
+        SmbiosMemoryState::Loading {
+            last_good: Some(_),
+            ..
+        }
+    ));
+}
+
+fn smbios_success() -> SmbiosMemorySnapshot {
+    SmbiosMemorySnapshot::success(
+        2,
+        1,
+        vec![SmbiosModuleRow {
+            slot: 1,
+            size_mb: Some(32_768),
+            ..SmbiosModuleRow::default()
+        }],
+        None,
+    )
+}
+
+#[test]
+fn rapl_power_session_correlates_replace_close_and_submission_failure() {
+    let mut session = RaplPowerSession::default();
+
+    let stale_attempt = session.begin_attempt();
+    let active_attempt = session.begin_attempt();
+    assert!(!session.accept_attempt(stale_attempt, request(60)));
+    assert!(session.accept_attempt(active_attempt, request(61)));
+    assert!(!session.complete(request(60), rapl_success()));
+    session.close();
+    assert!(!session.fail(request(61), FailureKind::ProviderFault));
+
+    let attempt = session.begin_attempt();
+    assert!(session.accept_attempt(attempt, request(62)));
+    assert!(session.complete(request(62), rapl_success()));
+    assert!(!session.complete(request(62), rapl_success()));
+
+    let refresh = session.begin_attempt();
+    assert!(session.accept_attempt(refresh, request(63)));
+    assert!(session.fail(request(63), FailureKind::TemporarilyUnavailable));
+    let RaplPowerState::Failed(failed) = session.state() else {
+        panic!("submission failure must be a typed terminal")
+    };
+    assert!(matches!(
+        failed.failure,
+        RaplPowerRequestFailure::Submission(FailureKind::TemporarilyUnavailable)
+    ));
+    assert!(failed.last_good.is_some());
+    assert!(session.retry().is_some());
+}
+
+fn rapl_success() -> RaplPowerSnapshot {
+    RaplPowerSnapshot::success(
+        250,
+        vec![RaplPackageRow {
+            name: "package-1".to_owned(),
+            power_w: 12.5,
+            energy_delta_uj: 3_125_000,
+        }],
+    )
+}
+
+#[test]
+fn msr_readout_session_correlates_replace_close_and_submission_failure() {
+    let mut session = MsrReadoutSession::default();
+
+    let stale_attempt = session.begin_attempt();
+    let active_attempt = session.begin_attempt();
+    assert!(!session.accept_attempt(stale_attempt, request(70)));
+    assert!(session.accept_attempt(active_attempt, request(71)));
+    assert!(!session.complete(request(70), msr_success()));
+    session.close();
+    assert!(!session.fail(request(71), FailureKind::ProviderFault));
+
+    let attempt = session.begin_attempt();
+    assert!(session.accept_attempt(attempt, request(72)));
+    assert!(session.complete(request(72), msr_success()));
+    assert!(!session.complete(request(72), msr_success()));
+
+    let refresh = session.begin_attempt();
+    assert!(session.accept_attempt(refresh, request(73)));
+    assert!(session.fail(request(73), FailureKind::TemporarilyUnavailable));
+    let MsrReadoutState::Failed(failed) = session.state() else {
+        panic!("submission failure must be a typed terminal")
+    };
+    assert!(matches!(
+        failed.failure,
+        MsrReadoutRequestFailure::Submission(FailureKind::TemporarilyUnavailable)
+    ));
+    assert!(failed.last_good.is_some());
+    assert!(session.retry().is_some());
+}
+
+fn msr_success() -> MsrReadoutSnapshot {
+    MsrReadoutSnapshot::success(vec![MsrPackageReadout {
+        cpu: 0,
+        bclk_mhz: None,
+        temperature_c: Some(54.5),
+        multiplier: Some(42.0),
+        multiplier_min: Some(8.0),
+        multiplier_max: Some(58.0),
+        vcore_v: Some(1.219),
+    }])
 }
 
 #[test]

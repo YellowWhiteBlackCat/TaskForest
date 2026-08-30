@@ -138,10 +138,18 @@ pub(super) fn about_rows(
         t("system.field.motherboard_vendor"),
         hardware.and_then(|h| h.motherboard_vendor.as_deref()),
     );
+    let motherboard_model = hardware.and_then(|h| {
+        h.motherboard_model
+            .as_deref()
+            .map(|model| match h.motherboard_version.as_deref() {
+                Some(version) if !version.is_empty() => format!("{model} ({version})"),
+                _ => model.to_owned(),
+            })
+    });
     push(
         &mut rows,
         t("system.field.motherboard_model"),
-        hardware.and_then(|h| h.motherboard_model.as_deref()),
+        motherboard_model.as_deref(),
     );
     push(
         &mut rows,
