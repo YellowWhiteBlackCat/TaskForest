@@ -5,6 +5,97 @@ use taskmanager_application::InteractionEvent;
 use super::*;
 
 impl ShellApp {
+    /// Project the selected Applications row into the shared process-control
+    /// availability state. The UI may render this state, but request
+    /// construction still goes through the methods below and freezes exact
+    /// identities at the point of submission.
+    #[must_use]
+    pub fn process_control_availability(&self) -> super::ProcessControlAvailability {
+        let selected: Vec<_> = self.selected_rows.iter().copied().collect();
+        super::process_control::process_control_availability(
+            self.data.processes_slice(),
+            self.selected_row,
+            &selected,
+            self.data
+                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+        )
+    }
+
+    /// Project the marked set independently of the keyboard row. The batch
+    /// menu uses this view because its scope is the explicit marked set even
+    /// when the visual cursor currently rests on a category or application
+    /// header.
+    #[must_use]
+    pub fn marked_process_control_availability(&self) -> super::ProcessControlAvailability {
+        let selected: Vec<_> = self.selected_rows.iter().copied().collect();
+        super::process_control::process_control_availability(
+            self.data.processes_slice(),
+            None,
+            &selected,
+            self.data
+                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+        )
+    }
+
+    /// Resolve the current selection into exact live identities. Application
+    /// rows expand through the shared leaf-first tree walk; process selection
+    /// uses the marked set and falls back to the validated anchor. Renderers
+    /// consume this projection and never rebuild a target set locally.
+    #[must_use]
+    pub fn process_control_targets(&self) -> Vec<ProcessLiveKey> {
+        let selected: Vec<_> = if self.selected_rows.is_empty() {
+            self.selected_process_identity()
+                .and_then(|target| target.live_key())
+                .into_iter()
+                .collect()
+        } else {
+            self.selected_rows.iter().copied().collect()
+        };
+        super::process_control::process_control_targets(
+            self.data.processes_slice(),
+            self.selected_row,
+            &selected,
+        )
+    }
+
+    /// Build the one atomic process-control intent used by every renderer's
+    /// confirmation or direct-submit surface. Target expansion and exact
+    /// identity freezing stay at this shell/application boundary.
+    #[must_use]
+    pub fn process_control_intent(&self, action: ProcessBatchAction) -> Option<ProcessBatchIntent> {
+        let processes = self.data.processes.as_deref()?;
+        let selected: Vec<_> = if self.selected_rows.is_empty() {
+            self.selected_process_identity()
+                .and_then(|target| target.live_key())
+                .into_iter()
+                .collect()
+        } else {
+            self.selected_rows.iter().copied().collect()
+        };
+        super::process_control::process_control_intent(
+            processes,
+            self.selected_row,
+            &selected,
+            action,
+        )
+    }
+
+    fn process_control_capability_allowed(&self) -> bool {
+        super::process_control::process_control_capability_allowed(
+            self.data
+                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+        )
+    }
+
+    fn report_process_control_unavailable(&mut self) {
+        self.report_notice(
+            FeedbackSource::Interaction,
+            FeedbackSeverity::Warning,
+            FeedbackLifecycle::SHORT,
+            "Process control capability is unavailable",
+        );
+    }
+
     /// Freeze the selected process identity and request the five insight
     /// domains for it. `None` when the selection is not a trustworthy
     /// process (e.g. a group header), mirroring `request_session_control`.
@@ -20,6 +111,10 @@ impl ShellApp {
     /// feedback path.
     #[must_use]
     pub fn request_process_signal(&mut self, signal: ProcessSignal) -> Option<PlatformEffect> {
+        if !self.process_control_capability_allowed() {
+            self.report_process_control_unavailable();
+            return None;
+        }
         let identity = self.selected_process_identity()?;
         Some(PlatformEffect::ProcessSignal {
             target: identity,
@@ -56,22 +151,11 @@ impl ShellApp {
     /// list refresh — or a pid reused by a different process — cannot
     /// retarget it (mirrors [`Self::request_startup_control`]). When the set
     /// is empty the keyboard anchor is used as a single-target fallback.
+    ///
+    /// Gating goes through [`Self::process_batch_requires_confirmation`]: the
+    /// returned `None` with a pending batch means "confirmed, not applied".
     #[must_use]
     pub fn request_process_batch(&mut self, action: ProcessBatchAction) -> Option<PlatformEffect> {
-        let destructive = matches!(action, ProcessBatchAction::Kill | ProcessBatchAction::End);
-        // Prefer the multi-select set; fall back to the keyboard anchor for
-        // single-select callers (the TUI arrow path keeps the set at one row).
-        if let Some(ProcessRowId::Application(root)) = self.selected_row {
-            let Some(intent) = self.freeze_tree_for_identity(root, action) else {
-                self.report_process_identity_unavailable();
-                return None;
-            };
-            if destructive {
-                self.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
-                return None;
-            }
-            return Some(PlatformEffect::ExecuteBatch(intent));
-        }
         // A legacy caller may still have assigned the numeric cursor directly.
         // Resolve that cursor into the stable row authority before building an
         // intent; after a failed reconciliation the invalidation flag prevents
@@ -84,37 +168,82 @@ impl ShellApp {
             self.selected_row = Some(ProcessRowId::Process(identity));
             self.selected_rows.insert(identity);
         }
-        let intent = {
-            let processes = self.data.processes.as_deref()?;
-            let identities = if self.selected_rows.is_empty() {
-                match self.selected_row {
-                    Some(ProcessRowId::Process(identity)) => vec![identity],
-                    Some(ProcessRowId::Application(_) | ProcessRowId::Category(_)) | None => {
-                        Vec::new()
-                    }
-                }
-            } else {
-                self.selected_rows.iter().copied().collect()
-            };
-            (!identities.is_empty())
-                .then(|| ProcessBatchIntent::freeze(processes, identities, action))
-        };
-        let Some(intent) = intent else {
+        if !self.process_control_capability_allowed() {
+            self.report_process_control_unavailable();
+            return None;
+        }
+        let Some(intent) = self.process_control_intent(action) else {
             self.report_process_identity_unavailable();
             return None;
         };
-        if destructive {
-            // Gate a destructive Kill behind a confirmation (mirrors pending_end
-            // for End-task). Non-destructive actions (Suspend / Resume /
-            // SetPriority) submit directly.
+        // One authoritative gate (see [`Self::process_batch_requires_confirmation`]):
+        // a destructive verb is always confirmed, and so is anything that
+        // reaches past the row the user is looking at. The gate reads the
+        // selection's reach (how many rows the user marked), not the frozen
+        // survivor count, so identities that went stale between marking and
+        // acting cannot quietly shrink a batch into an unconfirmed submit.
+        let application_tree = matches!(self.selected_row, Some(ProcessRowId::Application(_)));
+        let target_count = if application_tree || self.selected_rows.is_empty() {
+            intent.targets.len()
+        } else {
+            self.selected_rows.len()
+        };
+        if Self::process_batch_requires_confirmation(action, target_count, application_tree) {
             self.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
             return None;
         }
         Some(PlatformEffect::ExecuteBatch(intent))
     }
 
-    /// Confirm the pending destructive batch (Kill): emit the ExecuteBatch
-    /// effect and clear the gate. Returns `None` if no batch is pending.
+    /// Whether one batch verb is destructive enough to demand a confirmation
+    /// whatever it targets.
+    #[must_use]
+    pub const fn process_batch_is_destructive(action: ProcessBatchAction) -> bool {
+        matches!(action, ProcessBatchAction::Kill | ProcessBatchAction::End)
+    }
+
+    /// The SINGLE authority for whether one frozen batch intent must pass the
+    /// shared confirmation gate before it may reach the platform. Destructive
+    /// verbs (Kill / End) are gated at any target count. Anything that reaches
+    /// beyond the single row the user is looking at — a multi-select set, or an
+    /// application root whose tree is expanded at the boundary — is gated even
+    /// for a reversible verb (Suspend / Resume / SetPriority), because a
+    /// mis-aimed batch Suspend costs as much trust as a mis-aimed Kill. One
+    /// explicit non-destructive target applies immediately.
+    ///
+    /// Renderers query this (through
+    /// [`Self::selection_requires_batch_confirmation`]) instead of keeping a
+    /// per-frontend rule, so a multi-select Suspend cannot be gated on one
+    /// surface and silent on another.
+    #[must_use]
+    pub const fn process_batch_requires_confirmation(
+        action: ProcessBatchAction,
+        target_count: usize,
+        application_tree: bool,
+    ) -> bool {
+        Self::process_batch_is_destructive(action) || application_tree || target_count > 1
+    }
+
+    /// The same authority evaluated against the selection as it stands now, so
+    /// a renderer can label its action (arm a gate or submit) before freezing
+    /// the intent. An application row is a tree freeze; an empty set falls back
+    /// to the single keyboard anchor exactly like
+    /// [`Self::request_process_batch`] does.
+    #[must_use]
+    pub fn selection_requires_batch_confirmation(&self, action: ProcessBatchAction) -> bool {
+        let application_tree = matches!(self.selected_row, Some(ProcessRowId::Application(_)));
+        let target_count = if application_tree || self.selected_rows.is_empty() {
+            1
+        } else {
+            self.selected_rows.len()
+        };
+        Self::process_batch_requires_confirmation(action, target_count, application_tree)
+    }
+
+    /// Confirm the pending batch and emit the frozen `ExecuteBatch` effect,
+    /// clearing the gate. Returns `None` if no batch is pending; the armed
+    /// gate is whatever [`Self::process_batch_requires_confirmation`] asked
+    /// for.
     pub fn confirm_process_batch(&mut self) -> Option<PlatformEffect> {
         self.confirm_confirmation(ConfirmationKind::ProcessBatch)
     }
@@ -156,6 +285,10 @@ impl ShellApp {
     /// core intent freezes descendants leaf-first; the renderer only confirms
     /// or dismisses the pending intent and never recomputes its targets.
     pub fn request_process_tree_end(&mut self, root: ProcessLiveKey) {
+        if !self.process_control_capability_allowed() {
+            self.report_process_control_unavailable();
+            return;
+        }
         let Some(intent) = self.freeze_tree_for_identity(root, ProcessBatchAction::End) else {
             self.report_process_identity_unavailable();
             return;

@@ -126,9 +126,11 @@ fn application_row_uses_the_root_identity_without_fabricating_a_member_selection
     assert!(app.selected_identities().is_empty());
     assert_eq!(app.selected_process_identity(), None);
 
-    let Some(PlatformEffect::ExecuteBatch(intent)) =
-        app.request_process_batch(ProcessBatchAction::Suspend)
-    else {
+    // An application row freezes a whole tree, so the shared authority gates
+    // even a reversible verb behind the confirmation, exactly like gpui does.
+    assert!(app.selection_requires_batch_confirmation(ProcessBatchAction::Suspend));
+    assert_eq!(app.request_process_batch(ProcessBatchAction::Suspend), None);
+    let Some(PlatformEffect::ExecuteBatch(intent)) = app.confirm_process_batch() else {
         panic!("application row must freeze its root tree identity");
     };
     assert_eq!(intent.targets.len(), 1);

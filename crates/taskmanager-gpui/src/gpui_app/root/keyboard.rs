@@ -256,12 +256,27 @@ fn apply_app_action(
         }
         AppAction::Refresh(_) => view.request_refresh(RefreshRequest::Processes),
         AppAction::RequestEndTask => {
-            if view.selected_application_root().is_some() {
-                view.request_process_batch(
-                    taskmanager_core::core::process::ProcessBatchAction::End,
-                );
-            } else if let Some(identity) = view.selected_process_identity() {
-                view.request_process_termination(ProcessTerminationAction::EndTask, identity);
+            let availability = view.process_control_availability();
+            if availability.is_ready() {
+                match availability.scope() {
+                    Some(
+                        taskmanager_shell::ProcessControlScope::Tree
+                        | taskmanager_shell::ProcessControlScope::Batch,
+                    ) => {
+                        view.request_process_batch(
+                            taskmanager_core::core::process::ProcessBatchAction::End,
+                        );
+                    }
+                    Some(taskmanager_shell::ProcessControlScope::Single) => {
+                        if let Some(identity) = view.selected_process_identity() {
+                            view.request_process_termination(
+                                ProcessTerminationAction::EndTask,
+                                identity,
+                            );
+                        }
+                    }
+                    None => {}
+                }
             }
         }
         AppAction::OpenProperties => {

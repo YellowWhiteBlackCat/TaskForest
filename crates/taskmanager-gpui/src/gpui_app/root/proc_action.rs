@@ -158,7 +158,8 @@ impl RootView {
             ProcMenuAction::Resume => Some(MenuControlRequest::Resume),
             ProcMenuAction::Signal(s) => Some(MenuControlRequest::Signal(s)),
         };
-        if let Some(control) = control
+        if self.shell.process_control_capability_allowed()
+            && let Some(control) = control
             && let Some(target) = self.frozen_process(identity)
         {
             let (request, feedback_action) = menu_control_submission(control, target);

@@ -15,7 +15,7 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{
     ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryExportError,
     ProcessBatchHistoryFormat, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
-    ProcessLiveKey, descendant_live_keys, export_process_batch_history,
+    ProcessLiveKey, export_process_batch_history,
 };
 use taskmanager_theme::Theme;
 
@@ -132,26 +132,16 @@ impl RootView {
     /// The application-root branch expands through the same core tree walk;
     /// ordinary selection uses the shell's identity set directly.
     pub fn batch_process_identities(&self) -> Vec<ProcessLiveKey> {
-        self.selected_application_root().map_or_else(
-            || self.shell.selection.batch_identities(),
-            |root| descendant_live_keys(self.processes(), root),
-        )
+        self.shell.process_control_targets()
     }
 
     /// Freeze the exact live identities now. A later refresh cannot change
     /// what the confirmation represents.
     pub fn request_process_batch(&mut self, action: ProcessBatchAction) {
-        let intent = self.selected_application_root().map_or_else(
-            || {
-                ProcessBatchIntent::freeze(
-                    self.processes(),
-                    self.batch_process_identities(),
-                    action,
-                )
-            },
-            |root| ProcessBatchIntent::freeze_tree(self.processes(), root, action),
-        );
-        if !intent.targets.is_empty() {
+        if !self.shell.process_control_availability().is_ready() {
+            return;
+        }
+        if let Some(intent) = self.shell.process_control_intent(action) {
             self.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
         }
     }
@@ -162,6 +152,9 @@ impl RootView {
         identity: ProcessLiveKey,
         cx: &mut Context<Self>,
     ) -> bool {
+        if !self.shell.process_control_availability().is_ready() {
+            return false;
+        }
         let intent = ProcessBatchIntent::freeze(self.processes(), [identity], action);
         if intent.targets.is_empty() {
             return false;

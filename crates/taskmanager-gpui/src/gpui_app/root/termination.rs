@@ -122,6 +122,9 @@ impl RootView {
         action: ProcessTerminationAction,
         identity: ProcessLiveKey,
     ) {
+        if !self.shell.process_control_capability_allowed() {
+            return;
+        }
         if let Some(intent) = snapshot_single_process(action, identity, self.processes()) {
             self.arm_confirmation(PendingConfirmation::ProcessTermination(intent));
         }
@@ -130,6 +133,9 @@ impl RootView {
     /// Snapshot the selected process tree now; later refreshes cannot add, drop,
     /// or rename targets in the pending confirmation.
     pub fn request_process_tree_termination(&mut self, identity: ProcessLiveKey) {
+        if !self.shell.process_control_capability_allowed() {
+            return;
+        }
         if let Some(intent) = snapshot_process_tree(self.processes(), identity) {
             self.arm_confirmation(PendingConfirmation::ProcessTermination(intent));
         }

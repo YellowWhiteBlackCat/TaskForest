@@ -16,6 +16,7 @@ pub(crate) struct FocusableButton<'a> {
     focus_target: FocusTarget,
     focus_color: Color,
     focus_radius: f32,
+    enabled: bool,
     activate_on_pointer: bool,
     hover_color: Option<Color>,
     right_press: Option<Message>,
@@ -38,6 +39,7 @@ impl<'a> FocusableButton<'a> {
             focus_target,
             focus_color,
             focus_radius,
+            enabled: true,
             activate_on_pointer,
             hover_color: None,
             right_press: None,
@@ -51,6 +53,11 @@ impl<'a> FocusableButton<'a> {
 
     pub(crate) fn with_right_press(mut self, message: Option<Message>) -> Self {
         self.right_press = message;
+        self
+    }
+
+    pub(crate) fn with_enabled(mut self, enabled: bool) -> Self {
+        self.enabled = enabled;
         self
     }
 }
@@ -114,7 +121,9 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
         operation: &mut dyn Operation,
     ) {
         let state = tree.state.downcast_mut::<State>();
-        operation.focusable(Some(&self.id), layout.bounds(), state);
+        if self.enabled {
+            operation.focusable(Some(&self.id), layout.bounds(), state);
+        }
         operation.traverse(&mut |operation| {
             self.content.as_widget_mut().operate(
                 &mut tree.children[0],
@@ -140,7 +149,8 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
         let state = tree.state.downcast_ref::<State>();
         let focused = state.focused;
 
-        if focused
+        if self.enabled
+            && focused
             && matches!(
                 event,
                 Event::Keyboard(iced::keyboard::Event::KeyPressed {
@@ -162,8 +172,10 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
             ))
         ) && cursor.is_over(bounds)
         {
-            shell.publish(Message::Focus(self.focus_target));
-            if self.activate_on_pointer {
+            if self.enabled {
+                shell.publish(Message::Focus(self.focus_target));
+            }
+            if self.enabled && self.activate_on_pointer {
                 shell.publish(self.on_press.clone());
                 shell.capture_event();
                 return;
@@ -175,7 +187,8 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
             Event::Mouse(iced::advanced::mouse::Event::ButtonPressed(
                 iced::advanced::mouse::Button::Right,
             ))
-        ) && cursor.is_over(bounds)
+        ) && self.enabled
+            && cursor.is_over(bounds)
             && let Some(message) = self.right_press.clone()
         {
             shell.publish(Message::Focus(self.focus_target));
@@ -237,7 +250,7 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
         // Ring visibility follows the shared palette contract (the ring
         // token's alpha encodes focus-visible): only keyboard focus stays
         // opaque, per `crate::input_modality`.
-        let ring_visible = focused && self.focus_color.a > 0.0;
+        let ring_visible = self.enabled && focused && self.focus_color.a > 0.0;
         if ring_visible {
             renderer.fill_quad(
                 iced::advanced::renderer::Quad {
@@ -262,7 +275,7 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
         viewport: &Rectangle,
         renderer: &iced::Renderer,
     ) -> iced::advanced::mouse::Interaction {
-        if self.activate_on_pointer && cursor.is_over(layout.bounds()) {
+        if self.enabled && self.activate_on_pointer && cursor.is_over(layout.bounds()) {
             return iced::advanced::mouse::Interaction::Pointer;
         }
         self.content.as_widget().mouse_interaction(

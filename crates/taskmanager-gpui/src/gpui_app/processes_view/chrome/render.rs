@@ -23,6 +23,7 @@ use crate::gpui_app::processes_view::rows::{
     process_table_content_width,
 };
 use crate::gpui_app::root::{Hover, RootView};
+use taskmanager_shell::ProcessControlAvailability;
 use taskmanager_shell::SortCol;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
@@ -41,8 +42,8 @@ pub struct ProcessesViewProps<'a> {
     pub rows: &'a Rc<Vec<VisibleRow>>,
     pub query: &'a str,
     pub selected_identity: Option<ProcessLiveKey>,
+    pub control: ProcessControlAvailability,
     pub selected_row: Option<ProcessRowId>,
-    pub selected_target_count: usize,
     pub selected_identities: &'a HashSet<ProcessLiveKey>,
     pub hovered: Option<Hover>,
     pub sort_col: SortCol,
@@ -139,8 +140,8 @@ pub fn render_processes(
         rows,
         query,
         selected_identity,
+        control,
         selected_row,
-        selected_target_count,
         selected_identities,
         hovered,
         sort_col,
@@ -428,9 +429,7 @@ pub fn render_processes(
             ProcessControlChromeProps {
                 theme: &theme,
                 selected_identity,
-                selected_target_count,
-                application_selected: selected_row
-                    .is_some_and(|row| row.application_root().is_some()),
+                control,
                 hidden_cols,
                 swap_auto_hidden,
                 hovered: hovered.as_ref(),

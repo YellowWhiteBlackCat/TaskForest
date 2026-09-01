@@ -507,7 +507,8 @@ fn b_key_opens_the_batch_menu_over_the_marked_set() {
 fn batch_menu_actions_route_through_the_shared_batch_path() {
     taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     use crate::ui::batch_menu::BatchMenuAction;
-    // Suspend submits ExecuteBatch directly for the whole marked set.
+    // Suspend over a marked set uses the shared confirmation gate before it
+    // emits the atomic ExecuteBatch intent.
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
     let _ = handle_key(
@@ -548,9 +549,13 @@ fn batch_menu_actions_route_through_the_shared_batch_path() {
             KeyModifiers::NONE,
         ),
     );
+    assert!(effect.is_none(), "a marked-set Suspend is gated");
+    let pending = app.shell.pending_batch().expect("pending batch");
+    assert_eq!(pending.targets.len(), 2, "the gate freezes the marked set");
+    let effect = app.shell.confirm_process_batch();
     assert!(
         matches!(effect, Some(PlatformEffect::ExecuteBatch(intent)) if intent.targets.len() == 2),
-        "Suspend submits the whole marked set"
+        "Suspend submits the whole marked set after confirmation"
     );
 
     // Kill gates behind the batch confirmation (same as the `a` menu path).
@@ -594,9 +599,9 @@ fn batch_menu_actions_route_through_the_shared_batch_path() {
     );
     let _ = app.shell.confirm_process_batch();
 
-    // A priority tier row submits the TYPED tier directly for the whole
-    // marked set (the batch surface offers all three tiers, like GPUI's
-    // action bar and Iced's pick_list).
+    // A priority tier row submits the TYPED tier for the whole marked set
+    // through the same shared confirmation gate (the batch surface offers all
+    // three tiers, like GPUI's action bar and Iced's pick_list).
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
     let _ = handle_key(
@@ -637,6 +642,10 @@ fn batch_menu_actions_route_through_the_shared_batch_path() {
             KeyModifiers::NONE,
         ),
     );
+    assert!(effect.is_none(), "a marked-set priority change is gated");
+    let pending = app.shell.pending_batch().expect("pending priority batch");
+    assert_eq!(pending.targets.len(), 2);
+    let effect = app.shell.confirm_process_batch();
     assert!(
         matches!(
             effect,

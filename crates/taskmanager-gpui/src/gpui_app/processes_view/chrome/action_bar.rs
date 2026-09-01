@@ -19,7 +19,7 @@ use taskmanager_theme::tokens::{self, UiSize};
 use super::action_button::{ActionBtnProps, action_btn};
 use super::columns::columns_dropdown;
 use super::page_layout::{ProcessActionPresentation, ProcessActionSurface};
-use taskmanager_shell::SortCol;
+use taskmanager_shell::{ProcessControlAvailability, ProcessControlScope, SortCol};
 
 /// Inputs for the process action strip. The caller supplies the already
 /// projected column visibility, including the provider-confirmed no-swap
@@ -27,8 +27,7 @@ use taskmanager_shell::SortCol;
 pub(super) struct ProcessActionBarProps<'a> {
     pub(super) theme: &'a Theme,
     pub(super) selected_identity: Option<ProcessLiveKey>,
-    pub(super) selected_target_count: usize,
-    pub(super) application_selected: bool,
+    pub(super) control: ProcessControlAvailability,
     pub(super) hidden_cols: &'a HashSet<SortCol>,
     pub(super) swap_auto_hidden: bool,
     pub(super) hovered: Option<&'a Hover>,
@@ -52,8 +51,7 @@ enum ProcessToolbarAction {
 
 #[derive(Clone, Copy)]
 struct ProcessActionAvailability {
-    has_targets: bool,
-    single_process: bool,
+    control: ProcessControlAvailability,
     batch_history: bool,
 }
 
@@ -101,14 +99,21 @@ impl ProcessToolbarAction {
         match self {
             Self::RunNewTask => true,
             Self::End | Self::ForceKill | Self::Suspend | Self::Resume | Self::SetPriority(_) => {
-                availability.has_targets
+                availability.control.is_ready()
             }
-            Self::Affinity => availability.single_process,
+            Self::Affinity => availability.control.is_single_process(),
             Self::ExportBatchHistory => availability.batch_history,
         }
     }
 
     fn perform(self, view: &mut RootView, cx: &mut Context<RootView>) {
+        let availability = ProcessActionAvailability {
+            control: view.process_control_availability(),
+            batch_history: !view.process_batch_history.is_empty(),
+        };
+        if !self.enabled(availability) {
+            return;
+        }
         match self {
             Self::RunNewTask => {
                 view.show_run_task();
@@ -133,8 +138,7 @@ impl ProcessToolbarAction {
                 submit_batch_or_single(view, ProcessBatchAction::SetPriority(tier), None, cx)
             }
             Self::Affinity => {
-                if view.selected_application_root().is_none()
-                    && view.batch_process_identities().len() <= 1
+                if view.process_control_availability().is_single_process()
                     && let Some(identity) = view.selected_process_identity()
                 {
                     view.show_process_affinity(identity);
@@ -155,20 +159,27 @@ fn submit_batch_or_single(
     termination: Option<ProcessTerminationAction>,
     cx: &mut Context<RootView>,
 ) {
-    let submitted = if view.selected_application_root().is_some()
-        || view.batch_process_identities().len() > 1
-    {
-        view.request_process_batch(batch_action);
-        true
-    } else if let Some(identity) = view.selected_process_identity() {
-        if let Some(termination) = termination {
-            view.request_process_termination(termination, identity);
-        } else {
-            view.submit_process_batch_immediate(batch_action, identity, cx);
+    let availability = view.process_control_availability();
+    if !availability.is_ready() {
+        return;
+    }
+    let submitted = match availability.scope() {
+        Some(ProcessControlScope::Tree | ProcessControlScope::Batch) => {
+            view.request_process_batch(batch_action);
+            true
         }
-        true
-    } else {
-        false
+        Some(ProcessControlScope::Single) => {
+            let Some(identity) = view.selected_process_identity() else {
+                return;
+            };
+            if let Some(termination) = termination {
+                view.request_process_termination(termination, identity);
+            } else if !view.submit_process_batch_immediate(batch_action, identity, cx) {
+                return;
+            }
+            true
+        }
+        None => false,
     };
     if submitted {
         cx.notify();
@@ -330,8 +341,7 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     let ProcessActionBarProps {
         theme,
         selected_identity,
-        selected_target_count,
-        application_selected,
+        control,
         hidden_cols,
         swap_auto_hidden,
         hovered,
@@ -340,13 +350,7 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
         surface,
         ui_size,
     } = props;
-    let selected_count = if application_selected {
-        selected_target_count
-    } else if selected_target_count == 0 {
-        usize::from(selected_identity.is_some())
-    } else {
-        selected_target_count
-    };
+    let selected_count = control.target_count();
     let hint = if selected_count > 1 {
         i18n::t("proc.batch_selected").replace("{count}", &selected_count.to_string())
     } else {
@@ -356,8 +360,7 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
         }
     };
     let availability = ProcessActionAvailability {
-        has_targets: selected_count > 0,
-        single_process: selected_count == 1 && !application_selected,
+        control,
         batch_history: batch_history_available,
     };
     let mut content = vec![

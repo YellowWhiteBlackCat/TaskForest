@@ -321,7 +321,6 @@ pub fn execute_process_batch_with(
                 ProcessBatchTargetResult::IdentityUnavailable
             } else if live.iter().any(|process| {
                 process.pid == identity.pid
-                    && process.name == identity.name
                     && process.current_start_token() == identity.authoritative_start_token()
             }) {
                 execute(intent.action, &identity)

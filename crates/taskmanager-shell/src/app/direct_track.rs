@@ -251,6 +251,52 @@ impl DirectTrackState {
         visible
     }
 
+    /// Project the direct-track selection into the shared process-control
+    /// availability state used by GPUI action surfaces.
+    #[must_use]
+    pub fn process_control_availability(&self) -> super::ProcessControlAvailability {
+        let selected: Vec<_> = self.selection.rows().iter().copied().collect();
+        super::process_control::process_control_availability(
+            self.projection.processes_slice(),
+            self.selection.active_row(),
+            &selected,
+            self.projection
+                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+        )
+    }
+
+    #[must_use]
+    pub fn process_control_capability_allowed(&self) -> bool {
+        super::process_control::process_control_capability_allowed(
+            self.projection
+                .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
+        )
+    }
+
+    #[must_use]
+    pub fn process_control_targets(&self) -> Vec<ProcessLiveKey> {
+        let selected: Vec<_> = self.selection.rows().iter().copied().collect();
+        super::process_control::process_control_targets(
+            self.projection.processes_slice(),
+            self.selection.active_row(),
+            &selected,
+        )
+    }
+
+    #[must_use]
+    pub fn process_control_intent(
+        &self,
+        action: taskmanager_core::core::process::ProcessBatchAction,
+    ) -> Option<taskmanager_core::core::process::ProcessBatchIntent> {
+        let selected: Vec<_> = self.selection.rows().iter().copied().collect();
+        super::process_control::process_control_intent(
+            self.projection.processes_slice(),
+            self.selection.active_row(),
+            &selected,
+            action,
+        )
+    }
+
     pub fn apply_capability_snapshot(&mut self, snapshot: CapabilitySnapshot) -> bool {
         self.projection.replace_capability_snapshot(snapshot)
     }

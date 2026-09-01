@@ -15,7 +15,6 @@ use ratatui::backend::TestBackend;
 use ratatui::crossterm::event::{Event, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Rect;
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::process::ProcessLiveKey;
 
 use crate::ui::{TuiFramePlan, TuiHitTarget};
 
@@ -245,10 +244,11 @@ fn batch_menu_row_click_routes_through_the_shared_batch_path() {
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
     // One marked process is enough to open the batch menu (the count is
     // frozen at open time; the shell owns the live set).
-    app.shell.selected_rows.insert(
-        ProcessLiveKey::from_parts(4242, taskmanager_test_support::fixture_start_token(4242))
-            .expect("non-zero parts"),
-    );
+    let identity = app
+        .shell
+        .row_identity_at(app.shell.selected)
+        .expect("the selected fixture row is live");
+    app.shell.selected_rows.insert(identity);
     assert!(app.open_batch_menu(), "a marked set opens the batch menu");
     let plan = TuiFramePlan::build(&app, FRAME);
     let popup = plan.overlay().expect("batch menu popup").popup;

@@ -42,11 +42,12 @@ pub use app::process_rows::{
 pub use app::{
     BatchFoldChanges, BatchFoldOutput, DirectTrackState, FeedbackBatchLifetime, FeedbackLifecycle,
     FeedbackNotice, FeedbackSeverity, FeedbackSource, FeedbackState, FrameCommit, InfoSortCol,
-    InfoTable, PAGE_STEP, ProcessControlFeedback, ProcessControlKind, ProcessSelection,
-    ProcessViewing, QuitReason, QuitRequestOutcome, QuitState, ShellApp, ShellInputMode, SortCol,
-    SortDir, SystemProjectionStore, TelemetryFrameState, aggregate_sort_key, gpu_chart_metric_gate,
-    identity_range, order_service_rows, order_session_rows, order_startup_rows,
-    process_control_notice_text, queue_effect, queue_effect_result, selected_rows_range, sort_axis,
+    InfoTable, PAGE_STEP, ProcessControlAvailability, ProcessControlFeedback, ProcessControlKind,
+    ProcessControlScope, ProcessSelection, ProcessViewing, QuitReason, QuitRequestOutcome,
+    QuitState, ShellApp, ShellInputMode, SortCol, SortDir, SystemProjectionStore,
+    TelemetryFrameState, aggregate_sort_key, gpu_chart_metric_gate, identity_range,
+    order_service_rows, order_session_rows, order_startup_rows, process_control_notice_text,
+    queue_effect, queue_effect_result, selected_rows_range, sort_axis,
 };
 pub use fixture::demo_app;
 pub use input_dispatch::InputDispatch;

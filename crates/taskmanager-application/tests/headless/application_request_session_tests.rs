@@ -106,6 +106,12 @@ fn batch_session_accepts_one_matching_intent_and_retries_submission_failure() {
     let active_attempt = session.begin_attempt(first.clone());
     assert!(!session.accept_attempt(stale_attempt, request(10)));
     assert!(session.accept_attempt(active_attempt, request(11)));
+    let result = ProcessBatchResult {
+        intent: first.clone(),
+        targets: vec![(target.clone(), ProcessBatchTargetResult::Applied)],
+    };
+    assert!(!session.complete(request(12), result.clone()));
+    assert!(!session.fail(request(12), FailureKind::ProviderFault));
     assert!(!session.complete(
         request(11),
         ProcessBatchResult {
@@ -113,12 +119,8 @@ fn batch_session_accepts_one_matching_intent_and_retries_submission_failure() {
             targets: vec![(target.clone(), ProcessBatchTargetResult::Applied)],
         },
     ));
-    let result = ProcessBatchResult {
-        intent: first.clone(),
-        targets: vec![(target, ProcessBatchTargetResult::Applied)],
-    };
     assert!(session.complete(request(11), result.clone()));
-    assert!(!session.complete(request(11), result));
+    assert!(!session.complete(request(11), result.clone()));
     session.close();
     assert!(matches!(session.state(), ProcessBatchState::Idle));
 
@@ -131,6 +133,9 @@ fn batch_session_accepts_one_matching_intent_and_retries_submission_failure() {
             if loading.correlation == RequestCorrelation::Attempt(retry)
                 && loading.intent == first
     ));
+    assert!(session.accept_attempt(retry, request(12)));
+    assert!(!session.complete(request(11), result.clone()));
+    assert!(session.complete(request(12), result));
 }
 
 #[test]

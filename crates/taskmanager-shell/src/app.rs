@@ -76,7 +76,9 @@ pub use self::lifecycle::{
     FeedbackState, QuitReason, QuitRequestOutcome, QuitState,
 };
 pub use self::platform_feedback::process_control_notice_text;
-pub use self::process_control::{ProcessControlFeedback, ProcessControlKind};
+pub use self::process_control::{
+    ProcessControlAvailability, ProcessControlFeedback, ProcessControlKind, ProcessControlScope,
+};
 use self::process_rows::{ProcessProjectionGeneration, ProcessRowId};
 pub use self::service_log::OpenServiceLog;
 pub use self::sort_axis::{aggregate_sort_key, sort_axis};

@@ -81,6 +81,11 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
 - `ProcessTreeRow` is the sole cacheable category/tree structure: shell owns
   row order, depth, parentage, expansion, identity, and availability-bearing
   group aggregates; frontends only adapt it to their renderer.
+- `ProcessControlAvailability` is the sole action-surface projection for
+  process-control target scope, exact live count, identity readiness and
+  explicit capability failure. `process_control_intent` freezes the matching
+  atomic request at this boundary; frontends never rebuild tree, batch or stale
+  selection targets.
 - `ProcessRowId`/`ProcessRowAnchor` are the row identity seam:
   process-backed rows use the shell-owned `ProcessRowIdentity` wrapper around
   the core `ProcessIdentity`, while

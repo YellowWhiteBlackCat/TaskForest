@@ -87,15 +87,11 @@ fn batch_menu_plan_tracks_the_highlighted_item() {
     let mut app = demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
     app.reconcile_applications_cursor();
-    let pid = app
+    let process = app
         .selected_detail_process()
-        .expect("the demo exposes a selected process")
-        .pid;
-    if let Some(identity) =
-        ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
-    {
-        app.shell.toggle_selected_identity(identity);
-    }
+        .expect("the demo exposes a selected process");
+    let identity = ProcessLiveKey::from_process(&process).expect("the selected row is live");
+    app.shell.toggle_selected_identity(identity);
     assert!(app.open_batch_menu(), "a marked row enables the batch menu");
     app.batch_menu_move(1);
     assert_eq!(

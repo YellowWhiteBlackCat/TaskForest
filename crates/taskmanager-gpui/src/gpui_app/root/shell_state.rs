@@ -103,6 +103,14 @@ impl RootView {
         self.shell.selection.rows().len()
     }
 
+    /// Shared target/availability projection for every process action surface.
+    /// GPUI only renders this result; it never reconstructs a control scope
+    /// from a PID, label, or local menu state.
+    #[must_use]
+    pub fn process_control_availability(&self) -> taskmanager_shell::ProcessControlAvailability {
+        self.shell.process_control_availability()
+    }
+
     /// Whether one process row is part of the multi-select set, by exact
     /// live identity.
     #[must_use]
