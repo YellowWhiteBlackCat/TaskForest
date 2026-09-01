@@ -23,7 +23,7 @@ use bevy::input::keyboard::{Key, KeyCode, KeyboardInput, NativeKey};
 use bevy::input_focus::InputFocusPlugin;
 use bevy::scene::ScenePlugin;
 use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
+use taskmanager_core::core::process::{ProcessItem, ProcessScalarObservations};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
@@ -154,17 +154,18 @@ fn delete_arms_the_shared_gate_and_y_confirms_to_the_end_task_effect() {
 
 #[test]
 fn arrows_move_the_shell_cursor_and_the_details_seam_follows() {
-    // The details panel cannot read the keyboard: it learns the landed row
-    // only through the published selection identity. The recorder proves the
-    // arrow press actually tells it which process is on the cursor.
+    // The details panel cannot read the keyboard: it learns that the shell
+    // selection changed through the typed refresh signal. The shell remains
+    // the identity authority and the cursor assertion below proves the landed
+    // process.
     #[derive(Resource, Default)]
-    struct SelectionLog(Vec<Option<ProcessLiveKey>>);
+    struct SelectionLog(usize);
 
     fn record_selection(
-        change: bevy::ecs::observer::On<crate::pages::processes::ProcessSelectionChanged>,
+        _change: bevy::ecs::observer::On<crate::pages::processes::ProcessSelectionChanged>,
         mut log: ResMut<SelectionLog>,
     ) {
-        log.0.push(change.event().0);
+        log.0 += 1;
     }
 
     let mut app = input_app(shell_with_selection());
@@ -177,18 +178,10 @@ fn arrows_move_the_shell_cursor_and_the_details_seam_follows() {
     app.update();
     let shell = &app.world().non_send::<FrontendTrack>().shell;
     assert_eq!(shell.selected, 1, "arrow down moves the shell cursor");
-    let landed = app
-        .world()
-        .resource::<SelectionLog>()
-        .0
-        .last()
-        .cloned()
-        .flatten()
-        .expect("the move publishes the selection identity");
     assert_eq!(
-        landed.pid(),
-        200,
-        "the details seam learns the process identity the cursor landed on"
+        app.world().resource::<SelectionLog>().0,
+        1,
+        "the details seam receives one typed selection refresh signal"
     );
 }
 
@@ -299,4 +292,52 @@ fn quit_reason_forwards_app_exit_exactly_once() {
     let count = app.world().resource::<ExitCount>();
     assert_eq!(count.0, 1, "the shell quit decision forwards exactly once");
     assert!(app.world().resource::<QuitForwarded>().0);
+}
+
+#[test]
+fn the_process_action_chord_opens_the_applications_menu_and_commits_through_the_batch_track() {
+    use crate::menu_modal::MenuModal;
+    use crate::pages::processes::menu::ProcessMenuCtx;
+
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+
+    // `a` is the TUI's frontend-local action-menu chord on Applications.
+    press(&mut app, KeyCode::KeyA, Some("a"));
+    app.update();
+    assert!(
+        app.world()
+            .resource::<MenuModal<ProcessMenuCtx>>()
+            .session
+            .is_some(),
+        "the Applications action menu opens on the frontend-local chord"
+    );
+
+    // Down Down Enter picks Suspend (index 2): one marked row, a
+    // non-destructive verb — the batch track submits straight into the
+    // pending-effect bridge, so the drain submits it the same frame tail.
+    for key in [KeyCode::ArrowDown, KeyCode::ArrowDown, KeyCode::Enter] {
+        app.world_mut()
+            .resource_mut::<bevy::input::ButtonInput<KeyCode>>()
+            .clear();
+        press(&mut app, key, None);
+        app.update();
+    }
+    assert!(
+        app.world()
+            .resource::<MenuModal<ProcessMenuCtx>>()
+            .session
+            .is_none(),
+        "a committed menu closes"
+    );
+    let effects = app.world().resource::<PendingEffects>().0.clone();
+    let Some(taskmanager_application::PlatformEffect::ExecuteBatch(intent)) = effects.first()
+    else {
+        panic!("the menu's verb crosses the effect bridge, got {effects:?}");
+    };
+    assert_eq!(
+        intent.action,
+        taskmanager_core::core::process::ProcessBatchAction::Suspend
+    );
 }

@@ -8,8 +8,8 @@
 //! open-attempt (bare Enter over a selected row, resolved through the
 //! shell's `sorted_services` — the single "row N → target" authority).
 
-use taskmanager_application::AppAction;
 use taskmanager_application::i18n::t;
+use taskmanager_application::{AppAction, PlatformEffect};
 use taskmanager_core::core::services::{ServiceAction, ServiceItem};
 
 use taskmanager_shell::ShellApp;
@@ -45,10 +45,13 @@ impl ActionMenuContext for ServiceMenuCtx {
         }
     }
 
-    fn commit(&self, pick: usize, shell: &mut ShellApp) {
+    fn commit(&self, pick: usize, shell: &mut ShellApp) -> Vec<PlatformEffect> {
         if shell.select_service_control(&self.0, MENU_ACTIONS[pick]) {
+            // Arms the shared gate; the platform request comes from the gate's
+            // typed confirm path, so there is no effect to queue here.
             let _ = shell.apply_action(AppAction::RequestServiceControl);
         }
+        Vec::new()
     }
 }
 

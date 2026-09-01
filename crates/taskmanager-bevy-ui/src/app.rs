@@ -12,7 +12,7 @@
 //! 2. **Keyboard routing** ([`route_key_press`]): the frontend-local route
 //!    chords (Alt+1..8, bare `P`) resolve here; every other key is forwarded
 //!    through the shell's own routers by [`crate::input`], the real-input
-//!    seam (W4) — same chords, same page semantics as the TUI (Alt+1
+//!    seam — same chords, same page semantics as the TUI (Alt+1
 //!    Performance, Alt+2 Applications, …, Alt+8 Alerts). The Settings surface
 //!    has no shared chord (the TUI binds a frontend-local bare `p`), so it
 //!    gets the same treatment here: a documented frontend-local binding on
@@ -44,12 +44,12 @@ use bevy::ecs::observer::On;
 use bevy::ecs::query::{Has, With};
 use bevy::ecs::resource::Resource;
 use bevy::ecs::schedule::IntoScheduleConfigs;
-use bevy::ecs::system::{Commands, NonSend, Query, Res, ResMut, Single, SystemParam};
+use bevy::ecs::system::{Commands, NonSend, NonSendMut, Query, Res, ResMut, Single, SystemParam};
 use bevy::input::ButtonInput;
 use bevy::input::keyboard::KeyCode;
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
-use bevy::text::{TextColor, TextFont};
+use bevy::text::TextColor;
 use bevy::ui::Pressed;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
@@ -61,8 +61,9 @@ use taskmanager_application::{
     AppAction, AppPage, ApplicationHistoryProjection, CommandContext, CommandScope,
 };
 
-use taskmanager_shell::{ShellApp, SystemProjectionStore};
+use taskmanager_shell::ShellApp;
 
+use crate::input::{PendingEffects, ShellInteractionApplied};
 use crate::pages::history::HistoryProjectionResource;
 use crate::palette::{UiPalette, no_wrap_text, space_8, space_12};
 use crate::runtime::SharedRuntime;
@@ -101,7 +102,7 @@ pub(crate) struct FrontendTrack {
 /// ```ignore
 /// fn my_page_rows(track: ShellTrack, /* … */) {
 ///     let processes = track.shell().visible_processes();
-///     let projection: &SystemProjectionStore = track.projection();
+///     let projection = track.shell().projection();
 /// }
 /// ```
 ///
@@ -116,21 +117,11 @@ pub(crate) struct ShellTrack<'w> {
 }
 
 impl ShellTrack<'_> {
-    /// The renderer-neutral shell. Prefer [`Self::projection`] for plain
-    /// data reads; use this for the memoized projections (`visible_processes`,
+    /// The renderer-neutral shell. Prefer its `projection()` for plain data
+    /// reads; use it for the memoized projections (`visible_processes`,
     /// `sorted_services`, …) whose cache lives on the shell.
     pub(crate) fn shell(&self) -> &ShellApp {
         &self.track.shell
-    }
-
-    /// Immutable view of the folded projection store: processes, services,
-    /// startup entries, sessions, telemetry, alerts, source statuses, typed
-    /// revisions. Facts enter only through the drain seam — a page can read
-    /// but never write this store. Consumed by page systems (and the
-    /// headless seam probe) from `Update`.
-    #[allow(dead_code)]
-    pub(crate) fn projection(&self) -> &SystemProjectionStore {
-        self.track.shell.projection()
     }
 
     /// The Bevy-local expansion state consumed by the process-tree adapter.
@@ -218,14 +209,10 @@ impl Route {
 
 /// Fired (via `Commands::trigger`) after an accepted route change. The nav
 /// highlight observer restyles the rail from it; the mount observer despawns
-/// the outgoing page content. Route changes are the ONLY trigger — no polling.
+/// the outgoing page content. The route resource remains the sole page
+/// authority; this event is only the change signal.
 #[derive(Event)]
-pub(crate) struct RouteChanged(
-    /// Grammar-complete today; observers key off the trigger itself, page
-    /// analytics read the payload when it lands.
-    #[allow(dead_code)]
-    pub(crate) Page,
-);
+pub(crate) struct RouteChanged;
 
 /// Nav-item identity marker. The `Default` seed only exists for the bsn!
 /// template mechanism (template-then-patch); every spawned instance carries
@@ -245,10 +232,9 @@ pub(crate) struct ContentSlot;
 
 /// Marker + identity of the currently mounted page content. Exactly one
 /// instance exists while any page is mounted; route changes despawn it.
-/// The identity is asserted by the headless remount tests until page
-/// analytics read it in-product.
+/// The identity is consumed by the window capture/visibility adapter and by
+/// the headless remount tests.
 #[derive(Component)]
-#[allow(dead_code)]
 pub(crate) struct PageContent {
     pub(crate) page: Page,
 }
@@ -360,7 +346,7 @@ pub(crate) fn modifier_state(keys: &ButtonInput<KeyCode>) -> ModifierState {
 pub(crate) fn request_route(route: &mut Route, page: Page, commands: &mut Commands) {
     if let Some(next) = route.go(page) {
         route.page = next;
-        commands.trigger(RouteChanged(next));
+        commands.trigger(RouteChanged);
     }
 }
 
@@ -416,15 +402,33 @@ fn highlight_nav_items(
 /// Bevy 0.19 button activation for both wide and compact route items. Route
 /// changes still follow the same resource-plus-event protocol as keyboard and
 /// programmatic transitions.
+///
+/// Pointer navigation applies the same page action to the shell the keyboard
+/// chord does (see [`crate::input`]): `CommandScope` derivation in the shell's
+/// `dispatch_key` must follow the visible page, whichever way the page was
+/// reached. The resulting platform effect joins [`PendingEffects`] so the drain
+/// — the only holder of the client lock — submits it, and the shell mutation
+/// publishes [`ShellInteractionApplied`] exactly like a key press.
 fn nav_button_activated(
     activate: On<Activate>,
     targets: Query<&NavTarget>,
+    mut track: NonSendMut<FrontendTrack>,
     mut route: ResMut<Route>,
+    mut pending: ResMut<PendingEffects>,
     mut commands: Commands,
 ) {
     let Ok(target) = targets.get(activate.event().entity) else {
         return;
     };
+    // The keyboard adapter signals a re-render for every accepted route chord
+    // (effect or not) and stays silent for pages with no shared action — the
+    // pointer path mirrors that exactly.
+    if let Some(action) = action_for_page(target.0) {
+        if let Some(effect) = track.shell.apply_action(action) {
+            pending.0.push(effect);
+        }
+        commands.trigger(ShellInteractionApplied);
+    }
     request_route(&mut route, target.0, &mut commands);
 }
 
@@ -453,11 +457,9 @@ pub(crate) struct PageMount {
 
 /// **Page-agent scene input.** Everything a page's `content` function may
 /// read. Borrowed — scenes capture values by cloning, so nothing here
-/// outlives the spawn call.
-/// Fields are read by the page bodies; the history projection is a separate
-/// immutable resource because application-history has a connector-owned
-/// lifecycle rather than belonging to the live process projection.
-#[allow(dead_code)]
+/// outlives the spawn call. The history projection is separate because
+/// application-history has a connector-owned lifecycle rather than belonging
+/// to the live process projection.
 pub(crate) struct PageContext<'a> {
     /// The shell: projection store + memoized row projections. Read-only.
     pub(crate) shell: &'a ShellApp,
@@ -465,11 +467,6 @@ pub(crate) struct PageContext<'a> {
     pub(crate) process_tree_expansion: &'a crate::pages::process_tree::ProcessTreeExpansion,
     /// Resolved theme tokens for this window (see [`crate::palette`]).
     pub(crate) palette: &'a UiPalette,
-    /// Body type metrics (size/weight; the style observers stamp the font
-    /// handle, so pages never touch font assets).
-    pub(crate) body: TextFont,
-    /// Page-title type metrics.
-    pub(crate) heading: TextFont,
     /// Read-only application-history projection from the app-host connector.
     pub(crate) history: &'a ApplicationHistoryProjection,
 }
@@ -513,8 +510,6 @@ fn mount_page_system(
         shell: track.shell(),
         process_tree_expansion: track.process_tree_expansion(),
         palette: &palette.inner,
-        body: palette.inner.body.clone(),
-        heading: palette.inner.heading.clone(),
         history: &history.0,
     };
     let entity = commands
@@ -539,7 +534,10 @@ impl Plugin for AppShellPlugin {
         app.init_resource::<Route>()
             .init_resource::<PageMount>()
             // The input adapter drives every inventory modal on every key;
-            // all three exist whether or not their pages ever mounted.
+            // all four exist whether or not their pages ever mounted.
+            .init_resource::<crate::menu_modal::MenuModal<
+                crate::pages::processes::menu::ProcessMenuCtx,
+            >>()
             .init_resource::<crate::menu_modal::MenuModal<
                 crate::pages::services::menu::ServiceMenuCtx,
             >>()

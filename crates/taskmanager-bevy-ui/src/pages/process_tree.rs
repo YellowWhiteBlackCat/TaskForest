@@ -37,7 +37,6 @@ use crate::app::{FrontendTrack, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
 use crate::input_contract::{SemanticAddress, stable_semantic_address};
 use crate::palette::{UiPalette, space_8};
-use crate::widgets::control_contract::ControlSurface;
 use crate::window::{Role, TextRole, WindowPalette};
 
 /// Stable expansion state for the Applications tree.
@@ -48,25 +47,11 @@ pub(crate) struct ProcessTreeExpansion {
 }
 
 impl ProcessTreeExpansion {
-    #[must_use]
-    #[allow(dead_code)]
-    pub(crate) fn category_expanded(&self, category: ProcessCategory) -> bool {
-        self.expanded_groups
-            .contains(&category_expansion_key(category))
-    }
-
     pub(crate) fn toggle_category(&mut self, category: ProcessCategory) {
         let key = category_expansion_key(category);
         if !self.expanded_groups.insert(key.clone()) {
             self.expanded_groups.remove(&key);
         }
-    }
-
-    #[must_use]
-    #[allow(dead_code)]
-    pub(crate) fn application_expanded(&self, root: ProcessLiveKey) -> bool {
-        self.expanded_groups
-            .contains(&app_tree_expansion_key_for_identity(root))
     }
 
     pub(crate) fn toggle_application(&mut self, root: ProcessLiveKey) {
@@ -80,12 +65,6 @@ impl ProcessTreeExpansion {
         if !self.expanded_groups.insert(key.clone()) {
             self.expanded_groups.remove(&key);
         }
-    }
-
-    #[must_use]
-    #[allow(dead_code)]
-    pub(crate) fn process_collapsed(&self, identity: ProcessLiveKey) -> bool {
-        self.collapsed_processes.contains(&identity)
     }
 
     pub(crate) fn toggle_process(&mut self, identity: ProcessLiveKey) {
@@ -322,7 +301,6 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
             padding: UiRect::all(Val::Px(space_8())),
         }
         ProcessTreeSurface
-        ControlSurface
         Children [
             (
                 Node {

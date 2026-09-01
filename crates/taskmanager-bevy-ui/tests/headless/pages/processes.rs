@@ -28,8 +28,7 @@ use bevy::ui::widget::Text;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{
-    ProcessItem, ProcessLiveKey, ProcessMetadataObservations, ProcessOwner,
-    ProcessScalarObservations,
+    ProcessItem, ProcessMetadataObservations, ProcessOwner, ProcessScalarObservations,
 };
 
 use taskmanager_shell::ShellApp;
@@ -114,8 +113,6 @@ fn headless_page_app(palette: UiPalette, shell: ShellApp) -> App {
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,
-        body: palette.body.clone(),
-        heading: palette.heading.clone(),
         history: &history.0,
     };
     let _page_root = app
@@ -144,12 +141,12 @@ where
     app.update();
 }
 
-/// Test-only recorder for the published selection-identity seam.
+/// Test-only recorder for the published selection refresh seam.
 #[derive(Default, Resource)]
-struct SelectionLog(Vec<Option<ProcessLiveKey>>);
+struct SelectionLog(usize);
 
-fn record_selection(change: On<ProcessSelectionChanged>, mut log: ResMut<SelectionLog>) {
-    log.0.push(change.event().0);
+fn record_selection(_change: On<ProcessSelectionChanged>, mut log: ResMut<SelectionLog>) {
+    log.0 += 1;
 }
 
 fn rows_root(app: &mut App) -> Entity {
@@ -239,8 +236,9 @@ fn row_view_formats_contract_columns_from_typed_observations() {
     assert_eq!(column("Swap"), "—");
     assert_eq!(column("FDs"), "—");
     assert_eq!(column("StartTime"), "—", "no local-time observation yet");
-    // CPUTime mirrors the TUI's `{value:.1}s` spelling verbatim; on integer
-    // seconds the precision flag is inert, so the shared output is "91s".
+    // CPUTime reads the shell's single whole-seconds fold
+    // (`presentation::optional_cpu_time_seconds`) — the "91s" the integer
+    // `{value:.1}s` spelling always produced.
     assert_eq!(column("CPUTime"), "91s");
 }
 
@@ -270,7 +268,7 @@ fn empty_projection_is_honest_per_query_state() {
     let quiet = ShellApp::new();
     let projection = rows_projection(&quiet, 10, 0);
     assert_eq!(projection.total, 0);
-    assert!(projection.window.is_empty());
+    assert_eq!(projection.window.first, projection.window.last);
     assert_eq!(empty_state_text(""), t("empty.no_processes_reported"));
     assert_eq!(empty_state_text("zzz"), t("empty.no_processes_match_query"));
     assert_ne!(
@@ -434,7 +432,7 @@ fn details_panel_mounts_and_follows_the_selected_identity() {
 }
 
 #[test]
-fn selection_step_moves_the_cursor_publishes_identity_and_styles_the_row() {
+fn selection_step_moves_the_cursor_publishes_refresh_and_styles_the_row() {
     let items = vec![
         process(10, "alpha"),
         process(20, "beta"),
@@ -453,9 +451,8 @@ fn selection_step_moves_the_cursor_publishes_identity_and_styles_the_row() {
     assert_eq!(with_shell(&mut app, |shell| shell.selected), 1);
     let log = app.world().resource::<SelectionLog>();
     assert_eq!(
-        log.0,
-        vec![Some(ProcessLiveKey::new(20, 20).expect("fixture identity"))],
-        "the identity change is published exactly once"
+        log.0, 1,
+        "the identity change publishes exactly one refresh signal"
     );
 
     // The selected wrapper wears the palette's selected fill; the others none.
@@ -488,8 +485,7 @@ fn selection_step_moves_the_cursor_publishes_identity_and_styles_the_row() {
     assert_eq!(with_shell(&mut app, |shell| shell.selected), 0);
     let log = app.world().resource::<SelectionLog>();
     assert_eq!(
-        log.0.len(),
-        2,
+        log.0, 2,
         "an edge-clamped step changes no identity, so nothing publishes"
     );
 }
@@ -507,7 +503,7 @@ fn selection_on_an_empty_table_is_rejected_without_side_effects() {
     });
     assert_eq!(with_shell(&mut app, |shell| shell.selected), 0);
     assert!(
-        app.world().resource::<SelectionLog>().0.is_empty(),
+        app.world().resource::<SelectionLog>().0 == 0,
         "no identity exists to publish"
     );
     assert!(row_links(&mut app).is_empty(), "no rows materialize");
@@ -649,7 +645,7 @@ fn a_drain_fold_rebuilds_rows_and_idle_frames_do_not() {
     // The drain's refresh trigger rebuilds the window from the new snapshot.
     app.world_mut()
         .commands()
-        .trigger(crate::drain::ShellProjectionFolded(1));
+        .trigger(crate::drain::ShellProjectionFolded);
     app.update();
     let after = row_links(&mut app);
     assert_eq!(after.len(), 3, "the fold re-reads the projection");

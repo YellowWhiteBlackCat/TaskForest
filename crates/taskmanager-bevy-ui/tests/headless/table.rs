@@ -8,21 +8,23 @@
 //! hand-computed window arithmetic — no bevy types, no world.
 
 use super::{
-    RowWindow, SortProjection, header_label, process_columns, row_window, rows_in_viewport,
-    sorted_direction, visible_columns,
+    RowWindow, SortProjection, header_label, row_window, rows_in_viewport, sorted_direction,
+    visible_columns,
 };
 
 #[test]
 fn empty_table_or_viewport_renders_an_empty_window() {
     assert_eq!(row_window(0, 10, 0), RowWindow::default());
     assert_eq!(row_window(5, 0, 3), RowWindow::default());
-    assert!(row_window(0, 10, 0).is_empty());
+    let empty = row_window(0, 10, 0);
+    assert_eq!(empty.first, empty.last);
 }
 
 #[test]
 fn window_covers_the_viewport_from_the_requested_offset() {
-    assert_eq!(row_window(100, 10, 0).len(), 10);
-    assert_eq!(row_window(100, 10, 0).first, 0);
+    let window = row_window(100, 10, 0);
+    assert_eq!(window.last - window.first, 10);
+    assert_eq!(window.first, 0);
     assert_eq!(
         row_window(100, 10, 42),
         RowWindow {
@@ -73,7 +75,7 @@ fn viewport_capacity_floors_and_guards_degenerate_heights() {
 
 #[test]
 fn column_vocabulary_is_the_contract_single_source() {
-    let columns = process_columns();
+    let columns = visible_columns(&[]);
     assert_eq!(columns.len(), 14, "the contract's canonical column count");
     assert_eq!(columns[0].id, "Name", "the identity column leads");
     // Spot-prove the wiring is the live contract table, not a copy: the
@@ -103,12 +105,12 @@ fn hidden_columns_drop_but_the_identity_column_stays() {
         "hiding the identity column is refused (it is not hideable)"
     );
     let unchanged = visible_columns(&[]);
-    assert_eq!(unchanged.len(), process_columns().len());
+    assert_eq!(unchanged.len(), visible_columns(&[]).len());
 }
 
 #[test]
 fn the_sort_indicator_rests_on_exactly_one_column_with_a_typed_direction() {
-    let columns = process_columns();
+    let columns = visible_columns(&[]);
     let cpu = columns.iter().find(|spec| spec.id == "CPU").expect("CPU");
     let name = columns.iter().find(|spec| spec.id == "Name").expect("Name");
     let ascending = SortProjection {

@@ -67,10 +67,12 @@ fn nic_block_scene(nic: &NetworkMetrics, palette: &UiPalette) -> impl Scene + us
     )
 }
 
-fn segment_row_scene(segment: &MemSegment, memory: &MemoryMetrics) -> impl Scene + use<> {
+fn segment_row_scene(shell: &ShellApp, segment: &MemSegment) -> impl Scene + use<> {
     let key = segment_key(segment.kind);
     let label = segment.label.to_owned();
-    let value = segment_line(segment, memory.current_total_bytes());
+    // The legend line is folded by the data layer (`segment_value`), the same
+    // read the fold observer replays into this row — never a scene-local copy.
+    let value = segment_value(shell, segment.kind);
     let kind = segment.kind;
     bsn! {
         Node {
@@ -104,13 +106,12 @@ pub(crate) fn block_scene(
             .iter()
             .find(|nic| &*nic.device_id == key)
             .map(|nic| Box::new(nic_block_scene(nic, palette)) as Box<dyn Scene>),
-        Section::MemorySegments => {
-            let memory = memory_metrics(shell)?;
+        Section::MemorySegments => memory_metrics(shell).and_then(|memory| {
             memory_segments(memory)
                 .iter()
                 .find(|segment| segment_key(segment.kind) == key)
-                .map(|segment| Box::new(segment_row_scene(segment, memory)) as Box<dyn Scene>)
-        }
+                .map(|segment| Box::new(segment_row_scene(shell, segment)) as Box<dyn Scene>)
+        }),
     }
 }
 

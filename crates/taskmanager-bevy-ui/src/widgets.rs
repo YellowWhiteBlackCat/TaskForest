@@ -2,7 +2,7 @@
 //!
 //! The official two-piece base (`bevy_ui` + `bevy_ui_widgets`) provides the
 //! widget *primitives*; product component semantics — the process table,
-//! sparklines, menus, dialogs — are owned here per the charter
+//! charts, and action menus — are owned here per the charter
 //! (`docs/BEVY_UI_FRONTEND.md`: no third-party component semantic layer,
 //! Feathers not adopted). Every component splits the same way:
 //!
@@ -12,16 +12,13 @@
 //! - a **render adapter**: a minimal `bsn!` scene builder consuming the
 //!   core's output, themed exclusively through [`crate::palette`] tokens.
 //!
-//! `foo.rs` module shape per STANDARDS §1; `menu`/`dialog` are typed
-//! placeholders until W4 fills them.
+//! `foo.rs` module shape per STANDARDS §1; menus are the frontend-local action
+//! surface and confirmation panels are owned by `crate::confirmation`.
 
 pub mod chart;
-pub mod control_contract;
 pub mod controls;
-pub mod dialog;
 pub mod layout;
 pub mod menu;
-pub mod sparkline;
 pub mod table;
 
 #[cfg(test)]

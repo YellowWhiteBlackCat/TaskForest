@@ -18,7 +18,7 @@
 //! - [`app`]: the frontend-owned route model (nine pages), keyboard routing
 //!   through the shared command router, and the [`app::ShellTrack`] seam
 //!   pages read the folded projection through.
-//! - [`input`]: the real-input seam (W4) — Bevy keyboard events forwarded
+//! - [`input`]: the real-input seam — Bevy keyboard events forwarded
 //!   through the shell's own routers, with the effect bridge to the drain.
 //! - [`confirmation`]: the shell's armed destructive-action gate rendered as
 //!   one modal surface with typed confirm/dismiss paths.
@@ -26,14 +26,14 @@
 //!   tinted `ImageNode`s, with the no-decoration-glyph tofu law.
 //! - [`semantic`]: the accessibility seam — the shared `SemanticSnapshot`
 //!   vocabulary mapped onto bevy's AccessKit nodes.
-//! - [`pages`]: the nine page modules — placeholder bodies until their
-//!   milestones; each page agent fills exactly one file.
-//! - [`widgets`]: the owned component layer (table/sparkline cores + bsn!
-//!   render adapters, menu/dialog skeletons).
+//! - [`pages`]: the nine page modules — page adapters over the shared shell
+//!   projection; each page owns its scene and refresh seams.
+//! - [`widgets`]: the owned component layer (table/chart cores + bsn! render
+//!   adapters and the keyboard-first action menu).
 //! - [`window`]: the bsn! app shell (nav strip + status band + content slot)
 //!   and the observers that keep it live.
 //!
-//! Bevy types never cross this crate's public API: [`run_placeholder_window`]
+//! Bevy types never cross this crate's public API: [`run_window`]
 //! answers with a plain [`std::process::ExitCode`], and the window module
 //! stays crate-private.
 
@@ -59,6 +59,7 @@ pub mod app;
 pub mod bindings;
 pub mod capabilities;
 pub mod confirmation;
+pub mod demo_fixture;
 pub mod drain;
 pub mod functional;
 pub mod icons;
@@ -83,7 +84,7 @@ use std::process::ExitCode;
 /// The composition order matches the other frontends' launchers: the shared
 /// platform runtime is resolved first (typed failure → non-zero exit before
 /// any window exists), then the bevy `App` is built around the cached handle.
-pub fn run_placeholder_window() -> ExitCode {
+pub fn run_window() -> ExitCode {
     match runtime::shared_platform_runtime() {
         Ok(shared) => window::run(shared),
         Err(failure) => {

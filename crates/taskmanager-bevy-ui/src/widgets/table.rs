@@ -1,8 +1,3 @@
-#![allow(dead_code)]
-// ^ The pure core + render adapters are consumed by the M1 page bodies and
-// the headless tests; in-product call sites land with M1 (process table)
-// and M2 (curves). Tracked, not accidental: docs/BEVY_UI_FRONTEND.md ladder.
-
 //! Process/info table: pure projection core + minimal bsn! render adapter.
 //!
 //! **Pure core** (no bevy types): the column vocabulary comes verbatim from
@@ -26,12 +21,6 @@ use taskmanager_ui_contract::{PROCESS_COLUMNS, ProcessColumnSpec};
 
 use crate::palette::{UiPalette, no_wrap_text, space_4, space_8};
 use crate::window::{Role, TextRole};
-
-/// The process-table column vocabulary, straight from the ui-contract single
-/// source. Page agents consume this — never a local column copy.
-pub(crate) fn process_columns() -> &'static [ProcessColumnSpec] {
-    PROCESS_COLUMNS
-}
 
 /// Active sort as a table-projection input: the ui-contract column token
 /// plus direction. Pages translate their shell sort slot (`SortCol`,
@@ -76,17 +65,6 @@ pub(crate) fn rows_in_viewport(viewport_height_px: f32, row_height_px: f32) -> u
 pub(crate) struct RowWindow {
     pub(crate) first: usize,
     pub(crate) last: usize,
-}
-
-impl RowWindow {
-    /// Number of visible rows (always `<= viewport_rows` and `<= total`).
-    pub(crate) fn len(self) -> usize {
-        self.last - self.first
-    }
-
-    pub(crate) fn is_empty(self) -> bool {
-        self.last == self.first
-    }
 }
 
 /// Compute the visible [`RowWindow`]. Pure; the M1 virtual scroller feeds it

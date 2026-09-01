@@ -12,38 +12,23 @@ pub(super) fn observed_percentage(value: Option<f32>) -> String {
         .map_or_else(missing_value, |value| format!("{value:.1}%"))
 }
 
-/// A domain observation's usable value: current/partial read the live value,
-/// stale/unavailable keep the last known one — `None` stays `None` all the
-/// way to a dash, never a zero.
-pub(super) fn usable_value<'a, T, V>(
-    state: &'a SystemTelemetryDomainState<T>,
-    current: fn(&'a T) -> Option<V>,
-    last_known: fn(&'a T) -> Option<V>,
-) -> Option<V> {
-    match state {
-        SystemTelemetryDomainState::Current(observation)
-        | SystemTelemetryDomainState::Partial(observation) => current(observation),
-        SystemTelemetryDomainState::Stale(observation)
-        | SystemTelemetryDomainState::Unavailable {
-            observation: Some(observation),
-            ..
-        } => last_known(observation),
-        _ => None,
-    }
-}
-
 /// Read the correlated six-domain projection first. The complete shell
 /// snapshot is the honest fallback for demo/cold-start frames: it is already
 /// the shell's committed render model, so Performance does not show dashes
 /// merely because the newer partial telemetry stream has not warmed yet.
+///
+/// Every read goes through the application layer's staleness fold
+/// ([`taskmanager_application::SystemTelemetryDomainState::usable`]):
+/// current/partial domains read the live observation, stale/unavailable ones
+/// keep their last known fact, and nothing here turns a missing fact into a
+/// value.
 pub(super) fn cpu_metrics(shell: &ShellApp) -> Option<&CpuMetrics> {
     shell
         .projection()
         .system_telemetry
         .as_ref()
         .and_then(|telemetry| {
-            usable_value(
-                &telemetry.cpu,
+            telemetry.cpu.usable(
                 CpuTelemetryObservation::current_value,
                 CpuTelemetryObservation::last_known_value,
             )
@@ -63,8 +48,7 @@ pub(super) fn memory_metrics(shell: &ShellApp) -> Option<&MemoryMetrics> {
         .system_telemetry
         .as_ref()
         .and_then(|telemetry| {
-            usable_value(
-                &telemetry.memory,
+            telemetry.memory.usable(
                 MemoryTelemetryObservation::current_value,
                 MemoryTelemetryObservation::last_known_value,
             )
@@ -84,8 +68,7 @@ pub(super) fn gpu_devices(shell: &ShellApp) -> Option<&[GpuMetrics]> {
         .system_telemetry
         .as_ref()
         .and_then(|telemetry| {
-            usable_value(
-                &telemetry.gpu,
+            telemetry.gpu.usable(
                 GpuTelemetryObservation::current_value,
                 GpuTelemetryObservation::last_known_value,
             )
@@ -105,8 +88,7 @@ pub(super) fn network_devices(shell: &ShellApp) -> Option<&[NetworkMetrics]> {
         .system_telemetry
         .as_ref()
         .and_then(|telemetry| {
-            usable_value(
-                &telemetry.network,
+            telemetry.network.usable(
                 NetworkTelemetryObservation::current_value,
                 NetworkTelemetryObservation::last_known_value,
             )
@@ -125,7 +107,7 @@ pub(crate) fn summary_value(shell: &ShellApp, field: SummaryField) -> String {
         SummaryField::Cpu => {
             observed_percentage(cpu_metrics(shell).and_then(|cpu| cpu.current_global_usage_pct()))
         }
-        SummaryField::Cores => core_summary(cpu_metrics(shell)),
+        SummaryField::Cores => core_summary(shell),
         SummaryField::Memory => memory_summary(memory_metrics(shell)),
         // `swap_breakdown` only answers when a positive total is configured,
         // so `None` (no swap) is the dash, never "0 / 0".
@@ -153,18 +135,52 @@ pub(crate) fn summary_value(shell: &ShellApp, field: SummaryField) -> String {
     }
 }
 
+/// One core's folded utilization observation — the read every per-core view
+/// (numeric cell, bar fill) shares, so a bar and its number can never come
+/// from two different observations.
+pub(super) fn core_usage_pct(shell: &ShellApp, index: usize) -> Option<f32> {
+    cpu_metrics(shell).and_then(|cpu| cpu.current_core_usage_pct(index))
+}
+
+/// How many per-core usages the projection carries right now; zero until the
+/// CPU domain supplies a core group, so an unmeasured machine paints no grid.
+pub(super) fn core_usage_count(shell: &ShellApp) -> usize {
+    cpu_metrics(shell)
+        .map(|cpu| cpu.current_core_usage_len())
+        .unwrap_or(0)
+}
+
+/// The per-core bar's paint-ready fill percentage: a finite observation clamps
+/// into the 0..=100 range, anything else collapses to a zero fill — a missing
+/// fact is never painted as progress.
+pub(super) fn core_usage_fill_pct(shell: &ShellApp, index: usize) -> f32 {
+    core_usage_pct(shell, index)
+        .filter(|value| value.is_finite())
+        .map_or(0.0, |value| value.clamp(0.0, 100.0))
+}
+
+/// A disk rail row's caption: activity percentage and the two transfer rates.
+/// Each fact keeps its own dash-on-missing semantics.
+pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
+    let rate = |value: Option<u64>| value.map_or_else(missing_value, bytes);
+    [
+        disk.current_active_time_pct()
+            .map_or_else(missing_value, |value| format!("{value:.0}%")),
+        rate(disk.current_read_bytes_per_sec()),
+        rate(disk.current_write_bytes_per_sec()),
+    ]
+    .join(" · ")
+}
+
 /// Per-core usages, one readout per projected core with honest dashes for
 /// per-core gaps; no cores observed at all renders the plain dash.
-pub(super) fn core_summary(cpu: Option<&CpuMetrics>) -> String {
-    let Some(cpu) = cpu else {
-        return missing_value();
-    };
-    let count = cpu.current_core_usage_len();
+pub(super) fn core_summary(shell: &ShellApp) -> String {
+    let count = core_usage_count(shell);
     if count == 0 {
         return missing_value();
     }
     (0..count)
-        .map(|index| observed_percentage(cpu.current_core_usage_pct(index)))
+        .map(|index| observed_percentage(core_usage_pct(shell, index)))
         .collect::<Vec<_>>()
         .join(" ")
 }
@@ -266,7 +282,7 @@ pub(super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
             .filter(|value| value.is_finite())
             .map(power_w)
             .unwrap_or_else(missing_value),
-        CpuField::Core(index) => observed_percentage(cpu.current_core_usage_pct(index)),
+        CpuField::Core(index) => observed_percentage(core_usage_pct(shell, index)),
     }
 }
 

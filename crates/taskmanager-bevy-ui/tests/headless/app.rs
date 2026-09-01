@@ -39,7 +39,6 @@ use crate::input_contract::SemanticAddress;
 use crate::pages::process_tree::ProcessTreeSurface;
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
-use crate::widgets::control_contract::ControlSurface;
 use crate::window::FrontendWindowPlugin;
 use crate::window::SummaryLine;
 use crate::window::tests::HeadlessFrontendPlugins;
@@ -424,6 +423,46 @@ fn nav_button_activation_moves_the_real_route_and_remounts_content() {
 }
 
 #[test]
+fn nav_button_activation_applies_the_page_action_to_the_shell() {
+    // Pointer navigation must follow the same rule as the keyboard chord: the
+    // shell page tracks the visible page, so `CommandScope` derivation in the
+    // shell's own routers stays correct no matter how the page was reached
+    // (BEVY_UI_FRONTEND.md input seam).
+    let mut app = headless_shell_app();
+    app.update();
+    app.update();
+
+    let services = {
+        let world = app.world_mut();
+        let mut nav = world.query::<(Entity, &NavTarget)>();
+        nav.iter(world)
+            .find(|(_, target)| target.0 == Page::Services)
+            .map(|(entity, _)| entity)
+            .expect("the services nav item is a button scene")
+    };
+    app.world_mut()
+        .commands()
+        .trigger(Activate { entity: services });
+    app.update();
+    app.update();
+
+    assert_eq!(app.world().resource::<Route>().page, Page::Services);
+    let shell = &app.world().non_send::<crate::app::FrontendTrack>().shell;
+    assert_eq!(
+        shell.page(),
+        taskmanager_application::AppPage::Services,
+        "the pointer route wrote the shell page, not only the bevy route"
+    );
+    assert!(
+        app.world()
+            .resource::<crate::input::PendingEffects>()
+            .0
+            .is_empty(),
+        "a page switch emits no platform effect"
+    );
+}
+
+#[test]
 fn programmatic_transition_remounts_through_the_observer_chain() {
     // The programmatic seam (menus, deep links): move the route resource and
     // trigger RouteChanged — the same pair the keyboard adapter performs.
@@ -431,9 +470,7 @@ fn programmatic_transition_remounts_through_the_observer_chain() {
     app.update();
     app.update();
     app.world_mut().resource_mut::<Route>().page = Page::Services;
-    app.world_mut()
-        .commands()
-        .trigger(RouteChanged(Page::Services));
+    app.world_mut().commands().trigger(RouteChanged);
     app.update();
     app.update();
     let mounted = app
@@ -458,7 +495,7 @@ fn seam_probe_system(
     track: crate::app::ShellTrack,
     mut probe: bevy::ecs::system::ResMut<SeamProbe>,
 ) {
-    let projection = track.projection();
+    let projection = track.shell().projection();
     let status = projection
         .capability_status(&CapabilityId::TELEMETRY_HOST)
         .map(|status| format!("{status:?}"))
@@ -489,7 +526,7 @@ fn shell_track_param_reads_the_folded_projection() {
 }
 
 #[test]
-fn shell_spawns_the_full_skeleton_surfaces() {
+fn shell_spawns_the_full_page_surfaces() {
     let mut app = headless_shell_app();
     app.update();
     app.update();
@@ -522,14 +559,6 @@ fn shell_spawns_the_full_skeleton_surfaces() {
             .count(),
         1,
         "Applications route mounts the Bevy tree surface"
-    );
-    assert_eq!(
-        world
-            .query_filtered::<&ControlSurface, ()>()
-            .iter(world)
-            .count(),
-        1,
-        "the typed control surface is mounted with the tree"
     );
     assert_eq!(
         world
