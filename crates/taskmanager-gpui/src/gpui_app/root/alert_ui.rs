@@ -31,20 +31,31 @@ fn severity_label(severity: AlertSeverity) -> &'static str {
     }
 }
 
+fn alert_target_device(alert: &Alert, snapshot: &SystemSnapshot) -> Option<SelectedDevice> {
+    match alert.metric {
+        AlertMetric::CpuUsagePercent => Some(SelectedDevice::Cpu),
+        AlertMetric::MemoryUsagePercent => Some(SelectedDevice::Memory),
+        AlertMetric::DiskTemperatureC
+        | AlertMetric::SmartPercentUsed
+        | AlertMetric::SmartCriticalWarning => snapshot
+            .disks
+            .iter()
+            .position(|disk| disk.name == alert.target || disk.device_id == alert.target)
+            .map(SelectedDevice::Disk),
+    }
+}
+
 fn select_alert_target(view: &mut RootView, alert: &Alert, snapshot: &SystemSnapshot) {
+    let Some(device) = alert_target_device(alert, snapshot) else {
+        return;
+    };
     view.page = TopPage::Performance;
     let device = match alert.metric {
         AlertMetric::CpuUsagePercent => SelectedDevice::Cpu,
         AlertMetric::MemoryUsagePercent => SelectedDevice::Memory,
         AlertMetric::DiskTemperatureC
         | AlertMetric::SmartPercentUsed
-        | AlertMetric::SmartCriticalWarning => SelectedDevice::Disk(
-            snapshot
-                .disks
-                .iter()
-                .position(|disk| disk.name == alert.target || disk.device_id == alert.target)
-                .unwrap_or(0),
-        ),
+        | AlertMetric::SmartCriticalWarning => device,
     };
     view.select_device(device);
 }
@@ -122,3 +133,7 @@ pub fn render_banner(
                 .child(i18n::t("alert.view")),
         )
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_gpui_app_root_alert_ui_tests.rs"]
+mod tests;
