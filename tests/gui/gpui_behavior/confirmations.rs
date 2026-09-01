@@ -3,7 +3,7 @@
 //! interaction state. No renderer projection fixture is mutated here.
 
 use gpui::TestAppContext;
-use taskmanager_application::{ConfirmationKind, InteractionEvent, PendingConfirmation};
+use taskmanager_application::{InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent,
 };
@@ -16,9 +16,8 @@ use taskmanager_theme::Theme;
 use super::proc;
 
 fn end_task_target() -> FrozenProcessIdentity {
-    let root = FrozenProcessIdentity::from_process(&proc(4242, "important-worker"))
-        .expect("authoritative process fixture");
-    root
+    FrozenProcessIdentity::from_process(&proc(4242, "important-worker"))
+        .expect("authoritative process fixture")
 }
 
 #[gpui::test]
