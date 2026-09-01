@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import signal
+import shutil
 import subprocess
 import sys
 import time
@@ -17,6 +18,10 @@ from pathlib import Path
 
 class IsolationError(RuntimeError):
     """A fail-closed cross-run isolation failure."""
+
+
+class IsolationUnavailable(IsolationError):
+    """The host cannot provide the private capture prerequisites."""
 
 
 @dataclass(frozen=True)
@@ -43,6 +48,58 @@ def command_output(command: list[str], env: dict[str, str]) -> str:
         timeout=10,
     )
     return result.stdout.strip()
+
+
+def cgroup_v2_parent(pid: int) -> Path:
+    """Return the current process's cgroup-v2 parent without creating state."""
+
+    try:
+        lines = Path(f"/proc/{pid}/cgroup").read_text(encoding="utf-8").splitlines()
+    except (FileNotFoundError, PermissionError, OSError) as error:
+        raise IsolationUnavailable(f"cannot inspect cgroup membership: {error}") from error
+    for line in lines:
+        hierarchy, separator, relative = line.partition(":")
+        if separator:
+            _controllers, separator, relative = relative.partition(":")
+        if hierarchy == "0" and separator:
+            return Path("/sys/fs/cgroup") / relative.lstrip("/")
+    raise IsolationUnavailable("Linux cgroup v2 is unavailable")
+
+
+def isolation_preflight() -> str | None:
+    """Return an environment reason, or None when A/B capture can run."""
+
+    if sys.platform != "linux":
+        return "private capture supervision requires Linux"
+    runtime_text = os.environ.get("XDG_RUNTIME_DIR")
+    display = os.environ.get("WAYLAND_DISPLAY")
+    if not runtime_text or not display:
+        return "XDG_RUNTIME_DIR and WAYLAND_DISPLAY are required"
+    socket = Path(runtime_text) / display
+    if not socket.is_socket():
+        return f"Wayland socket is unavailable: {socket}"
+    missing = [
+        command
+        for command in ("dbus-run-session", "busctl", "qdbus6", "kwin_wayland", "niri")
+        if shutil.which(command) is None
+    ]
+    if missing:
+        return f"capture commands are unavailable: {', '.join(missing)}"
+
+    try:
+        parent = cgroup_v2_parent(os.getpid())
+        if not parent.is_dir():
+            return f"capture cgroup parent is unavailable: {parent}"
+        if parent.stat().st_uid != os.getuid():
+            return f"capture cgroup parent is not user-owned: {parent}"
+        probe = parent / f"taskforest-capture-preflight-{uuid.uuid4().hex}"
+        probe.mkdir(mode=0o700)
+        probe.rmdir()
+    except IsolationUnavailable as error:
+        return str(error)
+    except OSError as error:
+        return f"capture cgroup parent is not writable: {parent}: {error}"
+    return None
 
 
 def capture_bus_names(env: dict[str, str]) -> tuple[str, ...]:
@@ -273,6 +330,8 @@ def assert_cleaned(run: RunReceipt) -> None:
 
 
 def run(repo_root: Path) -> Path:
+    if (reason := isolation_preflight()) is not None:
+        raise IsolationUnavailable(reason)
     test_uuid = uuid.uuid4()
     test_root = repo_root / "target" / "capture-isolation" / "tests" / str(test_uuid)
     test_root.mkdir(parents=True, mode=0o700)
@@ -316,11 +375,19 @@ def main(argv: list[str]) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", type=Path, required=True)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--preflight", action="store_true")
     args = parser.parse_args(argv)
     if args.self_test:
         assert uuid.UUID(str(uuid.uuid4()))
         print("capture isolation self-test: PASS")
         return 0
+    if args.preflight:
+        reason = isolation_preflight()
+        if reason is None:
+            print("capture isolation preflight: READY")
+            return 0
+        print(f"capture isolation preflight: UNAVAILABLE: {reason}")
+        return 3
     try:
         output = run(args.repo_root.resolve())
     except (IsolationError, OSError, subprocess.SubprocessError) as error:
