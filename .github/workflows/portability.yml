@@ -47,11 +47,18 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
-      # Build the GUI bin natively on macOS — Cargo.toml's target-conditional
-      # gpui dep pulls in `macos-blade` (Metal) additively on this target.
-      - run: cargo build --locked
-      # Lib unit tests cross-check the cfg(target_os) gating + pure parsers.
-      - run: cargo nextest run --locked --lib --profile ci -j 4
+      # Build the GUI product natively on macOS — the workspace root is the
+      # no-binary taskmanager-gates host after ADR-051; the product lives in
+      # its own crate and pulls in `macos-blade` (Metal) on this target.
+      - run: cargo build --locked -p taskmanager-gpui --bin taskforest-g
+      # Only compile libraries relevant to this native target. The Linux and
+      # Windows adapters carry target-specific lib tests and are intentionally
+      # excluded from the macOS portability lane.
+      - run: cargo nextest run --locked --workspace --lib --exclude taskmanager-platform-linux --exclude taskmanager-platform-windows --exclude taskmanager-tray-muda --profile ci -j 4 --no-tests=pass
+      # macOS muda menu construction is main-thread-only; nextest deliberately
+      # runs tests on worker threads. Keep native tray compilation covered
+      # above/below and leave the main-thread UI harness to a dedicated lane.
+      - run: cargo check --locked -p taskmanager-tray-muda
       # Second-OS adapter contract proof: the macOS adapter must compose the
       # complete standard product surface and publish honest typed outcomes on
       # its native target (P1-ARCH-09). The same suite also runs on Linux.

@@ -23,12 +23,8 @@ const ONE_PIXEL_PNG: &[u8] = &[
 
 fn test_directory(label: &str) -> std::path::PathBuf {
     let sequence = NEXT_TEST_DIRECTORY.fetch_add(1, Ordering::Relaxed);
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.tmp")
-        .join(format!(
-            "taskforest-window-capture-{label}-{}-{sequence}",
-            std::process::id()
-        ))
+    crate::test_support::repo_temp_dir()
+        .join(format!("taskforest-window-capture-{label}-{sequence}"))
 }
 
 fn request(

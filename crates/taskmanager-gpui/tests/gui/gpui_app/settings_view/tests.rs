@@ -15,6 +15,7 @@ mod tests_inner {
     use super::super::fonts::effective_font_summary;
     use super::super::window_decorations_section;
     use super::super::{render_settings, startup_page_row};
+    #[cfg(target_os = "linux")]
     use crate::gpui_app::chrome::WindowDecorationsPreference;
     use crate::gpui_app::first_run::{self, FirstRunPhase};
     use crate::gpui_app::graph::GraphSettings;
@@ -23,9 +24,11 @@ mod tests_inner {
     use crate::gpui_app::settings_view::refresh::init_slider_entity;
     use taskmanager_application::i18n;
     use taskmanager_core::ProviderId;
+    #[cfg(target_os = "linux")]
+    use taskmanager_core::core::config::WINDOW_DECORATIONS_CUSTOM;
     use taskmanager_core::core::config::{
         STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER, TEXT_RENDERING_PLATFORM_DEFAULT,
-        WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_SYSTEM,
+        WINDOW_DECORATIONS_SYSTEM,
     };
     use taskmanager_core::core::failure::FailureKind;
     use taskmanager_core::core::setup::SetupScriptInfo;

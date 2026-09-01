@@ -51,8 +51,10 @@ pub use scenarios::CaptureScenario;
 pub(super) use state::{
     CaptureDataReadiness, CaptureEvidence, CaptureMode, CaptureProcessAction,
     CaptureScenarioProgress, HistoryReplayOpenState, SystemHealthCaptureOutcome,
-    SystemNpuCaptureState, WindowCaptureChain, WindowCaptureSchedule,
+    SystemNpuCaptureState,
 };
+#[cfg(target_os = "linux")]
+pub(super) use state::{WindowCaptureChain, WindowCaptureSchedule};
 
 impl CaptureEvidence {
     pub(crate) const fn is_enabled(&self) -> bool {

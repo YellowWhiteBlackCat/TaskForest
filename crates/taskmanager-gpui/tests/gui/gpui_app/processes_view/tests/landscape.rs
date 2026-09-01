@@ -212,7 +212,7 @@ async fn landscape_apps_page_keeps_table_and_chrome_inside_window(cx: &mut TestA
         let strip = vcx
             .debug_bounds("tm-navigation-strip")
             .expect("horizontal navigation must expose its bounded strip");
-        let mut nav_ids = vec![
+        let nav_ids = vec![
             "Performance",
             "Apps",
             "Services",
@@ -225,7 +225,11 @@ async fn landscape_apps_page_keeps_table_and_chrome_inside_window(cx: &mut TestA
             "settings-btn",
         ];
         #[cfg(target_os = "linux")]
-        nav_ids.push("window-capture-btn");
+        let nav_ids = nav_ids
+            .into_iter()
+            .chain(std::iter::once("window-capture-btn"));
+        #[cfg(not(target_os = "linux"))]
+        let nav_ids = nav_ids.into_iter();
         for id in nav_ids {
             let bounds = vcx
                 .debug_bounds(id)
@@ -361,7 +365,7 @@ async fn vertical_navigation_keeps_tabs_inside_the_rail(cx: &mut TestAppContext)
             "the first process row must have a bounded visible slot beside the vertical rail: body={body:?}, row={first_row:?}"
         );
 
-        let mut nav_ids = vec![
+        let nav_ids = vec![
             "Performance",
             "Apps",
             "Services",
@@ -374,7 +378,11 @@ async fn vertical_navigation_keeps_tabs_inside_the_rail(cx: &mut TestAppContext)
             "settings-btn",
         ];
         #[cfg(target_os = "linux")]
-        nav_ids.push("window-capture-btn");
+        let nav_ids = nav_ids
+            .into_iter()
+            .chain(std::iter::once("window-capture-btn"));
+        #[cfg(not(target_os = "linux"))]
+        let nav_ids = nav_ids.into_iter();
         for id in nav_ids {
             let bounds = vcx
                 .debug_bounds(id)

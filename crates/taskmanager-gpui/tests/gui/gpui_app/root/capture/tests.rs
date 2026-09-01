@@ -13,9 +13,10 @@ const PROCESSES_OBSERVED_AT_MS: u64 = 1_700_000_000_000;
 use super::{
     CaptureEvidence, CaptureMode, CaptureProcessAction, CaptureScenario, DashboardState,
     ProcessBatchAction, ProcessDetailsSection, ProcessItem, ProcessTerminationAction, ServiceId,
-    SystemHealthCaptureOutcome, SystemSection, SystemSnapshot, TopPage, WindowCaptureChain,
-    WindowCaptureSchedule,
+    SystemHealthCaptureOutcome, SystemSection, SystemSnapshot, TopPage,
 };
+#[cfg(target_os = "linux")]
+use super::{WindowCaptureChain, WindowCaptureSchedule};
 use crate::gpui_app::process_insights::ProcessInsightsState;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
@@ -31,6 +32,7 @@ impl CaptureEvidence {
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub(super) fn for_window_capture_test() -> Self {
         Self {
             mode: CaptureMode::Enabled,
@@ -269,6 +271,7 @@ fn settings_permission_center_capture_waits_for_data_and_marks_after_layout() {
     assert!(!evidence.settings_permission_center_requested());
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn window_capture_capture_waits_for_native_completion_before_marking_ready() {
     let mut evidence = CaptureEvidence::for_window_capture_test();
@@ -297,6 +300,7 @@ fn window_capture_capture_waits_for_native_completion_before_marking_ready() {
     assert!(evidence.scenario_ready());
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn window_capture_failure_is_terminal_and_never_retries() {
     let mut evidence = CaptureEvidence::for_window_capture_test();
