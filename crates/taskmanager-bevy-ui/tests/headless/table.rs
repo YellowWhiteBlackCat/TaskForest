@@ -11,6 +11,7 @@ use super::{
     RowWindow, SortProjection, header_label, row_window, rows_in_viewport, sorted_direction,
     visible_columns,
 };
+use taskmanager_ui_contract::PROCESS_COLUMNS;
 
 #[test]
 fn empty_table_or_viewport_renders_an_empty_window() {
@@ -105,7 +106,11 @@ fn hidden_columns_drop_but_the_identity_column_stays() {
         "hiding the identity column is refused (it is not hideable)"
     );
     let unchanged = visible_columns(&[]);
-    assert_eq!(unchanged.len(), visible_columns(&[]).len());
+    assert_eq!(
+        unchanged.len(),
+        PROCESS_COLUMNS.len(),
+        "an empty hidden set preserves the complete contract column set"
+    );
 }
 
 #[test]
