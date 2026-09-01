@@ -52,7 +52,7 @@ jobs:
       # its own crate and pulls in `macos-blade` (Metal) on this target.
       - run: cargo build --locked -p taskmanager-gpui --bin taskforest-g
       # Lib unit tests cross-check the cfg(target_os) gating + pure parsers.
-      - run: cargo nextest run --locked --workspace --lib --profile ci -j 4
+      - run: cargo nextest run --locked --workspace --lib --profile ci -j 4 --no-tests=pass
       # Second-OS adapter contract proof: the macOS adapter must compose the
       # complete standard product surface and publish honest typed outcomes on
       # its native target (P1-ARCH-09). The same suite also runs on Linux.
