@@ -13,11 +13,10 @@
 //! and unrelated batches leave the tree untouched (zero redraw at rest).
 //!
 //! **Interaction seams** (对接点): pointer picking and per-page key routing
-//! belong to the W4/M3 input work; their adapters fire the page-local events
+//! fire the page-local events
 //! [`ServiceSortClicked`], [`ServiceRowClicked`] and [`ServiceSelectionMoved`]
-//! — everything downstream of those events is live here. The menu/dialog
-//! surface (parallel W4 work) reads the current target from the
-//! [`ServiceSelection`] resource or the [`ServiceTargetSelected`] trigger;
+//! — everything downstream of those events is live here. The action-menu
+//! surface reads the current target from the [`ServiceSelection`] resource;
 //! destructive verbs then route through the shell's existing
 //! `select_service_control` gate. This page never mutates platform state.
 //!
@@ -163,7 +162,7 @@ pub(crate) fn status_line_text(shell: &ShellApp, rows: usize) -> String {
 
 /// The page's selection state: the opaque target id, never a row index, so a
 /// sort change can never make the highlight land on a different service.
-/// 对接点 (W4 menu/dialog): destructive verbs read the id from here.
+/// Action-menu target: destructive verbs read the id from here.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Resource)]
 pub(crate) struct ServiceSelection {
     pub(crate) target: Option<ServiceId>,
@@ -195,9 +194,10 @@ pub(crate) fn moved_row(rows_len: usize, current: Option<usize>, delta: isize) -
 // ---- page-owned column vocabulary ----
 
 /// One column: display label (shared catalog), width, and the shared sort
-/// column it toggles (`None` = not sortable). No ui-contract spec exists for
-/// the inventory tables yet; when one lands it becomes the single source and
-/// this descriptor shrinks to a mapping.
+/// column it toggles (`None` = not sortable). Inventory columns are
+/// page-owned because the shared ui-contract currently defines no inventory
+/// column vocabulary; row identity and control semantics still come from the
+/// shared shell contracts.
 struct Column {
     sort: Option<InfoSortCol>,
     label: String,
@@ -279,26 +279,19 @@ struct ServicesRenderState {
     rendered_revision: Option<u64>,
 }
 
-/// 对接点 (W4 pointer picking): a header cell was clicked. The observer
+/// Pointer input: a header cell was clicked. The observer
 /// routes through the shell's existing sort entry (`set_info_sort`).
 #[derive(Event)]
 pub(crate) struct ServiceSortClicked(pub(crate) InfoSortCol);
 
-/// 对接点 (W4 pointer picking): a row was clicked; the payload is the VISUAL
+/// Pointer input: a row was clicked; the payload is the VISUAL
 /// row index, resolved through the shell's `sorted_service_at` only.
 #[derive(Event)]
 pub(crate) struct ServiceRowClicked(pub(crate) usize);
 
-/// 对接点 (M3 key routing): the selection moved by a row delta.
+/// Keyboard input: the selection moved by a row delta.
 #[derive(Event)]
 pub(crate) struct ServiceSelectionMoved(pub(crate) isize);
-
-/// Published on every accepted selection change. 对接点 (W4 menu/dialog):
-/// the context menu reads its target from this trigger or from
-/// [`ServiceSelection`]. Grammar-complete today; the menu observers consume
-/// the payload when that surface lands.
-#[derive(Event)]
-pub(crate) struct ServiceTargetSelected(#[allow(dead_code)] pub(crate) ServiceId);
 
 // ---- render adapters (bsn!) ----
 
@@ -678,9 +671,7 @@ fn on_services_row_clicked(
     let Some(service) = track.shell().sorted_service_at(click.event().0) else {
         return;
     };
-    let target = service.id.clone();
-    selection.target = Some(target.clone());
-    commands.trigger(ServiceTargetSelected(target));
+    selection.target = Some(service.id.clone());
     commands.queue(paint_services);
 }
 
@@ -701,9 +692,7 @@ fn on_services_selection_moved(
     let Some(service) = track.shell().sorted_service_at(next) else {
         return;
     };
-    let target = service.id.clone();
-    selection.target = Some(target.clone());
-    commands.trigger(ServiceTargetSelected(target));
+    selection.target = Some(service.id.clone());
     commands.queue(paint_services);
 }
 

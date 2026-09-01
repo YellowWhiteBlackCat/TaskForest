@@ -186,9 +186,7 @@ fn push_startup(events: &ScriptedEvents, entries: Vec<StartupEntry>) {
 /// and never mounts the Processes default route (out of this page's scope).
 fn route_to_startup(app: &mut App) {
     app.world_mut().resource_mut::<Route>().page = Page::Startup;
-    app.world_mut()
-        .commands()
-        .trigger(RouteChanged(Page::Startup));
+    app.world_mut().commands().trigger(RouteChanged);
 }
 
 fn row_targets(app: &mut App) -> Vec<(usize, String)> {

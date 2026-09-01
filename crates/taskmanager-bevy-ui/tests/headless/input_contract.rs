@@ -27,7 +27,7 @@ fn bevy_page_keys_use_the_shared_router_and_reject_wrong_chords() {
 }
 
 #[test]
-fn focus_traversal_and_process_shortcuts_honor_scope_and_ime_ownership() {
+fn focus_traversal_and_process_shortcuts_honor_scope_and_text_input() {
     let global = CommandContext {
         scope: CommandScope::Global,
         ..CommandContext::default()
@@ -62,19 +62,9 @@ fn focus_traversal_and_process_shortcuts_honor_scope_and_ime_ownership() {
 }
 
 #[test]
-fn semantic_addresses_and_ime_state_are_stable_across_rebuilds() {
+fn semantic_addresses_are_stable_across_rebuilds() {
     let first = stable_semantic_address("process-row", "pid:42");
     let second = stable_semantic_address("process-row", "pid:42");
     assert_eq!(first, second);
     assert_ne!(first, stable_semantic_address("process-row", "pid:43"));
-
-    let mut ime = ImeOwnership::default();
-    assert!(!ime.owns_keyboard(&first));
-    ime.begin(first.clone());
-    assert!(ime.owns_keyboard(&first));
-    assert!(ime.composing());
-    ime.finish_composition();
-    assert!(!ime.composing());
-    ime.clear();
-    assert!(!ime.owns_keyboard(&first));
 }

@@ -179,9 +179,7 @@ fn push_sessions(events: &ScriptedEvents, items: Vec<SessionItem>) {
 /// and never mounts the Processes default route (out of this page's scope).
 fn route_to_sessions(app: &mut App) {
     app.world_mut().resource_mut::<Route>().page = Page::Sessions;
-    app.world_mut()
-        .commands()
-        .trigger(RouteChanged(Page::Sessions));
+    app.world_mut().commands().trigger(RouteChanged);
 }
 
 fn row_targets(app: &mut App) -> Vec<(usize, String)> {

@@ -1,4 +1,4 @@
-//! Real-input seam (W4): Bevy keyboard events into the shared shell routers.
+//! Real-input seam: Bevy keyboard events into the shared shell routers.
 //!
 //! This module is the ONLY place raw Bevy input reaches the shell, and it
 //! adds no semantics of its own: every press is forwarded through

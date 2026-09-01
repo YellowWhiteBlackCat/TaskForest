@@ -154,7 +154,6 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::ProcessMenuCopyJson => "iced-process-menu-copy-json".to_owned(),
         FocusTarget::RunTaskOpen => "iced-run-task-open".to_owned(),
         FocusTarget::RunTaskCommandInput => "iced-run-task-command-input".to_owned(),
-        FocusTarget::RunTaskAdminToggle => "iced-run-task-admin-toggle".to_owned(),
         FocusTarget::RunTaskSubmit => "iced-run-task-submit".to_owned(),
         FocusTarget::RunTaskCancel => "iced-run-task-cancel".to_owned(),
         FocusTarget::AlertsPageTab => "iced-alerts-page-tab".to_owned(),

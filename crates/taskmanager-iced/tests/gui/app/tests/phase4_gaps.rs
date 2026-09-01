@@ -314,7 +314,6 @@ fn test_focus_targets_all_contains_phase4_targets() {
     let all = FocusTarget::ALL;
     assert!(all.contains(&FocusTarget::RunTaskOpen));
     assert!(all.contains(&FocusTarget::RunTaskCommandInput));
-    assert!(all.contains(&FocusTarget::RunTaskAdminToggle));
     assert!(all.contains(&FocusTarget::RunTaskSubmit));
     assert!(all.contains(&FocusTarget::RunTaskCancel));
 }

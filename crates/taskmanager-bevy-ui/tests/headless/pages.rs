@@ -38,8 +38,6 @@ impl Fixture {
             shell: &self.shell,
             process_tree_expansion: &self.process_tree_expansion,
             palette: &self.palette,
-            body: self.palette.body.clone(),
-            heading: self.palette.heading.clone(),
             history: &self.history.0,
         }
     }

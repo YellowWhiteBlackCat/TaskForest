@@ -23,8 +23,8 @@
 //!   `crate::drain::ShellProjectionFolded` (fired whenever the drain folded
 //!   platform batches this frame) and re-read the shell through the
 //!   [`crate::app::ShellTrack`] system param.
-//! - Shared widgets live in [`crate::widgets`] (table, sparkline, menu,
-//!   dialog); shared files (app.rs, window.rs, palette.rs, drain.rs) are
+//! - Shared widgets live in [`crate::widgets`] (table, chart, menu);
+//!   shared files (app.rs, window.rs, palette.rs, drain.rs) are
 //!   NOT touched by page work — this reservation is the whole point of the
 //!   one-file-per-page shape.
 

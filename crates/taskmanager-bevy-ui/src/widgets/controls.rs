@@ -183,38 +183,6 @@ pub(crate) fn pill_scene(label: String, active: bool, palette: &UiPalette) -> im
     }
 }
 
-/// A selectable device row: identity on the first line, live caption below.
-/// The selection fill comes from the same token as pills and the navigation
-/// rail, so selected state is legible across the whole Performance surface.
-#[allow(dead_code)]
-pub(crate) fn device_row_scene(
-    title: String,
-    caption: Box<dyn Scene>,
-    selected: bool,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            width: percent(100),
-            min_height: px(palette.control_height_px * 2.0),
-            flex_direction: FlexDirection::Column,
-            justify_content: JustifyContent::Center,
-            row_gap: Val::Px(space_2()),
-            padding: UiRect::axes(Val::Px(space_12()), Val::Px(space_4())),
-            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-        }
-        BackgroundColor({
-            if selected { palette.nav_active_bg } else { palette.content_bg }
-        })
-        ControlVisual(ControlTone::Surface, selected)
-        Button
-        Children [
-            ( Text(title) TextRole(Role::Body) ),
-            ( { caption } ),
-        ]
-    }
-}
-
 /// Device row variant with a bounded visual accessory. The accessory owns its
 /// own chart/icon scene; this control only guarantees the same shrinkable
 /// identity column and selection surface used by the plain row.

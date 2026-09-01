@@ -443,9 +443,7 @@ fn headless_perf_app() -> App {
 /// `RouteChanged` trigger — the same pair the keyboard adapter performs).
 fn route_to_performance(app: &mut App) {
     app.world_mut().resource_mut::<Route>().page = Page::Performance;
-    app.world_mut()
-        .commands()
-        .trigger(RouteChanged(Page::Performance));
+    app.world_mut().commands().trigger(RouteChanged);
     app.update();
     app.update();
 }
@@ -457,7 +455,7 @@ fn fold_and_trigger(app: &mut App, batch: PlatformEventBatch) {
         .non_send_mut::<FrontendTrack>()
         .shell
         .apply_platform_batch(batch);
-    app.world_mut().commands().trigger(ShellProjectionFolded(1));
+    app.world_mut().commands().trigger(ShellProjectionFolded);
     app.update();
     app.update();
 }
@@ -512,8 +510,6 @@ fn content_spawns_from_a_cold_context_with_strip_markers() {
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,
-        body: palette.body.clone(),
-        heading: palette.heading.clone(),
         history: &history.0,
     };
     let world = app.world_mut();
@@ -871,9 +867,7 @@ fn device_blocks_follow_the_projection_device_list() {
     // Routing away unmounts the page: no markers remain for a later fold to
     // touch (idle/unmounted frames do zero work).
     app.world_mut().resource_mut::<Route>().page = Page::Processes;
-    app.world_mut()
-        .commands()
-        .trigger(RouteChanged(Page::Processes));
+    app.world_mut().commands().trigger(RouteChanged);
     app.update();
     app.update();
     let world = app.world_mut();

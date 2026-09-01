@@ -124,8 +124,6 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
         shell: &shell,
         process_tree_expansion: &process_tree_expansion,
         palette: &palette,
-        body: palette.body.clone(),
-        heading: palette.heading.clone(),
         history: &history.0,
     };
     let world = app.world_mut();
@@ -159,7 +157,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
 
     // A refold (the page's only refresh trigger) repaints in place — the
     // fact is still stated exactly once, never duplicated.
-    app.world_mut().trigger(ShellProjectionFolded(1));
+    app.world_mut().trigger(ShellProjectionFolded);
     app.update();
     paint_system(app.world_mut());
     let world = app.world_mut();

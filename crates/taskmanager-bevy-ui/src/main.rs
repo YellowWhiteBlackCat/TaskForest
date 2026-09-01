@@ -2,7 +2,7 @@
 //!
 //! Thin by law: it hands this product's capability set to the shared CLI
 //! harness (`taskmanager_cli::run`) instead of hand-parsing `--demo`. The
-//! shared runtime, drain seam, palette adapter and placeholder window all
+//! shared runtime, drain seam, palette adapter and live window all
 //! live in the library crate, so every bevy type stays inside
 //! `taskmanager_bevy_ui` and this bin stays a composition-free entry point.
 
@@ -23,7 +23,7 @@ fn run_gui(app_id: Option<String>, demo: bool) {
     let code = if demo {
         taskmanager_bevy_ui::run_demo_window()
     } else {
-        taskmanager_bevy_ui::run_placeholder_window()
+        taskmanager_bevy_ui::run_window()
     };
     if code != ExitCode::SUCCESS {
         std::process::exit(1);

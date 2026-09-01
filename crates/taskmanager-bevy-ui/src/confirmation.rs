@@ -371,8 +371,8 @@ fn overlay_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Sc
     }
 }
 
-/// The dialog panel: title, echoed body, and the two typed choice buttons —
-/// the interactive counterpart of the reserved `widgets::dialog` skeleton.
+/// The confirmation panel: title, echoed body, and the two typed choice
+/// buttons.
 fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scene + use<> {
     let title = view.title.clone();
     let body = view.body.clone();

@@ -17,11 +17,11 @@
 //!   boot, a chain/failed-units summary when it could, nothing before the
 //!   first observation.
 //!
-//! 对接点 (W4 menu/dialog): the enable/disable verbs read the current target
-//! from [`StartupSelection`] / [`StartupTargetSelected`]; the pointer and key
-//! adapters fire [`StartupSortClicked`], [`StartupRowClicked`] and
-//! [`StartupSelectionMoved`]. Colors are palette roles only — the chip seam
-//! note in [`crate::pages::services`] applies here too.
+//! Action-menu seam: the enable/disable verbs read the current target
+//! from [`StartupSelection`]; the pointer and key adapters fire
+//! [`StartupSortClicked`], [`StartupRowClicked`] and [`StartupSelectionMoved`].
+//! Colors are palette roles only — the chip seam note in
+//! [`crate::pages::services`] applies here too.
 
 use bevy::color::Color;
 use bevy::ecs::component::Component;
@@ -219,7 +219,7 @@ pub(crate) fn status_line_text(shell: &ShellApp, rows: usize) -> String {
 // ---- pure core: id-keyed selection model ----
 
 /// The page's selection state: the opaque target id, never a row index.
-/// 对接点 (W4 menu/dialog): enable/disable verbs read the id from here.
+/// Action-menu target: enable/disable verbs read the id from here.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Resource)]
 pub(crate) struct StartupSelection {
     pub(crate) target: Option<StartupEntryId>,
@@ -324,23 +324,18 @@ struct StartupRenderState {
     rendered_revision: Option<u64>,
 }
 
-/// 对接点 (W4 pointer picking): a header cell was clicked.
+/// Pointer input: a header cell was clicked.
 #[derive(Event)]
 pub(crate) struct StartupSortClicked(pub(crate) InfoSortCol);
 
-/// 对接点 (W4 pointer picking): a row was clicked; the payload is the VISUAL
+/// Pointer input: a row was clicked; the payload is the VISUAL
 /// row index, resolved through the shell's `sorted_startup_entry_at` only.
 #[derive(Event)]
 pub(crate) struct StartupRowClicked(pub(crate) usize);
 
-/// 对接点 (M3 key routing): the selection moved by a row delta.
+/// Keyboard input: the selection moved by a row delta.
 #[derive(Event)]
 pub(crate) struct StartupSelectionMoved(pub(crate) isize);
-
-/// Published on every accepted selection change. Grammar-complete today; the
-/// W4 menu observers consume the payload when that surface lands.
-#[derive(Event)]
-pub(crate) struct StartupTargetSelected(#[allow(dead_code)] pub(crate) StartupEntryId);
 
 // ---- render adapters (bsn!) ----
 
@@ -702,9 +697,7 @@ fn on_startup_row_clicked(
     let Some(entry) = track.shell().sorted_startup_entry_at(click.event().0) else {
         return;
     };
-    let target = entry.id.clone();
-    selection.target = Some(target.clone());
-    commands.trigger(StartupTargetSelected(target));
+    selection.target = Some(entry.id.clone());
     commands.queue(paint_startup);
 }
 
@@ -723,9 +716,7 @@ fn on_startup_selection_moved(
     let Some(entry) = track.shell().sorted_startup_entry_at(next) else {
         return;
     };
-    let target = entry.id.clone();
-    selection.target = Some(target.clone());
-    commands.trigger(StartupTargetSelected(target));
+    selection.target = Some(entry.id.clone());
     commands.queue(paint_startup);
 }
 

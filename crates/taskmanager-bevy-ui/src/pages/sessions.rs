@@ -14,12 +14,12 @@
 //!   source-status notice — never "no sessions";
 //! - the last accepted session-control outcome renders as one caption line
 //!   under the table (GPUI feedback-status parity, read-only: the Disconnect/
-//!   Lock verbs themselves belong to the W4 menu work).
+//!   Lock verbs are routed by the action menu).
 //!
-//! 对接点 (W4 menu/dialog): the disconnect/lock verbs read the current target
-//! from [`SessionSelection`] / [`SessionTargetSelected`]; the pointer and key
-//! adapters fire [`SessionSortClicked`], [`SessionRowClicked`] and
-//! [`SessionSelectionMoved`]. Colors are palette roles only.
+//! Action-menu seam: the disconnect/lock verbs read the current target
+//! from [`SessionSelection`]; the pointer and key adapters fire
+//! [`SessionSortClicked`], [`SessionRowClicked`] and [`SessionSelectionMoved`].
+//! Colors are palette roles only.
 
 use bevy::color::Color;
 use bevy::ecs::component::Component;
@@ -164,7 +164,7 @@ pub(crate) fn status_line_text(shell: &ShellApp, rows: usize) -> String {
 // ---- pure core: id-keyed selection model ----
 
 /// The page's selection state: the provider session id, never a row index.
-/// 对接点 (W4 menu/dialog): disconnect/lock verbs read the id from here.
+/// Action-menu target: disconnect/lock verbs read the id from here.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Resource)]
 pub(crate) struct SessionSelection {
     pub(crate) target: Option<SessionId>,
@@ -274,23 +274,18 @@ struct SessionsRenderState {
     rendered_revision: Option<u64>,
 }
 
-/// 对接点 (W4 pointer picking): a header cell was clicked.
+/// Pointer input: a header cell was clicked.
 #[derive(Event)]
 pub(crate) struct SessionSortClicked(pub(crate) InfoSortCol);
 
-/// 对接点 (W4 pointer picking): a row was clicked; the payload is the VISUAL
+/// Pointer input: a row was clicked; the payload is the VISUAL
 /// row index, resolved through the shell's `sorted_session_at` only.
 #[derive(Event)]
 pub(crate) struct SessionRowClicked(pub(crate) usize);
 
-/// 对接点 (M3 key routing): the selection moved by a row delta.
+/// Keyboard input: the selection moved by a row delta.
 #[derive(Event)]
 pub(crate) struct SessionSelectionMoved(pub(crate) isize);
-
-/// Published on every accepted selection change. Grammar-complete today; the
-/// W4 menu observers consume the payload when that surface lands.
-#[derive(Event)]
-pub(crate) struct SessionTargetSelected(#[allow(dead_code)] pub(crate) SessionId);
 
 // ---- render adapters (bsn!) ----
 
@@ -628,9 +623,7 @@ fn on_sessions_row_clicked(
     let Some(session) = track.shell().sorted_session_at(click.event().0) else {
         return;
     };
-    let target = session.id.clone();
-    selection.target = Some(target.clone());
-    commands.trigger(SessionTargetSelected(target));
+    selection.target = Some(session.id.clone());
     commands.queue(paint_sessions);
 }
 
@@ -649,9 +642,7 @@ fn on_sessions_selection_moved(
     let Some(session) = track.shell().sorted_session_at(next) else {
         return;
     };
-    let target = session.id.clone();
-    selection.target = Some(target.clone());
-    commands.trigger(SessionTargetSelected(target));
+    selection.target = Some(session.id.clone());
     commands.queue(paint_sessions);
 }
 

@@ -1,20 +1,16 @@
 //! Bevy-native input normalization with shared command and semantic identity.
 //!
-//! Native key values are translated once into the application router. Text
-//! input ownership is supplied in the command context, so list shortcuts are
-//! rejected while an IME/editor owns the keyboard. Accessibility actions use
-//! stable semantic IDs and targeted entity events rather than toolkit handles.
-
-#![allow(dead_code)]
+//! Native key values are translated once into the application router. The
+//! shared command context carries text-input ownership, so list shortcuts are
+//! rejected while an editor owns the keyboard. Rendered rows use stable
+//! semantic IDs rather than toolkit handles.
 
 use bevy::ecs::component::Component;
-use bevy::ecs::entity::Entity;
-use bevy::ecs::event::{EntityEvent, Event};
 use bevy::input::keyboard::KeyCode;
 use taskmanager_application::{AppAction, CommandContext, Modifiers};
 
 use taskmanager_shell::{ShellKeyEvent, route_key};
-use taskmanager_ui_contract::{SemanticAction, SemanticNodeId};
+use taskmanager_ui_contract::SemanticNodeId;
 
 /// Modifier state at the Bevy boundary. It deliberately has the same four
 /// axes as the shared command vocabulary, including platform/super.
@@ -80,8 +76,8 @@ pub(crate) fn normalize_key(
 }
 
 /// Stable semantic identity for an input and accessibility node. The formal
-/// route uses this marker on tree rows; native AccessKit projection remains a
-/// later M3 evidence surface.
+/// route uses this marker on tree rows; the semantic module maps the same
+/// identity into the native AccessKit projection.
 #[must_use]
 pub(crate) fn stable_semantic_address(namespace: &str, identity: &str) -> SemanticNodeId {
     SemanticNodeId::owned(format!("{namespace}:{identity}"))
@@ -95,55 +91,6 @@ impl Default for SemanticAddress {
         // `bsn!` needs a template value; every mounted row immediately
         // patches this sentinel with its typed stable identity.
         Self(stable_semantic_address("unset", "unset"))
-    }
-}
-
-/// Targeted semantic request emitted by a Bevy observer or an accessibility
-/// adapter. The application reducer decides whether the action is allowed.
-#[derive(Clone, Debug, EntityEvent)]
-pub(crate) struct SemanticActionRequest {
-    pub(crate) entity: Entity,
-    pub(crate) address: SemanticNodeId,
-    pub(crate) action: SemanticAction,
-}
-
-#[derive(Clone, Debug, Event, PartialEq, Eq)]
-pub(crate) struct FocusChanged {
-    pub(crate) address: Option<SemanticNodeId>,
-}
-
-/// Explicit editor/IME ownership state. While an owner is present, callers
-/// pass `text_input_focused = true` in [`CommandContext`] and the shared
-/// command enable rules suppress list navigation and destructive shortcuts.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct ImeOwnership {
-    owner: Option<SemanticNodeId>,
-    composing: bool,
-}
-
-impl ImeOwnership {
-    pub(crate) fn begin(&mut self, owner: SemanticNodeId) {
-        self.owner = Some(owner);
-        self.composing = true;
-    }
-
-    pub(crate) fn finish_composition(&mut self) {
-        self.composing = false;
-    }
-
-    pub(crate) fn clear(&mut self) {
-        self.owner = None;
-        self.composing = false;
-    }
-
-    #[must_use]
-    pub(crate) fn owns_keyboard(&self, owner: &SemanticNodeId) -> bool {
-        self.owner.as_ref() == Some(owner)
-    }
-
-    #[must_use]
-    pub(crate) const fn composing(&self) -> bool {
-        self.composing
     }
 }
 

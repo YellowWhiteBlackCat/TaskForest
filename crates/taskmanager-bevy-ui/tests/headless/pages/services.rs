@@ -192,9 +192,7 @@ pub(crate) fn push_services(events: &ScriptedEvents, items: Vec<ServiceItem>) {
 /// nothing).
 pub(crate) fn route_to_services(app: &mut App) {
     app.world_mut().resource_mut::<Route>().page = Page::Services;
-    app.world_mut()
-        .commands()
-        .trigger(RouteChanged(Page::Services));
+    app.world_mut().commands().trigger(RouteChanged);
 }
 
 fn row_targets(app: &mut App) -> Vec<(usize, String)> {

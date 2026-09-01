@@ -40,7 +40,7 @@ use bevy::camera::ClearColor;
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
-use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSendMut, Query, ResMut};
 use bevy::scene::{EntityScene, Scene, bsn};
 use bevy::ui::Checked;
 use bevy::ui::prelude::{
@@ -53,7 +53,7 @@ use taskmanager_application::{AppAction, TelemetryInterval};
 
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
-use crate::app::{FrontendTrack, PageContext, Route, RouteChanged};
+use crate::app::{FrontendTrack, PageContext, RouteChanged};
 use crate::pages::alerts::{page_observer, request_projection_refresh};
 use crate::palette::{UiPalette, space_8, ui_palette};
 use crate::window::{Role, TextRole, WindowPalette};
@@ -143,7 +143,6 @@ fn settings_choice_observer(
     mut track: NonSendMut<FrontendTrack>,
     mut palette: ResMut<WindowPalette>,
     mut clear: Option<ResMut<ClearColor>>,
-    route: Res<Route>,
     mut commands: Commands,
 ) {
     let Ok(choice) = choices.get(change.event().source) else {
@@ -161,7 +160,7 @@ fn settings_choice_observer(
             }
         }
     }
-    commands.trigger(RouteChanged(route.page));
+    commands.trigger(RouteChanged);
 }
 
 /// Re-resolve the render authorities from the theme tokens for `mode`. The
