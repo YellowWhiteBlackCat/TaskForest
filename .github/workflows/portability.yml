@@ -54,7 +54,11 @@ jobs:
       # Only compile libraries relevant to this native target. The Linux and
       # Windows adapters carry target-specific lib tests and are intentionally
       # excluded from the macOS portability lane.
-      - run: cargo nextest run --locked --workspace --lib --exclude taskmanager-platform-linux --exclude taskmanager-platform-windows --profile ci -j 4 --no-tests=pass
+      - run: cargo nextest run --locked --workspace --lib --exclude taskmanager-platform-linux --exclude taskmanager-platform-windows --exclude taskmanager-tray-muda --profile ci -j 4 --no-tests=pass
+      # macOS muda menu construction is main-thread-only; nextest deliberately
+      # runs tests on worker threads. Keep native tray compilation covered
+      # above/below and leave the main-thread UI harness to a dedicated lane.
+      - run: cargo check --locked -p taskmanager-tray-muda
       # Second-OS adapter contract proof: the macOS adapter must compose the
       # complete standard product surface and publish honest typed outcomes on
       # its native target (P1-ARCH-09). The same suite also runs on Linux.
