@@ -5,9 +5,7 @@
 //! surface or dangerous confirmation may be active, and only an explicit,
 //! branch-matched confirm transition can produce platform work.
 
-use taskmanager_core::core::process::{
-    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessGroupScope,
-};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent};
 use taskmanager_core::core::session::{SessionControlAction, SessionItem};
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
@@ -20,7 +18,6 @@ use crate::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ConfirmationKind {
     EndTask,
-    ProcessTermination,
     ProcessBatch,
     ServiceControl,
     StartupControl,
@@ -30,74 +27,14 @@ pub enum ConfirmationKind {
 
 impl ConfirmationKind {
     /// Single source for architecture tooling and presentation projections.
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 6] = [
         Self::EndTask,
-        Self::ProcessTermination,
         Self::ProcessBatch,
         Self::ServiceControl,
         Self::StartupControl,
         Self::SessionControl,
         Self::SmartSelfTest,
     ];
-}
-
-/// Destructive process action captured by the shared confirmation machine.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ProcessTerminationAction {
-    EndTask,
-    ForceKill,
-    EndProcessTree,
-}
-
-/// Frozen GPUI process-termination preview and execution scope.
-///
-/// GPUI offers richer single/tree verbs than the compact shell surfaces, but
-/// the semantic payload still belongs here: names, PIDs and authoritative
-/// start tokens cannot live in a renderer-local modal state. Descendants are
-/// retained leaf-first and the root is always submitted last.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ProcessTerminationConfirmation {
-    pub action: ProcessTerminationAction,
-    pub root: FrozenProcessIdentity,
-    pub descendants_leaf_first: Vec<FrozenProcessIdentity>,
-}
-
-impl ProcessTerminationConfirmation {
-    #[must_use]
-    pub fn descendant_count(&self) -> usize {
-        self.descendants_leaf_first.len()
-    }
-
-    #[must_use]
-    pub fn execution_pids(&self) -> Vec<u32> {
-        self.descendants_leaf_first
-            .iter()
-            .map(|target| target.pid)
-            .chain(std::iter::once(self.root.pid))
-            .collect()
-    }
-
-    fn into_platform_effect(self) -> PlatformEffect {
-        match self.action {
-            ProcessTerminationAction::EndTask => PlatformEffect::EndTask(self.root),
-            ProcessTerminationAction::ForceKill | ProcessTerminationAction::EndProcessTree => {
-                let action = match self.action {
-                    ProcessTerminationAction::ForceKill => ProcessBatchAction::Kill,
-                    ProcessTerminationAction::EndTask => ProcessBatchAction::End,
-                    ProcessTerminationAction::EndProcessTree => ProcessBatchAction::EndProcessTree,
-                };
-                PlatformEffect::ExecuteBatch(ProcessBatchIntent {
-                    action,
-                    scope: ProcessGroupScope::PidAdjacency,
-                    targets: self
-                        .descendants_leaf_first
-                        .into_iter()
-                        .chain(std::iter::once(self.root))
-                        .collect(),
-                })
-            }
-        }
-    }
 }
 
 /// Exact login-session payload frozen while its confirmation is visible.
@@ -115,7 +52,6 @@ pub struct SessionControlConfirmation {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PendingConfirmation {
     EndTask(FrozenProcessIdentity),
-    ProcessTermination(ProcessTerminationConfirmation),
     ProcessBatch(ProcessBatchIntent),
     ServiceControl(ServiceControlTarget),
     StartupControl(StartupControlRequest),
@@ -128,7 +64,6 @@ impl PendingConfirmation {
     pub const fn kind(&self) -> ConfirmationKind {
         match self {
             Self::EndTask(_) => ConfirmationKind::EndTask,
-            Self::ProcessTermination(_) => ConfirmationKind::ProcessTermination,
             Self::ProcessBatch(_) => ConfirmationKind::ProcessBatch,
             Self::ServiceControl(_) => ConfirmationKind::ServiceControl,
             Self::StartupControl(_) => ConfirmationKind::StartupControl,
@@ -144,7 +79,6 @@ impl PendingConfirmation {
             Self::EndTask(target) => target
                 .authoritative_start_token()
                 .map(|_| PlatformEffect::EndTask(target)),
-            Self::ProcessTermination(intent) => Some(intent.into_platform_effect()),
             Self::ProcessBatch(intent) => Some(PlatformEffect::ExecuteBatch(intent)),
             Self::ServiceControl(target) => Some(PlatformEffect::ServiceControl(target)),
             Self::StartupControl(request) => Some(PlatformEffect::StartupControl(request)),
@@ -172,10 +106,9 @@ pub enum SurfaceKind {
 impl SurfaceKind {
     /// Complete branch registry. Adding a confirmation kind must update this
     /// catalog and every exhaustive surface projection in the same change.
-    pub const ALL: [Self; 8] = [
+    pub const ALL: [Self; 7] = [
         Self::ProcessProperties,
         Self::Confirmation(ConfirmationKind::EndTask),
-        Self::Confirmation(ConfirmationKind::ProcessTermination),
         Self::Confirmation(ConfirmationKind::ProcessBatch),
         Self::Confirmation(ConfirmationKind::ServiceControl),
         Self::Confirmation(ConfirmationKind::StartupControl),

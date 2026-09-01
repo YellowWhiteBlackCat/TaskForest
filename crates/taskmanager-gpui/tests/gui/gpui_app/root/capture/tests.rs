@@ -12,8 +12,8 @@ const PROCESSES_OBSERVED_AT_MS: u64 = 1_700_000_000_000;
 
 use super::{
     CaptureEvidence, CaptureMode, CaptureProcessAction, CaptureScenario, DashboardState,
-    ProcessBatchAction, ProcessDetailsSection, ProcessItem, ProcessTerminationAction, ServiceId,
-    SystemHealthCaptureOutcome, SystemSection, SystemSnapshot, TopPage,
+    ProcessBatchAction, ProcessDetailsSection, ProcessItem, ServiceId, SystemHealthCaptureOutcome,
+    SystemSection, SystemSnapshot, TopPage,
 };
 #[cfg(target_os = "linux")]
 use super::{WindowCaptureChain, WindowCaptureSchedule};

@@ -9,7 +9,6 @@
 use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState, SystemSection};
 use crate::gpui_app::process_insights::process_insights_capture_fixture;
 use crate::gpui_app::timeline::HistoryWindow;
-use taskmanager_application::ProcessTerminationAction;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::group_aggregate::aggregate_apps_typed;
 use taskmanager_core::core::process::{
@@ -23,8 +22,7 @@ use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor,
 };
 
-use super::termination::snapshot_single_process;
-use super::{ProcessDetailsSection, TopPage, snapshot_process_tree};
+use super::{ProcessDetailsSection, TopPage};
 
 mod dashboard_history;
 mod fixtures;
@@ -309,8 +307,12 @@ impl CaptureEvidence {
                 .iter()
                 .find(|process| process.pid == 90_000)
                 .and_then(ProcessLiveKey::from_process)?;
-            return snapshot_process_tree(processes, identity)
-                .map(CaptureProcessAction::Termination);
+            let intent = ProcessBatchIntent::freeze_tree(
+                processes,
+                identity,
+                ProcessBatchAction::EndProcessTree,
+            );
+            return (!intent.targets.is_empty()).then_some(CaptureProcessAction::Batch(intent));
         }
 
         if self.scenario == Some(CaptureScenario::ProcessBatchConfirm) {
@@ -364,11 +366,11 @@ impl CaptureEvidence {
             return None;
         }
         self.mark_scenario_ready();
-        ProcessLiveKey::from_process(process)
-            .and_then(|identity| {
-                snapshot_single_process(ProcessTerminationAction::ForceKill, identity, processes)
-            })
-            .map(CaptureProcessAction::Termination)
+        ProcessLiveKey::from_process(process).and_then(|identity| {
+            let intent =
+                ProcessBatchIntent::freeze(processes, [identity], ProcessBatchAction::Kill);
+            (!intent.targets.is_empty()).then_some(CaptureProcessAction::Batch(intent))
+        })
     }
 
     pub fn on_services_update(

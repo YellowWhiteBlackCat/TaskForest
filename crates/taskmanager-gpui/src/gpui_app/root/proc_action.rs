@@ -3,14 +3,13 @@
 
 use gpui::{AppContext, Context, Entity};
 use taskmanager_application::ProcessControlRequest;
-use taskmanager_core::core::process::ProcessSignal;
-
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessLiveKey, ProcessSignal,
+};
 
 use super::{Hover, ProcMenuAction, ProcessDetailsSection, RootView};
 use crate::gpui_app::root::dispatch::apply_search_online;
 use crate::gpui_app::root::process_feedback::ProcessControlAction;
-use taskmanager_application::ProcessTerminationAction;
 
 /// A single-target control intent extracted from a process-menu action.
 /// `Suspend`/`Resume` route through the neutral request vocabulary
@@ -140,17 +139,24 @@ impl RootView {
                 return;
             }
             ProcMenuAction::EndTask => {
-                self.request_process_termination(ProcessTerminationAction::EndTask, identity);
+                self.request_end_task_confirmation(identity);
                 cx.notify();
                 return;
             }
             ProcMenuAction::EndProcessTree => {
-                self.request_process_tree_termination(identity);
+                self.request_process_tree_end(identity);
                 cx.notify();
                 return;
             }
             ProcMenuAction::Kill => {
-                self.request_process_termination(ProcessTerminationAction::ForceKill, identity);
+                if self
+                    .processes()
+                    .iter()
+                    .any(|process| ProcessLiveKey::from_process(process) == Some(identity))
+                {
+                    self.select_process_single(identity);
+                    self.request_process_batch(ProcessBatchAction::Kill, cx);
+                }
                 cx.notify();
                 return;
             }

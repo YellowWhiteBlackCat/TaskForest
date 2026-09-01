@@ -46,9 +46,6 @@ pub(super) fn apply_platform_batch(
 fn apply_process_capture(view: &mut RootView, processes_updated: bool, cx: &mut Context<RootView>) {
     if let Some(action) = view.sync_capture_process_system(processes_updated) {
         match action {
-            CaptureProcessAction::Termination(intent) => {
-                view.arm_confirmation(PendingConfirmation::ProcessTermination(intent));
-            }
             CaptureProcessAction::ApplicationSelection(root_identity) => {
                 view.page = TopPage::Apps;
                 view.select_application_root(root_identity);

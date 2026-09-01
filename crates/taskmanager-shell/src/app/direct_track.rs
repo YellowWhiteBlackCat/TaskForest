@@ -30,7 +30,9 @@ use std::collections::HashSet;
 use taskmanager_application::process_sort::compare_processes;
 use taskmanager_application::{InteractionState, ServiceDependenciesLifecycle};
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
+use taskmanager_core::core::process::{
+    FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent, ProcessItem,
+};
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_core::core::session::SessionItem;
 use taskmanager_core::core::startup::StartupEntry;
@@ -294,6 +296,18 @@ impl DirectTrackState {
             self.selection.active_row(),
             &selected,
             action,
+        )
+    }
+
+    /// Freeze a process tree through the same shell helper used by the
+    /// composed track. The direct frontend receives the frozen intent and
+    /// submits it; it never expands descendants itself.
+    #[must_use]
+    pub fn process_tree_end_intent(&self, root: ProcessLiveKey) -> Option<ProcessBatchIntent> {
+        super::process_control::process_tree_intent(
+            self.projection.processes_slice(),
+            root,
+            ProcessBatchAction::EndProcessTree,
         )
     }
 

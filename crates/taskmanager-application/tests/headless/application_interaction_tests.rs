@@ -1,7 +1,6 @@
 use taskmanager_application::{
     ConfirmationKind, InteractionEvent, InteractionState, PendingConfirmation, PlatformEffect,
-    ProcessTerminationAction, ProcessTerminationConfirmation, SmartControlRequest,
-    SurfaceDismissReason, SurfaceKind, SurfaceTransition,
+    SmartControlRequest, SurfaceDismissReason, SurfaceKind, SurfaceTransition,
 };
 use taskmanager_core::core::identity::{DeviceGeneration, DeviceId};
 use taskmanager_core::core::process::{
@@ -136,27 +135,25 @@ fn smart_self_test_is_frozen_and_only_confirm_converts_it_to_platform_work() {
 }
 
 #[test]
-fn process_termination_preserves_leaf_first_scope_in_the_confirmed_effect() {
+fn process_batch_preserves_leaf_first_scope_in_the_confirmed_effect() {
     let root = frozen(40, "root");
     let child = frozen(41, "child");
-    let intent = ProcessTerminationConfirmation {
-        action: ProcessTerminationAction::ForceKill,
-        root: root.clone(),
-        descendants_leaf_first: vec![child.clone()],
+    let intent = ProcessBatchIntent {
+        action: ProcessBatchAction::EndProcessTree,
+        scope: ProcessGroupScope::PidAdjacency,
+        targets: vec![child.clone(), root.clone()],
     };
     let mut state = InteractionState::default();
     let armed = state.reduce(InteractionEvent::ArmConfirmation(
-        PendingConfirmation::ProcessTermination(intent),
+        PendingConfirmation::ProcessBatch(intent.clone()),
     ));
     assert!(armed.effect.is_none());
 
-    let confirmed = state.reduce(InteractionEvent::Confirm(
-        ConfirmationKind::ProcessTermination,
-    ));
+    let confirmed = state.reduce(InteractionEvent::Confirm(ConfirmationKind::ProcessBatch));
     assert_eq!(
         confirmed.effect,
         Some(PlatformEffect::ExecuteBatch(ProcessBatchIntent {
-            action: ProcessBatchAction::Kill,
+            action: ProcessBatchAction::EndProcessTree,
             scope: ProcessGroupScope::PidAdjacency,
             targets: vec![child, root],
         }))

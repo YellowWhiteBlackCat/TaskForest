@@ -160,6 +160,29 @@ pub(crate) fn process_control_targets(
     targets
 }
 
+/// Freeze one exact process tree through the shared core traversal. Both the
+/// composed shell track and the direct GPUI track use this helper so a tree
+/// action cannot grow a second target-expansion rule.
+#[must_use]
+pub(crate) fn process_tree_intent(
+    processes: &[ProcessItem],
+    root: ProcessLiveKey,
+    action: ProcessBatchAction,
+) -> Option<ProcessBatchIntent> {
+    if !processes
+        .iter()
+        .any(|process| ProcessLiveKey::from_process(process) == Some(root))
+    {
+        return None;
+    }
+    let intent = ProcessBatchIntent::freeze_tree(processes, root, action);
+    intent
+        .targets
+        .iter()
+        .any(|target| target.live_key() == Some(root))
+        .then_some(intent)
+}
+
 /// Freeze one atomic batch intent from the shared process-control target
 /// projection. Application rows keep their leaf-first tree order; other rows
 /// use the exact live target set.

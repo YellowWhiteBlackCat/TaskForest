@@ -305,16 +305,6 @@ impl TuiApp {
                         target.pid, target.name
                     )),
                 }),
-                taskmanager_application::PendingConfirmation::ProcessTermination(target) => {
-                    Some(ModalInput {
-                        id: String::from("process-termination-confirmation"),
-                        name: String::from("Process termination confirmation"),
-                        description: Some(format!(
-                            "Confirm {:?} for process {} ({})",
-                            target.action, target.root.pid, target.root.name
-                        )),
-                    })
-                }
                 taskmanager_application::PendingConfirmation::ServiceControl(target) => {
                     Some(ModalInput {
                         id: String::from("service-control-confirmation"),

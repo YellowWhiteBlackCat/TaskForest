@@ -244,7 +244,7 @@ pub(crate) fn confirm_armed(
         ConfirmationKind::ServiceControl => shell.apply_action(AppAction::ConfirmServiceControl),
         ConfirmationKind::StartupControl => shell.confirm_startup_control(),
         ConfirmationKind::SessionControl => shell.confirm_session_control(),
-        ConfirmationKind::ProcessTermination | ConfirmationKind::SmartSelfTest => None,
+        ConfirmationKind::SmartSelfTest => None,
     }
 }
 

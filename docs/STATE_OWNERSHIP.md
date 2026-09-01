@@ -10,7 +10,7 @@
 | Canonical domain fact | `taskmanager-core` 私有 typed model | named constructor / transition / apply | current/last-known 只读 accessor | `taskmanager-core/src/core.rs`（owner module 索引） |
 | 已发布外部 payload ingress | 私有 read DTO / serializer | ingress canonicalization；canonical serializer | 不进入 provider/frontend state，不形成兼容 API | `taskmanager-core/src/core/metrics/*/wire.rs` |
 | 全局配置 | app-host 的单一 `ConfigCoordinator` | base→local typed submission | revisioned immutable snapshot | `taskmanager-application/src/config_runtime.rs` |
-| 危险确认 | application `InteractionState` | arm/replace/confirm/dismiss reducer | 三前端只投影或提交 intent | `taskmanager-application/src/interaction.rs` |
+| 危险确认 | application `InteractionState` | arm/replace/confirm/dismiss reducer | 四前端只投影或提交 intent | `taskmanager-application/src/interaction.rs` |
 | 相关异步请求 | application typed request session；每条 shell track 一个实例 | begin/accept/reject/terminal/close | frontend 只读状态；terminal payload 仅接受一次 | `taskmanager-application/src/request_session.rs`；track 实例在 `taskmanager-shell/src/app/request_sessions.rs` |
 | quit 与用户反馈 | shell `ShellLifecycleState` | typed lifecycle event | `should_quit` / immutable feedback | `taskmanager-shell/src/app/lifecycle.rs` |
 | 当前系统投影 | 每条前端轨私有的 `SystemProjectionStore` | platform batch 与命名 reducer | immutable `projection()` | `taskmanager-shell/src/app.rs` |

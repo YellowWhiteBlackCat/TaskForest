@@ -1,7 +1,6 @@
 use super::build_snapshot;
 use crate::gpui_app::root::{ProcessDetailsSection, RootView, TopPage};
 use gpui::{AppContext, Entity, TestAppContext};
-use taskmanager_application::ProcessTerminationAction;
 use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
 use taskmanager_core::core::{CpuScalarObservations, ScalarObservation};
 use taskmanager_theme::Theme;
@@ -212,7 +211,7 @@ async fn pending_termination_confirmation_is_published_to_the_live_region(cx: &m
         view.mark_telemetry_frame_ready();
         view.page = TopPage::Apps;
         view.replace_processes_for_test(vec![process(3, "hog"), process(4, "idle")]);
-        view.request_process_termination(ProcessTerminationAction::EndTask, identity(3));
+        view.request_end_task_confirmation(identity(3));
     });
 
     let snapshot = snapshot_of(cx, &root, 11);
@@ -225,9 +224,10 @@ async fn pending_termination_confirmation_is_published_to_the_live_region(cx: &m
         .get(&SemanticNodeId::borrowed("status"))
         .expect("status live region present");
     let announcement = status.name().unwrap_or_default();
+    let announcement_lower = announcement.to_ascii_lowercase();
     assert!(
-        announcement.contains("confirming")
-            && announcement.contains("end task")
+        announcement_lower.contains("confirming")
+            && announcement_lower.contains("end task")
             && announcement.contains('3'),
         "the confirmation must be announced with its action and target pid, got {announcement:?}"
     );
@@ -245,4 +245,73 @@ async fn pending_termination_confirmation_is_published_to_the_live_region(cx: &m
             );
         }
     }
+}
+
+/// The published row order is the shared process-sort authority on its CPU
+/// axis (`taskmanager_application::process_sort`): highest CPU first, and the
+/// pid tie-break makes equal readings deterministic — the AT reads the tree
+/// top-down, so a local `partial_cmp` ordering would announce an
+/// input-order-dependent list.
+#[gpui::test]
+async fn rows_are_published_highest_cpu_first_with_a_deterministic_tie_break(
+    cx: &mut TestAppContext,
+) {
+    fn published_pids(cx: &mut TestAppContext, root: &Entity<RootView>) -> Vec<u32> {
+        let snapshot = snapshot_of(cx, root, 5);
+        let table = snapshot
+            .get(&SemanticNodeId::borrowed("process-table"))
+            .expect("process table present");
+        table
+            .children()
+            .filter_map(|child| snapshot.get(child))
+            .filter(|node| node.role() == SemanticRole::Row)
+            .filter_map(|node| node.id().as_str().strip_prefix("row:process:pid:"))
+            .filter_map(|rest| rest.split(':').next()?.parse::<u32>().ok())
+            .collect()
+    }
+
+    let cpu_process = |pid: u32, name: &str, cpu: f32| {
+        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            .pid(pid)
+            .name(name.into())
+            .scalar_observations(ProcessScalarObservations {
+                start_token: ScalarObservation::available(u64::from(pid) + 100, 1),
+                ..ProcessScalarObservations::default()
+            })
+            .current_cpu_percentage(cpu)
+            .build()
+    };
+
+    // Insertion order is deliberately the reverse of the published order.
+    let root = make_root(cx);
+    root.update(cx, |view, _| {
+        view.mark_telemetry_frame_ready();
+        view.page = TopPage::Apps;
+        view.replace_processes_for_test(vec![
+            process(1003, "idle"),
+            cpu_process(1002, "warm", 12.5),
+            cpu_process(1001, "hog", 90.0),
+        ]);
+    });
+    assert_eq!(
+        published_pids(cx, &root),
+        vec![1001, 1002, 1003],
+        "the accessibility tree must publish the highest-CPU rows first"
+    );
+
+    // Equal readings: the pid tie-break, not the process-list order.
+    let root = make_root(cx);
+    root.update(cx, |view, _| {
+        view.mark_telemetry_frame_ready();
+        view.page = TopPage::Apps;
+        view.replace_processes_for_test(vec![
+            cpu_process(4004, "beta", 4.0),
+            cpu_process(2002, "alpha", 4.0),
+        ]);
+    });
+    assert_eq!(
+        published_pids(cx, &root),
+        vec![2002, 4004],
+        "equal CPU readings must fall back to the ascending pid tie-break"
+    );
 }

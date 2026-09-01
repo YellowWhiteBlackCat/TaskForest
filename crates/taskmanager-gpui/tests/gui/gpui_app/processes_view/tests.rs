@@ -407,10 +407,9 @@ async fn compact_apps_action_bar_prioritizes_the_table_without_hiding_commands(
     vcx.simulate_click(force_kill, Modifiers::none());
     assert_eq!(
         view.read_with(cx, |v, _| {
-            v.process_termination_confirmation()
-                .map(|intent| intent.action)
+            v.process_batch_confirmation().map(|intent| intent.action)
         }),
-        Some(taskmanager_application::ProcessTerminationAction::ForceKill),
+        Some(taskmanager_core::core::process::ProcessBatchAction::Kill),
         "a secondary destructive command must remain reachable through the real compact menu"
     );
 }

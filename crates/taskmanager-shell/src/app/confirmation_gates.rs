@@ -31,7 +31,6 @@ pub(super) fn route_armed_gate(app: &mut ShellApp, character: char) -> GateRouti
     GateRouting::Consumed(match character {
         'y' | 'Y' => match kind {
             ConfirmationKind::EndTask => app.confirm_end_task(),
-            ConfirmationKind::ProcessTermination => app.confirm_confirmation(kind),
             ConfirmationKind::ProcessBatch => app.confirm_process_batch(),
             ConfirmationKind::ServiceControl => app.apply_action(AppAction::ConfirmServiceControl),
             ConfirmationKind::StartupControl => app.confirm_startup_control(),

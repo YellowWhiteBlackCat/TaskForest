@@ -9,7 +9,6 @@ use gpui::{
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::root::{Hover, RootView};
-use taskmanager_application::ProcessTerminationAction;
 use taskmanager_application::i18n;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
@@ -120,22 +119,12 @@ impl ProcessToolbarAction {
                 view.run_error = None;
                 cx.notify();
             }
-            Self::End => submit_batch_or_single(
-                view,
-                ProcessBatchAction::End,
-                Some(ProcessTerminationAction::EndTask),
-                cx,
-            ),
-            Self::ForceKill => submit_batch_or_single(
-                view,
-                ProcessBatchAction::Kill,
-                Some(ProcessTerminationAction::ForceKill),
-                cx,
-            ),
-            Self::Suspend => submit_batch_or_single(view, ProcessBatchAction::Suspend, None, cx),
-            Self::Resume => submit_batch_or_single(view, ProcessBatchAction::Resume, None, cx),
+            Self::End => submit_batch_or_single(view, ProcessBatchAction::End, cx),
+            Self::ForceKill => submit_batch_or_single(view, ProcessBatchAction::Kill, cx),
+            Self::Suspend => submit_batch_or_single(view, ProcessBatchAction::Suspend, cx),
+            Self::Resume => submit_batch_or_single(view, ProcessBatchAction::Resume, cx),
             Self::SetPriority(tier) => {
-                submit_batch_or_single(view, ProcessBatchAction::SetPriority(tier), None, cx)
+                submit_batch_or_single(view, ProcessBatchAction::SetPriority(tier), cx)
             }
             Self::Affinity => {
                 if view.process_control_availability().is_single_process()
@@ -156,7 +145,6 @@ impl ProcessToolbarAction {
 fn submit_batch_or_single(
     view: &mut RootView,
     batch_action: ProcessBatchAction,
-    termination: Option<ProcessTerminationAction>,
     cx: &mut Context<RootView>,
 ) {
     let availability = view.process_control_availability();
@@ -165,17 +153,29 @@ fn submit_batch_or_single(
     }
     let submitted = match availability.scope() {
         Some(ProcessControlScope::Tree | ProcessControlScope::Batch) => {
-            view.request_process_batch(batch_action);
+            // The shell authority (`request_process_batch`) decides between
+            // arming the shared gate and submitting right away, so a
+            // multi-select or application-tree verb is confirmed exactly like
+            // the other frontends confirm it.
+            view.request_process_batch(batch_action, cx);
             true
         }
         Some(ProcessControlScope::Single) => {
             let Some(identity) = view.selected_process_identity() else {
                 return;
             };
-            if let Some(termination) = termination {
-                view.request_process_termination(termination, identity);
-            } else if !view.submit_process_batch_immediate(batch_action, identity, cx) {
-                return;
+            match batch_action {
+                ProcessBatchAction::End => view.request_end_task_confirmation(identity),
+                ProcessBatchAction::Kill | ProcessBatchAction::EndProcessTree => {
+                    view.request_process_batch(batch_action, cx)
+                }
+                ProcessBatchAction::Suspend
+                | ProcessBatchAction::Resume
+                | ProcessBatchAction::SetPriority(_) => {
+                    if !view.submit_process_batch_immediate(batch_action, identity, cx) {
+                        return;
+                    }
+                }
             }
             true
         }

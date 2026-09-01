@@ -29,11 +29,11 @@ fn process_and_service_capture_actions_are_typed_and_non_destructive() {
     let action = tree
         .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
         .unwrap();
-    let CaptureProcessAction::Termination(intent) = action else {
+    let CaptureProcessAction::Batch(intent) = action else {
         panic!("expected tree confirmation")
     };
-    assert_eq!(intent.action, ProcessTerminationAction::EndProcessTree);
-    assert_eq!(intent.descendant_count(), 6);
+    assert_eq!(intent.action, ProcessBatchAction::EndProcessTree);
+    assert_eq!(intent.targets.len(), 7);
     let mut service = CaptureEvidence::for_test(Some(CaptureScenario::ServiceDetailsLogs));
     let mut services = Vec::new();
     assert!(service.service_inventory_capture_requested());
@@ -348,17 +348,15 @@ fn force_kill_scenario_only_returns_one_non_executing_intent() {
             .on_processes_update(false, PROCESSES_OBSERVED_AT_MS, &mut processes)
             .is_none()
     );
-    assert_eq!(
-        evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes),
-        Some(CaptureProcessAction::Termination(
-            crate::gpui_app::root::termination::snapshot_single_process(
-                ProcessTerminationAction::ForceKill,
-                ProcessLiveKey::from_parts(4242, 42_420).expect("fixture identity"),
-                &processes,
-            )
-            .expect("capture fixture has an authoritative start token")
-        ))
-    );
+    let action = evidence
+        .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
+        .expect("capture fixture has an authoritative start token");
+    let CaptureProcessAction::Batch(intent) = action else {
+        panic!("expected batch confirmation")
+    };
+    assert_eq!(intent.action, ProcessBatchAction::Kill);
+    assert_eq!(intent.targets.len(), 1);
+    assert_eq!(intent.targets[0].pid, 4242);
     assert!(evidence.ui_data_ready());
     assert!(evidence.scenario_ready());
     assert!(
@@ -400,11 +398,11 @@ fn force_kill_capture_prefers_a_readable_process_name() {
     let action = evidence
         .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
         .unwrap();
-    let CaptureProcessAction::Termination(intent) = action else {
-        panic!("expected termination capture action")
+    let CaptureProcessAction::Batch(intent) = action else {
+        panic!("expected batch capture action")
     };
-    assert_eq!(intent.root.pid, 40);
-    assert_eq!(intent.action, ProcessTerminationAction::ForceKill);
+    assert_eq!(intent.targets[0].pid, 40);
+    assert_eq!(intent.action, ProcessBatchAction::Kill);
 }
 
 #[test]

@@ -3,10 +3,7 @@
 //! interaction state. No renderer projection fixture is mutated here.
 
 use gpui::TestAppContext;
-use taskmanager_application::ProcessTerminationAction;
-use taskmanager_application::{
-    InteractionEvent, PendingConfirmation, ProcessTerminationConfirmation,
-};
+use taskmanager_application::{ConfirmationKind, InteractionEvent, PendingConfirmation};
 use taskmanager_core::core::process::{
     FrozenProcessIdentity, ProcessBatchAction, ProcessBatchIntent,
 };
@@ -18,54 +15,42 @@ use taskmanager_theme::Theme;
 
 use super::proc;
 
-fn termination_intent(action: ProcessTerminationAction) -> ProcessTerminationConfirmation {
+fn end_task_target() -> FrozenProcessIdentity {
     let root = FrozenProcessIdentity::from_process(&proc(4242, "important-worker"))
         .expect("authoritative process fixture");
-    ProcessTerminationConfirmation {
-        action,
-        root,
-        descendants_leaf_first: Vec::new(),
-    }
+    root
 }
 
 #[gpui::test]
-async fn process_termination_cancel_is_inert_and_confirm_emits_the_frozen_effect(
+async fn end_task_confirmation_cancel_is_inert_and_confirm_consumes_the_frozen_effect(
     cx: &mut TestAppContext,
 ) {
     let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
     win.update(cx, |view, _window, cx| {
-        let intent = termination_intent(ProcessTerminationAction::EndTask);
+        let target = end_task_target();
         let _ = view
             .shell
             .interaction
             .reduce(InteractionEvent::ArmConfirmation(
-                PendingConfirmation::ProcessTermination(intent.clone()),
+                PendingConfirmation::EndTask(target.clone()),
             ));
-        assert_eq!(view.process_termination_confirmation(), Some(&intent));
+        assert_eq!(
+            view.pending_confirmation(),
+            Some(&PendingConfirmation::EndTask(target.clone()))
+        );
 
-        view.cancel_process_termination();
-        assert!(view.process_termination_confirmation().is_none());
+        view.cancel_end_task_confirmation();
+        assert!(view.pending_confirmation().is_none());
         assert!(view.shell.feedback_notice().is_none());
 
         let _ = view
             .shell
             .interaction
             .reduce(InteractionEvent::ArmConfirmation(
-                PendingConfirmation::ProcessTermination(intent),
+                PendingConfirmation::EndTask(target),
             ));
-        let mut submitted = None;
-        assert!(view.confirm_process_termination_with(
-            |effect| {
-                submitted = Some(effect);
-                Ok(())
-            },
-            cx,
-        ));
-        assert!(matches!(
-            submitted,
-            Some(taskmanager_application::PlatformEffect::EndTask(target)) if target.pid == 4242
-        ));
-        assert!(view.process_termination_confirmation().is_none());
+        assert!(view.confirm_end_task(cx));
+        assert!(view.pending_confirmation().is_none());
     })
     .unwrap();
 }

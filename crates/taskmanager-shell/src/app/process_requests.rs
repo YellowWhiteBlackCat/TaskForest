@@ -271,18 +271,7 @@ impl ShellApp {
         action: ProcessBatchAction,
     ) -> Option<ProcessBatchIntent> {
         let processes = self.data.processes.as_deref()?;
-        if !processes
-            .iter()
-            .any(|process| ProcessLiveKey::from_process(process) == Some(root))
-        {
-            return None;
-        }
-        let intent = ProcessBatchIntent::freeze_tree(processes, root, action);
-        intent
-            .targets
-            .iter()
-            .any(|target| target.live_key() == Some(root))
-            .then_some(intent)
+        super::process_control::process_tree_intent(processes, root, action)
     }
 
     fn report_process_identity_unavailable(&mut self) {

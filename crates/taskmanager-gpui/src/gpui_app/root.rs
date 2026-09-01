@@ -111,7 +111,7 @@ mod window_capture;
 pub(crate) use telemetry_warmup::TelemetryWarmupPhase;
 pub mod system_health;
 mod system_telemetry;
-pub mod termination;
+mod termination;
 mod tooltip;
 mod tray;
 mod units;
@@ -144,7 +144,6 @@ pub use responsive::*;
 use startup::page_token;
 pub use startup::{StartupEnvironment, StartupRuntime, init};
 use system_telemetry::SystemHistoryIngestionDiagnostic;
-pub use termination::*;
 pub(crate) use tooltip::ProcessHistories;
 pub(crate) use tooltip::ProcessTooltipIndex;
 pub use window_surface::{
