@@ -249,7 +249,7 @@ impl Widget<Message, Theme, iced::Renderer> for FocusableButton<'_> {
         let focused = tree.state.downcast_ref::<State>().focused;
         // Ring visibility follows the shared palette contract (the ring
         // token's alpha encodes focus-visible): only keyboard focus stays
-        // opaque, per `crate::input_modality`.
+        // opaque, per the per-window theme snapshot's `focus_visible` bit.
         let ring_visible = self.enabled && focused && self.focus_color.a > 0.0;
         if ring_visible {
             renderer.fill_quad(

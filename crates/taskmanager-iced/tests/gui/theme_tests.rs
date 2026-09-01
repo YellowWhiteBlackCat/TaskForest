@@ -193,11 +193,10 @@ fn row_padding_maps_the_shared_density_tokens() {
 
 /// The focused control rings in the shared ring token, and the ring follows
 /// the shared focus-visible contract: the ring token's alpha encodes the
-/// keyboard-vs-pointer decision, synthesized from the renderer-local input
-/// modality (`crate::input_modality`) — the same strict keyboard-only policy
-/// the GPUI root tracker drives. Destructive controls keep the danger ring
-/// under the same visibility rule, and the stroke stays inside the shared
-/// 1.5–2px focus-ring contract.
+/// keyboard-vs-pointer decision from the per-window theme snapshot — the same
+/// strict keyboard-only policy the GPUI root tracker drives. Destructive
+/// controls keep the danger ring under the same visibility rule, and the
+/// stroke stays inside the shared 1.5–2px focus-ring contract.
 #[test]
 fn focus_ring_consumes_the_shared_ring_token_and_follows_focus_visible() {
     let theme = Theme::dark();
@@ -208,8 +207,8 @@ fn focus_ring_consumes_the_shared_ring_token_and_follows_focus_visible() {
     assert_eq!(theme.palette().ring.a, 0.0);
 
     // Pointer-driven focus draws no ring (alpha 0), hue unchanged.
-    crate::input_modality::observe_pointer();
-    let pointer_stroke = focus_ring_color(&theme, false);
+    let pointer_theme = theme.with_focus_visible(false);
+    let pointer_stroke = focus_ring_color(&pointer_theme, false);
     assert_eq!(
         (pointer_stroke.r, pointer_stroke.g, pointer_stroke.b),
         (ring.r, ring.g, ring.b),
@@ -218,21 +217,20 @@ fn focus_ring_consumes_the_shared_ring_token_and_follows_focus_visible() {
     assert_eq!(pointer_stroke.a, 0.0, "pointer focus ⇒ no ring");
 
     // A keyboard press makes the next focus paint the ring opaquely.
-    crate::input_modality::observe_keyboard();
-    let stroke = focus_ring_color(&theme, false);
+    let keyboard_theme = theme.with_focus_visible(true);
+    let stroke = focus_ring_color(&keyboard_theme, false);
     assert_eq!((stroke.r, stroke.g, stroke.b), (ring.r, ring.g, ring.b));
     assert_eq!(stroke.a, 1.0, "keyboard focus ⇒ ring is drawn opaquely");
 
     // Destructive controls keep the danger hue under the same gate.
     let danger = color(theme.palette().danger);
-    let destructive = focus_ring_color(&theme, true);
+    let destructive = focus_ring_color(&keyboard_theme, true);
     assert_eq!(
         (destructive.r, destructive.g, destructive.b),
         (danger.r, danger.g, danger.b)
     );
     assert_eq!(destructive.a, 1.0);
-    crate::input_modality::observe_pointer();
-    assert_eq!(focus_ring_color(&theme, true).a, 0.0);
+    assert_eq!(focus_ring_color(&pointer_theme, true).a, 0.0);
 
     assert!(
         (1.5..=2.0).contains(&FOCUS_RING_WIDTH),

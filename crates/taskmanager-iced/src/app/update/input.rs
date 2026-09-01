@@ -24,7 +24,8 @@ impl IcedApp {
                 UpdateDispatch::none()
             }
             Message::Key(IcedKey::Fixed(event)) => {
-                crate::input_modality::observe_keyboard();
+                self.input.modality = crate::input_modality::InputModality::Keyboard;
+                self.configuration.set_focus_visible(true);
                 if let Some(copy) = self.copy_selected_row_summary(&event) {
                     UpdateDispatch::task(copy)
                 } else {
@@ -32,7 +33,8 @@ impl IcedApp {
                 }
             }
             Message::Key(IcedKey::Character(character, modifiers)) => {
-                crate::input_modality::observe_keyboard();
+                self.input.modality = crate::input_modality::InputModality::Keyboard;
+                self.configuration.set_focus_visible(true);
                 let effect = match self.input_scope() {
                     InputScope::ServiceLog => {
                         match character {
@@ -73,11 +75,13 @@ impl IcedApp {
             Message::Key(IcedKey::Other) => {
                 // Bare modifiers and other unmapped keys are still keyboard
                 // input to the focus-visible tracker.
-                crate::input_modality::observe_keyboard();
+                self.input.modality = crate::input_modality::InputModality::Keyboard;
+                self.configuration.set_focus_visible(true);
                 UpdateDispatch::none()
             }
             Message::PointerPressed => {
-                crate::input_modality::observe_pointer();
+                self.input.modality = crate::input_modality::InputModality::Pointer;
+                self.configuration.set_focus_visible(false);
                 UpdateDispatch::none()
             }
             Message::TextSelectionClaimed(id) => {

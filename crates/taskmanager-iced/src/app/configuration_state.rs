@@ -4,6 +4,7 @@ use taskmanager_application::{ConfigClient, ConfigRevision};
 use taskmanager_core::core::config::Config;
 
 use taskmanager_theme::Theme;
+use taskmanager_theme::tokens::MotionPolicy;
 
 use super::PresentationPreferences;
 use crate::i18n::Language;
@@ -15,6 +16,7 @@ pub(super) struct IcedConfiguration {
     preferences: PresentationPreferences,
     language: Language,
     theme: Theme,
+    motion_policy: MotionPolicy,
     observed_color_scheme: Option<super::appearance::OsColorScheme>,
 }
 
@@ -30,6 +32,7 @@ impl IcedConfiguration {
             preferences: PresentationPreferences::with_font_availability(font_availability),
             language: Language::En,
             theme: Theme::dark(),
+            motion_policy: MotionPolicy::Normal,
             observed_color_scheme: None,
         }
     }
@@ -66,6 +69,14 @@ impl IcedConfiguration {
         &self.theme
     }
 
+    pub(super) const fn motion_policy(&self) -> MotionPolicy {
+        self.motion_policy
+    }
+
+    pub(super) fn set_focus_visible(&mut self, focus_visible: bool) {
+        self.theme = self.theme.with_focus_visible(focus_visible);
+    }
+
     pub(super) const fn observed_color_scheme(&self) -> Option<super::appearance::OsColorScheme> {
         self.observed_color_scheme
     }
@@ -87,6 +98,7 @@ impl IcedConfiguration {
         language: Language,
         theme: Theme,
     ) {
+        self.motion_policy = super::motion::motion_policy_from_token(draft.motion.as_str());
         self.draft = draft;
         self.preferences = preferences;
         self.language = language;

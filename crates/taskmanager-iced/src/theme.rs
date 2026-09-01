@@ -216,12 +216,12 @@ pub const FOCUS_RING_WIDTH: f32 = 2.0;
 /// the focus-visible decision applied — the shared palette contract encodes
 /// that decision in the ring's alpha (alpha = 0 → no ring).
 ///
-/// The visibility source is the renderer-local input modality
-/// (`crate::input_modality`): only keyboard input keeps the ring opaque,
-/// the same strict policy the GPUI shell derives from its root input-modality
-/// tracker. `destructive` controls ring in the danger token under the same
-/// visibility rule — the irreversible-action affordance stays, and a
-/// pointer-driven focus draws no ring on it either.
+/// The visibility source is the per-window theme snapshot's
+/// `focus_visible` bit: only keyboard input keeps the ring opaque, the same
+/// strict policy the GPUI shell derives from its root input-modality tracker.
+/// `destructive` controls ring in the danger token under the same visibility
+/// rule — the irreversible-action affordance stays, and a pointer-driven
+/// focus draws no ring on it either.
 #[must_use]
 pub fn focus_ring_color(theme: &Theme, destructive: bool) -> iced::Color {
     let palette = theme.palette();
@@ -230,11 +230,7 @@ pub fn focus_ring_color(theme: &Theme, destructive: bool) -> iced::Color {
     } else {
         color(palette.ring)
     };
-    ring.a = if crate::input_modality::focus_visible() {
-        1.0
-    } else {
-        0.0
-    };
+    ring.a = if theme.focus_visible() { 1.0 } else { 0.0 };
     ring
 }
 
