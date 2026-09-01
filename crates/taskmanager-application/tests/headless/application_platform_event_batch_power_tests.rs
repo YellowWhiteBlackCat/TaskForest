@@ -37,7 +37,7 @@ fn power_supply_event_preserves_devices_and_source_status() {
                         "power-supply:serial-a".to_string(),
                         DeviceLifecycle {
                             presence: DevicePresence::Present,
-                            generation: 3,
+                            generation: DeviceGeneration::new(3),
                             ..Default::default()
                         },
                     )]),
@@ -70,7 +70,7 @@ fn power_supply_event_preserves_devices_and_source_status() {
             .device_lifecycles
             .get("power-supply:serial-a")
             .map(|lifecycle| lifecycle.generation),
-        Some(3)
+        Some(DeviceGeneration::new(3))
     );
     assert_eq!(
         snapshot.discovery().provider.as_str(),

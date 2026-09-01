@@ -21,7 +21,7 @@ impl DiskScalarState {
     /// from the hardware instance that occupied its prior generation.
     pub(crate) fn reconcile(&mut self, disks: &mut [DiskMetrics]) {
         for disk in disks {
-            if disk.device_id.is_empty() || disk.device_generation.get() == 0 {
+            if disk.device_id.is_empty() || !disk.device_generation.is_valid() {
                 continue;
             }
             let key = DiskScalarKey {

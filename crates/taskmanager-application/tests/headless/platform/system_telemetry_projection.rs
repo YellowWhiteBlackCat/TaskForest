@@ -3,10 +3,10 @@ use std::collections::BTreeMap;
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
-    CpuMetrics, CpuTelemetryObservation, DeviceId, DeviceLifecycle, DevicePresence, DeviceState,
-    FailureKind, GpuTelemetryObservation, HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics,
-    MemoryTelemetryObservation, NetworkTelemetryObservation, ScalarObservation,
-    StorageTelemetryObservation,
+    CpuMetrics, CpuTelemetryObservation, DeviceGeneration, DeviceId, DeviceLifecycle,
+    DevicePresence, DeviceState, FailureKind, GpuTelemetryObservation, HostRuntimeFacts,
+    HostRuntimeObservation, MemoryMetrics, MemoryTelemetryObservation, NetworkTelemetryObservation,
+    ScalarObservation, StorageTelemetryObservation,
 };
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
@@ -296,7 +296,7 @@ fn equal_lifecycle_with_same_id_across_domains_fails_closed() {
     let lifecycle = DeviceLifecycle {
         presence: DevicePresence::Present,
         state: DeviceState::healthy(10),
-        generation: 1,
+        generation: DeviceGeneration::INITIAL,
         first_seen_ms: Some(10),
         last_seen_ms: Some(10),
         absent_since_ms: None,
@@ -549,7 +549,7 @@ fn shared_lifecycle_policy_updates_three_independent_partitions() {
     let lifecycle = DeviceLifecycle {
         presence: DevicePresence::Present,
         state: DeviceState::healthy(10),
-        generation: 1,
+        generation: DeviceGeneration::INITIAL,
         first_seen_ms: Some(10),
         last_seen_ms: Some(10),
         absent_since_ms: None,

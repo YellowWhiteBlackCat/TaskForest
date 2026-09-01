@@ -111,6 +111,14 @@ impl DeviceGeneration {
         self.0
     }
 
+    /// Return whether this generation can identify a confirmed device
+    /// incarnation. Zero is reserved for an unbound/default value in
+    /// incomplete or legacy payloads.
+    #[must_use]
+    pub const fn is_valid(self) -> bool {
+        self.0 != 0
+    }
+
     #[must_use]
     pub const fn next(self) -> Self {
         Self(self.0.saturating_add(1))

@@ -381,8 +381,8 @@ impl DeviceLifecycleProjection {
             }
             let stable_id = DeviceId::new(stable_id.clone());
             supplied_ids.insert(stable_id.clone());
-            let observed_generation = DeviceGeneration::new(lifecycle.generation);
-            if observed_generation.get() == 0 {
+            let observed_generation = lifecycle.generation;
+            if !observed_generation.is_valid() {
                 issues.push(DeviceLifecycleProjectionIssue::ZeroGeneration { stable_id });
                 continue;
             }
@@ -541,7 +541,7 @@ fn project(
     ProjectedDeviceLifecycle {
         partition,
         stable_id,
-        generation: DeviceGeneration::new(lifecycle.generation),
+        generation: lifecycle.generation,
         state,
         health: lifecycle.state,
         first_seen_ms: lifecycle.first_seen_ms,

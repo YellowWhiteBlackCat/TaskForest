@@ -62,7 +62,7 @@ fn lifecycle(presence: DevicePresence, generation: u64, observed_at_ms: u64) -> 
     DeviceLifecycle {
         presence,
         state: DeviceState::healthy(observed_at_ms),
-        generation,
+        generation: DeviceGeneration::new(generation),
         first_seen_ms: Some(observed_at_ms),
         last_seen_ms: Some(observed_at_ms),
         absent_since_ms: (presence == DevicePresence::Absent).then_some(observed_at_ms),

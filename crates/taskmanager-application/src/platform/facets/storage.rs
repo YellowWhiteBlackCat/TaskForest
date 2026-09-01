@@ -81,7 +81,7 @@ fn storage_target_scope(
     target: &StorageDeviceTarget,
 ) -> Result<RequestScope, RequestTrackingError> {
     let device_id = target.device_id.as_str();
-    if device_id.is_empty() || target.device_generation.get() == 0 {
+    if device_id.is_empty() || !target.device_generation.is_valid() {
         return Err(RequestTrackingError::MissingTargetIdentity);
     }
     RequestScope::try_owned(format!(

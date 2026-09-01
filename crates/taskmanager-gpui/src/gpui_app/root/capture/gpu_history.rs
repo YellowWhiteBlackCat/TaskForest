@@ -3,7 +3,8 @@
 use std::collections::BTreeMap;
 
 use taskmanager_core::core::{
-    DeviceId, DeviceLifecycle, DevicePresence, DeviceState, GpuTelemetryObservation,
+    DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence, DeviceState,
+    GpuTelemetryObservation,
 };
 use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor, CorrelatedTelemetryStamp,
@@ -45,7 +46,7 @@ pub(super) fn seed(
             DeviceLifecycle {
                 presence: DevicePresence::Present,
                 state: DeviceState::healthy(timestamp_ms),
-                generation: 1,
+                generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(first_timestamp_ms),
                 last_seen_ms: Some(timestamp_ms),
                 absent_since_ms: None,

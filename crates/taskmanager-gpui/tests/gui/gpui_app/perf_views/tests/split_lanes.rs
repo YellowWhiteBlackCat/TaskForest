@@ -37,7 +37,7 @@ fn split_storage_observation(
             DeviceLifecycle {
                 presence: DevicePresence::Present,
                 state: DeviceState::healthy(10),
-                generation: 1,
+                generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(10),
                 last_seen_ms: Some(10),
                 absent_since_ms: None,
@@ -71,7 +71,7 @@ fn split_network_observation(
             DeviceLifecycle {
                 presence: DevicePresence::Present,
                 state: DeviceState::healthy(10),
-                generation: 1,
+                generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(10),
                 last_seen_ms: Some(10),
                 absent_since_ms: None,

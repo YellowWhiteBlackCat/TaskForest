@@ -75,7 +75,7 @@ fn battery_reappearance_advances_generation_without_replaying_absent_value() {
             .device_lifecycles
             .get("power-supply:BAT0")
             .map(|lifecycle| lifecycle.generation),
-        Some(1)
+        Some(DeviceGeneration::INITIAL)
     );
 
     let mut absent = snapshot(20, Vec::new());

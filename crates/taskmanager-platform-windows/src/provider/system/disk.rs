@@ -65,7 +65,7 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
             let lifecycle =
                 self.lifecycles
                     .observe(device_id.as_str(), device_state, observed_at_ms);
-            let device_generation = taskmanager_core::DeviceGeneration::new(lifecycle.generation);
+            let device_generation = lifecycle.generation;
             if usage.total_read_bytes > 0 || usage.total_written_bytes > 0 {
                 self.io_ready.insert(device_id.clone());
             }

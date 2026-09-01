@@ -468,7 +468,7 @@ impl PowerSupplyLifecycleTracker {
                 let lifecycle =
                     self.registry
                         .observe(battery.id.clone(), battery.device_state, now_ms);
-                battery.device_generation = DeviceGeneration::new(lifecycle.generation);
+                battery.device_generation = lifecycle.generation;
                 battery.device_state = lifecycle.state;
             }
         }
@@ -484,7 +484,7 @@ impl PowerSupplyLifecycleTracker {
         }
         for battery in &mut snapshot.batteries {
             if let Some(lifecycle) = self.registry.get(&battery.id) {
-                battery.device_generation = DeviceGeneration::new(lifecycle.generation);
+                battery.device_generation = lifecycle.generation;
                 battery.device_state = lifecycle.state;
                 self.previous_batteries
                     .insert(battery.id.clone(), battery.clone());

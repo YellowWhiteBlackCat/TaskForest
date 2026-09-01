@@ -1,6 +1,7 @@
 use std::collections::{BTreeMap, HashMap};
 
 use super::*;
+use taskmanager_core::DeviceGeneration;
 
 fn lifecycle(
     presence: DevicePresence,
@@ -14,7 +15,7 @@ fn lifecycle(
             status,
             last_success_ms: (status == DeviceStatus::Healthy).then_some(now_ms),
         },
-        generation,
+        generation: DeviceGeneration::new(generation),
         first_seen_ms: Some(10),
         last_seen_ms: Some(now_ms),
         absent_since_ms: (presence == DevicePresence::Absent).then_some(now_ms),

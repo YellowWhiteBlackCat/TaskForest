@@ -52,7 +52,7 @@ fn lifecycle_add_stale_absent_readd_advances_only_confirmed_generation() {
     registry.begin_refresh();
     let first = registry.observe("disk:wwid:alpha", DeviceState::healthy(10), 10);
     assert_eq!(first.presence, DevicePresence::Present);
-    assert_eq!(first.generation, 1);
+    assert_eq!(first.generation, DeviceGeneration::INITIAL);
 
     registry.begin_refresh();
     let stale = registry.observe(
@@ -86,13 +86,27 @@ fn lifecycle_add_stale_absent_readd_advances_only_confirmed_generation() {
     registry.begin_refresh();
     let readded = registry.observe("disk:wwid:alpha", DeviceState::healthy(40), 40);
     assert_eq!(readded.presence, DevicePresence::Present);
-    assert_eq!(readded.generation, 2);
+    assert_eq!(readded.generation, DeviceGeneration::new(2));
     assert_eq!(readded.state.last_success_ms, Some(40));
     let recovered = registry.finish_refresh(DeviceRefreshOutcome::Complete, 40);
     assert_eq!(
         recovered.reappeared.first().map(DeviceId::as_str),
         Some("disk:wwid:alpha")
     );
+}
+
+#[test]
+fn lifecycle_generation_keeps_the_numeric_wire_contract() {
+    let mut registry = DeviceLifecycleRegistry::new(100);
+    registry.begin_refresh();
+    let lifecycle = registry.observe("disk:wwid:wire", DeviceState::healthy(10), 10);
+
+    let encoded = serde_json::to_value(lifecycle).expect("lifecycle should serialize");
+    assert_eq!(encoded["generation"], serde_json::Value::from(1_u64));
+
+    let decoded: DeviceLifecycle =
+        serde_json::from_value(encoded).expect("lifecycle should deserialize");
+    assert_eq!(decoded.generation, DeviceGeneration::INITIAL);
 }
 
 #[test]
@@ -117,7 +131,7 @@ fn unavailable_refresh_is_not_absence_and_does_not_advance_generation() {
 
     registry.begin_refresh();
     let recovered = registry.observe("gpu:pci:0000:01:00.0", DeviceState::healthy(30), 30);
-    assert_eq!(recovered.generation, 1);
+    assert_eq!(recovered.generation, DeviceGeneration::INITIAL);
 }
 
 #[test]
@@ -191,7 +205,7 @@ fn identity_growth_is_capped_by_evicting_the_least_recently_seen() {
     // least recently seen entry (index 0) is forgotten instead.
     registry.begin_refresh();
     let newcomer = registry.observe("net:mac:dead", DeviceState::healthy(9_000), 9_000);
-    assert_eq!(newcomer.generation, 1);
+    assert_eq!(newcomer.generation, DeviceGeneration::INITIAL);
     assert_eq!(
         registry.len(),
         MAX_TRACKED_DEVICE_IDENTITIES,
