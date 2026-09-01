@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
-# Build the desktop frontend shapes into independently runnable artifacts.
+# Build the frontend products into independently runnable artifacts.
 #
-# Cargo's root package intentionally compiles exactly one UI shape at a time.
-# This script uses the repository's shared target directory, copies each
-# completed shape before the next feature build replaces target/<profile>/taskmanager,
-# and builds the standalone Bevy UI crate under its own bin name, leaving all
-# supported frontend artifacts available for installation and testing together.
+# Each frontend is its own product crate with its own binary (ADR-051): the
+# builds share the repository's common target directory without colliding,
+# and every supported frontend artifact lands in OUTPUT_DIR ready for
+# installation and testing together.
 #
 # Usage:
 #   scripts/build-frontend-binaries.sh              # release artifacts
@@ -40,18 +39,18 @@ case "$(uname -s)" in
   MINGW* | MSYS* | CYGWIN*) EXE_SUFFIX=".exe" ;;
 esac
 
-cargo build --locked -p taskmanager "${PROFILE_ARGS[@]}" \
-  --no-default-features --features hardware-all,ui-gpui
-install -Dm755 "target/$CARGO_PROFILE_DIR/taskmanager$EXE_SUFFIX" \
+# ADR-051: each product is its own crate + bin; no feature switching and no
+# artifact collisions in target/<profile>/.
+cargo build --locked -p taskmanager-gpui "${PROFILE_ARGS[@]}"
+install -Dm755 "target/$CARGO_PROFILE_DIR/taskforest-g$EXE_SUFFIX" \
   "$OUTPUT_DIR/taskforest-g$EXE_SUFFIX"
 
-cargo build --locked -p taskmanager "${PROFILE_ARGS[@]}" \
-  --no-default-features --features hardware-all,ui-iced
-install -Dm755 "target/$CARGO_PROFILE_DIR/taskmanager$EXE_SUFFIX" \
+cargo build --locked -p taskmanager-iced "${PROFILE_ARGS[@]}"
+install -Dm755 "target/$CARGO_PROFILE_DIR/taskforest-i$EXE_SUFFIX" \
   "$OUTPUT_DIR/taskforest-i$EXE_SUFFIX"
 
-# Third frontend (docs/BEVY_UI_FRONTEND.md): standalone crate, own bin name,
-# Wayland-only bevy closure on Linux — no root-package feature switching.
+# Bevy frontend (docs/BEVY_UI_FRONTEND.md): its own product crate, own bin
+# name, Wayland-only bevy closure on Linux.
 cargo build --locked -p taskmanager-bevy-ui "${PROFILE_ARGS[@]}"
 install -Dm755 "target/$CARGO_PROFILE_DIR/taskforest-b$EXE_SUFFIX" \
   "$OUTPUT_DIR/taskforest-b$EXE_SUFFIX"

@@ -1,9 +1,9 @@
 //! Shared empty, unavailable, and other state-panel visual grammar.
 
+use crate::icons_binding::icon;
 use gpui::{
     AnyElement, App, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
 };
-use taskmanager_icons::icon;
 use taskmanager_theme::{Color, Palette, tokens};
 use taskmanager_ui_contract::IconId;
 
@@ -66,7 +66,7 @@ impl StatePanel {
             .flex_col()
             .items_center()
             .justify_center()
-            .gap(tokens::SPACE_8)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
             .child(
                 div()
                     .size(px(42.0))
@@ -74,24 +74,28 @@ impl StatePanel {
                     .items_center()
                     .justify_center()
                     .rounded_full()
-                    .bg(self.tone.with_alpha(0.12))
+                    .bg(crate::theme_binding::fill(self.tone.with_alpha(0.12)))
                     .border_1()
-                    .border_color(self.tone.with_alpha(0.30))
-                    .child(icon(self.icon).size(px(22.0)).text_color(self.tone)),
+                    .border_color(crate::theme_binding::hsla(self.tone.with_alpha(0.30)))
+                    .child(
+                        icon(self.icon)
+                            .size(px(22.0))
+                            .text_color(crate::theme_binding::hsla(self.tone)),
+                    ),
             )
             .child(
                 div()
                     .max_w(px(360.0))
-                    .text_size(tokens::FONT_13)
-                    .text_color(self.palette.fg_muted)
+                    .text_size(crate::theme_binding::font_size(tokens::FONT_13))
+                    .text_color(crate::theme_binding::hsla(self.palette.fg_muted))
                     .child(self.title),
             );
         if let Some(detail) = self.detail {
             content = content.child(
                 div()
                     .max_w(px(360.0))
-                    .text_size(tokens::FONT_12)
-                    .text_color(self.palette.fg_muted)
+                    .text_size(crate::theme_binding::font_size(tokens::FONT_12))
+                    .text_color(crate::theme_binding::hsla(self.palette.fg_muted))
                     .child(detail),
             );
         }

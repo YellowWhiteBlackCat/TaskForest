@@ -48,8 +48,11 @@ Windows 和 macOS。它强调长时间使用时的视觉舒适度、可信的数
 
 ## 构建与安装
 
-当前发布面只包含 GPUI 桌面应用。只有推送与 `Cargo.toml` 版本一致的 `vX.Y.Z` tag
-才会创建正式 Release 并自动打包：
+每个前端是独立的 product crate（ADR-051）：`cargo build -p taskmanager-gpui` 产出
+`taskforest-g`，`-p taskmanager-iced` 产出 `taskforest-i`，`-p taskmanager-tui` 产出
+`taskmanager-tui`，`-p taskmanager-bevy-ui` 产出 `taskforest-b`。当前发布面只包含
+GPUI 桌面应用。只有推送与 `Cargo.toml` 版本一致的 `vX.Y.Z` tag 才会创建正式 Release
+并自动打包：
 
 - Debian `.deb`：amd64、arm64；
 - RPM `.rpm`：x86_64、aarch64；
@@ -58,9 +61,10 @@ Windows 和 macOS。它强调长时间使用时的视觉舒适度、可信的数
 Linux 与 Windows 的预发布安装包可在 GitHub Releases 获取；也可以从源码构建：
 
 ```bash
-cargo build --locked --release
+cargo build --locked --release -p taskmanager-gpui   # 产出 target/release/taskforest-g
 ```
 
+四个前端共享同一套 core/application/shell/theme 下层栈；平台差异是唯一的条件编译轴。
 Rust 版本、平台依赖、包内容和发布规则见[文档中心](docs/README.md)与
 [发布说明](docs/RELEASE.md)。
 

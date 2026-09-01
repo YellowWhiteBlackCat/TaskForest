@@ -22,6 +22,16 @@ crates/<crate>/
 `foo.rs + foo/` 是唯一模块形状；禁止 `mod.rs`。某一类没有测试时可以不创建对应
 入口，但已有测试必须归入 `common`、`headless` 或 `gui` 之一。
 
+### 工作区共享测试树（根 `tests/`）
+
+根包 `taskmanager-gates`（ADR-051，无二进制、无生产依赖表）承载跨 crate 结构守门
+套件：`tests/logic.rs`（工作区架构守门 + CLI 中性模式测试）、`tests/performance.rs`
+（确定性性能预算）、`tests/common/` 与 `tests/fixtures/`（挂载共享支持与 /proc
+fixture）。产品专属验收目标在产品 crate 声明：`taskmanager-gpui` 以
+`[[test]] path = "../../tests/gui.rs"` 声明 GUI 交互套件，以
+`tests/architecture.rs`（`#[path]` 挂载 `tests/logic/` 下的 gpui 闭包守门）运行
+gpui 作用域套件——目标归属决定依赖闭包，源文件物理位置允许留在共享树。
+
 ## 分类边界
 
 - `common` 只装配共享 fixture、fake、builders 和断言工具，不直接承担测试用例。

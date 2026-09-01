@@ -9508,37 +9508,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "taskmanager"
-version = "0.1.0-rc6"
-dependencies = [
- "chrono",
- "crossbeam-channel",
- "embed-resource",
- "gpui",
- "serde",
- "serde_json",
- "taskmanager-app-host",
- "taskmanager-application",
- "taskmanager-assets",
- "taskmanager-core",
- "taskmanager-escalation",
- "taskmanager-gpui",
- "taskmanager-iced",
- "taskmanager-platform-conformance",
- "taskmanager-platform-linux",
- "taskmanager-platform-native",
- "taskmanager-shell",
- "taskmanager-telemetry-store",
- "taskmanager-test-support",
- "taskmanager-theme",
- "taskmanager-tui",
- "taskmanager-ui",
- "taskmanager-ui-contract",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "taskmanager-accessibility-linux"
 version = "0.1.0"
 dependencies = [
@@ -9597,12 +9566,29 @@ dependencies = [
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
+ "taskmanager-cli",
  "taskmanager-core",
  "taskmanager-icons",
  "taskmanager-platform-contract",
  "taskmanager-shell",
  "taskmanager-theme",
  "taskmanager-ui-contract",
+]
+
+[[package]]
+name = "taskmanager-cli"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "taskmanager-app-host",
+ "taskmanager-application",
+ "taskmanager-assets",
+ "taskmanager-core",
+ "taskmanager-escalation",
+ "taskmanager-platform-native",
+ "taskmanager-test-support",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -9629,11 +9615,36 @@ dependencies = [
 ]
 
 [[package]]
+name = "taskmanager-gates"
+version = "0.1.0-rc7"
+dependencies = [
+ "chrono",
+ "crossbeam-channel",
+ "serde",
+ "serde_json",
+ "taskmanager-app-host",
+ "taskmanager-application",
+ "taskmanager-assets",
+ "taskmanager-core",
+ "taskmanager-escalation",
+ "taskmanager-platform-conformance",
+ "taskmanager-platform-linux",
+ "taskmanager-platform-native",
+ "taskmanager-shell",
+ "taskmanager-telemetry-store",
+ "taskmanager-test-support",
+ "taskmanager-theme",
+ "taskmanager-ui-contract",
+ "tracing",
+]
+
+[[package]]
 name = "taskmanager-gpui"
 version = "0.1.0"
 dependencies = [
  "chrono",
  "crossbeam-channel",
+ "embed-resource",
  "gpui",
  "raw-window-handle",
  "serde",
@@ -9643,6 +9654,7 @@ dependencies = [
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
+ "taskmanager-cli",
  "taskmanager-core",
  "taskmanager-icons",
  "taskmanager-platform-contract",
@@ -9678,6 +9690,7 @@ dependencies = [
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
+ "taskmanager-cli",
  "taskmanager-core",
  "taskmanager-icons",
  "taskmanager-platform-contract",
@@ -9694,7 +9707,6 @@ dependencies = [
 name = "taskmanager-icons"
 version = "0.1.0"
 dependencies = [
- "gpui",
  "taskmanager-assets",
  "taskmanager-ui-contract",
 ]
@@ -9955,10 +9967,6 @@ dependencies = [
 [[package]]
 name = "taskmanager-theme"
 version = "0.1.0"
-dependencies = [
- "gpui",
- "iced_core",
-]
 
 [[package]]
 name = "taskmanager-tray-muda"
@@ -9977,6 +9985,7 @@ dependencies = [
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
+ "taskmanager-cli",
  "taskmanager-core",
  "taskmanager-platform-contract",
  "taskmanager-shell",

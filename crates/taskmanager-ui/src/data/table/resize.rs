@@ -129,7 +129,7 @@ where
             div()
                 .h_full()
                 .justify_center()
-                .bg(palette.border)
+                .bg(crate::theme_binding::fill(palette.border))
                 .w(px(1.0)),
         )
         .on_drag_move(

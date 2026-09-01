@@ -8,6 +8,44 @@
 
 ## [Unreleased]
 
+## [0.1.0-rc7] — 2026-09-01
+
+### 变更
+
+- 前端架构改为四个独立 product（ADR-051）：GPUI（`taskforest-g`）、Iced
+  （`taskforest-i`）、TUI（`taskmanager-tui`）、Bevy（`taskforest-b`）各自是独立的
+  crate 加二进制，共享统一的 CLI（`--json`、`--suggest-thresholds`、
+  `--gpu-engines`、`--memory-smbios`、`--package-power`、`--msr`、`--help`），能力差异
+  （如 TUI 的 `--snapshot`、Windows GPUI 的 `--capture-window`）按产品如实呈现。源码
+  构建从 `cargo build --release` 改为 `cargo build --release -p taskmanager-gpui`；
+  工作区不再有 `ui-*` feature，`cfg` 只用于平台轴。主题与图标层不再包含任何 toolkit
+  代码，前端绑定（`taskmanager-ui::theme_binding`、`taskmanager-iced::theme_binding`）
+  由各前端自行拥有。
+- 真实截图测试改为每次运行独占 UUID、runtime、D-Bus、KWin 配置/数据/缓存、应用二进制、
+  用户 cgroup 和 receipt；supervisor/watchdog 在父进程异常退出后回收完整进程树，GPUI/TUI
+  的 latest 通过锁与原子 pointer 发布。
+- RC7 完成四前端当前构建的后台 Niri/KWin 证据链和 A/B 交叉隔离验证；捕获流程不创建
+  主机桌面图标、不改变主机 Wayland/D-Bus/KWin 状态。
+
+### 新增
+
+- 设置页新增"窗口边框"策略（Linux/Wayland）：跟随系统（默认，保持合成器协商）、
+  系统标题栏（显式请求原生装饰）、应用标题栏（请求 CSD 自绘标题栏与透明圆角，含
+  应用内最小化/最大化/关闭按钮）。切换经 gpui `Window::request_decorations` 实时
+  生效；合成器拒绝请求时（如 GNOME/Mutter 无法绘制原生标题栏）以 toast 诚实告知
+  实际生效的模式，绝不静默丢弃用户选择。渲染始终跟随合成器实际授予的装饰事实，
+  任何情况下不会出现双标题栏。
+- GPUI Performance 页面统一采用单一的 frame/content budget：CPU、内存、磁盘、网络、GPU、
+  电池和风扇页面共享有界主视图与 stats rail，低空间按完整内容组降级，不以滚动或裁切伪装完整。
+- 设置页新增集中可选硬件权限中心，统一展示授权中、拒绝、不可用、不支持和失败等 typed 状态；
+  授权入口保持按能力单发，不自动弹窗或轮询。
+- Linux/Wayland GPUI 新增一次性当前窗口 PNG 捕获：由 KDE Spectacle 固定参数提供，app-host
+  在后台校验并原子发布；Portal Screenshot v3 与 ScreenCast/PipeWire 保留为后续演化路径。
+
+### 修复
+
+- 修复纵向导航 rail 中新增截图入口后控制按钮越界的问题；窄 rail 使用紧凑图标目标，完整标签通过 tooltip 提供。
+
 ## [0.1.0-rc6] — 2026-08-31
 
 ### 新增

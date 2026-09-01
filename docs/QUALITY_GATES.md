@@ -35,7 +35,7 @@ bash scripts/quality/local-gates.sh standard
 bash scripts/quality/local-gates.sh extended
 ```
 
-- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。
+- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
 - `standard`：quick + dependency audit、clippy、nextest、doctest、rustdoc、release build 和
   平台无关形态矩阵，以及 Linux release/package smoke；
 - `extended`：standard + coverage、mutation、Miri、fuzz 和性能/体积回归。
@@ -128,15 +128,37 @@ SKIP，不能把 fixture、编译或静态图片写成平台验证通过。
 | Bevy | `scripts/accept-bevy-interactions.sh`（standard `--with-gui`） | `scripts/capture-bevy.sh`（Wayland-only） |
 
 四个前端的画面证据统一默认 `TM_CAPTURE_NIRI_BACKGROUND=1`：由私有
-`kwin_wayland --virtual` 承载 nested Niri，按真实 PID/app-id/window-id 绑定窗口，使用
-Niri `screenshot-window` 写出 PNG；`TM_CAPTURE_NIRI_BACKGROUND=0` 仅用于明确的可见宿主调试，
-不能作为验收证据。
+`dbus-run-session`（无 service activation）和 `kwin_wayland --virtual` 承载 nested Niri，
+按真实 PID/app-id/window-id 绑定窗口，使用
+Niri `screenshot-window` 写出 PNG；验收脚本拒绝 `TM_CAPTURE_NIRI_BACKGROUND=0`，避免调试
+参数意外触碰宿主桌面。需要研究可见 compositor 行为时，必须使用独立的手工调试环境，
+不得把结果写入验收 receipt。
+
+每个后台 capture 必须经 `scripts/capture_supervisor.py` 获得随机 Run UUID，并将应用
+binary、KWin 的 runtime/config/data/cache/state、Niri socket、D-Bus session 与 receipt
+绑定到该 UUID；supervisor 使用用户 cgroup v2 和 detached watchdog 管理完整进程树。
+失败、取消或父进程消失都必须留下可审计 receipt 并回收 runtime；`latest` 只能由通过
+独立 validator 的完整 run 在 `flock` 下以原子 pointer 发布。并发隔离由
+`scripts/test_capture_isolation.py` 证明：A/B 同时运行、窗口互不可见、单独终止 A 不得
+影响 B，主机 D-Bus/Wayland/KWin 状态不变，最终两个 run 都无进程和 runtime 残留。
+正式 RC7 本地收口必须以 `TM_CAPTURE_ISOLATION_GATE=1 bash scripts/quality/local-gates.sh
+standard` 重跑；CI/Rehearsal 若提供真实 Wayland/KWin runner，则同样强制该变量，普通无图形
+runner 只能报告环境性 SKIP，不能把它记为隔离 PASS。
 
 Bevy 交互矩阵（`scripts/bevy_interaction_matrix.tsv`）由机械发现驱动：脚本先对 lib 目标做
 nextest discovery，矩阵中的每个命名测试必须真实存在，然后完整运行 lib 目标；矩阵之外不
 存在"已登记但未运行"的用例。真实像素走嵌套 Niri，validator 对 app_id、PID/窗口身份、PNG、
 marker、source provenance 和当前 worktree fail-closed；无 compositor 时只报告 SKIP。
 UI 边界改动由 `scripts/quality/ui-evidence-route.sh` 按前端路由到对应矩阵与新鲜回执。
+
+### 7.1 弹性布局收口协议
+
+所有响应式、密集详情、图表分组或固定 viewport 改动必须先遵循
+[ELASTIC_LAYOUT_PLAYBOOK.md](ELASTIC_LAYOUT_PLAYBOOK.md)：先从根预算推导完整 slot footprint，
+再按 mandatory/elastic/optional 分配；lower band 只能整组准入、摘要或隐藏，底部安全带和
+右侧 label/value bounds 必须有 headless 断言。完成后必须运行当前构建的真实 capture 并通过
+独立 validator，且逐页检查最小、正常、tall、wide-short、窄宽和长文本状态；单张截图、fixture
+或编译通过不得替代这套证据。
 
 ## 8. 验证器质量
 

@@ -70,6 +70,11 @@ async fn mc00_page_sweep_case_nav_strip_renders_tabs_and_gear_in_both_decoration
             vcx.debug_bounds("settings-btn").is_some(),
             "settings gear must render in {mode} mode (it moved out of the CSD titlebar)"
         );
+        #[cfg(target_os = "linux")]
+        assert!(
+            vcx.debug_bounds("window-capture-btn").is_some(),
+            "Linux must render the current-window PNG capture action in {mode} mode"
+        );
         drop(vcx);
     }
 }

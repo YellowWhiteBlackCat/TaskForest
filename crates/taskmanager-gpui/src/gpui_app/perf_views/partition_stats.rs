@@ -19,6 +19,11 @@ mod stats;
 use stats::{PartitionUsage, partition_usage};
 use taskmanager_theme::tokens;
 
+/// The Performance main viewport never scrolls. Keep the partition detail
+/// bounded so a device with a large partition table cannot consume the
+/// headline's frame or leave a half-row at the bottom.
+pub(super) const MAX_VISIBLE_MOUNTED_PARTITIONS: usize = 4;
+
 pub(super) fn partition_panel(
     theme: &Theme,
     partitions: &[DiskPartition],
@@ -33,18 +38,24 @@ pub(super) fn partition_panel(
             div()
                 .flex()
                 .items_center()
-                .gap(tokens::SPACE_6)
-                .text_size(tokens::FONT_13)
-                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                .text_color(theme.fg)
-                .child(taskmanager_icons::icon(IconId::Disk).size(px(14.0)))
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_BOLD,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .child(taskmanager_ui::icons_binding::icon(IconId::Disk).size(px(14.0)))
                 .child(i18n::t("disk.partitions")),
         )
         .render()
         .flex()
         .flex_col()
         .w_full()
-        .gap(tokens::SPACE_8);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ));
     #[cfg(any(test, feature = "test-support"))]
     {
         panel = panel.debug_selector(|| "tm-disk-partitions".to_string());
@@ -53,8 +64,8 @@ pub(super) fn partition_panel(
     if partitions.is_empty() {
         return panel.child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("disk.no_partitions")),
         );
     }
@@ -71,11 +82,26 @@ pub(super) fn partition_panel(
         .iter()
         .filter(|partition| partition.mount_point.trim().is_empty())
         .collect();
-    for (index, partition) in mounted.iter().enumerate() {
+    for (index, partition) in mounted
+        .iter()
+        .take(MAX_VISIBLE_MOUNTED_PARTITIONS)
+        .enumerate()
+    {
         panel = panel.child(with_partition_selector(
             partition_row(theme, partition, units, index),
             index,
         ));
+    }
+    if mounted.len() > MAX_VISIBLE_MOUNTED_PARTITIONS {
+        panel = panel.child(
+            div()
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .child(i18n::t("disk.partitions_more").replace(
+                    "{count}",
+                    &(mounted.len() - MAX_VISIBLE_MOUNTED_PARTITIONS).to_string(),
+                )),
+        );
     }
     if !unmounted.is_empty() {
         panel = panel.child(unmounted_summary(theme, &unmounted));
@@ -128,9 +154,11 @@ fn partition_row(
         .flex_row()
         .w_full()
         .h(px(6.0))
-        .rounded(tokens::small_radius(theme))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::small_radius(theme),
+        ))
         .overflow_hidden()
-        .bg(theme.sidebar_bg);
+        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg));
     if let Some(fraction) = usage.1 {
         bar = bar.child(
             div()
@@ -139,7 +167,7 @@ fn partition_row(
                 .top_0()
                 .bottom_0()
                 .w(relative(fraction))
-                .bg(theme.disk),
+                .bg(taskmanager_ui::theme_binding::fill(theme.disk)),
         );
     }
     let bar = partition_slot(bar, index, "bar");
@@ -152,8 +180,8 @@ fn partition_row(
     let label_text = div().w_full().min_w(px(0.0)).child(
         elements::truncated_text(&label)
             .w_full()
-            .text_size(tokens::FONT_12)
-            .text_color(theme.fg),
+            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg)),
     );
     let label_row = partition_slot(
         div().flex().w_full().min_w(px(0.0)).child(
@@ -171,8 +199,8 @@ fn partition_row(
                 .flex_1()
                 .min_w(px(0.0))
                 .text_right()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim),
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
         ),
         index,
         "usage",
@@ -182,7 +210,9 @@ fn partition_row(
         .flex()
         .flex_col()
         .w_full()
-        .gap(tokens::SPACE_5)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_5,
+        ))
         .child(label_row)
         .child(usage_row)
         .child(bar)
@@ -209,13 +239,15 @@ fn unmounted_summary(theme: &Theme, partitions: &[&DiskPartition]) -> Div {
         .flex()
         .flex_row()
         .items_center()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(
             elements::truncated_text(&summary)
                 .flex_1()
                 .min_w(px(0.0))
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim),
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
         );
     #[cfg(any(test, feature = "test-support"))]
     let row = row.debug_selector(|| "tm-disk-partitions-unmounted".to_string());

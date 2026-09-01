@@ -553,9 +553,7 @@ fn section_title<'a>(
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     text(heading.to_string())
         .size(f32::from(tokens::FONT_13))
-        .color(taskmanager_theme::iced::color(
-            theme_snapshot.palette().accent,
-        ))
+        .color(crate::theme_binding::color(theme_snapshot.palette().accent))
         .into()
 }
 

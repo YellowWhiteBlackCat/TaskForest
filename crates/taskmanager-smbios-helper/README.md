@@ -30,3 +30,12 @@ cargo clippy -p taskmanager-smbios-helper --all-targets -- -D warnings
 
 Package/polkit verification and a live DMI receipt are separate; without the
 latter the capability remains permission-limited.
+
+## Module map
+
+```text
+src/main.rs       root entry
+src/dmi_walk.rs   read-only type-17 memory inventory walk (shared parser:
+                  taskmanager-smbios-tables)
+src/json.rs       fixed JSON envelope output
+```

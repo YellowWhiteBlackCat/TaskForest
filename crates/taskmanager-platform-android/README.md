@@ -51,3 +51,10 @@ cargo check --locked --target aarch64-linux-android \
 
 Target compilation proves only the Rust target seam. It does not prove Android
 permissions, runtime values, background execution, or APK behavior.
+
+## Module map
+
+```text
+src/lib.rs                     android-provider feature-gated seam (ADR-044);
+                               currently capability absence (typed Unsupported)
+```

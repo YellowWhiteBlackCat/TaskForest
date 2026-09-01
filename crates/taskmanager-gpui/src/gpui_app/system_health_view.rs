@@ -140,12 +140,18 @@ fn filesystem_color(theme: &Theme, status: FilesystemHealthStatus) -> Color {
 
 pub(crate) fn badge(theme: &Theme, label: String, color: Color) -> Div {
     div()
-        .px(tokens::SPACE_7)
-        .py(tokens::SPACE_3)
-        .rounded(tokens::control_radius(theme))
-        .bg(theme.shade)
-        .text_size(tokens::FONT_11)
-        .text_color(color)
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_3,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(theme.shade))
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+        .text_color(taskmanager_ui::theme_binding::hsla(color))
         .child(label)
 }
 
@@ -155,15 +161,15 @@ pub(crate) fn metric(theme: &Theme, label: String, value: String) -> Div {
         .min_w(px(118.0))
         .child(
             div()
-                .text_size(tokens::FONT_10)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(label),
         )
         .child(
             div()
-                .mt(tokens::SPACE_2)
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_2))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(value),
         )
 }
@@ -204,11 +210,15 @@ fn filesystem_row(
         })
         .unwrap_or_else(&unavailable);
     div()
-        .p(tokens::SPACE_9)
-        .rounded(tokens::control_radius(theme))
+        .p(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_9,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
         .border_1()
-        .border_color(theme.border)
-        .bg(theme.sidebar_card_bg)
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
         .child(
             div()
                 .flex()
@@ -216,11 +226,15 @@ fn filesystem_row(
                 .flex_wrap()
                 .items_center()
                 .justify_between()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(
                     div()
                         .min_w(px(0.0))
-                        .font_weight(tokens::FONT_WEIGHT_HEADER.into())
+                        .font_weight(taskmanager_ui::theme_binding::font_weight(
+                            tokens::FONT_WEIGHT_HEADER,
+                        ))
                         .child(filesystem.mount_point.display().to_string()),
                 )
                 .child(badge(
@@ -231,9 +245,9 @@ fn filesystem_row(
         )
         .child(
             div()
-                .mt(tokens::SPACE_3)
-                .text_size(tokens::FONT_10)
-                .text_color(theme.fg_dim)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_3))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(format!(
                     "{}: {} · {}",
                     copy(SystemHealthText::Source),
@@ -243,11 +257,13 @@ fn filesystem_row(
         )
         .child(
             div()
-                .mt(tokens::SPACE_7)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(metric(theme, copy(SystemHealthText::Space), capacity))
                 .child(metric(theme, copy(SystemHealthText::Inodes), unavailable()))
                 .child(metric(theme, copy(SystemHealthText::ReadOnly), read_only))
@@ -273,15 +289,19 @@ fn storage_section(
     units: UnitPreferences,
 ) -> Div {
     let mut rows = div()
-        .mt(tokens::SPACE_8)
+        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_7);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ));
     if data.filesystems.filesystems.is_empty() {
         rows = rows.child(
             div()
-                .py(tokens::SPACE_14)
-                .text_color(theme.fg_dim)
+                .py(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_14,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(copy(SystemHealthText::NoFilesystems)),
         );
     } else {
@@ -312,10 +332,12 @@ fn sensor_group(
     copy: &dyn Fn(SystemHealthText) -> String,
 ) -> Div {
     let mut rows = div()
-        .mt(tokens::SPACE_6)
+        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_6))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_5);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_5,
+        ));
     let mut count = 0;
     let quantity = group.quantity();
     for reading in readings
@@ -326,30 +348,36 @@ fn sensor_group(
         let value = sensor_value_vm(reading, copy);
         rows = rows.child(
             div()
-                .p(tokens::SPACE_8)
-                .rounded(tokens::control_radius(theme))
-                .bg(theme.sidebar_card_bg)
+                .p(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
+                .rounded(taskmanager_ui::theme_binding::absolute(
+                    tokens::control_radius(theme),
+                ))
+                .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
                 .flex()
                 .flex_row()
                 .flex_wrap()
                 .items_center()
                 .justify_between()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(
                     div()
                         .flex_1()
                         .min_w(px(120.0))
-                        .text_size(tokens::FONT_12)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
                         .child(reading.label().to_owned()),
                 )
                 .child(
                     div()
-                        .text_size(tokens::FONT_12)
-                        .text_color(if value.present {
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(if value.present {
                             theme.fg
                         } else {
                             state_color(theme, reading.state().status)
-                        })
+                        }))
                         .child(value.text),
                 )
                 .child(badge(
@@ -362,21 +390,29 @@ fn sensor_group(
     if count == 0 {
         rows = rows.child(
             div()
-                .py(tokens::SPACE_8)
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .py(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(copy(SystemHealthText::NoReadings)),
         );
     }
     div()
-        .p(tokens::SPACE_8)
-        .rounded(tokens::control_radius(theme))
+        .p(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
         .border_1()
-        .border_color(theme.border)
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
         .child(
             div()
-                .text_size(tokens::FONT_12)
-                .font_weight(tokens::FONT_WEIGHT_HEADER.into())
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_HEADER,
+                ))
                 .child(copy(SystemHealthText::SensorGroup(group))),
         )
         .child(rows)
@@ -389,10 +425,12 @@ fn sensor_section(
     copy: &dyn Fn(SystemHealthText) -> String,
 ) -> Div {
     let mut groups = div()
-        .mt(tokens::SPACE_8)
+        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_7);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ));
     for group in [
         SensorGroup::Temperature,
         SensorGroup::FanSpeed,
@@ -433,12 +471,16 @@ fn section_shell(
                 .flex_wrap()
                 .items_center()
                 .justify_between()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(
                     div()
-                        .text_size(tokens::FONT_18)
-                        .font_weight(tokens::FONT_WEIGHT_STRONG.into())
-                        .text_color(theme.fg)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_18))
+                        .font_weight(taskmanager_ui::theme_binding::font_weight(
+                            tokens::FONT_WEIGHT_STRONG,
+                        ))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                         .child(title),
                 )
                 .child(badge(
@@ -506,7 +548,9 @@ pub fn render_system_health(props: SystemHealthViewProps<'_>) -> Stateful<Div> {
             .flex_row()
             .flex_wrap()
             .items_start()
-            .gap(tokens::SPACE_10)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_10,
+            ))
             .child(storage_section(
                 theme,
                 StorageSectionData {

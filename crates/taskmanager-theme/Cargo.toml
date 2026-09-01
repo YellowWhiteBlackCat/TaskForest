@@ -8,30 +8,15 @@ description = "Toolkit-neutral theme tokens, skin/mode/high-contrast/fonts axes 
 readme = "README.md"
 publish = false
 
-# Toolkit-NEUTRAL by default (ADR-026): the design data modules never name a
-# toolkit type. The toolkit bindings live in cfg'd modules — `src/gpui.rs`
-# behind the optional `gpui` feature, `src/iced.rs` behind the optional
-# `iced` feature (CORE-07: the orphan rule pins `From<Color> for …` impls to
-# this crate, and the iced frontend previously grew a local second
-# conversion point, so its token→value edge is quarantined here too). The
-# TUI keeps its lossy terminal color quantization locally (ADR-026) and
-# consumes this crate with no toolkit feature at all.
+# Toolkit-NEUTRAL unconditionally (ADR-026, ADR-051): every module compiles
+# zero toolkit code on every target and this dependency table names no
+# toolkit at all — the table below IS the neutrality proof. Each frontend
+# owns its token→toolkit binding inside its own dependency closure
+# (`taskmanager-ui::theme_binding` for GPUI, `taskmanager-iced::theme_binding`
+# for iced); the TUI keeps its lossy terminal color quantization locally
+# (ADR-026).
 
 [dependencies]
-gpui = { version = "0.2.2", default-features = false, optional = true }
-# The thinnest iced surface the binding needs: `iced_core` owns
-# Color/Font/font::Weight (the umbrella re-exports them from here), pulls no
-# windowing/rendering chain, and feature-unifies with the iced frontend's
-# full feature set inside the workspace graph. The types are identical to
-# the umbrella's, so the frontend consumes them without a cast.
-iced_core = { version = "0.14.0", optional = true }
-
-[features]
-gpui = ["dep:gpui"]
-iced = ["dep:iced_core"]
-
-[dev-dependencies]
-gpui = { version = "0.2.2", default-features = false, features = ["test-support"] }
 
 [lib]
 name = "taskmanager_theme"

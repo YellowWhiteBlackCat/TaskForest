@@ -25,21 +25,45 @@ FRONTEND_PACKAGES = {
 FRONTEND_SCRIPTS = {
     "gpui": (
         "scripts/capture-niri.sh",
+        "scripts/capture-host-wayland-diagnostic.sh",
         "scripts/capture_scenarios.tsv",
+        "scripts/private-session.conf",
+        "scripts/receive_kwin_window_receipt.py",
+        "scripts/capture_supervisor.py",
+        "scripts/capture_build.py",
+        "scripts/capture_publish.py",
+        "scripts/capture-reclaim.sh",
+        "scripts/test_capture_isolation.py",
         "scripts/validate_capture_evidence.py",
+        "scripts/validate_host_wayland_diagnostic.py",
     ),
     "tui": (
         "scripts/capture-tui.sh",
+        "scripts/private-session.conf",
+        "scripts/capture_supervisor.py",
+        "scripts/capture_build.py",
+        "scripts/capture_publish.py",
+        "scripts/capture-reclaim.sh",
         "scripts/validate_tui_evidence.py",
     ),
     "iced": (
         "scripts/capture-iced.sh",
         "scripts/capture-iced-matrix.sh",
+        "scripts/private-session.conf",
+        "scripts/capture_supervisor.py",
+        "scripts/capture_build.py",
+        "scripts/capture_publish.py",
+        "scripts/capture-reclaim.sh",
         "scripts/capture_iced_scenarios.tsv",
         "scripts/validate_iced_matrix.py",
     ),
     "bevy": (
         "scripts/capture-bevy.sh",
+        "scripts/private-session.conf",
+        "scripts/capture_supervisor.py",
+        "scripts/capture_build.py",
+        "scripts/capture_publish.py",
+        "scripts/capture-reclaim.sh",
         "scripts/capture_bevy_scenarios.tsv",
         "scripts/validate_bevy_matrix.py",
         "scripts/accept-bevy-interactions.sh",
@@ -105,10 +129,11 @@ def workspace_packages(root: Path) -> dict[str, dict]:
 
 
 def package_scope(root: Path, packages: dict[str, dict], frontend: str) -> set[str]:
+    # ADR-051: each frontend is its own product crate. Provenance follows the
+    # production graph walked from the product crate — no feature simulation
+    # and no root dispatch package exist anymore.
     selected = FRONTEND_PACKAGES[frontend]
-    roots = {"taskmanager"}
-    if selected is not None:
-        roots.add(selected)
+    roots = {selected}
     included: set[str] = set()
     pending = list(roots)
     cursor = 0
@@ -120,21 +145,14 @@ def package_scope(root: Path, packages: dict[str, dict], frontend: str) -> set[s
         included.add(name)
         package = packages[name]
         for dependency in package["dependencies"]:
-            # Provenance follows the production graph.  Dev-only helpers used
-            # by root integration tests (for example the GPUI test harness)
-            # are not linked into a TUI/Iced release and must not invalidate
-            # their pixel receipts.
+            # Provenance follows the production graph. Dev-only helpers are
+            # not linked into a release binary and must not invalidate pixel
+            # receipts.
             if dependency.get("kind") not in (None, "normal"):
                 continue
             if not dependency_applies_to_host(dependency):
                 continue
             dep_name = dependency["name"]
-            # The root package declares all three optional frontend adapters;
-            # only the selected one belongs to this receipt. Other optional
-            # workspace dependencies are likewise not compiled into the shape.
-            if dependency.get("optional"):
-                if name != "taskmanager" or dep_name != selected:
-                    continue
             if dep_name in packages:
                 pending.append(dep_name)
     return included
@@ -151,14 +169,11 @@ def source_paths(root: Path, frontend: str) -> list[Path]:
         manifest = Path(packages[package_name]["manifest_path"]).resolve()
         paths.add(manifest)
         package_root = manifest.parent
-        # The root package contains the shared CLI and dispatch seam. Each
-        # frontend implementation is a peer workspace package, so walking its
-        # `src` tree records the selected product without invalidating receipts
-        # for the other frontend shapes.
-        if package_name != "taskmanager":
-            source_root = package_root / "src"
-            if source_root.is_dir():
-                paths.update(path for path in source_root.rglob("*") if path.is_file())
+        # Every walked package is a workspace member whose `src` tree affects
+        # the selected product's receipt.
+        source_root = package_root / "src"
+        if source_root.is_dir():
+            paths.update(path for path in source_root.rglob("*") if path.is_file())
         build_script = package_root / "build.rs"
         if build_script.is_file():
             paths.add(build_script)

@@ -26,7 +26,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use taskmanager_application::i18n;
 use taskmanager_core::core::DirectoryUsageSnapshot;
-use taskmanager_core::core::metrics::{NetworkAdapterType, SystemSnapshot};
+use taskmanager_core::core::metrics::{DiskMetrics, NetworkAdapterType, SystemSnapshot};
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_theme::Theme;
 
@@ -54,7 +54,9 @@ use taskmanager_theme::tokens;
 // public surface for Performance pages: cpu_view composes through the same
 // root as every device page, so no sibling module can hand-roll a parallel
 // page shell.
-pub(crate) use layout::{ChartSpec, DualLanes, HeadlineSurface, PerfPageProps, perf_page};
+pub(crate) use layout::{
+    ChartSpec, DualLanes, HEADLINE_COMPANION_FLOOR, HeadlineSurface, PerfPageProps, perf_page,
+};
 use layout::{render_chart, stats_panel};
 use memory_composition::{
     MEMORY_DETAIL_COMPACT_MIN_HEIGHT, MEMORY_DETAIL_FULL_MIN_HEIGHT, MemoryDetailMode,
@@ -62,6 +64,7 @@ use memory_composition::{
 };
 use memory_stats::memory_page_stats;
 use network_stats::{network_link_speed_graph_max, network_stats, network_title};
+use partition_stats::MAX_VISIBLE_MOUNTED_PARTITIONS;
 use partition_stats::partition_panel;
 pub use smart_dialog::render_smart_dialog;
 use smart_status::status_footer;
@@ -82,6 +85,21 @@ const MEMORY_CHART_FLOOR_BOTH: f32 = 2.0 * MEMORY_CHART_FLOOR_ONE + 10.0;
 /// with text metrics. The margin keeps that drift from clipping the swap
 /// chart's tail against the fixed viewport.
 const MEMORY_FIT_SAFETY: f32 = 24.0;
+
+/// Disk lower-band fit bounds. The main Performance viewport is fixed and
+/// non-scrolling, so the partition panel owns the first lower-band slot;
+/// activity and directory analysis are admitted only when their complete
+/// footprints also fit. These constants deliberately overestimate text
+/// height to keep the final card away from the viewport edge.
+const DISK_TOP_CHROME_FLOOR: f32 = 86.0;
+const DISK_HEADLINE_SECTION_FLOOR: f32 = 186.0;
+const DISK_PARTITION_PANEL_BASE: f32 = 68.0;
+const DISK_PARTITION_ROW_FLOOR: f32 = 58.0;
+const DISK_PARTITION_SUMMARY_FLOOR: f32 = 24.0;
+const DISK_ACTIVITY_SECTION_FLOOR: f32 = 170.0;
+const DISK_USAGE_PANEL_FLOOR: f32 = 280.0;
+const DISK_LOWER_GAP: f32 = 8.0;
+const DISK_BOTTOM_SAFETY: f32 = 12.0;
 
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/perf_views/tests.rs"]
@@ -212,10 +230,6 @@ fn badge_watts(v: f32) -> String {
 fn badge_temperature(v: f32) -> String {
     taskmanager_shell::presentation::temperature_c(v)
 }
-pub(super) fn badge_mhz(v: f32) -> String {
-    taskmanager_shell::presentation::megahertz(v)
-}
-
 /// Generation-keyed cache of the Memory page header-chart sample projections.
 ///
 /// Memory + swap histories change only when the platform batch accepts a
@@ -279,7 +293,6 @@ pub(crate) struct MemoryViewProps<'a> {
     pub(crate) snap: &'a SystemSnapshot,
     pub(crate) telemetry: &'a TelemetryStore,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) stats_scroll: gpui::ScrollHandle,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
     pub(crate) memory_history: &'a mut MemoryHistoryCache,
     pub(crate) budget: PerformancePageBudget,
@@ -291,7 +304,6 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
         snap,
         telemetry,
         performance,
-        stats_scroll,
         hover_slot,
         memory_history,
         budget,
@@ -340,6 +352,17 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
         } else {
             MemoryDetailMode::Compact
         };
+    let detail_floor = match detail_mode {
+        MemoryDetailMode::Full => MEMORY_DETAIL_FULL_MIN_HEIGHT,
+        MemoryDetailMode::Compact => MEMORY_DETAIL_COMPACT_MIN_HEIGHT,
+    };
+    // The lower card is admitted only when its complete compact/full footprint
+    // fits beside the chart floors. The fixed Performance viewport has no
+    // scroll escape hatch, so a lower card that cannot fit is omitted whole;
+    // it must never leave a half-painted bar at the bottom edge.
+    let show_detail = legacy_budget
+        || (budget.vertical.carries_below()
+            && available >= charts_floor + detail_floor + MEMORY_FIT_SAFETY);
     let mut charts = vec![ChartSpec::headline(
         "mem-graph",
         "mem-graph",
@@ -366,7 +389,6 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
     }
     perf_page(PerfPageProps {
         theme,
-        stats_scroll,
         title: i18n::t("common.memory").into(),
         subtitle: format!("{} {}", i18n::t("mem.total"), memory_stats.total_readout),
         vital_line: None,
@@ -375,8 +397,9 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
         // The composition module lives BELOW the two headline charts (the
         // memory page's own ordering, matching disk: charts carry the page,
         // the detail module follows and yields first).
-        below: Some(composition_block(theme, m, units, detail_mode).into_any_element()),
-        stats: stats_panel(theme, stats),
+        below: show_detail
+            .then(|| composition_block(theme, m, units, detail_mode).into_any_element()),
+        stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: None,
         hover_slot,
         graph_settings: performance.graph,
@@ -389,7 +412,6 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
 /// panel family (mirrors `CpuViewProps`).
 pub(crate) struct DiskViewProps<'a> {
     pub theme: &'a Theme,
-    pub stats_scroll: gpui::ScrollHandle,
     pub snap: &'a SystemSnapshot,
     pub telemetry: &'a TelemetryStore,
     pub index: usize,
@@ -399,10 +421,46 @@ pub(crate) struct DiskViewProps<'a> {
     pub budget: PerformancePageBudget,
 }
 
+fn disk_partition_panel_floor(disk: &DiskMetrics) -> f32 {
+    let mounted = disk
+        .partitions
+        .iter()
+        .filter(|partition| !partition.mount_point.trim().is_empty())
+        .count();
+    let unmounted = disk
+        .partitions
+        .iter()
+        .any(|partition| partition.mount_point.trim().is_empty());
+    let mut height = DISK_PARTITION_PANEL_BASE;
+    for _ in 0..mounted.min(MAX_VISIBLE_MOUNTED_PARTITIONS) {
+        height += DISK_PARTITION_ROW_FLOOR + DISK_LOWER_GAP;
+    }
+    if mounted > MAX_VISIBLE_MOUNTED_PARTITIONS {
+        height += DISK_PARTITION_SUMMARY_FLOOR + DISK_LOWER_GAP;
+    }
+    if unmounted {
+        height += DISK_PARTITION_SUMMARY_FLOOR + DISK_LOWER_GAP;
+    }
+    height
+}
+
+fn disk_lower_band_capacity(content_height: f32) -> Option<f32> {
+    if content_height <= 0.0 {
+        return None;
+    }
+    Some(
+        (content_height - DISK_TOP_CHROME_FLOOR - DISK_HEADLINE_SECTION_FLOOR - DISK_BOTTOM_SAFETY)
+            .max(0.0),
+    )
+}
+
+fn lower_band_fits(capacity: Option<f32>, required: f32) -> bool {
+    capacity.is_none_or(|available| available >= required)
+}
+
 pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) -> Div {
     let DiskViewProps {
         theme,
-        stats_scroll,
         snap,
         telemetry,
         index: i,
@@ -438,25 +496,56 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
     // budget keeps secondary charts — a cold window or a platform whose
     // active-time source is honestly unavailable keeps the absence instead
     // of a fabricated flat 0%.
-    let activity_graph = (!activity_samples.is_empty()
-        && budget.chart_inventory == PerformanceChartInventory::Full)
-        .then(|| {
-            render_chart(
-                theme,
-                ChartSpec::secondary(
-                    "disk-activity-graph",
-                    (ElementId::from("disk-activity-graph"), d.device_id.clone()),
-                    i18n::t("disk.active_time").to_string(),
-                    Rc::clone(&activity_samples),
-                    theme.disk,
-                    GraphUnit::Percent,
-                ),
-                performance.graph,
-                budget.vertical,
-                hover_slot,
-            )
-            .into_any_element()
-        });
+    let partition_floor = disk_partition_panel_floor(d);
+    let lower_capacity = disk_lower_band_capacity(budget.content_height);
+    let activity_available =
+        !activity_samples.is_empty() && budget.chart_inventory == PerformanceChartInventory::Full;
+    let usage_available = d.partitions.len() <= MAX_VISIBLE_MOUNTED_PARTITIONS;
+    let partition_fits = lower_band_fits(lower_capacity, partition_floor);
+    let activity_fits = lower_band_fits(
+        lower_capacity,
+        partition_floor + DISK_LOWER_GAP + DISK_ACTIVITY_SECTION_FLOOR,
+    );
+    let usage_after_activity_fits = lower_band_fits(
+        lower_capacity,
+        partition_floor
+            + if activity_available && activity_fits {
+                DISK_LOWER_GAP + DISK_ACTIVITY_SECTION_FLOOR
+            } else {
+                0.0
+            }
+            + DISK_LOWER_GAP
+            + DISK_USAGE_PANEL_FLOOR,
+    );
+    let usage_without_activity_fits = lower_band_fits(
+        lower_capacity,
+        partition_floor + DISK_LOWER_GAP + DISK_USAGE_PANEL_FLOOR,
+    );
+    let show_activity = partition_fits && activity_available && activity_fits;
+    let show_usage = partition_fits
+        && usage_available
+        && if show_activity {
+            usage_after_activity_fits
+        } else {
+            usage_without_activity_fits
+        };
+    let activity_graph = show_activity.then(|| {
+        render_chart(
+            theme,
+            ChartSpec::secondary(
+                "disk-activity-graph",
+                (ElementId::from("disk-activity-graph"), d.device_id.clone()),
+                i18n::t("disk.active_time").to_string(),
+                Rc::clone(&activity_samples),
+                theme.disk,
+                GraphUnit::Percent,
+            ),
+            performance.graph,
+            budget.vertical,
+            hover_slot,
+        )
+        .into_any_element()
+    });
     let stats = disk_stats(d, units, temperature_samples.as_ref());
     let has_smart = has_smart_fields(d); // ── SMART health button (opens a dedicated attributes dialog) ──
     let smart_footer: Option<AnyElement> = if smart_section_visible(d) {
@@ -475,8 +564,8 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
                     }))
                     .child(
                         div()
-                            .text_size(tokens::FONT_12)
-                            .text_color(theme.accent)
+                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                            .text_color(taskmanager_ui::theme_binding::hsla(theme.accent))
                             .child(i18n::t("disk.smart_health")),
                     )
                     .into_any_element(),
@@ -487,9 +576,10 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
     } else {
         None
     };
+    let usage_panel = show_usage
+        .then(|| directory_usage::directory_usage_panel(theme, d, directory_usage, units, cx));
     perf_page(PerfPageProps {
         theme,
-        stats_scroll,
         title: if d.model.is_empty() {
             d.name.trim_start_matches("/dev/").to_string()
         } else {
@@ -524,23 +614,20 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
             )
             .with_max(observed_max),
         ]),
-        below: Some(
+        below: partition_fits.then(|| {
             div()
                 .flex()
                 .flex_col()
-                .gap(tokens::SPACE_8)
+                .flex_none()
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .children(activity_graph)
                 .child(partition_panel(theme, &d.partitions, units))
-                .child(directory_usage::directory_usage_panel(
-                    theme,
-                    d,
-                    directory_usage,
-                    units,
-                    cx,
-                ))
-                .into_any_element(),
-        ),
-        stats: stats_panel(theme, stats),
+                .children(usage_panel)
+                .into_any_element()
+        }),
+        stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: smart_footer,
         hover_slot,
         graph_settings: performance.graph,
@@ -555,7 +642,6 @@ pub(crate) struct NetworkViewProps<'a> {
     pub(crate) telemetry: &'a TelemetryStore,
     pub(crate) index: usize,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) stats_scroll: gpui::ScrollHandle,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
     pub(crate) budget: PerformancePageBudget,
 }
@@ -567,7 +653,6 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
         telemetry,
         index: i,
         performance,
-        stats_scroll,
         hover_slot,
         budget,
     } = props;
@@ -600,7 +685,6 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
     let stats = network_stats(n, is_wireless, units);
     perf_page(PerfPageProps {
         theme,
-        stats_scroll,
         title,
         subtitle: n.ipv4_addr.as_deref().unwrap_or_default().to_owned(),
         vital_line: Some(network_stats::vital_line(n)),
@@ -622,7 +706,7 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
             .with_max(max),
         ]),
         below: None,
-        stats: stats_panel(theme, stats),
+        stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: status_footer(theme, n.device_state.status),
         hover_slot,
         graph_settings: performance.graph,
@@ -662,9 +746,11 @@ pub(super) fn graph_summary_row(
         div()
             .flex()
             .flex_row()
-            .gap(tokens::SPACE_16)
-            .text_size(tokens::FONT_11)
-            .text_color(theme.fg_dim)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_16,
+            ))
+            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
             .child(format!(
                 "{} {}",
                 i18n::t("common.latest"),

@@ -284,7 +284,7 @@ impl Render for LayerStack {
                     .absolute()
                     .size_full()
                     .occlude()
-                    .when_some(mask, |el, color| el.bg(color))
+                    .when_some(mask, |el, color| el.bg(crate::theme_binding::fill(color)))
                     .on_any_mouse_down(move |event: &MouseDownEvent, window, cx| {
                         cx.stop_propagation();
                         if mask_closable && event.button == MouseButton::Left {

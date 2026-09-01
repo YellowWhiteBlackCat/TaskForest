@@ -31,3 +31,9 @@ colors.
 Keep asset provenance and `currentColor` behavior stable when changing the
 registry. Product-wide asset rules live in
 `../../docs/UI_COMPONENT_ARCHITECTURE.md`.
+
+## Module map
+
+```text
+src/lib.rs                     deterministic demo assets (fonts/images), read-only access
+```

@@ -87,17 +87,23 @@ pub fn render_banner(
         .tab_stop(true)
         .focus(elements::focus_ring(theme))
         .w_full()
-        .px(tokens::SPACE_10)
-        .py(tokens::SPACE_6)
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .flex()
         .items_center()
         .justify_between()
-        .gap(tokens::SPACE_8)
-        .bg(theme.sidebar_card_bg)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
         .border_b_1()
-        .border_color(color)
-        .text_size(tokens::FONT_12)
-        .text_color(theme.fg)
+        .border_color(taskmanager_ui::theme_binding::hsla(color))
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
         .cursor_pointer()
         .on_click(move |_event, _window, cx| {
             entity.update(cx, |view, cx| {
@@ -109,8 +115,10 @@ pub fn render_banner(
         .child(
             div()
                 .flex_none()
-                .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
-                .text_color(color)
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_SEMIBOLD,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(color))
                 .child(i18n::t("alert.view")),
         )
 }

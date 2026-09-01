@@ -62,7 +62,7 @@ pub(super) fn render_transfer_actions(
         .flex_row()
         .flex_wrap()
         .items_center()
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(tokens::SPACE_6))
         .child(elements::pill(
             theme,
             "alert-rules-export",

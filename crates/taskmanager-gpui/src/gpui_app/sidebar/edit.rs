@@ -38,9 +38,19 @@ pub(super) fn edit_button(
                 cx,
             );
         }))
-        .px(tokens::SPACE_4)
-        .py(tokens::SPACE_2)
-        .rounded(tokens::control_radius(theme))
-        .text_color(if active { theme.accent } else { theme.fg_dim })
-        .child(taskmanager_icons::icon(IconId::Settings).size(px(14.0)))
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_4,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_2,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
+        .text_color(taskmanager_ui::theme_binding::hsla(if active {
+            theme.accent
+        } else {
+            theme.fg_dim
+        }))
+        .child(taskmanager_ui::icons_binding::icon(IconId::Settings).size(px(14.0)))
 }

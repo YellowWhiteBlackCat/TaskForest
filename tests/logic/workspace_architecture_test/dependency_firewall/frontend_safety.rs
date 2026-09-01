@@ -80,7 +80,10 @@ fn frontend_sources_import_domain_owners_directly() {
     }
 
     for (name, root) in [
-        ("Root", "src"),
+        // (ADR-051) the root gates host ships no business code and is
+        // intentionally absent here; the shared CLI harness consumes core
+        // facts for the UI-neutral modes like any composition edge.
+        ("Shared CLI", "crates/taskmanager-cli/src"),
         ("Application", "crates/taskmanager-application/src"),
         ("App host", "crates/taskmanager-app-host/src"),
         ("GPUI", "crates/taskmanager-gpui/src"),

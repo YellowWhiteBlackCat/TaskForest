@@ -1,32 +1,22 @@
-//! Semantic icon registry plus toolkit-specific rendering adapters (ADR-017).
+//! Toolkit-neutral semantic icon registry (ADR-017).
 //!
 //! The toolkit-neutral semantic identity ([`taskmanager_ui_contract::IconId`])
 //! stays in `taskmanager-ui-contract`; the embedded SVG assets stay in
-//! `taskmanager-assets`. This crate owns the GPUI mapping between them:
+//! `taskmanager-assets`. This crate owns the mapping between them:
 //!
-//! - [`path` function] — resolve an [`IconId`](taskmanager_ui_contract::IconId) to the
-//!   embedded asset path used by GPUI.
 //! - [`path`] — resolve an [`IconId`](taskmanager_ui_contract::IconId) to the
 //!   embedded SVG asset path.
-//! - [`asset_bytes`] — retrieve the same embedded SVG bytes for another
+//! - [`asset_bytes`] — retrieve the same embedded SVG bytes for any
 //!   frontend's native vector widget.
-//! - [`icon`] — build a GPUI SVG icon element. Color inherits from the
-//!   surrounding text style at layout time, and callers can keep chaining
-//!   GPUI style methods (`.size(..)`, `.text_color(..)`, …) on the result.
 //!
-//! No `gpui_component` types are used or re-exported.
+//! Toolkit rendering adapters are frontend-owned (ADR-051): the GPUI SVG/
+//! image builders live in `taskmanager-ui::icons_binding`, the Bevy raster
+//! fallback in `taskmanager-bevy-ui`, and the iced frontend resolves bytes
+//! directly. This crate compiles zero toolkit code on every target.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::wildcard_imports)]
 
-#[cfg(feature = "gpui")]
-mod application;
 mod path;
-#[cfg(feature = "gpui")]
-mod svg;
 
-#[cfg(feature = "gpui")]
-pub use application::{ApplicationImageFormat, application_image};
 pub use path::{asset_bytes, path};
-#[cfg(feature = "gpui")]
-pub use svg::icon;

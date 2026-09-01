@@ -15,3 +15,9 @@ telemetry, application reducers, authorization or renderer window state.
 Menu identity, show/hide/quit actions and unavailable native tray behavior are
 typed. Verify target cfg compilation and keep platform-specific event loops at
 the composition edge.
+
+## Module map
+
+```text
+src/lib.rs                     Windows/macOS muda tray adapter (Linux uses ksni, ADR-032)
+```

@@ -471,9 +471,13 @@ pub fn proc_row_with_layout(
         // Same inner gutter every other column carries (row `.px(SPACE_8)` +
         // cell `.pl(SPACE_8)`), so the identity column's text does not sit
         // flush against the table edge while User/PID sit 16px in.
-        .pl(tokens::SPACE_8)
-        .text_size(ui_size.body_font_size())
-        .text_color(theme.fg)
+        .pl(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .text_size(taskmanager_ui::theme_binding::absolute(
+            ui_size.body_font_size(),
+        ))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
         // Indentation by depth (tree children / group instances). flex_shrink_0
         // holds the indent fixed — without it gpui's default flex_shrink=1
         // collapses the spacer when the name cell overflows (deep nesting / a
@@ -497,7 +501,7 @@ pub fn proc_row_with_layout(
                 .w(px(18.0))
                 .flex_shrink_0()
                 .cursor_pointer()
-                .text_color(theme.fg_dim)
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 // stop_propagation keeps the parent row's selection on_click from firing
                 // when the chevron is the click target.
                 .on_mouse_down(MouseButton::Left, move |_ev, _win, cx: &mut App| {
@@ -518,10 +522,10 @@ pub fn proc_row_with_layout(
     if let Some(identity) = &row.application_identity {
         #[cfg(any(test, feature = "test-support"))]
         let has_asset = identity.icon_asset.is_some();
-        let app_icon_size: Pixels = ui_size.icon_size().into();
+        let app_icon_size: Pixels = taskmanager_ui::theme_binding::pixels(ui_size.icon_size());
         let icon = identity.icon_asset.as_ref().map_or_else(
             || {
-                taskmanager_icons::icon(IconId::Applications)
+                taskmanager_ui::icons_binding::icon(IconId::Applications)
                     .size(app_icon_size)
                     .into_any_element()
             },
@@ -529,7 +533,7 @@ pub fn proc_row_with_layout(
                 icons::application_image(asset)
                     .size(app_icon_size)
                     .with_fallback(move || {
-                        taskmanager_icons::icon(IconId::Applications)
+                        taskmanager_ui::icons_binding::icon(IconId::Applications)
                             .size(app_icon_size)
                             .into_any_element()
                     })
@@ -537,13 +541,13 @@ pub fn proc_row_with_layout(
             },
         );
         let marker = div()
-            .w(ui_size.icon_size())
-            .h(ui_size.icon_size())
+            .w(taskmanager_ui::theme_binding::length(ui_size.icon_size()))
+            .h(taskmanager_ui::theme_binding::length(ui_size.icon_size()))
             .flex_shrink_0()
             .flex()
             .items_center()
             .justify_center()
-            .mr(tokens::SPACE_4)
+            .mr(taskmanager_ui::theme_binding::length(tokens::SPACE_4))
             .child(icon);
         #[cfg(any(test, feature = "test-support"))]
         let marker = marker.debug_selector(move || {
@@ -570,9 +574,11 @@ pub fn proc_row_with_layout(
     if let Some(b) = &row.badge {
         name_cell = name_cell.child(
             div()
-                .ml(tokens::SPACE_8)
-                .text_size(ui_size.caption_font_size())
-                .text_color(theme.fg_dim)
+                .ml(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
+                .text_size(taskmanager_ui::theme_binding::absolute(
+                    ui_size.caption_font_size(),
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(b.clone()),
         );
     }
@@ -771,11 +777,19 @@ pub fn proc_row_with_layout(
         // The row is the positioning context for the selection rail (an
         // absolutely-positioned leading-edge accent bar, see below).
         .relative()
-        .px(tokens::SPACE_8)
-        .py(density.row_padding_y())
-        .line_height(density.line_height())
-        .rounded(tokens::small_radius(theme))
-        .bg(bg);
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            density.row_padding_y(),
+        ))
+        .line_height(taskmanager_ui::theme_binding::fraction(
+            density.line_height(),
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::small_radius(theme),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(bg));
     // ── Selection rail ─────────────────────────────────────────────────────
     // Selected rows carry a 4px accent rail on the leading edge (Win11 TM /
     // Mission Center parity) as the PRIMARY selection identity; the row's
@@ -788,10 +802,16 @@ pub fn proc_row_with_layout(
         .left_0()
         .top_0()
         .bottom_0()
-        .w(tokens::SELECTION_RAIL)
-        .rounded_tl(tokens::small_radius(theme))
-        .rounded_bl(tokens::small_radius(theme))
-        .bg(theme.accent);
+        .w(taskmanager_ui::theme_binding::length(
+            tokens::SELECTION_RAIL,
+        ))
+        .rounded_tl(taskmanager_ui::theme_binding::absolute(
+            tokens::small_radius(theme),
+        ))
+        .rounded_bl(taskmanager_ui::theme_binding::absolute(
+            tokens::small_radius(theme),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(theme.accent));
     #[cfg(any(test, feature = "test-support"))]
     let rail = rail.debug_selector(|| "tm-proc-rail".to_string());
     let line = if is_sel { line.child(rail) } else { line };

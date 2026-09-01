@@ -48,6 +48,9 @@ pub fn run(out: &Path) -> Result<(), String> {
     let snapshot_export_client = host
         .snapshot_export_client()
         .map_err(|error| format!("snapshot export runtime unavailable: {error}"))?;
+    let window_capture_client = host
+        .window_capture_client()
+        .map_err(|error| format!("window capture runtime unavailable: {error}"))?;
     let diagnostic_bundle_client = host
         .diagnostic_bundle_client()
         .map_err(|error| format!("diagnostic bundle runtime unavailable: {error}"))?;
@@ -67,6 +70,7 @@ pub fn run(out: &Path) -> Result<(), String> {
                 crate::gpui_app::StartupRuntime {
                     config_client,
                     snapshot_export_client,
+                    window_capture_client,
                     diagnostic_bundle_client,
                     service_log_export_client,
                     history_connector: history_factory.history_frontend_connector(),

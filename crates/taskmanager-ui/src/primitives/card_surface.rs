@@ -74,12 +74,14 @@ impl CardSurface {
     #[must_use]
     pub fn render(self) -> gpui::Div {
         let mut surface = div()
-            .p(self.padding)
-            .rounded(self.radius)
-            .bg(self.background)
+            .p(crate::theme_binding::definite_length(self.padding))
+            .rounded(crate::theme_binding::absolute(self.radius))
+            .bg(crate::theme_binding::fill(self.background))
             .children(self.children);
         if self.bordered {
-            surface = surface.border_1().border_color(self.palette.border);
+            surface = surface
+                .border_1()
+                .border_color(crate::theme_binding::hsla(self.palette.border));
         }
         surface
     }

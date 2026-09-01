@@ -15,12 +15,13 @@ test-support = []
 [dependencies]
 # gpui + theme + icons + ui-contract only (ADR-017 §1 dependency direction): no
 # gpui-component, no taskmanager-core/application. Colors come exclusively from
-# taskmanager-theme's Palette; icons from taskmanager-icons; focus/overlay
-# contracts from taskmanager-ui-contract. The theme's `gpui` feature (ADR-026)
-# supplies the From<Color>→Rgba/Hsla/Fill and token conversions this library
-# relies on.
+# taskmanager-theme's Palette; icon semantics from taskmanager-icons; focus/
+# overlay contracts from taskmanager-ui-contract. This crate owns the GPUI
+# theme binding (`theme_binding`, ADR-051): the token→gpui conversions and
+# window/appearance/font/animation helpers live here, not in the neutral
+# theme crate.
 gpui = { version = "0.2.2", default-features = false }
-taskmanager-theme = { path = "../taskmanager-theme", features = ["gpui"] }
+taskmanager-theme = { path = "../taskmanager-theme" }
 taskmanager-icons = { path = "../taskmanager-icons" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 

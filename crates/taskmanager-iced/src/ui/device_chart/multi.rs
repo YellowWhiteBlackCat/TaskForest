@@ -498,8 +498,8 @@ fn device_multi_graph_with_length(
     let max = prefs
         .max_override
         .unwrap_or_else(|| finite_peak(&primary.samples).max(finite_peak(&secondary.samples)));
-    let caption_color = taskmanager_theme::iced::color(theme_snapshot.palette().fg_muted);
-    let grid_color = taskmanager_theme::iced::color(theme_snapshot.palette().border);
+    let caption_color = crate::theme_binding::color(theme_snapshot.palette().fg_muted);
+    let grid_color = crate::theme_binding::color(theme_snapshot.palette().border);
     let label = mini_graph_caption(&caption, primary.samples.len().max(secondary.samples.len()));
     let chart = DeviceMultiChart {
         primary,
@@ -512,8 +512,8 @@ fn device_multi_graph_with_length(
         hover: prefs.hover,
         format_value,
         readout: ReadoutColors {
-            bg: taskmanager_theme::iced::color(theme_snapshot.palette().surface),
-            fg: taskmanager_theme::iced::color(theme_snapshot.palette().fg),
+            bg: crate::theme_binding::color(theme_snapshot.palette().surface),
+            fg: crate::theme_binding::color(theme_snapshot.palette().fg),
         },
         opts: ChartOpts::default(),
     };

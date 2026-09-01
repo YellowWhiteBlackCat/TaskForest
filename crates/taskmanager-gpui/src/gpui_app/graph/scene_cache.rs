@@ -592,7 +592,9 @@ fn draw_value_badge(
         };
         let mut run = window.text_style().to_run(text.len());
         run.color = Hsla::from(base);
-        run.font.weight = taskmanager_theme::tokens::FONT_WEIGHT_SEMIBOLD.into();
+        run.font.weight = taskmanager_ui::theme_binding::font_weight(
+            taskmanager_theme::tokens::FONT_WEIGHT_SEMIBOLD,
+        );
         let line = window
             .text_system()
             .shape_line(text.into(), px(10.0), &[run], None);

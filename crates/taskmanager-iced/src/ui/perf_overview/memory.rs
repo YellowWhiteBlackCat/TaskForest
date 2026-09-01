@@ -67,7 +67,7 @@ pub(crate) fn segment_color(
             // Reclaimable like the page cache, dimmed so the ARC legend
             // entry never blurs into "Cache + Buffers" (gpui renders the
             // same tint).
-            let mut arc = taskmanager_theme::iced::color(theme.disk);
+            let mut arc = crate::theme_binding::color(theme.disk);
             arc.a = 0.55;
             return arc;
         }
@@ -77,7 +77,7 @@ pub(crate) fn segment_color(
         MemSegmentKind::Free | MemSegmentKind::Available => theme.fg_dim,
         MemSegmentKind::Other => theme.shade,
     };
-    taskmanager_theme::iced::color(token)
+    crate::theme_binding::color(token)
 }
 
 /// Horizontal stacked proportion bar: a shade track with one fill per non-zero
@@ -94,7 +94,7 @@ fn composition_bar(
         .map(|s| (segment_color(s.kind, theme), s.bytes))
         .collect();
     let sum: u64 = drawn.iter().map(|(_, bytes)| *bytes).sum();
-    let track = taskmanager_theme::iced::color(theme.shade);
+    let track = crate::theme_binding::color(theme.shade);
     let mut bar = row![].height(Length::Fill).width(Length::Fill);
     for (color, bytes) in drawn {
         let portion = (((bytes as f64 / sum.max(1) as f64) * 1000.0).round() as u16).max(1);
@@ -200,7 +200,7 @@ fn swap_bar_view(
     let free_portion = 1000u16.saturating_sub(used_portion);
     let mut bar = row![].height(Length::Fill).width(Length::Fill);
     if used_portion > 0 {
-        let used_color = taskmanager_theme::iced::color(theme.network);
+        let used_color = crate::theme_binding::color(theme.network);
         bar = bar.push(
             container(column![])
                 .width(Length::FillPortion(used_portion))
@@ -209,7 +209,7 @@ fn swap_bar_view(
         );
     }
     if free_portion > 0 {
-        let free_color = taskmanager_theme::iced::color(theme.shade);
+        let free_color = crate::theme_binding::color(theme.shade);
         bar = bar.push(
             container(column![])
                 .width(Length::FillPortion(free_portion))
@@ -288,8 +288,8 @@ pub(crate) fn compression_card_view(
     }
 
     let text_content = parts.join("   ·   ");
-    let bg_color = taskmanager_theme::iced::color(theme_snapshot.shade);
-    let border_color = taskmanager_theme::iced::color(theme_snapshot.palette().border);
+    let bg_color = crate::theme_binding::color(theme_snapshot.shade);
+    let border_color = crate::theme_binding::color(theme_snapshot.palette().border);
     let muted_color = theme::muted_text_color(theme_snapshot);
 
     Some(

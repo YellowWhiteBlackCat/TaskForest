@@ -178,7 +178,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                                 let mut cell = text(remote_text(session.remote))
                                     .width(columns.remote.length());
                                 if session.remote {
-                                    cell = cell.color(taskmanager_theme::iced::color(
+                                    cell = cell.color(crate::theme_binding::color(
                                         table_theme.palette().accent,
                                     ));
                                 }
@@ -394,8 +394,8 @@ fn session_feedback_line<'a>(
             .replace("{target}", outcome.session_id.as_str()),
     };
     let color = match outcome.result {
-        Ok(()) => taskmanager_theme::iced::color(theme_snapshot.palette().success),
-        Err(_) => taskmanager_theme::iced::color(theme_snapshot.palette().danger),
+        Ok(()) => crate::theme_binding::color(theme_snapshot.palette().success),
+        Err(_) => crate::theme_binding::color(theme_snapshot.palette().danger),
     };
     Some(
         text(text_value)

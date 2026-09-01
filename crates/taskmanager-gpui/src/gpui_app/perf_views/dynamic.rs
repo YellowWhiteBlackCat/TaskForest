@@ -32,7 +32,6 @@ pub(crate) struct BatteryViewProps<'a> {
     pub(crate) telemetry: &'a TelemetryStore,
     pub(crate) index: usize,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) stats_scroll: gpui::ScrollHandle,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
     pub(crate) budget: PerformancePageBudget,
 }
@@ -44,7 +43,6 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         telemetry,
         index,
         performance,
-        stats_scroll,
         hover_slot,
         budget,
     } = props;
@@ -104,7 +102,6 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         });
     perf_page(PerfPageProps {
         theme,
-        stats_scroll,
         title,
         subtitle: model,
         vital_line: None,
@@ -117,7 +114,7 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
             GraphUnit::Percent,
         )]),
         below: power_graph,
-        stats: stats_panel(theme, stats),
+        stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: status_footer(theme, battery.device_state.status),
         hover_slot,
         graph_settings: performance.graph,
@@ -132,7 +129,6 @@ pub(crate) struct FanViewProps<'a> {
     pub(crate) telemetry: &'a TelemetryStore,
     pub(crate) index: usize,
     pub(crate) performance: PerformanceSettings,
-    pub(crate) stats_scroll: gpui::ScrollHandle,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
     pub(crate) budget: PerformancePageBudget,
 }
@@ -144,7 +140,6 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
         telemetry,
         index,
         performance,
-        stats_scroll,
         hover_slot,
         budget,
     } = props;
@@ -207,7 +202,6 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
         });
     perf_page(PerfPageProps {
         theme,
-        stats_scroll,
         title: i18n::t("common.fan").to_string(),
         subtitle: fan.label().to_owned(),
         vital_line: None,
@@ -223,7 +217,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
             .with_max(max),
         ]),
         below: temperature_graph,
-        stats: stats_panel(theme, stats),
+        stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: status_footer(theme, fan.state().status),
         hover_slot,
         graph_settings: performance.graph,
@@ -245,31 +239,39 @@ fn dynamic_device_empty(
         .child(
             div()
                 .max_w(px(460.0))
-                .p(tokens::SPACE_16)
-                .rounded(tokens::card_radius(theme))
+                .p(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_16,
+                ))
+                .rounded(taskmanager_ui::theme_binding::absolute(
+                    tokens::card_radius(theme),
+                ))
                 .border_1()
-                .border_color(theme.border)
-                .bg(theme.sidebar_card_bg)
+                .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+                .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
                 .flex()
                 .flex_col()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(
                     div()
-                        .text_size(tokens::FONT_20)
-                        .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
-                        .text_color(theme.fg)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_20))
+                        .font_weight(taskmanager_ui::theme_binding::font_weight(
+                            tokens::FONT_WEIGHT_SEMIBOLD,
+                        ))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                         .child(title.to_string()),
                 )
                 .child(
                     div()
-                        .text_size(tokens::FONT_13)
-                        .text_color(theme.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                         .child(message.to_string()),
                 )
                 .child(
                     div()
-                        .text_size(tokens::FONT_12)
-                        .text_color(theme.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                         .child(i18n::t(device_status_i18n_key(status))),
                 ),
         )

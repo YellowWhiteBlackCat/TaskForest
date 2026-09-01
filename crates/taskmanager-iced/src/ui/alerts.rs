@@ -33,9 +33,9 @@ fn severity_color(
 ) -> iced::Color {
     let palette = theme_snapshot.palette();
     match severity {
-        AlertSeverity::Critical => taskmanager_theme::iced::color(palette.danger),
-        AlertSeverity::Warning => taskmanager_theme::iced::color(palette.warning),
-        AlertSeverity::Info => taskmanager_theme::iced::color(palette.accent),
+        AlertSeverity::Critical => crate::theme_binding::color(palette.danger),
+        AlertSeverity::Warning => crate::theme_binding::color(palette.warning),
+        AlertSeverity::Info => crate::theme_binding::color(palette.accent),
     }
 }
 

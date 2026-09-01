@@ -5,6 +5,7 @@ use super::super::{
 };
 use crate::gpui_app::help_overlay;
 use crate::gpui_app::root::window_surface::WindowSurface;
+use crate::gpui_app::sidebar::SelectedDevice;
 use crate::gpui_app::system_about;
 use crate::gpui_app::{about, first_run};
 use gpui::{
@@ -51,6 +52,13 @@ pub(super) fn compose_primary_dialogs(
         let presentation = view.presentation_snapshot();
         let appearance = presentation.appearance;
         let devices = presentation.devices;
+        let gpu_engine_index = match view.selected {
+            SelectedDevice::Gpu(index) if index < view.system_snapshot().gpu.len() => Some(index),
+            _ if !view.system_snapshot().gpu.is_empty() => Some(0),
+            _ => None,
+        };
+        let gpu_engine_device_id =
+            gpu_engine_index.map(|index| view.gpu_engine_rows_device_id(index));
         let close_ent = close_entity.clone();
         let on_close = move |_win: &mut Window, cx: &mut App| {
             close_ent.update(cx, |view, cx| {
@@ -149,8 +157,50 @@ pub(super) fn compose_primary_dialogs(
                 text_rendering: appearance.text_rendering,
                 color_scheme: appearance.color_scheme,
                 startup_page: presentation.startup_page,
+                window_decorations: presentation.window_decorations,
                 slider_entity,
                 switches: &view.settings_switches,
+                privilege_center: settings_view::PrivilegeCenterInputs {
+                    gpu_engine_state: view.shell.gpu_engine_rows_state(),
+                    gpu_engine_capability: if view
+                        .capture_evidence
+                        .settings_permission_center_enabled()
+                    {
+                        Some(taskmanager_platform_contract::CapabilityStatus::PermissionRequired)
+                    } else {
+                        view.projection().capability_status(
+                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES,
+                        )
+                    },
+                    gpu_engine_device_id,
+                    gpu_engine_index,
+                    smbios_state: view.shell.smbios_memory_state(),
+                    smbios_capability: if view.capture_evidence.settings_permission_center_enabled()
+                    {
+                        Some(taskmanager_platform_contract::CapabilityStatus::PermissionRequired)
+                    } else {
+                        view.projection().capability_status(
+                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_MEMORY_SMBIOS,
+                        )
+                    },
+                    rapl_state: view.shell.rapl_power_state(),
+                    rapl_capability: if view.capture_evidence.settings_permission_center_enabled() {
+                        Some(taskmanager_platform_contract::CapabilityStatus::PermissionRequired)
+                    } else {
+                        view.projection().capability_status(
+                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+                        )
+                    },
+                    msr_state: view.shell.msr_readout_state(),
+                    msr_capability: if view.capture_evidence.settings_permission_center_enabled() {
+                        Some(taskmanager_platform_contract::CapabilityStatus::PermissionRequired)
+                    } else {
+                        view.projection().capability_status(
+                            &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_MSR,
+                        )
+                    },
+                },
+                permission_center_only: view.capture_evidence.settings_permission_center_enabled(),
             },
             cx,
         );
@@ -373,13 +423,19 @@ pub(super) fn compose_primary_dialogs(
             let input = div()
                 .w(px(360.0))
                 .child(TextInput::new(entity.clone(), theme.palette()).height(30.0));
-            let mut column = div().flex().flex_col().gap(tokens::SPACE_12).child(input);
+            let mut column = div()
+                .flex()
+                .flex_col()
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_12,
+                ))
+                .child(input);
             if let Some(error) = &run_error {
                 column = column.child(
                     div()
                         .w(px(360.0))
-                        .text_size(tokens::FONT_12)
-                        .text_color(theme.danger)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.danger))
                         .child(error.clone()),
                 );
             }
@@ -388,7 +444,7 @@ pub(super) fn compose_primary_dialogs(
                     div()
                         .flex()
                         .flex_row()
-                        .gap(tokens::SPACE_8)
+                        .gap(taskmanager_ui::theme_binding::definite_length(tokens::SPACE_8))
                         .justify_end()
                         .child(elements::pill(
                             theme,
@@ -448,9 +504,11 @@ pub(super) fn cold_start_placeholder(
         div()
             .flex()
             .items_center()
-            .gap(tokens::SPACE_10)
-            .text_color(theme.fg_dim)
-            .text_size(tokens::FONT_13)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_10,
+            ))
+            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
             .child(Spinner::new(theme.palette()).size(16.0))
             .child(taskmanager_application::i18n::t(
                 "common.collecting_telemetry",

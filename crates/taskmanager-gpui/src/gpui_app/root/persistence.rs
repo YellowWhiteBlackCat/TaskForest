@@ -191,6 +191,10 @@ pub(super) fn config_from_view(view: &RootView) -> Config {
         // available in the dependency we ship.
         text_rendering: taskmanager_core::core::config::TEXT_RENDERING_PLATFORM_DEFAULT.to_string(),
         startup_page: presentation.startup_page.to_string(),
+        // Persist the normalized window-frame token. System keeps the empty
+        // sentinel so an untouched preference round-trips byte-identically
+        // with pre-preference config files.
+        window_decorations: presentation.window_decorations.to_string(),
         show_cpu: devices.cpu,
         show_memory: devices.memory,
         show_disks: devices.disks,

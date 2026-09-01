@@ -62,6 +62,9 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::DiagnosticBundle => SurfaceDecision::Unsupported {
             reason: "the terminal product shape has no diagnostic-bundle preview or export surface",
         },
+        ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Unsupported {
+            reason: "the terminal product shape does not expose a compositor current-window PNG capture control",
+        },
         ProductIntent::FirstRunSetup => SurfaceDecision::Unsupported {
             reason: "first-run setup is owned by graphical composition and has no terminal surface",
         },

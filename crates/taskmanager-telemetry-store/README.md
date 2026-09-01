@@ -84,3 +84,16 @@ Disk active time is a device-only series: the persisted `storage-activity-pct`
 per-device ring is the authority, and no host mean is fabricated (the interim
 host mean ring was removed when the scope model made the per-device resolution
 the single path).
+
+## Module map
+
+```text
+src/live_graph.rs                revision-keyed immutable series; per-device reads must
+│                                carry generation (double-sided discipline)
+src/system_history.rs
+├── ingest.rs                    CorrelatedSystemTelemetryIngestor: the only write entry
+│   └── ingest/{dynamic,storage_network}.rs
+├── device.rs  dynamic_history.rs  gpu.rs   per-device curves and dynamic history
+```
+
+Writers: composition-owned ingestor only. Readers: frontend replay clients (read-only).

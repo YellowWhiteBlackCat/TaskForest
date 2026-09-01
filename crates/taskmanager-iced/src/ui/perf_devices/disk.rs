@@ -219,7 +219,7 @@ pub(crate) fn disk_section(
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let snapshot = app.shell.projection().snapshot.as_ref();
     let theme_snapshot = app.theme();
-    let color = taskmanager_theme::iced::color(theme_snapshot.disk);
+    let color = crate::theme_binding::color(theme_snapshot.disk);
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let mut disk_graph = app.graph_prefs();
     disk_graph.hover = true;
@@ -518,8 +518,8 @@ fn partition_row<'a>(
 
     // 6px family-colored progress bar (FillPortion siblings keep the measured
     // fraction visible on Iced).
-    let bar_fill_color = taskmanager_theme::iced::color(theme_snapshot.disk);
-    let bar_bg = taskmanager_theme::iced::color(theme_snapshot.shade);
+    let bar_fill_color = crate::theme_binding::color(theme_snapshot.disk);
+    let bar_bg = crate::theme_binding::color(theme_snapshot.shade);
     let progress_bar_content = match usage.1 {
         Some(value) => {
             let fill_portion = ((value * 1000.0).round() as u16).clamp(1, 1000);

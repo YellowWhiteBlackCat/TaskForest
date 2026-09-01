@@ -848,8 +848,8 @@ async fn table_cells_carry_the_column_gutter_padding(cx: &mut TestAppContext) {
         let state = TableState::new(TestDelegate::standard(3), cx);
         assert!(!state.col_groups.is_empty());
         let expected = div()
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8)
+            .pl(crate::theme_binding::definite_length(tokens::SPACE_8))
+            .pr(crate::theme_binding::definite_length(tokens::SPACE_8))
             .style()
             .padding
             .clone();

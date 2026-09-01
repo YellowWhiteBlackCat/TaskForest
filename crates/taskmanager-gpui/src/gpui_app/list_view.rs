@@ -78,7 +78,9 @@ impl ListPageScaffold {
         div()
             .flex()
             .flex_col()
-            .gap(tokens::SPACE_8)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
             .size_full()
             // The list-page family's ONE inner shell (ADR-042): header band
             // + bounded body, shared by every inventory page so their
@@ -253,7 +255,9 @@ pub fn filter_pill_row<F: FilterSpec>(
         .flex()
         .flex_row()
         .items_center()
-        .gap(tokens::SPACE_4)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_4,
+        ))
         .children(pills.iter().map(|&f| {
             // Clone the per-view on_select into each pill (the outer closure is
             // borrowed by the `.map` adapter; each pill needs its own `'static`
@@ -332,8 +336,10 @@ fn filter_pill<F: FilterSpec>(
         Some(ic) => wrapper
             .flex()
             .items_center()
-            .gap(tokens::SPACE_6)
-            .child(taskmanager_icons::icon(ic).size(px(12.0)))
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_6,
+            ))
+            .child(taskmanager_ui::icons_binding::icon(ic).size(px(12.0)))
             .child(pill),
         None => wrapper.child(pill),
     }
@@ -365,12 +371,14 @@ pub fn search_box_sized(
         .flex()
         .items_center()
         .w(px(width))
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .debug_selector(|| "tm-search-box".to_string())
         .child(
-            taskmanager_icons::icon(IconId::Search)
+            taskmanager_ui::icons_binding::icon(IconId::Search)
                 .size(px(14.0))
-                .text_color(palette.fg_muted),
+                .text_color(taskmanager_ui::theme_binding::hsla(palette.fg_muted)),
         )
         .child(
             div()
@@ -485,8 +493,8 @@ pub fn unavailable_source_state(
         content = content.child(
             div()
                 .max_w(px(360.0))
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("source.retry_after_change")),
         );
     }
@@ -571,23 +579,25 @@ pub fn source_notice_with_detail_presentation(
             .min_w(px(0.0))
             .flex()
             .flex_col()
-            .gap(tokens::SPACE_2)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_2,
+            ))
             .child(
                 div()
-                    .text_size(tokens::FONT_12)
-                    .text_color(theme.fg)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                     .child(title.to_string()),
             )
             .child(
                 div()
-                    .text_size(tokens::FONT_11)
-                    .text_color(theme.fg_dim)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                     .child(failure.to_string()),
             )
             .children(detail.into_iter().map(|detail| {
                 div()
-                    .text_size(tokens::FONT_11)
-                    .text_color(theme.fg_dim)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                     .child(detail.to_string())
             })),
         SourceNoticePresentation::Compact => div()
@@ -595,22 +605,24 @@ pub fn source_notice_with_detail_presentation(
             .min_w(px(0.0))
             .flex()
             .flex_col()
-            .gap(tokens::SPACE_1)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_1,
+            ))
             // Each truncating line is wrapped in a flex-row (the title-row
             // pattern): bare column-child `truncate()` poisons gpui's nowrap
             // measure cache and clips the line hard at narrow widths.
             .child(
                 div().flex().flex_row().min_w(px(0.0)).child(
                     crate::gpui_app::elements::truncated_text(&format!("{title} · {failure}"))
-                        .text_size(tokens::FONT_11)
-                        .text_color(theme.fg),
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg)),
                 ),
             )
             .children(detail.into_iter().map(|detail| {
                 div().flex().flex_row().min_w(px(0.0)).child(
                     crate::gpui_app::elements::truncated_text(detail)
-                        .text_size(tokens::FONT_11)
-                        .text_color(theme.fg_dim),
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
                 )
             })),
     };
@@ -618,26 +630,36 @@ pub fn source_notice_with_detail_presentation(
         .flex()
         .flex_row()
         .items_center()
-        .gap(match presentation {
-            SourceNoticePresentation::Standard => tokens::SPACE_8,
-            SourceNoticePresentation::Compact => tokens::SPACE_4,
-        })
-        .px(match presentation {
-            SourceNoticePresentation::Standard => tokens::SPACE_10,
-            SourceNoticePresentation::Compact => tokens::SPACE_6,
-        })
-        .py(match presentation {
-            SourceNoticePresentation::Standard => tokens::SPACE_6,
-            SourceNoticePresentation::Compact => tokens::SPACE_3,
-        })
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            match presentation {
+                SourceNoticePresentation::Standard => tokens::SPACE_8,
+                SourceNoticePresentation::Compact => tokens::SPACE_4,
+            },
+        ))
+        .px(taskmanager_ui::theme_binding::definite_length(
+            match presentation {
+                SourceNoticePresentation::Standard => tokens::SPACE_10,
+                SourceNoticePresentation::Compact => tokens::SPACE_6,
+            },
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            match presentation {
+                SourceNoticePresentation::Standard => tokens::SPACE_6,
+                SourceNoticePresentation::Compact => tokens::SPACE_3,
+            },
+        ))
         .rounded(px(6.0))
-        .bg(theme.warning.with_alpha(0.10))
+        .bg(taskmanager_ui::theme_binding::fill(
+            theme.warning.with_alpha(0.10),
+        ))
         .border_1()
-        .border_color(theme.warning.with_alpha(0.28))
+        .border_color(taskmanager_ui::theme_binding::hsla(
+            theme.warning.with_alpha(0.28),
+        ))
         .child(
-            taskmanager_icons::icon(IconId::TriangleAlert)
+            taskmanager_ui::icons_binding::icon(IconId::TriangleAlert)
                 .size(px(14.0))
-                .text_color(theme.warning),
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.warning)),
         )
         .child(content);
     if notice.is_retryable() {
@@ -645,8 +667,8 @@ pub fn source_notice_with_detail_presentation(
     } else {
         banner = banner.child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("source.retry_after_change")),
         );
     }
@@ -699,8 +721,8 @@ pub fn feedback_status_line(
         None => (selected_hint.to_string(), theme.fg_dim),
     };
     div()
-        .text_size(tokens::FONT_12)
-        .text_color(color)
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+        .text_color(taskmanager_ui::theme_binding::hsla(color))
         .child(text)
 }
 

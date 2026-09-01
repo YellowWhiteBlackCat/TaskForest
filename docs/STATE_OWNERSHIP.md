@@ -5,24 +5,24 @@
 
 ## 所有权台账
 
-| 事实或生命周期 | 唯一 owner | 唯一写入口 | 消费边界 |
-|---|---|---|---|
-| Canonical domain fact | `taskmanager-core` 私有 typed model | named constructor / transition / apply | current/last-known 只读 accessor |
-| 已发布外部 payload ingress | 私有 read DTO / serializer | ingress canonicalization；canonical serializer | 不进入 provider/frontend state，不形成兼容 API |
-| 全局配置 | app-host 的单一 `ConfigCoordinator` | base→local typed submission | revisioned immutable snapshot |
-| 危险确认 | application `InteractionState` | arm/replace/confirm/dismiss reducer | 三前端只投影或提交 intent |
-| 相关异步请求 | application typed request session；每条 shell track 一个实例 | begin/accept/reject/terminal/close | frontend 只读状态；terminal payload 仅接受一次 |
-| quit 与用户反馈 | shell `ShellLifecycleState` | typed lifecycle event | `should_quit` / immutable feedback |
-| 当前系统投影 | 每条前端轨私有的 `SystemProjectionStore` | platform batch 与命名 reducer | immutable `projection()` |
-| live graph 历史 | `taskmanager-telemetry-store` | composition-owned ingestor | revision-keyed immutable series；per-device 曲线是双侧纪律——写侧 ingest 事务换环、读时 generation 过滤（`requested != 0 && ring == requested`），任何 per-device 读边必须携带 generation，单侧防护不成立 |
-| 前端历史采集 generation | active frontend typed lifecycle | config Enable/Disable + bounded start/stop | app-host read-only replay client |
-| 持久历史 writer/lock | active frontend history session | correlated system/process/sensor/power ingestion | history-store JSONL/query；其他 frontend 不可写 |
-| runtime work | ECS `WorkState` | admission/renew/terminal/recovery system | scheduler snapshot 与 typed verdict |
-| runtime delivery | `FairEventPort` | bounded primary/mailbox publication | typed partition turn + sequence merge |
-| 本地时区规则 | app-host `StartupLocalTimeCache` | 宿主启动时一次捕获 | cloned host 共享同一 `Arc` observation |
-| 窗口事件时间 | frontend window-time component | tick/event 注入 | renderer filter/format，只读 |
-| renderer projection cache | 对应 frontend component | revision/fingerprint miss | owned `Rc`/value，不返回可变 guard |
-| 外部 saved-view 输入 | config/preset 私有 read DTO | ingress canonicalization | canonical 只有一套 category/tree projection |
+| 事实或生命周期 | 唯一 owner | 唯一写入口 | 消费边界 | 代码锚点 |
+|---|---|---|---|---|
+| Canonical domain fact | `taskmanager-core` 私有 typed model | named constructor / transition / apply | current/last-known 只读 accessor | `taskmanager-core/src/core.rs`（owner module 索引） |
+| 已发布外部 payload ingress | 私有 read DTO / serializer | ingress canonicalization；canonical serializer | 不进入 provider/frontend state，不形成兼容 API | `taskmanager-core/src/core/metrics/*/wire.rs` |
+| 全局配置 | app-host 的单一 `ConfigCoordinator` | base→local typed submission | revisioned immutable snapshot | `taskmanager-application/src/config_runtime.rs` |
+| 危险确认 | application `InteractionState` | arm/replace/confirm/dismiss reducer | 三前端只投影或提交 intent | `taskmanager-application/src/interaction.rs` |
+| 相关异步请求 | application typed request session；每条 shell track 一个实例 | begin/accept/reject/terminal/close | frontend 只读状态；terminal payload 仅接受一次 | `taskmanager-application/src/request_session.rs`；track 实例在 `taskmanager-shell/src/app/request_sessions.rs` |
+| quit 与用户反馈 | shell `ShellLifecycleState` | typed lifecycle event | `should_quit` / immutable feedback | `taskmanager-shell/src/app/lifecycle.rs` |
+| 当前系统投影 | 每条前端轨私有的 `SystemProjectionStore` | platform batch 与命名 reducer | immutable `projection()` | `taskmanager-shell/src/app.rs` |
+| live graph 历史 | `taskmanager-telemetry-store` | composition-owned ingestor | revision-keyed immutable series；per-device 曲线是双侧纪律——写侧 ingest 事务换环、读时 generation 过滤（`requested != 0 && ring == requested`），任何 per-device 读边必须携带 generation，单侧防护不成立 | `taskmanager-telemetry-store/src/live_graph.rs`、`system_history/ingest.rs` |
+| 前端历史采集 generation | active frontend typed lifecycle | config Enable/Disable + bounded start/stop | app-host read-only replay client | `taskmanager-app-host/src/history_frontend.rs` |
+| 持久历史 writer/lock | active frontend history session | correlated system/process/sensor/power ingestion | history-store JSONL/query；其他 frontend 不可写 | `taskmanager-app-host/src/history_persistence_runtime.rs` |
+| runtime work | ECS `WorkState` | admission/renew/terminal/recovery system | scheduler snapshot 与 typed verdict | `taskmanager-platform-runtime/src/ecs.rs` |
+| runtime delivery | `FairEventPort` | bounded primary/mailbox publication | typed partition turn + sequence merge | `taskmanager-platform-runtime/src/delivery/event_port.rs`、`delivery/event_queue.rs`；`EventSequence` 在 `taskmanager-platform-contract/src/envelope.rs` |
+| 本地时区规则 | app-host `StartupLocalTimeCache` | 宿主启动时一次捕获 | cloned host 共享同一 `Arc` observation | `taskmanager-app-host/src/lib.rs` |
+| 窗口事件时间 | frontend window-time component | tick/event 注入 | renderer filter/format，只读 | 对应 frontend crate 的 window-time 模块 |
+| renderer projection cache | 对应 frontend component | revision/fingerprint miss | owned `Rc`/value，不返回可变 guard | 如 `taskmanager-iced/src/app/projection_caches.rs` |
+| 外部 saved-view 输入 | config/preset 私有 read DTO | ingress canonicalization | canonical 只有一套 category/tree projection | `taskmanager-core/src/core/config.rs` |
 
 GPU engine、网络提权及 command/reveal/open-url correlation 同样走该 request session owner；前端
 不得另存 request map、pending bool、error 或 accepted payload。一个事实不得同时出现在 domain
@@ -83,11 +83,10 @@ struct 字段顺序或 toolkit 消息排列隐式决定业务结果。
 
 ## Core 硬切换与外部输入
 
-每次 core 演进都是同一变更内的硬切换：所有旧 API、alias、wrapper、fallback、renderer state、
-shortcut、fixture、demo/capture 和 caller 必须同步删除或迁移。禁止 deprecated 入口、兼容 facade、
-双栈状态和等待后续清理的反向门。已发布外部 payload 如因产品数据合同必须继续读取，只能在私有
-ingress DTO 解析后立即 canonicalize；它不进入 provider/frontend state，也不成为 live implementation
-path。具体输入与输出规则见 [`WIRE_DOMAIN_BOUNDARIES.md`](WIRE_DOMAIN_BOUNDARIES.md)。
+硬切换不变量的权威出处是 [AGENTS.md](../AGENTS.md)，外部 payload 的 ingress 规则权威出处是
+[`WIRE_DOMAIN_BOUNDARIES.md`](WIRE_DOMAIN_BOUNDARIES.md)。状态侧只补充一条：被替换的
+renderer state、fixture 与 demo/capture 路径属于"旧 API"，必须与 typed contract 在同一
+变更内删除。
 
 ## 验证
 

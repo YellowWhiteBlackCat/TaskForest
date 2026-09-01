@@ -1,6 +1,7 @@
 //! Sensor and power-supply providers.
 
 use super::*;
+use taskmanager_platform_contract::DeviceDiscovery;
 
 impl SensorProvider for FakeProvider {
     fn refresh(
@@ -16,14 +17,10 @@ impl SensorProvider for FakeProvider {
             })
             .into_iter()
             .collect();
-        Ok(DeviceSourceSnapshot::from_source_status(
+        Ok(DeviceSourceSnapshot::from_discovery(
             SensorCenterSnapshot::default(),
-            Vec::new(),
-            SourceStatus {
-                provider: ProviderId::borrowed("fixture.sensor.discovery"),
-                outcome: SourceOutcome::Empty,
-                item_count: 0,
-            },
+            ProviderId::borrowed("fixture.sensor.discovery"),
+            DeviceDiscovery::Empty,
             enrichments,
         ))
     }
@@ -34,19 +31,15 @@ impl PowerSupplyProvider for FakeProvider {
         &mut self,
         observed_at_ms: u64,
     ) -> Result<DeviceSourceSnapshot<PowerSupplySnapshot>, ProviderFailure> {
-        Ok(DeviceSourceSnapshot::from_source_status(
+        Ok(DeviceSourceSnapshot::from_discovery(
             PowerSupplySnapshot {
                 state: DeviceState::healthy(observed_at_ms),
                 timestamp_ms: observed_at_ms,
                 batteries: Vec::new(),
                 device_lifecycles: Default::default(),
             },
-            Vec::new(),
-            SourceStatus {
-                provider: ProviderId::borrowed("fixture.power.discovery"),
-                outcome: SourceOutcome::Empty,
-                item_count: 0,
-            },
+            ProviderId::borrowed("fixture.power.discovery"),
+            DeviceDiscovery::Empty,
             Vec::new(),
         ))
     }

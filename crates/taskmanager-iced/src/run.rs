@@ -199,7 +199,7 @@ pub fn run(demo: bool) -> iced::Result {
         ..Default::default()
     })
     .window_size(initial_window_size())
-    .default_font(taskmanager_theme::iced::BUNDLED_UI_FONT);
+    .default_font(crate::theme_binding::BUNDLED_UI_FONT);
 
     // Register the same bundled faces GPUI embeds (ADR-026 fonts policy) so the
     // resolved UI/mono families exist in iced's font database: MiSans VF (the

@@ -22,13 +22,29 @@
 #     exact child PIDs are therefore owned by this script without global `pkill`.
 #
 # Prereqs: cargo + niri + jq + kwin_wayland + setsid + file + sha256sum;
-# magick/montage is optional for the contact sheet. Set
-# TM_CAPTURE_NIRI_BACKGROUND=0 only for an explicit visible-host debug run.
+# magick/montage is optional for the contact sheet. Visible-host mode is
+# rejected by this acceptance path so a capture cannot steal desktop focus.
 # The script always rebuilds the current locked worktree before capture.
 # Usage: bash scripts/capture-niri.sh
 set -u
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
-APP="$REPO/target/debug/taskforest-g"
+if [ "${TM_CAPTURE_SUPERVISED:-0}" != "1" ] \
+  || [ "${TM_CAPTURE_SUPERVISOR_TOKEN:-}" != "${TM_CAPTURE_RUN_UUID:-}" ]; then
+  command -v python3 >/dev/null 2>&1 \
+    || { printf 'capture requires the supervisor interpreter\n' >&2; exit 2; }
+  command -v timeout >/dev/null 2>&1 \
+    || { printf 'capture requires timeout for supervisor lifetime bounding\n' >&2; exit 2; }
+  exec timeout --kill-after=10s 30m python3 "$REPO/scripts/capture_supervisor.py" \
+    --repo-root "$REPO" --frontend gpui -- bash "$0" "$@"
+fi
+CAPTURE_RUN_UUID="${TM_CAPTURE_RUN_UUID:-}"
+CAPTURE_RUN_ROOT="${TM_CAPTURE_RUN_ROOT:-}"
+CAPTURE_RUNTIME_ROOT="${TM_CAPTURE_RUNTIME_ROOT:-}"
+if [ -z "$CAPTURE_RUN_UUID" ] || [ -z "$CAPTURE_RUN_ROOT" ] || [ -z "$CAPTURE_RUNTIME_ROOT" ]; then
+  printf 'capture must be started by the private supervisor\n' >&2
+  exit 2
+fi
+APP="$CAPTURE_RUN_ROOT/bin/taskforest-g"
 APP_ID="io.github.YellowWhiteBlackCat.TaskForestG"
 HOST_XDG="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 HOST_DISPLAY="$HOST_XDG/${WAYLAND_DISPLAY:-wayland-0}"
@@ -38,9 +54,17 @@ HOST_DISPLAY="$HOST_XDG/${WAYLAND_DISPLAY:-wayland-0}"
 CAPTURE_LIBGL_ALWAYS_SOFTWARE="${TM_CAPTURE_LIBGL_ALWAYS_SOFTWARE:-1}"
 CAPTURE_NIRI_LOG="${TM_CAPTURE_NIRI_LOG:-niri=info}"
 # Run the nested compositor inside a private virtual KWin framebuffer by
-# default. Set this to 0 only when a visible host-wayland nested window is
-# explicitly desired for manual compositor debugging.
+# default. A visible host-wayland nested window is never an acceptance mode.
 CAPTURE_NIRI_BACKGROUND="${TM_CAPTURE_NIRI_BACKGROUND:-1}"
+if [ "$CAPTURE_NIRI_BACKGROUND" = "1" ] \
+  && [ "${TM_CAPTURE_PRIVATE_DBUS:-0}" != "1" ]; then
+  command -v dbus-run-session >/dev/null 2>&1 \
+    || { printf 'background Niri capture requires dbus-run-session\n' >&2; exit 2; }
+  TM_CAPTURE_PRIVATE_DBUS=1 exec dbus-run-session \
+    --config-file="$REPO/scripts/private-session.conf" -- bash "$0" "$@"
+fi
+# The private bus deliberately has no service directories: tray, portal and
+# input-method activation must never escape this disposable capture session.
 # A fresh nested compositor per scenario isolates Smithay/winit state from the
 # previous client. Hosts that have independently qualified longer-lived Niri
 # sessions may raise this value, but the fail-closed default favors complete,
@@ -59,8 +83,9 @@ if [ -n "$(git -C "$REPO" status --porcelain 2>/dev/null)" ]; then
 else
   WORKTREE_STATE=clean
 fi
-RUN_ID="${RUN_STAMP}_${GIT_HEAD}_${WORKTREE_STATE}_$$"
-RUN_DIR="$EVIDENCE_ROOT/$RUN_ID"
+RUN_ID="$CAPTURE_RUN_UUID"
+RUN_DIR="$CAPTURE_RUN_ROOT"
+RUN_RELATIVE="${RUN_DIR#"$REPO/"}"
 STAGED="$RUN_DIR/screenshots"
 TMP="$RUN_DIR/runtime"
 NIRI_RUNTIME=""
@@ -78,23 +103,40 @@ for command in cargo file git jq niri rustc sha256sum setsid stat timeout; do
   fi
 done
 case "$CAPTURE_NIRI_BACKGROUND" in
-  0|1) ;;
+  1) ;;
+  0) printf 'visible nested capture is disabled; use the private background route\n' >&2; exit 2 ;;
   *)
-    printf 'TM_CAPTURE_NIRI_BACKGROUND must be 0 or 1: %s\n' \
+    printf 'TM_CAPTURE_NIRI_BACKGROUND must be 1: %s\n' \
       "$CAPTURE_NIRI_BACKGROUND" >&2
     exit 2
     ;;
 esac
 if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ] \
   && ! command -v kwin_wayland >/dev/null 2>&1; then
-  printf 'background Niri capture requires kwin_wayland --virtual; set TM_CAPTURE_NIRI_BACKGROUND=0 for visible nested debug mode\n' >&2
+  printf 'background Niri capture requires kwin_wayland --virtual; visible mode is disabled\n' >&2
   exit 2
 fi
-mkdir -p "$OUT" "$STAGED" "$TMP" "$SCRATCH_ROOT"
+if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+  case "${DBUS_SESSION_BUS_ADDRESS:-}" in
+    unix:path=/tmp/dbus-*,guid=*) ;;
+    *)
+      printf 'background Niri capture requires the private-session D-Bus address\n' >&2
+      exit 2
+      ;;
+  esac
+fi
+DBUS_ADDRESS_SHA256="$(printf '%s' "${DBUS_SESSION_BUS_ADDRESS:-}" | sha256sum | cut -d' ' -f1)"
+case "$DBUS_ADDRESS_SHA256" in
+  [0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
+  *) printf 'private D-Bus address hash could not be recorded\n' >&2; exit 2 ;;
+esac
+mkdir -p "$EVIDENCE_ROOT" "$RUN_DIR/bin" "$STAGED" "$TMP" "$SCRATCH_ROOT"
 # Niri puts its IPC socket below XDG_RUNTIME_DIR. Keep this private runtime on
 # at SUN_LEN and the repository/lease path is already long. Cargo scratch and
 # build output still use the agent lease supplied by the caller.
-NIRI_RUNTIME="$(mktemp -d /tmp/taskforest-niri.XXXXXX)"
+NIRI_RUNTIME="$CAPTURE_RUNTIME_ROOT/niri"
+mkdir -p "$NIRI_RUNTIME" "$NIRI_RUNTIME/config" "$NIRI_RUNTIME/data" \
+  "$NIRI_RUNTIME/cache" "$NIRI_RUNTIME/state"
 chmod 700 "$NIRI_RUNTIME"
 NIRI_PID=""
 NIRI_PGID=""
@@ -106,6 +148,8 @@ APP_PGID=""
 KWIN_PID=""
 KWIN_PGID=""
 KWIN_RUNTIME=""
+KWIN_ROOT=""
+KWIN_SOCKET=""
 KWIN_DISPLAY=""
 NIRI_PARENT_WAYLAND="$HOST_DISPLAY"
 
@@ -184,15 +228,17 @@ cleanup() {
   terminate_owned "$APP_PID" "$APP_PGID"
   terminate_owned "$NIRI_PID" "$NIRI_PGID"
   terminate_owned "$KWIN_PID" "$KWIN_PGID"
-  if [ -n "$KWIN_RUNTIME" ] && [ -d "$KWIN_RUNTIME" ]; then
-    rm -rf -- "$KWIN_RUNTIME"
+  if [ -n "$KWIN_ROOT" ] && [ -d "$KWIN_ROOT" ]; then
+    case "$KWIN_ROOT" in
+      "$CAPTURE_RUNTIME_ROOT/kwin") rm -rf -- "$KWIN_ROOT" ;;
+      *) printf 'cleanup refused unexpected KWin root: %s\n' "$KWIN_ROOT" >&2 ;;
+    esac
   fi
-  # A failed run keeps its private runtime tree (per-scenario XDG config/data
-  # homes) so the fixture state can be inspected post-mortem.
-  if [ "${FAILURES:-0}" -gt 0 ]; then
-    printf 'retaining failed-run runtime tree: %s\n' "$NIRI_RUNTIME" >&2
-  else
-    rm -rf "$NIRI_RUNTIME"
+  if [ -n "$NIRI_RUNTIME" ] && [ -d "$NIRI_RUNTIME" ]; then
+    case "$NIRI_RUNTIME" in
+      "$CAPTURE_RUNTIME_ROOT/niri") rm -rf -- "$NIRI_RUNTIME" ;;
+      *) printf 'cleanup refused unexpected Niri runtime: %s\n' "$NIRI_RUNTIME" >&2 ;;
+    esac
   fi
 }
 trap cleanup EXIT
@@ -213,21 +259,29 @@ SOURCE_MANIFEST_SHA256="$(sha256sum "$SOURCE_MANIFEST" | cut -d' ' -f1)"
 
 # Never capture a stale executable. Locked build failures leave the accepted
 # screenshot set untouched and retain this run directory for diagnosis.
-(cd "$REPO" && timeout --kill-after=10s 20m cargo build --locked --quiet \
-  -p taskmanager) || {
+timeout --kill-after=10s 20m python3 scripts/capture_build.py \
+  --repo-root "$REPO" --source "$REPO/target/debug/taskforest-g" \
+  --destination "$APP" -- cargo build --locked --quiet \
+  -p taskmanager-gpui --bin taskforest-g || {
   printf 'capture build failed; evidence retained at %s\n' "$RUN_DIR"
   exit 1
 }
-install -Dm755 "$REPO/target/debug/taskmanager" "$APP"
 BINARY_SHA256="$(sha256sum "$APP" | cut -d' ' -f1)"
+APP_RELATIVE="${APP#"$REPO/"}"
 {
   printf 'run_id=%s\n' "$RUN_ID"
+  printf 'run_uuid=%s\n' "$CAPTURE_RUN_UUID"
+  printf 'frontend=gpui\n'
+  printf 'run_root=%s\n' "$RUN_RELATIVE"
+  printf 'runtime_root=%s\n' "$CAPTURE_RUNTIME_ROOT"
+  printf 'supervisor_pid=%s\n' "${TM_CAPTURE_SUPERVISOR_PID:-}"
+  printf 'cgroup_path=%s\n' "${TM_CAPTURE_CGROUP_PATH:-}"
   printf 'captured_at=%s\n' "$CAPTURED_AT"
   printf 'git_head=%s\n' "$GIT_HEAD"
   printf 'worktree=%s\n' "$WORKTREE_STATE"
   printf 'rust=%s\n' "$RUST_VERSION"
   printf 'niri=%s\n' "$NIRI_VERSION"
-  printf 'binary=target/debug/taskforest-g\n'
+  printf 'binary=%s\n' "$APP_RELATIVE"
   printf 'binary_sha256=%s\n' "$BINARY_SHA256"
   printf 'capture_scope=%s\n' "$CAPTURE_SCOPE"
   printf 'publish=%s\n' "$([ "$PUBLISH_CAPTURE" -eq 1 ] && printf full-matrix || printf targeted)"
@@ -240,10 +294,12 @@ BINARY_SHA256="$(sha256sum "$APP" | cut -d' ' -f1)"
     printf 'niri_host=host-wayland-visible\n'
   fi
   printf 'niri_background=%s\n' "$CAPTURE_NIRI_BACKGROUND"
+  printf 'dbus_isolation=private-session\n'
+  printf 'dbus_address_sha256=%s\n' "$DBUS_ADDRESS_SHA256"
   printf 'niri_batch_size=%s\n' "$CAPTURE_NIRI_BATCH_SIZE"
   printf 'niri_max_attempts=%s\n' "$CAPTURE_NIRI_MAX_ATTEMPTS"
-  printf 'niri_outputs=target/screenshot-evidence/%s/niri-outputs.json\n' "$RUN_ID"
-  printf 'window_receipts=target/screenshot-evidence/%s/capture-window-receipts.tsv\n' "$RUN_ID"
+  printf 'niri_outputs=%s/niri-outputs.json\n' "$RUN_RELATIVE"
+  printf 'window_receipts=%s/capture-window-receipts.tsv\n' "$RUN_RELATIVE"
   printf 'command=bash scripts/capture-niri.sh\n'
 } >"$METADATA"
 # Minimal valid 26.04 config: where niri saves screenshots (timestamped), and float
@@ -281,6 +337,7 @@ stop_niri() {
 }
 
 start_niri() {
+  ensure_capture_host || return 1
   NIRI_START_COUNT=$((NIRI_START_COUNT + 1))
   local niri_log="$RUN_DIR/niri.log"
   if [ "$NIRI_START_COUNT" -gt 1 ]; then
@@ -288,6 +345,8 @@ start_niri() {
   fi
 
   XDG_RUNTIME_DIR="$NIRI_RUNTIME" WAYLAND_DISPLAY="$NIRI_PARENT_WAYLAND" DISPLAY= \
+    XDG_CONFIG_HOME="$NIRI_RUNTIME/config" XDG_DATA_HOME="$NIRI_RUNTIME/data" \
+    XDG_CACHE_HOME="$NIRI_RUNTIME/cache" XDG_STATE_HOME="$NIRI_RUNTIME/state" \
     LIBGL_ALWAYS_SOFTWARE="$CAPTURE_LIBGL_ALWAYS_SOFTWARE" \
     RUST_LOG="$CAPTURE_NIRI_LOG" \
     setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" \
@@ -413,14 +472,20 @@ start_capture_host() {
   # desktop focus or paint over the current work.
   # Keep the socket path below Linux's sockaddr_un limit even when the
   # checkout itself lives under a long mounted workspace path.
-  KWIN_RUNTIME="$(mktemp -d /tmp/taskforest-kwin.XXXXXX)"
-  KWIN_DISPLAY="$KWIN_RUNTIME/wayland-outer"
-  mkdir -p "$KWIN_RUNTIME"
+  KWIN_ROOT="$CAPTURE_RUNTIME_ROOT/kwin"
+  KWIN_RUNTIME="$KWIN_ROOT/runtime"
+  KWIN_SOCKET="wayland-${CAPTURE_RUN_UUID%%-*}"
+  mkdir -p "$KWIN_ROOT/config" "$KWIN_ROOT/data" "$KWIN_ROOT/cache" \
+    "$KWIN_ROOT/state" "$KWIN_RUNTIME"
+  KWIN_DISPLAY="$KWIN_RUNTIME/$KWIN_SOCKET"
   chmod 700 "$KWIN_RUNTIME"
   local kwin_log="$RUN_DIR/kwin-wayland.log"
-  XDG_RUNTIME_DIR="$KWIN_RUNTIME" WAYLAND_DISPLAY= DISPLAY= \
+  XDG_RUNTIME_DIR="$KWIN_RUNTIME" XDG_CONFIG_HOME="$KWIN_ROOT/config" \
+    XDG_DATA_HOME="$KWIN_ROOT/data" XDG_CACHE_HOME="$KWIN_ROOT/cache" \
+    XDG_STATE_HOME="$KWIN_ROOT/state" WAYLAND_DISPLAY= DISPLAY= \
+    LIBGL_ALWAYS_SOFTWARE="$CAPTURE_LIBGL_ALWAYS_SOFTWARE" \
     QT_QPA_PLATFORM=wayland setsid timeout --foreground --kill-after=10s 20m \
-    kwin_wayland --virtual --socket=wayland-outer --width=1920 --height=1080 \
+    kwin_wayland --virtual --socket="$KWIN_SOCKET" --width=1920 --height=1080 \
       --scale=1 --no-global-shortcuts --no-lockscreen \
       &>"$kwin_log" & KWIN_PID=$!
   KWIN_PGID=""
@@ -446,6 +511,40 @@ start_capture_host() {
   fi
   NIRI_PARENT_WAYLAND="$KWIN_DISPLAY"
   printf 'background capture host: kwin-wayland --virtual (%s)\n' "$KWIN_DISPLAY"
+}
+
+capture_host_ready() {
+  if [ "$CAPTURE_NIRI_BACKGROUND" -eq 0 ]; then
+    return 0
+  fi
+  [ -n "$KWIN_PID" ] && kill -0 "$KWIN_PID" 2>/dev/null \
+    && [ -n "$KWIN_DISPLAY" ] && [ -S "$KWIN_DISPLAY" ]
+}
+
+reset_capture_host() {
+  terminate_owned "$KWIN_PID" "$KWIN_PGID"
+  KWIN_PID=""
+  KWIN_PGID=""
+  if [ -n "$KWIN_ROOT" ] && [ -d "$KWIN_ROOT" ]; then
+    case "$KWIN_ROOT" in
+      "$CAPTURE_RUNTIME_ROOT/kwin") rm -rf -- "$KWIN_ROOT" ;;
+      *) printf 'cleanup refused unexpected KWin root: %s\n' "$KWIN_ROOT" >&2 ;;
+    esac
+  fi
+  KWIN_RUNTIME=""
+  KWIN_ROOT=""
+  KWIN_SOCKET=""
+  KWIN_DISPLAY=""
+}
+
+ensure_capture_host() {
+  if capture_host_ready; then
+    return 0
+  fi
+  if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+    reset_capture_host
+    start_capture_host
+  fi
 }
 
 start_capture_host || exit 1
@@ -550,17 +649,19 @@ capture() {
   local marker_scenario="${scenario:-standard}"
   local config_home="$NIRI_RUNTIME/config-$name"
   local data_home="$NIRI_RUNTIME/data-$name"
+  local cache_home="$NIRI_RUNTIME/cache-$name"
+  local state_home="$NIRI_RUNTIME/state-$name"
   local expected_width=0 expected_height=0
   IFS=x read -r expected_width expected_height <<<"$capture_size"
   terminate_owned "$APP_PID" "$APP_PGID"
   APP_PID=""
   APP_PGID=""
   rm -f "$shot" "$windows_json" "$windows_json_tmp" "$action_log" 2>/dev/null
-  mkdir -p "$config_home"
+  mkdir -p "$config_home" "$data_home" "$cache_home" "$state_home"
   # Replay scenarios exercise the REAL persistence path: config opts in and a
   # capture-private XDG data home carries pre-seeded JSONL series. Rows still
   # travel through the history-store query and async application projection.
-  local xdg_data_env=()
+  local xdg_data_env=(XDG_DATA_HOME="$data_home")
   case "$scenario" in
     history-replay|application-history-replay)
       mkdir -p "$config_home/taskmanager" "$data_home/taskmanager/history"
@@ -572,19 +673,26 @@ capture() {
       fi
       printf '  seeded %s history fixture series for %s\n' \
         "$(find "$data_home/taskmanager/history" -name '*.jsonl' 2>/dev/null | wc -l)" "$name"
-      xdg_data_env=(XDG_DATA_HOME="$data_home")
       ;;
   esac
   local launch_attempt
   for launch_attempt in 1 2 3; do
-    XDG_RUNTIME_DIR="$NIRI_RUNTIME" XDG_CONFIG_HOME="$config_home" WAYLAND_DISPLAY="$SOCK" DISPLAY= \
+    XDG_RUNTIME_DIR="$NIRI_RUNTIME" XDG_CONFIG_HOME="$config_home" \
+      XDG_CACHE_HOME="$cache_home" XDG_STATE_HOME="$state_home" \
+      WAYLAND_DISPLAY="$SOCK" DISPLAY= \
       LIBGL_ALWAYS_SOFTWARE="$CAPTURE_LIBGL_ALWAYS_SOFTWARE" \
       TM_SKIN="$skin" TM_PAGE="$page" TM_DEVICE="$device" \
       TM_SKIN_HC="" TM_SETTINGS="$settings" \
       TM_CAPTURE_EVIDENCE=1 TM_CAPTURE_SCENARIO="$scenario" \
       TM_WINDOW_SIZE="$window_size" \
       env "${xdg_data_env[@]}" setsid "$APP" &>"$log" & APP_PID=$!
-    APP_PGID="$(process_group "$APP_PID")"
+    APP_PGID=""
+    for pgid_probe in $(seq 1 20); do
+      APP_PGID="$(process_group "$APP_PID")"
+      [ "$APP_PGID" = "$APP_PID" ] && break
+      kill -0 "$APP_PID" 2>/dev/null || break
+      sleep 0.05
+    done
     if [ "$APP_PGID" = "$APP_PID" ]; then
       break
     fi
@@ -744,15 +852,15 @@ capture() {
   local windows_hash=- action_hash=-
   [ -f "$windows_json" ] && windows_hash=$(sha256sum "$windows_json" | cut -d' ' -f1)
   [ -f "$action_log" ] && action_hash=$(sha256sum "$action_log" | cut -d' ' -f1)
-  local log_receipt="target/screenshot-evidence/$RUN_ID/$(basename "$log")"
-  local windows_receipt="target/screenshot-evidence/$RUN_ID/$(basename "$windows_json")"
-  local action_receipt="target/screenshot-evidence/$RUN_ID/$(basename "$action_log")"
+  local log_receipt="$RUN_RELATIVE/$(basename "$log")"
+  local windows_receipt="$RUN_RELATIVE/$(basename "$windows_json")"
+  local action_receipt="$RUN_RELATIVE/$(basename "$action_log")"
   grep 'CAPTURE_MARKER' "$log" 2>/dev/null | sed "s/^/$name\t/" >>"$MARKERS"
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$CAPTURED_AT" "$GIT_HEAD" "$WORKTREE_STATE" "$RUST_VERSION" "$marker_scenario" \
     "$name.png" "$skin" "$page" "$device" "$settings" "$width" "$height" "$bytes" \
     "$hash" "$markers" "$log_receipt" "$log_hash" \
-    "target/screenshot-evidence/$RUN_ID/capture-markers.log" >>"$MANIFEST"
+    "$RUN_RELATIVE/capture-markers.log" >>"$MANIFEST"
   printf '%s\t%s\t%s\t%s\t%s\t%s\t%s\n' \
     "$name" "$APP_PID" "$window_id" "$windows_receipt" \
     "$windows_hash" "$action_receipt" "$action_hash" \
@@ -840,15 +948,8 @@ timeout 30s python3 "$REPO/scripts/validate_capture_evidence.py" \
 # Promote only a complete matrix to the ignored local latest directory. Every
 # image, manifest, and receipt remains local evidence and is never committed.
 if [ "$PUBLISH_CAPTURE" -eq 1 ]; then
-  for f in "$STAGED"/*.png; do
-    install -m0644 "$f" "$OUT/$(basename "$f")"
-  done
-  install -m0644 "$MANIFEST" "$OUT/capture-manifest.tsv"
-  install -m0644 "$METADATA" "$OUT/capture-metadata.txt"
-  install -m0644 "$MARKERS" "$OUT/capture-markers.log"
-  install -m0644 "$VALIDATION" "$OUT/capture-validation.json"
-  install -m0644 "$SOURCE_MANIFEST" "$OUT/gpui-source-manifest.sha256"
-  printf '%s\n' "$RUN_ID" >"$EVIDENCE_ROOT/latest.txt"
+  PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=5s 30s python3 "$REPO/scripts/capture_publish.py" \
+    --repo-root "$REPO" --frontend gpui --run-root "$RUN_DIR" --run-uuid "$RUN_ID"
 else
   printf 'targeted capture accepted locally; durable matrix unchanged. Evidence: %s\n' "$RUN_DIR"
 fi

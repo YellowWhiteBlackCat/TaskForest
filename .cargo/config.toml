@@ -12,3 +12,19 @@
 # NOT configured here: the machine's user-level ~/.cargo/config.toml applies
 # it to every Rust project on that machine, so CI and other machines keep
 # plain rustc. See the "Compile affinity" section of AGENTS.md.
+
+# ADR-051: each frontend is its own product crate. Address a product by
+# package locally (`-p`) instead of re-selecting features — these aliases are
+# the convenience spelling. With four independent toolchains, a workspace-wide
+# `cargo build` compiles all of them; scope with --exclude when iterating.
+[alias]
+gpui = "build -p taskmanager-gpui"
+iced = "build -p taskmanager-iced"
+tui = "build -p taskmanager-tui"
+bevy = "build -p taskmanager-bevy-ui"
+gpui-test = "nextest run -p taskmanager-gpui -j 4"
+iced-test = "nextest run -p taskmanager-iced -j 4"
+tui-test = "nextest run -p taskmanager-tui -j 4"
+bevy-test = "nextest run -p taskmanager-bevy-ui -j 4"
+cli-test = "nextest run -p taskmanager-cli -j 4"
+gates-test = "nextest run -p taskmanager-gates --test logic --test performance -j 4"

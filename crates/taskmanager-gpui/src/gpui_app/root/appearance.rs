@@ -13,10 +13,10 @@ use taskmanager_core::core::config::Config;
 use taskmanager_core::core::config::{
     COLOR_SCHEME_DARK, COLOR_SCHEME_EYEFOREST, COLOR_SCHEME_LIGHT, COLOR_SCHEME_SYSTEM,
 };
-use taskmanager_theme::gpui::background_appearance;
 use taskmanager_theme::{
     FontChoice, FontRole, HighContrast, LightDark, Skin, Theme, resolve_fonts,
 };
+use taskmanager_ui::theme_binding::background_appearance;
 
 impl RootView {
     pub(crate) fn resolved_persisted_appearance(&self, config: &Config) -> AppearancePreferences {

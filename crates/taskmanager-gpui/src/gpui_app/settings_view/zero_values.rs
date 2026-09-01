@@ -30,7 +30,9 @@ pub(super) fn zero_values_row(
         .debug_selector(|| "gray-zero-values".to_string())
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_4)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_4,
+        ))
         .child(
             div()
                 .flex()
@@ -39,8 +41,8 @@ pub(super) fn zero_values_row(
                 .justify_between()
                 .child(
                     div()
-                        .text_size(tokens::FONT_13)
-                        .text_color(t.fg)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
                         .child(i18n::t("settings.gray_zero_values")),
                 )
                 .child(
@@ -53,8 +55,8 @@ pub(super) fn zero_values_row(
         )
         .child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(t.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
                 .child(i18n::t("settings.gray_zero_values_hint")),
         )
 }

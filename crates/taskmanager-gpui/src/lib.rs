@@ -1,13 +1,22 @@
-//! GPUI desktop frontend for TaskForest.
+//! GPUI desktop frontend product (`taskforest-g`) for TaskForest.
 //!
-//! The crate owns the GPUI product surface, including views, the theme
-//! adapter, and the GPUI event loop. Native composition is supplied by the
-//! toolkit-neutral `taskmanager-app-host`; the root `taskmanager` package only
-//! selects this frontend through its `ui-gpui` feature and dispatches the
-//! shared CLI entry point.
+//! The crate owns the GPUI product surface, the GPUI event loop, and this
+//! product's binary. Native composition is supplied by the toolkit-neutral
+//! `taskmanager-app-host`; the shared CLI harness (`taskmanager-cli`,
+//! ADR-051) owns argv parsing, the neutral modes, and the capability seam.
 
 #![forbid(unsafe_code)]
 #![deny(clippy::wildcard_imports)]
+
+// A release artifact is a platform variant, never a hardware-vendor variant
+// (ADR-006). Developers may use reduced debug builds to exercise fallback
+// paths, but a distributable binary must carry every backend in the standard
+// hardware set.
+#[cfg(all(not(debug_assertions), not(feature = "hardware-all")))]
+compile_error!(
+    "release builds require the default `hardware-all` feature; \
+     vendor-specific TaskForest artifacts are not supported"
+);
 
 mod assets;
 pub mod gpui_app;

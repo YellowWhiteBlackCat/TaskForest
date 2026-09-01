@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 
 use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
     BatteryInfo, BatteryScalarObservations, DeviceGeneration, DeviceLifecycle, DevicePresence,
     PowerSupplyKind, PowerSupplySnapshot, ScalarObservation,
 };
-use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, RequestId};
+use taskmanager_platform_contract::{
+    CapabilityId, DeviceDiscovery, DeviceSourceSnapshot, RequestId,
+};
 
 use super::super::super::{PlatformEvent, PowerSupplyEvent};
 use super::super::{PlatformEventBatch, test_support::test_event_context};
@@ -28,7 +29,7 @@ fn power_supply_event_preserves_devices_and_source_status() {
     batch.merge(
         test_event_context(request_id, CapabilityId::POWER_SUPPLIES),
         PlatformEvent::PowerSupplies(PowerSupplyEvent::Snapshot(
-            DeviceSourceSnapshot::from_source_status(
+            DeviceSourceSnapshot::from_discovery(
                 PowerSupplySnapshot {
                     timestamp_ms: 42,
                     batteries: vec![battery],
@@ -42,12 +43,10 @@ fn power_supply_event_preserves_devices_and_source_status() {
                     )]),
                     ..Default::default()
                 },
-                vec![taskmanager_core::DeviceId::new("power-supply:serial-a")],
-                SourceStatus {
-                    provider: ProviderId::borrowed("fixture.power-supply"),
-                    outcome: SourceOutcome::Available,
-                    item_count: 1,
-                },
+                ProviderId::borrowed("fixture.power-supply"),
+                DeviceDiscovery::Available(vec![taskmanager_core::DeviceId::new(
+                    "power-supply:serial-a",
+                )]),
                 Vec::new(),
             ),
         )),

@@ -40,7 +40,7 @@ if [[ "${PR_SMOKE_PROFILE:-false}" == "true" ]]; then
 fi
 
 timeout --kill-after=30s "$build_timeout" cargo build --locked --release -j "$jobs" \
-    -p taskmanager \
+    -p taskmanager-gpui \
     -p taskmanager-setup-helper \
     -p taskmanager-privilege-helper \
     -p taskmanager-net-launcher \
@@ -49,7 +49,8 @@ timeout --kill-after=30s "$build_timeout" cargo build --locked --release -j "$jo
     -p taskmanager-rapl-helper \
     -p taskmanager-msr-helper
 
-install -m755 target/release/taskmanager target/release/taskforest-g
+# The GPUI product binary is emitted as target/release/taskforest-g directly
+# (ADR-051); no artifact rename step is needed.
 timeout --kill-after=10s 30s scripts/test-system-install-manager.sh
 timeout --kill-after=30s 120s packaging/arch/stage-package-sim.sh
 

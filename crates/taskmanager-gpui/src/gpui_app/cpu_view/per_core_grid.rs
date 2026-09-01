@@ -80,7 +80,9 @@ pub(super) fn render(
         .flex_grow()
         .flex_shrink_0()
         .min_h(px(0.0))
-        .gap(tokens::SPACE_10)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
         .w_full();
     for core_type in [
         CpuType::Performance,
@@ -110,7 +112,9 @@ pub(super) fn render(
             .flex_grow()
             .flex_shrink_0()
             .min_h(px(0.0))
-            .gap(tokens::SPACE_4)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_4,
+            ))
             .w_full()
             .child(
                 div()
@@ -118,15 +122,17 @@ pub(super) fn render(
                     .justify_between()
                     .child(
                         div()
-                            .text_size(tokens::FONT_11)
-                            .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                            .text_color(theme.fg)
+                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                            .font_weight(taskmanager_ui::theme_binding::font_weight(
+                                tokens::FONT_WEIGHT_BOLD,
+                            ))
+                            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                             .child(core_type.label()),
                     )
                     .child(
                         div()
-                            .text_size(tokens::FONT_10)
-                            .text_color(theme.fg_dim)
+                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
+                            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                             .child(indices.len().to_string()),
                     ),
             );

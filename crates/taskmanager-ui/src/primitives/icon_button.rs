@@ -3,12 +3,12 @@
 use std::rc::Rc;
 
 use crate::OptEventCallback;
+use crate::icons_binding::icon;
 use gpui::prelude::FluentBuilder;
 use gpui::{
     App, ClickEvent, Context, ElementId, Entity, FocusHandle, InteractiveElement, IntoElement,
     KeyDownEvent, ParentElement, RenderOnce, StatefulInteractiveElement, Styled, Window, div, px,
 };
-use taskmanager_icons::icon;
 use taskmanager_theme::Palette;
 use taskmanager_ui_contract::IconId;
 
@@ -121,11 +121,11 @@ impl RenderOnce for IconButton {
             .justify_center()
             .size(px(28.0))
             .rounded_full()
-            .bg(palette.surface)
-            .text_color(palette.fg)
-            .hover(|style| style.bg(hover_fill(palette.surface)))
-            .active(|style| style.bg(active_fill(palette.surface)))
-            .focus(|style| style.border_color(palette.ring))
+            .bg(crate::theme_binding::fill(palette.surface))
+            .text_color(crate::theme_binding::hsla(palette.fg))
+            .hover(|style| style.bg(crate::theme_binding::fill(hover_fill(palette.surface))))
+            .active(|style| style.bg(crate::theme_binding::fill(active_fill(palette.surface))))
+            .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
             .when(!enabled, |el| el.opacity(0.5))
             .on_key_down({
                 let on_activate = on_activate.clone();

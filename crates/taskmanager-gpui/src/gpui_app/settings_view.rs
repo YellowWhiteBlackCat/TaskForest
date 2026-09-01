@@ -7,7 +7,10 @@
 //! this fn returns just the sections. All controls mutate `RootView.theme` via the
 //! entity handle, so the whole app re-skins live on the next frame.
 
-use gpui::{Context, Div, Entity, IntoElement, ParentElement, SharedString, Styled, div, px};
+use gpui::{
+    Context, Div, Entity, InteractiveElement, IntoElement, ParentElement, SharedString, Styled,
+    div, px,
+};
 use std::collections::HashMap;
 
 use taskmanager_ui::inputs::select::{SelectOption, select};
@@ -17,6 +20,7 @@ use taskmanager_ui::primitives::section_header::SectionHeader;
 
 use self::density::density_row;
 use self::ui_size::ui_size_row;
+use crate::gpui_app::chrome::WindowDecorationsPreference;
 use crate::gpui_app::elements::pill;
 use crate::gpui_app::first_run::{self, FirstRunUiState};
 use crate::gpui_app::graph::GraphSettings;
@@ -24,6 +28,7 @@ use crate::gpui_app::root::{Hover, RootView};
 use taskmanager_application::i18n;
 use taskmanager_core::core::config::{
     STARTUP_PAGE_PERFORMANCE, STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER,
+    WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE, WINDOW_DECORATIONS_SYSTEM,
 };
 use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens;
@@ -39,6 +44,7 @@ mod fonts;
 mod graphs;
 mod history;
 mod notifications;
+mod privilege_center;
 mod shortcuts;
 mod ui_size;
 mod units;
@@ -50,6 +56,8 @@ use self::graphs::graph_options_group;
 pub(crate) use self::graphs::init_data_points_slider;
 use self::history::history_persistence_row;
 use self::notifications::{notify_row, quiet_hours_rows};
+pub(crate) use self::privilege_center::PrivilegeCenterInputs;
+use self::privilege_center::render_privilege_center;
 use self::refresh::refresh_row;
 use self::units::units_group;
 use self::zero_values::zero_values_row;
@@ -67,7 +75,8 @@ pub(crate) mod refresh;
 /// dim captions (Skin GNOME/KDE/Windows/macOS pills, Light/Dark, Language,
 /// Fonts UI + monospace, Text rendering platform-default/subpixel/grayscale,
 /// Keyboard shortcuts, Devices per-category toggles, Apps zero-value styling,
-/// Performance refresh-interval slider, High contrast switch).
+/// Performance refresh-interval slider, High contrast switch, and the central
+/// optional-hardware permission center).
 ///
 /// The returned element is the Dialog **content** only; the wrapping
 /// [`crate::gpui_app::elements::dialog_overlay`] supplies the panel chrome
@@ -118,8 +127,16 @@ pub(crate) struct SettingsViewProps<'a> {
     pub color_scheme: &'static str,
     pub text_rendering: &'static str,
     pub startup_page: SharedString,
+    /// Persisted window-frame policy token, seeding the decoration select.
+    pub window_decorations: SharedString,
     pub slider_entity: Entity<SliderState>,
     pub switches: &'a HashMap<&'static str, Entity<SwitchState>>,
+    pub privilege_center: PrivilegeCenterInputs<'a>,
+    /// Capture-only projection that renders the real permission center as the
+    /// complete Settings body so evidence does not depend on an outer
+    /// AnyElement scroll-child index. Production Settings always leaves this
+    /// false.
+    pub permission_center_only: bool,
 }
 
 pub(crate) fn render_settings(
@@ -156,39 +173,68 @@ pub(crate) fn render_settings(
         color_scheme,
         text_rendering,
         startup_page,
+        window_decorations,
         slider_entity,
         switches,
+        privilege_center,
+        permission_center_only,
     } = props;
     let ent = cx.entity();
 
-    let mut system_sections = div().flex().flex_col().gap(tokens::SPACE_12).child(section(
-        t,
-        i18n::t("settings.devices"),
-        devices_row(
+    if permission_center_only {
+        let content = render_privilege_center(t, &privilege_center, ent).unwrap_or_else(|| {
+            div().debug_selector(|| "tm-settings-privilege-center-empty".to_string())
+        });
+        return div()
+            .debug_selector(|| "tm-settings-permission-center-capture".to_string())
+            .flex()
+            .flex_col()
+            .w_full()
+            .child(group(
+                t,
+                "settings.group_system",
+                section(t, i18n::t("settings.privileges"), content),
+            ));
+    }
+
+    let mut system_sections = div()
+        .flex()
+        .flex_col()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
+        .child(section(
             t,
-            ent.clone(),
-            DeviceVisibility {
-                cpu: show_cpu,
-                memory: show_memory,
-                disks: show_disks,
-                network: show_network,
-                network_wired: show_network_wired,
-                network_wireless: show_network_wireless,
-                network_vpn: show_network_vpn,
-                network_virtual: show_network_virtual,
-                network_other: show_network_other,
-                gpus: show_gpus,
-            },
-            switches,
-            cx,
-        ),
-    ));
+            i18n::t("settings.devices"),
+            devices_row(
+                t,
+                ent.clone(),
+                DeviceVisibility {
+                    cpu: show_cpu,
+                    memory: show_memory,
+                    disks: show_disks,
+                    network: show_network,
+                    network_wired: show_network_wired,
+                    network_wireless: show_network_wireless,
+                    network_vpn: show_network_vpn,
+                    network_virtual: show_network_virtual,
+                    network_other: show_network_other,
+                    gpus: show_gpus,
+                },
+                switches,
+                cx,
+            ),
+        ));
     if first_run_state.info.is_some() {
         system_sections = system_sections.child(section(
             t,
             i18n::t("settings.additional_setup"),
             first_run::render_settings_row(t, ent.clone()),
         ));
+    }
+    if let Some(privileges) = render_privilege_center(t, &privilege_center, ent.clone()) {
+        system_sections =
+            system_sections.child(section(t, i18n::t("settings.privileges"), privileges));
     }
     system_sections = system_sections
         .child(section(
@@ -233,7 +279,9 @@ pub(crate) fn render_settings(
             div()
                 .flex()
                 .flex_col()
-                .gap(tokens::SPACE_12)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_12,
+                ))
                 .child(section(
                     t,
                     i18n::t("settings.language"),
@@ -256,7 +304,9 @@ pub(crate) fn render_settings(
             div()
                 .flex()
                 .flex_col()
-                .gap(tokens::SPACE_12)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_12,
+                ))
                 .child(section(
                     t,
                     i18n::t("settings.ui_size"),
@@ -277,6 +327,11 @@ pub(crate) fn render_settings(
                     i18n::t("settings.appearance"),
                     mode_row(t, ent.clone(), color_scheme, hovered, cx),
                 ))
+                .children(window_decorations_section(
+                    t,
+                    ent.clone(),
+                    window_decorations,
+                ))
                 .child(hc_row(t, ent.clone(), switches, cx)),
         ))
         .child(group(
@@ -285,7 +340,9 @@ pub(crate) fn render_settings(
             div()
                 .flex()
                 .flex_col()
-                .gap(tokens::SPACE_12)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_12,
+                ))
                 .child(section(
                     t,
                     i18n::t("settings.fonts"),
@@ -304,7 +361,9 @@ pub(crate) fn render_settings(
             div()
                 .flex()
                 .flex_col()
-                .gap(tokens::SPACE_12)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_12,
+                ))
                 .child(section(
                     t,
                     i18n::t("settings.notifications"),
@@ -336,7 +395,9 @@ fn group(t: &Theme, key: &'static str, content: Div) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(
             SectionHeader::new(i18n::t(key).to_owned(), t.palette())
                 .debug_selector(key)
@@ -352,11 +413,13 @@ fn section(t: &Theme, label: &str, content: impl IntoElement) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(t.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
                 .child(label.to_string()),
         )
         .child(content)
@@ -375,7 +438,9 @@ fn skin_row(
         .flex()
         .flex_row()
         .flex_wrap()
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .child(skin_pill(
             t,
             ent.clone(),
@@ -478,7 +543,9 @@ fn language_row(
     div()
         .flex()
         .flex_row()
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .child(pill(
             t,
             "lang-en",
@@ -543,6 +610,51 @@ pub(crate) use rendering::{hc_row, text_rendering_row};
 // event → gpui-component Button on_click → token update). The grouping test
 // asserts the four semantic group titles render top-to-bottom via the
 // debug_selector the `group()` helper registers.
+
+/// ── window-frame chooser (follow system / system titlebar / app titlebar) ────
+///
+/// Select bound to the persisted window-frame policy token. Selecting applies
+/// LIVE on platforms whose toolkit honors a runtime decoration request
+/// (Linux/Wayland: `Window::request_decorations` — the compositor confirms or
+/// corrects via the next configure); when the window system refuses an
+/// explicit mode (e.g. Mutter cannot draw server-side frames), the shell
+/// reports the outcome honestly through the render-time check instead of
+/// pretending the mode changed.
+///
+/// The control is hidden off Linux: gpui 0.2.2's macOS/Windows backends
+/// ignore decoration requests (the OS always draws the frame), so offering
+/// Custom there could never be honored. The outcome-notice machinery still
+/// covers a hand-edited config on those platforms.
+fn window_decorations_section(
+    t: &Theme,
+    ent: Entity<RootView>,
+    window_decorations: SharedString,
+) -> Option<Div> {
+    if !cfg!(target_os = "linux") {
+        return None;
+    }
+    Some(section(
+        t,
+        i18n::t("settings.window_decorations"),
+        select(
+            "window-decorations",
+            Some(window_decorations),
+            i18n::t("settings.window_decorations"),
+            vec![
+                SelectOption::new(WINDOW_DECORATIONS_SYSTEM, i18n::t("settings.deco_system")),
+                SelectOption::new(WINDOW_DECORATIONS_NATIVE, i18n::t("settings.deco_native")),
+                SelectOption::new(WINDOW_DECORATIONS_CUSTOM, i18n::t("settings.deco_custom")),
+            ],
+            t.palette(),
+            move |token, window, cx| {
+                let pref = WindowDecorationsPreference::from_config_token(&token);
+                ent.update(cx, |v, cx| {
+                    v.set_window_decorations_preference(pref, window, cx);
+                });
+            },
+        ),
+    ))
+}
 
 // ── startup-page chooser (remember last / performance / processes) ──────────
 

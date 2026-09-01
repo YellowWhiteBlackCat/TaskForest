@@ -68,6 +68,7 @@ fn fixture_host(
         history_replay_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
         history_persistence_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
         snapshot_export_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
+        window_capture_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
         diagnostic_bundle_runtime: std::sync::Arc::new(std::sync::OnceLock::new()),
     }
 }

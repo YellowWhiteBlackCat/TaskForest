@@ -156,6 +156,18 @@ fn performance_slots_reflow_as_a_unit_instead_of_starving_the_main_view() {
     assert_eq!(tight_perf.sidebar_width, 0.0);
     assert!(tight_perf.main_width >= super::PERFORMANCE_MAIN_MIN_WIDTH);
 
+    let short_vertical = FrameBudget::for_root(
+        size(px(560.0), px(480.0)),
+        NavOrientation::Horizontal,
+        FrameChromeBudget::new(36.0, false, false),
+    );
+    let short_vertical_perf = PerformancePageBudget::from_frame(short_vertical, true, 260.0);
+    assert_eq!(
+        short_vertical_perf.details,
+        PerformanceDetailsPresentation::Hidden,
+        "a short stacked layout hides the rail instead of clipping its bottom"
+    );
+
     let hidden_sidebar = PerformancePageBudget::from_frame(medium, false, 320.0);
     assert_eq!(
         hidden_sidebar.device_navigation,

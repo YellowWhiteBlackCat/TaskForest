@@ -59,14 +59,16 @@ fn stacked_bar(theme: &Theme, segments: &[(Color, f32)], label: &str, height: f3
         .h(px(height))
         .flex()
         .flex_row()
-        .rounded(tokens::small_radius(theme))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::small_radius(theme),
+        ))
         .overflow_hidden()
-        .bg(theme.shade);
+        .bg(taskmanager_ui::theme_binding::fill(theme.shade));
     if share_sum <= 1e-6 {
         return bar.items_center().justify_center().child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(label),
         );
     }
@@ -78,7 +80,7 @@ fn stacked_bar(theme: &Theme, segments: &[(Color, f32)], label: &str, height: f3
                     .flex_basis(relative(fraction))
                     .flex_shrink_0()
                     .h_full()
-                    .bg(*color),
+                    .bg(taskmanager_ui::theme_binding::fill(*color)),
             );
         }
     }
@@ -92,7 +94,13 @@ fn composition_legend(
     units: UnitPreferences,
 ) -> Div {
     let total = bytes_to_gib(total_bytes.max(1));
-    let mut column = div().flex().flex_col().gap(tokens::SPACE_5).w_full();
+    let mut column = div()
+        .flex()
+        .flex_col()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_5,
+        ))
+        .w_full();
     let mut shown = false;
     for (color, _, label, bytes) in segments {
         if *bytes == 0 {
@@ -105,32 +113,36 @@ fn composition_legend(
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(
                     div()
                         .size(px(10.0))
-                        .rounded(tokens::xsmall_radius(theme))
-                        .bg(*color),
+                        .rounded(taskmanager_ui::theme_binding::absolute(
+                            tokens::xsmall_radius(theme),
+                        ))
+                        .bg(taskmanager_ui::theme_binding::fill(*color)),
                 )
                 .child(
                     div()
                         .flex_1()
-                        .text_size(tokens::FONT_12)
-                        .text_color(theme.fg)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                         .child(label.clone()),
                 )
                 .child(
                     div()
                         .w(px(44.0))
-                        .text_size(tokens::FONT_12)
-                        .text_color(theme.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                         .child(format!("{percent:>4.0}%")),
                 )
                 .child(
                     div()
                         .w(px(74.0))
-                        .text_size(tokens::FONT_12)
-                        .text_color(theme.fg)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                         .child(units.format_quantity(*bytes, QuantityFamily::Memory, false)),
                 ),
         );
@@ -154,15 +166,17 @@ fn swap_bar(
     let mut bar = div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_5)
-        .mt(tokens::SPACE_2);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_5,
+        ))
+        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_2));
     // Compact mode keeps only the bars: the prose captions are the text the
     // memory ladder omits first (the charts-keep-their-floors policy).
     if with_label {
         bar = bar.child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(stats.label),
         );
     }
@@ -173,13 +187,15 @@ fn metric_tile(theme: &Theme, title: &str, value: String, note: String) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_2)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_2,
+        ))
         .flex_1()
         .min_w(px(0.0))
         .child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(title.to_string()),
         )
         .child(
@@ -187,15 +203,17 @@ fn metric_tile(theme: &Theme, title: &str, value: String, note: String) -> Div {
             // poisons gpui's nowrap text measure cache (see the vital line).
             div().flex().flex_row().min_w(px(0.0)).child(
                 elements::truncated_text(&value)
-                    .text_size(tokens::FONT_16)
-                    .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                    .text_color(theme.fg),
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_16))
+                    .font_weight(taskmanager_ui::theme_binding::font_weight(
+                        tokens::FONT_WEIGHT_BOLD,
+                    ))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg)),
             ),
         )
         .child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(note),
         )
 }
@@ -206,7 +224,9 @@ fn summary_metrics(theme: &Theme, memory: &MemoryMetrics, units: UnitPreferences
     div()
         .flex()
         .items_center()
-        .gap(tokens::SPACE_12)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         .w_full()
         .child(metric_tile(
             theme,
@@ -214,14 +234,24 @@ fn summary_metrics(theme: &Theme, memory: &MemoryMetrics, units: UnitPreferences
             tiles.used,
             tiles.used_note,
         ))
-        .child(div().w(px(1.0)).h(px(34.0)).bg(theme.border))
+        .child(
+            div()
+                .w(px(1.0))
+                .h(px(34.0))
+                .bg(taskmanager_ui::theme_binding::fill(theme.border)),
+        )
         .child(metric_tile(
             theme,
             i18n::t("mem.available"),
             tiles.available,
             tiles.available_note,
         ))
-        .child(div().w(px(1.0)).h(px(34.0)).bg(theme.border))
+        .child(
+            div()
+                .w(px(1.0))
+                .h(px(34.0))
+                .bg(taskmanager_ui::theme_binding::fill(theme.border)),
+        )
         .child(metric_tile(
             theme,
             i18n::t("mem.swap"),
@@ -268,13 +298,22 @@ pub(super) fn composition_block(
     let mut column = div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
-        .px(tokens::SPACE_12)
-        .py(tokens::SPACE_10)
-        .rounded(tokens::card_radius(theme))
+        .flex_none()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::card_radius(theme),
+        ))
         .border_1()
-        .border_color(theme.border)
-        .bg(theme.card_surface())
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+        .bg(taskmanager_ui::theme_binding::fill(theme.card_surface()))
         .shadow(elements::card_shadow(theme));
     if mode == MemoryDetailMode::Full {
         column = column.child(summary_metrics(theme, memory, units));
@@ -288,17 +327,21 @@ pub(super) fn composition_block(
             div()
                 .flex()
                 .items_center()
-                .gap(tokens::SPACE_6)
-                .text_size(tokens::FONT_13)
-                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                .text_color(theme.fg)
-                .child(taskmanager_icons::icon(IconId::Performance).size(px(14.0)))
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_BOLD,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                .child(taskmanager_ui::icons_binding::icon(IconId::Performance).size(px(14.0)))
                 .child(i18n::t("mem.composition")),
         )
         .child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(format!(
                     "{} {}  ·  {} {}",
                     i18n::t("mem.in_use"),

@@ -39,3 +39,14 @@ released only while the stored token still matches the exact owner.
 The read-only claim probe distinguishes absent/live/stale/ambiguous without
 acquiring or replacing ownership; frontend startup uses it only for a bounded
 collector handshake.
+
+## Module map
+
+```text
+src/store.rs (+ store/{lock,pending,tmp_sweep,retention_io}.rs)   lock, pending, sweeps
+src/records.rs                   typed history records (JSONL)
+src/query.rs                     read-only queries
+src/retention.rs  boot_history.rs  bounded_io.rs   retention, boot segments, bounded I/O
+```
+
+Single writer: the app-host persistence generation; all other consumers are read-only.

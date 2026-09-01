@@ -120,16 +120,24 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
         .id("proc-sort-header")
         .flex()
         .items_center()
-        .px(tokens::SPACE_8)
-        .py(density.header_padding_y())
-        .text_size(ui_size.header_font_size())
-        .line_height(tokens::LINE_HEIGHT_HEADER)
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            density.header_padding_y(),
+        ))
+        .text_size(taskmanager_ui::theme_binding::absolute(
+            ui_size.header_font_size(),
+        ))
+        .line_height(taskmanager_ui::theme_binding::fraction(
+            tokens::LINE_HEIGHT_HEADER,
+        ))
         .relative()
         // One hairline under the header separates chrome from primary content
         // (the shared taskmanager-ui Table paints the same border_b_1 under its
         // live header); without it body row 0 sits flush against the header.
         .border_b_1()
-        .border_color(theme.border)
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
         // Name: identity column — always visible (never in hidden_cols by
         // contract) and fixed as the leading navigation anchor.
         .child(name_header);
@@ -272,10 +280,16 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
                     // "CPU▼" and "Trend" don't visually touch (BorderBox keeps
                     // the outer 56px column boundary — and header/body
                     // alignment — unchanged).
-                    .pl(tokens::SPACE_4)
-                    .text_size(tokens::FONT_CAPTION)
-                    .font_weight(tokens::FONT_WEIGHT_STRONG.into())
-                    .text_color(theme.fg_dim)
+                    .pl(taskmanager_ui::theme_binding::definite_length(
+                        tokens::SPACE_4,
+                    ))
+                    .text_size(taskmanager_ui::theme_binding::font_size(
+                        tokens::FONT_CAPTION,
+                    ))
+                    .font_weight(taskmanager_ui::theme_binding::font_weight(
+                        tokens::FONT_WEIGHT_STRONG,
+                    ))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                     .child(i18n::t("proc.trend")),
             );
     }
@@ -450,7 +464,7 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
                 .bottom_0()
                 .h(px(2.0))
                 .w(cursor_width)
-                .bg(theme.accent)
+                .bg(taskmanager_ui::theme_binding::fill(theme.accent))
                 .opacity(0.8),
         );
     }
@@ -517,8 +531,12 @@ fn sort_cell(props: SortCellProps<'_>) -> Stateful<Div> {
         // Column gutter (owner-directed 2026-08-15): every header cell carries
         // the same inner padding as its body cells (`cells.rs`), so labels sit
         // over their column's content and adjacent columns read apart.
-        .pl(tokens::SPACE_8)
-        .pr(tokens::SPACE_8)
+        .pl(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .pr(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(theme))
@@ -569,10 +587,14 @@ fn sort_cell(props: SortCellProps<'_>) -> Stateful<Div> {
         })
         .flex()
         .items_center()
-        .rounded(tokens::small_radius(theme))
-        .bg(bg)
-        .font_weight(tokens::FONT_WEIGHT_HEADER.into())
-        .text_color(fg);
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::small_radius(theme),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(bg))
+        .font_weight(taskmanager_ui::theme_binding::font_weight(
+            tokens::FONT_WEIGHT_HEADER,
+        ))
+        .text_color(taskmanager_ui::theme_binding::hsla(fg));
     let cell = if numeric {
         cell.justify_end().font(mono_font_with_fallback(theme))
     } else {

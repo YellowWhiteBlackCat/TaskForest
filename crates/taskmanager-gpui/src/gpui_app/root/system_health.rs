@@ -140,18 +140,20 @@ pub(super) fn render_system_health_confirmation_dialog(
         .max_w(relative(1.0))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_12)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_13)
-                .text_color(theme.fg)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(message),
         );
     if let Some(error) = error {
         content = content.child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.danger)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.danger))
                 .child(self_test_failure_text(error)),
         );
     }
@@ -160,7 +162,9 @@ pub(super) fn render_system_health_confirmation_dialog(
             div()
                 .flex()
                 .justify_end()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(elements::pill(
                     theme,
                     "health-self-test-cancel",

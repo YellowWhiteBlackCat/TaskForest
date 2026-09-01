@@ -6,7 +6,7 @@
 # gate set on this machine (see docs/QUALITY_GATES.md):
 #
 #   local standard tier: clippy, workspace nextest, doctests, rustdoc, the
-#       ui-tui/ui-iced shape matrix, the nvidia fallback matrix, cargo deny,
+#       per-product fallback builds, the nvidia fallback matrix, cargo deny,
 #       the release build, and (--with-gui) the GPUI interaction matrix.
 #   local extended tier: llvm-cov with the configured workspace floors plus
 #       per-crate floors, mutation testing of the core/application diff,
@@ -228,5 +228,5 @@ jobs:
         run: timeout --kill-after=30s 3600s scripts/quality/release-smoke.sh
       # Isolate the vendor backend only as a development/fallback matrix. The
       # standard tests above already include it through default hardware-all.
-      # ADR-029 still requires an explicit UI shape when defaults are disabled.
-      - run: cargo nextest run --locked --workspace --lib --no-default-features --features hardware-all,nvidia,ui-gpui --profile ci -j 4
+      # ADR-051: the vendor matrix runs against the GPUI product only.
+      - run: cargo nextest run --locked -p taskmanager-gpui --lib --features hardware-all,nvidia --profile ci -j 4

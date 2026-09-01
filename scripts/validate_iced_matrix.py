@@ -14,6 +14,14 @@ from pathlib import Path
 from validate_capture_evidence import EvidenceError, file_sha256, png_receipt
 from validate_tui_evidence import visual_content_receipt
 
+try:
+    from capture_supervisor import SupervisorError, validate_supervised_metadata
+except ModuleNotFoundError:
+    from scripts.capture_supervisor import (  # type: ignore[no-redef]
+        SupervisorError,
+        validate_supervised_metadata,
+    )
+
 
 EXPECTED_APP_ID = "io.github.YellowWhiteBlackCat.TaskForestI"
 MATRIX_FIELDS = {"name", "device", "window_size"}
@@ -35,6 +43,13 @@ MANIFEST_FIELDS = {
 }
 REQUIRED_METADATA = {
     "run_id",
+    "run_uuid",
+    "frontend",
+    "run_root",
+    "runtime_root",
+    "supervisor_pid",
+    "cgroup_path",
+    "dbus_address_sha256",
     "captured_at",
     "git_head",
     "worktree",
@@ -47,6 +62,7 @@ REQUIRED_METADATA = {
     "matrix",
     "scenario_count",
     "nested_output_logical",
+    "dbus_isolation",
     "source_scope",
     "source_manifest_sha256",
     "command",
@@ -73,6 +89,8 @@ def parse_metadata(path: Path) -> dict[str, str]:
         raise EvidenceError(f"metadata missing fields: {sorted(missing)}")
     if values["app_id"] != EXPECTED_APP_ID:
         raise EvidenceError(f"unexpected Iced app id: {values['app_id']!r}")
+    if values["dbus_isolation"] != "private-session":
+        raise EvidenceError("Iced capture must use the private D-Bus session")
     return values
 
 
@@ -193,6 +211,10 @@ def main() -> int:
         if set(manifest[0]) != MANIFEST_FIELDS:
             raise EvidenceError(f"unexpected manifest columns: {sorted(manifest[0])}")
         values = parse_metadata(args.metadata)
+        try:
+            validate_supervised_metadata(values, args.repo_root, args.metadata, "iced")
+        except SupervisorError as error:
+            raise EvidenceError(str(error)) from error
         if values["source_scope"] != "iced":
             raise EvidenceError(f"unexpected source scope: {values['source_scope']!r}")
         if int(values["scenario_count"]) != len(matrix):
@@ -280,6 +302,7 @@ def main() -> int:
             "status": "pass",
             "validated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "run_id": values["run_id"],
+            "run_uuid": values["run_uuid"],
             "git_head": values["git_head"],
             "worktree": values["worktree"],
             "rust": values["rust"],

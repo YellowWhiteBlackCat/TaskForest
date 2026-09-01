@@ -138,7 +138,10 @@ fn taskmanager_dep_name(name: &str) -> Option<&str> {
 /// Every workspace package manifest: the root `Cargo.toml` plus each
 /// `crates/*/Cargo.toml`, keyed by package name.
 fn workspace_crate_manifests(repository: &std::path::Path) -> Vec<(String, std::path::PathBuf)> {
-    let mut manifests = vec![("taskmanager".to_owned(), repository.join("Cargo.toml"))];
+    let mut manifests = vec![(
+        "taskmanager-gates".to_owned(),
+        repository.join("Cargo.toml"),
+    )];
     for entry in fs::read_dir(repository.join("crates")).expect("crates dir readable") {
         let entry = entry.expect("directory entry readable");
         if entry.path().is_dir() {
@@ -344,7 +347,7 @@ const MACOS_WINDOWS_ADAPTER_DEPS: &[&str] = &[
 ];
 
 fn assert_workspace_dependencies(repository: &std::path::Path, package: &str, expected: &[&str]) {
-    let manifest_path = if package == "taskmanager" {
+    let manifest_path = if package == "taskmanager-gates" {
         repository.join("Cargo.toml")
     } else {
         repository.join("crates").join(package).join("Cargo.toml")
@@ -513,6 +516,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         (
             "taskmanager-tui",
             &[
+                // ADR-051: the product bin hands its capabilities to the
+                // shared CLI harness.
+                "taskmanager-cli",
                 "taskmanager-app-host",
                 "taskmanager-application",
                 "taskmanager-assets",
@@ -528,6 +534,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         (
             "taskmanager-iced",
             &[
+                // ADR-051: the product bin hands its capabilities to the
+                // shared CLI harness.
+                "taskmanager-cli",
                 "taskmanager-app-host",
                 "taskmanager-application",
                 // ADR-026 fonts policy: run.rs registers the bundled font bytes
@@ -535,8 +544,8 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
                 "taskmanager-assets",
                 "taskmanager-core",
                 "taskmanager-platform-contract",
-                // The registry half of taskmanager-icons is toolkit-neutral;
-                // taskmanager-iced disables its optional GPUI adapter feature.
+                // ADR-051: taskmanager-icons is neutral on every target; the
+                // iced frontend resolves its own bytes for rendering.
                 "taskmanager-icons",
                 "taskmanager-shell",
                 "taskmanager-theme",
@@ -547,6 +556,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             "taskmanager-gpui",
             &[
                 "taskmanager-accessibility-linux",
+                // ADR-051: the product bin hands its capabilities to the
+                // shared CLI harness.
+                "taskmanager-cli",
                 "taskmanager-app-host",
                 "taskmanager-application",
                 "taskmanager-assets",
@@ -563,6 +575,9 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         (
             "taskmanager-bevy-ui",
             &[
+                // ADR-051: the product bin hands its capabilities to the
+                // shared CLI harness.
+                "taskmanager-cli",
                 "taskmanager-app-host",
                 "taskmanager-application",
                 "taskmanager-assets",
@@ -575,37 +590,40 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
             ][..],
         ),
         (
-            "taskmanager",
-            // `taskmanager-escalation` is the per-feature privilege-escalation
-            // seam (ADR-023): the CLI `--gpu-engines` surface drives the
-            // polkit/pkexec helper crossing from this composition edge. It is a
-            // pure safe-Rust leaf with zero dependencies, so adding it here
-            // cannot leak a platform adapter or a trust root.
+            "taskmanager-gates",
+            // ADR-051: the root package is the cross-crate conformance host.
+            // It ships no binary and carries an EMPTY production dependency
+            // table (its gates compile against dev-dependencies only); the
+            // frontend products live in their own crates.
+            &[],
+        ),
+        // ADR-051: the shared CLI composition harness — the UI-neutral modes
+        // drive the application port and app-host seam, and the escalation
+        // seam (ADR-023) for the on-demand helper crossings.
+        (
+            "taskmanager-cli",
             &[
                 "taskmanager-app-host",
                 "taskmanager-application",
+                "taskmanager-assets",
                 "taskmanager-core",
                 "taskmanager-escalation",
-                "taskmanager-gpui",
-                "taskmanager-assets",
-                "taskmanager-shell",
-                "taskmanager-telemetry-store",
-                // ADR-026: integration tests read skins/tokens from the
-                // neutral theme authority directly (never a frontend facade).
-                "taskmanager-theme",
-                // Root GPUI integration tests use the owned component layer
-                // directly. It is optional and activated only by ui-gpui;
-                // the resolved all-target closure gate proves it is absent
-                // from the TUI/Iced shapes.
-                "taskmanager-ui",
-                "taskmanager-ui-contract",
-                // ADR-029: the other two UI shapes are optional dependencies
-                // gated behind `ui-tui`/`ui-iced`; exactly one is enabled per
-                // build (build.rs enforces it). The DAG tracks manifest
-                // edges, so both optional edges appear here.
-                "taskmanager-tui",
-                "taskmanager-iced",
             ][..],
+        ),
+        // ADR-051: the theme binding and icons adapter are frontend-owned in
+        // the GPUI component layer; the neutral theme/icons crates carry no
+        // toolkit code.
+        (
+            "taskmanager-ui",
+            &[
+                "taskmanager-icons",
+                "taskmanager-theme",
+                "taskmanager-ui-contract",
+            ][..],
+        ),
+        (
+            "taskmanager-icons",
+            &["taskmanager-assets", "taskmanager-ui-contract"][..],
         ),
     ] {
         assert_workspace_dependencies(&repository, package, expected);
@@ -720,7 +738,6 @@ fn gpui_frontend_never_reaches_platform_adapter_crates() {
 #[test]
 fn standard_artifacts_enable_hardware_all_without_vendor_skus() {
     let repository = repository();
-    let root_manifest = read_source(&repository, "Cargo.toml");
     let native_manifest = read_source(&repository, "crates/taskmanager-platform-native/Cargo.toml");
     let linux_manifest = read_source(&repository, "crates/taskmanager-platform-linux/Cargo.toml");
     let macos_manifest = read_source(&repository, "crates/taskmanager-platform-macos/Cargo.toml");
@@ -728,8 +745,22 @@ fn standard_artifacts_enable_hardware_all_without_vendor_skus() {
         &repository,
         "crates/taskmanager-platform-windows/Cargo.toml",
     );
-    assert!(root_manifest.contains("default = [\"hardware-all\", \"ui-gpui\"]"));
-    assert!(root_manifest.contains("hardware-all = [\"taskmanager-app-host/hardware-all\"]"));
+    for product in [
+        "crates/taskmanager-gpui/Cargo.toml",
+        "crates/taskmanager-iced/Cargo.toml",
+        "crates/taskmanager-tui/Cargo.toml",
+        "crates/taskmanager-bevy-ui/Cargo.toml",
+    ] {
+        let product_manifest = read_source(&repository, product);
+        assert!(
+            product_manifest.contains("default = [\"hardware-all\"]"),
+            "{product} must default to the complete hardware registry (ADR-051)"
+        );
+        assert!(
+            product_manifest.contains("hardware-all = [\"taskmanager-app-host/hardware-all\"]"),
+            "{product} must route hardware-all through the shared app host"
+        );
+    }
     assert!(native_manifest.contains("default = [\"hardware-all\"]"));
     for adapter_feature in [
         "taskmanager-platform-linux/hardware-all",

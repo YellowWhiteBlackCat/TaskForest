@@ -28,3 +28,15 @@ are distinct outcomes. Readiness requires the exact `pkexec + policy + executabl
 helper` triple and never launches a prompt; the Windows readiness gate reads
 install facts only (missing install is `HelperUnavailable`, never a prompt).
 Verify fixture classification plus explicit on-box success/denial receipts.
+
+## Module map
+
+```text
+src/authorization.rs       typed authorization vocabulary (starts UnprivilegedGate)
+src/polkit/gate.rs         PolkitGate: pkexec + policy + executable verification
+│                          (the only Linux authorization authority)
+├── polkit/{msr,rapl,smbios,process_control,net_launcher,setup}.rs
+│                          per-capability helper clients
+└── polkit/bounded_runner.rs  polkit/json_reader.rs   bounded execution and envelopes
+src/uac.rs                 Windows UAC runas transport vocabulary (ADR-035)
+```

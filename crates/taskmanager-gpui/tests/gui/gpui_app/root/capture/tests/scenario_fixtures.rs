@@ -36,6 +36,7 @@ fn process_and_service_capture_actions_are_typed_and_non_destructive() {
     assert_eq!(intent.descendant_count(), 6);
     let mut service = CaptureEvidence::for_test(Some(CaptureScenario::ServiceDetailsLogs));
     let mut services = Vec::new();
+    assert!(service.service_inventory_capture_requested());
     assert_eq!(
         service.on_services_update(true, &mut services),
         Some(ServiceId::new(
@@ -43,9 +44,19 @@ fn process_and_service_capture_actions_are_typed_and_non_destructive() {
         ))
     );
     assert_eq!(services.len(), 1);
-    assert!(!service.scenario_ready);
+    assert!(!service.scenario_ready());
     service.mark_service_details_ready(true);
-    assert!(service.scenario_ready);
+    assert!(service.scenario_ready());
+    assert!(!service.service_inventory_capture_requested());
+}
+
+#[test]
+fn inventory_capture_can_request_a_fixture_without_a_provider_delta() {
+    let services = CaptureEvidence::for_test(Some(CaptureScenario::ServicesSearchHighlight));
+    assert!(services.service_inventory_capture_requested());
+
+    let startup = CaptureEvidence::for_test(Some(CaptureScenario::StartupImpact));
+    assert!(startup.startup_inventory_capture_requested());
 }
 
 #[test]
@@ -76,11 +87,11 @@ fn insights_scenarios_wait_for_exact_dialog_state_and_never_create_control_inten
                 .any(|process| ProcessLiveKey::from_process(process) == Some(identity))
         );
         assert!(matches!(state, ProcessInsightsState::Ready(_)));
-        assert!(!evidence.scenario_ready);
+        assert!(!evidence.scenario_ready());
         evidence.mark_process_insights_ready(false);
-        assert!(!evidence.scenario_ready);
+        assert!(!evidence.scenario_ready());
         evidence.mark_process_insights_ready(true);
-        assert!(evidence.scenario_ready);
+        assert!(evidence.scenario_ready());
         processes.clear();
         assert!(
             evidence
@@ -120,9 +131,9 @@ fn batch_capture_freezes_three_identities_without_executing() {
             .iter()
             .all(|target| target.start_time_secs > 0)
     );
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_process_batch_ready(true, intent.targets.len());
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(
         evidence
             .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
@@ -151,9 +162,9 @@ fn startup_capture_distinguishes_measured_from_unknown() {
             reason: StartupImpactUnknownReason::NotInstrumented
         }
     ));
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_startup_impact_ready(true, &entries);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
 }
 
 #[test]
@@ -166,12 +177,12 @@ fn startup_failure_evidence_capture_seeds_failed_units_and_chain() {
     assert_eq!(snapshot.failed_units.len(), 3);
     assert_eq!(snapshot.critical_chain.len(), 2);
     assert!(evidence.startup_boot_baseline().is_none());
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.restore_startup_fixture(&mut entries, &mut boot_evidence);
     let restored = boot_evidence.expect("fixture must survive a later platform batch");
     assert_eq!(restored.failed_units.len(), 3);
     evidence.mark_startup_failure_evidence_ready(true, Some(&snapshot));
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
 }
 
 #[test]
@@ -216,11 +227,11 @@ fn boot_markers_capture_seeds_waterfall_and_baseline_pair() {
     assert!(deltas.contains(&-300), "one unit faster: {deltas:?}");
     assert!(deltas.contains(&0), "one unit unchanged: {deltas:?}");
     // Readiness requires BOTH the page and the seeded pair.
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_startup_boot_markers_ready(true, false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_startup_boot_markers_ready(true, true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
 }
 
 #[test]
@@ -228,9 +239,9 @@ fn history_replay_capture_opens_once_and_marks_ready_only_when_loaded() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::HistoryReplay));
     // Before readiness the open request must stay refused.
     assert!(!evidence.history_replay_open_requested());
-    evidence.telemetry_ready = true;
+    evidence.mark_test_telemetry_ready();
     assert!(!evidence.history_replay_open_requested());
-    evidence.ui_data_ready = true;
+    evidence.mark_test_ui_data_ready();
     assert!(evidence.history_replay_open_requested());
     // Opening latches: the request never fires twice (the panel must not be
     // toggled closed again on a later tick).
@@ -238,9 +249,9 @@ fn history_replay_capture_opens_once_and_marks_ready_only_when_loaded() {
     assert!(!evidence.history_replay_open_requested());
     // Readiness needs rows actually loaded, not just the panel open.
     evidence.mark_history_replay_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_history_replay_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
 }
 
 #[test]
@@ -250,29 +261,28 @@ fn application_history_capture_requires_ready_non_empty_durable_projection() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::ApplicationHistoryReplay));
     evidence.mark_application_history_replay_ready(true, ApplicationHistoryStatus::Ready, 3);
     assert!(
-        !evidence.scenario_ready,
+        !evidence.scenario_ready(),
         "normal capture facts are still pending"
     );
 
-    evidence.telemetry_ready = true;
-    evidence.ui_data_ready = true;
+    evidence.mark_test_ui_data_ready();
     evidence.mark_application_history_replay_ready(false, ApplicationHistoryStatus::Ready, 3);
     assert!(
-        !evidence.scenario_ready,
+        !evidence.scenario_ready(),
         "the application-history page must be active"
     );
     evidence.mark_application_history_replay_ready(true, ApplicationHistoryStatus::Collecting, 3);
     assert!(
-        !evidence.scenario_ready,
+        !evidence.scenario_ready(),
         "an active empty reader is not replay evidence"
     );
     evidence.mark_application_history_replay_ready(true, ApplicationHistoryStatus::Ready, 0);
     assert!(
-        !evidence.scenario_ready,
+        !evidence.scenario_ready(),
         "Ready without joined rows is not evidence"
     );
     evidence.mark_application_history_replay_ready(true, ApplicationHistoryStatus::Ready, 3);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
 }
 
 #[test]
@@ -290,9 +300,9 @@ fn diagnostic_capture_requests_preview_but_never_confirms_write() {
     assert!(processes[0].cmdline.contains("/home/<user>"));
     assert!(evidence.diagnostic_preview_requested());
     evidence.mark_diagnostic_preview_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_diagnostic_preview_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.diagnostic_preview_requested());
 }
 
@@ -310,9 +320,9 @@ fn diagnostic_failure_capture_prepares_ui_state_without_worker_action() {
     );
     assert!(evidence.diagnostic_failure_requested());
     evidence.mark_diagnostic_failure_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_diagnostic_failure_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.diagnostic_failure_requested());
 }
 
@@ -349,8 +359,8 @@ fn force_kill_scenario_only_returns_one_non_executing_intent() {
             .expect("capture fixture has an authoritative start token")
         ))
     );
-    assert!(evidence.ui_data_ready);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.ui_data_ready());
+    assert!(evidence.scenario_ready());
     assert!(
         evidence
             .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
@@ -403,12 +413,12 @@ fn standard_evidence_marks_updates_without_mutating_data() {
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
     assert!(snapshot.disks.is_empty());
-    assert!(evidence.telemetry_ready);
+    assert!(evidence.telemetry_ready());
     assert!(
         evidence
             .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut Vec::new())
             .is_none()
     );
-    assert!(evidence.ui_data_ready);
-    assert!(!evidence.scenario_ready);
+    assert!(evidence.ui_data_ready());
+    assert!(!evidence.scenario_ready());
 }

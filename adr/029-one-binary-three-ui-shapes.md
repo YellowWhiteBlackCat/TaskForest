@@ -1,6 +1,6 @@
 # ADR-029: One binary, three UI shapes — feature-gated frontends and a unified CLI
 
-Status: accepted
+Status: superseded by ADR-051 (the unified CLI survives in `taskmanager-cli`; the feature matrix, `build.rs` arbiter, and one-binary dispatch are deleted)
 
 ## Context
 

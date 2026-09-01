@@ -51,16 +51,22 @@ impl RenderOnce for Divider {
     fn render(self, _window: &mut Window, _cx: &mut App) -> impl IntoElement {
         match self.orientation {
             DividerOrientation::Vertical => {
-                let mut d = div().w_px().h_full().bg(self.palette.border);
+                let mut d = div()
+                    .w_px()
+                    .h_full()
+                    .bg(crate::theme_binding::fill(self.palette.border));
                 if !self.flush {
-                    d = d.mx(tokens::SPACE_8);
+                    d = d.mx(crate::theme_binding::length(tokens::SPACE_8));
                 }
                 d
             }
             DividerOrientation::Horizontal => {
-                let mut d = div().h_px().w_full().bg(self.palette.border);
+                let mut d = div()
+                    .h_px()
+                    .w_full()
+                    .bg(crate::theme_binding::fill(self.palette.border));
                 if !self.flush {
-                    d = d.my(tokens::SPACE_8);
+                    d = d.my(crate::theme_binding::length(tokens::SPACE_8));
                 }
                 d
             }

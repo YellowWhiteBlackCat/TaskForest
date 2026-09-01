@@ -63,6 +63,9 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
             route: "about.diagnostic-report",
             reason: "Iced provides a redacted clipboard report while GPUI provides the preview/write bundle workflow",
         },
+        ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Unsupported {
+            reason: "the Iced product shape does not expose the graphical current-window PNG capture control",
+        },
         ProductIntent::FirstRunSetup => SurfaceDecision::Local {
             route: "first-run.dialog",
         },

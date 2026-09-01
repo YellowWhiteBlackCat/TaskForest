@@ -15,8 +15,8 @@
 pub const PERF_MAIN_VIEWPORT_SELECTOR: &str = "tm-perf-main-viewport";
 
 use gpui::{
-    AnyElement, Div, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels,
-    ScrollHandle, Stateful, Styled, div, px,
+    AnyElement, Div, ElementId, InteractiveElement, IntoElement, ParentElement, Pixels, Styled,
+    div, px,
 };
 
 use crate::gpui_app::elements;
@@ -27,20 +27,22 @@ use crate::gpui_app::graph::{
     latest_samples_rc_for_slide,
 };
 use crate::gpui_app::perf_views::{
-    badge_mhz, badge_pct, badge_rpm, badge_temperature, badge_watts, drive_badge_format,
-    graph_summary_row, network_badge_format,
+    badge_pct, badge_rpm, badge_temperature, badge_watts, drive_badge_format, graph_summary_row,
+    network_badge_format,
 };
 use crate::gpui_app::root::responsive::{
-    PERFORMANCE_STATS_MAX_WIDTH, PERFORMANCE_STATS_MIN_WIDTH, PerformanceDetailsPresentation,
-    PerformancePageBudget, PerformanceVerticalRunway,
+    PERFORMANCE_STATS_MIN_WIDTH, PerformanceDetailsPresentation, PerformancePageBudget,
+    PerformanceVerticalRunway,
 };
 use std::cell::RefCell;
 use std::rc::Rc;
-use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Length, Theme};
-use taskmanager_ui::data::key_value_row::KeyValueRow;
-use taskmanager_ui::layout::scroll_region_with_rail;
+
+mod stats;
+pub(super) use stats::stats_panel;
+mod composition;
+use composition::{performance_split, performance_stack};
 
 /// The shared main graph lives in a flex viewport that owns the page height.
 /// A plain intrinsic-height body would leave the graph with no definite
@@ -48,8 +50,17 @@ use taskmanager_ui::layout::scroll_region_with_rail;
 /// boundary so no device page can drift into a different invisible-chart fix.
 const MAIN_GRAPH_MIN_HEIGHT: Length = Length(180.0);
 const SECONDARY_GRAPH_MIN_HEIGHT: Length = Length(140.0);
+const COMPACT_GRAPH_MIN_HEIGHT: Length = Length(72.0);
+const COMPACT_GRAPH_HEIGHT: Pixels = px(72.0);
+const COMPACT_GRAPH_SECTION_HEIGHT: Pixels = px(94.0);
 const PERFORMANCE_TITLE_MAX_WIDTH: Length = Length(400.0);
 const PERFORMANCE_STATS_STACK_HEIGHT: Pixels = px(220.0);
+/// Inner trailing breathing room for the pinned statistics rail. The rail is
+/// flush with the page edge by contract, but its text content is not: without
+/// this inset a right-aligned value reaches the window boundary and a long
+/// observation is clipped by the parent surface instead of truncating inside
+/// the value column.
+const PERFORMANCE_STATS_TRAILING_INSET: Pixels = px(12.0);
 
 // ── chart specification ─────────────────────────────────────────────────────
 
@@ -62,10 +73,14 @@ pub(crate) enum ChartTier {
     /// viewport's free space, `MAIN_GRAPH_MIN_HEIGHT` floor, legend when the
     /// series is dual.
     Headline,
-    /// A second chart below the headline (battery power, fan temperature,
-    /// disk active time, GPU metric families): `flex_auto` with a
-    /// `SECONDARY_GRAPH_MIN_HEIGHT` floor and a small caption.
+    /// A second chart below the headline (battery power, fan temperature, or disk
+    /// active time): `flex_auto` with a `SECONDARY_GRAPH_MIN_HEIGHT` floor and a
+    /// small caption.
     Secondary,
+    /// A deliberately flat auxiliary chart (GPU memory) that sits below the
+    /// engine inventory. It keeps a compact fixed height and no summary row so
+    /// the GPU page has one clear bottom memory strip.
+    Compact,
 }
 
 impl ChartTier {
@@ -73,6 +88,7 @@ impl ChartTier {
         match self {
             Self::Headline => MAIN_GRAPH_MIN_HEIGHT,
             Self::Secondary => SECONDARY_GRAPH_MIN_HEIGHT,
+            Self::Compact => COMPACT_GRAPH_MIN_HEIGHT,
         }
     }
 }
@@ -98,14 +114,14 @@ enum ChartSeries<'a> {
 /// with [`ChartSpec::with_max`] for rate/temperature families.
 pub(crate) struct ChartSpec<'a> {
     /// Stable element/hover identity (`tm-graph:{id}` and the state overlay's
-    /// scroll identity). Device pages use `"main-graph"` for the aggregate
+    /// element identity). Device pages use `"main-graph"` for the aggregate
     /// headline so every page keeps the shared central surface address.
     id: ElementId,
     /// Per-series slide identity, traveling with the device (not the page
     /// slot) so switching devices cannot inherit another series' slide
     /// timing.
     slide_key: ElementId,
-    /// Small caption above the card (memory "Swap", GPU primary engine).
+    /// Small caption above the card (memory "Swap", GPU memory).
     title: Option<String>,
     color: Color,
     unit: GraphUnit,
@@ -208,13 +224,35 @@ impl<'a> ChartSpec<'a> {
         }
     }
 
+    /// A compact auxiliary chart with a caption and a short flat card.
+    pub(crate) fn compact(
+        id: impl Into<ElementId>,
+        slide_key: impl Into<ElementId>,
+        title: String,
+        samples: Rc<[f32]>,
+        color: Color,
+        unit: GraphUnit,
+    ) -> Self {
+        Self {
+            id: id.into(),
+            slide_key: slide_key.into(),
+            title: Some(title),
+            color,
+            unit,
+            max: 100.0,
+            series: ChartSeries::Single { samples },
+            tier: ChartTier::Compact,
+            max_height: None,
+        }
+    }
+
     /// Override the value scale (dynamic peaks, rate ceilings).
     pub(crate) fn with_max(mut self, max: f32) -> Self {
         self.max = max;
         self
     }
 
-    /// Attach a headline caption (memory "Swap", GPU primary engine name).
+    /// Attach a headline caption (for example memory "Swap").
     pub(crate) fn with_title(mut self, title: impl Into<String>) -> Self {
         self.title = Some(title.into());
         self
@@ -248,7 +286,6 @@ fn badge_formatter(unit: GraphUnit) -> fn(f32) -> String {
     match unit {
         GraphUnit::Percent => badge_pct,
         GraphUnit::Temperature => badge_temperature,
-        GraphUnit::Megahertz => badge_mhz,
         GraphUnit::NetworkRate(units) => network_badge_format(units),
         GraphUnit::DriveRate(units) => drive_badge_format(units),
         GraphUnit::Rpm => badge_rpm,
@@ -268,7 +305,6 @@ fn format_graph_value(unit: GraphUnit, value: f32) -> String {
         GraphUnit::Rpm => taskmanager_shell::presentation::fan_rpm(value),
         GraphUnit::Watts => taskmanager_shell::presentation::power_w(value),
         GraphUnit::Temperature => taskmanager_shell::presentation::temperature_c(value),
-        GraphUnit::Megahertz => taskmanager_shell::presentation::megahertz(value),
     }
 }
 
@@ -302,11 +338,14 @@ pub(crate) fn render_chart(
     let caption_font = match spec.tier {
         ChartTier::Headline => tokens::FONT_13,
         ChartTier::Secondary => tokens::FONT_12,
+        ChartTier::Compact => tokens::FONT_11,
     };
     let mut section = div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .w_full()
         .min_w(px(0.0));
     section = match spec.tier {
@@ -327,15 +366,26 @@ pub(crate) fn render_chart(
             // around a capped card would pile dead space under the card.
             // It only shrinks, yielding the card toward its companion floor.
             Some(_) => section.flex_shrink(),
-            None => section.flex_auto().flex_shrink_0(),
+            // Headline-only pages still grow into the viewport, but the
+            // section must yield when a page also admits a lower band. The
+            // card's tier floor remains the hard lower bound; a non-shrinking
+            // section was the source of the old bottom-overlap behaviour.
+            None => section.flex_auto().flex_shrink(),
         },
-        ChartTier::Secondary => section.flex_auto().min_h(spec.tier.min_height()),
+        ChartTier::Secondary => section
+            .flex_auto()
+            .min_h(taskmanager_ui::theme_binding::length(
+                spec.tier.min_height(),
+            )),
+        ChartTier::Compact => section.flex_none().h(COMPACT_GRAPH_SECTION_HEIGHT).min_h(
+            taskmanager_ui::theme_binding::length(spec.tier.min_height()),
+        ),
     };
     if let Some(title) = spec.title.as_deref() {
         section = section.child(
             div()
-                .text_size(caption_font)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(caption_font))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(title.to_owned()),
         );
     }
@@ -347,7 +397,7 @@ pub(crate) fn render_chart(
                 spec.id.clone(),
                 spec.slide_key,
                 Rc::clone(&samples),
-                spec.color.into(),
+                taskmanager_ui::theme_binding::rgba(spec.color),
                 graph_opts,
                 fmt,
                 hover_slot.clone(),
@@ -355,7 +405,9 @@ pub(crate) fn render_chart(
             let card = elements::graph_card_with_state(theme, graph, &samples);
             let card = apply_tier_to_card(card, spec.tier, spec.max_height);
             let card = match summary_row
-                .filter(|_| vertical.carries_core_stack())
+                .filter(|_| {
+                    vertical.carries_core_stack() && !matches!(spec.tier, ChartTier::Compact)
+                })
                 .map(|row| summary_overlay(theme, row))
             {
                 Some(overlay) => card.child(tag_summary(overlay, spec.id.clone())),
@@ -374,7 +426,8 @@ pub(crate) fn render_chart(
             // the summed lane can be all-gap while one direction is measured.
             let aggregate = limited_window(settings, aggregate);
             let summary_row = graph_summary_row(theme, &aggregate, &fmt);
-            let (primary_color, secondary_color) = dual_series_colors(spec.color.into());
+            let (primary_color, secondary_color) =
+                dual_series_colors(taskmanager_ui::theme_binding::rgba(spec.color));
             let graph = graph_element_hover_dual(
                 spec.id.clone(),
                 spec.slide_key,
@@ -393,14 +446,18 @@ pub(crate) fn render_chart(
             let card = elements::graph_card_with_dual_state(theme, graph, &primary, &secondary);
             let card = apply_tier_to_card(card, spec.tier, spec.max_height);
             let card = match summary_row
-                .filter(|_| vertical.carries_core_stack())
+                .filter(|_| {
+                    vertical.carries_core_stack() && !matches!(spec.tier, ChartTier::Compact)
+                })
                 .map(|row| summary_overlay(theme, row))
             {
                 Some(overlay) => card.child(tag_summary(overlay, spec.id.clone())),
                 None => card,
             };
             section = section
-                .gap(tokens::SPACE_4)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_4,
+                ))
                 .child(elements::graph_legend(
                     theme,
                     &[
@@ -421,8 +478,11 @@ pub(crate) fn render_chart(
     {
         let selector_id = spec.id;
         let secondary = matches!(spec.tier, ChartTier::Secondary);
+        let compact = matches!(spec.tier, ChartTier::Compact);
         section = section.debug_selector(move || {
-            if secondary {
+            if compact {
+                format!("tm-perf-compact-graph:{selector_id}")
+            } else if secondary {
                 format!("tm-perf-secondary-graph:{selector_id}")
             } else {
                 format!("tm-perf-chart:{selector_id}")
@@ -438,17 +498,28 @@ pub(crate) fn render_chart(
 /// keeps the numbers readable over the grid lines.
 fn summary_overlay(theme: &Theme, row: Div) -> Div {
     div().absolute().top(px(6.0)).left(px(8.0)).child(
-        row.rounded(tokens::control_radius(theme))
-            .bg(theme.card_surface().with_alpha(0.85))
-            .px(tokens::SPACE_8)
-            .py(tokens::SPACE_2),
+        row.rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(
+            theme.card_surface().with_alpha(0.85),
+        ))
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_2,
+        )),
     )
 }
 
 /// Chain the tier's growth/floor contract onto a rendered card.
 /// A capped headline is a headline sharing the viewport with its page's
 /// companion band (the CPU per-core matrix): its floor drops accordingly.
-const HEADLINE_COMPANION_FLOOR: f32 = 140.0;
+/// Minimum readable headline height while a lower companion band is present.
+/// Page-specific allocators use this shared floor to calculate a continuous
+/// headline budget instead of inventing a per-page breakpoint.
+pub(crate) const HEADLINE_COMPANION_FLOOR: f32 = 140.0;
 
 fn apply_tier_to_card(card: Div, tier: ChartTier, max_height: Option<Pixels>) -> Div {
     match tier {
@@ -462,13 +533,20 @@ fn apply_tier_to_card(card: Div, tier: ChartTier, max_height: Option<Pixels>) ->
                     .h(max_height)
                     .min_h(px(HEADLINE_COMPANION_FLOOR))
                     .flex_shrink(),
-                None => card.flex_1().min_h(tier.min_height()),
+                None => card
+                    .flex_1()
+                    .min_h(taskmanager_ui::theme_binding::length(tier.min_height())),
             }
         }
         ChartTier::Secondary => card
             .flex_auto()
             .min_w(px(0.0))
-            .min_h(tier.min_height())
+            .min_h(taskmanager_ui::theme_binding::length(tier.min_height()))
+            .w_full(),
+        ChartTier::Compact => card
+            .flex_none()
+            .h(COMPACT_GRAPH_HEIGHT)
+            .min_h(taskmanager_ui::theme_binding::length(tier.min_height()))
             .w_full(),
     }
 }
@@ -499,19 +577,16 @@ fn tag_card(card: Div, _id: ElementId) -> Div {
 
 // ── page composition root ───────────────────────────────────────────────────
 
-/// The headline surface of a page. Most pages declare one or two stacked
-/// headline charts; a standard multi-engine GPU page REPLACES the aggregate
-/// chart with the complete engine inventory — the enum prevents an aggregate
-/// graph and an engine inventory from being composed accidentally.
+/// The headline surface of a page. Every Performance page declares its
+/// headline charts through the shared chart contract; GPU engine inventory is
+/// a lower fine-detail band and can never replace the aggregate headline.
 pub(crate) enum HeadlineSurface<'a> {
     Charts(Vec<ChartSpec<'a>>),
-    Custom(AnyElement),
 }
 
 /// Stateless inputs for one Performance device page.
 pub(crate) struct PerfPageProps<'a> {
     pub(crate) theme: &'a Theme,
-    pub(crate) stats_scroll: ScrollHandle,
     pub(crate) title: String,
     pub(crate) subtitle: String,
     /// One-line distilled fact that keeps the page's meaning when every
@@ -535,18 +610,15 @@ pub(crate) struct PerfPageProps<'a> {
 /// Compose one Performance device page: the fixed main viewport (title,
 /// header band, headline surface, below band) beside the pinned stats rail.
 /// The main column is ONE fixed viewport (never a scrolling body): headline
-/// charts absorb slack through `flex_1`, secondary content compresses to its
-/// tier floor. The typed vertical runway degrades the page's fixed
-/// obligations in order — below band and header band/summaries drop
-/// explicitly before the headline floor is ever touched — so clipping is the
-/// ordered last resort of the overflow-tolerant tail, never a silent
-/// default. The responsive budget decides the stats rail presentation; the
-/// hover tooltip stays a sibling of the viewport so its label is never
-/// clipped.
+/// charts absorb slack through `flex_1`, while optional lower content is
+/// admitted only after its complete footprint passes the page fit check. The
+/// typed vertical runway drops lower bands and header summaries explicitly
+/// before the headline floor is touched. The responsive budget decides the
+/// stats-rail presentation; that rail is also static and the hover tooltip
+/// stays a sibling of the viewport so its label is never clipped.
 pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
     let PerfPageProps {
         theme,
-        stats_scroll,
         title,
         subtitle,
         vital_line,
@@ -560,14 +632,27 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         budget,
     } = props;
     let runway = budget.vertical;
-    let mut stats_col = stats;
+    let mut stats_col = div()
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_h(px(0.0))
+        .min_w(px(0.0))
+        .w_full()
+        .child(stats);
     if let Some(footer) = stats_footer {
-        stats_col = stats_col.child(div().mt(tokens::SPACE_6).child(footer));
+        stats_col = stats_col.child(
+            div()
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_6))
+                .child(footer),
+        );
     }
     let mut main_body = div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_10)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
         .min_w(px(0.0))
         .min_h(px(0.0))
         .w_full()
@@ -594,8 +679,8 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
             .flex_row()
             .child(
                 elements::truncated_text(&vital)
-                    .text_size(tokens::FONT_13)
-                    .text_color(theme.fg_dim),
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
             );
         #[cfg(any(test, feature = "test-support"))]
         let line = line.debug_selector(|| "tm-perf-vital-line".to_string());
@@ -613,34 +698,33 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
                 render_chart(theme, spec, graph_settings, runway, hover_slot).into_any_element()
             })
             .collect::<Vec<AnyElement>>(),
-        HeadlineSurface::Custom(inventory) => vec![
-            div()
-                .flex_1()
-                .min_w(px(0.0))
-                .min_h(MAIN_GRAPH_MIN_HEIGHT)
-                .w_full()
-                .child(inventory)
-                .into_any_element(),
-        ],
     };
     main_body = main_body.children(headline_center);
-    // Vertical ladder: the below band is the overflow-tolerant tail — it
-    // renders from the Core rung up and yields first; anything it cannot
-    // fit under Floor is clipped by the fixed viewport as the ordered last
-    // resort (ADR-039).
-    if let Some(panel) = below.filter(|_| runway.carries_core_stack()) {
+    // Vertical ladder: the below band is optional content, not an overflow
+    // target. It is admitted only by the full Charts runway; Core is a strict
+    // headline-only composition, so the fixed viewport never clips the first
+    // row of a lower band.
+    if let Some(panel) = below.filter(|_| runway.carries_below()) {
         main_body = main_body.child(panel);
     }
     let main_body = main_body
         .id("perf-main-viewport")
         .flex_1()
         .h_full()
+        // An owned bottom inset keeps the last row/card clear of the
+        // viewport edge. It is part of the shared page contract, so every
+        // Performance device receives the same pixel safety margin.
+        .pb(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         .overflow_hidden()
         .debug_selector(|| PERF_MAIN_VIEWPORT_SELECTOR.to_string());
     let mut left = div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_10)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
         .flex_1()
         .min_w(px(0.0))
         .min_h(px(0.0))
@@ -651,131 +735,12 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
     match budget.details {
         PerformanceDetailsPresentation::Hidden => left,
         PerformanceDetailsPresentation::Pinned => {
-            performance_split(theme, left, stats_col, stats_scroll, budget.stats_width)
+            performance_split(theme, left, stats_col, budget.stats_width)
         }
         PerformanceDetailsPresentation::Stacked => {
-            performance_stack(theme, left, stats_col, stats_scroll, budget.stats_width)
+            performance_stack(theme, left, stats_col, budget.stats_width)
         }
     }
-}
-
-/// Canonical Performance page split: a shrinkable main column and a pinned,
-/// non-shrinking scrolling statistics column.
-fn performance_split(
-    theme: &Theme,
-    left: Div,
-    stats: Div,
-    stats_scroll: ScrollHandle,
-    stats_width: f32,
-) -> Div {
-    let stats = performance_stats_surface(theme, stats, stats_scroll, px(stats_width), true)
-        .h_full()
-        .debug_selector(|| "tm-perf-stats-surface".to_string());
-    div()
-        .flex()
-        .flex_row()
-        .flex_1()
-        .w_full()
-        .min_w(px(0.0))
-        .min_h(px(0.0))
-        .size_full()
-        .bg(theme.window_bg)
-        .child(
-            left.flex_grow()
-                .flex_shrink()
-                .w_full()
-                .min_w(px(0.0))
-                .min_h(px(0.0))
-                .debug_selector(|| "tm-perf-main-surface".to_string()),
-        )
-        .child(stats)
-}
-
-/// Narrow-width fallback for the statistics rail. The rail remains available,
-/// but it moves below the primary viewport so the graph keeps its minimum
-/// readable width instead of being squeezed by two fixed columns.
-fn performance_stack(
-    theme: &Theme,
-    left: Div,
-    stats: Div,
-    stats_scroll: ScrollHandle,
-    stats_width: f32,
-) -> Div {
-    let stats = performance_stats_surface(theme, stats, stats_scroll, px(stats_width), false)
-        .flex_none()
-        .w_full()
-        .h(PERFORMANCE_STATS_STACK_HEIGHT)
-        .max_h(PERFORMANCE_STATS_STACK_HEIGHT)
-        .border_t_1()
-        .border_color(theme.border)
-        .pt(tokens::SPACE_10)
-        .debug_selector(|| "tm-perf-stats-surface".to_string());
-    div()
-        .flex()
-        .flex_col()
-        .flex_1()
-        .w_full()
-        .min_w(px(0.0))
-        .min_h(px(0.0))
-        .size_full()
-        .bg(theme.window_bg)
-        .child(
-            left.flex_1()
-                .min_w(px(0.0))
-                .min_h(px(0.0))
-                .debug_selector(|| "tm-perf-main-surface".to_string()),
-        )
-        .child(stats)
-}
-
-/// Build the one statistics surface used by both pinned and stacked modes.
-fn performance_stats_surface(
-    theme: &Theme,
-    stats: Div,
-    stats_scroll: ScrollHandle,
-    width: Pixels,
-    pinned: bool,
-) -> Stateful<Div> {
-    // Keep a definite readable width here. A percentage max-width can resolve
-    // against an indefinite flex measurement pass as zero in GPUI, collapsing
-    // the detail column before the parent receives its final width. The graph
-    // remains elastic because the sibling owns the remaining flex space.
-    let mut surface = scroll_region_with_rail(
-        "perf-stats-scroll",
-        "tm-perf-stats-scroll",
-        "perf-stats-scrollbar",
-        "tm-perf-stats-scrollbar",
-        stats_scroll,
-        theme.palette(),
-        stats,
-    )
-    // `auto_scroll_region_fill` is a flex-1 viewport by default. A
-    // pinned stats column must clear that growth contract before its
-    // explicit width is applied; otherwise Taffy can split the available
-    // row between the graph and stats column and leave unused space.
-    //
-    // `min_w` is the ELEMENT-level floor of the stats rail: the budget's
-    // 236px is an input, this floor is the contract. If a caller ever hands
-    // the split a width below `PERFORMANCE_STATS_MIN_WIDTH`, the rail still
-    // refuses to compress into an unreadable sliver — the width ladder
-    // (Pinned → Stacked → Hidden) is the sanctioned degradation, never
-    // flex squeeze.
-    .flex_none()
-    .flex_basis(width)
-    .w(width)
-    .min_w(px(PERFORMANCE_STATS_MIN_WIDTH))
-    .h_full()
-    // The split is one continuous workspace. A real divider plus padding on
-    // the stats surface replaces a transparent parent gap that exposed the
-    // window background as a visual crack between sibling components.
-    .bg(theme.window_bg);
-    if pinned {
-        surface = surface
-            .border_l_1()
-            .border_color(theme.border)
-            .pl(tokens::SPACE_16);
-    }
-    surface
 }
 
 /// Semantic Performance heading with a leading identity slot and a trailing
@@ -791,7 +756,9 @@ pub(crate) fn performance_title_row(theme: &Theme, title: String, subtitle: Stri
         .items_center()
         .w_full()
         .min_w(px(0.0))
-        .gap(tokens::SPACE_12)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         .child(
             elements::truncated_text(&title)
                 .debug_selector(|| "tm-perf-title-text".to_string())
@@ -799,10 +766,14 @@ pub(crate) fn performance_title_row(theme: &Theme, title: String, subtitle: Stri
                 // truncates inside its own slot and can never widen the
                 // whole split or overlap the context slot.
                 .flex_shrink()
-                .max_w(PERFORMANCE_TITLE_MAX_WIDTH)
-                .text_size(tokens::FONT_26)
-                .font_weight(tokens::FONT_WEIGHT_EXTRA_BOLD.into())
-                .text_color(theme.fg),
+                .max_w(taskmanager_ui::theme_binding::length(
+                    PERFORMANCE_TITLE_MAX_WIDTH,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_26))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_EXTRA_BOLD,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg)),
         )
         .child(
             elements::truncated_text(&subtitle)
@@ -811,70 +782,15 @@ pub(crate) fn performance_title_row(theme: &Theme, title: String, subtitle: Stri
                 .flex_shrink()
                 .min_w(px(0.0))
                 .text_right()
-                .text_size(tokens::FONT_16)
-                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                .text_color(theme.fg_dim),
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_16))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_BOLD,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim)),
         );
     // Geometry breakpoint on the page header — the render-path assertion looks
     // this up to prove a perf page paints its chrome when device data exists.
     #[cfg(any(test, feature = "test-support"))]
     let row = row.debug_selector(|| "tm-perf-title".to_string());
-    row
-}
-
-/// The shared Performance stat panel body. One rendering of the
-/// missing-value contract for every device page: `None` values draw the
-/// shared dash in the dim foreground so an uncollected field reads as quiet,
-/// present data reads in the full foreground.
-pub(super) fn stats_panel(theme: &Theme, stats: Vec<StatRow>) -> Div {
-    let mut col = div()
-        .w_full()
-        .max_w(px(PERFORMANCE_STATS_MAX_WIDTH))
-        .min_w(px(0.0))
-        .h_full()
-        .flex()
-        .flex_col()
-        .gap(tokens::SPACE_10);
-    // Geometry breakpoint on the stats column root.
-    #[cfg(any(test, feature = "test-support"))]
-    {
-        col = col.debug_selector(|| "tm-perf-stats-panel".to_string());
-    }
-    for (i, row) in stats.into_iter().enumerate() {
-        // One missing-value rendering for every producer: the shared dash,
-        // dimmed so an uncollected field reads quieter than present data.
-        // Text and Pair draw identically here — the variant types the
-        // producer's folding semantics (plain vs used/total), not the ink.
-        //
-        // Row contract matches the CPU details panel: the label owns the
-        // elastic side and truncates; the value keeps its intrinsic width
-        // flush-right. A reserved label column would hand long observations
-        // (serial numbers, temperature trends) a too-narrow value slot whose
-        // right-aligned text clips mid-string at the window edge.
-        let label = row.label().to_owned();
-        let (missing, v) = match row.value() {
-            Some(v) => (false, v.to_owned()),
-            None => (true, crate::gpui_app::formatting::missing_value()),
-        };
-        let row = KeyValueRow::new(label, v, theme.palette())
-            .value_color(if missing { theme.fg_dim } else { theme.fg })
-            .value_debug_selector(format!("tm-perf-stat-value:{i}"))
-            .selectable_value(("perf-stat-value", i))
-            .render();
-        col = col.child(stat_row_with_selector(row, i));
-    }
-    col
-}
-
-/// Geometry breakpoint per data-driven stats row — the render-path assertion
-/// counts these to prove the stats column grows with the snapshot (e.g.
-/// committed/zram/zswap rows only exist with data). Noop outside test support.
-#[cfg(any(test, feature = "test-support"))]
-fn stat_row_with_selector(row: Div, i: usize) -> Div {
-    row.debug_selector(move || format!("tm-perf-stat:{i}"))
-}
-
-#[cfg(not(any(test, feature = "test-support")))]
-fn stat_row_with_selector(row: Div, _i: usize) -> Div {
     row
 }

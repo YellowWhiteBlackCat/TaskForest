@@ -22,24 +22,25 @@ pub(super) fn compressed_swap_readout(
     memory: &MemoryMetrics,
     units: UnitPreferences,
 ) -> Option<String> {
-    let readout = match (
+    match (
         memory.current_compressed_swap_used_bytes(),
         memory.current_compressed_swap_capacity_bytes(),
     ) {
         (Some(used), Some(capacity)) if capacity > 0 => {
-            units.format_quantity_pair(used, capacity, QuantityFamily::Memory, false)
+            Some(units.format_quantity_pair(used, capacity, QuantityFamily::Memory, false))
         }
-        _ => return None,
-    };
-    // The compression depth follows the used/capacity pair only when the
-    // core guarded ratio is derivable (both mm_stat sizes current).
-    match memory.current_compressed_swap_ratio() {
-        Some(ratio) => Some(format!(
-            "{readout} · {} {ratio:.1}:1",
-            taskmanager_application::i18n::t("mem.compression_ratio")
-        )),
-        None => Some(readout),
+        _ => None,
     }
+}
+
+/// Format the compression depth as its own stat. Keeping it separate from the
+/// used/capacity pair is a right-rail contract: the pair remains a normal
+/// value row and the optional ratio gets its own bounded row instead of
+/// creating one compound line that can evict the label at narrow widths.
+pub(super) fn compression_ratio_readout(memory: &MemoryMetrics) -> Option<String> {
+    memory
+        .current_compressed_swap_ratio()
+        .map(|ratio| format!("{ratio:.1}:1"))
 }
 
 #[cfg(test)]

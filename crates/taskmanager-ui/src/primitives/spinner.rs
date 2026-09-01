@@ -89,14 +89,14 @@ impl RenderOnce for Spinner {
                 let mut ring = PathBuilder::stroke(stroke);
                 ring.add_polygon(&arc_points(bounds.origin, size, radius, 0.0, 1.0), false);
                 if let Ok(path) = ring.build() {
-                    window.paint_path(path, border);
+                    window.paint_path(path, crate::theme_binding::background(border));
                 }
 
                 // Accent arc sweeping ~70% of a turn, starting at `start`.
                 let mut arc = PathBuilder::stroke(stroke);
                 arc.add_polygon(&arc_points(bounds.origin, size, radius, start, 0.7), false);
                 if let Ok(path) = arc.build() {
-                    window.paint_path(path, accent);
+                    window.paint_path(path, crate::theme_binding::background(accent));
                 }
             },
         )

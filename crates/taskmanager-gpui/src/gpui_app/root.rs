@@ -42,8 +42,8 @@ use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::{OperationFailure, RequestId};
-use taskmanager_theme::gpui::detect_font_availability;
 use taskmanager_theme::{FontAvailability, Theme, WindowCorner};
+use taskmanager_ui::theme_binding::detect_font_availability;
 
 use taskmanager_shell::{DirectTrackState, TelemetryFrameState};
 use taskmanager_telemetry_store::{CorrelatedSystemTelemetryIngestor, TelemetryStore};
@@ -106,6 +106,7 @@ mod sidebar_preferences;
 mod snapshot_export;
 mod startup;
 mod telemetry_warmup;
+mod window_capture;
 
 pub(crate) use telemetry_warmup::TelemetryWarmupPhase;
 pub mod system_health;
@@ -173,6 +174,20 @@ pub struct RootView {
     /// harness's `TestWindow` always reports `Decorations::Server`, so without
     /// this hook the CSD fallback path is unreachable from render tests.
     pub decorations_override: Option<bool>,
+    /// The window-frame policy this session is running under, seeded from the
+    /// persisted config at startup and updated live by the Settings control.
+    /// It drives the decoration REQUEST (window creation and
+    /// `Window::request_decorations`); render keeps reading the granted
+    /// `window.window_decorations()` fact. Kept beside the persisted snapshot
+    /// token so the render-time outcome check can compare the explicit
+    /// request against what the window system actually granted.
+    pub(crate) window_decorations_pref: crate::gpui_app::chrome::WindowDecorationsPreference,
+    /// One-shot latch for the honest decoration-outcome notice: `false` arms
+    /// the render-time check, `true` means the current request's outcome (or
+    /// refusal) has already been reported. Re-armed by
+    /// [`RootView::set_window_decorations_preference`] on every preference
+    /// change.
+    pub(crate) decoration_outcome_reported: bool,
     /// Private authority for every persisted presentation axis. Runtime page,
     /// focus, scroll and sidebar interaction lifecycles remain separate.
     presentation: presentation_preferences::PresentationPreferences,
@@ -200,10 +215,6 @@ pub struct RootView {
     pub(crate) dialog_scroll: DialogScrollState,
     /// Per-window System-page scroll state (sectioned hardware cards).
     pub system_scroll: ScrollHandle,
-    /// Per-window Performance statistics-rail scroll state. Every device page
-    /// composes through the one fixed-viewport page root, so the rail is the
-    /// only scrolling surface on the page.
-    pub performance_stats_scroll: ScrollHandle,
     /// Per-window App-history list scroll state. The history page can contain
     /// more application groups than fit below its fixed title/status chrome;
     /// keeping this handle on the RootView avoids a process-global scroll
@@ -355,6 +366,7 @@ pub struct RootView {
     /// Application-correlated export lifecycle plus the app-host client. No
     /// renderer path owns serialization or filesystem publication.
     snapshot_export: snapshot_export::SnapshotExportRuntime,
+    window_capture: window_capture::WindowCaptureRuntime,
     pub(crate) diagnostic_bundle_runtime: diagnostic_bundle::DiagnosticBundleRuntime,
     /// Per-window background dependency/log/export state behind the service
     /// details dialog. Owned here (never a shared `thread_local`, which crossed
@@ -656,13 +668,15 @@ impl RootView {
             presentation: presentation_preferences::PresentationPreferences::default(),
             nav_orientation: NavOrientation::Horizontal,
             decorations_override: None,
+            window_decorations_pref: crate::gpui_app::chrome::WindowDecorationsPreference::default(
+            ),
+            decoration_outcome_reported: false,
             font_availability: detect_font_availability(cx),
             input_modality: InputModality::default(),
             input_modality_key_subscription: None,
             settings_switches: HashMap::new(),
             dialog_scroll: DialogScrollState::default(),
             system_scroll: ScrollHandle::new(),
-            performance_stats_scroll: ScrollHandle::new(),
             app_history_scroll: UniformListScrollHandle::new(),
             sidebar_scroll: ScrollHandle::new(),
             processes_scroll: processes_view::ProcessesScrollState::default(),
@@ -716,6 +730,7 @@ impl RootView {
             local_feedback_subscription: None,
             local_feedback_seq: 0,
             snapshot_export: snapshot_export::SnapshotExportRuntime::default(),
+            window_capture: window_capture::WindowCaptureRuntime::default(),
             diagnostic_bundle_runtime: diagnostic_bundle::DiagnosticBundleRuntime::default(),
             service_details: services_view::ServiceDetailsState::new(),
             service_log_now_ms: 0,

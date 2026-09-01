@@ -282,23 +282,20 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
         let mut temp_pills: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = Vec::new();
         for (label, temp) in temps {
             let (bg_color, tag) = if temp < 45.0 {
-                (
-                    taskmanager_theme::iced::color(theme_snapshot.network),
-                    "Cool",
-                )
+                (crate::theme_binding::color(theme_snapshot.network), "Cool")
             } else if temp < 70.0 {
                 (
-                    taskmanager_theme::iced::color(theme_snapshot.palette().accent),
+                    crate::theme_binding::color(theme_snapshot.palette().accent),
                     "Normal",
                 )
             } else if temp < 85.0 {
                 (
-                    taskmanager_theme::iced::color(theme_snapshot.palette().warning),
+                    crate::theme_binding::color(theme_snapshot.palette().warning),
                     "Warm",
                 )
             } else {
                 (
-                    taskmanager_theme::iced::color(theme_snapshot.palette().danger),
+                    crate::theme_binding::color(theme_snapshot.palette().danger),
                     "Hot",
                 )
             };
@@ -323,13 +320,13 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
             )
             .padding([3, 6])
             .style(move |_| container::Style {
-                background: Some(iced::Background::Color(taskmanager_theme::iced::color(
+                background: Some(iced::Background::Color(crate::theme_binding::color(
                     theme_snapshot.shade,
                 ))),
                 border: iced::Border {
                     radius: 4.0.into(),
                     width: 1.0,
-                    color: taskmanager_theme::iced::color(theme_snapshot.palette().border),
+                    color: crate::theme_binding::color(theme_snapshot.palette().border),
                 },
                 ..Default::default()
             });

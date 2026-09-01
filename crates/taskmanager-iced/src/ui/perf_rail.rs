@@ -115,7 +115,7 @@ impl RailCategory {
             Self::Battery => theme.battery,
             Self::Fan => theme.fan,
         };
-        taskmanager_theme::iced::color(token)
+        crate::theme_binding::color(token)
     }
 }
 
@@ -484,11 +484,11 @@ fn device_card(
             .center_x(Length::Fixed(30.0))
             .center_y(Length::Fixed(30.0))
             .style(move |_| iced::widget::container::Style {
-                background: Some(iced::Background::Color(taskmanager_theme::iced::color(
+                background: Some(iced::Background::Color(crate::theme_binding::color(
                     surface.palette().surface,
                 ))),
                 border: iced::Border {
-                    color: taskmanager_theme::iced::color(surface.palette().border),
+                    color: crate::theme_binding::color(surface.palette().border),
                     width: 1.0,
                     radius: 6.0.into(),
                 },
@@ -502,7 +502,7 @@ fn device_card(
             f32::from(tokens::FONT_13),
         ))
         .size(f32::from(tokens::FONT_13))
-        .font(taskmanager_theme::iced::ui_font_weight(
+        .font(crate::theme_binding::ui_font_weight(
             &theme_snapshot,
             tokens::FONT_WEIGHT_HEADER,
         ))

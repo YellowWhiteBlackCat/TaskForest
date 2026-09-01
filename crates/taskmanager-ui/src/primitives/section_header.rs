@@ -42,15 +42,22 @@ impl SectionHeader {
             .flex()
             .flex_row()
             .items_center()
-            .gap(tokens::SPACE_8)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
             .child(
                 div()
-                    .text_size(tokens::FONT_14)
-                    .text_color(self.palette.fg)
-                    .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
+                    .text_size(crate::theme_binding::font_size(tokens::FONT_14))
+                    .text_color(crate::theme_binding::hsla(self.palette.fg))
+                    .font_weight(crate::theme_binding::font_weight(
+                        tokens::FONT_WEIGHT_SEMIBOLD,
+                    ))
                     .child(self.title),
             )
-            .child(div().flex_grow().h(px(1.0)).bg(self.palette.border));
+            .child(
+                div()
+                    .flex_grow()
+                    .h(px(1.0))
+                    .bg(crate::theme_binding::fill(self.palette.border)),
+            );
         if let Some(selector) = self.debug_selector {
             header = header.debug_selector(move || selector.to_string());
         }

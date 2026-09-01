@@ -54,7 +54,7 @@ pub fn disabled_fg(palette: &Palette) -> Color {
 #[must_use]
 pub fn focus_ring_refinement(palette: &Palette) -> StyleRefinement {
     StyleRefinement {
-        border_color: Some(palette.ring.into()),
+        border_color: Some(crate::theme_binding::hsla(palette.ring)),
         ..StyleRefinement::default()
     }
 }

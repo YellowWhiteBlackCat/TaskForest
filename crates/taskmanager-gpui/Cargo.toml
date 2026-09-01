@@ -4,12 +4,13 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.97.1"
 license = "Apache-2.0"
-description = "GPUI desktop frontend for the TaskForest native system monitor"
+description = "GPUI desktop frontend product (taskforest-g) for the TaskForest native system monitor"
 publish = false
 
-# This crate owns the GPUI product surface and toolkit event loop.  The shared
-# app-host owns native composition; the root package only selects the product
-# shape and dispatches the binary.
+# This crate owns the GPUI product surface, toolkit event loop, and the
+# `taskforest-g` product binary. Native composition is supplied by the
+# toolkit-neutral `taskmanager-app-host`; the shared CLI harness
+# (`taskmanager-cli`, ADR-051) owns argv parsing and the neutral modes.
 
 [dependencies]
 gpui = { version = "0.2.2", default-features = false, features = ["wayland"] }
@@ -25,13 +26,21 @@ taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-assets = { path = "../taskmanager-assets" }
 taskmanager-icons = { path = "../taskmanager-icons" }
-taskmanager-theme = { path = "../taskmanager-theme", features = ["gpui"] }
+taskmanager-theme = { path = "../taskmanager-theme" }
 taskmanager-ui = { path = "../taskmanager-ui" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 taskmanager-shell = { path = "../taskmanager-shell" }
 taskmanager-telemetry-store = { path = "../taskmanager-telemetry-store" }
+# Shared CLI composition harness (ADR-051): the product bin hands this
+# frontend's capability set to `taskmanager_cli::run`.
+taskmanager-cli = { path = "../taskmanager-cli" }
 
 [features]
+# A release artifact is a platform variant, never a hardware-vendor variant
+# (ADR-006/051); the guard lives in this product's lib.
+default = ["hardware-all"]
+hardware-all = ["taskmanager-app-host/hardware-all"]
+nvidia = ["taskmanager-app-host/nvidia"]
 test-support = ["taskmanager-app-host/test-support"]
 
 [target.'cfg(target_os = "linux")'.dependencies]
@@ -55,6 +64,14 @@ windows-capture = "1.5.0"
 raw-window-handle = "0.6"
 sha2 = "0.10"
 
+[build-dependencies]
+# Embeds packaging/windows/taskmanager.ico as the exe main-icon resource (id 1)
+# for the Windows GPUI product; the same resource is what Explorer shows for
+# the .exe file icon. Keeping the build dependency host-available also lets an
+# LLVM-RC Windows cross-build embed the same mandatory resource instead of
+# silently producing an iconless executable.
+embed-resource = "3"
+
 [dev-dependencies]
 gpui = { version = "0.2.2", default-features = false, features = ["wayland", "test-support"] }
 taskmanager-app-host = { path = "../taskmanager-app-host", features = ["test-support"] }
@@ -63,3 +80,19 @@ taskmanager-test-support = { path = "../taskmanager-test-support" }
 [lib]
 name = "taskmanager_gpui"
 path = "src/lib.rs"
+
+[[bin]]
+name = "taskforest-g"
+path = "src/main.rs"
+
+# Product-scoped gates: the GPUI GUI interaction suite and the gpui-closure
+# architecture gates. Sources live in the workspace's shared `tests/` tree
+# and are declared here so they build and run inside THIS product's
+# dependency closure (ADR-051).
+[[test]]
+name = "gui"
+path = "../../tests/gui.rs"
+
+[[test]]
+name = "architecture"
+path = "tests/headless/architecture.rs"

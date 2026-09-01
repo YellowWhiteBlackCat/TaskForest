@@ -6,6 +6,7 @@
 
 use super::*;
 use taskmanager_core::core::sensors::ThermalThrottleSnapshot;
+use taskmanager_platform_contract::DeviceDiscovery;
 
 const CPU_THROTTLE_PROVIDER: ProviderId = ProviderId::borrowed("linux.sensor.cpu-thermal-throttle");
 
@@ -86,7 +87,16 @@ fn combine_sensor_sources(
     enrichments.extend(iio.enrichments);
     enrichments.push(throttle_source);
 
-    DeviceSourceSnapshot::from_source_status(
+    let discovery = match discovery_outcome {
+        SourceOutcome::Available => DeviceDiscovery::Available(discovered_devices),
+        SourceOutcome::Empty => DeviceDiscovery::Empty,
+        SourceOutcome::Partial(failure) => DeviceDiscovery::Partial {
+            discovered_devices,
+            failure,
+        },
+        SourceOutcome::Unavailable(failure) => DeviceDiscovery::Unavailable(failure),
+    };
+    DeviceSourceSnapshot::from_discovery(
         SensorCenterSnapshot {
             state: DeviceState::default().transition(status, now_ms),
             timestamp_ms: now_ms,
@@ -98,12 +108,8 @@ fn combine_sensor_sources(
             },
             device_lifecycles: Default::default(),
         },
-        discovered_devices.clone(),
-        SourceStatus {
-            provider: SYSFS_INVENTORY_PROVIDER,
-            outcome: discovery_outcome,
-            item_count: discovered_devices.len(),
-        },
+        SYSFS_INVENTORY_PROVIDER,
+        discovery,
         enrichments,
     )
 }

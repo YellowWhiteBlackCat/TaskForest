@@ -78,7 +78,7 @@ impl AdaptiveGrid {
             .w_full()
             .min_w(px(0.0))
             .min_h(px(0.0))
-            .gap(gap);
+            .gap(crate::theme_binding::definite_length(gap));
 
         if let Some(selector) = self.debug_selector {
             grid = grid.debug_selector(move || selector.to_string());

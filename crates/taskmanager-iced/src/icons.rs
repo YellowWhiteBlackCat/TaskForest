@@ -19,7 +19,7 @@ pub(crate) fn icon<'a>(
     id: IconId,
     size: f32,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let tint = taskmanager_theme::iced::color(theme_snapshot.palette().fg);
+    let tint = crate::theme_binding::color(theme_snapshot.palette().fg);
     let Some(bytes) = taskmanager_icons::asset_bytes(id) else {
         return text("·")
             .size(size)

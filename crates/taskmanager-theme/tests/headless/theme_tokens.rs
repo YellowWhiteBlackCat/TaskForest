@@ -51,15 +51,6 @@ fn ui_size_config_tokens_round_trip_and_unknown_input_falls_back_to_standard() {
     assert_eq!(UiSize::from_config_token(" FutureScale "), UiSize::Standard);
 }
 
-#[cfg(feature = "gpui")]
-#[test]
-fn gpui_font_tokens_are_root_relative_on_the_small_profile_baseline() {
-    let ::gpui::AbsoluteLength::Rems(body) = ::gpui::AbsoluteLength::from(super::FONT_BODY) else {
-        panic!("font tokens must resolve through the GPUI root rem");
-    };
-    assert_eq!(body.0, 1.0);
-}
-
 #[test]
 fn motion_policy_has_explicit_normal_reduced_and_no_motion_semantics() {
     assert_eq!(MotionPolicy::default(), MotionPolicy::Normal);

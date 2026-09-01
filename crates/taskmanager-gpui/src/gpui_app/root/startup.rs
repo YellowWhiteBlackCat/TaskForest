@@ -13,8 +13,8 @@ use gpui::{
 };
 use taskmanager_assets::product;
 use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
-use taskmanager_theme::gpui::{background_appearance, detect_font_availability};
 use taskmanager_theme::{HighContrast, resolve_fonts};
+use taskmanager_ui::theme_binding::{background_appearance, detect_font_availability};
 use tracing::{error, warn};
 
 mod appearance;
@@ -23,6 +23,7 @@ use appearance::observe_startup_appearance;
 mod capture_systems;
 
 mod config_tokens;
+use crate::gpui_app::chrome::WindowDecorationsPreference;
 pub(super) use config_tokens::{
     FONT_TOKEN_SYSTEM, color_scheme_from_token, font_pref_from_config, page_token,
     skin_preference_from_config,
@@ -38,13 +39,17 @@ use config_sync::{
     persist_config_if_due,
 };
 
-/// Window-frame policy: let Windows/macOS/KDE own caption buttons, hit
-/// testing, snap/maximize affordances and accessibility semantics. A
-/// compositor may still reject this request; render then follows the live
-/// `Decorations` fact and uses the audited CSD fallback rather than mixing two
-/// titlebars.
-fn requested_window_decorations() -> WindowDecorations {
-    WindowDecorations::Server
+/// Window-frame policy: the persisted preference picks the mode we REQUEST.
+/// `System` (the default) and `Native` both ask for server-side decorations
+/// so Windows/macOS/KDE own caption buttons, hit testing, snap/maximize
+/// affordances and accessibility semantics; `Custom` asks for client
+/// decorations (the app-drawn titlebar with transparent rounded corners). A
+/// compositor may refuse either request; render then follows the live
+/// `Decorations` fact and uses the audited CSD fallback rather than mixing
+/// two titlebars, and an explicitly refused preference is reported honestly
+/// by the render-time outcome check (`chrome::decoration_outcome_notice`).
+fn requested_window_decorations(pref: WindowDecorationsPreference) -> WindowDecorations {
+    pref.requested_decorations()
 }
 
 enum InstanceStartup {
@@ -178,8 +183,11 @@ fn spawn_update_loop(
                 view.drain_instance_events(cx, window_handle);
                 super::tray::drain_tray_events(view, cx, window_handle);
                 view.drain_history_replay_completions(cx);
-                view.reconcile_gpu_engines_visibility();
+                view.reconcile_gpu_engines_visibility(cx);
                 if view.drain_snapshot_export_completions() {
+                    cx.notify();
+                }
+                if view.drain_window_capture_completions() {
                     cx.notify();
                 }
             });
@@ -260,6 +268,7 @@ fn poll_window_systems(view: &mut RootView, cx: &mut gpui::Context<RootView>) {
 pub struct StartupRuntime {
     pub config_client: ConfigClient,
     pub snapshot_export_client: taskmanager_app_host::SnapshotExportClient,
+    pub window_capture_client: taskmanager_app_host::WindowCaptureClient,
     pub diagnostic_bundle_client: taskmanager_app_host::DiagnosticBundleClient,
     pub service_log_export_client: taskmanager_app_host::DiagnosticBundleClient,
     pub history_connector: Result<
@@ -284,6 +293,7 @@ pub fn init<E>(
     let StartupRuntime {
         mut config_client,
         snapshot_export_client,
+        window_capture_client,
         diagnostic_bundle_client,
         service_log_export_client,
         history_connector,
@@ -436,16 +446,20 @@ pub fn init<E>(
             origin: point(px(120.0), px(80.0)),
             size: responsive::initial_window_size(),
         })),
-        // Prefer SERVER-side (native) decorations: ask the compositor for the
-        // system titlebar. KDE/KWin, macOS, and Windows grant it and draw the
-        // native titlebar + corners; the renderer then emits NO app chrome (see
-        // `render`). GNOME/Mutter and some tiling WMs force Client (CSD), and
-        // the decoration negotiation reflects that — `window_decorations()` read
-        // each frame reacts to what was actually granted, so we do NOT sniff
-        // XDG_CURRENT_DESKTOP (fragile). `window_transparent` (set below for
-        // Linux) keeps the CSD fallback's transparent rounded corners working
-        // when a compositor forces Client despite this Server request.
-        window_decorations: Some(requested_window_decorations()),
+        // Window-frame mode per the persisted preference (`System` when the
+        // token is empty/unknown, the historical behavior): ask the compositor
+        // for the decoration mode the user picked. KDE/KWin, macOS, and
+        // Windows grant Server and draw the native titlebar + corners; the
+        // renderer then emits NO app chrome (see `render`). GNOME/Mutter and
+        // some tiling WMs force Client (CSD), and the decoration negotiation
+        // reflects that — `window_decorations()` read each frame reacts to
+        // what was actually granted, so we do NOT sniff XDG_CURRENT_DESKTOP
+        // (fragile). `window_transparent` (set below for Linux) keeps the CSD
+        // fallback's transparent rounded corners working when a compositor
+        // forces Client despite this Server request.
+        window_decorations: Some(requested_window_decorations(
+            WindowDecorationsPreference::from_config_token(&cfg.window_decorations),
+        )),
         // Mica (Windows) / vibrancy (macOS) material when the skin calls for it;
         // GNOME/KDE stay opaque. On Linux the surface is TRANSPARENT so the CSD
         // fallback can paint its own rounded corners (KWin/Niri don't round a
@@ -509,6 +523,7 @@ pub fn init<E>(
                 cx,
             );
             v.snapshot_export.install(snapshot_export_client);
+            v.window_capture.install(window_capture_client);
             v.diagnostic_bundle_runtime
                 .install(diagnostic_bundle_client);
             v.service_details
@@ -534,21 +549,22 @@ pub fn init<E>(
         if let Some(notice) = config_bootstrap_notice {
             entity.update(cx, |view, cx| view.show_local_feedback(notice, cx));
         }
-        // System tray (ADR-032): spawn on the application main thread and
-        // drain its events non-blockingly from the tick loop. A typed spawn failure
-        // (e.g. Linux without a StatusNotifierWatcher) degrades to no tray.
-        let tray_available = super::tray::spawn_tray_host(&entity, cx);
-        // A native titlebar close must not destroy the only window while the
-        // tray owns the process lifetime. Returning false keeps the GPUI root
-        // entity, ECS/runtime workers, single-instance guard, and tray alive;
-        // minimizing is the portable hide primitive exposed by GPUI.
-        // Capture evidence is intentionally allowed to close normally so its
-        // private compositor harness can terminate without a tray dependency.
-        if tray_available && !capture_mode {
-            window.on_window_should_close(cx, |window, _cx| {
-                window.minimize_window();
-                false
-            });
+        // System tray (ADR-032) belongs only to the product session. Capture
+        // mode is a disposable, private-compositor process: it must not probe
+        // or register a StatusNotifierItem on either the host bus or a private
+        // watcher, and it must be able to close normally for owned cleanup.
+        if !capture_mode {
+            let tray_available = super::tray::spawn_tray_host(&entity, cx);
+            // A native titlebar close must not destroy the only window while
+            // the tray owns the process lifetime. Returning false keeps the
+            // GPUI root entity, ECS/runtime workers, single-instance guard,
+            // and tray alive; minimizing is the portable hide primitive.
+            if tray_available {
+                window.on_window_should_close(cx, |window, _cx| {
+                    window.minimize_window();
+                    false
+                });
+            }
         }
         let window_handle = window.window_handle();
         spawn_update_loop(

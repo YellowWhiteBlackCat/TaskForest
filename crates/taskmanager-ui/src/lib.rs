@@ -60,14 +60,16 @@ pub type BackfillBuilder = Rc<dyn Fn(LayerBackfill, &mut Window, &mut App) -> An
 
 pub mod data;
 pub mod focus;
+pub mod icons_binding;
 pub mod inputs;
 pub mod layout;
 pub mod overlays;
 pub mod primitives;
+pub mod styled;
+pub mod theme_binding;
 
 use overlays::layer_stack::LayerBackfill;
 use overlays::popup::PopupMenuState;
-pub mod styled;
 
 pub use data::{highlighter, key_value_row, row, table, tree, virtual_list};
 pub use focus::{

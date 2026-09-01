@@ -45,6 +45,16 @@
 // would otherwise trip rustdoc's private-link lint under `-D warnings`.
 #![allow(rustdoc::private_intra_doc_links)]
 
+// A release artifact is a platform variant, never a hardware-vendor variant
+// (ADR-006/051). Developers may use reduced debug builds to exercise fallback
+// paths, but a distributable binary must carry every backend in the standard
+// hardware set.
+#[cfg(all(not(debug_assertions), not(feature = "hardware-all")))]
+compile_error!(
+    "release builds require the default `hardware-all` feature; \
+     vendor-specific TaskForest artifacts are not supported"
+);
+
 pub mod app;
 pub mod bindings;
 pub mod capabilities;

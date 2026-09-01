@@ -20,8 +20,8 @@
 use super::{Hover, RootView, TopPage};
 use crate::gpui_app::elements;
 use gpui::{
-    AnimationExt, Context, DefiniteLength, Div, InteractiveElement, IntoElement, Length,
-    ParentElement, StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
+    AnimationExt, Context, DefiniteLength, InteractiveElement, IntoElement, Length, ParentElement,
+    StatefulInteractiveElement, Styled, div, prelude::FluentBuilder, px,
 };
 use taskmanager_application::i18n;
 use taskmanager_theme::Color;
@@ -32,6 +32,9 @@ use taskmanager_ui_contract::IconId;
 
 use super::responsive::NavigationPresentation;
 use taskmanager_theme::Theme;
+
+mod strips;
+pub use strips::{nav_strip, nav_strip_horizontal, nav_strip_vertical};
 
 /// One nav-strip tab. `label` is the **identity** (English) string reused as the
 /// gpui element id, the focus target, and the [`Hover::Static`] identity that
@@ -108,19 +111,27 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(t))
-        .px(match presentation {
-            NavigationPresentation::IconOnly => tokens::SPACE_8,
-            NavigationPresentation::Labeled => tokens::SPACE_14,
-        })
-        .py(tokens::SPACE_7)
-        .rounded(tokens::control_radius(t))
-        .bg(base)
+        .px(taskmanager_ui::theme_binding::definite_length(
+            match presentation {
+                NavigationPresentation::IconOnly => tokens::SPACE_8,
+                NavigationPresentation::Labeled => tokens::SPACE_14,
+            },
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(t),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(base))
         .relative()
         .child(
             div().absolute().inset_0().child(
                 div()
                     .size_full()
-                    .rounded(tokens::control_radius(t))
+                    .rounded(taskmanager_ui::theme_binding::absolute(
+                        tokens::control_radius(t),
+                    ))
                     .with_animation(
                         ("tab-bg", hover_state_key(is_act, is_hov)),
                         hover_animation(),
@@ -132,7 +143,7 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
                             } else {
                                 base
                             };
-                            el.bg(bg)
+                            el.bg(taskmanager_ui::theme_binding::fill(bg))
                         },
                     ),
             ),
@@ -151,8 +162,10 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
                 .child(
                     div()
                         .h_full()
-                        .rounded(tokens::xsmall_radius(t))
-                        .bg(accent)
+                        .rounded(taskmanager_ui::theme_binding::absolute(
+                            tokens::xsmall_radius(t),
+                        ))
+                        .bg(taskmanager_ui::theme_binding::fill(accent))
                         .with_animation(
                             ("tab-indicator", hover_state_key(is_act, false)),
                             hover_animation(),
@@ -172,7 +185,9 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
             horizontal || presentation == NavigationPresentation::IconOnly,
             |tab| tab.justify_center(),
         )
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         // Elastic shrink: the tab is a flex child of the nav strip's tabs row.
         // min_w(0) overrides flex's default min-width:auto (= the content's
         // natural width) so this tab can shrink below content width when the
@@ -184,12 +199,12 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
         .when(horizontal, |tab| tab.flex_1())
         .when(!horizontal, |tab| tab.w_full().flex_shrink_0())
         .font_weight(if is_act {
-            tokens::FONT_WEIGHT_BOLD.into()
+            taskmanager_ui::theme_binding::font_weight(tokens::FONT_WEIGHT_BOLD)
         } else {
-            tokens::FONT_WEIGHT_NORMAL.into()
+            taskmanager_ui::theme_binding::font_weight(tokens::FONT_WEIGHT_NORMAL)
         })
-        .text_color(fg)
-        .child(taskmanager_icons::icon(icon).size(px(18.0)))
+        .text_color(taskmanager_ui::theme_binding::hsla(fg))
+        .child(taskmanager_ui::icons_binding::icon(icon).size(px(18.0)))
         // Label wraps min_w(0)+truncate so it shrinks/ellipses inside the tab's
         // flex row instead of forcing the tab to its natural text width. Text
         // styling is inherited from the tab div above. A hover tooltip (the full
@@ -246,24 +261,36 @@ pub fn gear_btn(
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(t))
-        .px(tokens::SPACE_8)
-        .py(tokens::SPACE_6)
-        .rounded(tokens::control_radius(t))
-        .bg(transparent)
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(t),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(transparent))
         .relative()
         .child(
             div().absolute().inset_0().child(
                 div()
                     .size_full()
-                    .rounded(tokens::control_radius(t))
+                    .rounded(taskmanager_ui::theme_binding::absolute(
+                        tokens::control_radius(t),
+                    ))
                     .with_animation(
                         ("gear-bg", hover_state_key(false, is_hov)),
                         hover_animation(),
                         move |el, delta| {
                             if is_hov {
-                                el.bg(mix(transparent, hover_bg, delta))
+                                el.bg(taskmanager_ui::theme_binding::fill(mix(
+                                    transparent,
+                                    hover_bg,
+                                    delta,
+                                )))
                             } else {
-                                el.bg(transparent)
+                                el.bg(taskmanager_ui::theme_binding::fill(transparent))
                             }
                         },
                     ),
@@ -273,9 +300,9 @@ pub fn gear_btn(
         .items_center()
         .justify_center()
         .child(
-            taskmanager_icons::icon(IconId::Settings)
+            taskmanager_ui::icons_binding::icon(IconId::Settings)
                 .size(px(16.0))
-                .text_color(color),
+                .text_color(taskmanager_ui::theme_binding::hsla(color)),
         )
 }
 
@@ -313,24 +340,36 @@ pub fn nav_orientation_btn(
         .focusable()
         .tab_stop(true)
         .focus(elements::focus_ring(t))
-        .px(tokens::SPACE_8)
-        .py(tokens::SPACE_6)
-        .rounded(tokens::control_radius(t))
-        .bg(transparent)
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(t),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(transparent))
         .relative()
         .child(
             div().absolute().inset_0().child(
                 div()
                     .size_full()
-                    .rounded(tokens::control_radius(t))
+                    .rounded(taskmanager_ui::theme_binding::absolute(
+                        tokens::control_radius(t),
+                    ))
                     .with_animation(
                         ("nav-orientation-bg", hover_state_key(false, is_hov)),
                         hover_animation(),
                         move |el, delta| {
                             if is_hov {
-                                el.bg(mix(transparent, hover_bg, delta))
+                                el.bg(taskmanager_ui::theme_binding::fill(mix(
+                                    transparent,
+                                    hover_bg,
+                                    delta,
+                                )))
                             } else {
-                                el.bg(transparent)
+                                el.bg(taskmanager_ui::theme_binding::fill(transparent))
                             }
                         },
                     ),
@@ -340,381 +379,8 @@ pub fn nav_orientation_btn(
         .items_center()
         .justify_center()
         .child(
-            taskmanager_icons::icon(IconId::Sidebar)
+            taskmanager_ui::icons_binding::icon(IconId::Sidebar)
                 .size(px(16.0))
-                .text_color(color),
-        )
-}
-
-/// The page-navigation strip: a floating rounded row or column of page tabs.
-pub fn nav_strip(
-    t: &Theme,
-    active: TopPage,
-    orientation: super::NavOrientation,
-    hovered: Option<&Hover>,
-    presentation: NavigationPresentation,
-    cx: &mut Context<RootView>,
-) -> Div {
-    match orientation {
-        super::NavOrientation::Horizontal => {
-            nav_strip_horizontal(t, active, hovered, presentation, cx)
-        }
-        super::NavOrientation::Vertical => nav_strip_vertical(t, active, hovered, presentation, cx),
-    }
-}
-
-pub fn nav_strip_horizontal(
-    t: &Theme,
-    active: TopPage,
-    hovered: Option<&Hover>,
-    presentation: NavigationPresentation,
-    cx: &mut Context<RootView>,
-) -> Div {
-    let tabs = div()
-        .id("tm-navigation-tabs-horizontal")
-        .flex()
-        .flex_row()
-        .items_center()
-        .gap(tokens::SPACE_4)
-        .flex_1()
-        .min_w(px(0.0))
-        // Labels are a semantic slot, not a reason to clip the last page. At
-        // narrow widths the root budget switches to icons; the scroll
-        // fallback still keeps the navigation complete for long locales and
-        // future pages.
-        .overflow_x_scroll()
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Performance",
-                display: "tab.performance",
-                icon: IconId::Performance,
-                page: TopPage::Performance,
-                active,
-                hovered,
-                presentation,
-                horizontal: true,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Apps",
-                display: "tab.apps",
-                icon: IconId::Applications,
-                page: TopPage::Apps,
-                active,
-                hovered,
-                presentation,
-                horizontal: true,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Services",
-                display: "tab.services",
-                icon: IconId::Services,
-                page: TopPage::Services,
-                active,
-                hovered,
-                presentation,
-                horizontal: true,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Startup",
-                display: "tab.startup",
-                icon: IconId::Startup,
-                page: TopPage::Startup,
-                active,
-                hovered,
-                presentation,
-                horizontal: true,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Users",
-                display: "tab.users",
-                icon: IconId::Users,
-                page: TopPage::Users,
-                active,
-                hovered,
-                presentation,
-                horizontal: true,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "App history",
-                display: "tab.apphistory_short",
-                icon: IconId::History,
-                page: TopPage::AppHistory,
-                active,
-                hovered,
-                presentation,
-                horizontal: true,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Containers",
-                display: "tab.containers",
-                icon: IconId::Applications,
-                page: TopPage::Containers,
-                active,
-                hovered,
-                presentation,
-                horizontal: true,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "System",
-                display: "tab.system",
-                icon: IconId::System,
-                page: TopPage::System,
-                active,
-                hovered,
-                presentation,
-                horizontal: true,
-            },
-            cx,
-        ));
-
-    div()
-        .w_full()
-        .min_w(px(0.0))
-        .flex_shrink_0()
-        .px(tokens::SPACE_12)
-        .pt(tokens::SPACE_6)
-        .pb(tokens::SPACE_4)
-        .child(
-            div()
-                .debug_selector(|| "tm-navigation-strip".to_string())
-                .h(px(crate::gpui_app::chrome::titlebar_height(t) + 4.0))
-                .flex_1()
-                .min_w(px(0.0))
-                .flex()
-                .flex_row()
-                .items_center()
-                .bg(t.sidebar_bg)
-                .rounded(tokens::card_radius(t))
-                .border_1()
-                .border_color(t.border)
-                .shadow_sm()
-                .px(tokens::SPACE_6)
-                .child(tabs)
-                .child(div().w(tokens::SPACE_6).flex_shrink_0())
-                .child(
-                    div()
-                        .flex_shrink_0()
-                        .flex()
-                        .items_center()
-                        .gap(tokens::SPACE_2)
-                        .child(nav_orientation_btn(t, hovered, cx))
-                        .child(gear_btn(t, hovered, cx)),
-                ),
-        )
-}
-
-pub fn nav_strip_vertical(
-    t: &Theme,
-    active: TopPage,
-    hovered: Option<&Hover>,
-    presentation: NavigationPresentation,
-    cx: &mut Context<RootView>,
-) -> Div {
-    let tabs = div()
-        .id("tm-navigation-tabs-vertical")
-        .flex()
-        .flex_col()
-        .gap(tokens::SPACE_4)
-        .flex_1()
-        .min_h(px(0.0))
-        .w_full()
-        // Vertical navigation is a real bounded rail. Let it scroll instead
-        // of allowing the lower pages to disappear when the window is short.
-        .overflow_y_scroll()
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Performance",
-                display: "tab.performance",
-                icon: IconId::Performance,
-                page: TopPage::Performance,
-                active,
-                hovered,
-                presentation,
-                horizontal: false,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Apps",
-                display: "tab.apps",
-                icon: IconId::Applications,
-                page: TopPage::Apps,
-                active,
-                hovered,
-                presentation,
-                horizontal: false,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Services",
-                display: "tab.services",
-                icon: IconId::Services,
-                page: TopPage::Services,
-                active,
-                hovered,
-                presentation,
-                horizontal: false,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Startup",
-                display: "tab.startup",
-                icon: IconId::Startup,
-                page: TopPage::Startup,
-                active,
-                hovered,
-                presentation,
-                horizontal: false,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Users",
-                display: "tab.users",
-                icon: IconId::Users,
-                page: TopPage::Users,
-                active,
-                hovered,
-                presentation,
-                horizontal: false,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "App history",
-                display: "tab.apphistory_short",
-                icon: IconId::History,
-                page: TopPage::AppHistory,
-                active,
-                hovered,
-                presentation,
-                horizontal: false,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "Containers",
-                display: "tab.containers",
-                icon: IconId::Applications,
-                page: TopPage::Containers,
-                active,
-                hovered,
-                presentation,
-                horizontal: false,
-            },
-            cx,
-        ))
-        .child(tab(
-            TabProps {
-                theme: t,
-                label: "System",
-                display: "tab.system",
-                icon: IconId::System,
-                page: TopPage::System,
-                active,
-                hovered,
-                presentation,
-                horizontal: false,
-            },
-            cx,
-        ));
-
-    div()
-        .h_full()
-        .min_w(px(0.0))
-        .min_h(px(0.0))
-        .flex_shrink_0()
-        .py(tokens::SPACE_6)
-        .pl(tokens::SPACE_8)
-        .pr(tokens::SPACE_4)
-        .child(
-            div()
-                .debug_selector(|| "tm-navigation-rail".to_string())
-                .h_full()
-                .min_w(px(0.0))
-                .w(px(crate::gpui_app::root::responsive::nav_rail_width(
-                    presentation,
-                )))
-                .flex_shrink_0()
-                .flex()
-                .flex_col()
-                .bg(t.sidebar_bg)
-                .rounded(tokens::card_radius(t))
-                .border_1()
-                .border_color(t.border)
-                .shadow_sm()
-                .p(tokens::SPACE_6)
-                .child(tabs)
-                .child(
-                    div()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .justify_around()
-                        .pt(tokens::SPACE_6)
-                        .border_t_1()
-                        .border_color(t.border)
-                        .flex_shrink_0()
-                        // An icon-only rail is intentionally only
-                        // 54px wide; two 32px controls cannot share that row.
-                        // Stack them at the bottom instead of letting the
-                        // settings hit target escape the rail.
-                        .when(
-                            presentation == NavigationPresentation::IconOnly,
-                            |controls| {
-                                controls
-                                    .flex_col()
-                                    .justify_center()
-                                    .gap(tokens::SPACE_2)
-                                    .pt(tokens::SPACE_4)
-                            },
-                        )
-                        .child(nav_orientation_btn(t, hovered, cx))
-                        .child(gear_btn(t, hovered, cx)),
-                ),
+                .text_color(taskmanager_ui::theme_binding::hsla(color)),
         )
 }

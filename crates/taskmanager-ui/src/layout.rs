@@ -338,7 +338,7 @@ pub fn bounded_scroll_column_with_fixed_header(
         .when_some(width, |column, width| {
             column.w(width).min_w(width).max_w(width)
         })
-        .gap(gap)
+        .gap(crate::theme_binding::definite_length(gap))
         .child(div().flex_none().min_w(px(0.0)).w_full().child(header))
         .child(bounded_scroll_region_with_rail(spec, body))
 }
@@ -450,7 +450,9 @@ fn tracked_vertical_viewport(
         .min_h(px(0.0))
         .w_full()
         .debug_selector(move || viewport_selector.to_string())
-        .when(reserve_rail, |viewport| viewport.pr(tokens::SPACE_16))
+        .when(reserve_rail, |viewport| {
+            viewport.pr(crate::theme_binding::definite_length(tokens::SPACE_16))
+        })
         .overflow_y_scroll()
         .track_scroll(&scroll)
         .child(body)

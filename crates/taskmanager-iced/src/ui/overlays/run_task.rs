@@ -41,7 +41,7 @@ pub fn run_task_overlay<'a>(
         vec![input.into(), admin_checkbox.into()];
 
     if let Some(err) = &state.error_msg {
-        let danger_color = taskmanager_theme::iced::color(theme_snapshot.palette().danger);
+        let danger_color = crate::theme_binding::color(theme_snapshot.palette().danger);
         body_items.push(
             text(err.clone())
                 .size(f32::from(tokens::FONT_12))

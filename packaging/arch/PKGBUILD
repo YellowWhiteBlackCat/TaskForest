@@ -45,7 +45,7 @@ build() {
   # 2026-08-14); the standalone conflict-safe installer
   # (scripts/manage-polkit-install.sh) remains for non-package hosts.
   cargo build --frozen --release \
-    -p taskmanager \
+    -p taskmanager-gpui \
     -p taskmanager-setup-helper \
     -p taskmanager-privilege-helper \
     -p taskmanager-net-launcher \
@@ -53,9 +53,8 @@ build() {
     -p taskmanager-smbios-helper \
     -p taskmanager-rapl-helper \
     -p taskmanager-msr-helper
-  # The root package enforces one UI feature per build; the default feature
-  # set is exactly the GPUI shape, so copy it to its distribution name.
-  install -m755 target/release/taskmanager target/release/taskforest-g
+  # ADR-051: the GPUI product binary is emitted as target/release/taskforest-g
+  # directly; no rename step is needed.
   # Third-party notices: generated from the Cargo.lock dependency closure so
   # the package carries every shipped dependency's license terms (the OFL
   # fonts are embedded in the binary). Mirrored by the deb/rpm staging path.

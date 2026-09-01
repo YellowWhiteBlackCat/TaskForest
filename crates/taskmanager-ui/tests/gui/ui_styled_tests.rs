@@ -51,7 +51,7 @@ fn disabled_fg_is_muted_relative_to_fg() {
 fn focus_ring_uses_palette_ring() {
     let p = palette();
     let refinement = focus_ring_refinement(&p);
-    let ring_color: Hsla = p.ring.into();
+    let ring_color: Hsla = crate::theme_binding::hsla(p.ring);
     assert_eq!(refinement.border_color, Some(ring_color));
 }
 

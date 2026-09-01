@@ -1,46 +1,37 @@
-//! Binary entry point: parses CLI arguments and dispatches to live, demo, or
-//! headless snapshot modes exposed by `taskmanager-tui`.
+//! `taskmanager-tui` — the Ratatui terminal product binary (ADR-051).
+//!
+//! Thin by law: it hands this product's capability set to the shared CLI
+//! harness (`taskmanager_cli::run`). The TUI product owns the headless
+//! `--snapshot [W H]` text-frame capability and runs inside a terminal, so
+//! the binary keeps the console subsystem on Windows.
 
 #![forbid(unsafe_code)]
 
-use std::io;
+use taskmanager_cli::{FrontendHandlers, run};
 
-use taskmanager_assets::product;
-
-fn main() -> io::Result<()> {
-    let mut args = std::env::args().skip(1);
-    match args.next().as_deref() {
-        None => taskmanager_tui::run_live(),
-        Some("--demo") => taskmanager_tui::run_demo(),
-        Some("--snapshot") => {
-            let width = parse_dimension(args.next(), 120, "width")?;
-            let height = parse_dimension(args.next(), 36, "height")?;
-            print!("{}", taskmanager_tui::snapshot_text(width, height));
-            Ok(())
-        }
-        Some("--help" | "-h") => {
-            println!(
-                "{} TUI — {}\n\n  taskmanager-tui              live platform telemetry\n  taskmanager-tui --demo       deterministic interactive demo\n  taskmanager-tui --snapshot [WIDTH HEIGHT]\n                                headless text-frame evidence",
-                product::NAME,
-                product::TAGLINE_EN
-            );
-            Ok(())
-        }
-        Some(argument) => Err(io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("unknown argument: {argument}; use --help"),
-        )),
+/// Launch the TUI. The desktop `app_id` is a graphical-product concept; the
+/// TUI accepts and ignores it so the CLI surface stays uniform (the unified
+/// CLI now lives in the shared harness).
+fn run_gui(app_id: Option<String>, demo: bool) {
+    let _ = app_id;
+    let result = if demo {
+        taskmanager_tui::run_demo()
+    } else {
+        taskmanager_tui::run_live()
+    };
+    if let Err(error) = result {
+        eprintln!("taskmanager-tui: {error}");
+        std::process::exit(1);
     }
 }
 
-fn parse_dimension(value: Option<String>, fallback: u16, name: &str) -> io::Result<u16> {
-    let Some(value) = value else {
-        return Ok(fallback);
-    };
-    value.parse::<u16>().map_err(|error| {
-        io::Error::new(
-            io::ErrorKind::InvalidInput,
-            format!("invalid {name} {value:?}: {error}"),
-        )
-    })
+fn main() {
+    run(
+        "taskmanager-tui",
+        FrontendHandlers {
+            run_gui,
+            snapshot_text: Some(taskmanager_tui::snapshot_text),
+            capture_window: None,
+        },
+    );
 }

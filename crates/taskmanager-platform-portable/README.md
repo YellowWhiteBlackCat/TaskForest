@@ -43,3 +43,11 @@ Unix callers are trusted fixed-argv tools that must not daemonize, call
 `setsid`, or double-fork. The runner kills their process group, but does not
 misrepresent that group as a kernel-enforced tree; cancellable nonblocking pipe
 readers still enforce the original deadline if a tool violates the contract.
+
+## Module map
+
+```text
+src/battery.rs  command.rs  directory_usage.rs  edid.rs
+```
+
+Truly cross-platform, semantically consistent sources; platform adapters may reuse them.

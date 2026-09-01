@@ -143,12 +143,18 @@ pub fn device_strip(props: DeviceStripProps<'_>, cx: &mut Context<RootView>) -> 
         .w_full()
         .flex()
         .flex_row()
-        .gap(tokens::SPACE_4)
-        .px(tokens::SPACE_8)
-        .py(tokens::SPACE_5)
-        .bg(theme.sidebar_bg)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_4,
+        ))
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_5,
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg))
         .border_b_1()
-        .border_color(theme.border)
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
         .overflow_x_scroll();
     let keys: Vec<String> = devices.iter().map(|entry| entry.key.clone()).collect();
     for (position, index) in ordered_indices(&keys, sidebar_order)

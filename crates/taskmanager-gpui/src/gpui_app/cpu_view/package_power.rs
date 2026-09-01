@@ -8,27 +8,23 @@
 //!
 //! # Escalation discipline
 //!
-//! The OS-native prompt is strictly user-initiated: the ONLY entry is the
-//! "Authorize package power" affordance rendered while the projection is
-//! [`PackagePowerModel::AuthorizationRequired`]. One click submits exactly one
-//! request (begin → platform submit → accept/reject, mirroring
-//! `submit_gpu_engine_rows_refresh`); there is no auto-poll chain, and the
-//! handler re-checks the projection so a stale click can never prompt.
+//! The OS-native prompt is strictly user-initiated through the central Settings
+//! permission center. One click submits exactly one request (begin → platform
+//! submit → accept/reject, mirroring `submit_gpu_engine_rows_refresh`); there is
+//! no auto-poll chain, and the handler re-checks the projection so a stale click
+//! can never prompt.
 
-use gpui::{
-    AnyElement, Context, Div, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, div,
-};
+use gpui::{Context, Div, InteractiveElement, ParentElement, Styled, div};
 use taskmanager_application::{RaplPowerRequest, RaplPowerState, i18n, request_submission_failure};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::RaplPowerSnapshot;
 use taskmanager_platform_contract::{CapabilityId, CapabilityStatus, SubmissionErrorKind};
 
-use crate::gpui_app::elements;
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::platform_submission_time_ms;
-use taskmanager_theme::Color;
 use taskmanager_theme::{Theme, tokens};
+
+const MAX_VISIBLE_PACKAGE_ROWS: usize = 3;
 
 /// Render-entry inputs for the section: the shared session state plus the
 /// runtime capability catalog entry for the lane.
@@ -48,8 +44,9 @@ pub(crate) enum PackagePowerModel {
     Packages(Vec<(String, String)>),
     /// A request is in flight and no accepted payload exists yet.
     Measuring,
-    /// The lane is escalation-backed: render the typed hint plus the
-    /// authorize affordance. No number may render in this state.
+    /// The lane is escalation-backed: the central Settings permission center
+    /// renders the typed hint plus the authorize affordance. No number may
+    /// render in this state.
     AuthorizationRequired,
     /// A typed failure; the value is the localized message key.
     Unavailable(&'static str),
@@ -139,6 +136,7 @@ impl RootView {
         if !matches!(
             package_power_model(&inputs),
             PackagePowerModel::AuthorizationRequired
+                | PackagePowerModel::Unavailable("cpu.package_power_denied")
         ) {
             return;
         }
@@ -177,92 +175,56 @@ impl RootView {
 /// The package-power subsection of the CPU details panel: a dim heading plus
 /// the honest body for the current projection. `Hidden` never reaches here
 /// (the caller omits the whole section).
-pub(super) fn render_package_power_section(
-    theme: &Theme,
-    model: &PackagePowerModel,
-    cx: &mut Context<RootView>,
-) -> Div {
+pub(super) fn render_package_power_section(theme: &Theme, model: &PackagePowerModel) -> Div {
+    let PackagePowerModel::Packages(rows) = model else {
+        return div();
+    };
     let heading = div()
-        .text_size(tokens::FONT_12)
-        .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-        .text_color(theme.fg_dim)
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+        .font_weight(taskmanager_ui::theme_binding::font_weight(
+            tokens::FONT_WEIGHT_BOLD,
+        ))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
         .child(i18n::t("cpu.package_power"));
     let mut col = div()
         .debug_selector(|| "tm-cpu-package-power".to_string())
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_5)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_5,
+        ))
         .w_full()
         .child(heading);
-    match model {
-        PackagePowerModel::Packages(rows) => {
-            if rows.is_empty() {
-                // The helper ran and honestly reported no packages: a typed
-                // empty message, not a fabricated row.
-                col = col.child(dim_text(theme, i18n::t("cpu.package_power_none")));
-            } else {
-                for (label, value) in rows {
-                    col = col.child(super::details_panel::kv_row(theme, label, value));
-                }
-            }
+    if rows.is_empty() {
+        // The helper ran and honestly reported no packages: a typed empty
+        // message, not a fabricated row.
+        col = col.child(dim_text(theme, i18n::t("cpu.package_power_none")));
+    } else {
+        let visible = rows.len().min(MAX_VISIBLE_PACKAGE_ROWS);
+        for (label, value) in rows.iter().take(visible) {
+            col = col.child(super::details_panel::kv_row(theme, label, value));
         }
-        PackagePowerModel::Measuring => {
-            col = col.child(dim_text(theme, i18n::t("cpu.package_power_measuring")));
+        if rows.len() > visible {
+            col = col.child(dim_text(
+                theme,
+                &i18n::t("common.more_rows")
+                    .replace("{count}", &(rows.len() - visible).to_string()),
+            ));
         }
-        PackagePowerModel::AuthorizationRequired => {
-            col = col
-                .child(dim_text(theme, i18n::t("cpu.package_power_requires_auth")))
-                .child(action_button(
-                    theme,
-                    i18n::t("cpu.package_power_authorize"),
-                    theme.accent,
-                    "tm-cpu-package-power-authorize",
-                    cx.listener(move |view, _ev, _win, cx| {
-                        view.authorize_package_power(cx);
-                    }),
-                ));
-        }
-        PackagePowerModel::Unavailable(key) => {
-            col = col.child(dim_text(theme, i18n::t(key)));
-        }
-        PackagePowerModel::Hidden => {}
     }
     col
 }
 
 fn dim_text(theme: &Theme, text: &str) -> Div {
     div()
-        .text_size(tokens::FONT_12)
-        .text_color(theme.fg_dim)
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
         .child(text.to_owned())
 }
 
-/// Keyboard-focusable, clickable text button in the shared affordance style
-/// (accent label, focus ring, pointer cursor — the GPU engines panel's
-/// `action_button` idiom). `selector` is a test-support geometry breakpoint.
-fn action_button(
-    theme: &Theme,
-    label: &str,
-    color: Color,
-    selector: &'static str,
-    on_click: impl Fn(&gpui::ClickEvent, &mut gpui::Window, &mut gpui::App) + 'static,
-) -> AnyElement {
-    let btn = div()
-        .id("cpu-package-power-action")
-        .focusable()
-        .tab_stop(true)
-        .focus(elements::focus_ring(theme))
-        .cursor_pointer()
-        .on_click(on_click)
-        .child(
-            div()
-                .text_size(tokens::FONT_12)
-                .text_color(color)
-                .child(label.to_owned()),
-        );
-    btn.debug_selector(move || selector.to_string())
-        .into_any_element()
-}
+// Page-local authorization controls intentionally do not exist here. The
+// central Settings permission center owns the request trigger; this renderer
+// only receives an accepted `Packages` projection.
 
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_gpui_app_cpu_view_package_power_tests.rs"]

@@ -11,7 +11,7 @@ use taskmanager_core::{
     BatteryInfo, BatteryScalarObservations, DeviceState, DeviceStatus, PowerSupplyKind,
     PowerSupplySnapshot, ScalarAvailability, ScalarObservation,
 };
-use taskmanager_platform_contract::DeviceSourceSnapshot;
+use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
 
 const POWER_SUPPLY_PROVIDER: ProviderId = ProviderId::borrowed("linux.power-supply.sysfs");
 const POWER_SUPPLY_SCALAR_PROVIDER: ProviderId = ProviderId::borrowed("linux.power-supply.scalars");
@@ -46,7 +46,7 @@ pub fn collect_power_supplies_from(
                 ErrorKind::NotFound => (DeviceStatus::Unsupported, FailureKind::Unsupported),
                 _ => (DeviceStatus::Stale, FailureKind::ProviderFault),
             };
-            return DeviceSourceSnapshot::from_source_status(
+            return DeviceSourceSnapshot::from_discovery(
                 PowerSupplySnapshot {
                     state: DeviceState {
                         status,
@@ -56,12 +56,8 @@ pub fn collect_power_supplies_from(
                     batteries: Vec::new(),
                     device_lifecycles: Default::default(),
                 },
-                Vec::new(),
-                SourceStatus {
-                    provider: POWER_SUPPLY_PROVIDER,
-                    outcome: SourceOutcome::Unavailable(failure),
-                    item_count: 0,
-                },
+                POWER_SUPPLY_PROVIDER,
+                DeviceDiscovery::Unavailable(failure),
                 Vec::new(),
             );
         }
@@ -109,7 +105,6 @@ pub fn collect_power_supplies_from(
     } else {
         SourceOutcome::Available
     };
-    let item_count = batteries.len();
     let state = if entry_failures == 0 {
         power_snapshot_state(scalar_source.outcome, observed_at_ms)
     } else {
@@ -118,19 +113,24 @@ pub fn collect_power_supplies_from(
             last_success_ms: None,
         }
     };
-    DeviceSourceSnapshot::from_source_status(
+    let discovery = match outcome {
+        SourceOutcome::Available => DeviceDiscovery::Available(discovered_devices),
+        SourceOutcome::Empty => DeviceDiscovery::Empty,
+        SourceOutcome::Partial(failure) => DeviceDiscovery::Partial {
+            discovered_devices,
+            failure,
+        },
+        SourceOutcome::Unavailable(failure) => DeviceDiscovery::Unavailable(failure),
+    };
+    DeviceSourceSnapshot::from_discovery(
         PowerSupplySnapshot {
             state,
             timestamp_ms: observed_at_ms,
             batteries,
             device_lifecycles: Default::default(),
         },
-        discovered_devices,
-        SourceStatus {
-            provider: POWER_SUPPLY_PROVIDER,
-            outcome,
-            item_count,
-        },
+        POWER_SUPPLY_PROVIDER,
+        discovery,
         vec![scalar_source],
     )
 }

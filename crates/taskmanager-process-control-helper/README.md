@@ -16,3 +16,10 @@ control, blanket capability or UI state.
 Success, target exit, PID reuse, permission, invalid operation and timeout must
 remain distinguishable. Package staging, policy checks and live installed
 authorization are independent evidence requirements.
+
+## Module map
+
+```text
+src/main.rs   one identity-revalidated foreign-process operation
+              (Windows UAC one-shot reply-file protocol, ADR-035)
+```

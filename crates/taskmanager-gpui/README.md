@@ -2,8 +2,11 @@
 
 ## Role
 
-GPUI desktop frontend. It owns `RootView`, window-local interaction state,
-page rendering, focus, overlays, visual projection and GPUI capture scenes.
+GPUI desktop frontend product (`taskforest-g`, ADR-051). It owns `RootView`,
+window-local interaction state, page rendering, focus, overlays, visual
+projection and GPUI capture scenes; its `[[bin]]` hands this product's
+capabilities (including the Windows `--capture-window` evidence mode) to the
+shared CLI harness.
 
 ## Boundary
 
@@ -66,8 +69,9 @@ startup modal.
   after the shared fold through typed named systems; it has no general mutable materialization
   accessor. Startup owns acquisition/configuration and schedules the loop.
 - `src/gpui_app/root/presentation_preferences.rs` is the private authority for persisted
-  appearance (including language), device visibility, units, graph options, sidebar preferences
-  and Apps display policy. Settings mutate named axes; renderers receive an immutable snapshot,
+  appearance (including language), device visibility, units, graph options, sidebar preferences,
+  the window-frame (decoration) policy token and Apps display policy. Settings mutate named axes;
+  renderers receive an immutable snapshot,
   and per-axis fingerprints invalidate only the affected projection. Page/focus/sidebar editing,
   drag/scroll state and runtime handles remain separate window-local facts. The process-global
   language catalog is a derived renderer activation, never preference storage.
@@ -85,6 +89,10 @@ startup modal.
   the current projection into an immutable request, then only drains correlated
   completion into shell feedback; System and Service Details own no file writer,
   current-directory lookup or per-window worker.
+- Linux GPUI exposes a current-window PNG action in the navigation controls. It
+  submits the shared application request and reports the app-host receipt; it does
+  not read Wayland state or invoke Spectacle from the renderer. The native adapter
+  seam reserves Portal Screenshot and ScreenCast/PipeWire for later evolution.
 - GPUI receives the app-host's narrow enable connector plus the paired read-only replay client
   and in-process writer capability. The root tick drains correlated connection/query
   completions; filesystem writes and teardown remain owned by app-host's bounded worker.
@@ -125,7 +133,7 @@ each real parent/child process tree; category/application totals own the sums, w
 process row (including a process with children) keeps its own PID and own sample. Old grouping
 tokens are migration inputs, not new UI choices.
 
-Application totals are selectable through `ProcessRowKey::Application(root_pid)` without a
+Application totals are selectable through `ProcessRowId::Application(root_identity)` without a
 representative PID. Keyboard/pointer selection share the rendered semantic row order; batch
 verbs freeze the live subtree, while single-process details/affinity stay unavailable. Desktop
 UI size is Small/Standard/Large: `RootView` sets the GPUI rem to 14/16/18px so every owned
@@ -137,23 +145,21 @@ independent, and page modules
 derive typed chrome/chart/timeline presentations rather than width/height
 booleans. Every Performance device page (CPU/Memory/Disk/Network/GPU/Battery/Fan)
 composes through the ONE `perf_views::layout` root (`perf_page`, ADR-039):
-pages declare `ChartSpec` charts whose `ChartTier` (headline/secondary)
+pages declare `ChartSpec` charts whose `ChartTier` (headline/secondary/compact)
 derives the height floor, first-frame state overlay, hover surface, legend,
 aesthetic injection, and summary row in one place; mini density cells render
 through the shared `mini_graph_cell`. The main column is one fixed
 `overflow_hidden` viewport — never a scrolling body — and the statistics rail
-follows the budget's pinned/stacked/hidden presentation at the budget's
-width. The CPU page adds its readout band as the header slot and, when the
-chart-inventory budget permits, the per-core matrix below; it owns no
-metric/detail selector state. The GPU page likewise owns no metric/detail
-selector: full-inventory budgets render every reported engine when multiple
-engines exist (the dominant engine wears the full headline chart contract),
-aggregate-only budgets keep one readable utilization graph, and both preserve
-immutable stats/VRAM facts. On full-inventory budgets every chartable scalar
-family the adapter actually reports (power, temperature, frequency, memory,
-dedicated/shared VRAM, idle residency) renders as its own secondary chart
-beneath the headline; a family the platform cannot measure renders nothing at
-all — never a fabricated zero and never a selector.
+width. Only the left device selector may scroll; the Performance main viewport
+and statistics rail are static, and lower content is capped, summarized, or
+omitted before it can reach the viewport edge. The CPU page adds its readout
+band as the header slot and, when the chart-inventory budget permits, the
+per-core matrix below; it owns no metric/detail selector state. The GPU page
+likewise owns no metric/detail selector: the large aggregate utilization graph
+is always the headline, full-inventory budgets add one fine mini-card per
+reported engine, and a compact GPU-memory utilization graph forms the bottom
+group. All preserve immutable stats/VRAM facts; a family the platform cannot
+measure renders nothing at all — never a fabricated zero and never a selector.
 Disk and network main graphs draw two series from the store's split-direction
 lanes (read/write, rx/tx; family color and its 0.32 tint) under one shared
 peak and one cached static grid — the dynamic scene keys carry an explicit
@@ -240,3 +246,17 @@ cannot leave an owned process behind.
 Keep render-entry folds shared by pointer and keyboard paths. Changes require
 headless behavior tests and, when visible, current GPUI capture/validator/review
 evidence. Component implementation belongs to `taskmanager-ui`.
+
+## Module map
+
+```text
+src/assets.rs  src/capture.rs          assets and evidence capture
+src/gpui_app/                          RootView composition root
+├── chrome.rs  containers_view.rs      window skeleton and containers
+├── dashboard/  cpu_view/  graph/      pages and cards (ADR-038/039 budgets)
+├── functional.rs                      CORE-04 GPUI surface declarations
+├── first_run.rs  about.rs  app_history_view.rs
+└── elements.rs  formatting.rs  capabilities.rs
+```
+
+Consumes shell projections only; every frame drains a bounded projection cache.

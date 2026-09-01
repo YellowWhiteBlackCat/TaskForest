@@ -1,4 +1,4 @@
-#![cfg(feature = "ui-gpui")]
+#![cfg(feature = "test-support")]
 #![allow(linker_messages)]
 
 #[path = "gui/gpui_behavior.rs"]

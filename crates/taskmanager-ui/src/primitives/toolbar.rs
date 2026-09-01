@@ -57,7 +57,7 @@ impl Toolbar {
             .flex_wrap()
             .w_full()
             .items_center()
-            .gap(self.gap)
+            .gap(crate::theme_binding::definite_length(self.gap))
             .children(self.children);
         if let Some(selector) = self.debug_selector {
             toolbar = toolbar.debug_selector(move || selector.to_string());

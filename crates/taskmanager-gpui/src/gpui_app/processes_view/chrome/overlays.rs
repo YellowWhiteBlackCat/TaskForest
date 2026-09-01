@@ -91,7 +91,13 @@ fn affinity_status_content(
         || i18n::t("common.collecting_telemetry").to_owned(),
         |failure| taskmanager_shell::presentation::control_error_detail(failure).to_owned(),
     );
-    let mut actions = div().flex().flex_row().gap(tokens::SPACE_8).justify_end();
+    let mut actions = div()
+        .flex()
+        .flex_row()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .justify_end();
     if failure.is_some() {
         actions = actions.child(action_btn(
             ActionBtnProps {
@@ -130,11 +136,13 @@ fn affinity_status_content(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_12)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(text),
         )
         .child(actions)
@@ -153,11 +161,13 @@ fn affinity_content(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_12)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(format!(
                     "{} {} {} {} {}",
                     selected,
@@ -172,7 +182,9 @@ fn affinity_content(
             div()
                 .flex()
                 .flex_row()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .justify_end()
                 .child(action_btn(
                     ActionBtnProps {
@@ -231,7 +243,14 @@ fn cpu_chip_grid(
     hover_chip: Option<usize>,
     entity: &Entity<RootView>,
 ) -> Div {
-    let mut grid = div().flex().flex_row().flex_wrap().gap(tokens::SPACE_6);
+    let mut grid =
+        div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_6,
+            ));
     for index in 0..logical_cpus {
         let active = cpus.contains(&(index as u32));
         let click_entity = entity.clone();

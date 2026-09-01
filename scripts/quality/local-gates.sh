@@ -8,7 +8,9 @@
 #   quick      seconds-minutes: toolchain/platform preflight, fmt, dependency-floor,
 #              python policy gates, test-runner policy, install-manager
 #              smoke, line/doc/test-layout/source-inspection/bevy-bsn/headless
-#              side-effect guards, per-crate coverage gate self-test.
+#              side-effect guards, per-crate coverage gate self-test, and the
+#              private A/B capture-isolation check when a host Wayland session
+#              is available (or TM_CAPTURE_ISOLATION_GATE=1 forces it).
 #   standard   ~ the blocking Linux CI surface: quick + cargo deny + clippy + the
 #              nextest workspace split into core/logic/gui/perf layers
 #              (failure attribution per layer; `--only nextest-core` gives a
@@ -50,6 +52,9 @@
 #                           repo; it must be outside the repository)
 #   SKIP_INSTALL_MANAGER_SMOKE=1  defer that smoke until the release build
 #                                 has produced its helper binaries
+#   TM_CAPTURE_ISOLATION_GATE=auto|0|1  run the real private A/B capture test;
+#                                 auto runs it only on a ready Wayland host,
+#                                 1 fails closed when its prerequisites are absent
 
 set -u
 
@@ -473,6 +478,40 @@ fi
 if maybe coverage-gate-self; then
     run_stage coverage-gate-self quick run_py scripts/quality/per_crate_coverage_gate.py --self-test
 fi
+if maybe capture-isolation-self; then
+    run_stage capture-isolation-self quick run_py scripts/test_capture_isolation.py --self-test --repo-root "$repo"
+fi
+if maybe capture-isolation; then
+    capture_isolation_gate="${TM_CAPTURE_ISOLATION_GATE:-auto}"
+    case "$capture_isolation_gate" in
+    auto|0|1) ;;
+    *)
+        echo "TM_CAPTURE_ISOLATION_GATE must be auto, 0, or 1" >&2
+        run_stage capture-isolation quick false
+        ;;
+    esac
+    capture_isolation_host_ready=1
+    if [[ "$capture_isolation_gate" == "auto" ]]; then
+        [[ -n "${WAYLAND_DISPLAY:-}" && -n "${XDG_RUNTIME_DIR:-}" ]] || capture_isolation_host_ready=0
+        if [[ "$capture_isolation_host_ready" == "1" && ! -S "$XDG_RUNTIME_DIR/$WAYLAND_DISPLAY" ]]; then
+            capture_isolation_host_ready=0
+        fi
+        for command in dbus-run-session busctl qdbus6 kwin_wayland niri; do
+            if ! command -v "$command" >/dev/null 2>&1; then
+                capture_isolation_host_ready=0
+                break
+            fi
+        done
+    fi
+    if [[ "$capture_isolation_gate" == "1" || ( "$capture_isolation_gate" == "auto" && "$capture_isolation_host_ready" == "1" ) ]]; then
+        run_stage capture-isolation quick timeout --kill-after=10s 240s python3 scripts/test_capture_isolation.py --repo-root "$repo"
+    else
+        reason="TM_CAPTURE_ISOLATION_GATE=$capture_isolation_gate"
+        [[ "$capture_isolation_gate" == "auto" ]] && reason="$reason; no private Wayland/KWin host"
+        echo "SKIP capture-isolation ($reason)"
+        record capture-isolation quick SKIP 0
+    fi
+fi
 
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 
@@ -538,24 +577,24 @@ if maybe nextest-core; then
 fi
 if maybe nextest-logic; then
     if scope_skip nextest-logic "root acceptance layer" standard; then
-        run_stage nextest-logic standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager --test logic --features test-support -j 4 --profile ci
+        run_stage nextest-logic standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager-gates --test logic -j 4 --profile ci
     fi
 fi
 if maybe nextest-gui; then
     if scope_skip nextest-gui "root acceptance layer" standard; then
-        run_stage nextest-gui standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager --test gui --features test-support -j 4 --profile ci
+        run_stage nextest-gui standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager-gpui --test gui --features test-support -j 4 --profile ci
     fi
 fi
 if maybe nextest-perf; then
     if scope_skip nextest-perf "root acceptance layer" standard; then
-        run_stage nextest-perf standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager --test performance --features test-support -j 4 --profile ci
+        run_stage nextest-perf standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager-gates --test performance -j 4 --profile ci
     fi
 fi
 if maybe live-smoke; then
     if scope_skip live-smoke "root acceptance layer" standard; then
         # One real-collector tick per supported platform (host-neutral invariants
         # only). Fixtures prove parsers; this stage proves the composition edge.
-        run_stage live-smoke standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager --test logic --features test-support -j 4 --profile ci -E 'test(live_smoke_)'
+        run_stage live-smoke standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager-gates --test logic -j 4 --profile ci -E 'test(live_smoke_)'
     fi
 fi
 if maybe doctests; then
@@ -577,20 +616,21 @@ if maybe rustdoc; then
     fi
 fi
 if maybe nvidia-fallback; then
-    if scope_skip nvidia-fallback "workspace feature form" standard; then
-        run_stage nvidia-fallback standard cargo nextest run "${LOCK_ARGS[@]}" --workspace --lib --no-default-features --features hardware-all,nvidia,ui-gpui -j 4 --profile ci
+    if scope_skip nvidia-fallback "product fallback build" standard; then
+        # ADR-051: the vendor matrix runs against the GPUI product only.
+        run_stage nvidia-fallback standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager-gpui --lib --features hardware-all,nvidia -j 4 --profile ci
     fi
 fi
 if maybe shape-tui; then
-    if scope_skip shape-tui "workspace feature form" standard; then
+    if scope_skip shape-tui "product fallback build" standard; then
         run_stage shape-tui standard bash -c \
-            'cargo check ${TM_CARGO_LOCK---locked} --workspace --all-targets --no-default-features --features hardware-all,ui-tui && cargo nextest run ${TM_CARGO_LOCK---locked} --workspace --all-targets --no-default-features --features hardware-all,ui-tui -j 4 --profile ci -E "not binary(throughput)"'
+            'cargo check ${TM_CARGO_LOCK---locked} -p taskmanager-tui --all-targets --no-default-features && cargo nextest run ${TM_CARGO_LOCK---locked} -p taskmanager-tui --all-targets --no-default-features -j 4 --profile ci -E "not binary(throughput)"'
     fi
 fi
 if maybe shape-iced; then
-    if scope_skip shape-iced "workspace feature form" standard; then
+    if scope_skip shape-iced "product fallback build" standard; then
         run_stage shape-iced standard bash -c \
-            'cargo check ${TM_CARGO_LOCK---locked} --workspace --all-targets --no-default-features --features hardware-all,ui-iced && cargo nextest run ${TM_CARGO_LOCK---locked} --workspace --all-targets --no-default-features --features hardware-all,ui-iced -j 4 --profile ci -E "not binary(throughput)"'
+            'cargo check ${TM_CARGO_LOCK---locked} -p taskmanager-iced --all-targets --no-default-features && cargo nextest run ${TM_CARGO_LOCK---locked} -p taskmanager-iced --all-targets --no-default-features -j 4 --profile ci -E "not binary(throughput)"'
     fi
 fi
 if [[ "$skip_release" == "1" ]]; then
@@ -661,7 +701,7 @@ fi
 if maybe bloat; then
     if scope_skip bloat "workspace-wide measurement" extended; then
         run_stage bloat extended bash -c \
-            'CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 CARGO_PROFILE_RELEASE_STRIP=debuginfo timeout --kill-after=30s 3600 cargo build ${TM_CARGO_LOCK---locked} --release -j 4 -p taskmanager; scripts/quality/trend-gate.sh --metric bloat --current "$(stat -c %s target/release/taskmanager 2>/dev/null || echo 0)" --trend docs/quality/bloat-trend.tsv --limit 5'
+            'CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 CARGO_PROFILE_RELEASE_STRIP=debuginfo timeout --kill-after=30s 3600 cargo build ${TM_CARGO_LOCK---locked} --release -j 4 -p taskmanager-gpui; scripts/quality/trend-gate.sh --metric bloat --current "$(stat -c %s target/release/taskforest-g 2>/dev/null || echo 0)" --trend docs/quality/bloat-trend.tsv --limit 5'
     fi
 fi
 if maybe benches; then

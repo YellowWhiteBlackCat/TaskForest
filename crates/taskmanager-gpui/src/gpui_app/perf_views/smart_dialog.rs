@@ -12,7 +12,9 @@ pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
     let mut column = div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .w(px(360.0))
         .child(prop_row(
             theme,
@@ -69,13 +71,22 @@ pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
     if disk.smart_critical_warning == Some(true) {
         column = column.child(
             div()
-                .mt(tokens::SPACE_8)
-                .px(tokens::SPACE_10)
-                .py(tokens::SPACE_6)
-                .rounded(tokens::small_radius(theme))
-                .bg(with_alpha(theme.danger, 0.18))
-                .text_size(tokens::FONT_12)
-                .text_color(theme.danger)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
+                .px(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_10,
+                ))
+                .py(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
+                .rounded(taskmanager_ui::theme_binding::absolute(
+                    tokens::small_radius(theme),
+                ))
+                .bg(taskmanager_ui::theme_binding::fill(with_alpha(
+                    theme.danger,
+                    0.18,
+                )))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.danger))
                 .child(i18n::t("disk.warning_text")),
         );
     }

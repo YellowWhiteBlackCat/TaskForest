@@ -1,0 +1,30 @@
+[package]
+name = "taskmanager-cli"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.97.1"
+license = "Apache-2.0"
+description = "Shared CLI composition harness for the TaskForest frontend products (ADR-051)"
+publish = false
+
+# Composition edge one step below the product binaries: it drives the
+# application port and the app-host seam for the UI-neutral CLI modes and
+# accepts shape capabilities as plain values (ADR-051) — never features.
+[dependencies]
+taskmanager-core = { path = "../taskmanager-core" }
+taskmanager-application = { path = "../taskmanager-application" }
+taskmanager-app-host = { path = "../taskmanager-app-host" }
+taskmanager-assets = { path = "../taskmanager-assets" }
+# Per-feature privilege-escalation seam (ADR-023): the CLI `--gpu-engines`
+# family drives the polkit/pkexec helpers on demand from this edge.
+taskmanager-escalation = { path = "../taskmanager-escalation" }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+[dev-dependencies]
+# The live end-to-end JSON honesty proof (tests/logic/main_tests.rs) spawns
+# the real native runtime through the reverse-dependency-firewall seam
+# instead of naming an OS crate.
+taskmanager-platform-native = { path = "../taskmanager-platform-native" }
+taskmanager-test-support = { path = "../taskmanager-test-support" }

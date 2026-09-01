@@ -505,7 +505,7 @@ fn selectable_row_base<'a>(
         true,
     )
     .with_right_press(on_right_press)
-    .with_hover(taskmanager_theme::iced::color(palette.hover))
+    .with_hover(crate::theme_binding::color(palette.hover))
     .into()
 }
 

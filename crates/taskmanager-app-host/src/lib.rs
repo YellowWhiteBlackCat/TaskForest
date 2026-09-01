@@ -32,6 +32,7 @@ mod history_replay_runtime;
 mod presentation;
 mod process_termination;
 mod snapshot_export_runtime;
+mod window_capture_runtime;
 mod worker_fault;
 use diagnostic_bundle_runtime::DiagnosticBundleCoordinator;
 pub use diagnostic_bundle_runtime::{DiagnosticBundleClient, DiagnosticBundleRuntimeStartError};
@@ -58,6 +59,8 @@ pub use presentation::{
 pub use process_termination::{ProcessTermination, ProcessTerminationInstallError};
 use snapshot_export_runtime::SnapshotExportCoordinator;
 pub use snapshot_export_runtime::{SnapshotExportClient, SnapshotExportRuntimeStartError};
+use window_capture_runtime::WindowCaptureCoordinator;
+pub use window_capture_runtime::{WindowCaptureClient, WindowCaptureRuntimeStartError};
 
 pub fn spawn_tray(
     spec: taskmanager_core::core::tray::TraySpec,
@@ -118,6 +121,8 @@ pub struct NativeAppHost {
         Arc<OnceLock<Result<HistoryPersistenceWriterGeneration, HistoryPersistenceStartError>>>,
     snapshot_export_runtime:
         Arc<OnceLock<Result<SnapshotExportCoordinator, SnapshotExportRuntimeStartError>>>,
+    window_capture_runtime:
+        Arc<OnceLock<Result<WindowCaptureCoordinator, WindowCaptureRuntimeStartError>>>,
     diagnostic_bundle_runtime:
         Arc<OnceLock<Result<DiagnosticBundleCoordinator, DiagnosticBundleRuntimeStartError>>>,
 }
@@ -207,6 +212,7 @@ impl NativeAppHost {
             history_replay_runtime: Arc::new(OnceLock::new()),
             history_persistence_runtime: Arc::new(OnceLock::new()),
             snapshot_export_runtime: Arc::new(OnceLock::new()),
+            window_capture_runtime: Arc::new(OnceLock::new()),
             diagnostic_bundle_runtime: Arc::new(OnceLock::new()),
         }
     }
@@ -283,6 +289,19 @@ impl NativeAppHost {
             .get_or_init(SnapshotExportCoordinator::start)
             .as_ref()
             .map(SnapshotExportCoordinator::client)
+            .map_err(Clone::clone)
+    }
+
+    /// Create a named client backed by the process-wide current-window PNG
+    /// capture worker. Native capture stays in the selected OS adapter; this
+    /// host owns bounded request delivery and atomic filesystem publication.
+    pub fn window_capture_client(
+        &self,
+    ) -> Result<WindowCaptureClient, WindowCaptureRuntimeStartError> {
+        self.window_capture_runtime
+            .get_or_init(WindowCaptureCoordinator::start)
+            .as_ref()
+            .map(WindowCaptureCoordinator::client)
             .map_err(Clone::clone)
     }
 

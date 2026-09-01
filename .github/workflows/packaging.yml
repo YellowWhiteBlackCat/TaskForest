@@ -132,12 +132,11 @@ jobs:
       - name: Build release binaries
         run: |
           cargo build --locked --release -j 4 \
-            -p taskmanager \
+            -p taskmanager-gpui \
             -p taskmanager-setup-helper \
             -p taskmanager-privilege-helper \
             -p taskmanager-net-launcher \
             -p taskmanager-process-control-helper
-          install -m755 target/release/taskmanager target/release/taskforest-g
       - name: Resolve package version
         id: version
         run: |
@@ -230,15 +229,15 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
-      # GPUI shape only — the release surface deliberately skips the Iced
+      # GPUI product only — the release surface deliberately skips the Iced
       # build. The Windows edge embeds the exe icon on the native MSVC toolchain.
       - name: Build release exe
         shell: bash
         run: |
           cargo build --locked --release --target "$RUST_TARGET" -j 4 \
-            -p taskmanager
+            -p taskmanager-gpui
           mkdir -p msi-stage
-          install -m755 "target/$RUST_TARGET/release/taskmanager.exe" msi-stage/taskforest-g.exe
+          install -m755 "target/$RUST_TARGET/release/taskforest-g.exe" msi-stage/taskforest-g.exe
           install -m644 LICENSE msi-stage/
       # WiX v4+ ships the standard dialog sets (WixUI_InstallDir et al.) as an
       # optional extension; without it `wix build -ext WixToolset.UI.wixext`

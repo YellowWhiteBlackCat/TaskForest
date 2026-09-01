@@ -487,7 +487,7 @@ fn performance_tab<'a>(
         device_chart::device_mini_graph(
             cpu,
             device_chart::DeviceMetricScale::Percent,
-            taskmanager_theme::iced::color(palette.accent),
+            crate::theme_binding::color(palette.accent),
             cpu_caption,
             theme_snapshot,
             device_chart::GraphPrefs {
@@ -499,7 +499,7 @@ fn performance_tab<'a>(
         device_chart::device_mini_graph(
             memory,
             device_chart::DeviceMetricScale::AutoPeak,
-            taskmanager_theme::iced::color(palette.success),
+            crate::theme_binding::color(palette.success),
             memory_caption,
             theme_snapshot,
             device_chart::GraphPrefs {
@@ -511,7 +511,7 @@ fn performance_tab<'a>(
         device_chart::device_mini_graph(
             read,
             device_chart::DeviceMetricScale::AutoPeak,
-            taskmanager_theme::iced::color(theme_snapshot.disk),
+            crate::theme_binding::color(theme_snapshot.disk),
             read_caption,
             theme_snapshot,
             device_chart::GraphPrefs {
@@ -523,7 +523,7 @@ fn performance_tab<'a>(
         device_chart::device_mini_graph(
             write,
             device_chart::DeviceMetricScale::AutoPeak,
-            taskmanager_theme::iced::color(theme_snapshot.disk),
+            crate::theme_binding::color(theme_snapshot.disk),
             write_caption,
             theme_snapshot,
             device_chart::GraphPrefs {

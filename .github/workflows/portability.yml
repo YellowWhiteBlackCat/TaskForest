@@ -58,7 +58,7 @@ jobs:
       - run: cargo nextest run --locked -p taskmanager-platform-macos --profile ci -j 4
       # Reduced debug builds remain useful for fallback tests; releases reject
       # them and always use the default hardware-all profile.
-      - run: cargo check --locked --no-default-features --features ui-gpui
+      - run: cargo check --locked -p taskmanager-gpui --lib --no-default-features
 
   windows:
     name: Windows (native safety receipt)
@@ -77,9 +77,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
-      # Build the GUI bin natively on Windows (MSVC) — Cargo.toml's
+      # Build the GUI product natively on Windows (MSVC) — the gpui crate's
       # target-conditional gpui dep pulls in `windows-manifest` additively here.
-      - run: cargo build --locked -j 4
+      - run: cargo build --locked -j 4 -p taskmanager-gpui --bin taskforest-g
       # Run the boundary and adapter's complete native test surface, including
       # the Known Folder, exact-process, WTS, registry and config receipts.
       - name: Execute native boundary receipt
@@ -100,14 +100,14 @@ jobs:
       # artifacts (the Windows product links platform-windows instead); their
       # boundary-crate edges are target-gated since 2026-08-18.
       - run: cargo nextest run --locked --workspace --lib --exclude taskmanager-platform-linux --exclude taskmanager-platform-macos --profile ci -j 4
-      # Every product shape is a Windows product surface. The default build
-      # selects GPUI, so compile the Iced and TUI compositions explicitly;
-      # otherwise a Windows-only dependency or cfg regression can remain
-      # invisible while the required native GPUI job stays green.
+      # Every frontend is a separate product crate (ADR-051). The default
+      # workspace build covers the GPUI product, so compile the Iced and TUI
+      # products explicitly; otherwise a Windows-only dependency or cfg
+      # regression can remain invisible while the native GPUI job stays green.
       - name: Check Iced frontend on Windows
-        run: cargo check --locked --no-default-features --features ui-iced -j 4
+        run: cargo check --locked -p taskmanager-iced -j 4
       - name: Check TUI frontend on Windows
-        run: cargo check --locked --no-default-features --features ui-tui -j 4
+        run: cargo check --locked -p taskmanager-tui -j 4
       # Reduced debug builds remain useful for fallback tests; releases reject
       # them and always use the default hardware-all profile.
-      - run: cargo check --locked --no-default-features --features ui-gpui -j 4
+      - run: cargo check --locked -p taskmanager-gpui --lib --no-default-features -j 4

@@ -185,7 +185,9 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
     let mut col = div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .flex_1()
         .min_h(px(0.0));
     // Header: "System" headline on the left, action pills on the right.
@@ -207,7 +209,9 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
         .flex_row()
         .flex_wrap()
         .items_center()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .min_w(px(0.0))
         .child(elements::pill(
             theme,
@@ -285,13 +289,19 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
             .flex_wrap()
             .items_center()
             .justify_between()
-            .gap(tokens::SPACE_8)
-            .pb(tokens::SPACE_10)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pb(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_10,
+            ))
             .child(
                 div()
-                    .text_size(tokens::FONT_26)
-                    .font_weight(tokens::FONT_WEIGHT_EXTRA_BOLD.into())
-                    .text_color(theme.fg)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_26))
+                    .font_weight(taskmanager_ui::theme_binding::font_weight(
+                        tokens::FONT_WEIGHT_EXTRA_BOLD,
+                    ))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                     .child(i18n::t("system.title")),
             )
             .child(actions),
@@ -303,10 +313,14 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
         .id("system-scroll")
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_10)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
         .flex_1()
         .min_h(px(0.0))
-        .pr(tokens::SPACE_16);
+        .pr(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_16,
+        ));
     // Hero: product name (hostname/OS fallbacks) + a dim identity subtitle.
     let hero_title = hw
         .product_name
@@ -354,7 +368,6 @@ pub fn render_system(theme: &Theme, data: SystemViewData<'_>, entity: Entity<Roo
                 theme,
                 &memory_inventory,
                 units,
-                entity.clone(),
             ));
         }
     }

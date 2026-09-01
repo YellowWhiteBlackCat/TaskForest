@@ -62,6 +62,9 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::DiagnosticBundle => SurfaceDecision::Unsupported {
             reason: "the Bevy shape has no diagnostic-bundle surface",
         },
+        ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Unsupported {
+            reason: "the Bevy shape has no current-window PNG capture surface",
+        },
         ProductIntent::FirstRunSetup => SurfaceDecision::Unsupported {
             reason: "the Bevy first-run setup route is not wired",
         },

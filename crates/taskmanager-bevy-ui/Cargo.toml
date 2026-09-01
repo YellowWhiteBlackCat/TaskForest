@@ -30,6 +30,9 @@ taskmanager-assets = { path = "../taskmanager-assets" }
 # feature stays off: this frontend consumes only the toolkit-neutral path
 # table plus the checked-in RGBA bitmaps in taskmanager-assets.
 taskmanager-icons = { path = "../taskmanager-icons", default-features = false }
+# Shared CLI composition harness (ADR-051): the product bin hands this
+# frontend's capability set to `taskmanager_cli::run`.
+taskmanager-cli = { path = "../taskmanager-cli" }
 # AccessKit node/role vocabulary for the semantic row nodes. Must match the
 # version the locked bevy stack (bevy_a11y / accesskit_winit) resolves to —
 # one 0.24.1 across the workspace, same resolution as the accessibility-linux
@@ -145,3 +148,11 @@ path = "src/lib.rs"
 [[bin]]
 name = "taskforest-b"
 path = "src/main.rs"
+
+[features]
+# A release artifact is a platform variant, never a hardware-vendor variant
+# (ADR-006/051): the guard lives in the product, so a stripped release build
+# fails fast instead of shipping a vendor-specific binary.
+default = ["hardware-all"]
+hardware-all = ["taskmanager-app-host/hardware-all"]
+nvidia = ["taskmanager-app-host/nvidia"]

@@ -11,6 +11,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import uuid
 import zlib
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -180,10 +181,50 @@ def read_metadata(path: Path) -> dict[str, str]:
         if not separator or not key or key in values:
             raise EvidenceError(f"invalid metadata line: {raw_line!r}")
         values[key] = value
-    required = {"run_id", "captured_at", "git_head", "worktree", "rust", "niri", "command"}
+    required = {
+        "run_id",
+        "run_uuid",
+        "frontend",
+        "run_root",
+        "runtime_root",
+        "supervisor_pid",
+        "cgroup_path",
+        "dbus_address_sha256",
+        "captured_at",
+        "git_head",
+        "worktree",
+        "rust",
+        "niri",
+        "command",
+        "dbus_isolation",
+    }
     if missing := required - values.keys():
         raise EvidenceError(f"metadata missing fields: {sorted(missing)}")
     return values
+
+
+def validate_run_identity(metadata: dict[str, str], repo_root: Path, metadata_path: Path) -> None:
+    try:
+        run_uuid = uuid.UUID(metadata["run_uuid"])
+    except ValueError as error:
+        raise EvidenceError("metadata run_uuid is not a UUID") from error
+    if metadata["run_id"] != metadata["run_uuid"]:
+        raise EvidenceError("run_id and run_uuid differ")
+    if metadata["frontend"] != "gpui":
+        raise EvidenceError("metadata frontend is not gpui")
+    run_root = safe_child(repo_root, metadata["run_root"])
+    if run_root != metadata_path.resolve().parent:
+        raise EvidenceError("metadata run_root does not own the metadata file")
+    if not metadata["supervisor_pid"].isdigit() or int(metadata["supervisor_pid"]) < 1:
+        raise EvidenceError("metadata supervisor_pid is invalid")
+    runtime_root = Path(metadata["runtime_root"])
+    if not runtime_root.is_absolute() or not runtime_root.name.startswith("taskforest-capture-gpui-"):
+        raise EvidenceError("metadata runtime_root is not GPUI-private")
+    cgroup_path = Path(metadata["cgroup_path"])
+    if cgroup_path.name != f"taskforest-capture-{run_uuid.hex}":
+        raise EvidenceError("metadata cgroup_path is not owned by this run UUID")
+    if "/sys/fs/cgroup/" not in f"{cgroup_path}/":
+        raise EvidenceError("metadata cgroup_path is outside cgroup v2")
 
 
 def validate_source_manifest(path: Path, root: Path) -> None:
@@ -320,6 +361,13 @@ def validate_bundle(args: argparse.Namespace) -> dict[str, object]:
     metadata = read_metadata(args.metadata)
     repo_root = args.repo_root.resolve()
     screenshots = args.screenshots.resolve()
+    validate_run_identity(metadata, repo_root, args.metadata)
+
+    if (
+        metadata.get("niri_host") == "kwin-wayland-virtual"
+        and metadata.get("dbus_isolation") != "private-session"
+    ):
+        raise EvidenceError("background Niri evidence must use a private D-Bus session")
 
     if args.source_manifest is not None:
         if metadata.get("source_scope") != "gpui":
@@ -412,9 +460,11 @@ def validate_bundle(args: argparse.Namespace) -> dict[str, object]:
             raise EvidenceError(f"{name}: provenance differs from metadata")
         if row["worktree"] != metadata["worktree"] or row["captured_at"] != metadata["captured_at"]:
             raise EvidenceError(f"{name}: run identity differs from metadata")
-        marker_paths = {
-            f"target/screenshot-evidence/{metadata['run_id']}/capture-markers.log"
-        }
+        try:
+            expected_marker_receipt = args.markers.resolve().relative_to(repo_root).as_posix()
+        except ValueError as error:
+            raise EvidenceError("marker receipt is outside the repository") from error
+        marker_paths = {expected_marker_receipt}
         if row["marker_receipt"] not in marker_paths:
             raise EvidenceError(f"{name}: marker receipt path is not canonical for this run")
 
@@ -486,6 +536,7 @@ def validate_bundle(args: argparse.Namespace) -> dict[str, object]:
         "status": "pass",
         "validated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "run_id": metadata["run_id"],
+        "run_uuid": metadata["run_uuid"],
         "git_head": metadata["git_head"],
         "worktree": metadata["worktree"],
         "rust": metadata["rust"],

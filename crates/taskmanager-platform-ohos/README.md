@@ -46,3 +46,10 @@ cargo check --locked --target aarch64-unknown-linux-ohos -p taskmanager-platform
 The crate is not yet connected to `taskmanager-platform-native` or any
 frontend. That connection belongs after the first verified OHOS provider and
 the application-data path/context boundary exist.
+
+## Module map
+
+```text
+src/lib.rs                     OpenHarmony placeholder; CPU/memory telemetry deferred as
+                               capability absence per ADR-043 (typed Unsupported)
+```

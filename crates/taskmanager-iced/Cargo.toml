@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.97.1"
 license = "Apache-2.0"
-description = "Iced desktop frontend for the TaskForest native system monitor (ADR-027/028)"
+description = "Iced desktop frontend product (taskforest-i) for the TaskForest native system monitor (ADR-027/028)"
 readme = "README.md"
 publish = false
 
@@ -65,7 +65,7 @@ taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-shell = { path = "../taskmanager-shell" }
 taskmanager-icons = { path = "../taskmanager-icons", default-features = false }
-taskmanager-theme = { path = "../taskmanager-theme", features = ["iced"] }
+taskmanager-theme = { path = "../taskmanager-theme" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 # The bundled font bytes (ADR-026 fonts policy): the composition edge (run.rs)
 # registers Roboto Mono + MiSans VF into iced's font database, the same
@@ -74,8 +74,16 @@ taskmanager-assets = { path = "../taskmanager-assets" }
 # The Iced event loop consumes the bundled fonts; native composition remains in
 # the toolkit-neutral app host.
 
-# ADR-029: no binary target — the single `taskmanager` binary compiles this
-# frontend in under the `ui-iced` feature.
+# Shared CLI composition harness (ADR-051): the product bin hands this
+# frontend's capability set to `taskmanager_cli::run`.
+taskmanager-cli = { path = "../taskmanager-cli" }
+
+[features]
+# A release artifact is a platform variant, never a hardware-vendor variant
+# (ADR-006/051); the guard lives in this product's lib.
+default = ["hardware-all"]
+hardware-all = ["taskmanager-app-host/hardware-all"]
+nvidia = ["taskmanager-app-host/nvidia"]
 
 # Keep Iced's Windows renderer on the same `windows` 0.58 family as its
 # wgpu-hal 27 DX12 path.  gpu-allocator 0.27 accepts 0.53..=0.58, so Cargo
@@ -98,3 +106,7 @@ taskmanager-telemetry-store = { path = "../taskmanager-telemetry-store" }
 [lib]
 name = "taskmanager_iced"
 path = "src/lib.rs"
+
+[[bin]]
+name = "taskforest-i"
+path = "src/main.rs"

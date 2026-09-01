@@ -46,6 +46,10 @@ the lower document layers.
   typed, and observable; unavailable data is never fabricated as zero or success.
 - Frontends never read OS sources directly. Blocking collection stays off the UI thread;
   rendering and keyboard paths consume the same cached projection.
+- Conditional compilation is a platform-axis mechanism only (ADR-051). Each frontend is
+  an independent product crate with its own binary over the shared `taskmanager-cli`
+  harness; the workspace carries no `ui-*` features, and shared layers never gate code
+  on a frontend identity.
 - Use the owned theme/component layer, toolkit-neutral contracts, typed layout tokens,
   and the `foo.rs` + `foo/` module shape; do not add `foo/mod.rs`.
 - Windows telemetry, tests, and helpers never use PowerShell or another command interpreter.
@@ -56,17 +60,21 @@ the lower document layers.
 
 ## Authority route
 
-- Start at [docs/README.md](docs/README.md), then read the relevant current charter.
+- Start at [docs/README.md](docs/README.md), then read the relevant current charter;
+  task-type routing and document layering live there.
 - Read [docs/ARCH.md](docs/ARCH.md), [docs/STATE_OWNERSHIP.md](docs/STATE_OWNERSHIP.md),
-  [docs/STANDARDS.md](docs/STANDARDS.md), and [docs/QUALITY_GATES.md](docs/QUALITY_GATES.md).
+  [docs/STANDARDS.md](docs/STANDARDS.md), [docs/QUALITY_GATES.md](docs/QUALITY_GATES.md);
+  house terminology is defined in [docs/GLOSSARY.md](docs/GLOSSARY.md).
+- For responsive or dense UI layout work, follow [docs/ELASTIC_LAYOUT_PLAYBOOK.md](docs/ELASTIC_LAYOUT_PLAYBOOK.md) and the affected UI/component charter before editing the renderer.
 - Read [docs/PERMISSION_MODEL.md](docs/PERMISSION_MODEL.md), the affected crate README,
-  and any relevant [ADR](adr/) before changing trust or platform boundaries.
+  and relevant [ADR](adr/) via the [adr/README.md](adr/README.md) index, never the
+  directory top-to-bottom, before changing trust or platform boundaries.
 
 ## Working protocol
 
-- Preserve unrelated work. Cargo uses `.tmp/`, the shared `target/`, and at most four jobs;
-  every test execution uses `cargo nextest ... -j 4`, except doctests, which use
-  `cargo test --doc ... -j 4`. The quick test-runner policy gate enforces this rule.
+- Preserve unrelated work. Cargo uses `.tmp/`, shared `target/`, and at most four jobs; tests use `cargo nextest ... -j 4` (doctests use `cargo test --doc ... -j 4`), enforced by the quick gate.
 - Routine work may proceed on `main` until the owner rescinds mainline mode.
 - Before completion, run the quick gate and report pass/fail/skip with relevant evidence.
+- Every visible layout change must complete the elastic-layout playbook: derive slot budgets, admit
+  lower content as whole groups, protect bottom/right edges, and run headless bounds plus real capture.
 - Keep commits focused. Never publish `.private/`, generated host receipts, or live captures.

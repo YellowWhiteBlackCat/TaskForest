@@ -1,8 +1,11 @@
-use super::*;
 use taskmanager_application::GpuEngineRowsSession;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineRowsSnapshot};
-use taskmanager_platform_contract::RequestId;
+use taskmanager_core::core::identity::DeviceId;
+use taskmanager_core::core::metrics::{GpuEngineKind, GpuEngineMetric, GpuEngineRowsSnapshot};
+use taskmanager_platform_contract::{CapabilityStatus, RequestId};
+use taskmanager_shell::presentation::gpu_engine_rows::{
+    GpuEngineRowsPresentation, present_gpu_engine_rows,
+};
 
 fn device() -> DeviceId {
     DeviceId::new("gpu:0")

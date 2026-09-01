@@ -63,7 +63,7 @@ pub(crate) fn device_status_footer<'a>(
             ])
             .style(move |_| {
                 use iced::widget::container::Style;
-                let accent = taskmanager_theme::iced::color(theme_snapshot.accent);
+                let accent = crate::theme_binding::color(theme_snapshot.accent);
                 Style {
                     background: Some(iced::Background::Color(iced::Color { a: 0.12, ..accent })),
                     border: iced::Border {
@@ -71,7 +71,7 @@ pub(crate) fn device_status_footer<'a>(
                         width: 0.0,
                         radius: f32::from(palette.control_radius).into(),
                     },
-                    text_color: Some(taskmanager_theme::iced::color(theme_snapshot.fg)),
+                    text_color: Some(crate::theme_binding::color(theme_snapshot.fg)),
                     ..Style::default()
                 }
             })

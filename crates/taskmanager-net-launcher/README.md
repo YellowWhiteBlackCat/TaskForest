@@ -27,3 +27,9 @@ additionally admits only a uid-0 peer via `SO_PEERCRED` before receiving
 Authorization, helper identity, denial, timeout and descriptor handoff must
 remain visible to the caller. Package/polkit checks and the live on-box handoff
 receipt are separate; absence of the latter keeps the feature partial.
+
+## Module map
+
+```text
+src/main.rs   single-purpose network launcher helper
+```

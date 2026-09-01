@@ -23,6 +23,17 @@ pub(super) fn apply_root_persisted_projection(
     next.appearance.text_rendering = text_rendering_from_token(&cfg.text_rendering);
     next.appearance.language = cfg.language.as_deref().and_then(i18n::Language::from_code);
     next.startup_page = SharedString::from(startup_page_from_token(&cfg.startup_page));
+    // Window-frame policy: normalize the persisted token through the typed
+    // preference (unknown values fail closed to System) and keep the
+    // session-side enum in step so the render-time outcome check always
+    // compares the ACTUAL request against the granted fact. This path only
+    // records the preference; re-requesting the mode on the live window is
+    // the Settings control's job (it owns a Window handle).
+    let decorations_pref = crate::gpui_app::chrome::WindowDecorationsPreference::from_config_token(
+        &cfg.window_decorations,
+    );
+    next.window_decorations = SharedString::from(decorations_pref.config_token());
+    view.window_decorations_pref = decorations_pref;
     next.devices = DeviceVisibilityPreferences {
         cpu: cfg.show_cpu,
         memory: cfg.show_memory,

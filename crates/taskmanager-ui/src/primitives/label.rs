@@ -134,7 +134,9 @@ impl RenderOnce for PaletteLabel {
         } else {
             self.palette.fg
         };
-        let mut element = div().text_color(color).child(self.text);
+        let mut element = div()
+            .text_color(crate::theme_binding::hsla(color))
+            .child(self.text);
         match self.size {
             LabelSize::Small => element = element.text_xs(),
             LabelSize::Regular => element = element.text_sm(),

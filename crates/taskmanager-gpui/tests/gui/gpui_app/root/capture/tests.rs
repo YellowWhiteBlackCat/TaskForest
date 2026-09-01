@@ -11,10 +11,12 @@ mod scenario_fixtures;
 const PROCESSES_OBSERVED_AT_MS: u64 = 1_700_000_000_000;
 
 use super::{
-    CaptureEvidence, CaptureProcessAction, CaptureScenario, DashboardState, ProcessBatchAction,
-    ProcessDetailsSection, ProcessInsightsState, ProcessItem, ProcessTerminationAction, ServiceId,
-    SystemHealthCaptureOutcome, SystemSection, SystemSnapshot, TopPage,
+    CaptureEvidence, CaptureMode, CaptureProcessAction, CaptureScenario, DashboardState,
+    ProcessBatchAction, ProcessDetailsSection, ProcessItem, ProcessTerminationAction, ServiceId,
+    SystemHealthCaptureOutcome, SystemSection, SystemSnapshot, TopPage, WindowCaptureChain,
+    WindowCaptureSchedule,
 };
+use crate::gpui_app::process_insights::ProcessInsightsState;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
 use taskmanager_core::core::startup::{StartupImpactEvidence, StartupImpactUnknownReason};
@@ -23,10 +25,27 @@ use taskmanager_core::core::{ScalarObservation, SmartAvailability};
 impl CaptureEvidence {
     pub(super) fn for_test(scenario: Option<CaptureScenario>) -> Self {
         Self {
-            enabled: true,
+            mode: CaptureMode::Enabled,
             scenario,
             ..Self::default()
         }
+    }
+
+    pub(super) fn for_window_capture_test() -> Self {
+        Self {
+            mode: CaptureMode::Enabled,
+            window_capture_schedule: WindowCaptureSchedule::AwaitingFrame,
+            window_capture_chain: WindowCaptureChain::Active,
+            ..Self::default()
+        }
+    }
+
+    pub(crate) fn mark_test_ui_data_ready(&mut self) {
+        self.mark_ui_data_ready();
+    }
+
+    pub(crate) fn mark_test_telemetry_ready(&mut self) {
+        self.mark_telemetry_ready();
     }
 }
 
@@ -104,6 +123,10 @@ fn scenario_tokens_parse_strictly() {
         ),
         ("settings-zero-gray", CaptureScenario::SettingsZeroGray),
         (
+            "settings-permission-center",
+            CaptureScenario::SettingsPermissionCenter,
+        ),
+        (
             "apps-search-highlight",
             CaptureScenario::AppsSearchHighlight,
         ),
@@ -168,7 +191,7 @@ fn process_selection_capture_targets_the_visible_application_aggregate() {
             .expect("fixture identity"),
         ))
     );
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
 }
 
 #[test]
@@ -185,7 +208,7 @@ fn keyboard_capture_waits_for_live_data_and_observed_input_focus() {
     );
     assert!(evidence.keyboard_focus_requested());
     evidence.mark_keyboard_focus_ready();
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
 }
 
 #[test]
@@ -202,7 +225,7 @@ fn settings_switch_capture_waits_for_data_and_marks_only_after_focus() {
     );
     assert!(evidence.settings_switch_focus_requested());
     evidence.mark_settings_switch_focus_ready();
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.settings_switch_focus_requested());
 }
 
@@ -220,10 +243,84 @@ fn settings_zero_gray_capture_waits_for_data_and_marks_only_after_focus() {
     );
     assert!(evidence.settings_zero_gray_requested());
     evidence.mark_settings_zero_gray_ready();
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     evidence.mark_settings_zero_gray_ready();
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.settings_zero_gray_requested());
+}
+
+#[test]
+fn settings_permission_center_capture_waits_for_data_and_marks_after_layout() {
+    let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::SettingsPermissionCenter));
+    assert!(!evidence.settings_permission_center_requested());
+    let mut snapshot = SystemSnapshot::default();
+    evidence.on_snapshot(&mut snapshot);
+    let mut processes = vec![ProcessItem::default()];
+    assert!(
+        evidence
+            .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
+            .is_none()
+    );
+    assert!(evidence.settings_permission_center_requested());
+    evidence.mark_settings_permission_center_ready(false);
+    assert!(!evidence.scenario_ready());
+    evidence.mark_settings_permission_center_ready(true);
+    assert!(evidence.scenario_ready());
+    assert!(!evidence.settings_permission_center_requested());
+}
+
+#[test]
+fn window_capture_capture_waits_for_native_completion_before_marking_ready() {
+    let mut evidence = CaptureEvidence::for_window_capture_test();
+    assert!(!evidence.window_capture_requested());
+
+    let mut snapshot = SystemSnapshot::default();
+    evidence.on_snapshot(&mut snapshot);
+    let mut processes = vec![ProcessItem::default()];
+    assert!(
+        evidence
+            .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
+            .is_none()
+    );
+    assert!(evidence.window_capture_requested());
+
+    assert!(evidence.schedule_window_capture_frame());
+    assert!(!evidence.window_capture_requested());
+    assert!(evidence.schedule_window_capture_submission());
+    assert!(!evidence.window_capture_submission_requested());
+    assert!(evidence.window_capture_settling());
+    evidence.mark_window_capture_settled();
+    assert!(evidence.window_capture_submission_requested());
+    evidence.mark_window_capture_submitted();
+    assert!(!evidence.scenario_ready());
+    evidence.mark_window_capture_ready();
+    assert!(evidence.scenario_ready());
+}
+
+#[test]
+fn window_capture_failure_is_terminal_and_never_retries() {
+    let mut evidence = CaptureEvidence::for_window_capture_test();
+    let mut snapshot = SystemSnapshot::default();
+    evidence.on_snapshot(&mut snapshot);
+    let mut processes = vec![ProcessItem::default()];
+    evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
+
+    assert!(evidence.schedule_window_capture_frame());
+    assert!(evidence.schedule_window_capture_submission());
+    evidence.mark_window_capture_settled();
+    assert!(evidence.window_capture_submission_requested());
+
+    evidence.mark_window_capture_failed();
+    assert!(!evidence.window_capture_requested());
+    assert!(!evidence.window_capture_submission_requested());
+    assert!(!evidence.window_capture_settling());
+    assert!(!evidence.scenario_ready());
+
+    evidence.mark_window_capture_failed();
+    evidence.mark_window_capture_ready();
+    assert!(!evidence.window_capture_requested());
+    assert!(!evidence.window_capture_submission_requested());
+    assert!(!evidence.scenario_ready());
 }
 
 #[test]
@@ -242,9 +339,9 @@ fn sidebar_hidden_capture_waits_for_live_data_and_requires_hidden_projection() {
     assert!(evidence.sidebar_hidden_requested());
 
     evidence.mark_sidebar_hidden_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_sidebar_hidden_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.sidebar_hidden_requested());
 }
 
@@ -264,9 +361,9 @@ fn sidebar_edit_capture_waits_for_live_data_and_requires_edit_projection() {
     assert!(evidence.sidebar_edit_requested());
 
     evidence.mark_sidebar_edit_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_sidebar_edit_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.sidebar_edit_requested());
 }
 
@@ -286,9 +383,9 @@ fn telemetry_paused_capture_waits_for_live_data_and_requires_paused_projection()
     assert!(evidence.telemetry_paused_requested());
 
     evidence.mark_telemetry_paused_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_telemetry_paused_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.telemetry_paused_requested());
 }
 
@@ -308,9 +405,9 @@ fn system_about_capture_waits_for_live_data_and_requires_open_projection() {
     assert!(evidence.system_about_requested());
 
     evidence.mark_system_about_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_system_about_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.system_about_requested());
 }
 
@@ -330,9 +427,9 @@ fn mc07_capture_readiness_case_about_capture_waits_for_live_data_and_requires_op
     assert!(evidence.about_requested());
 
     evidence.mark_about_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_about_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.about_requested());
 }
 
@@ -366,9 +463,9 @@ fn first_run_capture_waits_for_live_data_and_uses_fixed_fixture_values() {
     );
 
     evidence.mark_first_run_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_first_run_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.first_run_requested());
 }
 
@@ -385,7 +482,7 @@ fn apps_zero_gray_capture_keeps_zero_values_measured_and_fixture_bounded() {
             .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
             .is_none()
     );
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert_eq!(processes.len(), 2);
     assert!(processes.iter().all(|process| {
         process.current_cpu_percentage() == Some(0.0)
@@ -430,9 +527,9 @@ fn apps_group_capture_keeps_a_bounded_expanded_fixture_after_refresh() {
     }));
 
     evidence.mark_apps_group_expanded_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_apps_group_expanded_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.apps_group_expanded_requested());
 
     let before = processes.len();
@@ -480,9 +577,9 @@ fn apps_identity_matrix_fixture_keeps_three_validated_target_shapes() {
     }
 
     evidence.mark_apps_identity_matrix_ready(false);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.mark_apps_identity_matrix_ready(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     let before = processes.len();
     assert!(
         evidence
@@ -544,7 +641,7 @@ fn health_scenarios_wait_for_exact_visible_fixture_state() {
             ),
             scenario == CaptureScenario::SmartSelfTestConfirm
         );
-        assert!(evidence.scenario_ready);
+        assert!(evidence.scenario_ready());
     }
 }
 
@@ -571,7 +668,7 @@ fn dynamic_device_capture_installs_battery_and_fan_fixture_after_readiness() {
             .iter()
             .any(|reading| reading.quantity() == &taskmanager_core::core::SensorQuantity::FanSpeed)
     );
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.on_dynamic_device_state(&mut page, &mut power_supplies, &mut sensors,));
 }
 
@@ -581,7 +678,7 @@ fn partition_capture_installs_mounted_and_unmounted_children() {
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
 
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert_eq!(snapshot.disks.len(), 1);
     assert_eq!(snapshot.disks[0].partitions.len(), 3);
     assert_eq!(
@@ -632,8 +729,8 @@ fn smart_scenario_prepares_explicit_missing_tool_state() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::SmartMissingTool));
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
-    assert!(evidence.telemetry_ready);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.telemetry_ready());
+    assert!(evidence.scenario_ready());
     assert_eq!(snapshot.disks.len(), 1);
     let disk = &snapshot.disks[0];
     assert_eq!(disk.smart_availability, SmartAvailability::MissingTool);
@@ -649,10 +746,10 @@ fn mc02_hotplug_case_hotplug_capture_exposes_disconnect_after_stable_identity_wa
     evidence.on_snapshot(&mut snapshot);
     assert_eq!(snapshot.disks[0].device_id, "disk:wwid:capture-hotplug");
     assert_eq!(snapshot.disks[0].device_generation.get(), 1);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     evidence.on_snapshot(&mut snapshot);
     assert!(snapshot.disks.is_empty());
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
 
     // The disconnect projection remains stable while the screenshot runner
     // settles. A later provider refresh must then publish the same stable
@@ -703,7 +800,7 @@ fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
     assert_eq!(gpu.device_id, "gpu:capture:engine-inventory");
     assert_eq!(gpu.device_generation, DeviceGeneration::new(1));
     assert_eq!(gpu.engines.len(), 2);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
 
     let mut processes = Vec::new();
     evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
@@ -714,7 +811,7 @@ fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
         &ingestor,
         snapshot.timestamp_ms,
     ));
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     let aggregate_samples =
         taskmanager_shell::presentation::gpu_chart_metric::gpu_chart_metric_history(
             &live_graph,
@@ -768,6 +865,6 @@ fn system_npu_capture_waits_for_fixture_layout_and_visible_scroll_before_marker(
 
     assert!(evidence.schedule_system_npu_scroll());
     evidence.mark_system_npu_scroll_applied(true);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert!(!evidence.system_npu_layout_requested());
 }

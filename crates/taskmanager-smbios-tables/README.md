@@ -28,3 +28,10 @@ by headless byte-fixture tests:
 cargo nextest run -p taskmanager-smbios-tables -j 4 --all-targets
 cargo clippy -p taskmanager-smbios-tables --all-targets -- -D warnings
 ```
+
+## Module map
+
+```text
+src/lib.rs   the ONE pure SMBIOS record parser, shared by the unprivileged
+             DMI probe and the pkexec-escalated helper (types 0/1/2/17)
+```

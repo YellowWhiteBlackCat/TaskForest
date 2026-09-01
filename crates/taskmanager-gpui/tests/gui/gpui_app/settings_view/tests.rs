@@ -13,18 +13,26 @@ mod tests_inner {
     };
 
     use super::super::fonts::effective_font_summary;
+    use super::super::window_decorations_section;
     use super::super::{render_settings, startup_page_row};
+    use crate::gpui_app::chrome::WindowDecorationsPreference;
     use crate::gpui_app::first_run::{self, FirstRunPhase};
     use crate::gpui_app::graph::GraphSettings;
     use crate::gpui_app::root::RootView;
     use crate::gpui_app::settings_view::init_data_points_slider;
     use crate::gpui_app::settings_view::refresh::init_slider_entity;
     use taskmanager_application::i18n;
+    use taskmanager_core::ProviderId;
     use taskmanager_core::core::config::{
         STARTUP_PAGE_PROCESSES, STARTUP_PAGE_REMEMBER, TEXT_RENDERING_PLATFORM_DEFAULT,
+        WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_SYSTEM,
     };
+    use taskmanager_core::core::failure::FailureKind;
     use taskmanager_core::core::setup::SetupScriptInfo;
     use taskmanager_core::core::units::UnitPreferences;
+    use taskmanager_platform_contract::{
+        CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
+    };
     use taskmanager_theme::tokens;
     use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
     use taskmanager_ui::inputs::switch::SwitchState;
@@ -37,14 +45,29 @@ mod tests_inner {
         /// renders only the Startup-page row so its select is the only
         /// tab stop in the window.
         full: bool,
+        /// Renders ONLY the window-frame row so its select is the only tab
+        /// stop in the window (the full dialog can scroll the Appearance
+        /// group out of the laid-out viewport).
+        deco_only: bool,
     }
 
     impl Render for SettingsHarness {
         fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
             let root = self.root_view.clone();
             let full = self.full;
+            let deco_only = self.deco_only;
             let content = self.root_view.update(cx, move |v, cx| {
-                if full {
+                if deco_only {
+                    window_decorations_section(
+                        &v.theme,
+                        root,
+                        SharedString::from(
+                            v.presentation_snapshot().window_decorations().to_owned(),
+                        ),
+                    )
+                    .expect("deco_only harness mode is Linux-only; the section must render there")
+                    .into_any_element()
+                } else if full {
                     // The harness owns the per-window slider entity, exactly
                     // like `RootView::render`'s settings call site does.
                     let slider_entity = v
@@ -82,6 +105,17 @@ mod tests_inner {
                             .entry(id)
                             .or_insert_with(|| cx.new(|cx| SwitchState::new(cx)));
                     }
+                    let gpu_engine_index = match v.selected {
+                        crate::gpui_app::sidebar::SelectedDevice::Gpu(index)
+                            if index < v.system_snapshot().gpu.len() =>
+                        {
+                            Some(index)
+                        }
+                        _ if !v.system_snapshot().gpu.is_empty() => Some(0),
+                        _ => None,
+                    };
+                    let gpu_engine_device_id =
+                        gpu_engine_index.map(|index| v.gpu_engine_rows_device_id(index));
                     render_settings(
                         {
                             let presentation = v.presentation_snapshot();
@@ -126,8 +160,30 @@ mod tests_inner {
                                 color_scheme: appearance.color_scheme,
                                 text_rendering: appearance.text_rendering,
                                 startup_page: presentation.startup_page,
+                                window_decorations: SharedString::from(WINDOW_DECORATIONS_SYSTEM),
                                 slider_entity,
                                 switches: &v.settings_switches,
+                                privilege_center: super::super::PrivilegeCenterInputs {
+                                    gpu_engine_state: v.shell.gpu_engine_rows_state(),
+                                    gpu_engine_capability: v
+                                        .projection()
+                                        .capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES),
+                                    gpu_engine_device_id,
+                                    gpu_engine_index,
+                                    smbios_state: v.shell.smbios_memory_state(),
+                                    smbios_capability: v
+                                        .projection()
+                                        .capability_status(&CapabilityId::TELEMETRY_MEMORY_SMBIOS),
+                                    rapl_state: v.shell.rapl_power_state(),
+                                    rapl_capability: v.projection().capability_status(
+                                        &CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+                                    ),
+                                    msr_state: v.shell.msr_readout_state(),
+                                    msr_capability: v
+                                        .projection()
+                                        .capability_status(&CapabilityId::TELEMETRY_CPU_MSR),
+                                },
+                                permission_center_only: false,
                             }
                         },
                         cx,
@@ -142,7 +198,11 @@ mod tests_inner {
                     .into_any_element()
                 }
             });
-            div().p(tokens::SPACE_4).child(content)
+            div()
+                .p(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_4,
+                ))
+                .child(content)
         }
     }
 
@@ -156,7 +216,11 @@ mod tests_inner {
             let row = root.read_with(cx, |view, _| {
                 first_run::render_settings_row(&view.theme, root.clone())
             });
-            div().p(tokens::SPACE_4).child(row)
+            div()
+                .p(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_4,
+                ))
+                .child(row)
         }
     }
 
@@ -178,6 +242,7 @@ mod tests_inner {
         let (_, window) = cx.add_window_view(|_window, cx| SettingsHarness {
             root_view: cx.new(|cx| RootView::new(Theme::dark(), cx)),
             full: true,
+            deco_only: false,
         });
         window.update(|window, cx| window.draw(cx).clear());
 
@@ -231,6 +296,149 @@ mod tests_inner {
         );
     }
 
+    /// Optional helper-backed fields are controlled from one Settings section;
+    /// the page renderers do not need to expose one authorization button per
+    /// missing field.
+    #[gpui::test]
+    async fn settings_permission_center_lists_each_registered_lane(cx: &mut TestAppContext) {
+        let root_view = cx.new(|cx| RootView::new(Theme::dark(), cx));
+        root_view.update(cx, |view, _cx| {
+            let mut gpu = taskmanager_core::core::metrics::GpuMetrics::new(
+                "gpu:settings-test",
+                "Settings GPU",
+            );
+            gpu.device_generation = taskmanager_core::core::DeviceGeneration::new(1);
+            view.system_snapshot_mut_for_test().gpu = vec![gpu];
+            view.shell
+                .apply_capability_snapshot(CapabilitySnapshot::from_descriptors([
+                    CapabilityDescriptor {
+                        id: CapabilityId::TELEMETRY_GPU_ENGINES,
+                        status: CapabilityStatus::PermissionRequired,
+                        providers: vec![ProviderId::borrowed("fixture.gpu")],
+                        observed_at_ms: 1,
+                        last_success_at_ms: None,
+                    },
+                    CapabilityDescriptor {
+                        id: CapabilityId::TELEMETRY_MEMORY_SMBIOS,
+                        status: CapabilityStatus::PermissionRequired,
+                        providers: vec![ProviderId::borrowed("fixture.smbios")],
+                        observed_at_ms: 1,
+                        last_success_at_ms: None,
+                    },
+                    CapabilityDescriptor {
+                        id: CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+                        status: CapabilityStatus::PermissionRequired,
+                        providers: vec![ProviderId::borrowed("fixture.rapl")],
+                        observed_at_ms: 1,
+                        last_success_at_ms: None,
+                    },
+                    CapabilityDescriptor {
+                        id: CapabilityId::TELEMETRY_CPU_MSR,
+                        status: CapabilityStatus::PermissionRequired,
+                        providers: vec![ProviderId::borrowed("fixture.msr")],
+                        observed_at_ms: 1,
+                        last_success_at_ms: None,
+                    },
+                ]));
+        });
+        let settings_root = root_view.clone();
+        let (_, window) = cx.add_window_view(|_window, _cx| SettingsHarness {
+            root_view: settings_root,
+            full: true,
+            deco_only: false,
+        });
+        window.update(|window, cx| window.draw(cx).clear());
+
+        window
+            .debug_bounds("tm-settings-privilege-center")
+            .expect("registered helper lanes must share one permission center");
+        for id in ["gpu-engines", "smbios-memory", "rapl-power", "msr-readouts"] {
+            let row: &'static str =
+                Box::leak(format!("tm-settings-privilege-row:{id}").into_boxed_str());
+            let action: &'static str =
+                Box::leak(format!("tm-settings-privilege-action:{id}").into_boxed_str());
+            assert!(window.debug_bounds(row).is_some(), "missing {row}");
+            assert!(window.debug_bounds(action).is_some(), "missing {action}");
+        }
+    }
+
+    /// The central surface must not collapse a typed unsupported provider or a
+    /// failed provider into the generic unavailable label. Only the two
+    /// actionable states retain an authorize target.
+    #[gpui::test]
+    async fn settings_permission_center_keeps_failure_classes_distinct(cx: &mut TestAppContext) {
+        let root_view = cx.new(|cx| RootView::new(Theme::dark(), cx));
+        root_view.update(cx, |view, _cx| {
+            let mut gpu = taskmanager_core::core::metrics::GpuMetrics::new(
+                "gpu:settings-state-test",
+                "Settings state GPU",
+            );
+            gpu.device_generation = taskmanager_core::core::DeviceGeneration::new(1);
+            view.system_snapshot_mut_for_test().gpu = vec![gpu];
+            view.shell
+                .apply_capability_snapshot(CapabilitySnapshot::from_descriptors([
+                    CapabilityDescriptor {
+                        id: CapabilityId::TELEMETRY_GPU_ENGINES,
+                        status: CapabilityStatus::Unsupported,
+                        providers: vec![ProviderId::borrowed("fixture.gpu")],
+                        observed_at_ms: 1,
+                        last_success_at_ms: None,
+                    },
+                    CapabilityDescriptor {
+                        id: CapabilityId::TELEMETRY_MEMORY_SMBIOS,
+                        status: CapabilityStatus::Degraded(FailureKind::ProviderFault),
+                        providers: vec![ProviderId::borrowed("fixture.smbios")],
+                        observed_at_ms: 1,
+                        last_success_at_ms: None,
+                    },
+                    CapabilityDescriptor {
+                        id: CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+                        status: CapabilityStatus::TemporarilyUnavailable,
+                        providers: vec![ProviderId::borrowed("fixture.rapl")],
+                        observed_at_ms: 1,
+                        last_success_at_ms: None,
+                    },
+                    CapabilityDescriptor {
+                        id: CapabilityId::TELEMETRY_CPU_MSR,
+                        status: CapabilityStatus::PermissionRequired,
+                        providers: vec![ProviderId::borrowed("fixture.msr")],
+                        observed_at_ms: 1,
+                        last_success_at_ms: None,
+                    },
+                ]));
+        });
+
+        let (_, window) = cx.add_window_view(|_window, _cx| SettingsHarness {
+            root_view,
+            full: true,
+            deco_only: false,
+        });
+        window.update(|window, cx| window.draw(cx).clear());
+
+        for id in ["gpu-engines", "smbios-memory", "rapl-power", "msr-readouts"] {
+            let state: &'static str =
+                Box::leak(format!("tm-settings-privilege-state:{id}").into_boxed_str());
+            assert!(
+                window.debug_bounds(state).is_some(),
+                "missing typed state {state}"
+            );
+        }
+        for id in ["gpu-engines", "smbios-memory", "rapl-power"] {
+            let action: &'static str =
+                Box::leak(format!("tm-settings-privilege-action:{id}").into_boxed_str());
+            assert!(
+                window.debug_bounds(action).is_none(),
+                "non-actionable state must not expose {action}"
+            );
+        }
+        assert!(
+            window
+                .debug_bounds("tm-settings-privilege-action:msr-readouts")
+                .is_some(),
+            "permission-required state must expose the single authorize action"
+        );
+    }
+
     /// Optional setup is discoverable from Settings, but it only becomes a
     /// modal surface after an explicit user activation.
     #[gpui::test]
@@ -248,6 +456,7 @@ mod tests_inner {
             let (_, settings_window) = cx.add_window_view(|_window, _cx| SettingsHarness {
                 root_view: root_view.clone(),
                 full: true,
+                deco_only: false,
             });
             settings_window.update(|window, cx| window.draw(cx).clear());
 
@@ -280,6 +489,7 @@ mod tests_inner {
         let (_, window) = cx.add_window_view(|_window, cx| SettingsHarness {
             root_view: cx.new(|cx| RootView::new(Theme::dark(), cx)),
             full: true,
+            deco_only: false,
         });
         window.update(|window, cx| window.draw(cx).clear());
         let light = window
@@ -371,6 +581,7 @@ mod tests_inner {
         let win = cx.add_window(|_window, _cx| SettingsHarness {
             root_view: root_view.clone(),
             full: true,
+            deco_only: false,
         });
         let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
         vcx.update(|window, cx| window.draw(cx).clear());
@@ -406,6 +617,7 @@ mod tests_inner {
         let win = cx.add_window(|_window, _cx| SettingsHarness {
             root_view: root_view.clone(),
             full: false,
+            deco_only: false,
         });
         let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
         vcx.update(|window, cx| window.draw(cx).clear());
@@ -459,6 +671,69 @@ mod tests_inner {
                 v.presentation_snapshot().startup_page() == STARTUP_PAGE_REMEMBER
             }),
             "confirming the Remember-last option must record the remember token"
+        );
+    }
+
+    /// The window-frame select records the typed preference through the REAL
+    /// pipeline (click → dropdown menu → option activation → token update +
+    /// live `Window::request_decorations`), re-arming the honest-outcome
+    /// latch for each new request. Linux-only: the control is hidden on
+    /// platforms whose toolkit ignores decoration requests.
+    #[cfg(target_os = "linux")]
+    #[gpui::test]
+    async fn window_decorations_select_records_the_preference_and_rearms_the_latch(
+        cx: &mut TestAppContext,
+    ) {
+        let root_view = cx.new(|cx| RootView::new(Theme::dark(), cx));
+        let win = cx.add_window(|_window, _cx| SettingsHarness {
+            root_view: root_view.clone(),
+            full: false,
+            deco_only: true,
+        });
+        let mut vcx = gpui::VisualTestContext::from_window(win.into(), cx);
+        vcx.update(|window, cx| window.draw(cx).clear());
+
+        let trigger = vcx
+            .debug_bounds("window-decorations:trigger")
+            .expect("the window-frame select must render on Linux");
+        vcx.simulate_mouse_move(
+            trigger.center(),
+            None::<gpui::MouseButton>,
+            Default::default(),
+        );
+        vcx.simulate_click(trigger.center(), Default::default());
+        vcx.update(|window, cx| window.draw(cx).clear());
+        assert!(
+            vcx.debug_bounds("tm-popup").is_some(),
+            "clicking the select trigger must open the menu"
+        );
+
+        // The menu cursor starts unselected; the first Down lands on the
+        // FIRST option, so three downs + Enter activate the third (Custom).
+        vcx.simulate_keystrokes("down down down enter");
+        vcx.update(|window, cx| window.draw(cx).clear());
+        assert!(
+            root_view.read_with(cx, |v, _| {
+                v.presentation_snapshot().window_decorations() == WINDOW_DECORATIONS_CUSTOM
+                    && v.window_decorations_pref == WindowDecorationsPreference::Custom
+                    && !v.decoration_outcome_reported
+            }),
+            "confirming Custom must record the token, seed the session preference, and re-arm the outcome latch"
+        );
+
+        // Reopen and restore the System sentinel (negotiation default): the
+        // first Up lands on the LAST option, so three ups reach the first.
+        vcx.update(|window, cx| window.draw(cx).clear());
+        press_enter(&mut vcx);
+        vcx.update(|window, cx| window.draw(cx).clear());
+        vcx.simulate_keystrokes("up up up enter");
+        vcx.update(|window, cx| window.draw(cx).clear());
+        assert!(
+            root_view.read_with(cx, |v, _| {
+                v.presentation_snapshot().window_decorations().is_empty()
+                    && v.window_decorations_pref == WindowDecorationsPreference::System
+            }),
+            "confirming System must restore the empty sentinel and the negotiation default"
         );
     }
 

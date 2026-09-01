@@ -570,11 +570,11 @@ fn boot_evidence_strip<'a>(
     let data = boot_evidence_strip_data(evidence)?;
     let muted = theme::muted_text_color(theme_snapshot);
     let failed_color = if data.failed_units_danger {
-        taskmanager_theme::iced::color(theme_snapshot.danger)
+        crate::theme_binding::color(theme_snapshot.danger)
     } else {
         muted
     };
-    let fg = taskmanager_theme::iced::color(theme_snapshot.fg);
+    let fg = crate::theme_binding::color(theme_snapshot.fg);
     Some(
         row![
             row![

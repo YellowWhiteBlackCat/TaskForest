@@ -218,6 +218,16 @@ pub struct Config {
     /// keeps the full-motion default.
     #[serde(default = "default_motion")]
     pub motion: String,
+    /// Window-frame policy token: `""` = follow the compositor negotiation
+    /// ([`WINDOW_DECORATIONS_SYSTEM`]), `"native"` = prefer the OS-drawn
+    /// titlebar ([`WINDOW_DECORATIONS_NATIVE`]), `"custom"` = prefer the
+    /// app-drawn titlebar with transparent rounded corners
+    /// ([`WINDOW_DECORATIONS_CUSTOM`]). Opaque on the core side; the frontend
+    /// maps the token to its toolkit's decoration request (unknown values
+    /// fail closed to System), the same split as `skin`/`mode`. A missing
+    /// field (an old config file) keeps the negotiation default.
+    #[serde(default)]
+    pub window_decorations: String,
     /// Sidebar device-category toggles (Performance page).
     pub show_cpu: bool,
     pub show_memory: bool,
@@ -394,6 +404,9 @@ impl Default for Config {
             // Full-motion default: an old config file (and a cold start)
             // keeps the pre-preference animated behavior.
             motion: MOTION_NORMAL.to_string(),
+            // Compositor-negotiation default: an old config file (and a cold
+            // start) keep the request-native + follow-the-grant behavior.
+            window_decorations: WINDOW_DECORATIONS_SYSTEM.to_string(),
             show_cpu: true,
             show_memory: true,
             show_disks: true,
@@ -593,6 +606,26 @@ pub const MOTION_NONE: &str = "none";
 fn default_motion() -> String {
     MOTION_NORMAL.to_string()
 }
+
+// ── window-frame (decoration) policy tokens ────────────────────────────────
+// Stable string tokens round-tripped via [`Config::window_decorations`]. The
+// desktop frontend maps them onto its toolkit's decoration request; core only
+// carries the opaque strings (same split as `skin`/`mode`). An unknown token
+// fails closed to System at the consumer, never a panic.
+
+/// Follow the compositor negotiation (also the serde + [`Default`] value):
+/// request native decorations, then react to what the window system actually
+/// grants, falling back to the app-drawn titlebar when refused. An old config
+/// file (empty token) keeps exactly this behavior.
+pub const WINDOW_DECORATIONS_SYSTEM: &str = "";
+/// Prefer the OS-drawn titlebar (KDE/KWin, macOS, Windows). A compositor that
+/// cannot draw server-side decorations (GNOME/Mutter) will refuse; the
+/// frontend then keeps the audited CSD fallback and reports that honestly.
+pub const WINDOW_DECORATIONS_NATIVE: &str = "native";
+/// Prefer the app-drawn titlebar with transparent rounded corners and
+/// in-app minimize/maximize/close controls. Only offered on platforms whose
+/// toolkit honors a client-decoration request.
+pub const WINDOW_DECORATIONS_CUSTOM: &str = "custom";
 
 // ── row-density tokens ─────────────────────────────────────────────────────
 // Stable string tokens round-tripped via [`Config::density`]. The GPUI layer

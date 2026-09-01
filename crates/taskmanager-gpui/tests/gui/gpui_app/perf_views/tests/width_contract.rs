@@ -14,6 +14,7 @@
 use super::*;
 use crate::gpui_app::perf_views::PERF_MAIN_VIEWPORT_SELECTOR;
 use crate::gpui_app::root::responsive::PERFORMANCE_STATS_MIN_WIDTH;
+use taskmanager_core::core::hardware::CpuType;
 use taskmanager_core::core::metrics::SystemSnapshot;
 
 fn contract_page_snapshot() -> SystemSnapshot {
@@ -135,6 +136,33 @@ async fn sub_floor_width_degrades_through_the_ladder_without_overflow(cx: &mut T
     }
 }
 
+/// The narrow-width details fallback is still a fixed composition: the rail
+/// may move below the main viewport, but neither sibling gets a scroll owner
+/// and both remain inside the window when the vertical budget can support them.
+#[gpui::test]
+async fn stacked_details_rail_stays_fixed_and_inside_the_window(cx: &mut TestAppContext) {
+    let mut vcx = draw_perf_page_at(cx, SelectedDevice::Nic(0), 560.0, 780.0);
+    let main = vcx
+        .debug_bounds("tm-perf-main-viewport")
+        .expect("stacked Performance main viewport");
+    let stats = vcx
+        .debug_bounds("tm-perf-stats-surface")
+        .expect("stacked Performance stats surface");
+    assert!(
+        stats.origin.y >= main.bottom() - px(0.5),
+        "stacked stats must follow the main viewport instead of covering it: main={main:?}, stats={stats:?}"
+    );
+    assert!(
+        stats.bottom() <= px(780.0) + px(0.5),
+        "stacked stats must stay inside the window: {stats:?}"
+    );
+    assert!(
+        vcx.debug_bounds("tm-perf-left-scrollbar").is_none()
+            && vcx.debug_bounds("tm-perf-stats-scrollbar").is_none(),
+        "stacked Performance must remain non-scrolling outside the device selector"
+    );
+}
+
 /// The network page's vital line paints readable at every width. Geometry
 /// only — the truncation-poisoning regression this complements is pinned by
 /// the niri screenshot matrix (see the module doc).
@@ -169,6 +197,13 @@ fn seed_16_core_cpu(cx: &mut TestAppContext, width: f32, height: f32) -> VisualT
                 ),
                 ..Default::default()
             });
+        v.hardware_mut_for_test().cpu_types = (0..16)
+            .map(|index| match index {
+                0..=3 => CpuType::Performance,
+                4..=11 => CpuType::Efficient,
+                _ => CpuType::LowPower,
+            })
+            .collect();
         cx.notify();
     });
     draw(cx, win);
@@ -226,6 +261,59 @@ async fn cpu_matrix_hides_whole_below_row_floors_and_headline_fills(cx: &mut Tes
         );
         drop(vcx);
     }
+    // A normal 1280x720 frame must not reserve the full headline ceiling. The
+    // continuous allocator gives the headline only the remaining height, so
+    // the complete small-core matrix still gets a readable slot.
+    {
+        let mut vcx = seed_16_core_cpu(cx, 1280.0, 720.0);
+        assert!(
+            vcx.debug_bounds("tm-cpu-per-core-matrix").is_some(),
+            "the normal 1280x720 frame must retain the per-core matrix"
+        );
+        let headline = vcx
+            .debug_bounds("tm-perf-chart-card:cpu-headline-graph")
+            .expect("normal CPU headline");
+        assert!(
+            headline.size.height < px(200.0),
+            "the normal frame must continuously yield height to the matrix: {headline:?}"
+        );
+        let viewport = vcx
+            .debug_bounds("tm-perf-main-viewport")
+            .expect("normal CPU fixed viewport");
+        let last = vcx
+            .debug_bounds("tm-perf-core:15")
+            .expect("normal CPU final core");
+        assert!(
+            last.bottom() <= viewport.bottom() - px(4.0),
+            "normal CPU matrix must keep its bottom safety band: last={last:?}, viewport={viewport:?}"
+        );
+    }
+}
+
+/// The normal Performance frame keeps a real bottom safety band when the CPU
+/// headline shares its viewport with the per-core matrix. This catches the
+/// regression where a flex section consumed the last pixels and the final
+/// core cards were painted half outside the fixed viewport.
+#[gpui::test]
+async fn cpu_matrix_keeps_the_last_core_inside_the_fixed_viewport(cx: &mut TestAppContext) {
+    let mut vcx = seed_16_core_cpu(cx, 1180.0, 780.0);
+    let viewport = vcx
+        .debug_bounds("tm-perf-main-viewport")
+        .expect("the fixed Performance viewport must render");
+    let headline = vcx
+        .debug_bounds("tm-perf-chart-card:cpu-headline-graph")
+        .expect("the CPU headline must render");
+    let last = vcx
+        .debug_bounds("tm-perf-core:15")
+        .expect("the final CPU core card must render");
+    assert!(
+        headline.size.height <= px(208.0),
+        "the CPU headline must stay compact beside its matrix: {headline:?}"
+    );
+    assert!(
+        last.bottom() <= viewport.bottom() - px(4.0),
+        "the final core card must keep a bottom safety band: last={last:?}, viewport={viewport:?}"
+    );
 }
 
 /// Memory vertical policy (the page's own ladder): the two headline charts
@@ -266,6 +354,16 @@ async fn memory_detail_degrades_text_first_and_keeps_chart_floors(cx: &mut TestA
                 "{selector} squeezed below its floor: {chart:?}"
             );
         }
+        let viewport = vcx
+            .debug_bounds("tm-perf-main-viewport")
+            .expect("memory page fixed viewport");
+        let detail = vcx
+            .debug_bounds("tm-memory-overview-card")
+            .expect("memory detail card");
+        assert!(
+            detail.bottom() <= viewport.bottom() - px(4.0),
+            "memory detail must end before the shared bottom safety band: detail={detail:?}, viewport={viewport:?}"
+        );
         drop(vcx);
     }
     // Narrow column: the prose form is width-gated off (wrapping grows the

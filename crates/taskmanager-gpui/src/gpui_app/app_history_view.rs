@@ -127,7 +127,9 @@ pub fn render_app_history(props: AppHistoryViewProps<'_>) -> Div {
         .min_h(px(0.0))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(header)
         .child(body)
 }
@@ -149,7 +151,9 @@ fn history_table(
         .flex_1()
         .min_h(px(0.0))
         .min_w(px(0.0))
-        .pr(tokens::SPACE_16)
+        .pr(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_16,
+        ))
         .overflow_hidden()
         .child(
             div()
@@ -216,15 +220,17 @@ fn page_header(
     let mut title = div()
         .flex_1()
         .min_w(px(0.0))
-        .text_size(tokens::FONT_18)
-        .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
-        .text_color(theme.fg)
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_18))
+        .font_weight(taskmanager_ui::theme_binding::font_weight(
+            tokens::FONT_WEIGHT_SEMIBOLD,
+        ))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
         .child(i18n::t("history.application.title").to_string());
     if refreshing {
         title = title.child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("history.application.refreshing").to_string()),
         );
     }
@@ -232,7 +238,9 @@ fn page_header(
         .flex()
         .items_center()
         .w_full()
-        .gap(tokens::SPACE_12)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         .debug_selector(|| "tm-app-history-page-header".to_string())
         .child(title)
         .child(windows)
@@ -349,7 +357,7 @@ fn row_for_projected(
         columns,
     );
     if row_index % 2 == 1 {
-        rendered = rendered.bg(theme.zebra_bg());
+        rendered = rendered.bg(taskmanager_ui::theme_binding::fill(theme.zebra_bg()));
     }
     rendered
         .h(px(f32::from(ui_size.body_font_size())
@@ -367,14 +375,16 @@ fn trend_cell_from_samples(
     if samples.iter().filter(|sample| sample.is_finite()).count() >= MIN_TREND_SAMPLES {
         cell.child(elements::sparkline(
             Rc::clone(samples),
-            theme.accent.into(),
+            taskmanager_ui::theme_binding::rgba(theme.accent),
             TREND_W,
             TREND_H,
         ))
     } else {
-        cell.text_size(ui_size.caption_font_size())
-            .text_color(theme.fg_dim)
-            .child(formatting::missing_value())
+        cell.text_size(taskmanager_ui::theme_binding::absolute(
+            ui_size.caption_font_size(),
+        ))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+        .child(formatting::missing_value())
     }
 }
 
@@ -414,14 +424,16 @@ fn row_skeleton_with_count(
         .min_w(px(0.0))
         .flex()
         .items_center()
-        .gap(tokens::SPACE_6)
-        .text_size(if is_header {
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .text_size(taskmanager_ui::theme_binding::absolute(if is_header {
             ui_size.header_font_size()
         } else {
             ui_size.body_font_size()
-        })
-        .text_color(foreground)
-        .font_weight(weight.into())
+        }))
+        .text_color(taskmanager_ui::theme_binding::hsla(foreground))
+        .font_weight(taskmanager_ui::theme_binding::font_weight(weight))
         .child(
             div()
                 .flex_1()
@@ -433,8 +445,10 @@ fn row_skeleton_with_count(
         name_cell = name_cell.child(
             div()
                 .flex_shrink_0()
-                .text_size(ui_size.caption_font_size())
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::absolute(
+                    ui_size.caption_font_size(),
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t(if verified {
                     "history.application.verified"
                 } else {
@@ -493,9 +507,15 @@ fn row_skeleton(
     let trend_label = div()
         .w(px(TREND_W))
         .min_w(px(0.0))
-        .text_size(ui_size.header_font_size())
-        .text_color(if is_header { theme.fg_dim } else { theme.fg })
-        .font_weight(weight.into())
+        .text_size(taskmanager_ui::theme_binding::absolute(
+            ui_size.header_font_size(),
+        ))
+        .text_color(taskmanager_ui::theme_binding::hsla(if is_header {
+            theme.fg_dim
+        } else {
+            theme.fg
+        }))
+        .font_weight(taskmanager_ui::theme_binding::font_weight(weight))
         .child(trend.to_owned());
     row_skeleton_with_count(
         theme,
@@ -522,9 +542,9 @@ fn fixed_cell(
         .w(px(width))
         .min_w(px(0.0))
         .flex_shrink_0()
-        .text_size(font_size)
-        .text_color(foreground)
-        .font_weight(weight.into())
+        .text_size(taskmanager_ui::theme_binding::absolute(font_size))
+        .text_color(taskmanager_ui::theme_binding::hsla(foreground))
+        .font_weight(taskmanager_ui::theme_binding::font_weight(weight))
         .child(label.to_owned())
 }
 

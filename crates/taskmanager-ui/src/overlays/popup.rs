@@ -11,6 +11,7 @@
 
 use std::rc::Rc;
 
+use crate::icons_binding::icon;
 use gpui::prelude::FluentBuilder;
 use gpui::{
     App, AppContext, ClickEvent, Context, DismissEvent, ElementId, Entity, EventEmitter,
@@ -18,7 +19,6 @@ use gpui::{
     ParentElement, Pixels, Point, Render, ScrollHandle, SharedString, StatefulInteractiveElement,
     Styled, Window, actions, anchored, deferred, div, px,
 };
-use taskmanager_icons::icon;
 use taskmanager_theme::{Palette, Theme};
 use taskmanager_ui_contract::IconId;
 
@@ -330,7 +330,7 @@ impl Render for PopupMenuState {
             .max_h(px(360.0))
             .overflow_y_scroll()
             .track_scroll(&scroll_handle)
-            .py(tokens::SPACE_4)
+            .py(crate::theme_binding::definite_length(tokens::SPACE_4))
             .flex_col()
             // Outside-click dismiss.
             .on_mouse_down_out({
@@ -377,15 +377,18 @@ impl Render for PopupMenuState {
         let mut body = menu_body;
         for (ix, entry) in self.items.iter().enumerate() {
             body = match entry {
-                MenuEntry::Separator => {
-                    body.child(div().h_px().my(tokens::SPACE_4).bg(palette.border))
-                }
+                MenuEntry::Separator => body.child(
+                    div()
+                        .h_px()
+                        .my(crate::theme_binding::length(tokens::SPACE_4))
+                        .bg(crate::theme_binding::fill(palette.border)),
+                ),
                 MenuEntry::Label(label) => body.child(
                     div()
-                        .px(tokens::SPACE_12)
-                        .py(tokens::SPACE_6)
+                        .px(crate::theme_binding::definite_length(tokens::SPACE_12))
+                        .py(crate::theme_binding::definite_length(tokens::SPACE_6))
                         .text_sm()
-                        .text_color(palette.fg_muted)
+                        .text_color(crate::theme_binding::hsla(palette.fg_muted))
                         .child(label.clone()),
                 ),
                 MenuEntry::Item(item) => {
@@ -398,17 +401,19 @@ impl Render for PopupMenuState {
                             .flex()
                             .flex_row()
                             .items_center()
-                            .gap(tokens::SPACE_8)
-                            .px(tokens::SPACE_12)
-                            .py(tokens::SPACE_6)
+                            .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
+                            .px(crate::theme_binding::definite_length(tokens::SPACE_12))
+                            .py(crate::theme_binding::definite_length(tokens::SPACE_6))
                             .h(px(26.0))
                             .text_sm()
-                            .text_color(if is_disabled {
+                            .text_color(crate::theme_binding::hsla(if is_disabled {
                                 palette.fg_muted
                             } else {
                                 palette.fg
+                            }))
+                            .when(is_selected, |el| {
+                                el.bg(crate::theme_binding::fill(hover_fill(palette.surface)))
                             })
-                            .when(is_selected, |el| el.bg(hover_fill(palette.surface)))
                             .on_hover({
                                 let state = state.clone();
                                 move |hovering: &bool, _window, cx| {
@@ -447,7 +452,7 @@ impl Render for PopupMenuState {
                                 div().child(
                                     icon(IconId::EndTask)
                                         .size(px(12.0))
-                                        .text_color(palette.accent),
+                                        .text_color(crate::theme_binding::hsla(palette.accent)),
                                 )
                             } else {
                                 div()
@@ -462,19 +467,19 @@ impl Render for PopupMenuState {
             .debug_selector(|| "tm-popup".into())
             .relative()
             .min_w(px(self.min_width))
-            .rounded(palette.panel_radius)
-            .bg(palette.surface)
+            .rounded(crate::theme_binding::absolute(palette.panel_radius))
+            .bg(crate::theme_binding::fill(palette.surface))
             .border_1()
-            .border_color(palette.border)
+            .border_color(crate::theme_binding::hsla(palette.border))
             .shadow_md()
             .child(body)
             .child(
                 div()
                     .occlude()
                     .absolute()
-                    .top(tokens::SPACE_4)
+                    .top(crate::theme_binding::length(tokens::SPACE_4))
                     .right_0()
-                    .bottom(tokens::SPACE_4)
+                    .bottom(crate::theme_binding::length(tokens::SPACE_4))
                     .w(px(SCROLLBAR_WIDTH))
                     .child(
                         Scrollbar::vertical("tm-popup-scrollbar", Rc::new(scroll_handle), palette)

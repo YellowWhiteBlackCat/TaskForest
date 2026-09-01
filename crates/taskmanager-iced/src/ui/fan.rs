@@ -51,7 +51,7 @@ pub(super) fn fan_section(
     let sensors = app.shell.projection().sensors.as_ref();
     let theme_snapshot = app.theme();
     // GPUI parity: the fan family strokes with the CPU token.
-    let color = taskmanager_theme::iced::color(theme_snapshot.cpu);
+    let color = crate::theme_binding::color(theme_snapshot.cpu);
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let rows = match (fan_section_state(sensors), sensors) {
         (tables::ListState::Loading, _) => {

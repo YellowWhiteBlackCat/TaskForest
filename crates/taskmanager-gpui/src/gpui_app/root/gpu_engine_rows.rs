@@ -99,6 +99,13 @@ impl GpuEnginePacingState {
         }
     }
 
+    fn resume(&mut self) -> Option<u64> {
+        let GpuEnginePacingPhase::Bound(binding) = &self.phase else {
+            return None;
+        };
+        Some(self.start(binding.clone()))
+    }
+
     fn is_polling(&self, generation: u64) -> bool {
         matches!(
             &self.phase,
@@ -156,6 +163,20 @@ impl RootView {
         }
     }
 
+    /// Pause the renderer cadence while retaining the accepted helper session.
+    ///
+    /// The authorization center lives outside the Performance page, so leaving
+    /// that page must not close a request session that the user just enabled.
+    /// Explicit disable and device replacement still use
+    /// [`stop_gpu_engine_polling`] and close the session.
+    pub(crate) fn suspend_gpu_engine_polling(&mut self) {
+        self.gpu_engine_pacing.stop(false);
+    }
+
+    pub(crate) fn resume_gpu_engine_polling(&mut self) -> Option<u64> {
+        self.gpu_engine_pacing.resume()
+    }
+
     pub(crate) fn gpu_engine_polling_is_current(&self, generation: u64) -> bool {
         self.gpu_engine_pacing.is_polling(generation)
     }
@@ -202,3 +223,7 @@ impl RootView {
         )
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_gpui_app_root_gpu_engine_rows_tests.rs"]
+mod tests;

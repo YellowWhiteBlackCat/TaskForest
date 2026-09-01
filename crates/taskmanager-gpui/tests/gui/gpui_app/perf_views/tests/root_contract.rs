@@ -29,6 +29,33 @@ fn assert_shared_root_chrome(vcx: &mut VisualTestContext, page: &str) {
             && vcx.debug_bounds("tm-perf-left-scrollbar").is_none(),
         "{page} must not mount a page-local scrolling main column"
     );
+    assert!(
+        vcx.debug_bounds("tm-perf-stats-scrollbar").is_none(),
+        "{page} statistics rail must remain fixed and non-scrolling"
+    );
+    if let Some(surface) = vcx.debug_bounds("tm-perf-stats-surface") {
+        if let Some(panel) = vcx.debug_bounds("tm-perf-stats-panel") {
+            assert!(
+                panel.right() <= surface.right() - px(8.0),
+                "{page} statistics content must honor the rail trailing inset: panel={panel:?}, surface={surface:?}"
+            );
+        }
+        let mut last_row = None;
+        for index in 0..32 {
+            let selector: &'static str =
+                Box::leak(format!("tm-perf-stat:{index}").into_boxed_str());
+            let Some(row) = vcx.debug_bounds(selector) else {
+                break;
+            };
+            last_row = Some(row);
+        }
+        if let Some(last_row) = last_row {
+            assert!(
+                last_row.bottom() <= surface.bottom() - px(4.0),
+                "{page} statistics rows must end inside the fixed rail: last={last_row:?}, surface={surface:?}"
+            );
+        }
+    }
 }
 
 fn contract_snapshot() -> SystemSnapshot {
@@ -483,5 +510,12 @@ async fn chart_tiers_hold_their_height_floors(cx: &mut TestAppContext) {
     assert!(
         secondary.size.height >= px(140.0),
         "secondary tier floor breached: {secondary:?}"
+    );
+    let viewport = vcx
+        .debug_bounds("tm-perf-main-viewport")
+        .expect("battery page fixed viewport");
+    assert!(
+        secondary.bottom() <= viewport.bottom() - px(4.0),
+        "battery secondary chart must end inside the fixed viewport: secondary={secondary:?}, viewport={viewport:?}"
     );
 }

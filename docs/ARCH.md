@@ -9,13 +9,23 @@ layer-shell 并存合同见 [HOST_ARCHITECTURE.md](HOST_ARCHITECTURE.md)。这�
 TaskForest 是 Linux、Windows、macOS 三平台系统监视器。平台能力不同，但共享相同的
 领域语义：数据存在、真实零、缺失、暂时失败、权限不足和不支持必须可区分。
 
-四个前端消费同一应用投影：GPUI、Iced、Ratatui 和 Bevy。GPUI 是当前发布形态；其他
-前端用于受支持的源码构建或实验性开发，不拥有独立业务事实。
+四个前端是四个独立产品：GPUI、Iced、Ratatui 和 Bevy 各自是一个产品 crate 加一个
+二进制（ADR-051），消费同一应用投影。GPUI 是当前发布形态；其他前端用于受支持的
+源码构建或实验性开发，不拥有独立业务事实。
 
 ## 2. 单向依赖与数据流
 
+产品轴在分层之上：四个产品 crate（`taskforest-g`、`taskforest-i`、
+`taskmanager-tui`、`taskforest-b`）各自是"前端 crate + 共享 CLI 组合边
+（`taskmanager-cli`）"，没有第三种产品形态，也没有任何 feature 开关（ADR-051）：
+
 ```text
-frontend
+taskforest-g   taskforest-i   taskmanager-tui   taskforest-b      ← 产品 bin
+  └─────────────── 每个产品一个 [[bin]]，能力以值注入 ───────────────┘
+                          │
+        taskmanager-cli（共享 CLI：解析 / 中性模式 / help / tracing）
+                          │
+frontend (taskmanager-gpui / -iced / -tui / -bevy-ui)
    │ commands / render intent
    ▼
 application ───────► core / shell
@@ -54,7 +64,9 @@ application-owned command/reducer/projection。`taskmanager-app-host` 与
 | `taskmanager-platform-*` | 平台数据源和控制适配器 | 重定义领域语义、制造默认成功 |
 | `taskmanager-platform-runtime` | 调度、并发、背压和事件传递 | UI 生命周期所有权 |
 | `taskmanager-app-host` | 选择适配器并组合应用运行时，发布工具包无关的 surface role 合同 | 新建第二套事实模型、持有 toolkit/native surface |
-| frontend crates | 渲染投影并提交命令 | OS I/O、阻塞采集、业务规则分叉 |
+| `taskmanager-cli` | 共享 CLI 组合边：解析、中性模式、help、tracing；以能力值接收产品差异 | 拥有 UI 生命周期、按前端身份 `cfg`、第二个事实模型 |
+| frontend crates | 渲染投影并提交命令；各自拥有 toolkit 适配（含 theme token → toolkit 类型的映射） | OS I/O、阻塞采集、业务规则分叉 |
+| `taskmanager-gates`（根包） | 承载跨 crate 结构守门套件（tests/logic、tests/performance） | 发布二进制、公开 API、产品 feature |
 | boundary/helper crates | 最小化原生或特权边界 | 把裸句柄、指针或未验证输入传入业务层 |
 
 ## 4. 事实与可用性
@@ -89,7 +101,15 @@ application-owned command/reducer/projection。`taskmanager-app-host` 与
 
 ## 6. 平台与组合
 
-平台选择只发生在组合边界。业务 crate 不以 `cfg(target_os)` 建立第二套产品模型。
+组合有且只有两根轴，规则各一条（ADR-051）：
+
+- **UI 轴用 crate 组合，零 `cfg`**：一个前端是一个产品 crate 加一个 `[[bin]]`，
+  永远不是一个 feature。工作区不存在 `ui-*` feature；共享层（core/application/
+  shell/theme/icons/ui-contract）不出现任何按前端身份编译的代码。产品差异由
+  `taskmanager-cli` 以普通值注入（能力 handler），不是编译期分叉。
+- **平台轴用 `cfg(target_os)`，且只发生在组合边界**：per-OS 平台 crate +
+  `taskmanager-platform-native` 作为唯一选择点。业务 crate 不以 `cfg(target_os)`
+  建立第二套产品模型。
 
 - Linux adapter 负责 procfs、sysfs、桌面服务和可选 helper；
 - Windows adapter 通过经审计的原生边界 crate 使用 Windows API；

@@ -295,18 +295,26 @@ pub(super) fn render_process_batch_dialog(
             scroll,
             palette: theme.palette(),
         },
-        div().flex().flex_col().gap(tokens::SPACE_3).children(
-            intent.targets.iter().take(shown).map(|target| {
+        div()
+            .flex()
+            .flex_col()
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_3,
+            ))
+            .children(intent.targets.iter().take(shown).map(|target| {
                 div()
-                    .text_size(tokens::FONT_12)
-                    .text_color(theme.fg)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                     .child(format!("{} (PID {})", target.name, target.pid))
-            }),
-        ),
+            })),
     )
-    .p(tokens::SPACE_8)
-    .rounded(tokens::control_radius(theme))
-    .bg(theme.sidebar_card_bg);
+    .p(taskmanager_ui::theme_binding::definite_length(
+        tokens::SPACE_8,
+    ))
+    .rounded(taskmanager_ui::theme_binding::absolute(
+        tokens::control_radius(theme),
+    ))
+    .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg));
     if hidden > 0 {
         targets = targets.child(elements::more_rows_hint(theme, hidden));
     }
@@ -314,11 +322,13 @@ pub(super) fn render_process_batch_dialog(
         .w(px(420.0))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_12)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_13)
-                .text_color(theme.fg)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(message),
         )
         .child(targets)
@@ -326,7 +336,9 @@ pub(super) fn render_process_batch_dialog(
             div()
                 .flex()
                 .justify_end()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(elements::pill(
                     theme,
                     "process-batch-cancel",

@@ -304,18 +304,18 @@ if maybe nextest-core; then
     run_stage nextest-core standard cargo nextest run --locked --workspace --all-targets --features test-support -j 4 --profile ci $exclude_platform_adapters -E 'not (binary(throughput) or binary(logic) or binary(gui) or binary(performance))'
 fi
 if maybe nextest-logic; then
-    run_stage nextest-logic standard cargo nextest run --locked -p taskmanager --test logic --features test-support -j 4 --profile ci
+    run_stage nextest-logic standard cargo nextest run --locked -p taskmanager-gates --test logic --features test-support -j 4 --profile ci
 fi
 if maybe nextest-gui; then
-    run_stage nextest-gui standard cargo nextest run --locked -p taskmanager --test gui --features test-support -j 4 --profile ci
+    run_stage nextest-gui standard cargo nextest run --locked -p taskmanager-gpui --test gui --features test-support -j 4 --profile ci
 fi
 if maybe nextest-perf; then
-    run_stage nextest-perf standard cargo nextest run --locked -p taskmanager --test performance --features test-support -j 4 --profile ci
+    run_stage nextest-perf standard cargo nextest run --locked -p taskmanager-gates --test performance --features test-support -j 4 --profile ci
 fi
 if maybe live-smoke; then
     # One real-collector tick on the Windows host (host-neutral invariants
     # only). Fixtures prove parsers; this stage proves the composition edge.
-    run_stage live-smoke standard cargo nextest run --locked -p taskmanager --test logic --features test-support -j 4 --profile ci -E 'test(live_smoke_)'
+    run_stage live-smoke standard cargo nextest run --locked -p taskmanager-gates --test logic --features test-support -j 4 --profile ci -E 'test(live_smoke_)'
 fi
 if maybe ui-route; then
     # UI diffs must carry the headless GUI matrix: pure core changes skip it.
@@ -332,14 +332,14 @@ if maybe rustdoc; then
     run_stage rustdoc standard env RUSTDOCFLAGS="-D warnings" cargo doc --locked --workspace --no-deps -j 4 $exclude_platform_adapters
 fi
 if maybe shape-tui; then
-    # Shape checks are compile-scope on Windows, mirroring the portability job.
-    run_stage shape-tui standard cargo check --locked --workspace --all-targets --no-default-features --features hardware-all,ui-tui -j 4 $exclude_platform_adapters
+    # ADR-051: per-product compile checks, mirroring the portability job.
+    run_stage shape-tui standard cargo check --locked -p taskmanager-tui --all-targets -j 4 $exclude_platform_adapters
 fi
 if maybe shape-iced; then
-    run_stage shape-iced standard cargo check --locked --workspace --all-targets --no-default-features --features hardware-all,ui-iced -j 4 $exclude_platform_adapters
+    run_stage shape-iced standard cargo check --locked -p taskmanager-iced --all-targets -j 4 $exclude_platform_adapters
 fi
-if maybe ui-gpui-minimal; then
-    run_stage ui-gpui-minimal standard cargo check --locked --no-default-features --features ui-gpui -j 4
+if maybe gpui-reduced; then
+    run_stage gpui-reduced standard cargo check --locked -p taskmanager-gpui --lib --no-default-features -j 4
 fi
 if [[ "$skip_release" == "1" ]]; then
     skip_stage release standard "--skip-release"

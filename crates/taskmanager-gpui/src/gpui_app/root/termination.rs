@@ -210,27 +210,41 @@ pub(super) fn render_process_termination_dialog(
         .w(px(420.0))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_14)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_14,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_13)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
                 .line_height(relative(1.45))
-                .text_color(if is_high_risk { theme.danger } else { theme.fg })
+                .text_color(taskmanager_ui::theme_binding::hsla(if is_high_risk {
+                    theme.danger
+                } else {
+                    theme.fg
+                }))
                 .child(message),
         );
     if intent.action == ProcessTerminationAction::EndProcessTree {
         let mut preview = div()
             .flex()
             .flex_col()
-            .gap(tokens::SPACE_3)
-            .p(tokens::SPACE_8)
-            .rounded(tokens::control_radius(theme))
-            .bg(theme.sidebar_card_bg)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_3,
+            ))
+            .p(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .rounded(taskmanager_ui::theme_binding::absolute(
+                tokens::control_radius(theme),
+            ))
+            .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
             .child(
                 div()
-                    .text_size(tokens::FONT_11)
-                    .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                    .text_color(theme.fg_dim)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                    .font_weight(taskmanager_ui::theme_binding::font_weight(
+                        tokens::FONT_WEIGHT_BOLD,
+                    ))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                     .child(
                         i18n::t("proc.tree_descendants")
                             .replace("{count}", &intent.descendant_count().to_string()),
@@ -239,16 +253,16 @@ pub(super) fn render_process_termination_dialog(
         for target in intent.descendants_leaf_first.iter().take(5) {
             preview = preview.child(
                 div()
-                    .text_size(tokens::FONT_12)
-                    .text_color(theme.fg)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                     .child(format!("{} (PID {})", target.name, target.pid)),
             );
         }
         if intent.descendant_count() > 5 {
             preview = preview.child(
                 div()
-                    .text_size(tokens::FONT_11)
-                    .text_color(theme.fg_dim)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                     .child(
                         i18n::t("proc.more_descendants")
                             .replace("{count}", &(intent.descendant_count() - 5).to_string()),
@@ -263,7 +277,9 @@ pub(super) fn render_process_termination_dialog(
                 .flex()
                 .flex_row()
                 .justify_end()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(elements::pill(
                     theme,
                     "process-termination-cancel",

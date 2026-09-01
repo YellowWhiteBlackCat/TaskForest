@@ -111,23 +111,31 @@ pub(super) fn device_row(
                 cx,
             );
         }))
-        .mx(tokens::SPACE_8)
-        .px(tokens::SPACE_10)
-        .py(tokens::SPACE_7)
-        .rounded(tokens::card_radius(theme))
+        .mx(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::card_radius(theme),
+        ))
         // Static idle fill; the hover/selection fills are painted by an
         // animated overlay UNDER the content (keyed 120ms transition) — a
         // descendant of the focusable shell, never wrapping it (a keyed
         // animation id that changes between frames on a focused element's
         // ancestor path breaks gpui 0.2.2 key dispatch; the same absolute-
         // child pattern as the process-row selection rail).
-        .bg(Color::TRANSPARENT)
+        .bg(taskmanager_ui::theme_binding::fill(Color::TRANSPARENT))
         .relative()
         .child(
             div().absolute().inset_0().child(
                 div()
                     .size_full()
-                    .rounded(tokens::card_radius(theme))
+                    .rounded(taskmanager_ui::theme_binding::absolute(
+                        tokens::card_radius(theme),
+                    ))
                     .with_animation(
                         ("sidebar-row-bg", hover_state_key(is_sel, is_hov)),
                         hover_animation(),
@@ -139,18 +147,24 @@ pub(super) fn device_row(
                             } else {
                                 idle_bg
                             };
-                            el.bg(bg)
+                            el.bg(taskmanager_ui::theme_binding::fill(bg))
                         },
                     ),
             ),
         )
         .flex()
         .items_center()
-        .gap(tokens::SPACE_10)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
         .child(
-            taskmanager_icons::icon(icon)
+            taskmanager_ui::icons_binding::icon(icon)
                 .size(px(16.0))
-                .text_color(if is_sel { base } else { theme.fg_dim }),
+                .text_color(taskmanager_ui::theme_binding::hsla(if is_sel {
+                    base
+                } else {
+                    theme.fg_dim
+                })),
         )
         .child(
             div()
@@ -164,7 +178,7 @@ pub(super) fn device_row(
                 .child(graph_element(
                     (ElementId::from("tm-sidebar-graph"), key.clone()),
                     samples,
-                    base.into(),
+                    taskmanager_ui::theme_binding::rgba(base),
                     opts,
                 )),
         )
@@ -181,27 +195,31 @@ pub(super) fn device_row(
                 // children render at natural height + the column's stretched width,
                 // and truncate() only fires for genuinely over-long device names.
                 .min_w(px(0.0))
-                .gap(tokens::SPACE_1)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_1,
+                ))
                 .child(
                     div()
                         .truncate()
-                        .text_size(tokens::FONT_13)
-                        .font_weight(tokens::FONT_WEIGHT_STRONG.into())
-                        .text_color(theme.fg)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                        .font_weight(taskmanager_ui::theme_binding::font_weight(
+                            tokens::FONT_WEIGHT_STRONG,
+                        ))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                         .child(heading),
                 )
                 .child(
                     div()
                         .truncate()
-                        .text_size(tokens::FONT_11)
-                        .text_color(theme.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                         .child(cap1),
                 )
                 .child(
                     div()
                         .truncate()
-                        .text_size(tokens::FONT_11)
-                        .text_color(theme.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                         .child(cap2),
                 ),
         );
@@ -228,7 +246,7 @@ pub(super) fn device_row(
                 },
             )
             .drag_over(move |mut style, _: &SidebarDeviceDrag, _, _| {
-                style.border_color = Some(accent.into());
+                style.border_color = Some(taskmanager_ui::theme_binding::hsla(accent));
                 style
             })
             .on_drop(cx.listener(move |view, drag: &SidebarDeviceDrag, _, cx| {
@@ -248,9 +266,13 @@ pub(super) fn device_row(
                         cx.stop_propagation();
                         view.set_sidebar_device_override(&override_key, !visible, cx);
                     }))
-                    .text_color(if visible { theme.accent } else { theme.fg_dim })
+                    .text_color(taskmanager_ui::theme_binding::hsla(if visible {
+                        theme.accent
+                    } else {
+                        theme.fg_dim
+                    }))
                     .child(
-                        taskmanager_icons::icon(if visible {
+                        taskmanager_ui::icons_binding::icon(if visible {
                             IconId::CircleCheck
                         } else {
                             IconId::CircleX

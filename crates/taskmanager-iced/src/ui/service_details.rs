@@ -257,12 +257,12 @@ pub(crate) fn dependency_panel<'a>(
                             .padding([2, 6])
                             .style(move |_| container::Style {
                                 background: Some(iced::Background::Color(
-                                    taskmanager_theme::iced::color(app.theme().shade),
+                                    crate::theme_binding::color(app.theme().shade),
                                 )),
                                 border: iced::Border {
                                     radius: 3.0.into(),
                                     width: 1.0,
-                                    color: taskmanager_theme::iced::color(
+                                    color: crate::theme_binding::color(
                                         app.theme().palette().border,
                                     ),
                                 },
@@ -377,7 +377,7 @@ fn logs_panel<'a>(
                         value_id,
                         line.clone(),
                         f32::from(tokens::FONT_11),
-                        taskmanager_theme::iced::color(theme_snapshot.palette().fg),
+                        crate::theme_binding::color(theme_snapshot.palette().fg),
                     )
                     .selection_owner(is_owner)
                     .into()
@@ -439,6 +439,6 @@ fn value_or_dash(value: &str) -> String {
 
 fn warning_panel_style(theme_snapshot: &Theme) -> iced::widget::container::Style {
     let mut style = theme::panel_style(theme_snapshot);
-    style.border.color = taskmanager_theme::iced::color(theme_snapshot.palette().warning);
+    style.border.color = crate::theme_binding::color(theme_snapshot.palette().warning);
     style
 }

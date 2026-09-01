@@ -324,18 +324,24 @@ fn render_row(
         .on_click(cx.listener(move |_view, _event, _window, cx| {
             cx.write_to_clipboard(ClipboardItem::new_string(copy_value.clone()));
         }))
-        .px(tokens::SPACE_10)
-        .py(tokens::SPACE_8)
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .flex()
         .items_center()
         .justify_between()
-        .gap(tokens::SPACE_12)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         .child(
             elements::truncated_text(i18n::t(row.label_key))
                 .flex_1()
                 .min_w(px(0.0))
-                .text_size(tokens::FONT_13)
-                .text_color(theme.fg),
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg)),
         )
         .child(
             div()
@@ -344,8 +350,8 @@ fn render_row(
                 .min_w(px(0.0))
                 .truncate()
                 .text_right()
-                .text_size(tokens::FONT_13)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(
                     SelectableText::new(
                         ("system-about-selectable-value", index),
@@ -371,7 +377,12 @@ pub fn render_system_about(
 ) -> SystemAboutView {
     let groups = groups(hardware, appearance);
     let copy_text = copy_all_text(&groups);
-    let mut content = div().flex().flex_col().gap(tokens::SPACE_12);
+    let mut content = div()
+        .flex()
+        .flex_col()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ));
     let mut row_index = 0;
     for (group_index, group) in groups.iter().enumerate() {
         let mut rows = div().flex().flex_col();
@@ -383,15 +394,19 @@ pub fn render_system_about(
             div()
                 .flex()
                 .flex_col()
-                .gap(tokens::SPACE_4)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_4,
+                ))
                 .child(
                     div()
                         .debug_selector(move || {
                             format!("tm-system-about-section-title-{group_index}")
                         })
-                        .pl(tokens::SPACE_2)
-                        .text_size(tokens::FONT_12)
-                        .text_color(theme.fg_dim)
+                        .pl(taskmanager_ui::theme_binding::definite_length(
+                            tokens::SPACE_2,
+                        ))
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                         .child(i18n::t(group.title_key)),
                 )
                 .child(
@@ -399,8 +414,10 @@ pub fn render_system_about(
                         .debug_selector(move || {
                             format!("tm-system-about-section-card-{group_index}")
                         })
-                        .rounded(tokens::card_radius(theme))
-                        .bg(theme.sidebar_card_bg)
+                        .rounded(taskmanager_ui::theme_binding::absolute(
+                            tokens::card_radius(theme),
+                        ))
+                        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
                         .overflow_hidden()
                         .child(rows),
                 ),
@@ -409,8 +426,8 @@ pub fn render_system_about(
     if groups.is_empty() {
         content = content.child(
             div()
-                .text_size(tokens::FONT_13)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("system_about.unavailable")),
         );
     }

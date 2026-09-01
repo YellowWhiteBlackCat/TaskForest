@@ -75,14 +75,14 @@ GPUI Entity, Ratatui widget, Iced widget or native provider selection.
   same `FeedbackState`; there is no parallel feedback holder. Single-process
   completions are emitted once by the batch fold and reduced into the notice
   lifecycle rather than retained in a second projection slot.
-- `ProcessRowKey` distinguishes structural category rows, PID-less application
+- `ProcessRowId` distinguishes structural category rows, PID-less application
   aggregates and real process rows. An application root PID is a live tree
   lookup key; batch submission freezes its exact leaf-first descendant scope.
-- `ProcessRowId`/`ProcessRowAnchor` are the forward-compatible row seam:
+- `ProcessRowId`/`ProcessRowAnchor` are the row identity seam:
   process-backed rows use the shell-owned `ProcessRowIdentity` wrapper around
   the core `ProcessIdentity`, while
-  `ProcessProjectionGeneration` rejects stale renderer geometry. The existing
-  `ProcessRowKey` remains as a compatibility adapter until frontend migration.
+  `ProcessProjectionGeneration` rejects stale renderer geometry. There is no
+  compatibility row-key API.
 - `src/presentation.rs` and `src/viewmodel.rs` expose renderer-neutral projections, including the
   product-first GPU display identity that keeps hardware names separate from driver names.
 - GPU history retains typed utilization/scalar/engine query windows. The shared chart-metric
@@ -107,3 +107,17 @@ accessibility summaries. Keep frame commit, stale/current semantics and source
 notices typed. Frontends request quit with an explicit reason and only read
 `should_quit()`; they render feedback through the read-only projection API.
 Verify shell behavior independently of a compositor.
+
+## Module map
+
+```text
+src/app.rs                    SystemProjectionStore: one instance per frontend track
+src/app/batch_fold/           event folding: failure seed → domain systems → revision
+│                             → alert watermark → feedback
+src/app/direct_track/         process inventory, sorting, selection
+src/app/request_sessions.rs   per-track typed request-session instances
+src/app/lifecycle.rs          ShellLifecycleState (quit and feedback)
+src/app/effects.rs (+ effect_dispatch.rs)   effect generation and dispatch
+src/app/confirmation_gates.rs  process_control.rs  process_requests.rs
+src/app/frame.rs  input_mode.rs  selection.rs  search_input.rs
+```

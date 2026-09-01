@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.97.1"
 license = "Apache-2.0"
-description = "Ratatui terminal frontend for the TaskForest native system monitor"
+description = "Ratatui terminal frontend product (taskmanager-tui) for the TaskForest native system monitor"
 publish = false
 
 [dependencies]
@@ -19,6 +19,16 @@ taskmanager-application = { path = "../taskmanager-application" }
 taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
 taskmanager-assets = { path = "../taskmanager-assets" }
+# Shared CLI composition harness (ADR-051): the product bin hands this
+# frontend's capability set to `taskmanager_cli::run`.
+taskmanager-cli = { path = "../taskmanager-cli" }
+
+[features]
+# A release artifact is a platform variant, never a hardware-vendor variant
+# (ADR-006/051); the guard lives in this product's lib.
+default = ["hardware-all"]
+hardware-all = ["taskmanager-app-host/hardware-all"]
+nvidia = ["taskmanager-app-host/nvidia"]
 
 [dev-dependencies]
 taskmanager-test-support = { path = "../taskmanager-test-support" }
@@ -29,6 +39,10 @@ taskmanager-telemetry-store = { path = "../taskmanager-telemetry-store" }
 [lib]
 name = "taskmanager_tui"
 path = "src/lib.rs"
+
+[[bin]]
+name = "taskmanager-tui"
+path = "src/main.rs"
 
 # The standalone allocation-budget binary needs its own process-global
 # counting allocator, so it cannot be registered as a library module like

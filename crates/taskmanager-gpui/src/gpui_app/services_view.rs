@@ -262,23 +262,23 @@ impl TableDelegate for ServicesDelegate {
                     _ => theme.fg_dim,
                 };
                 div()
-                    .text_size(tokens::FONT_12)
-                    .text_color(color)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                    .text_color(taskmanager_ui::theme_binding::hsla(color))
                     .child(s.status.as_str().to_string())
             }
             1 => div()
                 .flex()
                 .min_w(px(0.0))
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(div().flex_1().min_w(px(0.0)).truncate().child(
                     crate::gpui_app::elements::highlighted_text(&s.name, &self.query, &self.theme),
                 )),
             _ => div()
                 .flex()
                 .min_w(px(0.0))
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(
                     div()
                         .flex_1()
@@ -474,12 +474,9 @@ pub fn render_services(
         });
         // Table is size_full internally; wrap so it expands to fill the
         // remaining vertical space below the action bar + controls row.
-        let mut body = div()
-            .flex_1()
-            .min_h(px(0.0))
-            .flex()
-            .flex_col()
-            .gap(tokens::SPACE_8);
+        let mut body = div().flex_1().min_h(px(0.0)).flex().flex_col().gap(
+            taskmanager_ui::theme_binding::definite_length(tokens::SPACE_8),
+        );
         if let Some(notice) = list_view::source_notice(
             &theme,
             sources,

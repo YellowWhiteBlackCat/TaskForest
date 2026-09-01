@@ -16,3 +16,10 @@ providers, or expose toolkit widgets to core/application.
 Unavailable desktop accessibility support is typed and visible. Keep the
 semantic tree aligned with the renderer projection; verify with the crate
 tests and the real AT-SPI receipt described in `../../docs/screenshots/README.md`.
+
+## Module map
+
+```text
+src/bridge.rs    AT-SPI (D-Bus) connection and lifecycle
+src/mapping.rs   typed semantic snapshots → AccessKit/Unix roles, states, focus
+```

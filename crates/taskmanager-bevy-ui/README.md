@@ -29,7 +29,7 @@ control verbs, settings persistence across sessions, the tray seam, and
 multi-window composition. Feathers (the official skin system) is not
 adopted — theme tokens are the only skin authority.
 
-## Layout
+## Module map
 
 - `src/app.rs` — the frontend-owned route model (eight pages), the nav rail,
   page mounting, and `ShellTrack`: the SystemParam every page reads the

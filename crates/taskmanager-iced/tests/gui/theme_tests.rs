@@ -1,6 +1,6 @@
 use super::*;
+use crate::theme_binding::{BUNDLED_UI_FONT, mono_font, ui_font, ui_font_weight};
 use iced::Font;
-use taskmanager_theme::iced::{BUNDLED_UI_FONT, mono_font, ui_font, ui_font_weight};
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{FONT_MISANS_VF, HighContrast, LightDark, ResolvedFonts, Skin};
 

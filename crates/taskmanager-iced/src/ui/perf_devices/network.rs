@@ -197,7 +197,7 @@ pub(crate) fn network_section(
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let snapshot = app.shell.projection().snapshot.as_ref();
     let theme_snapshot = app.theme();
-    let color = taskmanager_theme::iced::color(theme_snapshot.network);
+    let color = crate::theme_binding::color(theme_snapshot.network);
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let rows = match (network_section_state(snapshot), snapshot) {
         (tables::ListState::Loading, _) => {
@@ -317,7 +317,7 @@ fn network_block<'a>(
                     value_id,
                     value.to_owned(),
                     13.0,
-                    taskmanager_theme::iced::color(theme_snapshot.palette().fg),
+                    crate::theme_binding::color(theme_snapshot.palette().fg),
                 )
                 .selection_owner(is_owner),
             ]
@@ -340,12 +340,12 @@ fn network_block<'a>(
         // disconnected reads muted, degraded/error states read danger.
         let status_color = match (nic.device_state.status, network_connected(nic)) {
             (DeviceStatus::Healthy, Some(true)) => {
-                taskmanager_theme::iced::color(theme_snapshot.success)
+                crate::theme_binding::color(theme_snapshot.success)
             }
             (DeviceStatus::Healthy, Some(false) | None) => {
                 crate::theme::muted_text_color(theme_snapshot)
             }
-            _ => taskmanager_theme::iced::color(theme_snapshot.gpu),
+            _ => crate::theme_binding::color(theme_snapshot.gpu),
         };
         wifi_items.push(
             text("\u{25CF}")

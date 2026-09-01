@@ -27,7 +27,11 @@ use taskmanager_ui::primitives::card_surface::CardSurface;
 /// snapshot itself is bounded (`max_reported`), but the left column under the
 /// disk graph is not scrollable, so the panel keeps a compact projection;
 /// drill-down reaches the rest.
-const MAX_VISIBLE_ENTRIES: usize = 8;
+const MAX_VISIBLE_ENTRIES: usize = 4;
+/// Mount-target pills are also part of the fixed disk-page lower band. Keep
+/// their intrinsic width from turning a large partition table into a tall
+/// wrapped toolbar.
+const MAX_VISIBLE_MOUNTS: usize = 4;
 
 /// Depth indent per nesting level, in device pixels.
 const DEPTH_INDENT: f32 = 10.0;
@@ -48,7 +52,9 @@ pub(super) fn directory_usage_panel(
         .render()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ));
     #[cfg(any(test, feature = "test-support"))]
     {
         panel = panel.debug_selector(|| "tm-disk-usage-panel".to_string());
@@ -60,8 +66,8 @@ pub(super) fn directory_usage_panel(
     let mut header_right = div();
     if let Some(snapshot) = own {
         header_right = header_right
-            .text_size(tokens::FONT_11)
-            .text_color(theme.fg_dim)
+            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
             .child(status_text(snapshot));
     }
     panel = panel.child(
@@ -69,16 +75,22 @@ pub(super) fn directory_usage_panel(
             .flex()
             .items_center()
             .justify_between()
-            .gap(tokens::SPACE_6)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_6,
+            ))
             .child(
                 div()
                     .flex()
                     .items_center()
-                    .gap(tokens::SPACE_6)
-                    .text_size(tokens::FONT_13)
-                    .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                    .text_color(theme.fg)
-                    .child(taskmanager_icons::icon(IconId::Search).size(px(14.0)))
+                    .gap(taskmanager_ui::theme_binding::definite_length(
+                        tokens::SPACE_6,
+                    ))
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                    .font_weight(taskmanager_ui::theme_binding::font_weight(
+                        tokens::FONT_WEIGHT_BOLD,
+                    ))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
+                    .child(taskmanager_ui::icons_binding::icon(IconId::Search).size(px(14.0)))
                     .child(i18n::t("disk.usage_analysis")),
             )
             .child(header_right),
@@ -95,14 +107,19 @@ pub(super) fn directory_usage_panel(
     if mounts.is_empty() {
         return panel.child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("disk.usage_no_mounts")),
         );
     }
 
-    let mut targets = div().flex().flex_wrap().gap(tokens::SPACE_6);
-    for (index, mount) in &mounts {
+    let mut targets = div()
+        .flex()
+        .flex_wrap()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ));
+    for (index, mount) in mounts.iter().take(MAX_VISIBLE_MOUNTS) {
         let mount_label = mount.clone();
         let mount_root = mount.clone();
         let ent = ent.clone();
@@ -121,6 +138,17 @@ pub(super) fn directory_usage_panel(
             |_hovered, _win, _cx| {},
         );
         targets = targets.child(with_scan_selector(div().child(pill), *index));
+    }
+    if mounts.len() > MAX_VISIBLE_MOUNTS {
+        targets = targets.child(
+            div()
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .child(
+                    i18n::t("disk.usage_more_mounts")
+                        .replace("{count}", &(mounts.len() - MAX_VISIBLE_MOUNTS).to_string()),
+                ),
+        );
     }
     if let Some(snapshot) = own.filter(|s| s.status == DirectoryScanStatus::Scanning) {
         let ent = ent.clone();
@@ -146,8 +174,8 @@ pub(super) fn directory_usage_panel(
     let Some(snapshot) = own else {
         return panel.child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("disk.usage_idle")),
         );
     };
@@ -155,7 +183,12 @@ pub(super) fn directory_usage_panel(
     panel = panel.child(totals_row(theme, snapshot, units));
 
     let visible = snapshot.entries.len().min(MAX_VISIBLE_ENTRIES);
-    let mut list = div().flex().flex_col().gap(tokens::SPACE_4);
+    let mut list = div()
+        .flex()
+        .flex_col()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_4,
+        ));
     for (index, entry) in snapshot.entries.iter().take(visible).enumerate() {
         list = list.child(with_entry_selector(
             entry_row(theme, snapshot, entry, units, ent.clone(), index),
@@ -165,8 +198,8 @@ pub(super) fn directory_usage_panel(
     if snapshot.entries.len() > visible {
         list = list.child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(format!(
                     "+{} {}",
                     snapshot.entries.len() - visible,
@@ -241,8 +274,8 @@ fn totals_row(theme: &Theme, snapshot: &DirectoryUsageSnapshot, units: UnitPrefe
         text.push_str(i18n::t("disk.usage_capped"));
     }
     div()
-        .text_size(tokens::FONT_11)
-        .text_color(theme.fg_dim)
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
         .child(text)
 }
 
@@ -279,12 +312,16 @@ fn entry_row(
         .flex()
         .items_center()
         .justify_between()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(
             div()
                 .flex()
                 .items_center()
-                .gap(tokens::SPACE_4)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_4,
+                ))
                 .min_w(px(0.0))
                 .child(
                     div()
@@ -295,8 +332,8 @@ fn entry_row(
                     div()
                         .flex_1()
                         .min_w(px(0.0))
-                        .text_size(tokens::FONT_12)
-                        .text_color(theme.fg)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                         .child(elements::truncated_text(&label)),
                 ),
         )
@@ -305,17 +342,19 @@ fn entry_row(
                 .flex_shrink_0()
                 .flex()
                 .items_center()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(
                     div()
-                        .text_size(tokens::FONT_11)
-                        .text_color(theme.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                         .child(count_text),
                 )
                 .child(
                     div()
-                        .text_size(tokens::FONT_12)
-                        .text_color(size_color)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(size_color))
                         .child(size_text),
                 ),
         );

@@ -50,7 +50,9 @@ pub(super) fn devices_row(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(device_toggle(
             t,
             ent.clone(),
@@ -118,7 +120,9 @@ fn network_visibility_group(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_4)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_4,
+        ))
         .child(device_toggle(
             t,
             ent.clone(),
@@ -166,18 +170,22 @@ fn network_visibility_group(
             ]
             .into_iter()
             .map(|(id, device, label, on)| {
-                div().pl(tokens::SPACE_16).child(device_toggle(
-                    t,
-                    ent.clone(),
-                    DeviceToggleSpec {
-                        id,
-                        device,
-                        label: i18n::t(label),
-                        on,
-                    },
-                    switches,
-                    cx,
-                ))
+                div()
+                    .pl(taskmanager_ui::theme_binding::definite_length(
+                        tokens::SPACE_16,
+                    ))
+                    .child(device_toggle(
+                        t,
+                        ent.clone(),
+                        DeviceToggleSpec {
+                            id,
+                            device,
+                            label: i18n::t(label),
+                            on,
+                        },
+                        switches,
+                        cx,
+                    ))
             }),
         )
 }
@@ -203,8 +211,8 @@ fn device_toggle(
         .justify_between()
         .child(
             div()
-                .text_size(tokens::FONT_13)
-                .text_color(t.fg)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
                 .child(spec.label),
         )
         .child(

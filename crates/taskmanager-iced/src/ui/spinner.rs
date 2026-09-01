@@ -45,8 +45,8 @@ impl WarmupSpinner {
     /// for the faint track — so every skin restyles the spinner for free.
     pub(crate) fn new(theme: &taskmanager_theme::Theme, phase: Option<f32>) -> Self {
         Self {
-            accent: taskmanager_theme::iced::color(theme.palette().accent),
-            track: taskmanager_theme::iced::color(theme.palette().border),
+            accent: crate::theme_binding::color(theme.palette().accent),
+            track: crate::theme_binding::color(theme.palette().border),
             phase,
         }
     }

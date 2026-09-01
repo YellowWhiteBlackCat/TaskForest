@@ -26,6 +26,7 @@ pub enum ProductIntent {
     ProcessAffinityEditor,
     SmartSelfTest,
     DiagnosticBundle,
+    CurrentWindowScreenshot,
     FirstRunSetup,
     GpuMetricInspection,
     TransientFeedback,
@@ -34,7 +35,7 @@ pub enum ProductIntent {
 impl ProductIntent {
     /// Canonical matrix order. Frontend declarations and reports fold against
     /// this list, never against a hand-maintained per-shape list.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::AlertRuleToggle,
         Self::AlertRuleAuthoring,
         Self::AlertRuleTransfer,
@@ -47,6 +48,7 @@ impl ProductIntent {
         Self::ProcessAffinityEditor,
         Self::SmartSelfTest,
         Self::DiagnosticBundle,
+        Self::CurrentWindowScreenshot,
         Self::FirstRunSetup,
         Self::GpuMetricInspection,
         Self::TransientFeedback,
@@ -68,6 +70,7 @@ impl ProductIntent {
             Self::ProcessAffinityEditor => "process.affinity-editor",
             Self::SmartSelfTest => "storage.smart-self-test",
             Self::DiagnosticBundle => "diagnostics.bundle",
+            Self::CurrentWindowScreenshot => "window.current-screenshot",
             Self::FirstRunSetup => "first-run.setup",
             Self::GpuMetricInspection => "gpu.metric-inspection",
             Self::TransientFeedback => "feedback.transient",
@@ -113,6 +116,7 @@ impl ProductIntent {
                 RequestResponse,
                 RequestCorrelation,
             ),
+            Self::CurrentWindowScreenshot => (Diagnostics, Application, RequestResponse, None),
             Self::FirstRunSetup => (Setup, Application, RequestResponse, RequestCorrelation),
             Self::GpuMetricInspection => (Gpu, Shell, Projection, DeviceGeneration),
             Self::TransientFeedback => (Feedback, Shell, Projection, None),
@@ -140,7 +144,8 @@ impl ProductIntent {
             | Self::ServiceLogExport
             | Self::GpuMetricInspection
             | Self::TransientFeedback
-            | Self::DiagnosticBundle => Vec::new(),
+            | Self::DiagnosticBundle
+            | Self::CurrentWindowScreenshot => Vec::new(),
             Self::ServiceDetails => vec![CapabilityId::SERVICES],
             Self::ServiceDependencies => {
                 vec![CapabilityId::SERVICE_DEPENDENCIES]

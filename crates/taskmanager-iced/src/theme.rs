@@ -5,7 +5,7 @@
 //! TUI — `taskmanager-theme`'s skin tables — and converts at this edge
 //! through the theme crate's OWN `iced` binding module (the single
 //! conversion source, CORE-07): call sites import the token→value functions
-//! ([`taskmanager_theme::iced::color`], `ui_font`, `mono_font`,
+//! ([`crate::theme_binding::color`], `ui_font`, `mono_font`,
 //! `ui_font_weight`, `BUNDLED_UI_FONT`) from that owner path directly, and
 //! this module keeps only style ASSEMBLY — the `Theme::custom` palette and
 //! the container/button styles composed from converted values — which is
@@ -13,9 +13,9 @@
 //! read the neutral `Theme` snapshot through those helpers, never
 //! hardcoding a terminal/desktop literal.
 
+use crate::theme_binding::color;
 use iced::widget::{button, container};
 use taskmanager_theme::color::mix;
-use taskmanager_theme::iced::color;
 use taskmanager_theme::tokens::RowDensity;
 use taskmanager_theme::{Color, Theme, tokens};
 

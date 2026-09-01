@@ -19,10 +19,10 @@ impl CpuCoreReadout {
 }
 
 pub(super) struct CpuDetailsStats {
-    pub utilization: String,
-    pub speed: String,
+    pub utilization: Option<String>,
+    pub speed: Option<String>,
     pub speed_note: Option<&'static str>,
-    pub temperature: String,
+    pub temperature: Option<String>,
     pub temperature_note: Option<String>,
 }
 
@@ -71,18 +71,17 @@ impl CpuLiveStats {
             }),
             power_readout: power.map(|value| format!("{value:.1} W")),
             details: CpuDetailsStats {
-                utilization: usage.map_or_else(formatting::missing_value, |value| {
-                    format!("{:.0}%", value.round())
+                utilization: usage.map(|value| format!("{:.0}%", value.round())),
+                speed: frequency.map(|value| {
+                    cpu_frequency_readout_for_source(Some(value), cpu.frequency_source)
                 }),
-                speed: cpu_frequency_readout_for_source(frequency, cpu.frequency_source),
                 speed_note: cpu
                     .frequency_source
                     .is_bogomips()
                     .then(|| i18n::t("cpu.frequency_bogomips")),
-                temperature: cpu_temperature_readout_for_source(
-                    temperature,
-                    cpu.temperature_source,
-                ),
+                temperature: temperature.map(|value| {
+                    cpu_temperature_readout_for_source(Some(value), cpu.temperature_source)
+                }),
                 temperature_note: core_temperature_note(&reporting_temperatures),
             },
         }

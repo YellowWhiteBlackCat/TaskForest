@@ -152,9 +152,9 @@ impl RenderOnce for Slider {
         let thumb = div()
             .size(px(16.0))
             .rounded_full()
-            .bg(palette.accent)
+            .bg(crate::theme_binding::fill(palette.accent))
             .border(px(2.0))
-            .border_color(palette.surface)
+            .border_color(crate::theme_binding::hsla(palette.surface))
             .mx(px(-8.0));
 
         // Keyboard: arrows step by `step`, Home/End jump to the ends.
@@ -186,7 +186,7 @@ impl RenderOnce for Slider {
             .w_full()
             .h(px(28.0))
             .cursor_pointer()
-            .focus(|style| style.border_color(palette.ring))
+            .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
             .on_key_down({
                 let state = state.clone();
                 let on_change = on_change.clone();
@@ -232,7 +232,7 @@ impl RenderOnce for Slider {
                 div()
                     .w_full()
                     .h(px(4.0))
-                    .rounded(palette.xsmall_radius)
+                    .rounded(crate::theme_binding::absolute(palette.xsmall_radius))
                     .flex()
                     .flex_row()
                     .items_center()
@@ -241,8 +241,8 @@ impl RenderOnce for Slider {
                             .flex_basis(relative(frac))
                             .flex_shrink_0()
                             .h_full()
-                            .rounded(palette.xsmall_radius)
-                            .bg(palette.accent),
+                            .rounded(crate::theme_binding::absolute(palette.xsmall_radius))
+                            .bg(crate::theme_binding::fill(palette.accent)),
                     )
                     .child(thumb)
                     .child(
@@ -250,8 +250,8 @@ impl RenderOnce for Slider {
                             .flex_basis(relative(1.0 - frac))
                             .flex_shrink_0()
                             .h_full()
-                            .rounded(palette.xsmall_radius)
-                            .bg(palette.border),
+                            .rounded(crate::theme_binding::absolute(palette.xsmall_radius))
+                            .bg(crate::theme_binding::fill(palette.border)),
                     ),
             )
             .child(

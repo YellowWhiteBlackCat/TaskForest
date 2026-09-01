@@ -32,3 +32,15 @@ Prefer safe crates first. Every query is bounded, checks reported lengths and
 maps unsupported/permission/not-found to typed outcomes. Run Windows target
 contract, boundary firewall and native verification; never add PowerShell/CMD
 telemetry as a shortcut.
+
+## Module map
+
+```text
+Call-group modules, one per audited surface:
+pdh/ (performance counters)  process/ (+ insights, tree)  gpu  disk  network  power
+thermal  display  event_log  smbios  task_scheduler  job_control  sessions
+known_folders  time_zones  single_instance  msg_pump  runas (UAC, ADR-035)
+npu  open_files  process_network  icons  memory_info
+```
+
+Every unsafe block carries a SAFETY proof; public APIs return typed values only (ADR-031).

@@ -45,7 +45,9 @@ def crate_of_path(path: Path) -> str | None:
     if len(parts) >= 3 and parts[0] == "crates":
         return parts[1]
     if len(parts) >= 1 and parts[0] == "src":
-        return "taskmanager"
+        # ADR-051: the root package is the gates host; its src/ holds the
+        # conformance lib only.
+        return "taskmanager-gates"
     return None
 
 
@@ -140,7 +142,7 @@ DA:1,1
 end_of_record
 """.format(repo=REPO)
     measured = parse_lcov(sample)
-    if measured != {"taskmanager-core": (3, 4), "taskmanager": (1, 1)}:
+    if measured != {"taskmanager-core": (3, 4), "taskmanager-gates": (1, 1)}:
         failures.append(f"parse_lcov mapping wrong: {measured}")
     if crate_of_path(Path("/elsewhere/x.rs")) is not None:
         failures.append("crate_of_path must ignore outside paths")

@@ -307,9 +307,9 @@ pub(super) fn usage_panel<'a>(
     {
         let danger = entry_is_unreadable(entry);
         let size_color = if danger {
-            taskmanager_theme::iced::color(theme_snapshot.danger)
+            crate::theme_binding::color(theme_snapshot.danger)
         } else {
-            taskmanager_theme::iced::color(theme_snapshot.palette().fg)
+            crate::theme_binding::color(theme_snapshot.palette().fg)
         };
         let indent = Length::Fixed(12.0 * entry.depth.min(MAX_INDENT_DEPTH) as f32);
         list.push(

@@ -35,17 +35,19 @@ pub(super) fn notify_row(
             div()
                 .flex()
                 .flex_col()
-                .gap(tokens::SPACE_4)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_4,
+                ))
                 .child(
                     div()
-                        .text_size(tokens::FONT_13)
-                        .text_color(t.fg)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
                         .child(i18n::t("settings.desktop_notifications")),
                 )
                 .child(
                     div()
-                        .text_size(tokens::FONT_11)
-                        .text_color(t.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
                         .child(i18n::t("settings.desktop_notifications_hint")),
                 ),
         )
@@ -99,7 +101,9 @@ pub(super) fn quiet_hours_rows(
         .debug_selector(|| "quiet-hours-rows".to_string())
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(quiet_hour_row(
             t,
             ent.clone(),

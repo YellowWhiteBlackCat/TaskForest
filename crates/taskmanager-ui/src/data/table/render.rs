@@ -32,13 +32,13 @@ impl Render for DragColumn {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         let palette = Theme::dark().palette();
         let mut el = div()
-            .px(tokens::SPACE_8)
-            .py(tokens::SPACE_4)
+            .px(crate::theme_binding::definite_length(tokens::SPACE_8))
+            .py(crate::theme_binding::definite_length(tokens::SPACE_4))
             .opacity(0.9)
-            .rounded(palette.small_radius)
+            .rounded(crate::theme_binding::absolute(palette.small_radius))
             .border_1()
-            .border_color(palette.border)
-            .bg(hover_fill(palette.surface))
+            .border_color(crate::theme_binding::hsla(palette.border))
+            .bg(crate::theme_binding::fill(hover_fill(palette.surface)))
             .child(self.name.clone());
         el.style().refine(&StyleRefinement {
             size: SizeRefinement {
@@ -69,8 +69,8 @@ impl<D: TableDelegate> TableState<D> {
             // `.w()` sets the border box, so the resize handle and column
             // boundaries keep their geometry — the padding only insets the
             // content.
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8)
+            .pl(crate::theme_binding::definite_length(tokens::SPACE_8))
+            .pr(crate::theme_binding::definite_length(tokens::SPACE_8))
             .overflow_hidden()
             .whitespace_nowrap()
             .text_align(col_group.column.text_align)
@@ -86,7 +86,10 @@ impl<D: TableDelegate> TableState<D> {
                 .map(|group| group.column.selectable)
                 .unwrap_or(false);
         if selectable && self.selection == TableSelection::Column(col_ix) {
-            el.bg(with_alpha(self.palette.accent, 0.15))
+            el.bg(crate::theme_binding::fill(with_alpha(
+                self.palette.accent,
+                0.15,
+            )))
         } else {
             el
         }
@@ -102,8 +105,8 @@ impl<D: TableDelegate> TableState<D> {
     ) -> Div {
         self.render_col_wrap(col_ix).child(
             self.render_cell(col_ix)
-                .text_color(self.palette.fg)
-                .font_weight(tokens::FONT_WEIGHT_BODY.into())
+                .text_color(crate::theme_binding::hsla(self.palette.fg))
+                .font_weight(crate::theme_binding::font_weight(tokens::FONT_WEIGHT_BODY))
                 .child(self.delegate.render_td(row_ix, col_ix, window, cx)),
         )
     }
@@ -132,7 +135,7 @@ impl<D: TableDelegate> TableState<D> {
             .flex_row()
             .items_center()
             .justify_between()
-            .gap(tokens::SPACE_4)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_4))
             .child(self.delegate.render_th(col_ix, window, cx));
         if let Some(sort_icon) = self.render_sort_icon(col_ix, &col_group, cx) {
             content = content.child(sort_icon);
@@ -141,8 +144,10 @@ impl<D: TableDelegate> TableState<D> {
         let mut cell = self
             .render_cell(col_ix)
             .id(("col-header", col_ix))
-            .text_color(palette.fg_muted)
-            .font_weight(tokens::FONT_WEIGHT_HEADER.into())
+            .text_color(crate::theme_binding::hsla(palette.fg_muted))
+            .font_weight(crate::theme_binding::font_weight(
+                tokens::FONT_WEIGHT_HEADER,
+            ))
             .on_click(cx.listener(move |this, _, _, cx| {
                 this.on_col_head_click(col_ix, cx);
             }))
@@ -163,7 +168,7 @@ impl<D: TableDelegate> TableState<D> {
                     },
                 )
                 .drag_over::<DragColumn>(move |mut style, _, _, _| {
-                    style.border_color = Some(palette.accent.into());
+                    style.border_color = Some(crate::theme_binding::hsla(palette.accent));
                     style
                 })
                 .on_drop(cx.listener(move |table, drag: &DragColumn, _, cx| {
@@ -221,10 +226,10 @@ impl<D: TableDelegate> TableState<D> {
         Some(
             div()
                 .id(("icon-sort", col_ix))
-                .p(tokens::SPACE_2)
-                .rounded(palette.small_radius)
+                .p(crate::theme_binding::definite_length(tokens::SPACE_2))
+                .rounded(crate::theme_binding::absolute(palette.small_radius))
                 .opacity(if active { 1.0 } else { 0.45 })
-                .hover(|this| this.bg(hover_fill(palette.surface)))
+                .hover(|this| this.bg(crate::theme_binding::fill(hover_fill(palette.surface))))
                 .on_click(cx.listener(move |this, _, _, cx| {
                     this.perform_sort(col_ix, cx);
                 }))
@@ -233,12 +238,12 @@ impl<D: TableDelegate> TableState<D> {
                         .flex()
                         .items_center()
                         .justify_center()
-                        .text_color(if active {
+                        .text_color(crate::theme_binding::hsla(if active {
                             palette.accent
                         } else {
                             palette.fg_muted
-                        })
-                        .child(taskmanager_icons::icon(icon_id).size(px(12.0))),
+                        }))
+                        .child(crate::icons_binding::icon(icon_id).size(px(12.0))),
                 )
                 .into_any_element(),
         )
@@ -271,10 +276,16 @@ impl<D: TableDelegate> TableState<D> {
             .h(self.options.row_height)
             .flex_shrink_0()
             .border_b_1()
-            .border_color(palette.border)
-            .text_color(palette.fg_muted)
-            .font_weight(tokens::FONT_WEIGHT_HEADER.into())
-            .bg(blend(palette.surface, palette.fg, 0.035));
+            .border_color(crate::theme_binding::hsla(palette.border))
+            .text_color(crate::theme_binding::hsla(palette.fg_muted))
+            .font_weight(crate::theme_binding::font_weight(
+                tokens::FONT_WEIGHT_HEADER,
+            ))
+            .bg(crate::theme_binding::fill(blend(
+                palette.surface,
+                palette.fg,
+                0.035,
+            )));
         header.style().refine(&style);
 
         if fixed_count > 0 {
@@ -295,7 +306,7 @@ impl<D: TableDelegate> TableState<D> {
                             .w_0()
                             .flex_shrink_0()
                             .border_r_1()
-                            .border_color(palette.border),
+                            .border_color(crate::theme_binding::hsla(palette.border)),
                     )
                     .child(
                         canvas(
@@ -320,7 +331,7 @@ impl<D: TableDelegate> TableState<D> {
                 .overflow_scroll()
                 .relative()
                 .track_scroll(&horizontal_scroll_handle)
-                .bg(hover_fill(palette.surface))
+                .bg(crate::theme_binding::fill(hover_fill(palette.surface)))
                 .child(
                     div()
                         .flex()
@@ -374,19 +385,24 @@ impl<D: TableDelegate> TableState<D> {
                 .flex_row()
                 .w_full()
                 .h(row_height)
-                .text_color(palette.fg)
-                .font_weight(tokens::FONT_WEIGHT_BODY.into())
+                .text_color(crate::theme_binding::hsla(palette.fg))
+                .font_weight(crate::theme_binding::font_weight(tokens::FONT_WEIGHT_BODY))
                 .when(need_render_border, |this| {
-                    this.border_b_1().border_color(palette.border)
+                    this.border_b_1()
+                        .border_color(crate::theme_binding::hsla(palette.border))
                 })
                 .when(is_stripe_row, |this| {
-                    this.bg(blend(palette.surface, palette.fg, 0.04))
+                    this.bg(crate::theme_binding::fill(blend(
+                        palette.surface,
+                        palette.fg,
+                        0.04,
+                    )))
                 })
                 .hover(|this| {
                     if is_selected || is_right_clicked {
                         this
                     } else {
-                        this.bg(hover_fill(palette.surface))
+                        this.bg(crate::theme_binding::fill(hover_fill(palette.surface)))
                     }
                 });
             tr.style().refine(&style);
@@ -412,7 +428,7 @@ impl<D: TableDelegate> TableState<D> {
                                 .w_0()
                                 .flex_shrink_0()
                                 .border_r_1()
-                                .border_color(palette.border),
+                                .border_color(crate::theme_binding::hsla(palette.border)),
                         ),
                 );
             }
@@ -454,9 +470,9 @@ impl<D: TableDelegate> TableState<D> {
                         .right(px(0.0))
                         .bottom(px(-1.0))
                         .absolute()
-                        .bg(with_alpha(palette.accent, 0.15))
+                        .bg(crate::theme_binding::fill(with_alpha(palette.accent, 0.15)))
                         .border_1()
-                        .border_color(palette.accent),
+                        .border_color(crate::theme_binding::hsla(palette.accent)),
                 )
             });
             // Right-clicked row border.
@@ -469,7 +485,7 @@ impl<D: TableDelegate> TableState<D> {
                         .bottom(px(-1.0))
                         .absolute()
                         .border_1()
-                        .border_color(with_alpha(palette.accent, 0.6)),
+                        .border_color(crate::theme_binding::hsla(with_alpha(palette.accent, 0.6))),
                 )
             });
 
@@ -491,9 +507,13 @@ impl<D: TableDelegate> TableState<D> {
                 .w_full()
                 .h(row_height)
                 .border_b_1()
-                .border_color(palette.border)
+                .border_color(crate::theme_binding::hsla(palette.border))
                 .when(is_stripe_row, |this| {
-                    this.bg(blend(palette.surface, palette.fg, 0.04))
+                    this.bg(crate::theme_binding::fill(blend(
+                        palette.surface,
+                        palette.fg,
+                        0.04,
+                    )))
                 })
                 .child(
                     div()

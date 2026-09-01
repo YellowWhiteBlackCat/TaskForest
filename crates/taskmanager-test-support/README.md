@@ -39,3 +39,12 @@ can layer one family, e.g. the zram `mm_stat` depth, onto an existing snapshot).
 
 Check with `cargo check -p taskmanager-test-support --all-targets` and its
 downstream behavior tests.
+
+## Module map
+
+```text
+src/lib.rs                     dev-only typed fixture builders
+src/memory.rs  metrics.rs  process.rs
+```
+
+Consumed only through dev-dependencies; never a product dependency.

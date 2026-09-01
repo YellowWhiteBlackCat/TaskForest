@@ -81,8 +81,8 @@ const BADGE_HEIGHT: f32 = 20.0;
 /// label is copied into the pill's text (the footer pills format theirs per
 /// frame), so the returned element borrows only the theme.
 pub(crate) fn badge<'a>(theme: &'a Theme, label: &str, tone: BadgeTone) -> IcedElement<'a> {
-    let fill = taskmanager_theme::iced::color(tone.fill(theme));
-    let foreground = taskmanager_theme::iced::color(tone.foreground(theme));
+    let fill = crate::theme_binding::color(tone.fill(theme));
+    let foreground = crate::theme_binding::color(tone.foreground(theme));
     container(
         text(label.to_owned())
             .size(f32::from(tokens::FONT_CAPTION))
@@ -98,7 +98,7 @@ pub(crate) fn badge<'a>(theme: &'a Theme, label: &str, tone: BadgeTone) -> IcedE
 /// A 1px horizontal hairline in the palette's border color — the divider
 /// that separates stacked sections inside a card without a second surface.
 pub(crate) fn divider<'a>(theme: &'a Theme) -> IcedElement<'a> {
-    let hairline = taskmanager_theme::iced::color(theme.palette().border);
+    let hairline = crate::theme_binding::color(theme.palette().border);
     container(iced::widget::Space::new())
         .width(Length::Fill)
         .height(Length::Fixed(f32::from(tokens::SPACE_1)))
@@ -143,9 +143,9 @@ pub(crate) fn progress<'a>(
     tone: BadgeTone,
 ) -> IcedElement<'a> {
     let palette = theme.palette();
-    let track_fill = taskmanager_theme::iced::color(palette.border);
-    let stripe_fill = taskmanager_theme::iced::color(palette.fg_muted);
-    let value_fill = taskmanager_theme::iced::color(tone.fill(theme));
+    let track_fill = crate::theme_binding::color(palette.border);
+    let stripe_fill = crate::theme_binding::color(palette.fg_muted);
+    let value_fill = crate::theme_binding::color(tone.fill(theme));
     let radius = f32::from(palette.xsmall_radius);
     let bar_height = f32::from(tokens::SPACE_6);
 
@@ -201,7 +201,7 @@ pub(crate) fn tooltip<'a>(
     content: IcedElement<'a>,
     tip: &'a str,
 ) -> IcedElement<'a> {
-    let tip_fg = taskmanager_theme::iced::color(theme.palette().fg);
+    let tip_fg = crate::theme_binding::color(theme.palette().fg);
     let surface = theme;
     let hint: IcedElement<'a> = container(text(tip).size(f32::from(tokens::FONT_11)).color(tip_fg))
         .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_8)])
@@ -265,10 +265,10 @@ pub(crate) fn state_panel<'a>(
 ) -> IcedElement<'a> {
     let palette = theme.palette();
     let tone = state.tone(theme);
-    let tone_fill = taskmanager_theme::iced::color(tone);
-    let tile_fill = taskmanager_theme::iced::color(tone.with_alpha(0.12));
-    let tile_border = taskmanager_theme::iced::color(tone.with_alpha(0.30));
-    let muted = taskmanager_theme::iced::color(palette.fg_muted);
+    let tone_fill = crate::theme_binding::color(tone);
+    let tile_fill = crate::theme_binding::color(tone.with_alpha(0.12));
+    let tile_border = crate::theme_binding::color(tone.with_alpha(0.30));
+    let muted = crate::theme_binding::color(palette.fg_muted);
     let icon_extent = f32::from(tokens::UiSize::Small.icon_size());
     let surface = theme;
 

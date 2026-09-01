@@ -12,7 +12,7 @@ use taskmanager_core::core::metrics::{
     ScalarObservation, StorageInterconnect,
 };
 use taskmanager_core::core::source::SourceOutcome;
-use taskmanager_platform_contract::DeviceSourceSnapshot;
+use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
 
 use super::identity::reconcile_storage_identity;
 use super::mounts::{MountedDiskFact, mounted_disk_facts};
@@ -42,10 +42,19 @@ pub(super) fn collect_storage_inventory(
         .iter()
         .map(|metric| DeviceId::new(metric.device_id.clone()))
         .collect();
-    DeviceSourceSnapshot::from_source_status(
+    let discovery = match inventory.discovery.outcome {
+        SourceOutcome::Available => DeviceDiscovery::Available(discovered_devices),
+        SourceOutcome::Empty => DeviceDiscovery::Empty,
+        SourceOutcome::Partial(failure) => DeviceDiscovery::Partial {
+            discovered_devices,
+            failure,
+        },
+        SourceOutcome::Unavailable(failure) => DeviceDiscovery::Unavailable(failure),
+    };
+    DeviceSourceSnapshot::from_discovery(
         metrics,
-        discovered_devices,
-        inventory.discovery.clone(),
+        inventory.discovery.provider,
+        discovery,
         vec![inventory.metadata.clone(), mounts.source.clone()],
     )
 }

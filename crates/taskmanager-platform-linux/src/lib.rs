@@ -22,6 +22,7 @@ mod engine;
 mod local_time;
 mod platform_handle;
 mod provider;
+pub mod window_capture;
 
 pub use backend::{
     EnvironmentProviders, IntegrationProviders, LinuxProviderRegistry, PowerProviders,

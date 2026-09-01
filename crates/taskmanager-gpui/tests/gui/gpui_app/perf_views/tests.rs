@@ -63,18 +63,14 @@ fn draw(cx: &mut TestAppContext, win: gpui::WindowHandle<RootView>) {
         .unwrap();
 }
 
-/// The 8 always-present Memory stats rows (in_use, available, hardware_reserved,
-/// cached, buffers, swap, speed, slots). Data-gated rows (committed / zram /
-/// zswap / usage rate) append after these.
-const MEM_BASE_STAT_ROWS: [&str; 8] = [
+/// The measured Memory stats rows in this fixture. Unavailable optional fields
+/// (hardware reserved, speed and slots) do not consume a detail-row slot.
+const MEM_BASE_STAT_ROWS: [&str; 5] = [
     "tm-perf-stat:0",
     "tm-perf-stat:1",
     "tm-perf-stat:2",
     "tm-perf-stat:3",
     "tm-perf-stat:4",
-    "tm-perf-stat:5",
-    "tm-perf-stat:6",
-    "tm-perf-stat:7",
 ];
 
 /// A first-frame Performance page must explain an empty history instead of
@@ -156,6 +152,8 @@ async fn memory_page_stats_rows_follow_snapshot_data(cx: &mut TestAppContext) {
         optional.compression = MemoryCompressionObservations {
             compressed_swap_used_bytes: OptionalObservation::present(mib(256), 10),
             compressed_swap_capacity_bytes: OptionalObservation::present(gib(2), 10),
+            compressed_swap_original_bytes: OptionalObservation::present(gib(3), 10),
+            compressed_swap_compressed_bytes: OptionalObservation::present(gib(1), 10),
             compressed_swap_memory_used_bytes: OptionalObservation::present(mib(128), 10),
             compressed_swap_cache_enabled: OptionalObservation::present(true, 10),
             ..Default::default()
@@ -164,22 +162,39 @@ async fn memory_page_stats_rows_follow_snapshot_data(cx: &mut TestAppContext) {
         cx.notify();
     });
     vcx.update(|window, cx| window.draw(cx).clear());
-    // committed, zram swap, zram RAM used (`mm_stat` `mem_used_total`),
-    // zswap, usage rate — in that order.
+    // committed, zram swap, compression ratio, zram RAM used (`mm_stat`
+    // `mem_used_total`), zswap, usage rate — in that order, directly after the
+    // five measured base rows. The ratio owns a row so the bounded right rail
+    // never has to paint a compound line wider than its value slot.
     for sel in [
+        "tm-perf-stat:5",
+        "tm-perf-stat:6",
+        "tm-perf-stat:7",
         "tm-perf-stat:8",
         "tm-perf-stat:9",
         "tm-perf-stat:10",
-        "tm-perf-stat:11",
-        "tm-perf-stat:12",
     ] {
         assert!(
             vcx.debug_bounds(sel).is_some(),
             "{sel} must render when its snapshot data exists"
         );
     }
+    let panel = vcx
+        .debug_bounds("tm-perf-stats-panel")
+        .expect("memory stats panel remains bounded after adding the ratio row");
+    for index in 0..11 {
+        let selector: &'static str =
+            Box::leak(format!("tm-perf-stat-value:{index}").into_boxed_str());
+        let Some(value) = vcx.debug_bounds(selector) else {
+            continue;
+        };
+        assert!(
+            value.origin.x >= panel.origin.x - px(0.5) && value.right() <= panel.right() + px(0.5),
+            "memory stats value {index} must stay inside its bounded right-rail slot: value={value:?}, panel={panel:?}"
+        );
+    }
     assert!(
-        vcx.debug_bounds("tm-perf-stat:13").is_none(),
+        vcx.debug_bounds("tm-perf-stat:11").is_none(),
         "no stats row may render beyond the snapshot-derived set"
     );
 }
@@ -522,6 +537,27 @@ async fn disk_page_composes_instead_of_scrolling(cx: &mut TestAppContext) {
         f32::from(panel.origin.x) >= -0.5 && f32::from(panel.origin.x + panel.size.width) <= 720.5,
         "the pinned stats panel must remain inside the viewport: {panel:?}"
     );
+
+    // A partition-heavy device gets a bounded lower projection at the normal
+    // desktop size. The final lower card must end before the fixed viewport;
+    // it may summarize excess partitions, but it may not be clipped.
+    cx.simulate_window_resize(win.into(), size(px(1180.0), px(780.0)));
+    draw(cx, win);
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    let viewport = vcx
+        .debug_bounds("tm-perf-main-viewport")
+        .expect("heavy disk page fixed viewport");
+    let partitions = vcx
+        .debug_bounds("tm-disk-partitions")
+        .expect("heavy disk page partition summary");
+    assert!(
+        partitions.bottom() <= viewport.bottom() - px(4.0),
+        "heavy disk lower band must end inside the fixed viewport: partitions={partitions:?}, viewport={viewport:?}"
+    );
+    assert!(
+        vcx.debug_bounds("tm-disk-usage-panel").is_none(),
+        "a partition-heavy page omits the optional usage panel instead of clipping it"
+    );
 }
 
 /// The Network page uses the same shared device-page graph helper as Disk, but
@@ -555,8 +591,8 @@ async fn network_page_keeps_shared_main_graph_readable_in_compact_view(cx: &mut 
         "the network main column is a fixed viewport and must not mount a scrollbar"
     );
     assert!(
-        vcx.debug_bounds("tm-perf-stats-scrollbar").is_some(),
-        "the network statistics column must keep its vertical rail mounted"
+        vcx.debug_bounds("tm-perf-stats-scrollbar").is_none(),
+        "the network statistics column must remain a fixed non-scrolling rail"
     );
     assert!(
         graph.size.height >= px(220.0),
@@ -891,8 +927,6 @@ async fn mc04_gpu_layout_case_gpu_page_adapts_complete_engine_inventory_to_avail
         gpu.device_state = DeviceState::healthy(10);
         gpu.apply_scalar_observations(GpuScalarObservations {
             utilization_pct: ScalarObservation::available(42.0, 10),
-            memory_used_bytes: ScalarObservation::available(3 * 1024, 10),
-            memory_total_bytes: ScalarObservation::available(8 * 1024, 10),
             dedicated_vram_used_bytes: ScalarObservation::available(3 * 1024 * 1024 * 1024, 10),
             dedicated_vram_total_bytes: ScalarObservation::available(8 * 1024 * 1024 * 1024, 10),
             shared_vram_used_bytes: ScalarObservation::available(640 * 1024 * 1024, 10),
@@ -931,13 +965,33 @@ async fn mc04_gpu_layout_case_gpu_page_adapts_complete_engine_inventory_to_avail
         );
     }
     assert!(
-        vcx.debug_bounds("tm-graph:main-graph").is_none(),
-        "standard multi-engine GPU page must own exactly one engine-grid main surface"
+        vcx.debug_bounds("tm-graph:main-graph").is_some(),
+        "the aggregate GPU utilization chart must remain the large headline"
     );
     assert!(
-        vcx.debug_bounds("tm-perf-aggregate-graph-summary")
-            .is_none(),
-        "standard multi-engine GPU page must not label aggregate statistics as engine statistics"
+        vcx.debug_bounds("tm-perf-compact-graph:gpu-memory-graph")
+            .is_some(),
+        "the GPU memory utilization chart must be the compact bottom group"
+    );
+    let viewport = vcx
+        .debug_bounds("tm-perf-main-viewport")
+        .expect("GPU page must expose the shared fixed viewport");
+    let headline = vcx
+        .debug_bounds("tm-perf-chart-card:main-graph")
+        .expect("GPU utilization must remain the headline card");
+    let engines = vcx
+        .debug_bounds("tm-perf-gpu-engine-grid")
+        .expect("GPU engines must occupy the fine-detail group");
+    let memory = vcx
+        .debug_bounds("tm-perf-chart-card:gpu-memory-graph")
+        .expect("GPU memory must occupy the bottom compact card");
+    assert!(
+        headline.bottom() <= engines.top() && engines.bottom() <= memory.top(),
+        "GPU groups must stay in large → fine → compact order: headline={headline:?}, engines={engines:?}, memory={memory:?}"
+    );
+    assert!(
+        memory.bottom() <= viewport.bottom() - px(4.0),
+        "the compact GPU memory card must keep the shared bottom safety band: memory={memory:?}, viewport={viewport:?}"
     );
     let stats_surface = vcx
         .debug_bounds("tm-perf-stats-surface")
@@ -955,33 +1009,43 @@ async fn mc04_gpu_layout_case_gpu_page_adapts_complete_engine_inventory_to_avail
         contains(stats_surface, product) && product.size.height <= px(24.0),
         "long production GPU identity must stay on one bounded line: {product:?}"
     );
-    let vram_block = vcx
-        .debug_bounds("tm-gpu-vram-composition")
-        .expect("complete split VRAM facts paint the composition block");
     assert!(
-        contains(stats_surface, vram_block),
-        "VRAM composition must remain inside the 280px stats surface: {vram_block:?}"
-    );
-    for (row_name, selector) in [
-        ("dedicated", "tm-gpu-vram-row:dedicated"),
-        ("shared", "tm-gpu-vram-row:shared"),
-        ("total", "tm-gpu-vram-row:total"),
-    ] {
-        let row = vcx
-            .debug_bounds(selector)
-            .unwrap_or_else(|| panic!("missing vertical VRAM summary row {row_name}"));
-        assert!(
-            contains(vram_block, row) && row.size.height <= px(24.0),
-            "VRAM {row_name} label/value must remain one bounded line: {row:?}"
-        );
-    }
-    assert_ne!(
-        taskmanager_application::i18n::t("gpu.vram_total"),
-        "gpu.vram_total",
-        "the total row must use an existing localized product key"
+        !vcx.debug_bounds("tm-gpu-engines-card").is_some(),
+        "GPU authorization must not reappear as a page-local card"
     );
 
     let gpu = view.read_with(cx, |view, _| view.system_snapshot().gpu[0].clone());
+    let mut crowded_gpu = gpu.clone();
+    crowded_gpu.engines = (0..24_u16)
+        .map(|index| GpuEngine {
+            name: format!("Engine {index}"),
+            kind: GpuEngineKind::Unknown,
+            usage_pct: f32::from(index),
+        })
+        .collect();
+    view.update(cx, |view, cx| {
+        view.system_snapshot_mut_for_test().gpu = vec![crowded_gpu];
+        cx.notify();
+    });
+    draw(cx, win);
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    let viewport = vcx
+        .debug_bounds("tm-perf-main-viewport")
+        .expect("crowded GPU page fixed viewport");
+    let memory = vcx
+        .debug_bounds("tm-perf-chart-card:gpu-memory-graph")
+        .expect("crowded GPU page must retain its compact memory group");
+    assert!(
+        memory.bottom() <= viewport.bottom() - px(4.0),
+        "crowded engine inventory must not push the memory strip through the viewport: memory={memory:?}, viewport={viewport:?}"
+    );
+    assert!(
+        vcx.debug_bounds("tm-perf-gpu-engine:Engine 0").is_some()
+            && vcx.debug_bounds("tm-perf-gpu-engine:Engine 23").is_none(),
+        "crowded engine inventory must show complete rows only and summarize the remainder"
+    );
+    drop(vcx);
+
     let (compact_win, compact_view) = wrapped_root(cx);
     cx.simulate_window_resize(compact_win.into(), size(px(720.0), px(480.0)));
     compact_view.update(cx, |view, cx| {
@@ -1003,8 +1067,9 @@ async fn mc04_gpu_layout_case_gpu_page_adapts_complete_engine_inventory_to_avail
         "compact GPU page must not retain a hidden engine summary"
     );
     assert!(
-        vcx.debug_bounds("tm-perf-left-scrollbar").is_none(),
-        "compact aggregate chart owns the viewport and must not expose a central scrollbar"
+        vcx.debug_bounds("tm-perf-left-scrollbar").is_none()
+            && vcx.debug_bounds("tm-perf-stats-scrollbar").is_none(),
+        "the GPU page must not expose a scroll surface outside the device selector"
     );
     let aggregate = vcx
         .debug_bounds("tm-graph:main-graph")

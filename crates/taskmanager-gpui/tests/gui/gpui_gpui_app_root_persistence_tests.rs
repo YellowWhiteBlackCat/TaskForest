@@ -8,7 +8,9 @@ use crate::gpui_app::dashboard::SavedViewPreset;
 use crate::gpui_app::dashboard::saved_view_transfer::filter_from_token;
 use crate::gpui_app::root::ProcessesState;
 use taskmanager_core::core::config::{
-    COLOR_SCHEME_DARK, STARTUP_PAGE_PROCESSES, SidebarDeviceOverrideConfig, TEXT_RENDERING_SUBPIXEL,
+    COLOR_SCHEME_DARK, STARTUP_PAGE_PROCESSES, SidebarDeviceOverrideConfig,
+    TEXT_RENDERING_SUBPIXEL, WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE,
+    WINDOW_DECORATIONS_SYSTEM,
 };
 use taskmanager_shell::{ProcessStatusFilter, SortCol};
 use taskmanager_theme::{Skin, Theme};
@@ -33,6 +35,27 @@ fn config_projection_persists_window_tokens_and_normalizes_graph_points(cx: &mut
         taskmanager_core::core::config::TEXT_RENDERING_PLATFORM_DEFAULT
     );
     assert_eq!(config.graph_data_points, 600);
+}
+
+#[gpui::test]
+fn config_projection_persists_the_window_decorations_preference(cx: &mut TestAppContext) {
+    let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
+    let (default, native, custom) = root.update(cx, |view, _cx| {
+        // An untouched preference persists as the empty System sentinel, so
+        // the periodic save never freezes a mode the user did not choose.
+        let default = config_from_view(view);
+        let mut presentation = view.presentation_snapshot();
+        presentation.window_decorations = SharedString::from(WINDOW_DECORATIONS_NATIVE);
+        view.replace_presentation(presentation);
+        let native = config_from_view(view);
+        let mut presentation = view.presentation_snapshot();
+        presentation.window_decorations = SharedString::from(WINDOW_DECORATIONS_CUSTOM);
+        view.replace_presentation(presentation);
+        (default, native, config_from_view(view))
+    });
+    assert_eq!(default.window_decorations, WINDOW_DECORATIONS_SYSTEM);
+    assert_eq!(native.window_decorations, WINDOW_DECORATIONS_NATIVE);
+    assert_eq!(custom.window_decorations, WINDOW_DECORATIONS_CUSTOM);
 }
 
 #[gpui::test]

@@ -27,6 +27,10 @@ use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
+const REPLAY_FIXED_CHROME: f32 = 220.0;
+const REPLAY_ROW_SLOT: f32 = 84.0;
+const MAX_VISIBLE_REPLAY_ROWS: usize = 8;
+
 /// One replayed series: the stride-downsampled curve plus its fact-only
 /// summary. Gaps stay `NaN` so the graph renders them as holes.
 #[derive(Clone, Debug, PartialEq)]
@@ -266,10 +270,18 @@ pub(crate) fn render_history_replay(
     theme: &Theme,
     state: &HistoryReplayState,
     local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    content_height: f32,
     entity: gpui::Entity<RootView>,
 ) -> AnyElement {
     let window = state.window();
-    let mut controls = div().flex().flex_row().items_center().gap(tokens::SPACE_6);
+    let mut controls =
+        div()
+            .flex()
+            .flex_row()
+            .items_center()
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_6,
+            ));
     for candidate in HistoryWindow::ALL {
         let label = history_window_label(candidate).to_string();
         let ent = entity.clone();
@@ -308,8 +320,12 @@ pub(crate) fn render_history_replay(
         .id("tm-replay-panel")
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .size_full()
+        .min_h(px(0.0))
+        .overflow_hidden()
         .child(performance_title_row(
             theme,
             i18n::t("perf.replay.title").to_string(),
@@ -323,8 +339,8 @@ pub(crate) fn render_history_replay(
         column = column.child(
             div()
                 .id("tm-replay-loaded-at")
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(format!(
                     "{} {}",
                     i18n::t("perf.replay.loaded_at"),
@@ -336,8 +352,8 @@ pub(crate) fn render_history_replay(
         column = column.child(
             div()
                 .id("tm-replay-loading")
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("perf.replay.loading")),
         );
     }
@@ -345,7 +361,7 @@ pub(crate) fn render_history_replay(
         column = column.child(
             div()
                 .id("tm-replay-failure")
-                .text_color(theme.fg)
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(failure.to_string()),
         );
         if let Some(last_good_window) = state.rows_window()
@@ -354,7 +370,7 @@ pub(crate) fn render_history_replay(
             column = column.child(
                 div()
                     .id("tm-replay-last-good-window")
-                    .text_color(theme.fg_dim)
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                     .child(format!(
                         "{}: {}",
                         i18n::t("perf.replay.last_good_window"),
@@ -367,15 +383,45 @@ pub(crate) fn render_history_replay(
         column = column.child(
             div()
                 .id("tm-replay-empty")
-                .text_color(theme.fg)
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(i18n::t("perf.replay.empty").to_string()),
         );
     } else {
-        for (index, row) in state.rows().iter().enumerate() {
+        let visible_rows = replay_row_budget(content_height);
+        let row_limit = state.rows().len().min(visible_rows);
+        for (index, row) in state.rows().iter().take(row_limit).enumerate() {
             column = column.child(replay_row(theme, row, index));
+        }
+        if state.rows().len() > row_limit {
+            column = column.child(
+                div()
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                    .child(
+                        i18n::t("common.more_rows")
+                            .replace("{count}", &(state.rows().len() - row_limit).to_string()),
+                    ),
+            );
         }
     }
     column.into_any_element()
+}
+
+fn replay_row_budget(content_height: f32) -> usize {
+    if content_height <= 0.0 {
+        return MAX_VISIBLE_REPLAY_ROWS;
+    }
+    let available = (content_height - REPLAY_FIXED_CHROME).max(0.0);
+    let mut rows = 0_usize;
+    let mut used = 0.0_f32;
+    for _ in 0..MAX_VISIBLE_REPLAY_ROWS {
+        if used + REPLAY_ROW_SLOT > available {
+            break;
+        }
+        rows += 1;
+        used += REPLAY_ROW_SLOT;
+    }
+    rows
 }
 
 fn history_window_label(window: HistoryWindow) -> &'static str {
@@ -405,12 +451,16 @@ fn replay_row(theme: &Theme, row: &HistoryReplayRow, index: usize) -> AnyElement
         .id(("tm-replay-row", index))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_4)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_4,
+        ))
         .child(
             div()
                 .flex()
                 .flex_row()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(row_heading(&row.key))
                 .child(summary)
                 .children(clock_note),
@@ -418,7 +468,7 @@ fn replay_row(theme: &Theme, row: &HistoryReplayRow, index: usize) -> AnyElement
         .child(div().h(px(72.0)).child(graph_element(
             (ElementId::from("tm-replay-graph"), row.key.file_stem()),
             Rc::clone(&row.samples),
-            gpui::Rgba::from(series_color(theme, row.key.metric())),
+            taskmanager_ui::theme_binding::rgba(series_color(theme, row.key.metric())),
             GraphOpts {
                 gradient_fill: true,
                 ref_lines: true,

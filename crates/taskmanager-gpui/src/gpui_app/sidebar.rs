@@ -104,7 +104,13 @@ fn sidebar_resize_handle(
         .flex_none()
         .justify_end()
         .items_center()
-        .child(div().h_full().justify_center().bg(border).w(px(1.0)))
+        .child(
+            div()
+                .h_full()
+                .justify_center()
+                .bg(taskmanager_ui::theme_binding::fill(border))
+                .w(px(1.0)),
+        )
         .on_drag_move(
             move |e: &DragMoveEvent<SidebarResize>, _win, cx: &mut App| {
                 let payload = *e.drag(cx);
@@ -208,18 +214,30 @@ pub(crate) fn render_sidebar(
     let mut body = div()
         .flex()
         .flex_col()
-        .py(tokens::SPACE_10)
-        .gap(tokens::SPACE_2)
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_2,
+        ))
         .child(
             div()
-                .px(tokens::SPACE_14)
-                .pb(tokens::SPACE_8)
+                .px(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_14,
+                ))
+                .pb(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .flex()
                 .items_center()
-                .gap(tokens::SPACE_6)
-                .font_weight(tokens::FONT_WEIGHT_STRONG.into())
-                .text_color(theme.fg_dim)
-                .child(taskmanager_icons::icon(IconId::System).size(px(18.0)))
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_STRONG,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .child(taskmanager_ui::icons_binding::icon(IconId::System).size(px(18.0)))
                 .child(div().flex_1().child(i18n::t("sidebar.devices")))
                 .child(edit::edit_button(theme, edit_mode, cx)),
         );
@@ -547,7 +565,7 @@ pub(crate) fn render_sidebar(
     .min_w(content_width)
     .max_w(content_width)
     .h_full()
-    .bg(theme.sidebar_bg)
+    .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg))
     // Round the sidebar's BOTTOM-LEFT corner: it spans the full window
     // height beside the content area and would otherwise paint a square
     // pixel into the transparent CSD corner (its top-left sits under the
@@ -575,7 +593,7 @@ pub(crate) fn render_sidebar(
         .min_w(width)
         .max_w(width)
         .flex_none()
-        .bg(theme.sidebar_bg)
+        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg))
         .child(col)
         .child(sidebar_resize_handle(theme, width, &cx.entity()))
 }

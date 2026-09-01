@@ -102,14 +102,18 @@ fn compose_shell_feedback(view: &RootView, root: Stateful<Div>, theme: &Theme) -
     };
     let card = div()
         .max_w(px(640.0))
-        .px(tokens::SPACE_10)
-        .py(tokens::SPACE_6)
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .rounded(px(6.0))
-        .bg(theme.card_bg)
+        .bg(taskmanager_ui::theme_binding::fill(theme.card_bg))
         .border_1()
-        .border_color(color.with_alpha(0.45))
-        .text_size(tokens::FONT_12)
-        .text_color(theme.fg)
+        .border_color(taskmanager_ui::theme_binding::hsla(color.with_alpha(0.45)))
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
         .child(notice.text().to_owned());
     root.child(deferred(
         div()
@@ -151,27 +155,31 @@ fn compose_warmup(
         .flex()
         .flex_col()
         .items_center()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(Spinner::new(theme.palette()).size(18.0))
         .child(
             div()
-                .text_size(tokens::FONT_16)
-                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                .text_color(theme.fg)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_16))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_BOLD,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(headline),
         )
         .child(
             div()
                 .max_w(px(420.0))
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(detail),
         );
     let content = if let Some(retry) = retry {
         content.child(
             div()
                 .debug_selector(|| "tm-telemetry-warmup-retry".to_string())
-                .mt(tokens::SPACE_8)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
                 .child(retry),
         )
     } else {
@@ -182,7 +190,7 @@ fn compose_warmup(
             .absolute()
             .inset_0()
             .debug_selector(|| "tm-telemetry-warmup".to_string())
-            .bg(theme.view_bg)
+            .bg(taskmanager_ui::theme_binding::fill(theme.view_bg))
             .occlude()
             .on_any_mouse_down(|_event, _window, cx| cx.stop_propagation())
             .flex()
@@ -191,7 +199,7 @@ fn compose_warmup(
             .justify_center()
             .child(content.with_animation(
                 "telemetry-warmup-content",
-                taskmanager_theme::gpui::appear(),
+                taskmanager_ui::theme_binding::appear(),
                 |element, delta| element.opacity(delta).mt(px((1.0 - delta) * 6.0)),
             )),
     ))

@@ -163,3 +163,48 @@ fn runtime_config_apply_preserves_ephemeral_alert_history_and_runtime_owners(
         );
     });
 }
+
+#[gpui::test]
+fn config_fold_normalizes_window_decorations_and_seeds_the_session_preference(
+    cx: &mut TestAppContext,
+) {
+    use crate::gpui_app::chrome::WindowDecorationsPreference;
+    use taskmanager_core::core::config::WINDOW_DECORATIONS_CUSTOM;
+
+    let root = cx.new(|cx| RootView::new(taskmanager_theme::Theme::dark(), cx));
+    root.update(cx, |view, _cx| {
+        // An unknown (future / hand-edited) token fails closed to System, and
+        // the snapshot is normalized to the canonical empty sentinel.
+        let config = taskmanager_core::core::config::Config {
+            window_decorations: "glass".into(),
+            ..taskmanager_core::core::config::Config::default()
+        };
+        apply_root_persisted_projection(view, &config);
+        assert_eq!(
+            view.window_decorations_pref,
+            WindowDecorationsPreference::System
+        );
+        assert!(view.presentation_snapshot().window_decorations().is_empty());
+
+        // An explicit token seeds BOTH the persisted snapshot and the
+        // session-side enum the render-time outcome check compares against.
+        let config = taskmanager_core::core::config::Config {
+            window_decorations: WINDOW_DECORATIONS_CUSTOM.into(),
+            ..taskmanager_core::core::config::Config::default()
+        };
+        apply_root_persisted_projection(view, &config);
+        assert_eq!(
+            view.window_decorations_pref,
+            WindowDecorationsPreference::Custom
+        );
+        assert_eq!(
+            view.presentation_snapshot().window_decorations(),
+            WINDOW_DECORATIONS_CUSTOM
+        );
+        // The fold path only RECORDS the preference: re-requesting the mode
+        // on the live window is the Settings control's job (it owns a Window
+        // handle), so the outcome latch stays armed for this session's
+        // original request.
+        assert!(!view.decoration_outcome_reported);
+    });
+}

@@ -28,3 +28,10 @@ cargo clippy -p taskmanager-rapl-helper --all-targets -- -D warnings
 
 Package/polkit verification and a live RAPL receipt are separate; without the
 latter the capability remains permission-limited.
+
+## Module map
+
+```text
+src/main.rs → rapl_read.rs   read-only RAPL package-power sample (energy_uj)
+src/json.rs                  fixed JSON envelope output
+```

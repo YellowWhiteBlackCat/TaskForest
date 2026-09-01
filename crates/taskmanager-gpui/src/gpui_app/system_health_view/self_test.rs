@@ -21,13 +21,19 @@ use crate::gpui_app::system_health_view::{
 fn disabled_action(theme: &Theme, label: String, id: &'static str) -> Stateful<Div> {
     div()
         .id(id)
-        .px(tokens::SPACE_10)
-        .py(tokens::SPACE_6)
-        .rounded(tokens::control_radius(theme))
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
         .border_1()
-        .border_color(theme.border)
-        .text_size(tokens::FONT_12)
-        .text_color(theme.fg_dim)
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
         .child(label)
 }
 
@@ -82,11 +88,13 @@ pub(crate) fn self_test_card(
         .is_some_and(|disk| disk.smart_availability == SmartAvailability::Available)
         && report.is_none_or(|report| report.phase != SmartSelfTestPhase::Running);
     let mut details = div()
-        .mt(tokens::SPACE_7)
+        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
         .flex()
         .flex_row()
         .flex_wrap()
-        .gap(tokens::SPACE_8);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ));
     if let Some(report) = report {
         details = details
             .child(metric(theme, copy(SystemHealthText::Status), phase))
@@ -132,12 +140,16 @@ pub(crate) fn self_test_card(
         details = details.child(metric(theme, copy(SystemHealthText::Status), phase));
     }
     div()
-        .mt(tokens::SPACE_9)
-        .p(tokens::SPACE_9)
-        .rounded(tokens::control_radius(theme))
+        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_9))
+        .p(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_9,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
         .border_1()
-        .border_color(theme.border)
-        .bg(theme.sidebar_card_bg)
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
         .child(
             div()
                 .flex()
@@ -145,10 +157,14 @@ pub(crate) fn self_test_card(
                 .flex_wrap()
                 .items_center()
                 .justify_between()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(
                     div()
-                        .font_weight(tokens::FONT_WEIGHT_HEADER.into())
+                        .font_weight(taskmanager_ui::theme_binding::font_weight(
+                            tokens::FONT_WEIGHT_HEADER,
+                        ))
                         .child(copy(SystemHealthText::SmartSelfTest)),
                 )
                 .child(badge(
@@ -160,18 +176,20 @@ pub(crate) fn self_test_card(
         .child(details)
         .child(
             div()
-                .mt(tokens::SPACE_8)
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_8))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(copy(SystemHealthText::ConfirmationRequired)),
         )
         .child(
             div()
-                .mt(tokens::SPACE_6)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_6))
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(self_test_action(
                     theme,
                     copy(SystemHealthText::ShortTest),

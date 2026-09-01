@@ -22,7 +22,7 @@ fn product_intent_registry_is_unique_and_described() {
         .iter()
         .map(|intent| intent.id())
         .collect();
-    assert_eq!(ids.len(), 15);
+    assert_eq!(ids.len(), 16);
     let mut unique = ids.clone();
     unique.sort_unstable();
     unique.dedup();
@@ -66,6 +66,14 @@ fn platform_request_intents_name_their_native_capability() {
     assert_eq!(
         ProductIntent::DiagnosticBundle.spec().target,
         TargetContract::RequestCorrelation
+    );
+    assert_eq!(
+        ProductIntent::CurrentWindowScreenshot.required_platform_capabilities(),
+        Vec::new()
+    );
+    assert_eq!(
+        ProductIntent::CurrentWindowScreenshot.spec().target,
+        TargetContract::None
     );
     assert_eq!(
         ProductIntent::AlertRuleAuthoring.spec().target,

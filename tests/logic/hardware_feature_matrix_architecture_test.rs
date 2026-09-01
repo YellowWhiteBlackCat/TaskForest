@@ -152,7 +152,23 @@ fn expression_balance(value: &str) -> i32 {
 fn every_native_os_hardware_backend_feature_is_in_the_standard_artifact() {
     let repository = repository();
     let native = read_features(repository.join("crates/taskmanager-platform-native/Cargo.toml"));
-    let root = read_features(repository.join("Cargo.toml"));
+    // ADR-051: the release feature matrix lives in every product manifest,
+    // not in a root dispatch package.
+    let product_names = [
+        "taskmanager-gpui",
+        "taskmanager-iced",
+        "taskmanager-tui",
+        "taskmanager-bevy-ui",
+    ];
+    let products: Vec<_> = product_names
+        .iter()
+        .map(|name| {
+            (
+                *name,
+                read_features(repository.join("crates").join(name).join("Cargo.toml")),
+            )
+        })
+        .collect();
 
     let mut hardware_feature_count = 0;
     for platform in ["linux", "macos", "windows"] {
@@ -198,12 +214,14 @@ fn every_native_os_hardware_backend_feature_is_in_the_standard_artifact() {
                 );
             }
 
-            if let Some(root_fallback) = root.get(&feature) {
-                let root_route = format!("taskmanager-app-host/{feature}");
-                assert!(
-                    root_fallback.contains(&root_route),
-                    "declared root fallback feature `{feature}` must route to `{root_route}`"
-                );
+            for (product, product_features) in &products {
+                if let Some(product_fallback) = product_features.get(&feature) {
+                    let route = format!("taskmanager-app-host/{feature}");
+                    assert!(
+                        product_fallback.contains(&route),
+                        "declared {product} fallback feature `{feature}` must route to `{route}`"
+                    );
+                }
             }
         }
 
@@ -221,11 +239,18 @@ fn every_native_os_hardware_backend_feature_is_in_the_standard_artifact() {
         "the guard must exercise at least one runtime-probed hardware backend"
     );
 
-    assert_eq!(
-        root.get("hardware-all"),
-        Some(&vec!["taskmanager-app-host/hardware-all".to_owned()]),
-        "the product artifact must route hardware-all through the shared app host"
-    );
+    for (product, product_features) in &products {
+        assert_eq!(
+            product_features.get("default"),
+            Some(&vec!["hardware-all".to_owned()]),
+            "{product} must default to the complete hardware registry"
+        );
+        assert_eq!(
+            product_features.get("hardware-all"),
+            Some(&vec!["taskmanager-app-host/hardware-all".to_owned()]),
+            "{product} must route hardware-all through the shared app host"
+        );
+    }
 }
 
 #[test]
@@ -288,7 +313,10 @@ fn every_optional_native_hardware_dependency_is_reachable_from_hardware_all() {
 #[test]
 fn every_release_composition_edge_rejects_reduced_hardware_profiles() {
     for relative in [
-        "src/lib.rs",
+        "crates/taskmanager-gpui/src/lib.rs",
+        "crates/taskmanager-iced/src/lib.rs",
+        "crates/taskmanager-tui/src/lib.rs",
+        "crates/taskmanager-bevy-ui/src/lib.rs",
         "crates/taskmanager-platform-native/src/lib.rs",
         "crates/taskmanager-platform-linux/src/lib.rs",
         "crates/taskmanager-platform-macos/src/lib.rs",

@@ -96,3 +96,73 @@ async fn desktop_widget_surface_paints_metric_cards_from_the_snapshot(cx: &mut T
     }
     drop(vcx);
 }
+
+#[gpui::test]
+async fn refused_window_frame_preference_reports_an_honest_notice_once(cx: &mut TestAppContext) {
+    use crate::gpui_app::chrome::WindowDecorationsPreference;
+
+    let win = cx.add_window(|_window, cx| crate::gpui_app::root::RootView::new(Theme::dark(), cx));
+    let view = win.entity(cx).expect("window root RootView entity");
+    view.update(cx, |v, _cx| {
+        v.mark_telemetry_frame_ready();
+    });
+
+    // Honored request (Native, and the platform fact agrees with the Server
+    // grant the gpui test window reports): rendering must stay silent —
+    // nothing to apologize for.
+    view.update(cx, |v, _cx| {
+        v.window_decorations_pref = WindowDecorationsPreference::Native;
+    });
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    view.read_with(cx, |v, _| {
+        assert!(
+            v.local_feedback_toast.is_none(),
+            "an honored frame preference must not raise a notice"
+        );
+        assert!(!v.decoration_outcome_reported);
+    });
+
+    // Refused request: force the granted fact to Client (what GNOME/Mutter
+    // configures when a compositor cannot draw server-side frames). The next
+    // render reports the contradiction once and latches.
+    view.update(cx, |v, _cx| {
+        v.decorations_override = Some(false);
+    });
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    view.read_with(cx, |v, _| {
+        assert!(
+            v.local_feedback_toast.is_some(),
+            "a refused Native preference must surface an honest notice"
+        );
+        assert!(v.decoration_outcome_reported, "the notice must latch");
+        assert_eq!(v.local_feedback_seq, 1);
+    });
+
+    // The latch holds: subsequent renders do not re-notify (no toast churn).
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    view.read_with(cx, |v, _| {
+        assert_eq!(
+            v.local_feedback_seq, 1,
+            "the outcome notice must fire once per preference change"
+        );
+    });
+
+    // A NEW explicit request re-arms the latch; System never promises a mode,
+    // so even the contradicting (overridden) fact stays silent.
+    view.update(cx, |v, _cx| {
+        v.window_decorations_pref = WindowDecorationsPreference::System;
+        v.decoration_outcome_reported = false;
+    });
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    view.read_with(cx, |v, _| {
+        assert!(!v.decoration_outcome_reported);
+        assert_eq!(
+            v.local_feedback_seq, 1,
+            "System mode must never raise an outcome notice"
+        );
+    });
+}

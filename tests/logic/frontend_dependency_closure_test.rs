@@ -14,12 +14,7 @@ fn repository() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
-fn cargo_tree_packages(
-    feature: Option<&str>,
-    package: &str,
-    edges: &str,
-    all_targets: bool,
-) -> Option<BTreeSet<String>> {
+fn cargo_tree_packages(package: &str, edges: &str, all_targets: bool) -> Option<BTreeSet<String>> {
     let cargo = std::env::var_os("CARGO").unwrap_or_else(|| OsString::from("cargo"));
     let mut command = Command::new(cargo);
     command.current_dir(repository()).args([
@@ -39,9 +34,6 @@ fn cargo_tree_packages(
     if all_targets {
         command.args(["--target", "all"]);
     }
-    if let Some(feature) = feature {
-        command.args(["--no-default-features", "--features", feature]);
-    }
 
     let output = match command.output() {
         Ok(output) => output,
@@ -54,7 +46,7 @@ fn cargo_tree_packages(
 
     assert!(
         output.status.success(),
-        "cargo tree failed for {package} ({feature:?}): {}",
+        "cargo tree failed for {package}: {}",
         String::from_utf8_lossy(&output.stderr)
     );
     Some(
@@ -68,11 +60,19 @@ fn cargo_tree_packages(
 
 #[test]
 fn frontend_production_closures_match_toolkit_boundaries() {
+    // ADR-051: a frontend is a product crate, not a feature. Each product's
+    // closure is its manifest, resolved without feature simulation: the GPUI
+    // product must contain its toolkit, and every other product must be
+    // provably gpui-free.
     let forbidden_for_non_gpui = ["gpui", "taskmanager-gpui", "taskmanager-ui"];
 
-    for (feature, expects_gpui) in [("ui-tui", false), ("ui-iced", false), ("ui-gpui", true)] {
-        let Some(closure) = cargo_tree_packages(Some(feature), "taskmanager", "no-dev", false)
-        else {
+    for (package, expects_gpui) in [
+        ("taskmanager-gpui", true),
+        ("taskmanager-iced", false),
+        ("taskmanager-tui", false),
+        ("taskmanager-bevy-ui", false),
+    ] {
+        let Some(closure) = cargo_tree_packages(package, "no-dev", false) else {
             return;
         };
 
@@ -82,14 +82,14 @@ fn frontend_production_closures_match_toolkit_boundaries() {
                 "GPUI product closure lost gpui: {closure:?}"
             );
             assert!(
-                closure.contains("taskmanager-gpui"),
-                "GPUI product closure lost taskmanager-gpui: {closure:?}"
+                closure.contains("taskmanager-ui"),
+                "GPUI product closure lost taskmanager-ui: {closure:?}"
             );
         } else {
             for forbidden in forbidden_for_non_gpui {
                 assert!(
                     !closure.contains(forbidden),
-                    "{feature} production closure reached forbidden {forbidden}: {closure:?}"
+                    "{package} production closure reached forbidden {forbidden}: {closure:?}"
                 );
             }
         }
@@ -98,7 +98,7 @@ fn frontend_production_closures_match_toolkit_boundaries() {
 
 #[test]
 fn neutral_assets_have_no_toolkit_in_their_production_closure() {
-    let Some(closure) = cargo_tree_packages(None, "taskmanager-assets", "no-dev", false) else {
+    let Some(closure) = cargo_tree_packages("taskmanager-assets", "no-dev", false) else {
         return;
     };
     for forbidden in ["gpui", "iced", "ratatui"] {
@@ -113,8 +113,13 @@ fn neutral_assets_have_no_toolkit_in_their_production_closure() {
 fn frontend_all_target_dev_closures_match_toolkit_boundaries() {
     let forbidden_for_non_gpui = ["gpui", "taskmanager-gpui", "taskmanager-ui"];
 
-    for (feature, expects_gpui) in [("ui-tui", false), ("ui-iced", false), ("ui-gpui", true)] {
-        let Some(closure) = cargo_tree_packages(Some(feature), "taskmanager", "all", true) else {
+    for (package, expects_gpui) in [
+        ("taskmanager-gpui", true),
+        ("taskmanager-iced", false),
+        ("taskmanager-tui", false),
+        ("taskmanager-bevy-ui", false),
+    ] {
+        let Some(closure) = cargo_tree_packages(package, "all", true) else {
             return;
         };
 
@@ -131,7 +136,7 @@ fn frontend_all_target_dev_closures_match_toolkit_boundaries() {
             for forbidden in forbidden_for_non_gpui {
                 assert!(
                     !closure.contains(forbidden),
-                    "{feature} all-target dev closure reached forbidden {forbidden}: {closure:?}"
+                    "{package} all-target dev closure reached forbidden {forbidden}: {closure:?}"
                 );
             }
         }
@@ -140,7 +145,7 @@ fn frontend_all_target_dev_closures_match_toolkit_boundaries() {
 
 #[test]
 fn neutral_assets_have_no_toolkit_in_their_all_target_dev_closure() {
-    let Some(closure) = cargo_tree_packages(None, "taskmanager-assets", "all", true) else {
+    let Some(closure) = cargo_tree_packages("taskmanager-assets", "all", true) else {
         return;
     };
     for forbidden in [
@@ -183,8 +188,7 @@ fn bevy_frontend_closures_keep_the_read_only_composition_boundary() {
     ];
 
     for (edges, all_targets) in [("no-dev", false), ("all", true)] {
-        let Some(closure) = cargo_tree_packages(None, "taskmanager-bevy-ui", edges, all_targets)
-        else {
+        let Some(closure) = cargo_tree_packages("taskmanager-bevy-ui", edges, all_targets) else {
             return;
         };
         for package in required {

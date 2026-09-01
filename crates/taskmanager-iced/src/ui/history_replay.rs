@@ -68,31 +68,29 @@ fn series_color(theme_snapshot: &taskmanager_theme::Theme, metric: HistoryMetric
         | HistoryMetric::CpuTemperatureC
         | HistoryMetric::CpuFrequencyMhz
         | HistoryMetric::CpuPowerW
-        | HistoryMetric::ApplicationCpuUsagePct => {
-            taskmanager_theme::iced::color(theme_snapshot.cpu)
-        }
+        | HistoryMetric::ApplicationCpuUsagePct => crate::theme_binding::color(theme_snapshot.cpu),
         HistoryMetric::MemoryUsedPct
         | HistoryMetric::SwapUsedPct
         | HistoryMetric::ApplicationMemoryBytes => {
-            taskmanager_theme::iced::color(theme_snapshot.memory)
+            crate::theme_binding::color(theme_snapshot.memory)
         }
-        HistoryMetric::StorageActivityPct => taskmanager_theme::iced::color(theme_snapshot.disk),
-        HistoryMetric::NetworkRateBps => taskmanager_theme::iced::color(theme_snapshot.network),
+        HistoryMetric::StorageActivityPct => crate::theme_binding::color(theme_snapshot.disk),
+        HistoryMetric::NetworkRateBps => crate::theme_binding::color(theme_snapshot.network),
         HistoryMetric::GpuUsagePct
         | HistoryMetric::GpuPowerW
         | HistoryMetric::GpuTemperatureC
-        | HistoryMetric::GpuFrequencyMhz => taskmanager_theme::iced::color(theme_snapshot.gpu),
+        | HistoryMetric::GpuFrequencyMhz => crate::theme_binding::color(theme_snapshot.gpu),
         HistoryMetric::BatteryCapacityPct
         | HistoryMetric::BatteryPowerW
-        | HistoryMetric::BatteryHealthPct => taskmanager_theme::iced::color(theme_snapshot.battery),
+        | HistoryMetric::BatteryHealthPct => crate::theme_binding::color(theme_snapshot.battery),
         HistoryMetric::FanRpm | HistoryMetric::FanPwmPct | HistoryMetric::FanTemperatureC => {
-            taskmanager_theme::iced::color(theme_snapshot.palette().accent)
+            crate::theme_binding::color(theme_snapshot.palette().accent)
         }
         HistoryMetric::UptimeSecs
         | HistoryMetric::ProcessCount
         | HistoryMetric::ThreadCount
         | HistoryMetric::ApplicationProcessCount => {
-            taskmanager_theme::iced::color(theme_snapshot.palette().fg)
+            crate::theme_binding::color(theme_snapshot.palette().fg)
         }
     }
 }
@@ -140,9 +138,7 @@ pub fn render_history_replay<'a>(
         panel = panel.push(
             text(error.to_string())
                 .size(f32::from(tokens::FONT_12))
-                .color(taskmanager_theme::iced::color(
-                    theme_snapshot.palette().danger,
-                )),
+                .color(crate::theme_binding::color(theme_snapshot.palette().danger)),
         );
         if let Some(last_good_window) = state.rows_window()
             && last_good_window != window
@@ -193,9 +189,9 @@ pub fn render_history_replay<'a>(
 
             let mut summary = row![
                 text(row_heading(&row_item.key)).size(f32::from(tokens::FONT_12)),
-                text(peak_str).size(f32::from(tokens::FONT_12)).color(
-                    taskmanager_theme::iced::color(theme_snapshot.palette().accent)
-                ),
+                text(peak_str)
+                    .size(f32::from(tokens::FONT_12))
+                    .color(crate::theme_binding::color(theme_snapshot.palette().accent)),
                 text(gaps_str).size(f32::from(tokens::FONT_11)).color(muted),
             ]
             .spacing(8);
@@ -210,13 +206,13 @@ pub fn render_history_replay<'a>(
                 samples,
                 color,
                 max,
-                grid_color: taskmanager_theme::iced::color(theme_snapshot.palette().border),
+                grid_color: crate::theme_binding::color(theme_snapshot.palette().border),
                 smooth: true,
                 hover: true,
                 scale: device_chart::DeviceMetricScale::AutoPeak,
                 readout: crate::perf_chart::ReadoutColors {
-                    bg: taskmanager_theme::iced::color(theme_snapshot.palette().surface),
-                    fg: taskmanager_theme::iced::color(theme_snapshot.palette().fg),
+                    bg: crate::theme_binding::color(theme_snapshot.palette().surface),
+                    fg: crate::theme_binding::color(theme_snapshot.palette().fg),
                 },
             })
             .width(Length::Fill)

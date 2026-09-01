@@ -22,7 +22,7 @@ use taskmanager_core::core::sensors::{
     SensorReading, ThermalControlSnapshot,
 };
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::DeviceSourceSnapshot;
+use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
 
 const HWMON_DISCOVERY_PROVIDER: ProviderId = ProviderId::borrowed("linux.sensor.hwmon.discovery");
 const HWMON_READING_PROVIDER: ProviderId = ProviderId::borrowed("linux.sensor.hwmon.readings");
@@ -56,17 +56,13 @@ pub(crate) fn collect_sensor_center_source(
 pub(crate) fn collect_sensor_center_source(
     now_ms: u64,
 ) -> DeviceSourceSnapshot<SensorCenterSnapshot> {
-    DeviceSourceSnapshot::from_source_status(
+    DeviceSourceSnapshot::from_discovery(
         SensorCenterSnapshot {
             timestamp_ms: now_ms,
             ..Default::default()
         },
-        Vec::new(),
-        SourceStatus {
-            provider: HWMON_DISCOVERY_PROVIDER,
-            outcome: SourceOutcome::Unavailable(FailureKind::Unsupported),
-            item_count: 0,
-        },
+        HWMON_DISCOVERY_PROVIDER,
+        DeviceDiscovery::Unavailable(FailureKind::Unsupported),
         Vec::new(),
     )
 }
@@ -94,7 +90,7 @@ fn collect_sensor_center_source_from(
             } else {
                 (DeviceStatus::Stale, FailureKind::ProviderFault)
             };
-            return DeviceSourceSnapshot::from_source_status(
+            return DeviceSourceSnapshot::from_discovery(
                 SensorCenterSnapshot {
                     state: DeviceState::default().transition(status, now_ms),
                     timestamp_ms: now_ms,
@@ -102,12 +98,8 @@ fn collect_sensor_center_source_from(
                     thermal_control: Default::default(),
                     device_lifecycles: Default::default(),
                 },
-                Vec::new(),
-                SourceStatus {
-                    provider: HWMON_DISCOVERY_PROVIDER,
-                    outcome: SourceOutcome::Unavailable(failure),
-                    item_count: 0,
-                },
+                HWMON_DISCOVERY_PROVIDER,
+                DeviceDiscovery::Unavailable(failure),
                 Vec::new(),
             );
         }
@@ -239,8 +231,16 @@ fn collect_sensor_center_source_from(
         None if discovered_devices.is_empty() => SourceOutcome::Empty,
         None => SourceOutcome::Available,
     };
-    let discovered_count = discovered_devices.len();
-    DeviceSourceSnapshot::from_source_status(
+    let discovery = match discovery_outcome {
+        SourceOutcome::Available => DeviceDiscovery::Available(discovered_devices),
+        SourceOutcome::Empty => DeviceDiscovery::Empty,
+        SourceOutcome::Partial(failure) => DeviceDiscovery::Partial {
+            discovered_devices,
+            failure,
+        },
+        SourceOutcome::Unavailable(failure) => DeviceDiscovery::Unavailable(failure),
+    };
+    DeviceSourceSnapshot::from_discovery(
         SensorCenterSnapshot {
             state: DeviceState::default().transition(status, now_ms),
             timestamp_ms: now_ms,
@@ -248,12 +248,8 @@ fn collect_sensor_center_source_from(
             thermal_control: Default::default(),
             device_lifecycles: Default::default(),
         },
-        discovered_devices,
-        SourceStatus {
-            provider: HWMON_DISCOVERY_PROVIDER,
-            outcome: discovery_outcome,
-            item_count: discovered_count,
-        },
+        HWMON_DISCOVERY_PROVIDER,
+        discovery,
         vec![SourceStatus {
             provider: HWMON_READING_PROVIDER,
             outcome: reading_outcome,

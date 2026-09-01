@@ -234,8 +234,10 @@ pub fn render_processes(
             .flex()
             .items_center()
             .justify_center()
-            .text_color(theme.fg_dim)
-            .text_size(ui_size.body_font_size())
+            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .text_size(taskmanager_ui::theme_binding::absolute(
+                ui_size.body_font_size(),
+            ))
             .child(message)
             .into_any_element()
     } else {
@@ -379,7 +381,9 @@ pub fn render_processes(
                     .right_0()
                     .bottom_0()
                     .h(px(1.0))
-                    .bg(theme.border.with_alpha(0.18)),
+                    .bg(taskmanager_ui::theme_binding::fill(
+                        theme.border.with_alpha(0.18),
+                    )),
             )
             .child(
                 Scrollbar::horizontal(
@@ -408,7 +412,9 @@ pub fn render_processes(
     let view = div()
         .flex()
         .flex_col()
-        .gap(presentation.band_gap())
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            presentation.band_gap(),
+        ))
         .size_full()
         .child(process_overview(ProcessOverviewProps {
             theme: &theme,

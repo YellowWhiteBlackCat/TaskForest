@@ -644,15 +644,15 @@ impl RenderOnce for TextInput {
             .track_focus(&focus_handle)
             .flex()
             .items_center()
-            .px(tokens::SPACE_10)
+            .px(crate::theme_binding::definite_length(tokens::SPACE_10))
             .h(px(self.height))
             .rounded(px(self.radius))
-            .bg(palette.surface)
+            .bg(crate::theme_binding::fill(palette.surface))
             .border_1()
-            .border_color(palette.border)
+            .border_color(crate::theme_binding::hsla(palette.border))
             .text_sm()
-            .text_color(palette.fg)
-            .focus(|style| style.border_color(palette.ring))
+            .text_color(crate::theme_binding::hsla(palette.fg))
+            .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
             .when(disabled, |el| el.opacity(0.5))
             .cursor_text()
             // Editing actions (Input context keymap above).
@@ -751,7 +751,7 @@ impl RenderOnce for TextInput {
         if display.is_empty() {
             element = element.child(
                 div()
-                    .text_color(palette.fg_muted)
+                    .text_color(crate::theme_binding::hsla(palette.fg_muted))
                     .child(placeholder.unwrap_or_default()),
             );
         } else {

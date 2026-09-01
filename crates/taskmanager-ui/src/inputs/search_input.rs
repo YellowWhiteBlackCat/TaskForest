@@ -3,10 +3,10 @@
 
 use std::rc::Rc;
 
+use crate::icons_binding::icon;
 use gpui::{
     App, Entity, IntoElement, ParentElement, RenderOnce, SharedString, Styled, Window, div, px,
 };
-use taskmanager_icons::icon;
 use taskmanager_theme::Palette;
 use taskmanager_ui_contract::IconId;
 
@@ -73,11 +73,11 @@ impl RenderOnce for SearchInput {
             .flex()
             .flex_row()
             .items_center()
-            .gap(tokens::SPACE_8)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
             .child(
                 icon(IconId::Search)
                     .size(px(14.0))
-                    .text_color(palette.fg_muted),
+                    .text_color(crate::theme_binding::hsla(palette.fg_muted)),
             )
             .child(
                 TextInput::new(self.state.clone(), palette)

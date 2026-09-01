@@ -14,7 +14,7 @@ use taskmanager_core::core::sensors::{
     SensorDescriptor, SensorMagnitude, SensorQuantity, SensorScale, SensorUnit,
 };
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::DeviceSourceSnapshot;
+use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
 
 use super::*;
 
@@ -34,7 +34,7 @@ pub(super) fn collect_iio_source_from(
             // composite sensor center stays Available on such hosts. Any other
             // enumeration error is a real failure.
             if error.kind() == std::io::ErrorKind::NotFound {
-                return DeviceSourceSnapshot::from_source_status(
+                return DeviceSourceSnapshot::from_discovery(
                     SensorCenterSnapshot {
                         state: DeviceState::default().transition(DeviceStatus::Unsupported, now_ms),
                         timestamp_ms: now_ms,
@@ -42,12 +42,8 @@ pub(super) fn collect_iio_source_from(
                         thermal_control: Default::default(),
                         device_lifecycles: Default::default(),
                     },
-                    Vec::new(),
-                    SourceStatus {
-                        provider: IIO_DISCOVERY_PROVIDER,
-                        outcome: SourceOutcome::Empty,
-                        item_count: 0,
-                    },
+                    IIO_DISCOVERY_PROVIDER,
+                    DeviceDiscovery::Empty,
                     Vec::new(),
                 );
             }
@@ -59,7 +55,7 @@ pub(super) fn collect_iio_source_from(
             } else {
                 (DeviceStatus::Stale, FailureKind::ProviderFault)
             };
-            return DeviceSourceSnapshot::from_source_status(
+            return DeviceSourceSnapshot::from_discovery(
                 SensorCenterSnapshot {
                     state: DeviceState::default().transition(status, now_ms),
                     timestamp_ms: now_ms,
@@ -67,12 +63,8 @@ pub(super) fn collect_iio_source_from(
                     thermal_control: Default::default(),
                     device_lifecycles: Default::default(),
                 },
-                Vec::new(),
-                SourceStatus {
-                    provider: IIO_DISCOVERY_PROVIDER,
-                    outcome: SourceOutcome::Unavailable(failure),
-                    item_count: 0,
-                },
+                IIO_DISCOVERY_PROVIDER,
+                DeviceDiscovery::Unavailable(failure),
                 Vec::new(),
             );
         }
@@ -203,8 +195,16 @@ pub(super) fn collect_iio_source_from(
         None if discovered_devices.is_empty() => SourceOutcome::Empty,
         None => SourceOutcome::Available,
     };
-    let discovered_count = discovered_devices.len();
-    DeviceSourceSnapshot::from_source_status(
+    let discovery = match discovery_outcome {
+        SourceOutcome::Available => DeviceDiscovery::Available(discovered_devices),
+        SourceOutcome::Empty => DeviceDiscovery::Empty,
+        SourceOutcome::Partial(failure) => DeviceDiscovery::Partial {
+            discovered_devices,
+            failure,
+        },
+        SourceOutcome::Unavailable(failure) => DeviceDiscovery::Unavailable(failure),
+    };
+    DeviceSourceSnapshot::from_discovery(
         SensorCenterSnapshot {
             state: DeviceState::default().transition(status, now_ms),
             timestamp_ms: now_ms,
@@ -212,12 +212,8 @@ pub(super) fn collect_iio_source_from(
             thermal_control: Default::default(),
             device_lifecycles: Default::default(),
         },
-        discovered_devices,
-        SourceStatus {
-            provider: IIO_DISCOVERY_PROVIDER,
-            outcome: discovery_outcome,
-            item_count: discovered_count,
-        },
+        IIO_DISCOVERY_PROVIDER,
+        discovery,
         vec![SourceStatus {
             provider: IIO_READING_PROVIDER,
             outcome: reading_outcome,

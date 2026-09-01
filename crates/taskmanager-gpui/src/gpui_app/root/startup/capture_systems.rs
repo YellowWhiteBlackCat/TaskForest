@@ -195,7 +195,9 @@ fn apply_inventory_capture(
     restore_startup_fixture: bool,
     cx: &mut Context<RootView>,
 ) {
-    if let Some(service) = view.sync_capture_service_system(services_updated) {
+    let service_capture_update =
+        services_updated || view.capture_evidence.service_inventory_capture_requested();
+    if let Some(service) = view.sync_capture_service_system(service_capture_update) {
         view.page = TopPage::Services;
         view.open_service_details(service);
         view.capture_evidence
@@ -208,7 +210,12 @@ fn apply_inventory_capture(
             input.update(cx, |state, cx| state.set_value("4", cx));
         }
     }
-    if view.sync_capture_startup_system(startup_updated, restore_startup_fixture) {
+    let startup_capture_update =
+        startup_updated || view.capture_evidence.startup_inventory_capture_requested();
+    if view.sync_capture_startup_system(
+        startup_capture_update,
+        restore_startup_fixture || startup_capture_update,
+    ) {
         view.page = TopPage::Startup;
         let entries = view.startup_entries_rc().clone();
         view.capture_evidence

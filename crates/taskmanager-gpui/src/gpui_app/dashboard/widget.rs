@@ -44,22 +44,26 @@ fn metric_card(
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(tokens::SPACE_5)
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_5,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(
-                    taskmanager_icons::icon(icon)
+                    taskmanager_ui::icons_binding::icon(icon)
                         .size(px(14.0))
-                        .text_color(color),
+                        .text_color(taskmanager_ui::theme_binding::hsla(color)),
                 )
                 .child(label),
         )
         .child(
             div()
-                .mt(tokens::SPACE_6)
-                .text_size(tokens::FONT_20)
-                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                .text_color(color)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_6))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_20))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_BOLD,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(color))
                 .child(value),
         )
         .render()
@@ -87,7 +91,9 @@ pub fn render_widget(props: DashboardWidgetProps<'_>) -> Stateful<Div> {
     let first_row = div()
         .flex()
         .flex_row()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .flex_1()
         .min_h(px(0.0))
         .child(metric_card(
@@ -112,7 +118,9 @@ pub fn render_widget(props: DashboardWidgetProps<'_>) -> Stateful<Div> {
     let second_row = div()
         .flex()
         .flex_row()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .flex_1()
         .min_h(px(0.0))
         .child(metric_card(
@@ -136,10 +144,14 @@ pub fn render_widget(props: DashboardWidgetProps<'_>) -> Stateful<Div> {
         .id("taskforest-desktop-widget")
         .debug_selector(|| "taskforest-desktop-widget".to_owned())
         .size_full()
-        .p(tokens::SPACE_16)
+        .p(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_16,
+        ))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(
             div()
                 .flex()
@@ -149,14 +161,16 @@ pub fn render_widget(props: DashboardWidgetProps<'_>) -> Stateful<Div> {
                 .h(px(24.0))
                 .child(
                     div()
-                        .font_weight(tokens::FONT_WEIGHT_HEADER.into())
-                        .text_size(tokens::FONT_14)
+                        .font_weight(taskmanager_ui::theme_binding::font_weight(
+                            tokens::FONT_WEIGHT_HEADER,
+                        ))
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_14))
                         .child(product::GPUI_NAME),
                 )
                 .child(
                     div()
-                        .text_size(tokens::FONT_11)
-                        .text_color(theme.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                         .child(i18n::t("dashboard.title")),
                 ),
         )

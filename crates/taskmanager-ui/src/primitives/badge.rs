@@ -52,13 +52,15 @@ impl RenderOnce for Badge {
         div()
             .flex()
             .items_center()
-            .px(tokens::SPACE_8)
+            .px(crate::theme_binding::definite_length(tokens::SPACE_8))
             .h(px(20.0))
             .rounded_full()
-            .bg(fill)
-            .text_color(foreground)
+            .bg(crate::theme_binding::fill(fill))
+            .text_color(crate::theme_binding::hsla(foreground))
             .text_xs()
-            .font_weight(tokens::FONT_WEIGHT_MEDIUM.into())
+            .font_weight(crate::theme_binding::font_weight(
+                tokens::FONT_WEIGHT_MEDIUM,
+            ))
             .child(self.text)
     }
 }

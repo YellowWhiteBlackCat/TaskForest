@@ -8,7 +8,7 @@ use taskmanager_core::core::{
     SmartSelfTestObservation, SmartSelfTestReport, StorageDeviceKey,
 };
 
-use super::{CaptureEvidence, CaptureScenario, SystemHealthCaptureOutcome, emit_marker};
+use super::{CaptureEvidence, CaptureScenario, SystemHealthCaptureOutcome};
 
 impl CaptureEvidence {
     /// Prepare strict Health-page evidence only after the normal telemetry and
@@ -22,9 +22,9 @@ impl CaptureEvidence {
         filesystems: &mut taskmanager_core::core::FilesystemHealthSnapshot,
         sensors: &mut taskmanager_core::core::SensorCenterSnapshot,
     ) -> SystemHealthCaptureOutcome {
-        if !self.enabled
-            || !self.telemetry_ready
-            || !self.ui_data_ready
+        if !self.is_enabled()
+            || !self.telemetry_ready()
+            || !self.ui_data_ready()
             || !self.system_health_fixture_requested()
         {
             return SystemHealthCaptureOutcome::default();
@@ -93,9 +93,8 @@ impl CaptureEvidence {
             }
             _ => false,
         };
-        if page_ready && target_ready && !self.scenario_ready {
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+        if page_ready && target_ready && !self.scenario_ready() {
+            self.mark_scenario_ready();
         }
         if !page_ready || !target_ready {
             return SystemHealthCaptureOutcome::NotReady;

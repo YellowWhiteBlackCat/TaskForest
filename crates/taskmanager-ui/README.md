@@ -66,3 +66,15 @@ text-selection arbitration is defined. `data/table/resize.rs` is the separate
 `ColumnDragResize` reference surface: it owns the typed GPUI drag payload,
 stable first-motion anchoring, width transition, and outside-release wiring;
 page adapters retain column identity and persistence.
+
+## Module map
+
+```text
+src/data/                        table, tree, virtual list, row models, highlighting
+│   └── data/table/              columns, interaction, model, render, resize
+src/inputs/                      checkbox, select, slider, switch, text_input, search_input
+src/overlays/                    context_menu, dialog, dropdown_menu, popup, layer_stack
+src/layout.rs (+ adaptive_grid.rs)  focus.rs
+```
+
+Toolkit-neutral component contracts; each frontend materializes them (ADR-017/020/026).

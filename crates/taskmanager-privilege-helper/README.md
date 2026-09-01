@@ -15,3 +15,12 @@ resource for that invocation and never becomes a general command runner.
 Exit code, stderr, JSON schema, denial and malformed input are part of the
 contract. Package/polkit verification and a live perf receipt are separate;
 without the latter the capability remains permission-limited.
+
+## Module map
+
+```text
+src/main.rs                  root entry, single bounded invocation
+src/discovery.rs  engine_names.rs   GPU engine discovery
+src/sample.rs                PMU sampling
+src/json.rs                  fixed JSON envelope output
+```

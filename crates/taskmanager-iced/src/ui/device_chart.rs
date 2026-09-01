@@ -506,8 +506,8 @@ fn device_mini_graph_with_length<S: Into<Rc<[f32]>>>(
     let max = prefs
         .max_override
         .unwrap_or_else(|| series_max(scale, &samples));
-    let caption_color = taskmanager_theme::iced::color(theme_snapshot.palette().fg_muted);
-    let grid_color = taskmanager_theme::iced::color(theme_snapshot.palette().border);
+    let caption_color = crate::theme_binding::color(theme_snapshot.palette().fg_muted);
+    let grid_color = crate::theme_binding::color(theme_snapshot.palette().border);
     // The DeviceChart draws nothing for fewer than two points; surface that in
     // the caption so an empty/just-launched window reads as collecting, not as a
     // blank graph. History windows are finite-only, so len == finite count.
@@ -518,8 +518,8 @@ fn device_mini_graph_with_length<S: Into<Rc<[f32]>>>(
     // The hover pill wears the same elevated-surface/foreground pair as the CPU
     // chart's readout (token-derived, never a literal).
     let readout = ReadoutColors {
-        bg: taskmanager_theme::iced::color(theme_snapshot.palette().surface),
-        fg: taskmanager_theme::iced::color(theme_snapshot.palette().fg),
+        bg: crate::theme_binding::color(theme_snapshot.palette().surface),
+        fg: crate::theme_binding::color(theme_snapshot.palette().fg),
     };
     column(vec![
         text(label)

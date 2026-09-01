@@ -1,6 +1,6 @@
 # ADR-026: Toolkit-neutral theme layer for multiple frontends
 
-Status: accepted
+Status: accepted (the feature-gated gpui/iced bindings clause is superseded by ADR-051: toolkit bindings are frontend-owned adapter functions; the theme crate carries no frontend features)
 
 ## Context
 

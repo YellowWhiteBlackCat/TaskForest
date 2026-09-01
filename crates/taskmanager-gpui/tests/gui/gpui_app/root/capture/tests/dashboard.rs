@@ -27,14 +27,14 @@ fn dashboard_marker_waits_for_live_readiness_and_prepares_exact_target() {
         evidence.on_dashboard_state(&mut dashboard, &store.system_history, &ingestor, 7_200_000,),
         None
     );
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
     assert_eq!(
         evidence.on_dashboard_state(&mut dashboard, &store.system_history, &ingestor, 7_200_000,),
         None
     );
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
     let mut processes = Vec::new();
     assert!(
         evidence
@@ -43,7 +43,7 @@ fn dashboard_marker_waits_for_live_readiness_and_prepares_exact_target() {
     );
     let panel =
         evidence.on_dashboard_state(&mut dashboard, &store.system_history, &ingestor, 7_200_000);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert_eq!(panel, Some(DashboardPanel::Events));
     let events = evidence
         .take_event_history_fixture()
@@ -69,7 +69,7 @@ fn every_dashboard_capture_token_reaches_its_exact_root_state() {
             &ingestor,
             7_200_000,
         );
-        assert!(evidence.scenario_ready);
+        assert!(evidence.scenario_ready());
         (dashboard, store, panel)
     }
     let (overview, _, _) = prepared(CaptureScenario::SystemDashboard);
@@ -114,7 +114,7 @@ fn system_npu_capture_selects_hardware_but_defers_marker_to_post_layout_scroll()
     assert_eq!(dashboard.section, SystemSection::Hardware);
     assert_eq!(panel, None);
     assert!(
-        !evidence.scenario_ready,
+        !evidence.scenario_ready(),
         "the marker belongs to the later visible-scroll terminal"
     );
 }

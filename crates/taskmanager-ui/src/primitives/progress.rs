@@ -66,7 +66,7 @@ impl RenderOnce for ProgressBar {
             .w_full()
             .h(px(self.height))
             .rounded(px(self.radius))
-            .bg(self.palette.border)
+            .bg(crate::theme_binding::fill(self.palette.border))
             .overflow_hidden();
 
         match self.value {
@@ -75,14 +75,14 @@ impl RenderOnce for ProgressBar {
                     .h_full()
                     .w(relative(value))
                     .rounded(px(self.radius))
-                    .bg(self.palette.accent),
+                    .bg(crate::theme_binding::fill(self.palette.accent)),
             ),
             None => track.child(
                 div()
                     .h_full()
                     .w_1_2()
                     .rounded(px(self.radius))
-                    .bg(self.palette.accent)
+                    .bg(crate::theme_binding::fill(self.palette.accent))
                     .with_animation(
                         ElementId::Name("tm-progress-indeterminate".into()),
                         Animation::new(Duration::from_millis(1200)).repeat(),

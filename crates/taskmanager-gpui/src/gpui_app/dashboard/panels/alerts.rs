@@ -193,24 +193,32 @@ fn adjustment_control(props: AdjustmentControlProps<'_>) -> Div {
     div()
         .flex_1()
         .min_w(px(142.0))
-        .p(tokens::SPACE_7)
-        .rounded(tokens::control_radius(theme))
-        .bg(theme.card_surface())
+        .p(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(theme.card_surface()))
         .child(
             div()
                 .flex()
                 .justify_between()
-                .gap(tokens::SPACE_6)
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(label)
                 .child(value),
         )
         .child(
             div()
-                .mt(tokens::SPACE_5)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_5))
                 .flex()
-                .gap(tokens::SPACE_4)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_4,
+                ))
                 .child(elements::pill(
                     theme,
                     (SharedString::from(format!("{id_prefix}-less")), index),
@@ -261,13 +269,17 @@ fn target_control(
     let mut control = div()
         .flex_1()
         .min_w(px(142.0))
-        .p(tokens::SPACE_7)
-        .rounded(tokens::control_radius(theme))
-        .bg(theme.card_surface())
+        .p(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(theme.card_surface()))
         .child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("alerts.target")),
         );
     if supports_target {
@@ -290,10 +302,12 @@ fn target_control(
     } else {
         control = control.child(
             div()
-                .mt(tokens::SPACE_5)
-                .py(tokens::SPACE_6)
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_5))
+                .py(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(value),
         );
     }
@@ -313,14 +327,20 @@ fn rule_row(
     let severity_rule_id = managed.rule.id.clone();
     let remove_rule_id = managed.rule.id.clone();
     div()
-        .p(tokens::SPACE_8)
-        .rounded(tokens::card_radius(theme))
+        .p(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::card_radius(theme),
+        ))
         .border_1()
-        .border_color(theme.border)
-        .bg(theme.sidebar_card_bg)
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_7)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ))
         .child(
             div()
                 .flex()
@@ -328,10 +348,14 @@ fn rule_row(
                 .flex_wrap()
                 .items_center()
                 .justify_between()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(
                     div()
-                        .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
+                        .font_weight(taskmanager_ui::theme_binding::font_weight(
+                            tokens::FONT_WEIGHT_SEMIBOLD,
+                        ))
                         .child(metric_label(managed.rule.metric)),
                 )
                 .child(
@@ -339,7 +363,9 @@ fn rule_row(
                         .flex()
                         .flex_row()
                         .flex_wrap()
-                        .gap(tokens::SPACE_4)
+                        .gap(taskmanager_ui::theme_binding::definite_length(
+                            tokens::SPACE_4,
+                        ))
                         .child(elements::pill(
                             theme,
                             ("alert-toggle", index),
@@ -405,7 +431,9 @@ fn rule_row(
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(adjustment_control(AdjustmentControlProps {
                     theme,
                     index,
@@ -451,7 +479,12 @@ pub(super) fn render_alert_rules(
     rules: &[ManagedAlertRule],
     entity: Entity<RootView>,
 ) -> Div {
-    let mut rows = div().flex().flex_col().gap(tokens::SPACE_7);
+    let mut rows = div()
+        .flex()
+        .flex_col()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ));
     for (index, managed) in rules.iter().enumerate() {
         rows = rows.child(rule_row(theme, index, managed, &entity));
     }
@@ -459,11 +492,13 @@ pub(super) fn render_alert_rules(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_10)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("alerts.manager_help")),
         )
         .child(render_transfer_actions(theme, rules, add.clone()))

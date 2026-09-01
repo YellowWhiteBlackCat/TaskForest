@@ -465,9 +465,9 @@ pub fn presets_ribbon<'a>(
             }
         };
         let color = if is_error {
-            taskmanager_theme::iced::color(theme_snapshot.palette().danger)
+            crate::theme_binding::color(theme_snapshot.palette().danger)
         } else {
-            taskmanager_theme::iced::color(theme_snapshot.palette().accent)
+            crate::theme_binding::color(theme_snapshot.palette().accent)
         };
         items.push(
             text(msg)

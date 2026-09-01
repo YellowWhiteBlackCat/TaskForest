@@ -267,12 +267,18 @@ pub(super) fn render_service_control_confirmation_dialog(
         .w(px(420.0))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_14)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_14,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_13)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
                 .line_height(relative(1.45))
-                .text_color(if is_high_risk { theme.danger } else { theme.fg })
+                .text_color(taskmanager_ui::theme_binding::hsla(if is_high_risk {
+                    theme.danger
+                } else {
+                    theme.fg
+                }))
                 .child(message),
         )
         .child(
@@ -280,7 +286,9 @@ pub(super) fn render_service_control_confirmation_dialog(
                 .flex()
                 .flex_row()
                 .justify_end()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(elements::pill(
                     theme,
                     "service-control-cancel",

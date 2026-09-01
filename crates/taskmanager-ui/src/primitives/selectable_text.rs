@@ -296,7 +296,7 @@ impl RenderOnce for SelectableText {
             styled = styled.with_highlights([(
                 selection,
                 HighlightStyle {
-                    background_color: Some(self.palette.selection.into()),
+                    background_color: Some(crate::theme_binding::hsla(self.palette.selection)),
                     ..Default::default()
                 },
             )]);

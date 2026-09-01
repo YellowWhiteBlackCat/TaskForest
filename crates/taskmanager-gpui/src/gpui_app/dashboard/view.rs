@@ -28,6 +28,10 @@ use taskmanager_theme::{Color, Theme};
 use taskmanager_ui::layout::scroll_region_with_rail;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
+#[path = "history_grid.rs"]
+mod history_grid;
+use history_grid::render_history_grid;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SummaryDestination {
     Cpu,
@@ -150,13 +154,17 @@ pub fn render_system_header(
         .flex_wrap()
         .items_center()
         .justify_between()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(
             div()
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(section_pill(
                     theme,
                     SystemSection::Dashboard,
@@ -181,10 +189,12 @@ pub fn render_system_header(
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(match layout.surfaces {
-                    SystemSurfacePresentation::SingleColumn => tokens::SPACE_4,
-                    SystemSurfacePresentation::MultiColumn => tokens::SPACE_6,
-                })
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    match layout.surfaces {
+                        SystemSurfacePresentation::SingleColumn => tokens::SPACE_4,
+                        SystemSurfacePresentation::MultiColumn => tokens::SPACE_6,
+                    },
+                ))
                 .child(
                     elements::Pill::new(
                         "open-alert-rules",
@@ -236,18 +246,22 @@ fn summary_card(
             div()
                 .flex()
                 .justify_between()
-                .gap(tokens::SPACE_6)
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(
                     div()
                         .flex()
                         .items_center()
-                        .gap(tokens::SPACE_5)
+                        .gap(taskmanager_ui::theme_binding::definite_length(
+                            tokens::SPACE_5,
+                        ))
                         .child(
-                            taskmanager_icons::icon(icon)
+                            taskmanager_ui::icons_binding::icon(icon)
                                 .size(px(14.0))
-                                .text_color(color),
+                                .text_color(taskmanager_ui::theme_binding::hsla(color)),
                         )
                         .child(label.to_string()),
                 )
@@ -255,10 +269,12 @@ fn summary_card(
         )
         .child(
             div()
-                .mt(tokens::SPACE_4)
-                .text_size(tokens::FONT_20)
-                .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                .text_color(color)
+                .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_4))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_20))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_BOLD,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(color))
                 .child(value),
         )
         .render()
@@ -267,7 +283,11 @@ fn summary_card(
         .tab_stop(true)
         .focus(elements::focus_ring(theme))
         .cursor_pointer()
-        .hover(|style| style.bg(theme.accent.with_alpha(0.08)))
+        .hover(|style| {
+            style.bg(taskmanager_ui::theme_binding::fill(
+                theme.accent.with_alpha(0.08),
+            ))
+        })
         .flex_1()
         .min_w(px(132.0))
         .shadow(elements::card_shadow(theme))
@@ -380,11 +400,15 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
         }))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_5)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_5,
+        ))
         .child(
             div()
-                .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
-                .text_size(tokens::FONT_12)
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_SEMIBOLD,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
                 .child(label.to_string()),
         )
         .child(
@@ -392,7 +416,9 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(tokens::SPACE_4)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_4,
+                ))
                 .child(readout_pill(
                     theme,
                     series,
@@ -418,7 +444,7 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
                 history_graph_id(metric),
                 history_graph_id(metric),
                 std::rc::Rc::clone(&samples),
-                color.into(),
+                taskmanager_ui::theme_binding::rgba(color),
                 GraphOpts {
                     max: max.max(1.0),
                     gradient_fill: true,
@@ -484,7 +510,14 @@ pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
     } = props;
     let series = state.timeline.series(history, state.history_window);
     let coverage_minutes = series.covered_ms as f64 / 60_000.0;
-    let mut windows = div().flex().flex_row().flex_wrap().gap(tokens::SPACE_4);
+    let mut windows =
+        div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_4,
+            ));
     for window in HistoryWindow::ALL {
         let entity = entity.clone();
         windows = windows.child(elements::pill(
@@ -510,16 +543,22 @@ pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
         scroll.clone(),
         theme.palette(),
         div()
-            .pt(tokens::SPACE_8)
+            .pt(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
             .flex()
             .flex_col()
-            .gap(tokens::SPACE_10)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_10,
+            ))
             .child(
                 div()
                     .flex()
                     .flex_row()
                     .flex_wrap()
-                    .gap(tokens::SPACE_8)
+                    .gap(taskmanager_ui::theme_binding::definite_length(
+                        tokens::SPACE_8,
+                    ))
                     .child(summary_card(
                         theme,
                         i18n::t("common.cpu"),
@@ -571,17 +610,21 @@ pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
                     .flex_wrap()
                     .items_center()
                     .justify_between()
-                    .gap(tokens::SPACE_6)
+                    .gap(taskmanager_ui::theme_binding::definite_length(
+                        tokens::SPACE_6,
+                    ))
                     .child(
                         div()
-                            .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
+                            .font_weight(taskmanager_ui::theme_binding::font_weight(
+                                tokens::FONT_WEIGHT_SEMIBOLD,
+                            ))
                             .child(i18n::t("dashboard.history")),
                     )
                     .child(windows)
                     .child(
                         div()
-                            .text_size(tokens::FONT_11)
-                            .text_color(theme.fg_dim)
+                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                             .child(
                                 i18n::t("dashboard.coverage")
                                     .replace("{minutes}", &format!("{coverage_minutes:.1}")),
@@ -604,78 +647,6 @@ pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
         root = root.child(elements::tooltip_overlay(theme, &text, pos));
     }
     root
-}
-
-fn render_history_grid(
-    theme: &Theme,
-    series: &TimelineSeries,
-    state: &DashboardState,
-    layout: SystemPageBudget,
-    entity: Entity<RootView>,
-    hover_slot: Rc<RefCell<Option<GraphHover>>>,
-) -> Div {
-    let disk_max = finite_peak(&series.disk_mib_per_sec);
-    let network_max = finite_peak(&series.network_mib_per_sec);
-    let card = |metric, label, color, max, unit, entity| {
-        history_card(HistoryCardProps {
-            theme,
-            label,
-            series,
-            metric,
-            color,
-            max,
-            unit,
-            layout,
-            active: state.history_selection,
-            entity,
-            hover_slot: hover_slot.clone(),
-        })
-    };
-    div()
-        .flex()
-        .flex_row()
-        .flex_wrap()
-        .gap(tokens::SPACE_8)
-        .child(card(
-            TimelineMetric::Cpu,
-            i18n::t("common.cpu"),
-            theme.cpu,
-            100.0,
-            "%",
-            entity.clone(),
-        ))
-        .child(card(
-            TimelineMetric::Memory,
-            i18n::t("common.memory"),
-            theme.memory,
-            100.0,
-            "%",
-            entity.clone(),
-        ))
-        .child(card(
-            TimelineMetric::Disk,
-            i18n::t("dashboard.disk_io"),
-            theme.disk,
-            disk_max,
-            "MiB/s",
-            entity.clone(),
-        ))
-        .child(card(
-            TimelineMetric::Network,
-            i18n::t("dashboard.network_io"),
-            theme.network,
-            network_max,
-            "MiB/s",
-            entity,
-        ))
-}
-
-fn finite_peak(samples: &[f32]) -> f32 {
-    samples
-        .iter()
-        .copied()
-        .filter(|value| value.is_finite())
-        .fold(0.0_f32, f32::max)
 }
 
 #[cfg(test)]

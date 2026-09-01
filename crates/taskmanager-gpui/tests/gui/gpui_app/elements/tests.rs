@@ -24,7 +24,10 @@ mod titlebar_border_tests {
             for mode in [LightDark::Light, LightDark::Dark] {
                 for contrast in [HighContrast::Off, HighContrast::On] {
                     let theme = Theme::build(skin, mode, contrast, ResolvedFonts::system_for(skin));
-                    assert_eq!(titlebar_border(&theme, true), theme.border.into());
+                    assert_eq!(
+                        titlebar_border(&theme, true),
+                        taskmanager_ui::theme_binding::rgba(theme.border)
+                    );
                 }
             }
         }
@@ -40,7 +43,9 @@ mod titlebar_border_tests {
                 for contrast in [HighContrast::Off, HighContrast::On] {
                     let theme = Theme::build(skin, mode, contrast, ResolvedFonts::system_for(skin));
                     let dim = titlebar_border(&theme, false);
-                    let expected = theme.border.with_alpha(theme.border.a * 0.6).into();
+                    let expected = taskmanager_ui::theme_binding::rgba(
+                        theme.border.with_alpha(theme.border.a * 0.6),
+                    );
                     assert_eq!(dim, expected);
                     assert_eq!(
                         (dim.r, dim.g, dim.b),
@@ -86,11 +91,12 @@ mod card_shadow_tests {
                     skin.label(),
                     mode.label()
                 );
-                let ink: Hsla = theme.card_shadow().into();
-                let ambient: Hsla = theme
-                    .card_shadow()
-                    .with_alpha(theme.card_shadow().a * CARD_SHADOW_AMBIENT_ALPHA)
-                    .into();
+                let ink: Hsla = taskmanager_ui::theme_binding::hsla(theme.card_shadow());
+                let ambient: Hsla = taskmanager_ui::theme_binding::hsla(
+                    theme
+                        .card_shadow()
+                        .with_alpha(theme.card_shadow().a * CARD_SHADOW_AMBIENT_ALPHA),
+                );
                 assert_eq!(
                     shadow[1].color,
                     ink,
@@ -140,7 +146,7 @@ mod card_shadow_tests {
             ambient.blur_radius
         );
         assert!(f32::from(ambient.offset.y) <= 3.0);
-        let ink: Hsla = theme.card_shadow().into();
+        let ink: Hsla = taskmanager_ui::theme_binding::hsla(theme.card_shadow());
         let painted: Hsla = ambient.color;
         assert!(
             painted.a <= ink.a * 0.4,
@@ -172,7 +178,7 @@ mod card_shadow_tests {
             dark_shadow[1].color, light_shadow[1].color,
             "light and dark cards must cast different shadow ink"
         );
-        let black_ink: Hsla = Theme::dark().card_shadow().into();
+        let black_ink: Hsla = taskmanager_ui::theme_binding::hsla(Theme::dark().card_shadow());
         assert_eq!(
             dark_shadow[1].color, black_ink,
             "dark skins cast the locked black ink"

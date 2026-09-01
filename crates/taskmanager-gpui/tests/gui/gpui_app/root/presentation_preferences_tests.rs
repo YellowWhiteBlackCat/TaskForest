@@ -83,3 +83,45 @@ fn whole_snapshot_replace_preserves_unrelated_fingerprints_and_noop_is_inert() {
         [false, true, false, true, false, false]
     );
 }
+
+#[test]
+fn window_decorations_mutation_bumps_only_the_appearance_axis_and_noop_is_inert() {
+    use taskmanager_core::core::config::{
+        WINDOW_DECORATIONS_CUSTOM, WINDOW_DECORATIONS_NATIVE, WINDOW_DECORATIONS_SYSTEM,
+    };
+    let mut preferences = PresentationPreferences::default();
+    assert_eq!(
+        preferences.snapshot().window_decorations(),
+        WINDOW_DECORATIONS_SYSTEM,
+        "the default snapshot carries the System sentinel"
+    );
+
+    let before = preferences.fingerprint();
+    preferences.set_window_decorations(gpui::SharedString::from(WINDOW_DECORATIONS_CUSTOM));
+    assert_eq!(
+        changed_axes(before, preferences.fingerprint()),
+        [true, false, false, false, false, false],
+        "the frame policy persists with the appearance/startup-page axis"
+    );
+    assert_eq!(
+        preferences.snapshot().window_decorations(),
+        WINDOW_DECORATIONS_CUSTOM
+    );
+
+    // Writing the same token again must not churn the fingerprint, or the
+    // periodic save would consider every projection dirty forever.
+    let before = preferences.fingerprint();
+    preferences.set_window_decorations(gpui::SharedString::from(WINDOW_DECORATIONS_CUSTOM));
+    assert_eq!(preferences.fingerprint(), before);
+
+    // A whole-snapshot replace that changes only the frame policy still
+    // bumps the appearance axis (the fold path used by config publications).
+    let mut next = preferences.snapshot();
+    next.window_decorations = gpui::SharedString::from(WINDOW_DECORATIONS_NATIVE);
+    let before = preferences.fingerprint();
+    preferences.replace(next);
+    assert_eq!(
+        changed_axes(before, preferences.fingerprint()),
+        [true, false, false, false, false, false]
+    );
+}

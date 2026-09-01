@@ -52,15 +52,23 @@ where
         .id(label)
         .flex()
         .items_center()
-        .gap(tokens::SPACE_6)
-        .px(tokens::SPACE_12)
-        .py(tokens::SPACE_6)
-        .rounded(tokens::control_radius(theme))
-        .bg(background)
-        .text_size(tokens::FONT_13)
-        .text_color(foreground);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(background))
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+        .text_color(taskmanager_ui::theme_binding::hsla(foreground));
     if let Some(icon) = icon {
-        button = button.child(taskmanager_icons::icon(icon).size(px(14.0)));
+        button = button.child(taskmanager_ui::icons_binding::icon(icon).size(px(14.0)));
     }
     button = button.child(label);
     if enabled {

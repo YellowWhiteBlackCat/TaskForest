@@ -6,7 +6,9 @@ use taskmanager_core::core::metrics::MemoryMetrics;
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::viewmodel::StatRow;
 
-use super::memory_details::{compressed_swap_readout, virtual_memory_commit_readout};
+use super::memory_details::{
+    compressed_swap_readout, compression_ratio_readout, virtual_memory_commit_readout,
+};
 
 pub(super) struct MemoryPageStats {
     pub rows: Vec<StatRow>,
@@ -105,6 +107,12 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: UnitPreferences) 
     }
     if let Some(readout) = compressed_swap_readout(memory, units) {
         rows.push(StatRow::text(i18n::t("mem.zram_swap"), Some(readout)));
+    }
+    if let Some(readout) = compression_ratio_readout(memory) {
+        rows.push(StatRow::text(
+            i18n::t("mem.compression_ratio"),
+            Some(readout),
+        ));
     }
     // The RAM the zram store actually consumes (`mm_stat` `mem_used_total`,
     // metadata included): a distinct fact from the swap-used view above, so

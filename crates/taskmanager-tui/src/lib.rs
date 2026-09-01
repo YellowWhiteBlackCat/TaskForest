@@ -12,6 +12,16 @@
 
 #![forbid(unsafe_code)]
 
+// A release artifact is a platform variant, never a hardware-vendor variant
+// (ADR-006/051). Developers may use reduced debug builds to exercise fallback
+// paths, but a distributable binary must carry every backend in the standard
+// hardware set.
+#[cfg(all(not(debug_assertions), not(feature = "hardware-all")))]
+compile_error!(
+    "release builds require the default `hardware-all` feature; \
+     vendor-specific TaskForest artifacts are not supported"
+);
+
 mod bindings;
 mod capabilities;
 mod clipboard;

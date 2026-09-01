@@ -149,8 +149,9 @@ use taskmanager_core::core::process::{
 };
 use taskmanager_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_core::core::session::SessionControlAction;
-use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
-use taskmanager_platform_contract::{CapabilityId, DeviceSourceSnapshot, EventSequence, RequestId};
+use taskmanager_platform_contract::{
+    CapabilityId, DeviceDiscovery, DeviceSourceSnapshot, EventSequence, RequestId,
+};
 
 fn snapshot_with_cpu(cpu_usage: f32, timestamp_ms: u64) -> SystemSnapshot {
     SystemSnapshot {
@@ -823,14 +824,10 @@ fn sensor_and_power_lifecycle_partitions_use_their_own_event_sequences() {
             sequence: EventSequence::new(7),
             observed_at_ms: 70,
         },
-        SensorEvent::Snapshot(DeviceSourceSnapshot::from_source_status(
+        SensorEvent::Snapshot(DeviceSourceSnapshot::from_discovery(
             SensorCenterSnapshot::default(),
-            Vec::new(),
-            SourceStatus {
-                provider: ProviderId::borrowed("fixture.sensor.discovery"),
-                outcome: SourceOutcome::Empty,
-                item_count: 0,
-            },
+            ProviderId::borrowed("fixture.sensor.discovery"),
+            DeviceDiscovery::Empty,
             Vec::new(),
         )),
     ));
@@ -842,14 +839,10 @@ fn sensor_and_power_lifecycle_partitions_use_their_own_event_sequences() {
             sequence: EventSequence::new(9),
             observed_at_ms: 90,
         },
-        PowerSupplyEvent::Snapshot(DeviceSourceSnapshot::from_source_status(
+        PowerSupplyEvent::Snapshot(DeviceSourceSnapshot::from_discovery(
             PowerSupplySnapshot::default(),
-            Vec::new(),
-            SourceStatus {
-                provider: ProviderId::borrowed("fixture.power.discovery"),
-                outcome: SourceOutcome::Empty,
-                item_count: 0,
-            },
+            ProviderId::borrowed("fixture.power.discovery"),
+            DeviceDiscovery::Empty,
             Vec::new(),
         )),
     ));
@@ -924,14 +917,10 @@ fn sensor_snapshot_is_stored_for_frontend_rendering() {
             sequence: EventSequence::new(11),
             observed_at_ms: 110,
         },
-        SensorEvent::Snapshot(DeviceSourceSnapshot::from_source_status(
+        SensorEvent::Snapshot(DeviceSourceSnapshot::from_discovery(
             SensorCenterSnapshot::default(),
-            Vec::new(),
-            SourceStatus {
-                provider: ProviderId::borrowed("fixture.sensor.discovery"),
-                outcome: SourceOutcome::Empty,
-                item_count: 0,
-            },
+            ProviderId::borrowed("fixture.sensor.discovery"),
+            DeviceDiscovery::Empty,
             Vec::new(),
         )),
     ));

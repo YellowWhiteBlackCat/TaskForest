@@ -29,7 +29,7 @@ pub fn hover_animation() -> Animation {
 /// Policy-aware hover animation. `None` means the caller should paint the
 /// final hover state without mounting an animation wrapper.
 pub fn hover_animation_for(policy: MotionPolicy) -> Option<Animation> {
-    taskmanager_theme::gpui::motion_animation(policy, DURATION_HOVER)
+    crate::theme_binding::motion_animation(policy, DURATION_HOVER)
 }
 
 /// Pure key encoder for a two-state hover transition: packs both booleans
@@ -67,7 +67,7 @@ fn interpolate_color(from: Color, to: Color, progress: f32) -> Color {
 }
 
 fn animation_for(policy: MotionPolicy, duration: Duration) -> Option<Animation> {
-    taskmanager_theme::gpui::motion_animation(policy, duration)
+    crate::theme_binding::motion_animation(policy, duration)
 }
 
 fn opacity_transition_with_duration<E>(
@@ -109,16 +109,22 @@ where
     E: IntoElement + Styled + 'static,
 {
     if from == to {
-        return element.bg(to).into_any_element();
+        return element
+            .bg(crate::theme_binding::fill(to))
+            .into_any_element();
     }
 
     match animation_for(policy, duration) {
         Some(animation) => element
             .with_animation(id, animation, move |element, progress| {
-                element.bg(interpolate_color(from, to, progress))
+                element.bg(crate::theme_binding::fill(interpolate_color(
+                    from, to, progress,
+                )))
             })
             .into_any_element(),
-        None => element.bg(to).into_any_element(),
+        None => element
+            .bg(crate::theme_binding::fill(to))
+            .into_any_element(),
     }
 }
 
@@ -190,7 +196,9 @@ where
     E: IntoElement + Styled + 'static,
 {
     if !hovered {
-        return element.bg(base).into_any_element();
+        return element
+            .bg(crate::theme_binding::fill(base))
+            .into_any_element();
     }
 
     color_transition_with_duration(element, id, base, hover, policy, DURATION_HOVER)

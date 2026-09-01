@@ -64,18 +64,22 @@ fn font_choice_row(props: FontChoiceRowProps<'_>, cx: &mut Context<RootView>) ->
         .flex_row()
         .items_center()
         .justify_between()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_13)
-                .text_color(theme.fg)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(caption.to_string()),
         )
         .child(
             div()
                 .flex()
                 .flex_row()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(font_pill(
                     FontPillProps {
                         theme,
@@ -180,7 +184,9 @@ pub(super) fn font_row(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(font_choice_row(
             FontChoiceRowProps {
                 theme,
@@ -213,14 +219,18 @@ pub(super) fn font_row(
         ))
         .child(
             div()
-                .text_size(tokens::FONT_CAPTION)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(
+                    tokens::FONT_CAPTION,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("settings.font_hint").to_string()),
         )
         .child(
             div()
-                .text_size(tokens::FONT_CAPTION)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(
+                    tokens::FONT_CAPTION,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(effective_font_summary(theme)),
         )
 }

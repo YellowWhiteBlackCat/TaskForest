@@ -7,10 +7,9 @@
 //! capture preparation never invokes a destructive action.
 
 use crate::gpui_app::dashboard::{DashboardPanel, DashboardState, EventCenterState, SystemSection};
-use crate::gpui_app::process_insights::{ProcessInsightsState, process_insights_capture_fixture};
-use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
+use crate::gpui_app::process_insights::process_insights_capture_fixture;
 use crate::gpui_app::timeline::HistoryWindow;
-use taskmanager_application::{ProcessTerminationAction, ProcessTerminationConfirmation};
+use taskmanager_application::ProcessTerminationAction;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::group_aggregate::aggregate_apps_typed;
 use taskmanager_core::core::process::{
@@ -19,7 +18,7 @@ use taskmanager_core::core::process::{
 };
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_core::core::startup::StartupEntry;
-use taskmanager_core::core::{AlertEvent, ServiceId, SmartSelfTestObservation};
+use taskmanager_core::core::{AlertEvent, ServiceId};
 use taskmanager_telemetry_store::{
     CorrelatedSystemTelemetryHistory, CorrelatedSystemTelemetryIngestor,
 };
@@ -33,6 +32,7 @@ mod gpu_history;
 mod marker;
 mod process_fixtures;
 mod scenarios;
+mod state;
 mod system_health;
 use fixtures::{
     dynamic_power_fixture, dynamic_sensor_fixture, npu_inventory_fixture, prepare_active_alert,
@@ -48,83 +48,58 @@ use process_fixtures::{
     prepare_startup_impact,
 };
 pub use scenarios::CaptureScenario;
-
-#[derive(Debug, PartialEq)]
-pub enum CaptureProcessAction {
-    Termination(ProcessTerminationConfirmation),
-    ApplicationSelection(ProcessLiveKey),
-    Batch(ProcessBatchIntent),
-    Properties(ProcessLiveKey, ProcessDetailsSection),
-    Insights {
-        identity: ProcessLiveKey,
-        state: ProcessInsightsState,
-    },
-}
-
-#[derive(Debug, Default)]
-pub enum SystemHealthCaptureOutcome {
-    #[default]
-    NotReady,
-    Ready,
-    ReadyWithConfirmation(SmartSelfTestConfirmationRequest),
-}
-
-/// The NPU evidence marker is emitted only after its typed fixture has entered
-/// the canonical projection and the Graphics section has actually been laid
-/// out and scrolled into the per-window viewport.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-enum SystemNpuCaptureState {
-    #[default]
-    AwaitingFixture,
-    AwaitingLayout,
-    ScrollScheduled,
-    Ready,
-}
-
-impl SystemNpuCaptureState {
-    const fn needs_fixture(self) -> bool {
-        matches!(self, Self::AwaitingFixture)
-    }
-}
-
-impl SystemHealthCaptureOutcome {
-    pub const fn ready(&self) -> bool {
-        matches!(self, Self::Ready | Self::ReadyWithConfirmation(_))
-    }
-}
-
-#[derive(Debug, Default)]
-pub struct CaptureEvidence {
-    enabled: bool,
-    scenario: Option<CaptureScenario>,
-    telemetry_ready: bool,
-    ui_data_ready: bool,
-    scenario_ready: bool,
-    snapshot_count: u8,
-    scenario_process_identity: Option<ProcessLiveKey>,
-    history_replay_opened: bool,
-    system_npu_state: SystemNpuCaptureState,
-    /// Capture-only comparison evidence. Persistent history runtime is
-    /// reader-only; deterministic screenshots must not reintroduce its retired
-    /// boot writer/controller state.
-    startup_boot_baseline: Option<taskmanager_core::core::startup::BootTimeline>,
-    /// Strict-capture-only typed observation. Production reports are borrowed
-    /// directly from the shell projection and never copied into this slot.
-    system_health_observation: Option<SmartSelfTestObservation>,
-    /// Capture-only handoff for deterministic alert events. The fixture is
-    /// installed into the shared shell authority before the panel is shown.
-    event_history_fixture: Option<Vec<AlertEvent>>,
-}
+pub(super) use state::{
+    CaptureDataReadiness, CaptureEvidence, CaptureMode, CaptureProcessAction,
+    CaptureScenarioProgress, HistoryReplayOpenState, SystemHealthCaptureOutcome,
+    SystemNpuCaptureState, WindowCaptureChain, WindowCaptureSchedule,
+};
 
 impl CaptureEvidence {
+    pub(crate) const fn is_enabled(&self) -> bool {
+        self.mode.enabled()
+    }
+
+    pub(crate) const fn telemetry_ready(&self) -> bool {
+        self.data_readiness.telemetry_ready()
+    }
+
+    pub(crate) const fn ui_data_ready(&self) -> bool {
+        self.data_readiness.ui_data_ready()
+    }
+
+    pub(crate) const fn scenario_ready(&self) -> bool {
+        self.scenario_progress.ready()
+    }
+
+    fn mark_scenario_ready(&mut self) {
+        if !self.scenario_ready() {
+            self.scenario_progress = CaptureScenarioProgress::Ready;
+            emit_marker("scenario_ready", self.scenario);
+        }
+    }
+
+    fn mark_telemetry_ready(&mut self) {
+        if !self.telemetry_ready() {
+            self.data_readiness = CaptureDataReadiness::TelemetryReady;
+            emit_marker("telemetry_ready", self.scenario);
+        }
+    }
+
+    fn mark_ui_data_ready(&mut self) {
+        if !self.ui_data_ready() {
+            self.data_readiness = CaptureDataReadiness::UiDataReady;
+            emit_marker("ui_data_ready", self.scenario);
+        }
+    }
+
     pub fn mark_theme(&self, theme: &taskmanager_theme::Theme) {
-        if self.enabled {
+        if self.is_enabled() {
             emit_theme_marker(self.scenario, theme);
         }
     }
 
     pub fn on_snapshot(&mut self, snapshot: &mut SystemSnapshot) {
-        if !self.enabled {
+        if !self.is_enabled() {
             return;
         }
 
@@ -140,10 +115,7 @@ impl CaptureEvidence {
             _ => {}
         }
 
-        if !self.telemetry_ready {
-            self.telemetry_ready = true;
-            emit_marker("telemetry_ready", self.scenario);
-        }
+        self.mark_telemetry_ready();
         let snapshot_scenario_ready = matches!(
             self.scenario,
             Some(
@@ -157,9 +129,8 @@ impl CaptureEvidence {
             && self.snapshot_count >= 2)
             || (self.scenario == Some(CaptureScenario::PartitionLiveUsage)
                 && snapshot.disks.iter().any(|disk| disk.partitions.len() >= 2));
-        if snapshot_scenario_ready && !self.scenario_ready {
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+        if snapshot_scenario_ready {
+            self.mark_scenario_ready();
         }
     }
 
@@ -169,20 +140,20 @@ impl CaptureEvidence {
     /// list is intentionally cleared would erase the key that the reconnect
     /// card needs to render and that the recovery frame needs to resolve.
     pub fn preserve_hotplug_selection(&self) -> bool {
-        self.scenario == Some(CaptureScenario::DeviceHotplug) && self.scenario_ready
+        self.scenario == Some(CaptureScenario::DeviceHotplug) && self.scenario_ready()
     }
 
     /// Whether the Apps search-highlight fixture has reached the point where
     /// the RootView should select the Apps page and install its query.
     pub fn apps_search_highlight_requested(&self) -> bool {
-        self.scenario == Some(CaptureScenario::AppsSearchHighlight) && self.scenario_ready
+        self.scenario == Some(CaptureScenario::AppsSearchHighlight) && self.scenario_ready()
     }
 
     /// Whether the Services search-highlight fixture has reached the point
     /// where the RootView should select the Services page and install its
     /// query.
     pub fn services_search_highlight_requested(&self) -> bool {
-        self.scenario == Some(CaptureScenario::ServicesSearchHighlight) && self.scenario_ready
+        self.scenario == Some(CaptureScenario::ServicesSearchHighlight) && self.scenario_ready()
     }
 
     /// Record that a real background process-list update reached RootView and,
@@ -196,23 +167,17 @@ impl CaptureEvidence {
         processes_observed_at_ms: u64,
         processes: &mut Vec<ProcessItem>,
     ) -> Option<CaptureProcessAction> {
-        if !self.enabled || !processes_updated {
+        if !self.is_enabled() || !processes_updated {
             return None;
         }
-        if !self.ui_data_ready {
-            self.ui_data_ready = true;
-            emit_marker("ui_data_ready", self.scenario);
-        }
+        self.mark_ui_data_ready();
         if self.scenario == Some(CaptureScenario::AppsSearchHighlight) {
             prepare_apps_search_highlight(processes);
-            if !self.scenario_ready {
-                self.scenario_ready = true;
-                emit_marker("scenario_ready", self.scenario);
-            }
+            self.mark_scenario_ready();
             return None;
         }
         if self.scenario == Some(CaptureScenario::ProcessPropertiesPerformance)
-            && self.scenario_ready
+            && self.scenario_ready()
         {
             if let Some(identity) = self.scenario_process_identity
                 && let Some(process) = processes
@@ -227,7 +192,7 @@ impl CaptureEvidence {
         // identity in every refreshed process list until the screenshot is
         // taken; otherwise the normal 2 s process refresh removes it and the
         // Properties dialog correctly auto-closes before pixel capture.
-        if self.scenario_ready
+        if self.scenario_ready()
             && self
                 .scenario
                 .is_some_and(CaptureScenario::is_process_insights)
@@ -236,23 +201,23 @@ impl CaptureEvidence {
             debug_assert_eq!(self.scenario_process_identity, Some(identity));
             return None;
         }
-        if self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) && self.scenario_ready {
+        if self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) && self.scenario_ready() {
             prepare_process_memory_pss_swap(processes);
             return None;
         }
-        if self.scenario == Some(CaptureScenario::AppsZeroGray) && self.scenario_ready {
+        if self.scenario == Some(CaptureScenario::AppsZeroGray) && self.scenario_ready() {
             prepare_apps_zero_gray(processes);
             return None;
         }
-        if self.scenario == Some(CaptureScenario::AppsGroupExpanded) && self.scenario_ready {
+        if self.scenario == Some(CaptureScenario::AppsGroupExpanded) && self.scenario_ready() {
             prepare_apps_group_expanded(processes);
             return None;
         }
-        if self.scenario == Some(CaptureScenario::AppsIdentityMatrix) && self.scenario_ready {
+        if self.scenario == Some(CaptureScenario::AppsIdentityMatrix) && self.scenario_ready() {
             prepare_apps_identity_matrix(processes);
             return None;
         }
-        if self.scenario_ready {
+        if self.scenario_ready() {
             return None;
         }
 
@@ -294,22 +259,19 @@ impl CaptureEvidence {
                     .find(|group| group.member_identities().contains(&selected_identity))?
                     .main_identity()?;
             self.scenario_process_identity = Some(root_identity);
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+            self.mark_scenario_ready();
             return Some(CaptureProcessAction::ApplicationSelection(root_identity));
         }
 
         if self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) {
             prepare_process_memory_pss_swap(processes);
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+            self.mark_scenario_ready();
             return None;
         }
 
         if self.scenario == Some(CaptureScenario::AppsZeroGray) {
             prepare_apps_zero_gray(processes);
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+            self.mark_scenario_ready();
             return None;
         }
 
@@ -327,7 +289,7 @@ impl CaptureEvidence {
             .scenario
             .is_some_and(CaptureScenario::is_process_insights)
         {
-            if !self.telemetry_ready {
+            if !self.telemetry_ready() {
                 return None;
             }
             let identity = prepare_process_insights(processes)?;
@@ -340,8 +302,7 @@ impl CaptureEvidence {
 
         if self.scenario == Some(CaptureScenario::ProcessTreeConfirm) {
             prepare_process_tree(processes);
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+            self.mark_scenario_ready();
             let identity = processes
                 .iter()
                 .find(|process| process.pid == 90_000)
@@ -391,8 +352,7 @@ impl CaptureEvidence {
                 prepare_process_histories(process);
             }
             self.scenario_process_identity = Some(identity);
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+            self.mark_scenario_ready();
             return Some(CaptureProcessAction::Properties(
                 identity,
                 ProcessDetailsSection::Performance,
@@ -401,8 +361,7 @@ impl CaptureEvidence {
         if self.scenario != Some(CaptureScenario::ProcessForceKill) {
             return None;
         }
-        self.scenario_ready = true;
-        emit_marker("scenario_ready", self.scenario);
+        self.mark_scenario_ready();
         ProcessLiveKey::from_process(process)
             .and_then(|identity| {
                 snapshot_single_process(ProcessTerminationAction::ForceKill, identity, processes)
@@ -415,7 +374,7 @@ impl CaptureEvidence {
         services_updated: bool,
         services: &mut Vec<ServiceItem>,
     ) -> Option<ServiceId> {
-        if !self.enabled || !services_updated {
+        if !self.is_enabled() || !services_updated {
             return None;
         }
         if self.scenario == Some(CaptureScenario::ServicesSearchHighlight) {
@@ -430,13 +389,10 @@ impl CaptureEvidence {
                 "active",
                 "running",
             ));
-            if !self.scenario_ready {
-                self.scenario_ready = true;
-                emit_marker("scenario_ready", self.scenario);
-            }
+            self.mark_scenario_ready();
             return None;
         }
-        if self.scenario != Some(CaptureScenario::ServiceDetailsLogs) || self.scenario_ready {
+        if self.scenario != Some(CaptureScenario::ServiceDetailsLogs) || self.scenario_ready() {
             return None;
         }
         if services.is_empty() {
@@ -459,7 +415,7 @@ impl CaptureEvidence {
         entries: &mut Vec<StartupEntry>,
         evidence: &mut Option<taskmanager_core::core::startup::StartupBootEvidenceSnapshot>,
     ) -> bool {
-        if !self.enabled
+        if !self.is_enabled()
             || !startup_updated
             || !matches!(
                 self.scenario,
@@ -469,7 +425,7 @@ impl CaptureEvidence {
                         | CaptureScenario::StartupBootMarkers,
                 )
             )
-            || self.scenario_ready
+            || self.scenario_ready()
         {
             return false;
         }
@@ -542,9 +498,9 @@ impl CaptureEvidence {
 
     pub fn system_npu_layout_requested(&self) -> bool {
         self.scenario == Some(CaptureScenario::SystemNpu)
-            && self.telemetry_ready
-            && self.ui_data_ready
-            && !self.scenario_ready
+            && self.telemetry_ready()
+            && self.ui_data_ready()
+            && !self.scenario_ready()
             && self.system_npu_state == SystemNpuCaptureState::AwaitingLayout
     }
 
@@ -566,8 +522,7 @@ impl CaptureEvidence {
         }
         if graphics_visible {
             self.system_npu_state = SystemNpuCaptureState::Ready;
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+            self.mark_scenario_ready();
         } else {
             self.system_npu_state = SystemNpuCaptureState::AwaitingLayout;
         }
@@ -580,16 +535,15 @@ impl CaptureEvidence {
         anchor_timestamp_ms: u64,
     ) -> bool {
         if self.scenario != Some(CaptureScenario::GpuEngineInventory)
-            || !self.telemetry_ready
-            || !self.ui_data_ready
-            || self.scenario_ready
+            || !self.telemetry_ready()
+            || !self.ui_data_ready()
+            || self.scenario_ready()
         {
             return false;
         }
         let ready = gpu_history::seed(history, ingestor, anchor_timestamp_ms);
         if ready {
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+            self.mark_scenario_ready();
         }
         ready
     }
@@ -604,7 +558,11 @@ impl CaptureEvidence {
         ingestor: &CorrelatedSystemTelemetryIngestor,
         anchor_timestamp_ms: u64,
     ) -> Option<DashboardPanel> {
-        if !self.enabled || !self.telemetry_ready || !self.ui_data_ready || self.scenario_ready {
+        if !self.is_enabled()
+            || !self.telemetry_ready()
+            || !self.ui_data_ready()
+            || self.scenario_ready()
+        {
             return None;
         }
         let (handled, panel) = match self.scenario {
@@ -650,8 +608,7 @@ impl CaptureEvidence {
             _ => (false, None),
         };
         if handled {
-            self.scenario_ready = true;
-            emit_marker("scenario_ready", self.scenario);
+            self.mark_scenario_ready();
         }
         panel
     }
@@ -672,7 +629,11 @@ impl CaptureEvidence {
         page: &mut TopPage,
         power_supplies: &taskmanager_core::core::PowerSupplySnapshot,
     ) -> bool {
-        if !self.enabled || !self.telemetry_ready || !self.ui_data_ready || self.scenario_ready {
+        if !self.is_enabled()
+            || !self.telemetry_ready()
+            || !self.ui_data_ready()
+            || self.scenario_ready()
+        {
             return false;
         }
         let target_ready = match self.scenario {
@@ -683,13 +644,12 @@ impl CaptureEvidence {
             return false;
         }
         *page = TopPage::Performance;
-        self.scenario_ready = true;
-        emit_marker("scenario_ready", self.scenario);
+        self.mark_scenario_ready();
         true
     }
 
     pub fn process_memory_pss_swap_requested(&self) -> bool {
-        self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) && self.scenario_ready
+        self.scenario == Some(CaptureScenario::ProcessMemoryPssSwap) && self.scenario_ready()
     }
 
     pub fn on_dynamic_device_state(
@@ -698,19 +658,18 @@ impl CaptureEvidence {
         power_supplies: &mut taskmanager_core::core::PowerSupplySnapshot,
         sensors: &mut taskmanager_core::core::SensorCenterSnapshot,
     ) -> bool {
-        if !self.enabled
-            || !self.telemetry_ready
-            || !self.ui_data_ready
+        if !self.is_enabled()
+            || !self.telemetry_ready()
+            || !self.ui_data_ready()
             || !self.dynamic_device_fixture_requested()
-            || self.scenario_ready
+            || self.scenario_ready()
         {
             return false;
         }
         *page = TopPage::Performance;
         *power_supplies = dynamic_power_fixture();
         *sensors = dynamic_sensor_fixture();
-        self.scenario_ready = true;
-        emit_marker("scenario_ready", self.scenario);
+        self.mark_scenario_ready();
         true
     }
 }

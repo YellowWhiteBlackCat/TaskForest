@@ -15,7 +15,12 @@ pub(super) fn ui_size_row(
     hovered: Option<&Hover>,
     cx: &mut Context<RootView>,
 ) -> Div {
-    let mut row = div().flex().flex_row().gap(tokens::SPACE_6);
+    let mut row = div()
+        .flex()
+        .flex_row()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ));
     for (size, id, key) in [
         (UiSize::Small, "ui-size-small", "settings.ui_size_small"),
         (

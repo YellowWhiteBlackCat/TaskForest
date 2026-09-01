@@ -101,7 +101,9 @@ pub(super) fn compose_content(
                 .min_h(px(0.0))
                 .flex()
                 .flex_col()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(primary)
                 .children(timeline.map(|timeline| {
                     div()
@@ -120,7 +122,9 @@ pub(super) fn compose_content(
                 .min_h(px(0.0))
                 .flex()
                 .flex_row()
-                .gap(tokens::SPACE_12)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_12,
+                ))
                 .child(primary)
                 .children(timeline.map(|timeline| {
                     div()

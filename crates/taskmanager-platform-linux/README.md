@@ -19,6 +19,12 @@ fixed-argument native query for the detected distro; a missing database or tool
 yields `None`. PCI marketing names are best-effort identity enrichment, never a
 vendor-SKU inference.
 
+The current-window PNG adapter is also capability-optional. On KDE Wayland it
+uses the installed Spectacle active-window provider through fixed argv, validates
+the returned PNG header and dimensions, and reports a typed provider absence or
+fault when Spectacle is unavailable. Portal Screenshot and ScreenCast/PipeWire
+remain later backend slots rather than being faked as supported today.
+
 For the static CPU Base field, cpufreq policy `base_frequency` is authoritative
 and the highest visible policy is selected for heterogeneous CPUs; CPUID 0x16
 is only a static fallback. Live `scaling_cur_freq` samples remain telemetry.
@@ -74,3 +80,18 @@ version tokens only when exactly one DRM GPU is visible. The registry preserves
 per-field precedence/provenance, retains failed values only as stale within one
 device generation, and applies the merged groups once; legacy GPU keys remain a
 core wire concern.
+
+## Module map
+
+```text
+src/engine/collector/
+├── domains/                   host, cpu, memory, network, gpu collection orchestration
+├── compute/                   cpu_sources, memory_sources (DMI, udev)
+└── disks/                     inventory, mounts, sysfs, SMART, rates
+src/backend/                   environment, integration, power, process, sensor,
+                               service, storage, system control providers
+src/config.rs                  Linux composition configuration
+src/window_capture.rs          current-window PNG provider and bounded validation
+```
+
+Control paths go through taskmanager-escalation (polkit) or udisks2 (eject, MC !493).

@@ -89,13 +89,13 @@ fn panel_shadow(palette: &Palette) -> Vec<BoxShadow> {
     let ink = palette.card_shadow;
     vec![
         BoxShadow {
-            color: ink.with_alpha(ink.a * 0.6).into(),
+            color: crate::theme_binding::hsla(ink.with_alpha(ink.a * 0.6)),
             offset: Point::new(px(0.0), px(4.0)),
             blur_radius: px(16.0),
             spread_radius: px(0.0),
         },
         BoxShadow {
-            color: ink.into(),
+            color: crate::theme_binding::hsla(ink),
             offset: Point::new(px(0.0), px(1.0)),
             blur_radius: px(4.0),
             spread_radius: px(0.0),
@@ -339,10 +339,10 @@ impl Dialog {
             ))
             .w(px(self.width))
             .when_some(self.max_width, |el, max| el.max_w(px(max)))
-            .rounded(palette.panel_radius)
-            .bg(palette.surface)
+            .rounded(crate::theme_binding::absolute(palette.panel_radius))
+            .bg(crate::theme_binding::fill(palette.surface))
             .border_1()
-            .border_color(palette.border)
+            .border_color(crate::theme_binding::hsla(palette.border))
             .shadow(panel_shadow(&palette))
             .flex()
             .flex_col()
@@ -363,12 +363,14 @@ impl Dialog {
                     .flex_row()
                     .items_center()
                     .justify_between()
-                    .px(tokens::SPACE_16)
-                    .py(tokens::SPACE_12)
+                    .px(crate::theme_binding::definite_length(tokens::SPACE_16))
+                    .py(crate::theme_binding::definite_length(tokens::SPACE_12))
                     .child(
                         div()
-                            .font_weight(tokens::FONT_WEIGHT_HEADER.into())
-                            .text_color(palette.fg)
+                            .font_weight(crate::theme_binding::font_weight(
+                                tokens::FONT_WEIGHT_HEADER,
+                            ))
+                            .text_color(crate::theme_binding::hsla(palette.fg))
                             .child(match &self.title {
                                 Some(title) => title(window, cx),
                                 None => div().into_any_element(),
@@ -396,10 +398,10 @@ impl Dialog {
                 .collect();
             panel = panel.child(
                 div()
-                    .px(tokens::SPACE_16)
-                    .py(tokens::SPACE_12)
+                    .px(crate::theme_binding::definite_length(tokens::SPACE_16))
+                    .py(crate::theme_binding::definite_length(tokens::SPACE_12))
                     .flex_col()
-                    .gap(tokens::SPACE_8)
+                    .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
                     .children(content_elements),
             );
         }

@@ -21,7 +21,7 @@ fn live_battery_capture_waits_for_real_data_and_never_inserts_a_fixture() {
     let mut page = TopPage::Apps;
     let mut power_supplies = PowerSupplySnapshot::default();
     assert!(!evidence.on_live_dynamic_device_state(&mut page, &power_supplies));
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
 
     let mut battery = BatteryInfo::new("power-supply:real-battery", DeviceState::healthy(100));
     battery.device_generation = DeviceGeneration::new(1);
@@ -37,7 +37,7 @@ fn live_battery_capture_waits_for_real_data_and_never_inserts_a_fixture() {
     };
     assert!(evidence.on_live_dynamic_device_state(&mut page, &power_supplies));
     assert_eq!(page, TopPage::Performance);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn live_partition_capture_waits_for_two_real_children_and_never_inserts_them() {
     let mut evidence = CaptureEvidence::for_test(Some(CaptureScenario::PartitionLiveUsage));
     let mut snapshot = SystemSnapshot::default();
     evidence.on_snapshot(&mut snapshot);
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
 
     let mut processes = Vec::new();
     assert!(
@@ -53,7 +53,7 @@ fn live_partition_capture_waits_for_two_real_children_and_never_inserts_them() {
             .on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes)
             .is_none()
     );
-    assert!(!evidence.scenario_ready);
+    assert!(!evidence.scenario_ready());
 
     snapshot.disks = vec![
         taskmanager_test_support::DiskMetricsFixtureBuilder::new()
@@ -62,6 +62,6 @@ fn live_partition_capture_waits_for_two_real_children_and_never_inserts_them() {
             .build(),
     ];
     evidence.on_snapshot(&mut snapshot);
-    assert!(evidence.scenario_ready);
+    assert!(evidence.scenario_ready());
     assert_eq!(snapshot.disks[0].partitions.len(), 2);
 }

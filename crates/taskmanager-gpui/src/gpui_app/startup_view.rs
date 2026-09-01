@@ -383,8 +383,8 @@ impl TableDelegate for StartupDelegate {
             0 => {
                 let color = if e.enabled { theme.disk } else { theme.fg_dim };
                 div()
-                    .text_size(tokens::FONT_12)
-                    .text_color(color)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                    .text_color(taskmanager_ui::theme_binding::hsla(color))
                     .child(if e.enabled {
                         i18n::t("common.enabled")
                     } else {
@@ -394,8 +394,8 @@ impl TableDelegate for StartupDelegate {
             1 => div()
                 .flex()
                 .min_w(px(0.0))
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(div().flex_1().min_w(px(0.0)).truncate().child(
                     crate::gpui_app::elements::highlighted_text(&e.name, &self.query, &self.theme),
                 )),
@@ -418,19 +418,19 @@ impl TableDelegate for StartupDelegate {
                     }
                 };
                 div()
-                    .text_size(tokens::FONT_12)
-                    .text_color(color)
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                    .text_color(taskmanager_ui::theme_binding::hsla(color))
                     .child(label)
             }
             3 => div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(e.source.as_str().to_string()),
             _ => div()
                 .flex()
                 .min_w(px(0.0))
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(
                     div()
                         .flex_1()
@@ -563,7 +563,9 @@ pub fn render_startup(
         .debug_selector(|| "tm-startup-chrome".to_string())
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(action_bar(
             &theme,
             entries,
@@ -617,7 +619,9 @@ pub fn render_startup(
             .min_h(px(0.0))
             .flex()
             .flex_col()
-            .gap(tokens::SPACE_8);
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ));
         let source_detail = startup_source_detail(sources);
         if let Some(notice) = list_view::source_notice_with_detail_presentation(
             &theme,

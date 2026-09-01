@@ -78,7 +78,7 @@ fn summary_card<'a>(
     let alert_color = if model.active_alerts == 0 {
         muted
     } else {
-        taskmanager_theme::iced::color(theme_snapshot.palette().danger)
+        crate::theme_binding::color(theme_snapshot.palette().danger)
     };
     let value = |label: &'static str, display: String, color: iced::Color| {
         column![
@@ -93,9 +93,9 @@ fn summary_card<'a>(
         .spacing(f32::from(tokens::SPACE_4))
         .width(Length::Fill)
     };
-    let cpu = taskmanager_theme::iced::color(theme_snapshot.cpu);
-    let memory = taskmanager_theme::iced::color(theme_snapshot.memory);
-    let disk = taskmanager_theme::iced::color(theme_snapshot.disk);
+    let cpu = crate::theme_binding::color(theme_snapshot.cpu);
+    let memory = crate::theme_binding::color(theme_snapshot.memory);
+    let disk = crate::theme_binding::color(theme_snapshot.disk);
     let values = row![
         value(t("common.cpu"), model.cpu.clone(), cpu),
         value(t("common.memory"), model.memory.clone(), memory),
@@ -164,14 +164,12 @@ fn events_card<'a>(
         for line in lines {
             let color = match line.severity {
                 AlertSeverity::Critical => {
-                    taskmanager_theme::iced::color(theme_snapshot.palette().danger)
+                    crate::theme_binding::color(theme_snapshot.palette().danger)
                 }
                 AlertSeverity::Warning => {
-                    taskmanager_theme::iced::color(theme_snapshot.palette().warning)
+                    crate::theme_binding::color(theme_snapshot.palette().warning)
                 }
-                AlertSeverity::Info => {
-                    taskmanager_theme::iced::color(theme_snapshot.palette().accent)
-                }
+                AlertSeverity::Info => crate::theme_binding::color(theme_snapshot.palette().accent),
             };
             list = list.push(
                 text(line.text)

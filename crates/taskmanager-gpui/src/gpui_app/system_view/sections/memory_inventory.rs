@@ -34,8 +34,9 @@ pub(crate) enum MemoryInventoryModel {
     Inventory(Vec<(String, String)>),
     /// A request is in flight and no accepted payload exists yet.
     Reading,
-    /// The lane is escalation-backed: render the typed hint plus the
-    /// authorize affordance. No slot or module row may render in this state.
+    /// The lane is escalation-backed: the central Settings permission center
+    /// renders the typed hint plus the authorize affordance. No slot or module
+    /// row may render in this state.
     AuthorizationRequired,
     /// A typed failure; the value is the localized message key.
     Unavailable(&'static str),

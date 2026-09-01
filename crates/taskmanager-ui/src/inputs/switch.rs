@@ -122,16 +122,22 @@ impl RenderOnce for Switch {
             .w(px(36.0))
             .h(px(20.0))
             .rounded_full()
-            .bg(if on { palette.accent } else { palette.border })
-            .p(tokens::SPACE_2)
+            .bg(crate::theme_binding::fill(if on {
+                palette.accent
+            } else {
+                palette.border
+            }))
+            .p(crate::theme_binding::definite_length(tokens::SPACE_2))
             .cursor_pointer();
 
         let knob = div()
             .size(px(16.0))
             .rounded_full()
-            .bg(palette.surface)
+            .bg(crate::theme_binding::fill(palette.surface))
             .shadow_sm()
-            .when(on, |el| el.ml(tokens::SPACE_16));
+            .when(on, |el| {
+                el.ml(crate::theme_binding::length(tokens::SPACE_16))
+            });
 
         div()
             .id(id)
@@ -142,7 +148,7 @@ impl RenderOnce for Switch {
             .when(disabled, |el| el.opacity(0.5))
             // Focus ring: transparent alpha for pointer focus, visible for
             // keyboard focus (palette.ring carries the decision).
-            .focus(|style| style.border_color(palette.ring))
+            .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
             .border_1()
             .rounded_full()
             .child(track.child(knob))

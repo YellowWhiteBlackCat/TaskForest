@@ -28,9 +28,11 @@ fn numeric_cell(theme: &Theme, text: String, color: Color, ui_size: UiSize) -> D
         .flex()
         .flex_row()
         .justify_end()
-        .text_size(ui_size.body_font_size())
+        .text_size(taskmanager_ui::theme_binding::absolute(
+            ui_size.body_font_size(),
+        ))
         .font(mono_font_with_fallback(theme))
-        .text_color(color)
+        .text_color(taskmanager_ui::theme_binding::hsla(color))
         .child(text)
 }
 
@@ -57,7 +59,7 @@ fn status_dot(theme: &Theme, status: &str) -> Div {
         .h(px(8.0))
         .flex_shrink_0()
         .rounded_full()
-        .bg(color)
+        .bg(taskmanager_ui::theme_binding::fill(color))
 }
 
 /// Localized status label by bucket. The `Other` bucket has no stable
@@ -118,14 +120,20 @@ pub(super) fn append_body_cells(
         line = line.child(
             div()
                 .w(live_width(col_widths, SortCol::User))
-                .pl(tokens::SPACE_8)
-                .pr(tokens::SPACE_8)
+                .pl(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
+                .pr(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .min_w(px(0.0))
                 .truncate()
-                .text_size(ui_size.body_font_size())
+                .text_size(taskmanager_ui::theme_binding::absolute(
+                    ui_size.body_font_size(),
+                ))
                 // Identity tier (Name / User / PID): primary foreground, not the
                 // dim secondary-counter color, so identity reads above counts.
-                .text_color(theme.fg)
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(row.cell_text.user.clone()),
         );
     }
@@ -133,8 +141,12 @@ pub(super) fn append_body_cells(
         line = line.child(
             numeric_cell(theme, row.cell_text.pid.clone(), theme.fg, ui_size)
                 .w(live_width(col_widths, SortCol::Pid))
-                .pl(tokens::SPACE_8)
-                .pr(tokens::SPACE_8),
+                .pl(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
+                .pr(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                )),
         );
     }
     if !hidden_cols.contains(&SortCol::Threads) {
@@ -151,20 +163,30 @@ pub(super) fn append_body_cells(
                 ui_size,
             )
             .w(live_width(col_widths, SortCol::Threads))
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8),
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
         );
     }
     if !hidden_cols.contains(&SortCol::StartTime) {
         line = line.child(
             div()
                 .w(live_width(col_widths, SortCol::StartTime))
-                .pl(tokens::SPACE_8)
-                .pr(tokens::SPACE_8)
+                .pl(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
+                .pr(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .min_w(px(0.0))
                 .truncate()
-                .text_size(ui_size.body_font_size())
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::absolute(
+                    ui_size.body_font_size(),
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(row.cell_text.start_time.clone()),
         );
     }
@@ -172,14 +194,22 @@ pub(super) fn append_body_cells(
         line = line.child(
             div()
                 .w(live_width(col_widths, SortCol::State))
-                .pl(tokens::SPACE_8)
-                .pr(tokens::SPACE_8)
+                .pl(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
+                .pr(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .min_w(px(0.0))
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(tokens::SPACE_4)
-                .text_size(ui_size.body_font_size())
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_4,
+                ))
+                .text_size(taskmanager_ui::theme_binding::absolute(
+                    ui_size.body_font_size(),
+                ))
                 // A colored status dot gives the only categorical column a
                 // visual identity separate from the adjacent numeric columns
                 // (the core "muddle" fix); the label is lifted to fg so state
@@ -191,7 +221,7 @@ pub(super) fn append_body_cells(
                         .flex_1()
                         .min_w(px(0.0))
                         .truncate()
-                        .text_color(theme.fg)
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                         .child(row.cell_text.status_label.clone()),
                 ),
         );
@@ -215,8 +245,12 @@ pub(super) fn append_body_cells(
                     ui_size,
                 )
                 .w(live_width(col_widths, SortCol::Cpu))
-                .pl(tokens::SPACE_8)
-                .pr(tokens::SPACE_8),
+                .pl(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
+                .pr(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                )),
             )
             .child({
                 if row.process_identity.is_some() {
@@ -227,7 +261,7 @@ pub(super) fn append_body_cells(
                         .items_center()
                         .child(elements::sparkline(
                             Rc::clone(&row.cpu_history),
-                            theme.cpu.into(),
+                            taskmanager_ui::theme_binding::rgba(theme.cpu),
                             48.0,
                             16.0,
                         ))
@@ -252,8 +286,12 @@ pub(super) fn append_body_cells(
                 ui_size,
             )
             .w(live_width(col_widths, SortCol::Memory))
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8),
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
         );
     }
     if !hidden_cols.contains(&SortCol::Swap) {
@@ -273,8 +311,12 @@ pub(super) fn append_body_cells(
                 ui_size,
             )
             .w(live_width(col_widths, SortCol::Swap))
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8),
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
         );
     }
     if !hidden_cols.contains(&SortCol::DiskRead) {
@@ -291,8 +333,12 @@ pub(super) fn append_body_cells(
                 ui_size,
             )
             .w(live_width(col_widths, SortCol::DiskRead))
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8),
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
         );
     }
     if !hidden_cols.contains(&SortCol::DiskWrite) {
@@ -309,8 +355,12 @@ pub(super) fn append_body_cells(
                 ui_size,
             )
             .w(live_width(col_widths, SortCol::DiskWrite))
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8),
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
         );
     }
     if !hidden_cols.contains(&SortCol::CpuTime) {
@@ -327,8 +377,12 @@ pub(super) fn append_body_cells(
                 ui_size,
             )
             .w(live_width(col_widths, SortCol::CpuTime))
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8),
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
         );
     }
     // FDs column: open file-descriptor count. `None` renders as "—" (the no-data
@@ -348,8 +402,12 @@ pub(super) fn append_body_cells(
                 ui_size,
             )
             .w(live_width(col_widths, SortCol::Fds))
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8),
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
         );
     }
     // Nice column: scheduling priority, signed. `format_nice` renders "+5"/"-3"/"0"
@@ -368,8 +426,12 @@ pub(super) fn append_body_cells(
                 ui_size,
             )
             .w(live_width(col_widths, SortCol::Nice))
-            .pl(tokens::SPACE_8)
-            .pr(tokens::SPACE_8),
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
         );
     }
     // Right-click process menu: taskmanager-ui `ContextMenuExt` attaches the

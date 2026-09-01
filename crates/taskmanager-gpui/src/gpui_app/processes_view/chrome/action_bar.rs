@@ -237,13 +237,21 @@ fn actions_dropdown(
         .debug_selector(|| "tm-proc-actions-trigger".to_string())
         .flex()
         .items_center()
-        .gap(tokens::SPACE_6)
-        .px(tokens::SPACE_12)
-        .py(tokens::SPACE_6)
-        .rounded(tokens::control_radius(theme))
-        .bg(background)
-        .text_size(tokens::FONT_14)
-        .text_color(theme.fg)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
+        .py(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(theme),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(background))
+        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_14))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
         .focusable()
         .tab_stop(true)
         .focus(crate::gpui_app::elements::focus_ring(theme))
@@ -251,7 +259,10 @@ fn actions_dropdown(
         .on_hover(cx.listener(move |view, is_hovered: &bool, _, cx| {
             view.set_hover(is_hovered.then_some(Hover::Static(label)), cx);
         }))
-        .child(taskmanager_icons::icon(IconId::More).size(ui_size.icon_size()))
+        .child(
+            taskmanager_ui::icons_binding::icon(IconId::More)
+                .size(taskmanager_ui::theme_binding::length(ui_size.icon_size())),
+        )
         .child(label);
     let entity = cx.entity();
     DropdownMenu::new(
@@ -309,9 +320,9 @@ fn actions_dropdown(
 fn action_divider(theme: &Theme) -> Div {
     div()
         .w_px()
-        .h(tokens::SPACE_24)
+        .h(taskmanager_ui::theme_binding::length(tokens::SPACE_24))
         .flex_shrink_0()
-        .bg(theme.palette().border)
+        .bg(taskmanager_ui::theme_binding::fill(theme.palette().border))
         .debug_selector(|| "tm-proc-action-divider".to_string())
 }
 
@@ -378,8 +389,8 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     match surface {
         ProcessActionSurface::Standalone => content.push(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(hint)
                 .into_any_element(),
         ),
@@ -392,32 +403,46 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     let content = div()
         .flex()
         .items_center()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .children(content)
         .debug_selector(|| "tm-proc-action-bar".to_string());
     let mut action_bar = div()
         .flex()
         .flex_col()
         .flex_shrink_0()
-        .px(tokens::SPACE_4)
+        .px(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_4,
+        ))
         .debug_selector(|| "tm-proc-action-surface".to_string())
         .child(content);
     action_bar = match (surface, actions) {
         (ProcessActionSurface::Standalone, ProcessActionPresentation::Essential) => action_bar
             .w_full()
-            .py(tokens::SPACE_2)
-            .rounded(tokens::card_radius(theme))
+            .py(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_2,
+            ))
+            .rounded(taskmanager_ui::theme_binding::absolute(
+                tokens::card_radius(theme),
+            ))
             .border_1()
-            .border_color(theme.border)
-            .bg(theme.card_surface()),
+            .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+            .bg(taskmanager_ui::theme_binding::fill(theme.card_surface())),
         (ProcessActionSurface::Standalone, ProcessActionPresentation::Primary) => action_bar
             .w_full()
-            .py(tokens::SPACE_4)
-            .rounded(tokens::card_radius(theme))
+            .py(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_4,
+            ))
+            .rounded(taskmanager_ui::theme_binding::absolute(
+                tokens::card_radius(theme),
+            ))
             .border_1()
-            .border_color(theme.border)
-            .bg(theme.card_surface()),
-        (ProcessActionSurface::Embedded, _) => action_bar.py(tokens::SPACE_2),
+            .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
+            .bg(taskmanager_ui::theme_binding::fill(theme.card_surface())),
+        (ProcessActionSurface::Embedded, _) => action_bar.py(
+            taskmanager_ui::theme_binding::definite_length(tokens::SPACE_2),
+        ),
     };
     action_bar
 }

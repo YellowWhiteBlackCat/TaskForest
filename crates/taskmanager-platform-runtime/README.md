@@ -198,3 +198,15 @@ silently remove admission, leases, target bounds, or scheduler diagnostics.
 The cross-crate ledger is [`STATE_OWNERSHIP.md`](../../docs/STATE_OWNERSHIP.md). Preserve sequence,
 generation, partial/stale/unavailable outcomes and recovery; verify queue fairness, cancellation,
 timeout, delivery ownership and live drain without host UI.
+
+## Module map
+
+```text
+src/assembly.rs  composition.rs     channel assembly and composition
+src/channel/                        one bounded channel per capability (lanes, port, budget)
+src/delivery/                       FairEventPort + EventClass fair delivery
+│                                   (event_port, event_queue, publisher, worker/, catalog)
+src/ecs/                            Bevy ECS scheduling kernel: WorkState admission,
+│                                   lease renewal, stall and terminal verdicts (ADR-033)
+src/health.rs  lifecycle.rs  config.rs   runtime health, lifecycle and configuration
+```

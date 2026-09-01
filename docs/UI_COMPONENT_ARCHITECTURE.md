@@ -52,6 +52,9 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
 
 ## GPUI 弹性布局合同
 
+实现顺序、预算公式、整组准入和收口清单统一见 [ELASTIC_LAYOUT_PLAYBOOK.md](ELASTIC_LAYOUT_PLAYBOOK.md)；
+本节定义组件边界，playbook 定义动手流程，二者不能被页面特化覆盖。
+
 - root 先消费窗口、装饰、告警和导航方向，生成一次 `FrameBudget`；它扣除实际 shell chrome
   后生成 `ContentBudget`，页面只消费这个内容槽位，不在每个页面重复判断窗口宽高。横向
   `LayoutProfile` 固定区分 ultra-compact、compact、standard 和 wide，垂直空间是独立 typed axis，
@@ -62,6 +65,11 @@ TaskForest 自己拥有 theme、icons 和各 toolkit 的 renderer-local UI primi
 - Performance 的设备导航、主视图和统计栏由同一份页面槽位预算分配：不足以容纳三列时，设备栏
   自动变为横向 strip；统计栏下沉为 stacked 或在极限空间隐藏，主视图始终保留可读最小宽度。
   持久化侧栏宽度只是偏好，当前帧会在槽位上限内临时收缩，不会污染独立 App 的窗口状态。
+- Performance 的滚动边界是硬合同：只有左侧设备选择栏（sidebar/strip）允许滚动；主视图和右侧
+  统计栏必须使用固定视口与弹性分配，不能挂载 `scroll_region`、`uniform_list` 或隐式滚动句柄。
+  下方内容必须在进入视口前整组适配、摘要或省略，最后一行不得靠裁切或滚动来“解决”。
+- 所有右侧 detail/stat rail 共享 label/value 槽位：复合事实必须拆成独立行，超长值只能在自己的
+  bounded value 槽内截断或换行，不能把标签挤出行首、把值推过边框，或用一条超长字符串填满窄栏。
 - 自适应网格必须以内容最小可读宽度为约束，允许换行但禁止压缩文字、图表和操作控件到不可见；`flex_1` 的兄弟必须显式
   `min_w(0)` / `min_h(0)`，滚动内容必须保留真实 intrinsic extent。
 - 页面自身拥有 pinned trailing rail 时，`PageFrame` 的外层 trailing inset 必须归零；可点击的
@@ -107,8 +115,8 @@ Iced 的 renderer-local 组件入口是 `taskmanager-iced/src/ui/components.rs`�
 
 - 颜色只能来自 `taskmanager_theme` token；禁止在组件中新增产品色 literal。
 - 间距、字体、行高、圆角和动画使用 token；`px(...)` 只用于明确的几何合同。
-- 可选择的应用汇总行使用 `ProcessRowKey::Application(root_pid)`；root pid 仅是实时树查找键，
-  不是代表 PID。分类标题是结构行，真实进程行才使用 `ProcessRowKey::Process(pid)`。
+- 可选择的应用汇总行使用 `ProcessRowId::Application(root_identity)`；root identity 仅是实时树查找键，
+  不是代表 PID。分类标题是结构行，真实进程行才使用 `ProcessRowId::Process(identity)`。
 - 渲染入口先完成数据 fold；同一 projection 同时服务鼠标、键盘和辅助技术。
 - 组件不复制 core 文本匹配、时间、格式化或可用性规则；共享规则只有一个实现。
 - 组件层保持零第三方 GPUI 组件依赖；上游代码只作研究材料，不复制 GPL UI 源码。

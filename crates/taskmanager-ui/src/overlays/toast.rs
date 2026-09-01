@@ -5,13 +5,13 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use crate::OptCallback;
+use crate::icons_binding::icon;
 use gpui::prelude::FluentBuilder;
 use gpui::{
     AnimationExt, App, ClickEvent, Context, Entity, EventEmitter, InteractiveElement, IntoElement,
     ParentElement, RenderOnce, SharedString, StatefulInteractiveElement, Styled, Task, Window, div,
     px,
 };
-use taskmanager_icons::icon;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Palette};
 use taskmanager_ui_contract::IconId;
@@ -160,24 +160,28 @@ impl RenderOnce for Toast {
             .flex()
             .flex_row()
             .items_center()
-            .gap(tokens::SPACE_10)
-            .px(tokens::SPACE_12)
-            .py(tokens::SPACE_10)
-            .rounded(palette.panel_radius)
-            .bg(palette.surface)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_10))
+            .px(crate::theme_binding::definite_length(tokens::SPACE_12))
+            .py(crate::theme_binding::definite_length(tokens::SPACE_10))
+            .rounded(crate::theme_binding::absolute(palette.panel_radius))
+            .bg(crate::theme_binding::fill(palette.surface))
             .border_1()
-            .border_color(palette.border)
+            .border_color(crate::theme_binding::hsla(palette.border))
             .shadow_md()
             .text_sm()
-            .text_color(palette.fg)
-            .child(icon(kind.icon()).size(px(16.0)).text_color(accent))
+            .text_color(crate::theme_binding::hsla(palette.fg))
+            .child(
+                icon(kind.icon())
+                    .size(px(16.0))
+                    .text_color(crate::theme_binding::hsla(accent)),
+            )
             .child(div().child(message))
             .when_some(on_dismiss, |el, on_dismiss| {
                 el.child(
                     div()
                         .id("tm-toast-dismiss")
                         .cursor_pointer()
-                        .text_color(palette.fg_muted)
+                        .text_color(crate::theme_binding::hsla(palette.fg_muted))
                         .on_click(move |_event: &ClickEvent, window, cx| {
                             on_dismiss(window, cx);
                         })
@@ -188,7 +192,7 @@ impl RenderOnce for Toast {
             // as it mounts (a fresh toast always replays the animation).
             .with_animation(
                 "toast-entrance",
-                taskmanager_theme::gpui::appear(),
+                crate::theme_binding::appear(),
                 |el, delta| el.opacity(delta).mt(px((1.0 - delta) * 4.0)),
             )
     }

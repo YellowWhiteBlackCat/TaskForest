@@ -143,9 +143,6 @@ pub(crate) enum GraphUnit {
     Rpm,
     Watts,
     Temperature,
-    /// Clock magnitude (GPU core MHz) — the GPU headline chart's frequency
-    /// family (ADR-034 stage 2).
-    Megahertz,
 }
 
 #[cfg(test)]

@@ -2,9 +2,9 @@
 
 ## Role
 
-Shared semantic icon registry with an optional GPUI rendering adapter (ADR-017
-Phase 2). Other frontends can consume the same paths and embedded bytes without
-enabling the GPUI feature.
+Toolkit-neutral semantic icon registry (ADR-017 Phase 2, ADR-051). The crate
+compiles zero toolkit code on every target; each frontend materializes icons
+in its own crate.
 
 `IconId` (the toolkit-neutral semantic identity) lives in
 [`taskmanager-ui-contract`](../taskmanager-ui-contract); the embedded tintable
@@ -13,12 +13,12 @@ owns the semantic mapping in between:
 
 - [`path`] — resolve an `IconId` to its embedded SVG asset path.
 - [`asset_bytes`] — retrieve the embedded SVG bytes for an `IconId`.
-- [`icon`] — when the `gpui` feature is enabled, build a GPUI icon element for
-  an `IconId`. The glyph inherits the
-  surrounding text color (resolved from the text style at layout time) and
-  supports the usual GPUI style chain (`.size(..)`, `.text_color(..)`, …).
 
-No `gpui-component` types are used or re-exported.
+Toolkit rendering adapters are frontend-owned (ADR-051): the GPUI SVG/image
+builders live in [`taskmanager-ui::icons_binding`](../taskmanager-ui); the
+Bevy raster fallback lives in `taskmanager-bevy-ui`; the iced frontend
+resolves the bytes directly. No `gpui-component` types are used or
+re-exported anywhere.
 
 ## Boundary
 
@@ -27,7 +27,15 @@ theme tokens.
 
 ## Contract and verification
 
-The registry remains toolkit-neutral until the optional adapter boundary.
-Verify every `IconId` has an asset/fallback and that color comes from the
-consumer theme; product rules live in
+The registry is neutral unconditionally — the dependency table names no
+toolkit. Verify every `IconId` has an asset/fallback and that color comes
+from the consumer theme; product rules live in
 `../../docs/UI_COMPONENT_ARCHITECTURE.md`.
+
+## Module map
+
+```text
+src/path.rs                    IconId → asset path + embedded bytes table
+```
+
+IconId → shared SVG → per-toolkit materialization; text glyphs never fake icons.

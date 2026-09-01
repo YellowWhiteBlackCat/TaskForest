@@ -119,3 +119,20 @@ External saved-view input is read-only at the private ingress: recognized old
 tokens are canonicalized into `ProcessViewPresetConfig`. The canonical write
 DTO has no obsolete mode field, so saving a parsed configuration cannot
 republish the old vocabulary.
+
+## Module map
+
+```text
+src/core.rs                     owner-module index for every fact below
+├── metrics/                    domain measurements and availability joins
+│   └── */wire.rs               private ingress DTOs (legacy payloads canonicalize here)
+├── process/                    process facts: identity.rs (ProcessLiveKey),
+│                               aggregate.rs, group_aggregate.rs
+├── services/  startup/         service and startup-item facts
+├── alerts/                     alert rules, active-set transitions, bounded event export
+├── export/                     typed export formatting (CSV and friends)
+├── history.rs  config.rs       gap-aware history and configuration facts
+└── identity.rs  hardware.rs  failure.rs  diagnostics/  …
+```
+
+Pure rules and typed facts only: no I/O, no clock reads, no toolkit types.

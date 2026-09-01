@@ -77,21 +77,26 @@ impl RenderOnce for Tooltip {
             .flex()
             .flex_row()
             .items_center()
-            .gap(tokens::SPACE_8)
-            .px(tokens::SPACE_10)
-            .py(tokens::SPACE_5)
-            .rounded(palette.control_radius)
-            .bg(palette.surface)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
+            .px(crate::theme_binding::definite_length(tokens::SPACE_10))
+            .py(crate::theme_binding::definite_length(tokens::SPACE_5))
+            .rounded(crate::theme_binding::absolute(palette.control_radius))
+            .bg(crate::theme_binding::fill(palette.surface))
             .border_1()
-            .border_color(palette.border)
+            .border_color(crate::theme_binding::hsla(palette.border))
             .text_sm()
-            .text_color(palette.fg)
+            .text_color(crate::theme_binding::hsla(palette.fg))
             .child(match &self.content {
                 TooltipContent::Text(text) => div().child(text.clone()),
                 TooltipContent::Element(builder) => div().child(builder(_window, _cx)),
             })
             .when_some(self.key_hint, |el, hint| {
-                el.child(div().text_xs().text_color(palette.fg_muted).child(hint))
+                el.child(
+                    div()
+                        .text_xs()
+                        .text_color(crate::theme_binding::hsla(palette.fg_muted))
+                        .child(hint),
+                )
             })
     }
 }

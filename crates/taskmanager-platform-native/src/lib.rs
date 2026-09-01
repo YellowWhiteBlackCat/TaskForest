@@ -7,7 +7,11 @@
 //! storage, sensor, and transport implementations are selected and merged at
 //! runtime rather than becoming product build variants.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+#[cfg(not(target_os = "linux"))]
+use taskmanager_platform_contract::WindowCaptureFailureKind;
+use taskmanager_platform_contract::{WindowCaptureFailure, WindowCaptureReceipt};
 
 #[cfg(all(not(debug_assertions), not(feature = "hardware-all")))]
 compile_error!(
@@ -117,6 +121,27 @@ pub use tray::spawn_tray;
 pub mod instance;
 
 pub use instance::acquire_single_instance;
+
+/// Capture the currently active window through the selected native adapter.
+/// Linux currently uses the fixed-argument KDE Spectacle Wayland path; other
+/// platforms return the contract's typed `Unsupported` failure until their
+/// native capture seam is implemented.
+pub fn capture_current_window_png(
+    output: &Path,
+) -> Result<WindowCaptureReceipt, WindowCaptureFailure> {
+    #[cfg(target_os = "linux")]
+    {
+        taskmanager_platform_linux::window_capture::capture_current_window_png(output)
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = output;
+        Err(WindowCaptureFailure::new(
+            WindowCaptureFailureKind::Unsupported,
+            "current-window PNG capture is not implemented on this platform",
+        ))
+    }
+}
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 compile_error!(

@@ -106,7 +106,7 @@ fn tree_node_row(
             )
             .padding([0, 4])
             .style(move |_| iced::widget::container::Style {
-                background: Some(iced::Background::Color(taskmanager_theme::iced::color(
+                background: Some(iced::Background::Color(crate::theme_binding::color(
                     theme_snapshot.shade,
                 ))),
                 border: iced::Border {
@@ -566,7 +566,7 @@ fn process_sparkline_cell(
     if let Some(identity) = identity.filter(|_| show) {
         canvas::Canvas::new(ProcessCpuSparkline::new(
             std::rc::Rc::clone(history),
-            taskmanager_theme::iced::color(theme_snapshot.cpu),
+            crate::theme_binding::color(theme_snapshot.cpu),
             identity,
         ))
         .width(Length::Fixed(PROCESS_SPARK_WIDTH))

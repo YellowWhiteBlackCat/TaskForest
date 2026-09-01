@@ -132,7 +132,23 @@ async fn cpu_page_renders_dominant_graph_readouts_and_per_core_content(cx: &mut 
     let panel = vcx
         .debug_bounds("tm-cpu-details-panel")
         .expect("pinned CPU details");
-    assert!(panel.right() <= stats_surface.right() + px(0.5));
+    assert!(
+        panel.right() <= stats_surface.right() - px(8.0),
+        "CPU details must keep the shared trailing inset before the rail edge: panel={panel:?}, stats={stats_surface:?}"
+    );
+    let mut last_spec = None;
+    for index in 0..32 {
+        let selector: &'static str = Box::leak(format!("tm-cpu-spec:{index}").into_boxed_str());
+        let Some(row) = vcx.debug_bounds(selector) else {
+            break;
+        };
+        last_spec = Some(row);
+    }
+    let last_spec = last_spec.expect("CPU details must paint at least one specification row");
+    assert!(
+        last_spec.bottom() <= stats_surface.bottom() - px(4.0),
+        "CPU specification rows must end inside the fixed statistics surface: last={last_spec:?}, stats={stats_surface:?}"
+    );
 
     let (compact_win, compact_view) = wrapped_root(cx);
     cx.simulate_window_resize(compact_win.into(), size(px(720.0), px(480.0)));
@@ -162,6 +178,23 @@ async fn cpu_page_renders_dominant_graph_readouts_and_per_core_content(cx: &mut 
     );
     assert!(vcx.debug_bounds("tm-cpu-readouts").is_some());
     assert!(vcx.debug_bounds("tm-cpu-per-core-matrix").is_none());
+    let compact_stats = vcx
+        .debug_bounds("tm-perf-stats-surface")
+        .expect("compact CPU details surface");
+    let mut compact_last_spec = None;
+    for index in 0..32 {
+        let selector: &'static str = Box::leak(format!("tm-cpu-spec:{index}").into_boxed_str());
+        let Some(row) = vcx.debug_bounds(selector) else {
+            break;
+        };
+        compact_last_spec = Some(row);
+    }
+    let compact_last_spec =
+        compact_last_spec.expect("compact CPU details must paint a specification row");
+    assert!(
+        compact_last_spec.bottom() <= compact_stats.bottom() - px(4.0),
+        "compact CPU specification rows must end inside the fixed stats surface: last={compact_last_spec:?}, stats={compact_stats:?}"
+    );
 }
 
 /// Width and height are independent layout axes: a panoramic, short window

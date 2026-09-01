@@ -71,16 +71,16 @@ printf 'command=%s\n' "${GPUI_INTERACTION_COMMAND:-bash scripts/accept-gpui-inte
 
 timeout 30s python3 scripts/validate_gpui_interaction_matrix.py --self-test
 
-timeout --kill-after=10s 20m cargo nextest list --locked --profile ci --test gui --features test-support \
+timeout --kill-after=10s 20m cargo nextest list --locked --profile ci \
+    -p taskmanager-gpui --test gui --features test-support \
     --message-format json >"$RUN_DIR/gui-list.json"
-# The interaction matrix's `lib` rows all live in taskmanager-gpui's lib tests
-# (gpui_app::…), and the `gui` rows in the root package's integration binary —
-# since the GPUI crate split out of the root package. The precise package
+# The interaction matrix's `lib` rows and the `gui` integration binary both
+# belong to taskmanager-gpui after ADR-051. The precise package
 # scope also keeps this gate runnable on every platform: workspace-wide lib
 # builds would pull the single-platform adapters (platform-linux/macos do not
 # compile on Windows; platform-linux needs the Linux artifact set).
 timeout --kill-after=10s 20m cargo nextest list --locked --profile ci \
-    -p taskmanager -p taskmanager-gpui --lib \
+    -p taskmanager-gpui --lib \
     --message-format json >"$RUN_DIR/lib-list.json"
 
 timeout 30s python3 scripts/validate_gpui_interaction_matrix.py \
@@ -100,8 +100,8 @@ run_nextest() {
         >"$output" 2>&1
 }
 
-run_nextest "$RUN_DIR/gui-run.log" --test gui --features test-support
-run_nextest "$RUN_DIR/lib-run.log" -p taskmanager -p taskmanager-gpui --lib
+run_nextest "$RUN_DIR/gui-run.log" -p taskmanager-gpui --test gui --features test-support
+run_nextest "$RUN_DIR/lib-run.log" -p taskmanager-gpui --lib
 
 timeout 30s python3 scripts/validate_gpui_interaction_matrix.py \
     --matrix scripts/gpui_interaction_matrix.tsv \

@@ -7,18 +7,17 @@ fn value_of(rows: &[(String, String)], key: &'static str) -> String {
         .unwrap_or_default()
 }
 
-/// Absent facts keep their row slots as the shared dash (ADR-020
-/// `missing_value`) — an uncollected clock/socket/cache never renders a
-/// fabricated number.
+/// Absent facts do not consume a row in the fixed, non-scrolling detail rail.
+/// The permission center owns the explanation/action for optional data.
 #[test]
-fn cpu_spec_rows_render_shared_dash_for_missing_facts() {
+fn cpu_spec_rows_omit_missing_facts() {
     let rows = cpu_spec_rows(
         &CpuMetrics::default(),
         &HardwareInfo::default(),
         taskmanager_core::core::units::UnitPreferences::default(),
     );
     for key in ["cpu.base_speed", "common.sockets"] {
-        assert_eq!(value_of(&rows, key), formatting::missing_value(), "{key}");
+        assert_eq!(value_of(&rows, key), "", "{key} must be omitted");
     }
     for key in [
         "common.l1_data_cache",
@@ -26,7 +25,7 @@ fn cpu_spec_rows_render_shared_dash_for_missing_facts() {
         "common.l2_cache",
         "common.l3_cache",
     ] {
-        assert_eq!(value_of(&rows, key), formatting::missing_value(), "{key}");
+        assert_eq!(value_of(&rows, key), "", "{key} must be omitted");
     }
     // An unprobed CPUID identity (non-x86 host, fixture inventory) renders no
     // row at all rather than a dash slot — same discipline as policy rows.
@@ -127,18 +126,9 @@ fn cpu_spec_rows_emit_hybrid_rows_in_order() {
         taskmanager_core::core::units::UnitPreferences::default(),
     );
     let expected_keys = [
-        "cpu.base_speed",
-        "cpu.multiplier",
-        "common.sockets",
-        "common.cores",
         "cpu.performance_cores",
         "cpu.efficiency_cores",
-        "cpu.logical_processors",
         "common.virtualization",
-        "common.l1_data_cache",
-        "common.l1_instruction_cache",
-        "common.l2_cache",
-        "common.l3_cache",
         "cpu.cpufreq_driver",
         "cpu.cpufreq_governor",
         "cpu.power_preference",
@@ -147,8 +137,8 @@ fn cpu_spec_rows_emit_hybrid_rows_in_order() {
     for (row, key) in rows.iter().zip(expected_keys) {
         assert_eq!(row.0, i18n::t(key).to_string(), "row order: {key}");
     }
-    assert_eq!(rows[4].1, "4", "P-core count");
-    assert_eq!(rows[5].1, "8", "E-core count");
+    assert_eq!(rows[0].1, "4", "P-core count");
+    assert_eq!(rows[1].1, "8", "E-core count");
 }
 
 #[test]

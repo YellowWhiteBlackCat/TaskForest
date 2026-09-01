@@ -41,3 +41,10 @@ Socketpair round-trips, multi-fd/truncation rejection with fd-leak checks,
 `SO_PEERCRED` cross-anchored against `getuid`/`process::id`, pidfd
 probe/ESRCH/ENOSYS predicate tests, dependency firewall and Miri before
 changing the crate.
+
+## Module map
+
+```text
+src/lib.rs     SCM_RIGHTS fd transfer (launcher → unprivileged app)
+src/pidfd.rs   pidfd identity verification
+```

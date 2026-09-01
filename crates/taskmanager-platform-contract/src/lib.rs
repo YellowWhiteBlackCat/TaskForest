@@ -16,6 +16,7 @@ mod port;
 mod scheduler;
 mod source;
 mod tray;
+mod window_capture;
 
 pub use capability::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilityRequest, CapabilitySnapshot,
@@ -40,3 +41,7 @@ pub use source::{
     CompositeSourceSnapshot, DeviceDiscovery, DeviceSourceSnapshot, PartialSourceSnapshot,
 };
 pub use tray::TrayController;
+pub use window_capture::{
+    MAX_WINDOW_CAPTURE_FAILURE_CHARS, WindowCaptureBackend, WindowCaptureFailure,
+    WindowCaptureFailureKind, WindowCaptureReceipt,
+};

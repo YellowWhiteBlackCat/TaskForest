@@ -18,7 +18,7 @@ use taskmanager_core::{
     DeviceId, DeviceState, OptionalObservation, ProviderId, ScalarObservation, SourceOutcome,
     SourceStatus,
 };
-use taskmanager_platform_contract::DeviceSourceSnapshot;
+use taskmanager_platform_contract::{DeviceDiscovery, DeviceSourceSnapshot};
 
 use crate::engine::hardware::is_virtual_interface;
 
@@ -131,7 +131,6 @@ struct ResolvedInventory {
     interfaces: Vec<SysfsInterface>,
     discovered_devices: Vec<DeviceId>,
     outcome: SourceOutcome,
-    fresh_count: usize,
     metadata_outcome: SourceOutcome,
     metadata_item_count: usize,
     fresh_interfaces: HashSet<Arc<str>>,
@@ -217,7 +216,6 @@ fn resolve_inventory(
             interface.mac_addr.clone_from(&previous.mac_addr);
         }
     }
-    let fresh_count = observed.value.len();
     let discovered_devices = observed
         .value
         .iter()
@@ -260,7 +258,6 @@ fn resolve_inventory(
         interfaces,
         discovered_devices,
         outcome: observed.discovery_outcome,
-        fresh_count,
         metadata_outcome: observed.metadata_outcome,
         metadata_item_count: observed.metadata_item_count,
         fresh_interfaces,
@@ -383,11 +380,15 @@ fn assemble_snapshot(
         })
         .collect::<Vec<_>>();
 
-    let discovery = source_status(
-        SYSFS_INVENTORY_PROVIDER,
-        inventory.outcome,
-        inventory.fresh_count,
-    );
+    let discovery = match inventory.outcome {
+        SourceOutcome::Available => DeviceDiscovery::Available(inventory.discovered_devices),
+        SourceOutcome::Empty => DeviceDiscovery::Empty,
+        SourceOutcome::Partial(failure) => DeviceDiscovery::Partial {
+            discovered_devices: inventory.discovered_devices,
+            failure,
+        },
+        SourceOutcome::Unavailable(failure) => DeviceDiscovery::Unavailable(failure),
+    };
     let enrichments = vec![
         source_status(
             SYSFS_METADATA_PROVIDER,
@@ -427,9 +428,9 @@ fn assemble_snapshot(
                 .count(),
         ),
     ];
-    DeviceSourceSnapshot::from_source_status(
+    DeviceSourceSnapshot::from_discovery(
         metrics,
-        inventory.discovered_devices,
+        ProviderId::borrowed(SYSFS_INVENTORY_PROVIDER),
         discovery,
         enrichments,
     )

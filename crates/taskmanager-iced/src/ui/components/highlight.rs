@@ -67,8 +67,8 @@ pub fn cell(
     }
 
     let palette = theme_snapshot.palette();
-    let accent = taskmanager_theme::iced::color(palette.accent);
-    let foreground = taskmanager_theme::iced::color(palette.fg);
+    let accent = crate::theme_binding::color(palette.accent);
+    let foreground = crate::theme_binding::color(palette.fg);
 
     let spans: Vec<Span<'static, ()>> = highlight_segments(text, query)
         .into_iter()

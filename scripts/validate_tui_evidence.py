@@ -17,6 +17,14 @@ from pathlib import Path
 
 from validate_capture_evidence import EvidenceError, file_sha256, png_chunk, png_receipt
 
+try:
+    from capture_supervisor import SupervisorError, validate_supervised_metadata
+except ModuleNotFoundError:
+    from scripts.capture_supervisor import (  # type: ignore[no-redef]
+        SupervisorError,
+        validate_supervised_metadata,
+    )
+
 
 @dataclass(frozen=True)
 class VisualContentReceipt:
@@ -164,6 +172,13 @@ def metadata(path: Path) -> dict[str, str]:
         values[key] = value
     required = {
         "run_id",
+        "run_uuid",
+        "frontend",
+        "run_root",
+        "runtime_root",
+        "supervisor_pid",
+        "cgroup_path",
+        "dbus_address_sha256",
         "captured_at",
         "git_head",
         "worktree",
@@ -173,10 +188,13 @@ def metadata(path: Path) -> dict[str, str]:
         "stack",
         "source_scope",
         "source_manifest_sha256",
+        "dbus_isolation",
         "command",
     }
     if missing := required - values.keys():
         raise EvidenceError(f"metadata missing fields: {sorted(missing)}")
+    if values["dbus_isolation"] != "private-session":
+        raise EvidenceError("TUI capture must use the private D-Bus session")
     return values
 
 
@@ -249,6 +267,10 @@ def main() -> int:
         if receipt.width < 900 or receipt.height < 500:
             raise EvidenceError(f"TUI image is too small: {receipt.width}x{receipt.height}")
         values = metadata(metadata_path)
+        try:
+            validate_supervised_metadata(values, root, metadata_path, "tui")
+        except SupervisorError as error:
+            raise EvidenceError(str(error)) from error
         expected_page = values.get("page", "performance")
         markers = markers_path.read_text(encoding="utf-8")
         for token in (
@@ -285,6 +307,7 @@ def main() -> int:
             "status": "pass",
             "validated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "run_id": values["run_id"],
+            "run_uuid": values["run_uuid"],
             "git_head": values["git_head"],
             "worktree": values["worktree"],
             "rust": values["rust"],

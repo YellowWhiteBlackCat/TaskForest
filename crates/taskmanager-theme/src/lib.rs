@@ -2,10 +2,12 @@
 //!
 //! Everything the eight skin variants (4 skins × light/dark), the
 //! high-contrast axis, fonts, corner radii, and window-chrome decisions need —
-//! **toolkit-neutral** (ADR-026): the toolkit bindings live in cfg'd modules
-//! (`gpui`, `iced`, each behind its own optional feature, off by default),
-//! and a frontend (TUI) whose color type is a lossy terminal mapping maps
-//! these types onto its own rendering vocabulary. Modules:
+//! **toolkit-neutral** (ADR-026, ADR-051): every module compiles zero toolkit
+//! code and the dependency table names no toolkit on any target. Each
+//! frontend owns its token→toolkit binding inside its own dependency closure
+//! (the GPUI binding in `taskmanager-ui::theme_binding`, the iced binding in
+//! `taskmanager-iced::theme_binding`); the TUI keeps its lossy terminal color
+//! quantization locally (ADR-026). Modules:
 //!
 //! - [`color`] — the neutral color/length/ratio/weight types.
 //! - [`theme`] — the resolved runtime token snapshot ([`Theme`]) plus the
@@ -32,20 +34,6 @@ pub mod platform;
 pub mod skins;
 pub mod theme;
 pub mod tokens;
-
-/// The gpui bindings (conversions + window/appearance/font/animation
-/// helpers), compiled only under `feature = "gpui"` (ADR-026).
-#[cfg(feature = "gpui")]
-pub mod gpui;
-
-/// The iced bindings (free-function token→value conversions), compiled only
-/// under `feature = "iced"` (ADR-026, CORE-07). Free functions, not `From`
-/// impls: the orphan rule would actually permit `From<Color> for
-/// iced::Color` here, but iced's enum weight and named-family font targets
-/// are not `From`-shaped, and one uniform call surface keeps the binding
-/// auditable as the frontend's single conversion source.
-#[cfg(feature = "iced")]
-pub mod iced;
 
 pub use color::{Color, FontSize, Length, Ratio, Weight};
 pub use detection::{NativeAppearance, detect_high_contrast, detect_mode, detect_skin};

@@ -64,12 +64,12 @@ impl RenderOnce for Pill {
             // segment eases surface→hover tint and leaving eases back.
             PillState::Idle => {
                 let pill = div()
-                    .px(tokens::SPACE_10)
+                    .px(crate::theme_binding::definite_length(tokens::SPACE_10))
                     .h(px(24.0))
                     .rounded(px(self.radius))
                     .border_1()
-                    .border_color(self.palette.border)
-                    .text_color(self.palette.fg_muted)
+                    .border_color(crate::theme_binding::hsla(self.palette.border))
+                    .text_color(crate::theme_binding::hsla(self.palette.fg_muted))
                     .text_sm()
                     .cursor_pointer()
                     .child(self.text);
@@ -83,11 +83,11 @@ impl RenderOnce for Pill {
                 .into_any_element()
             }
             PillState::Active => div()
-                .px(tokens::SPACE_10)
+                .px(crate::theme_binding::definite_length(tokens::SPACE_10))
                 .h(px(24.0))
                 .rounded(px(self.radius))
-                .bg(self.palette.accent)
-                .text_color(on_accent(self.palette.accent))
+                .bg(crate::theme_binding::fill(self.palette.accent))
+                .text_color(crate::theme_binding::hsla(on_accent(self.palette.accent)))
                 .text_sm()
                 .cursor_pointer()
                 .child(self.text)

@@ -3,7 +3,7 @@ use taskmanager_core::core::metrics::{MemoryMetrics, OptionalObservation};
 use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_test_support::MemoryMetricsFixtureBuilder;
 
-use super::{compressed_swap_readout, virtual_memory_commit_readout};
+use super::{compressed_swap_readout, compression_ratio_readout, virtual_memory_commit_readout};
 
 #[test]
 fn optional_memory_rows_require_complete_observations() {
@@ -76,8 +76,8 @@ fn failed_typed_truth_never_renders_optional_values() {
 }
 
 #[test]
-fn zram_readout_appends_only_a_derivable_compression_ratio() {
-    // Both mm_stat sizes current → the used/capacity pair gains the ratio.
+fn zram_pair_and_compression_ratio_are_separate_bounded_readouts() {
+    // Both mm_stat sizes current → the pair and ratio remain separate rows.
     let measured = MemoryMetricsFixtureBuilder::new()
         .current_total_bytes(8 * 1024 * 1024 * 1024)
         .compressed_swap_used_bytes(512 * 1024 * 1024)
@@ -87,13 +87,11 @@ fn zram_readout_appends_only_a_derivable_compression_ratio() {
         .build();
     assert_eq!(
         compressed_swap_readout(&measured, UnitPreferences::default()).as_deref(),
-        Some(
-            format!(
-                "512.0 MiB / 1.0 GiB · {} 3.0:1",
-                taskmanager_application::i18n::t("mem.compression_ratio")
-            )
-            .as_str()
-        )
+        Some("512.0 MiB / 1.0 GiB")
+    );
+    assert_eq!(
+        compression_ratio_readout(&measured,).as_deref(),
+        Some("3.0:1")
     );
 
     // A zero compressed size cannot derive a ratio; the pair stands alone.
@@ -108,4 +106,5 @@ fn zram_readout_appends_only_a_derivable_compression_ratio() {
         compressed_swap_readout(&undecompressible, UnitPreferences::default()).as_deref(),
         Some("512.0 MiB / 1.0 GiB")
     );
+    assert_eq!(compression_ratio_readout(&undecompressible), None);
 }

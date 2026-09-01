@@ -1,11 +1,8 @@
 //! CPU detail/specification surface kept separate from the graph renderer.
 
-use gpui::{
-    Context, Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px, uniform_list,
-};
+use gpui::{Div, InteractiveElement, ParentElement, Styled, div, px};
 
 use crate::gpui_app::formatting;
-use crate::gpui_app::root::RootView;
 use taskmanager_application::i18n;
 use taskmanager_core::core::hardware::{CoreBreakdown, HardwareInfo};
 use taskmanager_core::core::metrics::{CpuMetrics, SystemSnapshot};
@@ -18,6 +15,12 @@ use super::msr_readouts::MsrReadoutsModel;
 use super::package_power::PackagePowerModel;
 use super::{EscalationReadouts, format_uptime, stats::CpuDetailsStats};
 
+const CPU_SPEC_ROW_SLOT: f32 = 26.0;
+const CPU_DETAILS_RESERVE: f32 = 194.0;
+const CPU_PACKAGE_POWER_RESERVE: f32 = 120.0;
+const CPU_MSR_RESERVE: f32 = 180.0;
+const MAX_CPU_SPEC_ROWS: usize = 32;
+
 pub(super) fn render_pinned(
     theme: &Theme,
     snap: &SystemSnapshot,
@@ -25,13 +28,14 @@ pub(super) fn render_pinned(
     live: &CpuDetailsStats,
     units: UnitPreferences,
     escalation: &EscalationReadouts,
-    cx: &mut Context<RootView>,
+    content_height: f32,
 ) -> Div {
     let EscalationReadouts {
         package_power,
         msr_readouts,
     } = escalation;
     let cpu = &snap.cpu;
+    let spec_rows = spec_row_budget(content_height, package_power, msr_readouts);
     // Per-core average + maximum temperature, surfaced as a note beneath the
     // package reading. The typed CPU sensor source exposes Intel `coretemp`
     // channels as genuine per-core values and keeps AMD `k10temp` die readings
@@ -48,7 +52,9 @@ pub(super) fn render_pinned(
         .min_w(px(0.0))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_12)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_12,
+        ))
         // Top stats as a clean label-left / value-right list (Win11 Task Manager /
         // Mission Center style): every row is one aligned line instead of the prior
         // alternating 2-up big-number blocks + full-width blocks, which read as a
@@ -59,59 +65,70 @@ pub(super) fn render_pinned(
         // entirely while `Hidden`: no session and no registered lane on this
         // host renders nothing, never a placeholder.
         .children(
-            (!matches!(package_power, PackagePowerModel::Hidden)).then(|| {
-                super::package_power::render_package_power_section(theme, package_power, cx)
-            }),
+            matches!(package_power, PackagePowerModel::Packages(_))
+                .then(|| super::package_power::render_package_power_section(theme, package_power)),
         )
         // MSR-readout subsection (the escalation-backed CpuMsr lane). Same
         // absence discipline: `Hidden` renders nothing at all.
         .children(
-            (!matches!(msr_readouts, MsrReadoutsModel::Hidden))
-                .then(|| super::msr_readouts::render_msr_readouts_section(theme, msr_readouts, cx)),
+            matches!(msr_readouts, MsrReadoutsModel::Rows(_))
+                .then(|| super::msr_readouts::render_msr_readouts_section(theme, msr_readouts)),
         )
         // Hairline section divider between the live stats and the static spec list.
-        .child(div().h(px(1.0)).w_full().bg(theme.border))
-        .child(spec_grid(theme, cpu, hardware, units))
+        .child(
+            div()
+                .h(px(1.0))
+                .w_full()
+                .bg(taskmanager_ui::theme_binding::fill(theme.border)),
+        )
+        .child(spec_grid(theme, cpu, hardware, units, spec_rows))
 }
 
 fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> Div {
-    let threads = snap
-        .threads
-        .map_or_else(formatting::missing_value, |threads| threads.to_string());
-    div()
+    let mut col = div()
         .debug_selector(|| "tm-cpu-details-live-stats".to_string())
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_5)
-        .w_full()
-        .child(kv_row(
-            theme,
-            i18n::t("common.utilization"),
-            &live.utilization,
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_5,
         ))
-        .child(kv_row_with_note(
+        .w_full();
+    if let Some(utilization) = live.utilization.as_deref() {
+        col = col.child(kv_row(theme, i18n::t("common.utilization"), utilization));
+    }
+    if let Some(speed) = live.speed.as_deref() {
+        col = col.child(kv_row_with_note(
             theme,
             i18n::t("common.speed"),
-            &live.speed,
+            speed,
             live.speed_note,
-        ))
-        .child(kv_row_with_note(
+        ));
+    }
+    if let Some(temperature) = live.temperature.as_deref() {
+        col = col.child(kv_row_with_note(
             theme,
             i18n::t("common.temperature"),
-            &live.temperature,
+            temperature,
             live.temperature_note.as_deref(),
-        ))
-        .child(kv_row(
+        ));
+    }
+    col = col.child(kv_row(
+        theme,
+        i18n::t("cpu.processes"),
+        &snap.processes.to_string(),
+    ));
+    if let Some(threads) = snap.threads {
+        col = col.child(kv_row(
             theme,
-            i18n::t("cpu.processes"),
-            &snap.processes.to_string(),
-        ))
-        .child(kv_row(theme, i18n::t("common.threads"), &threads))
-        .child(kv_row(
-            theme,
-            i18n::t("common.up_time"),
-            &format_uptime(snap.uptime_secs),
-        ))
+            i18n::t("common.threads"),
+            &threads.to_string(),
+        ));
+    }
+    col.child(kv_row(
+        theme,
+        i18n::t("common.up_time"),
+        &format_uptime(snap.uptime_secs),
+    ))
 }
 
 /// A clean label-left / value-right details row (Win11 TM / Mission Center style):
@@ -120,8 +137,8 @@ fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> D
 /// BOTH the CPU details panel's top stats AND the spec list below — one shared
 /// geometry for a unified panel.
 pub(super) fn kv_row(theme: &Theme, label: &str, value: &str) -> Div {
-    // The shared row owns the shrinkable label/value geometry so uniform-list
-    // measurement and the live-stat block cannot drift apart.
+    // The shared row owns the shrinkable label/value geometry so live stats
+    // and specification rows cannot drift apart.
     KeyValueRow::new(label, value, theme.palette())
         .selectable_value(gpui::ElementId::Name(
             format!("cpu-detail-value:{label}").into(),
@@ -136,7 +153,9 @@ fn kv_row_with_note(theme: &Theme, label: &str, value: &str, note: Option<&str>)
     let mut col = div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_1)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_1,
+        ))
         .w_full()
         .child(kv_row(theme, label, value));
     if let Some(n) = note {
@@ -144,8 +163,8 @@ fn kv_row_with_note(theme: &Theme, label: &str, value: &str, note: Option<&str>)
             div()
                 .flex()
                 .justify_end()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(n.to_string()),
         );
     }
@@ -157,30 +176,73 @@ fn spec_grid(
     cpu: &CpuMetrics,
     hardware: &HardwareInfo,
     units: UnitPreferences,
-) -> impl IntoElement {
-    // Pure projection lives in `cpu_spec_rows` (data/render split, ARCH.md §4);
-    // this fn only paints the ordered rows it returns.
+    max_rows: Option<usize>,
+) -> Div {
+    // Performance details are intentionally static: the page's only scrollable
+    // surface is the device selector on the left. Missing optional facts were
+    // removed by `cpu_spec_rows`; the remaining rows are painted in place so
+    // the right rail cannot hide a second implicit list viewport.
     let rows = cpu_spec_rows(cpu, hardware, units);
-    // Scrollable list — the spec table can grow (e.g. heterogeneous "Core types"
-    // row) beyond a short window, so render it via uniform_list rather than overflow.
-    // Each row reuses `kv_row` (the same geometry as the top stats above) so the
-    // whole details panel reads as one unified, consistently right-aligned list;
-    // `kv_row`'s truncate-on-both-columns keeps long values from overflowing.
-    let theme = *theme;
-    uniform_list(("spec", 0_usize), rows.len(), move |range, _win, _cx| {
-        range
-            .filter_map(|i| {
-                // `uniform_list` is declared above with count = rows.len(), so `i`
-                // is contractually in range; `.get` is defensive insurance against a
-                // future count/len drift — render nothing for an out-of-range idx
-                // instead of panicking.
-                let (k, v) = rows.get(i)?;
-                Some(kv_row(&theme, k, v))
-            })
-            .collect::<Vec<_>>()
-    })
-    .flex_1()
-    .min_h(px(0.0))
+    let row_limit = max_rows.map_or(rows.len(), |limit| {
+        if rows.len() > limit {
+            limit.saturating_sub(1)
+        } else {
+            limit
+        }
+    });
+    let omitted = rows.len().saturating_sub(row_limit);
+    let mut column = div()
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_w(px(0.0))
+        .min_h(px(0.0))
+        .w_full();
+    for (index, (label, value)) in rows.into_iter().take(row_limit).enumerate() {
+        let row = kv_row(theme, &label, &value);
+        #[cfg(any(test, feature = "test-support"))]
+        let row = row.debug_selector(move || format!("tm-cpu-spec:{index}"));
+        #[cfg(not(any(test, feature = "test-support")))]
+        let _ = index;
+        column = column.child(row);
+    }
+    if omitted > 0 {
+        column = column.child(
+            div()
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .child(i18n::t("common.more_rows").replace("{count}", &omitted.to_string())),
+        );
+    }
+    column
+}
+
+fn spec_row_budget(
+    content_height: f32,
+    package_power: &PackagePowerModel,
+    msr_readouts: &MsrReadoutsModel,
+) -> Option<usize> {
+    if content_height <= 0.0 {
+        return None;
+    }
+    let mut reserved = CPU_DETAILS_RESERVE;
+    if matches!(package_power, PackagePowerModel::Packages(_)) {
+        reserved += CPU_PACKAGE_POWER_RESERVE;
+    }
+    if matches!(msr_readouts, MsrReadoutsModel::Rows(_)) {
+        reserved += CPU_MSR_RESERVE;
+    }
+    let available = (content_height - reserved).max(0.0);
+    let mut rows = 0_usize;
+    let mut used = 0.0_f32;
+    for _ in 0..MAX_CPU_SPEC_ROWS {
+        if used + CPU_SPEC_ROW_SLOT > available {
+            break;
+        }
+        rows += 1;
+        used += CPU_SPEC_ROW_SLOT;
+    }
+    Some(rows)
 }
 
 /// Pure data-layer builder for the CPU specification rows (ADR-020
@@ -279,6 +341,12 @@ pub(crate) fn cpu_spec_rows(
             preference.clone(),
         ));
     }
+    // The Performance detail rail has no scroll surface. Keep only accepted
+    // facts here; an unavailable optional value is represented by absence and
+    // its authorization/recovery affordance belongs to the Settings
+    // permission center, never a dashed row in this panel.
+    let missing = formatting::missing_value();
+    rows.retain(|(_, value)| !value.trim().is_empty() && value != &missing);
     rows
 }
 

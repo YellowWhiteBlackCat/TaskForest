@@ -32,6 +32,13 @@ pub fn run(app_id: Option<String>, demo: bool) {
             return;
         }
     };
+    let window_capture_client = match host.window_capture_client() {
+        Ok(client) => client,
+        Err(error) => {
+            error!(%error, detail = error.detail(), "window capture runtime unavailable");
+            return;
+        }
+    };
     let diagnostic_bundle_client = match host.diagnostic_bundle_client() {
         Ok(client) => client,
         Err(error) => {
@@ -59,6 +66,7 @@ pub fn run(app_id: Option<String>, demo: bool) {
                 crate::gpui_app::StartupRuntime {
                     config_client,
                     snapshot_export_client,
+                    window_capture_client,
                     diagnostic_bundle_client,
                     service_log_export_client,
                     history_connector,

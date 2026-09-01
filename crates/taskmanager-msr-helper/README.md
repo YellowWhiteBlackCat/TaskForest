@@ -51,3 +51,11 @@ cargo clippy -p taskmanager-msr-helper --all-targets -- -D warnings
 
 Package/polkit verification and a live on-box pkexec receipt are separate;
 without the latter the capability remains permission-limited.
+
+## Module map
+
+```text
+src/main.rs → msr_read.rs    pre-read of fixed MSR registers (/dev/cpu/*/msr)
+                             and the /dev/cpu/N/cpuid family gate
+src/json.rs                  honest-null JSON envelope output
+```

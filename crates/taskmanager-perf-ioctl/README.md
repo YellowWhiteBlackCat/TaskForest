@@ -16,3 +16,10 @@ no raw pointer, handle or platform policy crosses the boundary.
 Permission denial, missing PMU, driver mismatch, counter reset and recovery are
 normal typed outcomes. Run boundary unit tests, dependency firewall and Miri;
 real privileged PMU success still requires a target-machine receipt.
+
+## Module map
+
+```text
+src/lib.rs    perf_event_open ABI (#[repr(C)]) → typed per-engine usage;
+              pure constant ABI face (Miri gate, fuzz-exempt)
+```

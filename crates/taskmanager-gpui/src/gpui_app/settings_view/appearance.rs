@@ -33,14 +33,18 @@ pub(super) fn mode_row(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(
             div()
                 .flex()
                 .flex_row()
                 .flex_wrap()
                 .w_full()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(mode_preview_card(ModePreviewProps {
                     theme: t,
                     entity: ent.clone(),
@@ -77,11 +81,13 @@ pub(super) fn mode_row(
                 .flex()
                 .flex_row()
                 .items_center()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .child(
                     div()
-                        .text_size(tokens::FONT_11)
-                        .text_color(t.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
                         .child(i18n::t("settings.system_secondary")),
                 )
                 .child(pill(
@@ -153,18 +159,24 @@ fn mode_preview_card(props: ModePreviewProps<'_>) -> impl IntoElement {
         .min_w(px(0.0))
         .w_full()
         .max_w(px(180.0))
-        .p(tokens::SPACE_6)
+        .p(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_6)
-        .rounded(tokens::control_radius(t))
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(t),
+        ))
         .border_1()
-        .border_color(border)
-        .bg(if is_hov {
+        .border_color(taskmanager_ui::theme_binding::hsla(border))
+        .bg(taskmanager_ui::theme_binding::fill(if is_hov {
             preview.accent.with_alpha(0.10)
         } else {
             preview.card_bg
-        })
+        }))
         .focusable()
         .tab_stop(true)
         .cursor_pointer()
@@ -190,20 +202,28 @@ fn mode_preview_card(props: ModePreviewProps<'_>) -> impl IntoElement {
             .relative()
             .h(px(42.0))
             .w_full()
-            .rounded(tokens::small_radius(t))
+            .rounded(taskmanager_ui::theme_binding::absolute(
+                tokens::small_radius(t),
+            ))
             .border_1()
-            .border_color(preview.border)
-            .bg(preview.view_bg)
+            .border_color(taskmanager_ui::theme_binding::hsla(preview.border))
+            .bg(taskmanager_ui::theme_binding::fill(preview.view_bg))
             .flex()
             .flex_row()
-            .gap(tokens::SPACE_4)
-            .p(tokens::SPACE_4)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_4,
+            ))
+            .p(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_4,
+            ))
             .child(
                 div()
                     .w(px(16.0))
                     .h_full()
-                    .rounded(tokens::xsmall_radius(t))
-                    .bg(preview.sidebar_bg),
+                    .rounded(taskmanager_ui::theme_binding::absolute(
+                        tokens::xsmall_radius(t),
+                    ))
+                    .bg(taskmanager_ui::theme_binding::fill(preview.sidebar_bg)),
             )
             .child(
                 div()
@@ -211,13 +231,17 @@ fn mode_preview_card(props: ModePreviewProps<'_>) -> impl IntoElement {
                     .h_full()
                     .flex()
                     .items_end()
-                    .gap(tokens::SPACE_2)
+                    .gap(taskmanager_ui::theme_binding::definite_length(
+                        tokens::SPACE_2,
+                    ))
                     .children(bars.into_iter().map(|height| {
                         div()
                             .flex_1()
                             .h(px(26.0 * height))
-                            .rounded_t(tokens::xsmall_radius(t))
-                            .bg(preview.accent)
+                            .rounded_t(taskmanager_ui::theme_binding::absolute(
+                                tokens::xsmall_radius(t),
+                            ))
+                            .bg(taskmanager_ui::theme_binding::fill(preview.accent))
                     })),
             )
             .child(
@@ -227,7 +251,11 @@ fn mode_preview_card(props: ModePreviewProps<'_>) -> impl IntoElement {
                     .right_0()
                     .bottom_0()
                     .h(px(3.0))
-                    .bg(if active { t.accent } else { preview.border }),
+                    .bg(taskmanager_ui::theme_binding::fill(if active {
+                        t.accent
+                    } else {
+                        preview.border
+                    })),
             ),
     )
     .child(
@@ -235,14 +263,22 @@ fn mode_preview_card(props: ModePreviewProps<'_>) -> impl IntoElement {
             .flex()
             .items_center()
             .justify_between()
-            .gap(tokens::SPACE_4)
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_4,
+            ))
             .min_w(px(0.0))
             .child(
                 crate::gpui_app::elements::truncated_text(label)
                     .flex_1()
-                    .text_size(tokens::FONT_12)
-                    .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
-                    .text_color(if active { t.fg } else { t.fg_dim }),
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                    .font_weight(taskmanager_ui::theme_binding::font_weight(
+                        tokens::FONT_WEIGHT_SEMIBOLD,
+                    ))
+                    .text_color(taskmanager_ui::theme_binding::hsla(if active {
+                        t.fg
+                    } else {
+                        t.fg_dim
+                    })),
             )
             .child(
                 div()
@@ -250,7 +286,7 @@ fn mode_preview_card(props: ModePreviewProps<'_>) -> impl IntoElement {
                     .h(px(7.0))
                     .flex_shrink_0()
                     .rounded_full()
-                    .bg(preview.accent),
+                    .bg(taskmanager_ui::theme_binding::fill(preview.accent)),
             ),
     )
 }

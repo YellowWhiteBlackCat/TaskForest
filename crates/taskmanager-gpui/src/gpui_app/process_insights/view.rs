@@ -165,12 +165,9 @@ pub(crate) fn render_process_insights(
     units: UnitPreferences,
 ) -> Div {
     let layout = process_insights_layout(available_width);
-    let root = div()
-        .w_full()
-        .min_w(px(0.0))
-        .flex()
-        .flex_col()
-        .gap(tokens::SPACE_8);
+    let root = div().w_full().min_w(px(0.0)).flex().flex_col().gap(
+        taskmanager_ui::theme_binding::definite_length(tokens::SPACE_8),
+    );
     match state {
         ProcessInsightsRenderState::Loading => root.child(message_panel(
             theme,
@@ -190,7 +187,9 @@ pub(crate) fn render_process_insights(
                 .flex_row()
                 .flex_wrap()
                 .items_start()
-                .gap(tokens::SPACE_8)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_8,
+                ))
                 .min_w(px(0.0))
                 .child(network_card(
                     theme,
@@ -240,23 +239,25 @@ fn card(theme: &Theme, title: &str, width: f32) -> Div {
         .bordered(false)
         .child(
             div()
-                .mb(tokens::SPACE_7)
-                .text_size(tokens::FONT_13)
-                .font_weight(tokens::FONT_WEIGHT_HEADER.into())
+                .mb(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_HEADER,
+                ))
                 .child(title.to_string()),
         )
         .render()
         .w(px(width))
         .min_w(px(0.0))
-        .text_color(theme.fg)
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
 }
 
 fn message_panel(theme: &Theme, message: &str, color: Color, width: f32) -> Div {
     card(theme, "", width).child(
         div()
             .min_w(px(0.0))
-            .text_size(tokens::FONT_12)
-            .text_color(color)
+            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+            .text_color(taskmanager_ui::theme_binding::hsla(color))
             .whitespace_normal()
             .child(message.to_string()),
     )
@@ -284,42 +285,52 @@ fn network_card(
     let network = &snapshot.network;
     let availability = status_label(network.traffic_state.status, labels);
     let mut connections = div()
-        .mt(tokens::SPACE_7)
-        .pt(tokens::SPACE_7)
+        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
+        .pt(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ))
         .border_t_1()
-        .border_color(theme.border)
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.border))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_3);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_3,
+        ));
     if network.connections.is_empty() {
         connections = connections.child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(labels.no_connections.to_string()),
         );
     } else {
         let (shown, hidden) = capped_card_rows(network.connections.len());
         connections = connections.child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(format!(
                     "{} · {}",
                     labels.connections,
                     network.connections.len()
                 )),
         );
-        connections = connections.child(div().flex().flex_col().gap(tokens::SPACE_3).children(
-            network.connections.iter().take(shown).map(|connection| {
-                div()
-                    .min_w(px(0.0))
-                    .text_size(tokens::FONT_10)
-                    .font(mono_font_with_fallback(theme))
-                    .whitespace_normal()
-                    .child(format_connection(connection))
-            }),
-        ));
+        connections = connections.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_3,
+                ))
+                .children(network.connections.iter().take(shown).map(|connection| {
+                    div()
+                        .min_w(px(0.0))
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
+                        .font(mono_font_with_fallback(theme))
+                        .whitespace_normal()
+                        .child(format_connection(connection))
+                })),
+        );
         if hidden > 0 {
             connections =
                 connections.child(crate::gpui_app::elements::more_rows_hint(theme, hidden));
@@ -370,7 +381,7 @@ fn escalation_row(
         }
     };
     div()
-        .mt(tokens::SPACE_7)
+        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
         .flex()
         .flex_row()
         .items_center()
@@ -400,8 +411,8 @@ fn gpu_card(
     if snapshot.gpu.devices.is_empty() {
         return content.child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(if snapshot.gpu.state.status == DeviceStatus::Healthy {
                     labels.no_gpu.to_string()
                 } else {
@@ -412,12 +423,12 @@ fn gpu_card(
     for device in &snapshot.gpu.devices {
         content = content.child(
             div()
-                .mb(tokens::SPACE_7)
+                .mb(taskmanager_ui::theme_binding::length(tokens::SPACE_7))
                 .min_w(px(0.0))
                 .child(
                     div()
                         .truncate()
-                        .text_size(tokens::FONT_11)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
                         .font(mono_font_with_fallback(theme))
                         .child(device.device_id.clone()),
                 )

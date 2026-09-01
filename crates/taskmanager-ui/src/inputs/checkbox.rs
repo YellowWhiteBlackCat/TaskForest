@@ -121,18 +121,18 @@ impl RenderOnce for Checkbox {
 
         let box_ = div()
             .size(px(18.0))
-            .rounded(palette.small_radius)
+            .rounded(crate::theme_binding::absolute(palette.small_radius))
             .border_1()
-            .border_color(if checked {
+            .border_color(crate::theme_binding::hsla(if checked {
                 palette.accent
             } else {
                 palette.border
-            })
-            .bg(if checked {
+            }))
+            .bg(crate::theme_binding::fill(if checked {
                 palette.accent
             } else {
                 palette.surface
-            })
+            }))
             .flex()
             .items_center()
             .justify_center()
@@ -141,12 +141,12 @@ impl RenderOnce for Checkbox {
         // Check mark: an accent-on-accent tick (colors stay palette-derived).
         let mark = div()
             .size(px(10.0))
-            .rounded(palette.xsmall_radius)
-            .bg(if checked {
+            .rounded(crate::theme_binding::absolute(palette.xsmall_radius))
+            .bg(crate::theme_binding::fill(if checked {
                 taskmanager_theme::color::on_accent(palette.accent)
             } else {
                 palette.surface
-            });
+            }));
 
         let focus_handle = focus_handle.clone().tab_stop(!disabled);
 
@@ -157,10 +157,10 @@ impl RenderOnce for Checkbox {
             .flex()
             .flex_row()
             .items_center()
-            .gap(tokens::SPACE_8)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
             .cursor_pointer()
             .when(disabled, |el| el.opacity(0.5))
-            .focus(|style| style.border_color(palette.ring))
+            .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
             .border_1()
             .rounded(px(4.0))
             .child(box_.child(mark))
@@ -199,7 +199,12 @@ impl RenderOnce for Checkbox {
             });
 
         if let Some(label) = self.label {
-            element = element.child(div().text_sm().text_color(palette.fg).child(label));
+            element = element.child(
+                div()
+                    .text_sm()
+                    .text_color(crate::theme_binding::hsla(palette.fg))
+                    .child(label),
+            );
         }
         element
     }

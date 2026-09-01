@@ -577,15 +577,15 @@ impl Tree {
         div()
             .h_full()
             .pl(px(4.0) + indent)
-            .pr(tokens::SPACE_8)
+            .pr(crate::theme_binding::definite_length(tokens::SPACE_8))
             .flex()
             .flex_row()
             .items_center()
-            .gap(tokens::SPACE_4)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_4))
             .child(
                 div()
                     .w(px(16.0))
-                    .text_color(palette.fg_muted)
+                    .text_color(crate::theme_binding::hsla(palette.fg_muted))
                     .child(if item.is_folder() {
                         if expanded { "▾" } else { "▸" }
                     } else {
@@ -594,11 +594,11 @@ impl Tree {
             )
             .child(
                 div()
-                    .text_color(if item.is_disabled() {
+                    .text_color(crate::theme_binding::hsla(if item.is_disabled() {
                         palette.fg_muted
                     } else {
                         palette.fg
-                    })
+                    }))
                     .child(item.label.clone()),
             )
     }
@@ -694,7 +694,9 @@ impl RenderOnce for Tree {
                                         .id(flat_ix)
                                         .h(row_height)
                                         .when(selected == Some(flat_ix), |this| {
-                                            this.bg(crate::styled::hover_fill(palette.surface))
+                                            this.bg(crate::theme_binding::fill(
+                                                crate::styled::hover_fill(palette.surface),
+                                            ))
                                         })
                                         .when(!item.is_disabled(), |this| {
                                             this.on_mouse_down(MouseButton::Left, {

@@ -228,12 +228,12 @@ fn memory_detail(
         let swap_chart = canvas::Canvas::new(PerfChart::new(
             Rc::clone(&swap_samples),
             swap_samples.clone(),
-            taskmanager_theme::iced::color(theme_snapshot.memory).scale_alpha(0.75),
-            taskmanager_theme::iced::color(theme_snapshot.palette().border),
-            taskmanager_theme::iced::color(theme_snapshot.palette().border),
+            crate::theme_binding::color(theme_snapshot.memory).scale_alpha(0.75),
+            crate::theme_binding::color(theme_snapshot.palette().border),
+            crate::theme_binding::color(theme_snapshot.palette().border),
             crate::perf_chart::ReadoutColors {
-                bg: taskmanager_theme::iced::color(theme_snapshot.palette().surface),
-                fg: taskmanager_theme::iced::color(theme_snapshot.palette().fg),
+                bg: crate::theme_binding::color(theme_snapshot.palette().surface),
+                fg: crate::theme_binding::color(theme_snapshot.palette().fg),
             },
             false,
         ))
@@ -665,37 +665,37 @@ fn trend_strip_panel(
         crate::trend_strip::TrendEntry {
             caption: "CPU",
             samples: app.cached_metric_series(TrendSeries::CpuUsagePercent),
-            color: taskmanager_theme::iced::color(theme_snapshot.cpu),
+            color: crate::theme_binding::color(theme_snapshot.cpu),
             max: 100.0,
         },
         crate::trend_strip::TrendEntry {
             caption: "MEM",
             samples: app.cached_metric_series(TrendSeries::MemoryUsagePercent),
-            color: taskmanager_theme::iced::color(theme_snapshot.memory),
+            color: crate::theme_binding::color(theme_snapshot.memory),
             max: 100.0,
         },
         crate::trend_strip::TrendEntry {
             caption: "DSK",
             samples: disk,
-            color: taskmanager_theme::iced::color(theme_snapshot.disk),
+            color: crate::theme_binding::color(theme_snapshot.disk),
             max: disk_max,
         },
         crate::trend_strip::TrendEntry {
             caption: "NET",
             samples: net,
-            color: taskmanager_theme::iced::color(theme_snapshot.network),
+            color: crate::theme_binding::color(theme_snapshot.network),
             max: net_max,
         },
         crate::trend_strip::TrendEntry {
             caption: "GPU",
             samples: app.cached_metric_series(TrendSeries::GpuUsagePercent),
-            color: taskmanager_theme::iced::color(theme_snapshot.gpu),
+            color: crate::theme_binding::color(theme_snapshot.gpu),
             max: 100.0,
         },
     ];
     let strip = crate::trend_strip::TrendStrip::new(
         entries,
-        taskmanager_theme::iced::color(theme_snapshot.palette().fg_muted),
+        crate::theme_binding::color(theme_snapshot.palette().fg_muted),
     );
     canvas::Canvas::new(strip)
         .width(Length::Fill)
@@ -726,17 +726,17 @@ fn performance_chart(
             .into();
     }
     let palette = theme_snapshot.palette();
-    let cpu_color = taskmanager_theme::iced::color(palette.accent);
-    let memory_color = taskmanager_theme::iced::color(palette.success);
+    let cpu_color = crate::theme_binding::color(palette.accent);
+    let memory_color = crate::theme_binding::color(palette.success);
     canvas::Canvas::new(PerfChart::new(
         cpu,
         memory,
         cpu_color,
         memory_color,
-        taskmanager_theme::iced::color(theme_snapshot.palette().border),
+        crate::theme_binding::color(theme_snapshot.palette().border),
         crate::perf_chart::ReadoutColors {
-            bg: taskmanager_theme::iced::color(palette.surface),
-            fg: taskmanager_theme::iced::color(palette.fg),
+            bg: crate::theme_binding::color(palette.surface),
+            fg: crate::theme_binding::color(palette.fg),
         },
         true,
     ))

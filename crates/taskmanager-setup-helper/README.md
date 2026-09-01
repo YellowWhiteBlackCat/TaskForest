@@ -15,3 +15,10 @@ and rolls back on failure; it is not a general installer or shell.
 Conflict, permission, reload failure, retry, revert and restart outcomes are
 typed. Test the helper in isolation and keep installed-package polkit and
 restart receipts separate from fixture evidence.
+
+## Module map
+
+```text
+src/main.rs   install/revert setup actions (udev rules, pkexec; idempotent,
+              bounded atomic steps with rollback)
+```

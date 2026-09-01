@@ -282,7 +282,7 @@ pub(super) fn stats_panel(
                 text(value).size(value_size).color(if missing {
                     theme::muted_text_color(theme_snapshot)
                 } else {
-                    taskmanager_theme::iced::color(theme_snapshot.palette().fg)
+                    crate::theme_binding::color(theme_snapshot.palette().fg)
                 }),
             ]
             .spacing(if compact { 4 } else { 8 })

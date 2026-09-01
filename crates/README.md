@@ -18,7 +18,8 @@
 
 ## Product surfaces
 
-- [GPUI](taskmanager-gpui/README.md) · [Iced](taskmanager-iced/README.md) · [TUI](taskmanager-tui/README.md) · [Bevy](taskmanager-bevy-ui/README.md)
+- Four frontend products (ADR-051): [GPUI / taskforest-g](taskmanager-gpui/README.md) · [Iced / taskforest-i](taskmanager-iced/README.md) · [TUI / taskmanager-tui](taskmanager-tui/README.md) · [Bevy / taskforest-b](taskmanager-bevy-ui/README.md)
+- [Shared CLI harness](taskmanager-cli/README.md) — every product bin hands its capabilities to `taskmanager_cli::run`; the root package (`taskmanager-gates`) hosts the cross-crate conformance suites and ships no binary
 - [UI components](taskmanager-ui/README.md) · [theme](taskmanager-theme/README.md)
 - [icons](taskmanager-icons/README.md) · [assets](taskmanager-assets/README.md) · [tray](taskmanager-tray-muda/README.md)
 

@@ -21,21 +21,13 @@ mod gpui_interaction_matrix_test;
 #[path = "logic/accessibility_architecture_test.rs"]
 mod accessibility_architecture_test;
 
-#[cfg(feature = "ui-gpui")]
-#[path = "logic/columns_metadata_test.rs"]
-mod columns_metadata_test;
-
-#[cfg(feature = "ui-gpui")]
-#[path = "logic/graph_helpers_test.rs"]
-mod graph_helpers_test;
-
 #[path = "logic/ecs_application_bridge_test.rs"]
 mod ecs_application_bridge_test;
 
 #[path = "logic/hardware_feature_matrix_architecture_test.rs"]
 mod hardware_feature_matrix_architecture_test;
 
-#[cfg(feature = "ui-gpui")]
+#[cfg(target_os = "linux")]
 #[path = "logic/metrics_test.rs"]
 mod metrics_test;
 
@@ -61,11 +53,9 @@ mod live_smoke_test;
 #[path = "logic/process_telemetry_test.rs"]
 mod process_telemetry_test;
 
-#[cfg(feature = "ui-gpui")]
 #[path = "logic/quality_gate_test.rs"]
 mod quality_gate_test;
 
-#[cfg(feature = "ui-gpui")]
 #[path = "logic/workspace_architecture_test.rs"]
 mod workspace_architecture_test;
 
@@ -75,13 +65,8 @@ mod ui_component_boundary;
 #[path = "logic/theme_neutrality_test.rs"]
 mod theme_neutrality_test;
 
-#[cfg(feature = "ui-gpui")]
 #[path = "logic/panic_surface_test.rs"]
 mod panic_surface_test;
-
-#[cfg(feature = "ui-gpui")]
-#[path = "logic/processes_view_test.rs"]
-mod processes_view_test;
 
 // Linux init systems only: the module drives the real systemd/OpenRC scan
 // path from the Linux-only dev-dependency.

@@ -10,13 +10,13 @@
 use crate::OptEventCallback;
 use std::rc::Rc;
 
+use crate::icons_binding::icon;
 use gpui::prelude::FluentBuilder;
 use gpui::{
     App, BoxShadow, ClickEvent, Context, ElementId, Entity, Fill, FocusHandle, InteractiveElement,
     IntoElement, KeyDownEvent, ParentElement, RenderOnce, SharedString, StatefulInteractiveElement,
     Styled, Window, div, linear_color_stop, linear_gradient, point, px,
 };
-use taskmanager_icons::icon;
 
 /// The pressed-state shadow: a tighter, fainter drop than the resting state
 /// so the button visually sinks under the pointer (Mission-Center-style
@@ -179,8 +179,8 @@ fn primary_state_fill(
 ) -> Fill {
     Fill::from(linear_gradient(
         90.0,
-        linear_color_stop(map(from), 0.0),
-        linear_color_stop(map(to), 1.0),
+        linear_color_stop(crate::theme_binding::hsla(map(from)), 0.0),
+        linear_color_stop(crate::theme_binding::hsla(map(to)), 1.0),
     ))
 }
 
@@ -209,16 +209,16 @@ impl RenderOnce for Button {
                 )
             }
             ButtonVariant::Secondary => (
-                palette.surface.into(),
-                hover_fill(palette.surface).into(),
-                active_fill(palette.surface).into(),
+                crate::theme_binding::fill(palette.surface),
+                crate::theme_binding::fill(hover_fill(palette.surface)),
+                crate::theme_binding::fill(active_fill(palette.surface)),
                 palette.fg,
                 palette.border,
             ),
             ButtonVariant::Danger => (
-                palette.danger.into(),
-                hover_fill(palette.danger).into(),
-                active_fill(palette.danger).into(),
+                crate::theme_binding::fill(palette.danger),
+                crate::theme_binding::fill(hover_fill(palette.danger)),
+                crate::theme_binding::fill(active_fill(palette.danger)),
                 on_accent(palette.danger),
                 palette.danger,
             ),
@@ -241,20 +241,25 @@ impl RenderOnce for Button {
             .flex_row()
             .items_center()
             .justify_center()
-            .gap(tokens::SPACE_6)
-            .px(tokens::SPACE_12)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_6))
+            .px(crate::theme_binding::definite_length(tokens::SPACE_12))
             .h(px(28.0))
             .rounded(px(self.radius))
             .bg(fill)
-            .text_color(text)
+            .text_color(crate::theme_binding::hsla(text))
             .text_sm()
-            .font_weight(tokens::FONT_WEIGHT_MEDIUM.into())
-            .when(self.icon_id.is_some(), |el| el.pl(tokens::SPACE_2))
+            .font_weight(crate::theme_binding::font_weight(
+                tokens::FONT_WEIGHT_MEDIUM,
+            ))
+            .when(self.icon_id.is_some(), |el| {
+                el.pl(crate::theme_binding::definite_length(tokens::SPACE_2))
+            })
             // Focus ring: palette.ring is transparent when focus is not
             // keyboard-driven, so this draws only for keyboard focus.
-            .focus(|style| style.border_color(palette.ring))
+            .focus(|style| style.border_color(crate::theme_binding::hsla(palette.ring)))
             .when(!enabled, |el| {
-                el.opacity(0.5).text_color(disabled_fg(&palette))
+                el.opacity(0.5)
+                    .text_color(crate::theme_binding::hsla(disabled_fg(&palette)))
             })
             .when(enabled && self.variant != ButtonVariant::Secondary, |el| {
                 el.hover(|style| style.bg(hover.clone()))
@@ -262,7 +267,7 @@ impl RenderOnce for Button {
             })
             .when(enabled && self.variant == ButtonVariant::Secondary, |el| {
                 el.border_1()
-                    .border_color(border)
+                    .border_color(crate::theme_binding::hsla(border))
                     .hover(|style| style.bg(hover))
                     .active(|style| style.bg(active).shadow(press_shadow()))
             })

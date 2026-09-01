@@ -11,8 +11,8 @@ use super::{focus_visible, observe_keyboard, observe_pointer};
 use crate::app::Message;
 use crate::keys::IcedKey;
 use crate::theme::focus_ring_color;
+use crate::theme_binding::color;
 use taskmanager_theme::Theme;
-use taskmanager_theme::iced::color;
 
 #[test]
 fn pointer_input_clears_the_keyboard_ring_source() {

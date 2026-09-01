@@ -87,13 +87,15 @@ impl KeyValueRow {
         let mut label = div()
             .min_w(px(0.0))
             .truncate()
-            .text_size(tokens::FONT_12)
-            .text_color(self.palette.fg_muted)
+            .text_size(crate::theme_binding::font_size(tokens::FONT_12))
+            .text_color(crate::theme_binding::hsla(self.palette.fg_muted))
             .child(self.label);
         let mut value = div()
             .min_w(px(0.0))
-            .text_size(tokens::FONT_12)
-            .text_color(self.value_color.unwrap_or(self.palette.fg))
+            .text_size(crate::theme_binding::font_size(tokens::FONT_12))
+            .text_color(crate::theme_binding::hsla(
+                self.value_color.unwrap_or(self.palette.fg),
+            ))
             .debug_selector(move || value_selector.clone());
         value = match self.selectable_value_id {
             Some(id) if self.value_align_right => value.child(
@@ -110,7 +112,7 @@ impl KeyValueRow {
         if let Some(width) = self.label_width {
             // Property/detail rows reserve a stable label column and let the
             // value consume the remaining width of the bounded panel.
-            label = label.w(width).flex_shrink_0();
+            label = label.w(crate::theme_binding::length(width)).flex_shrink_0();
             value = value.flex_1();
         } else {
             // Stat/spec rows have no external label token. Let the label own
@@ -131,14 +133,18 @@ impl KeyValueRow {
             // `51 °C` and `0.43 GHz` at their internal space, making the right
             // column appear vertically misaligned even though its flex bounds
             // are correct.
-            value = value.truncate().text_right();
+            // `overflow_hidden` is explicit as well: a selectable text child
+            // can retain its intrinsic paint width even after the parent has
+            // flex-shrunk. The rail must clip/truncate inside its value slot,
+            // never at the outer window edge.
+            value = value.truncate().overflow_hidden().text_right();
         }
         div()
             .flex()
             .flex_row()
             .items_start()
             .justify_between()
-            .gap(tokens::SPACE_12)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_12))
             .w_full()
             .min_w(px(0.0))
             .debug_selector(move || row_selector.clone())

@@ -40,8 +40,10 @@ the desktop titlebar, navigation, page frame, or Performance slot policy.
 
 - All GPUI pages share one resize-time capacity projection.
 - Page modules do not re-read window pixels or subtract shell regions locally.
-- Long locales and short vertical rails have scroll fallback instead of clipping
-  the navigation set.
+- Long locales and short vertical rails keep their existing local scroll
+  contracts; Performance is the explicit exception: only its left device
+  selector scrolls, while the main viewport and statistics rail remain fixed
+  and lower content is bounded before painting.
 - Slot allocation is pure and headlessly testable across width, height,
   orientation, CSD, alert, and persisted-sidebar inputs.
 - The page-specific `PerformancePageBudget` still owns semantic composition;

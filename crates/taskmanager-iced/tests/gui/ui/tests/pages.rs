@@ -172,31 +172,31 @@ fn segment_color_maps_each_kind_to_its_theme_token() {
     let theme = taskmanager_theme::Theme::dark();
     assert_eq!(
         segment_color(MemSegmentKind::Active, &theme),
-        taskmanager_theme::iced::color(theme.memory)
+        crate::theme_binding::color(theme.memory)
     );
     assert_eq!(
         segment_color(MemSegmentKind::InUse, &theme),
-        taskmanager_theme::iced::color(theme.memory)
+        crate::theme_binding::color(theme.memory)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Inactive, &theme),
-        taskmanager_theme::iced::color(theme.accent)
+        crate::theme_binding::color(theme.accent)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Cache, &theme),
-        taskmanager_theme::iced::color(theme.disk)
+        crate::theme_binding::color(theme.disk)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Free, &theme),
-        taskmanager_theme::iced::color(theme.fg_dim)
+        crate::theme_binding::color(theme.fg_dim)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Available, &theme),
-        taskmanager_theme::iced::color(theme.fg_dim)
+        crate::theme_binding::color(theme.fg_dim)
     );
     assert_eq!(
         segment_color(MemSegmentKind::Other, &theme),
-        taskmanager_theme::iced::color(theme.shade)
+        crate::theme_binding::color(theme.shade)
     );
 }
 

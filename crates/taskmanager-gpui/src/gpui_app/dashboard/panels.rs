@@ -110,7 +110,14 @@ fn render_events(
     events: &[AlertEvent],
     entity: Entity<RootView>,
 ) -> Div {
-    let mut filters = div().flex().flex_row().flex_wrap().gap(tokens::SPACE_4);
+    let mut filters =
+        div()
+            .flex()
+            .flex_row()
+            .flex_wrap()
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_4,
+            ));
     for filter in [EventFilter::All, EventFilter::Active, EventFilter::Cleared] {
         let entity = entity.clone();
         filters = filters.child(elements::pill(
@@ -129,13 +136,20 @@ fn render_events(
         ));
     }
     let visible = state.events.visible_events(events);
-    let mut events = div().flex().flex_col().gap(tokens::SPACE_6);
+    let mut events = div()
+        .flex()
+        .flex_col()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ));
     if visible.is_empty() {
         events = events.child(
             div()
-                .py(tokens::SPACE_24)
-                .text_color(theme.fg_dim)
-                .text_size(tokens::FONT_12)
+                .py(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_24,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
                 .child(i18n::t("events.empty")),
         );
     }
@@ -155,10 +169,14 @@ fn render_events(
                     div()
                         .flex()
                         .justify_between()
-                        .gap(tokens::SPACE_8)
+                        .gap(taskmanager_ui::theme_binding::definite_length(
+                            tokens::SPACE_8,
+                        ))
                         .child(
                             div()
-                                .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
+                                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                                    tokens::FONT_WEIGHT_SEMIBOLD,
+                                ))
                                 .child(format!(
                                     "{} · {}",
                                     event_kind_label(event.kind),
@@ -167,16 +185,18 @@ fn render_events(
                         )
                         .child(
                             div()
-                                .text_size(tokens::FONT_11)
-                                .text_color(theme.fg_dim)
+                                .text_size(taskmanager_ui::theme_binding::font_size(
+                                    tokens::FONT_11,
+                                ))
+                                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                                 .child(format!("{} ms", event.observed_at_ms)),
                         ),
                 )
                 .child(
                     div()
-                        .mt(tokens::SPACE_3)
-                        .text_size(tokens::FONT_12)
-                        .text_color(theme.fg_dim)
+                        .mt(taskmanager_ui::theme_binding::length(tokens::SPACE_3))
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                         .child(format!(
                             "{} · {:.1} / {:.1}",
                             event.alert.target, event.alert.value, event.alert.threshold
@@ -184,7 +204,7 @@ fn render_events(
                 )
                 .render()
                 .border_l_2()
-                .border_color(color),
+                .border_color(taskmanager_ui::theme_binding::hsla(color)),
         );
     }
     let mark = entity.clone();
@@ -192,19 +212,25 @@ fn render_events(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_10)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
         .child(
             div()
                 .flex()
                 .flex_row()
                 .flex_wrap()
                 .justify_between()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(filters)
                 .child(
                     div()
                         .flex()
-                        .gap(tokens::SPACE_4)
+                        .gap(taskmanager_ui::theme_binding::definite_length(
+                            tokens::SPACE_4,
+                        ))
                         .child(elements::pill(
                             theme,
                             "events-mark-read",
@@ -242,26 +268,36 @@ fn render_events(
 }
 
 fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<RootView>) -> Div {
-    let mut rows = div().flex().flex_col().gap(tokens::SPACE_7);
+    let mut rows = div()
+        .flex()
+        .flex_col()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_7,
+        ));
     for preset in &state.saved_views {
         let apply = entity.clone();
         let remove = entity.clone();
         let preset_for_apply = preset.clone();
         let preset_id = preset.id;
-        let mut actions = div().flex().gap(tokens::SPACE_4).child(elements::pill(
-            theme,
-            ("saved-view-apply", preset_id),
-            i18n::t("common.apply"),
-            false,
-            false,
-            move |_window, cx| {
-                apply.update(cx, |view, cx| {
-                    view.apply_saved_view(&preset_for_apply);
-                    cx.notify();
-                });
-            },
-            |_, _, _| {},
-        ));
+        let mut actions = div()
+            .flex()
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_4,
+            ))
+            .child(elements::pill(
+                theme,
+                ("saved-view-apply", preset_id),
+                i18n::t("common.apply"),
+                false,
+                false,
+                move |_window, cx| {
+                    apply.update(cx, |view, cx| {
+                        view.apply_saved_view(&preset_for_apply);
+                        cx.notify();
+                    });
+                },
+                |_, _, _| {},
+            ));
         if !preset.built_in {
             actions = actions.child(elements::pill(
                 theme,
@@ -293,20 +329,28 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                         .flex_wrap()
                         .items_center()
                         .justify_between()
-                        .gap(tokens::SPACE_8)
+                        .gap(taskmanager_ui::theme_binding::definite_length(
+                            tokens::SPACE_8,
+                        ))
                         .child(
                             div()
                                 .flex_1()
                                 .min_w(px(190.0))
                                 .child(
                                     div()
-                                        .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
+                                        .font_weight(taskmanager_ui::theme_binding::font_weight(
+                                            tokens::FONT_WEIGHT_SEMIBOLD,
+                                        ))
                                         .child(preset.display_name()),
                                 )
                                 .child(
                                     div()
-                                        .text_size(tokens::FONT_11)
-                                        .text_color(theme.fg_dim)
+                                        .text_size(taskmanager_ui::theme_binding::font_size(
+                                            tokens::FONT_11,
+                                        ))
+                                        .text_color(taskmanager_ui::theme_binding::hsla(
+                                            theme.fg_dim,
+                                        ))
                                         .child(format!(
                                             "{} · {} · {} {}",
                                             process_hierarchy_label(),
@@ -327,11 +371,13 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
     let mut content = div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_10)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_10,
+        ))
         .child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("saved_views.help")),
         )
         .child(
@@ -339,7 +385,9 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
                 .flex()
                 .flex_row()
                 .flex_wrap()
-                .gap(tokens::SPACE_6)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_6,
+                ))
                 .child(elements::pill(
                     theme,
                     "saved-view-save-current",
@@ -409,8 +457,8 @@ fn render_saved_views(theme: &Theme, state: &DashboardState, entity: Entity<Root
         content = content.child(
             div()
                 .id("saved-view-transfer-feedback")
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(saved_view_transfer_feedback(feedback)),
         );
     }

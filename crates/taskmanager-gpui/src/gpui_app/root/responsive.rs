@@ -59,6 +59,10 @@ pub const PERFORMANCE_STATS_MAX_WIDTH: f32 = 280.0;
 pub const PERFORMANCE_SIDEBAR_MIN_WIDTH: f32 = 220.0;
 pub const PERFORMANCE_SIDEBAR_MAX_WIDTH: f32 = 460.0;
 pub const PERFORMANCE_SLOT_GAP: f32 = 12.0;
+/// Minimum content height for a stacked Performance details rail. Below this
+/// the main headline plus the fixed 220px rail cannot both remain readable,
+/// so the typed width fallback is Hidden rather than allowing a bottom clip.
+const PERFORMANCE_STACKED_DETAILS_MIN_HEIGHT: f32 = 520.0;
 
 /// Horizontal layout capacity shared by every GPUI page.
 ///
@@ -127,7 +131,7 @@ pub enum PerformanceVerticalRunway {
     Floor,
     /// The core stack composes: title row + header band (readouts /
     /// composition) + headline card with its summary row. Secondary charts
-    /// and the below band are dropped.
+    /// and below content are dropped so the fixed viewport cannot clip them.
     Core,
     /// The full chart inventory fits: the core stack plus secondary charts
     /// and the per-core matrix. This is the rung `chart_inventory` requires
@@ -161,6 +165,15 @@ impl PerformanceVerticalRunway {
     #[must_use]
     pub const fn carries_core_stack(self) -> bool {
         matches!(self, Self::Core | Self::Charts)
+    }
+
+    /// Whether a page may admit content below its headline surface. Only the
+    /// full Charts runway has enough named capacity for that optional band;
+    /// Core is intentionally headline-only, which makes the no-scroll
+    /// Performance contract explicit at the shared boundary.
+    #[must_use]
+    pub const fn carries_below(self) -> bool {
+        matches!(self, Self::Charts)
     }
 }
 
@@ -318,12 +331,19 @@ impl PerformancePageBudget {
         };
         let remaining = (workspace_width - sidebar_width).max(0.0);
         let stats_capacity = remaining - main_min - inset;
-        let details = if stats_capacity >= PERFORMANCE_STATS_MIN_WIDTH {
+        let width_details = if stats_capacity >= PERFORMANCE_STATS_MIN_WIDTH {
             PerformanceDetailsPresentation::Pinned
         } else if remaining >= main_min {
             PerformanceDetailsPresentation::Stacked
         } else {
             PerformanceDetailsPresentation::Hidden
+        };
+        let details = if width_details == PerformanceDetailsPresentation::Stacked
+            && f32::from(frame.content.size.height) < PERFORMANCE_STACKED_DETAILS_MIN_HEIGHT
+        {
+            PerformanceDetailsPresentation::Hidden
+        } else {
+            width_details
         };
         let stats_width = if details == PerformanceDetailsPresentation::Pinned {
             stats_capacity.clamp(PERFORMANCE_STATS_MIN_WIDTH, PERFORMANCE_STATS_MAX_WIDTH)
@@ -666,30 +686,36 @@ pub fn disconnected_device(theme: &Theme, stable_id: Option<&str>) -> impl IntoE
     let mut card = div()
         .max_w(px(460.0))
         .p(px(18.0))
-        .rounded(tokens::card_radius(theme))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::card_radius(theme),
+        ))
         .border_1()
-        .border_color(theme.gpu)
-        .bg(theme.sidebar_card_bg)
+        .border_color(taskmanager_ui::theme_binding::hsla(theme.gpu))
+        .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_8)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
         .child(
             div()
-                .font_weight(tokens::FONT_WEIGHT_SEMIBOLD.into())
-                .text_color(theme.fg)
+                .font_weight(taskmanager_ui::theme_binding::font_weight(
+                    tokens::FONT_WEIGHT_SEMIBOLD,
+                ))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
                 .child(i18n::t("device.disconnected")),
         )
         .child(
             div()
-                .text_size(tokens::FONT_12)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(i18n::t("device.reconnect_hint")),
         )
         .child(
             div()
-                .text_size(tokens::FONT_11)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
                 .font(mono_font_with_fallback(theme))
-                .text_color(theme.fg_dim)
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(
                     stable_id.map_or_else(crate::gpui_app::formatting::missing_value, String::from),
                 ),

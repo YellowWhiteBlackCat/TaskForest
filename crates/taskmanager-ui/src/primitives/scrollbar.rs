@@ -505,8 +505,11 @@ impl Element for ScrollbarElement {
                 // any background; active states brighten instead of recoloring.
                 let thumb_alpha = if active { 0.55 } else { 0.30 };
                 window.paint_quad(
-                    Scrollbar::fill(thumb, with_alpha(palette.fg, thumb_alpha * opacity).into())
-                        .corner_radii(px(thumb_width / 2.0)),
+                    Scrollbar::fill(
+                        thumb,
+                        crate::theme_binding::hsla(with_alpha(palette.fg, thumb_alpha * opacity)),
+                    )
+                    .corner_radii(px(thumb_width / 2.0)),
                 );
             }
 

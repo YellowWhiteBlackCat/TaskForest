@@ -41,6 +41,14 @@ service-log exports. Frontends only submit immutable typed requests, drain
 correlated completions and project shell feedback; they never construct a
 filesystem adapter or spawn a per-window writer.
 
+Current-window PNG capture follows the same host-owned worker boundary. Its Linux
+adapter uses fixed-argument KDE Spectacle active-window capture on Wayland, the
+worker validates the staged PNG and atomically renames it to the requested path.
+This release exposes only that Linux one-shot path; unsupported platforms never
+fall back to a display-wide or fabricated capture.
+The receipt already records a backend enum so Portal Screenshot and continuous
+ScreenCast/PipeWire can be added without moving native I/O into a frontend.
+
 The host owns one `StartupLocalTimeCache` shared by every cloned host and
 window. Native discovery runs exactly once when the production host is built;
 frontend refreshes only clone the cached typed observation. Its explicit
@@ -80,3 +88,16 @@ only the app-host workers and startup-cache policy.
 Composition must be deterministic, typed and portable across target OSes.
 Keep platform selection here rather than in core or a renderer; verify all
 target cfg paths and the native composition architecture tests.
+
+## Module map
+
+```text
+src/lib.rs                       composition root: runtime + native client + surface roles
+src/presentation.rs              toolkit-neutral WindowPresentation contract (ADR-037)
+src/history_frontend.rs          HistoryFrontendSession (replay client + writer ownership)
+src/history_persistence_runtime.rs (+ health.rs)   bounded persistence generation
+src/history_replay_runtime.rs    read-only replay client
+src/snapshot_export_runtime.rs  src/window_capture_runtime.rs
+src/process_termination.rs     src/diagnostic_bundle_runtime.rs
+src/worker_fault.rs              worker fault accounting
+```

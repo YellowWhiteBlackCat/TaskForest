@@ -84,7 +84,7 @@ pub(super) fn app_history_page(
     );
     let model = AppHistoryTableModel {
         rows: Rc::clone(&history_model.rows),
-        accent: taskmanager_theme::iced::color(theme_snapshot.palette().accent),
+        accent: crate::theme_binding::color(theme_snapshot.palette().accent),
         window,
     };
     let key = virtual_table_key(

@@ -202,3 +202,17 @@ the renderer rows and returns owned cache snapshots rather than borrow guards.
 Preserve compact/wide geometry, current/partial/loading/error projection and
 Iced-native focus/scroll semantics. Visible changes require the current Iced
 matrix and validator; headless changes require behavior/geometry tests.
+
+## Module map
+
+```text
+src/a11y.rs                    accessibility bridge
+src/app.rs                     IcedApp root
+src/app/navigation.rs  input_state.rs  focus_*    navigation, input and focus
+src/app/projection.rs  projection_caches.rs      immutable projections and render caches
+src/app/refresh.rs  config_sync.rs  configuration_state.rs  preferences.rs
+                               refresh scheduling and atomic config/theme substitution
+src/app/menus.rs  process_menu.rs  column_menu.rs
+src/app/performance_state.rs  alerts.rs  history_*   page state
+src/app/affinity.rs  motion.rs  pointer_capture.rs
+```

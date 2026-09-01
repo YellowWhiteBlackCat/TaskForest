@@ -69,9 +69,9 @@ pub(super) fn boot_timeline_block<'a>(
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
     let (total_ms, kinds) = startup_timeline(evidence)?;
     let muted = theme::muted_text_color(theme_snapshot);
-    let accent = taskmanager_theme::iced::color(theme_snapshot.accent);
-    let warning_color = taskmanager_theme::iced::color(theme_snapshot.palette().warning);
-    let track = taskmanager_theme::iced::color(theme_snapshot.card_surface());
+    let accent = crate::theme_binding::color(theme_snapshot.accent);
+    let warning_color = crate::theme_binding::color(theme_snapshot.palette().warning);
+    let track = crate::theme_binding::color(theme_snapshot.card_surface());
     let mut rows: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = vec![
         row![
             text(t("startup.timeline")).size(f32::from(tokens::FONT_12)),

@@ -99,7 +99,25 @@ def validate_python_text(path: str, source: str) -> list[Finding]:
                     findings.append(
                         Finding(path, node.lineno, "AUTO002", f"{name} requires a finite timeout=")
                     )
-            elif name in {"subprocess.Popen", "os.system", "os.popen"}:
+            elif name == "subprocess.Popen":
+                starts_new_session = next(
+                    (
+                        item.value
+                        for item in node.keywords
+                        if item.arg == "start_new_session"
+                    ),
+                    None,
+                )
+                if not isinstance(starts_new_session, ast.Constant) or starts_new_session.value is not True:
+                    findings.append(
+                        Finding(
+                            path,
+                            node.lineno,
+                            "AUTO003",
+                            "subprocess.Popen requires start_new_session=True and explicit lifecycle ownership",
+                        )
+                    )
+            elif name in {"os.system", "os.popen"}:
                 findings.append(
                     Finding(
                         path,
@@ -163,7 +181,12 @@ def validate_shell_text(path: str, source: str) -> list[Finding]:
                 Finding(path, number, "AUTO104", "global name-based process killing is forbidden; use an exact PID/PGID")
             )
         match = PYTHON_COMMAND.search(line)
-        if match and "timeout" not in line[: match.start()]:
+        if (
+            match
+            and "timeout" not in line[: match.start()]
+            and "command -v python3" not in line
+            and "command_name" not in line
+        ):
             findings.append(
                 Finding(path, number, "AUTO105", "shell-launched Python requires an external timeout")
             )
@@ -210,6 +233,13 @@ while offset < len(data):
     assert not validate_python_text(
         "child.py", "import subprocess\nsubprocess.run(['tool'], timeout=10, check=True)\n"
     )
+    assert not validate_python_text(
+        "supervisor.py",
+        "import subprocess\nsubprocess.Popen(['tool'], start_new_session=True)\n",
+    )
+    assert {item.code for item in validate_python_text(
+        "unsafe-supervisor.py", "import subprocess\nsubprocess.Popen(['tool'])\n"
+    )} == {"AUTO003"}
     unsafe_shell = "python3 - <<'PY'\nPY\nworker &\npkill worker\n"
     assert {item.code for item in validate_shell_text("unsafe.sh", unsafe_shell)} == {
         "AUTO101",

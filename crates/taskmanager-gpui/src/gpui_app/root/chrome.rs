@@ -68,7 +68,7 @@ pub fn top_bar(
         .flex()
         .flex_row()
         .items_center()
-        .bg(t.sidebar_bg)
+        .bg(taskmanager_ui::theme_binding::fill(t.sidebar_bg))
         .border_b_1()
         .border_color(elements::titlebar_border(t, window_active))
         // Round the titlebar's two TOP corners: it spans the full window width
@@ -103,8 +103,8 @@ pub fn top_bar(
         })
         .child(
             div()
-                .text_size(tokens::FONT_13)
-                .text_color(t.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_13))
+                .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
                 .child(title),
         );
 
@@ -192,6 +192,7 @@ pub fn static_label(id: &'static str) -> Option<&'static str> {
         "Containers" => Some(i18n::t("tooltip.containers")),
         "settings-btn" => Some(i18n::t("chrome.settings")),
         "nav-orientation-btn" => Some(i18n::t("chrome.toggle_orientation")),
+        "window-capture-btn" => Some(i18n::t("window_capture.tooltip")),
         "tl-close" | "wnd-close" => Some(i18n::t("chrome.close")),
         "tl-min" | "wnd-min" => Some(i18n::t("chrome.minimize")),
         "tl-zoom" | "wnd-max" => Some(i18n::t("chrome.maximize")),
@@ -276,8 +277,10 @@ fn details_section_tabs(
         .flex()
         .flex_row()
         .flex_wrap()
-        .gap(tokens::SPACE_6)
-        .mb(tokens::SPACE_6);
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .mb(taskmanager_ui::theme_binding::length(tokens::SPACE_6));
     for section in ProcessDetailsSection::ALL {
         let click_entity = entity.clone();
         row = row.child(elements::pill(
@@ -313,10 +316,16 @@ fn prop_history_graph(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_4)
-        .p(tokens::SPACE_6)
-        .rounded(tokens::control_radius(t))
-        .bg(t.sidebar_card_bg)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_4,
+        ))
+        .p(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
+        .rounded(taskmanager_ui::theme_binding::absolute(
+            tokens::control_radius(t),
+        ))
+        .bg(taskmanager_ui::theme_binding::fill(t.sidebar_card_bg))
         .child(
             div()
                 .flex()
@@ -324,15 +333,17 @@ fn prop_history_graph(
                 .justify_between()
                 .child(
                     div()
-                        .text_size(tokens::FONT_12)
-                        .font_weight(tokens::FONT_WEIGHT_BOLD.into())
-                        .text_color(t.fg)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                        .font_weight(taskmanager_ui::theme_binding::font_weight(
+                            tokens::FONT_WEIGHT_BOLD,
+                        ))
+                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
                         .child(label.to_string()),
                 )
                 .child(
                     div()
-                        .text_size(tokens::FONT_11)
-                        .text_color(t.fg_dim)
+                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                        .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
                         .child(i18n::t("prop.last_60_seconds")),
                 ),
         )
@@ -340,9 +351,11 @@ fn prop_history_graph(
             div()
                 .flex()
                 .flex_row()
-                .gap(tokens::SPACE_12)
-                .text_size(tokens::FONT_11)
-                .text_color(t.fg_dim)
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_12,
+                ))
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
                 .child(kv_label_value("prop.current", &current))
                 .child(kv_label_value("prop.peak", &peak))
                 .child(kv_label_value("prop.unit", unit)),
@@ -419,7 +432,12 @@ fn details_overview(
     item: &ProcessItem,
     local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Div {
-    let mut section = div().flex().flex_col().gap(tokens::SPACE_6);
+    let mut section = div()
+        .flex()
+        .flex_col()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ));
     for (label, value) in vm_rows(item, &OVERVIEW_FIELDS, local_time_rules) {
         section = section.child(prop_row(t, label, value));
     }
@@ -443,7 +461,9 @@ fn details_performance(
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .child(prop_history_graph(
             t,
             i18n::t("common.cpu"),
@@ -451,7 +471,7 @@ fn details_performance(
             peaks.cpu,
             "%",
             &histories.cpu,
-            t.cpu.into(),
+            taskmanager_ui::theme_binding::rgba(t.cpu),
         ))
         .child(prop_history_graph(
             t,
@@ -463,7 +483,7 @@ fn details_performance(
             // way the CPU graph shows "%".
             "B",
             &histories.memory,
-            t.memory.into(),
+            taskmanager_ui::theme_binding::rgba(t.memory),
         ))
         .child(prop_history_graph(
             t,
@@ -472,7 +492,7 @@ fn details_performance(
             peaks.disk_read,
             i18n::t("prop.bytes_per_second"),
             &histories.disk_read,
-            t.disk.into(),
+            taskmanager_ui::theme_binding::rgba(t.disk),
         ))
         .child(prop_history_graph(
             t,
@@ -481,7 +501,7 @@ fn details_performance(
             peaks.disk_write,
             i18n::t("prop.bytes_per_second"),
             &histories.disk_write,
-            t.disk.into(),
+            taskmanager_ui::theme_binding::rgba(t.disk),
         ))
 }
 
@@ -490,7 +510,12 @@ fn details_command(
     item: &ProcessItem,
     local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
 ) -> Div {
-    let mut section = div().flex().flex_col().gap(tokens::SPACE_6);
+    let mut section = div()
+        .flex()
+        .flex_col()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ));
     for (label, value) in vm_rows(item, &COMMAND_FIELDS, local_time_rules) {
         section = section.child(prop_row(t, label, value));
     }
@@ -547,7 +572,9 @@ pub(crate) fn details_panel_content(props: DetailsPanelProps<'_>) -> Div {
     div()
         .flex()
         .flex_col()
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .w_full()
         .min_w(px(0.0))
         .child(details_section_tabs(t, active, &entity))

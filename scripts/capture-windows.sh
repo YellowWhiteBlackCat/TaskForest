@@ -80,15 +80,12 @@ mkdir -p "$out_dir"
 echo "=== capture-windows: $stamp ($head, $worktree) ==="
 
 if [ "$skip_build" != "1" ]; then
-    echo "building taskforest-g.exe (ui-gpui) ..."
-    cargo build -j 4 || exit 2
+    echo "building taskforest-g.exe (GPUI product) ..."
+    cargo build -j 4 -p taskmanager-gpui --bin taskforest-g || exit 2
 fi
 binary="target/debug/taskforest-g.exe"
-if [ "$skip_build" != "1" ]; then
-    cp -f target/debug/taskmanager.exe "$binary"
-fi
 if [ ! -x "$binary" ]; then
-    echo "missing $binary; build the ui-gpui shape first (or pass --skip-build after a named build)" >&2
+    echo "missing $binary; build the taskforest-g product first (or pass --skip-build after a named build)" >&2
     exit 2
 fi
 

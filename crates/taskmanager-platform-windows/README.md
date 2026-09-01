@@ -89,3 +89,18 @@ boundary, and the adapter supplies local-time rules by synthesizing a TZif
 payload for the core parser from the native per-year zone rules.
 System and process registrations cross into runtime as named binding
 transactions, preserving capability identity without positional wiring.
+
+## Module map
+
+```text
+src/provider/
+├── process/                   list, insights, control, uac (ADR-035 transport)
+├── system/                    cpu_freq, cpu_info, disk, gpu, hardware_inventory,
+│                              msr_readout, network, auxiliary
+├── service/ (+ log_runtime)  storage/  environment/ (+ sessions, boot_evidence)
+├── power/  sensor/  integration/
+src/bindings.rs                taskmanager-windows-api consumption wrappers
+src/command.rs  config.rs  instance.rs  local_time.rs
+```
+
+No PowerShell/CMD anywhere; native calls stay inside the ADR-031 boundary.

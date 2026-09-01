@@ -202,7 +202,7 @@ fn discovering_body<'a>(
     state: &'a FirstRunUiState,
 ) -> IcedElement<'a> {
     let muted = theme::muted_text_color(theme_snapshot);
-    let danger = taskmanager_theme::iced::color(theme_snapshot.palette().danger);
+    let danger = crate::theme_binding::color(theme_snapshot.palette().danger);
     let line = if let FirstRunPhase::Failed(kind) = state.phase {
         text(failure_key(kind))
             .size(f32::from(tokens::FONT_13))
@@ -253,15 +253,15 @@ fn info_body<'a>(
         body = body.push(
             text(failure_key(kind))
                 .size(f32::from(tokens::FONT_12))
-                .color(taskmanager_theme::iced::color(
-                    theme_snapshot.palette().danger,
-                )),
+                .color(crate::theme_binding::color(theme_snapshot.palette().danger)),
         );
     }
     if let Some(status_key) = phase_status_key(&state.phase) {
-        body = body.push(text(status_key).size(f32::from(tokens::FONT_12)).color(
-            taskmanager_theme::iced::color(theme_snapshot.palette().accent),
-        ));
+        body = body.push(
+            text(status_key)
+                .size(f32::from(tokens::FONT_12))
+                .color(crate::theme_binding::color(theme_snapshot.palette().accent)),
+        );
     }
 
     body = body.push(action_row(theme_snapshot, state, pending));

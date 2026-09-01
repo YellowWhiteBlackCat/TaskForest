@@ -14,6 +14,14 @@ from pathlib import Path
 from validate_capture_evidence import EvidenceError, file_sha256, png_receipt
 from validate_tui_evidence import visual_content_receipt
 
+try:
+    from capture_supervisor import SupervisorError, validate_supervised_metadata
+except ModuleNotFoundError:
+    from scripts.capture_supervisor import (  # type: ignore[no-redef]
+        SupervisorError,
+        validate_supervised_metadata,
+    )
+
 EXPECTED_APP_ID = "io.github.YellowWhiteBlackCat.TaskForestB"
 MATRIX_FIELDS = {"name", "page", "window_size"}
 MANIFEST_FIELDS = {
@@ -38,9 +46,11 @@ def parse_metadata(path: Path) -> dict[str, str]:
             raise EvidenceError(f"invalid metadata line: {line!r}")
         values[key] = value
     required = {
-        "run_id", "captured_at", "git_head", "worktree_sha256", "rust", "binary",
+        "run_id", "run_uuid", "frontend", "run_root", "runtime_root",
+        "supervisor_pid", "cgroup_path", "dbus_address_sha256", "captured_at", "git_head", "worktree_sha256", "rust", "binary",
         "binary_sha256", "app_id", "capture_backend", "matrix", "scenario_count",
         "source_scope", "source_manifest_sha256", "command",
+        "dbus_isolation",
     }
     missing = required - values.keys()
     if missing:
@@ -49,6 +59,8 @@ def parse_metadata(path: Path) -> dict[str, str]:
         raise EvidenceError(f"unexpected Bevy app id: {values['app_id']!r}")
     if values["source_scope"] != "bevy":
         raise EvidenceError(f"unexpected source scope: {values['source_scope']!r}")
+    if values["dbus_isolation"] != "private-session":
+        raise EvidenceError("Bevy capture must use the private D-Bus session")
     return values
 
 
@@ -165,6 +177,7 @@ def main() -> int:
     )
     if any(value is None for value in required_args):
         parser.error("all capture paths are required unless --self-test is used")
+    root = args.repo_root.resolve()
     try:
         matrix = read_tsv(args.matrix)
         if set(matrix[0]) != MATRIX_FIELDS:
@@ -173,6 +186,10 @@ def main() -> int:
         if set(manifest[0]) != MANIFEST_FIELDS:
             raise EvidenceError(f"unexpected manifest fields: {sorted(manifest[0])}")
         values = parse_metadata(args.metadata)
+        try:
+            validate_supervised_metadata(values, root, args.metadata, "bevy")
+        except SupervisorError as error:
+            raise EvidenceError(str(error)) from error
         validate_niri_outputs(args.niri_outputs)
         if int(values["scenario_count"]) != len(matrix) or len(manifest) != len(matrix):
             raise EvidenceError("scenario count or manifest completeness mismatch")
@@ -223,7 +240,8 @@ def main() -> int:
                 "height": image.height, "sha256": image.sha256,
             })
         args.receipt.write_text(
-            json.dumps({"frontend": "bevy", "app_id": EXPECTED_APP_ID,
+            json.dumps({"frontend": "bevy", "run_id": values["run_id"],
+                        "run_uuid": values["run_uuid"], "app_id": EXPECTED_APP_ID,
                         "scenario_count": len(receipt), "artifacts": receipt}, indent=2)
             + "\n",
             encoding="utf-8",

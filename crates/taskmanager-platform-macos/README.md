@@ -32,3 +32,14 @@ The adapter never writes schema-v1 GPU mirrors.
 System and process registrations cross into runtime as named binding
 transactions; macOS composition owns provider selection but not positional
 runtime wiring.
+
+## Module map
+
+```text
+src/provider/                  process, storage, system, sensor, service, environment,
+│                              power, gpu, integration providers
+src/bindings.rs                safe system-API bindings with typed degradation
+src/instance.rs  config.rs  tray.rs
+```
+
+Abilities without receipts stay typed `Unsupported` (ADR-019).

@@ -73,6 +73,11 @@ identity map.
   `Closed | Queued | Running | Ready | Failed` lifecycle. Its non-blocking port
   couples admission failure, late/duplicate terminal rejection and close; it
   contains no serializer, current-directory discovery or filesystem adapter.
+- `src/window_capture.rs` owns the same typed one-shot lifecycle for a current-window
+  PNG. It carries only the destination, receipt dimensions/backend and bounded native
+  failure; capture and publication remain outside the application layer. The current
+  native one-shot implementation is Linux-only; other platforms keep a typed
+  unsupported/unavailable result rather than claiming a capture they cannot provide.
 - `src/diagnostics.rs` prepares already-redacted diagnostic plans and owns the
   request-correlated publication port. The app-host alone owns its worker and
   file transaction; closing a frontend session makes a late completion inert.
@@ -132,3 +137,17 @@ Every drained batch is stable-sorted inside each domain before it leaves the
 application, and the shell repeats that normalization defensively for alternate
 typed producers. Cross-domain folds must commute unless the shell declares an
 explicit precedence phase; struct field order is never execution order.
+
+## Module map
+
+```text
+src/command.rs (+ command/spec.rs)    shared command vocabulary, one entry per intent
+src/interaction.rs                    danger-confirmation state machine (arm/confirm/dismiss)
+src/request_session.rs (+ request_session/*)   typed request sessions per target
+src/config_runtime.rs (+ publication.rs)  config_store.rs   configuration publication
+src/control.rs  action.rs             control orchestration and action vocabulary
+src/alert_*                           alert center, dispatch, suggestion window, managed rules
+src/history_*                         replay, decimation, application history projection
+src/platform/client/*                 serial reducers over runtime event ports
+src/boot_baseline.rs  device_lifecycle.rs  diagnostics.rs  window_capture.rs  i18n.rs
+```

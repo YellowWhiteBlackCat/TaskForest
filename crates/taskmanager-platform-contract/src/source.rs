@@ -132,33 +132,6 @@ impl<T> DeviceSourceSnapshot<T> {
         )
     }
 
-    /// Migrate a legacy source status through the constrained discovery
-    /// lattice. Contradictory pairs are canonicalized: empty IDs cannot be
-    /// `Available`/`Partial`, and `Empty`/`Unavailable` cannot retain IDs.
-    #[must_use]
-    pub fn from_source_status(
-        value: T,
-        discovered_devices: Vec<DeviceId>,
-        discovery: SourceStatus,
-        enrichments: Vec<SourceStatus>,
-    ) -> Self {
-        let provider = discovery.provider;
-        let constrained = match discovery.outcome {
-            SourceOutcome::Available if discovered_devices.is_empty() => DeviceDiscovery::Empty,
-            SourceOutcome::Available => DeviceDiscovery::Available(discovered_devices),
-            SourceOutcome::Empty => DeviceDiscovery::Empty,
-            SourceOutcome::Partial(failure) if discovered_devices.is_empty() => {
-                DeviceDiscovery::Unavailable(failure)
-            }
-            SourceOutcome::Partial(failure) => DeviceDiscovery::Partial {
-                discovered_devices,
-                failure,
-            },
-            SourceOutcome::Unavailable(failure) => DeviceDiscovery::Unavailable(failure),
-        };
-        Self::from_discovery(value, provider, constrained, enrichments)
-    }
-
     fn assemble(
         value: T,
         discovered_devices: Vec<DeviceId>,

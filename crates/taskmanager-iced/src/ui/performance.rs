@@ -225,7 +225,7 @@ fn disconnected_device<'a>(
         column![
             text(t("device.disconnected"))
                 .size(f32::from(tokens::FONT_15))
-                .font(taskmanager_theme::iced::ui_font_weight(
+                .font(crate::theme_binding::ui_font_weight(
                     theme_snapshot,
                     tokens::FONT_WEIGHT_HEADER,
                 )),

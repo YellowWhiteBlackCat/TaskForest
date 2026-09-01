@@ -8,8 +8,10 @@
 /// observe it.
 pub const TELEMETRY_READY_BODY_SELECTOR: &str = "tm-telemetry-ready-body";
 
+use std::time::Duration;
+
 use super::{
-    Hover, InputModality, RootView, TopPage, WindowCorner, alert_ui, device_label,
+    Hover, InputModality, RootView, TopPage, WindowCorner, alert_ui, device_label, i18n,
     init_search_entity, keyboard, nav_strip, responsive, static_label, top_bar,
 };
 use crate::gpui_app::dashboard;
@@ -23,8 +25,8 @@ use gpui::{
 };
 use taskmanager_core::core::SystemSnapshot;
 use taskmanager_shell::ProcessRowId;
-use taskmanager_theme::gpui::window_chrome_state;
 use taskmanager_theme::tokens;
+use taskmanager_ui::theme_binding::window_chrome_state;
 use taskmanager_ui::{focus::restore_modal, layout::page_viewport};
 mod overlays;
 mod pages;
@@ -101,6 +103,46 @@ fn schedule_system_npu_capture(
     });
 }
 
+#[cfg(target_os = "linux")]
+fn schedule_window_capture(view: &mut RootView, window: &mut Window, cx: &mut Context<RootView>) {
+    if !view.capture_evidence.schedule_window_capture_frame() {
+        return;
+    }
+    cx.on_next_frame(window, move |view, window, cx| {
+        if !view.capture_evidence.schedule_window_capture_submission() {
+            return;
+        }
+        cx.on_next_frame(window, move |view, _window, cx| {
+            if !view.capture_evidence.window_capture_settling() {
+                return;
+            }
+            let root = cx.entity();
+            cx.spawn(async move |_this, cx| {
+                // The data marker proves projection arrival, not that the
+                // graph/history children have painted a useful frame.
+                // Let several 200 ms telemetry ticks settle before the
+                // native active-window request, without sleeping the UI
+                // thread or blocking the compositor.
+                gpui::Timer::after(Duration::from_millis(1_200)).await;
+                let _ = root.update(cx, |view, cx| {
+                    view.capture_evidence.mark_window_capture_settled();
+                    if !view.capture_evidence.window_capture_submission_requested() {
+                        return;
+                    }
+                    if view.request_current_window_capture() {
+                        view.capture_evidence.mark_window_capture_submitted();
+                    } else {
+                        view.capture_evidence.mark_window_capture_failed();
+                    }
+                    cx.notify();
+                });
+            })
+            .detach();
+        });
+        cx.notify();
+    });
+}
+
 impl Render for RootView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let presentation = self.presentation_snapshot();
@@ -108,7 +150,9 @@ impl Render for RootView {
         // All FONT_* tokens resolve from this root-relative scale, including
         // older pages with explicit sizes. Native compositor DPI remains an
         // independent multiplier; row density remains whitespace-only.
-        window.set_rem_size(ui_size.body_font_size());
+        window.set_rem_size(taskmanager_ui::theme_binding::pixels(
+            ui_size.body_font_size(),
+        ));
         if matches!(self.input_scope(), super::GpuiInputScope::Content) {
             // Content buttons often close their typed modal state directly. This
             // render-edge cleanup gives those paths the same exact trigger-focus
@@ -118,6 +162,8 @@ impl Render for RootView {
         self.ensure_input_modality_key_interceptor(window, cx);
         self.poll_diagnostic_bundle_result();
         schedule_system_npu_capture(self, window, cx);
+        #[cfg(target_os = "linux")]
+        schedule_window_capture(self, window, cx);
         if self.capture_evidence.keyboard_focus_requested() {
             // The capture token represents a keyboard-initiated focus state even
             // though the deterministic harness performs the final focus call.
@@ -134,8 +180,24 @@ impl Render for RootView {
         }
         let settings_switch_focus = self.capture_evidence.settings_switch_focus_enabled();
         let settings_zero_gray = self.capture_evidence.settings_zero_gray_enabled();
-        if settings_switch_focus || settings_zero_gray {
+        let settings_permission_center = self.capture_evidence.settings_permission_center_enabled();
+        if settings_switch_focus || settings_zero_gray || settings_permission_center {
             self.show_settings();
+        }
+        if settings_permission_center
+            && self.capture_evidence.settings_permission_center_requested()
+        {
+            // The capture-only Settings body is the real permission-center
+            // component, rendered as the complete dialog content. Mark the
+            // scenario after one frame so the capture runner never samples a
+            // pre-layout dialog.
+            cx.on_next_frame(window, move |view, _window, cx| {
+                if view.capture_evidence.settings_permission_center_requested() {
+                    view.capture_evidence
+                        .mark_settings_permission_center_ready(true);
+                    cx.notify();
+                }
+            });
         }
         let settings_focus_id = if settings_switch_focus {
             Some("device-cpu")
@@ -219,6 +281,25 @@ impl Render for RootView {
         // sites below (and is inert on CSD, where the radius already collapses
         // to 0 for maximized/fullscreen/tiled states via `corner_enabled`).
         let corner_radius_factor = if server_decorations { 0.0 } else { 1.0 };
+        // Honest outcome report for an explicit window-frame preference. The
+        // request echo is optimistic (the reported mode equals the request
+        // until the compositor's configure arrives), so a contradiction
+        // between the preference and the granted fact is the window system's
+        // authoritative verdict — report it once instead of silently dropping
+        // the user's choice. `System` never reports (it promised no mode);
+        // the layer-shell widget surface has no decorations and is excluded.
+        if !self.decoration_outcome_reported
+            && self.surface_role != GpuiSurfaceRole::DesktopWidget
+            && let Some(notice) = crate::gpui_app::chrome::decoration_outcome_notice(
+                self.window_decorations_pref,
+                server_decorations,
+            )
+        {
+            self.decoration_outcome_reported = true;
+            // The "⚠ " prefix routes the toast to the Danger kind (see
+            // `RootView::show_local_feedback`).
+            self.show_local_feedback(format!("\u{26a0} {}", i18n::t(notice.i18n_key())), cx);
+        }
         let t = t.with_focus_visible(self.input_modality.shows_focus_ring());
 
         if self.surface_role == GpuiSurfaceRole::DesktopWidget {
@@ -379,11 +460,15 @@ impl Render for RootView {
         let root = div()
             .id("root")
             .size_full()
-            .bg(t.window_bg)
-            .text_color(t.fg)
+            .bg(taskmanager_ui::theme_binding::fill(t.window_bg))
+            .text_color(taskmanager_ui::theme_binding::hsla(t.fg))
             .font(ui_font_with_fallback(&t))
-            .font_weight(tokens::FONT_WEIGHT_BODY.into())
-            .text_size(ui_size.body_font_size())
+            .font_weight(taskmanager_ui::theme_binding::font_weight(
+                tokens::FONT_WEIGHT_BODY,
+            ))
+            .text_size(taskmanager_ui::theme_binding::absolute(
+                ui_size.body_font_size(),
+            ))
             .flex()
             .flex_col()
             .on_mouse_move(cx.listener(move |v, _ev: &MouseMoveEvent, window, cx| {
@@ -485,11 +570,15 @@ fn render_widget_surface(
     div()
         .id("root")
         .size_full()
-        .bg(theme.window_bg)
-        .text_color(theme.fg)
+        .bg(taskmanager_ui::theme_binding::fill(theme.window_bg))
+        .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
         .font(crate::gpui_app::theme::ui_font_with_fallback(theme))
-        .font_weight(taskmanager_theme::tokens::FONT_WEIGHT_BODY.into())
-        .text_size(ui_size.body_font_size())
+        .font_weight(taskmanager_ui::theme_binding::font_weight(
+            taskmanager_theme::tokens::FONT_WEIGHT_BODY,
+        ))
+        .text_size(taskmanager_ui::theme_binding::absolute(
+            ui_size.body_font_size(),
+        ))
         .flex()
         .flex_col()
         .capture_any_mouse_down(cx.listener(RootView::capture_input_modality_mouse_down))

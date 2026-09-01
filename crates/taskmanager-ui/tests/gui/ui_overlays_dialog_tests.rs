@@ -43,11 +43,9 @@ fn panel_shadow_is_two_layer_token_ink() {
         let palette = theme.palette();
         let shadow = panel_shadow(&palette);
         assert_eq!(shadow.len(), 2, "panel shadow must have two layers");
-        let ink: gpui::Hsla = palette.card_shadow.into();
-        let ambient: gpui::Hsla = palette
-            .card_shadow
-            .with_alpha(palette.card_shadow.a * 0.6)
-            .into();
+        let ink: gpui::Hsla = crate::theme_binding::hsla(palette.card_shadow);
+        let ambient: gpui::Hsla =
+            crate::theme_binding::hsla(palette.card_shadow.with_alpha(palette.card_shadow.a * 0.6));
         assert_eq!(shadow[1].color, ink, "edge layer carries the token ink");
         assert_eq!(
             shadow[0].color, ambient,

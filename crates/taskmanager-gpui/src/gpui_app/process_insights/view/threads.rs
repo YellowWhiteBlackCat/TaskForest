@@ -69,8 +69,8 @@ pub(in crate::gpui_app::process_insights::view) fn threads_card(
     if threads.state.status != DeviceStatus::Healthy {
         return super::card(theme, labels.threads, width).child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(super::status_label(threads.state.status, labels).to_string()),
         );
     }
@@ -78,21 +78,21 @@ pub(in crate::gpui_app::process_insights::view) fn threads_card(
     if threads.threads.is_empty() {
         return content.child(
             div()
-                .text_size(tokens::FONT_11)
-                .text_color(theme.fg_dim)
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(labels.no_threads.to_string()),
         );
     }
     content = content.child(
         div()
-            .text_size(tokens::FONT_11)
-            .text_color(theme.fg_dim)
+            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
             .child(format!("{} · {}", labels.threads, threads.threads.len())),
     );
     content = content.child(
         div()
-            .text_size(tokens::FONT_10)
-            .text_color(theme.fg_dim)
+            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
+            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
             .font(mono_font_with_fallback(theme))
             .child(format!(
                 "{}  {}  {}  {}  {}",
@@ -105,21 +105,27 @@ pub(in crate::gpui_app::process_insights::view) fn threads_card(
     );
     let (shown, hidden) = super::capped_card_rows(threads.threads.len());
     content = content.child(
-        div().flex().flex_col().gap(tokens::SPACE_3).children(
-            threads
-                .threads
-                .iter()
-                .take(shown)
-                .map(format_thread)
-                .map(|line| {
-                    div()
-                        .min_w(px(0.0))
-                        .text_size(tokens::FONT_10)
-                        .font(mono_font_with_fallback(theme))
-                        .whitespace_normal()
-                        .child(line)
-                }),
-        ),
+        div()
+            .flex()
+            .flex_col()
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_3,
+            ))
+            .children(
+                threads
+                    .threads
+                    .iter()
+                    .take(shown)
+                    .map(format_thread)
+                    .map(|line| {
+                        div()
+                            .min_w(px(0.0))
+                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
+                            .font(mono_font_with_fallback(theme))
+                            .whitespace_normal()
+                            .child(line)
+                    }),
+            ),
     );
     if hidden > 0 {
         content = content.child(crate::gpui_app::elements::more_rows_hint(theme, hidden));

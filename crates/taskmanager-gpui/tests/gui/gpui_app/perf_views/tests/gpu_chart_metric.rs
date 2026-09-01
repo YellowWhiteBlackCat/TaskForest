@@ -1,5 +1,6 @@
-//! GPU page chartable-family regressions: the page renders every measured
-//! family as its own graph (no selector row), and the shared
+//! GPU page chart-family regressions: the page keeps one fixed visual grammar
+//! (aggregate headline, fine engine group, compact memory strip; no selector
+//! row), and the shared
 //! `gpu_chart_metric_history` dispatch keeps one sampling track across view
 //! capacities — the same shell contract the Iced and TUI frontends consume.
 
@@ -12,6 +13,8 @@ fn chart_metric_gpu(device_id: &str, utilization: f32, temperature_c: f32) -> Gp
     gpu.apply_scalar_observations(GpuScalarObservations {
         utilization_pct: ScalarObservation::available(utilization, 1),
         temperature_c: ScalarObservation::available(temperature_c, 1),
+        memory_used_bytes: ScalarObservation::available(2 * 1024 * 1024 * 1024, 1),
+        memory_total_bytes: ScalarObservation::available(8 * 1024 * 1024 * 1024, 1),
         // Power stays unobserved: the product contract is "hide what is not
         // read", so the power family must render nothing at all — never a
         // fabricated zero graph.
@@ -59,9 +62,9 @@ fn seed_chart_metric_gpu(view: &mut RootView, device_id: &str, frames: [(f32, f3
     }
 }
 
-/// The GPU page renders every family the device measures as its own graph —
-/// the utilization headline plus one card per additional available family —
-/// with no selector row and no chart for an unobserved family.
+/// The GPU page renders the fixed three-group grammar: the utilization headline
+/// and the compact memory strip. Scalar families such as temperature remain in
+/// the details rail rather than creating unrelated main-column cards.
 #[gpui::test]
 async fn mc04_gpu_metric_families_case_gpu_page_renders_every_measured_family_without_selector(
     cx: &mut TestAppContext,
@@ -99,21 +102,17 @@ async fn mc04_gpu_metric_families_case_gpu_page_renders_every_measured_family_wi
         headline.size.width > px(100.0) && headline.size.height > px(100.0),
         "the utilization headline must stay readable: {headline:?}"
     );
-    let temperature = vcx
-        .debug_bounds("tm-perf-secondary-graph:gpu-temperature-graph")
-        .expect("the measured temperature family must render its own graph card");
+    let memory = vcx
+        .debug_bounds("tm-perf-compact-graph:gpu-memory-graph")
+        .expect("the measured memory family must render the compact bottom strip");
     assert!(
-        temperature.size.height >= px(100.0),
-        "the temperature graph card must stay readable: {temperature:?}"
+        memory.size.height >= px(72.0),
+        "the memory graph strip must keep its compact floor: {memory:?}"
     );
     assert!(
-        vcx.debug_bounds("tm-graph:gpu-temperature-graph").is_some(),
-        "the temperature card must paint a real chart canvas"
-    );
-    assert!(
-        vcx.debug_bounds("tm-perf-secondary-graph:gpu-power-graph")
+        vcx.debug_bounds("tm-perf-secondary-graph:gpu-temperature-graph")
             .is_none(),
-        "an unobserved family must render nothing at all"
+        "temperature must stay in the details rail, not become a fourth graph group"
     );
 
     // The headline window reads the ONE shared dispatch (the same call

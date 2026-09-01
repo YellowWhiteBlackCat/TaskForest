@@ -128,13 +128,13 @@ pub(crate) fn per_core_grid_panel<'a>(app: &crate::IcedApp, theme_snapshot: &'a 
             container(text(breakdown).size(f32::from(tokens::FONT_10)))
                 .padding([1, 6])
                 .style(move |_| container::Style {
-                    background: Some(iced::Background::Color(taskmanager_theme::iced::color(
+                    background: Some(iced::Background::Color(crate::theme_binding::color(
                         theme_snapshot.shade,
                     ))),
                     border: iced::Border {
                         radius: 3.0.into(),
                         width: 1.0,
-                        color: taskmanager_theme::iced::color(theme_snapshot.palette().border),
+                        color: crate::theme_binding::color(theme_snapshot.palette().border),
                     },
                     ..Default::default()
                 })
@@ -322,7 +322,7 @@ fn tier_color(theme: &Theme, utilization: f32) -> Color {
     } else {
         theme.success
     };
-    taskmanager_theme::iced::color(token)
+    crate::theme_binding::color(token)
 }
 
 #[cfg(test)]

@@ -141,9 +141,14 @@ fn parse_args_rejects_unknown_and_trailing_tokens() {
 fn help_and_unknown_argument_hint_list_every_mode_flag() {
     // Every mode the parser dispatches must be discoverable from the binary's
     // own output: the help text and the unknown-argument usage hint. A mode
-    // missing from either is invisible to a scripting user.
+    // missing from either is invisible to a scripting user. The shape-owned
+    // modes appear exactly when the product injects the capability (ADR-051).
+    let full = CliCapabilities {
+        snapshot_text: true,
+        capture_window: true,
+    };
     let mut help = Vec::new();
-    print_help_to(&mut help).expect("help renders to the buffer");
+    print_help_to(&mut help, "taskforest-g", full).expect("help renders to the buffer");
     let help = String::from_utf8(help).expect("help output is UTF-8");
     let hint = CliArgError::UnknownArgument.to_string();
     for flag in [
@@ -165,6 +170,24 @@ fn help_and_unknown_argument_hint_list_every_mode_flag() {
             "the unknown-argument hint must mention {flag}"
         );
     }
+
+    // A product without a capability does not advertise the mode.
+    let mut minimal = Vec::new();
+    print_help_to(&mut minimal, "taskforest-g", CliCapabilities::default())
+        .expect("help renders to the buffer");
+    let minimal = String::from_utf8(minimal).expect("help output is UTF-8");
+    assert!(
+        !minimal.contains("--snapshot"),
+        "absent capability must not be listed"
+    );
+    assert!(
+        !minimal.contains("--capture-window"),
+        "absent capability must not be listed"
+    );
+    assert!(
+        minimal.contains("--json"),
+        "neutral modes are always listed"
+    );
 }
 
 #[test]

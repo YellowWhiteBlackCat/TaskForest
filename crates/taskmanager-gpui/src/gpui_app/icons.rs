@@ -16,11 +16,11 @@ use taskmanager_core::core::{ApplicationIconAsset, ApplicationIconFormat};
 #[must_use]
 pub fn application_image(asset: &ApplicationIconAsset) -> Img {
     let format = match asset.format {
-        ApplicationIconFormat::Svg => taskmanager_icons::ApplicationImageFormat::Svg,
-        ApplicationIconFormat::Png => taskmanager_icons::ApplicationImageFormat::Png,
-        ApplicationIconFormat::Jpeg => taskmanager_icons::ApplicationImageFormat::Jpeg,
-        ApplicationIconFormat::Webp => taskmanager_icons::ApplicationImageFormat::Webp,
-        ApplicationIconFormat::Bmp => taskmanager_icons::ApplicationImageFormat::Bmp,
+        ApplicationIconFormat::Svg => taskmanager_ui::icons_binding::ApplicationImageFormat::Svg,
+        ApplicationIconFormat::Png => taskmanager_ui::icons_binding::ApplicationImageFormat::Png,
+        ApplicationIconFormat::Jpeg => taskmanager_ui::icons_binding::ApplicationImageFormat::Jpeg,
+        ApplicationIconFormat::Webp => taskmanager_ui::icons_binding::ApplicationImageFormat::Webp,
+        ApplicationIconFormat::Bmp => taskmanager_ui::icons_binding::ApplicationImageFormat::Bmp,
     };
-    taskmanager_icons::application_image(format, &asset.bytes)
+    taskmanager_ui::icons_binding::application_image(format, &asset.bytes)
 }

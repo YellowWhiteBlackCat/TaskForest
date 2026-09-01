@@ -6,44 +6,54 @@ Performance device page; it retires the three parallel page shells.
 ## Context
 
 The Performance page grew three independent composition roots: the shared
-`main_with_stats` helper (disk/network/GPU/battery/fan), a bespoke scrolling
-Memory column, and a bespoke CPU column. Height contracts (180/140/0/190),
-viewport policies (fixed clip vs scrolling vs none), `GraphOpts` aesthetic
-injection, summary rows, and the responsive budget applied differently per
-page, and the mini-cell label pattern was hand-copied in three places with
-drifting fonts and offsets.
+`main_with_stats` helper (disk/network/GPU/battery/fan), a bespoke Memory
+column, and a bespoke CPU column. Height contracts (180/140/72), viewport
+policies, `GraphOpts` aesthetic injection, summary rows, and the responsive
+budget applied differently per page, and the mini-cell label pattern was
+hand-copied in three places with drifting fonts and offsets.
 
 ## Decision
 
 1. `perf_views::layout` is the ONLY page composition root. Every device page
    (CPU/Memory/Disk/Network/GPU/Battery/Fan) assembles through `perf_page`
    with typed slots: title, `header_extra`, `HeadlineSurface` (declared
-   `ChartSpec`s, or one `Custom` replacement such as the GPU engine
-   inventory), `below`, the statistics column, and the frame
+   `ChartSpec`s), `below`, the statistics column, and the frame
    `PerformancePageBudget`. `performance_split`, `stats_panel`, and the card
    assembly are module-private; there is no compile-time path to a parallel
    shell.
 2. A chart is declared, not assembled. `ChartSpec` + `ChartTier`
-   (`Headline`/`Secondary`) derive the entire card contract in ONE place:
-   height floor (180/140), growth, first-frame state overlay, hover surface,
+   (`Headline`/`Secondary`/`Compact`) derive the entire card contract in ONE
+   place: height floor (180/140/72), growth, first-frame state overlay, hover surface,
    dual-series legend, the Batch-8 aesthetic injection, and the
    latest/avg/peak summary row. The value-format table (hover, badge,
    summary) is derived from the typed `GraphUnit`; scale policy stays a
    per-family input (`with_max` over the shared `finite_series_peak*`
    helpers). Mini density cells (CPU per-core, GPU engines) render through
    the one `elements::mini_graph_cell`.
-3. The main column is ONE fixed viewport (never a scrolling body): headline
-   charts absorb slack through `flex_1`, secondary content compresses to its
-   tier floor, and content that still cannot fit is clipped. The statistics
-   rail follows the budget's `details` presentation — pinned, stacked below
-   the viewport, or hidden — using the budget's `stats_width`.
-4. The GPU primary engine card is a Headline chart (hover, state overlay,
-   summary), not a bare card; its identity caption carries the live
-   per-engine readout.
+3. The Performance workspace is ONE fixed, non-scrolling composition. The
+   main viewport and the statistics rail never mount a scroll owner; only the
+   left device selector may scroll. Headline charts absorb slack through
+   `flex_1`, and every optional lower band is admitted only when its complete
+   minimum footprint fits. A band that cannot fit is omitted or summarized
+   before painting, so no bottom row is clipped or hidden behind an implicit
+   scrollbar. The statistics rail follows the budget's `details`
+   presentation — pinned, stacked below the viewport, or hidden — using the
+   budget's `stats_width`.
+4. GPU always keeps aggregate utilization as the large Headline chart. When
+   the full inventory is admitted, per-engine utilization renders as a fine
+   mini-card group below it, followed by one Compact GPU-memory utilization
+   chart at the bottom. The engine group can never replace or resize the
+   aggregate headline into a different semantic role.
 5. Render-path assertions guard the root: every selectable device page must
    paint the shared title row and `tm-perf-main-viewport`, headline cards
    hold their tier floor (`tm-perf-chart-card:*`), and no page may mount a
    page-local scrolling main column.
+
+All future responsive or dense-detail changes follow the repository's
+[elastic layout playbook](../docs/ELASTIC_LAYOUT_PLAYBOOK.md): derive complete
+slot footprints first, allocate primary space from the remainder, admit lower
+groups atomically, and attach both headless bounds and current-build pixel
+evidence before calling the layout complete.
 
 ## Minimum-space doctrine (three layers of floors)
 
@@ -65,8 +75,8 @@ below the layer above's floor.
    | title row | identity + context | never |
    | vital line | one-line distilled fact (disk capacity, VRAM totals, link state) | never |
    | header band | CPU readouts, memory composition | Floor |
-   | headline surface | the tier-180 chart(s) or engine inventory | never |
-   | data band | partition/directory panels, secondary charts | Core (charts), Floor (panels) |
+   | headline surface | the tier-180 aggregate chart(s) | never |
+   | data band | engine mini-cards, partition/directory panels, secondary charts, compact GPU-memory chart | Core |
    | stats rail | typed statistic column | width budget (Pinned/Stacked/Hidden) |
 
    Charts are the headline of a Performance page, but they are not its whole
@@ -83,13 +93,13 @@ below the layer above's floor.
    drops at `Core`, and the header band plus per-chart summary rows drop at
    `Floor`, explicitly rather than by silent clipping. `chart_inventory`
    folds the two axes through `chart_inventory_from_axes`: two typed reasons
-   in, one product bit out. The below band is the overflow-tolerant tail: it
-   renders from `Core` up and yields first; what it cannot fit under the
-   ladder is clipped by the fixed viewport — the ordered last resort of the
-   deliberate decision 3 policy, never a silent default.
-3. **Tier layer (card floors).** `ChartTier::Headline` 180px and
-   `Secondary` 140px are enforced on the card, and mini cells keep their grid
-   row heights.
+   in, one product bit out. The below band renders only from `Charts` up and
+   yields first; page-specific caps and fit checks omit excess content before
+   it reaches the fixed viewport. `Core` is a strict headline-only
+   composition, so there is no overflow-tolerant scrolling or clipping tail.
+3. **Tier layer (card floors).** `ChartTier::Headline` 180px,
+   `Secondary` 140px, and `Compact` 72px are enforced on the card; mini cells
+   keep their bounded grid row heights.
 
 Feasibility guarantee: the minimum viable page (shell chrome + title row +
 headline floor ≈ 320px) fits inside the window-layer floor's worst content
@@ -104,8 +114,9 @@ the headline floor at the 720×480 minimum and prove the ladder's drop order
   fork the viewport, height, aesthetic, or summary contract.
 - Memory and CPU lose their bespoke columns and scroll bodies; Memory/CPU
   content composes into the window like every other device page.
-- The clipping policy for over-tall `below` content is deliberate (see
-  decision 3); introducing scrolling for that case requires replacing this
-  ADR, not adding a second path.
+- The no-scroll policy is deliberate (see decision 3): lower content must be
+  bounded, summarized, or dropped before it reaches the fixed viewport. Adding
+  a Performance-page scroll owner requires replacing this ADR, not adding a
+  second path.
 - Test identities: headline `tm-perf-chart:{id}` / `tm-perf-chart-card:{id}`,
   secondary `tm-perf-secondary-graph:{id}`, summary `tm-perf-chart-summary:{id}`.

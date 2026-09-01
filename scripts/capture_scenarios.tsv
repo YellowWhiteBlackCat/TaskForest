@@ -29,6 +29,8 @@ vertical-nav-performance	gnome-light	performance	cpu	0	vertical-nav	1180x780	118
 vertical-nav-performance-compact	gnome-light	performance	cpu	0	vertical-nav	720x480	720x480
 settings-switch-focus	gnome-light	performance	cpu	1	settings-switch-focus	1180x780	1180x780
 settings-zero-gray	gnome-light	performance	cpu	1	settings-zero-gray	1180x780	1180x780
+settings-permission-center	gnome-light	performance	cpu	0	settings-permission-center	1180x780	1180x780
+settings-permission-center-compact	gnome-light	performance	cpu	0	settings-permission-center	720x480	720x480
 apps-zero-gray	gnome-light	apps	cpu	0	apps-zero-gray	1180x780	1180x780
 apps-search-highlight	gnome-light	apps	cpu	0	apps-search-highlight	1180x780	1180x780
 services-search-highlight	gnome-light	services	cpu	0	services-search-highlight	1180x780	1180x780

@@ -24,3 +24,14 @@ Component capability registration is likewise exhaustive: `ColumnDragResize`
 is a component-level contract whose GPUI reference is
 `taskmanager-ui/src/data/table/resize.rs`; page identity and persistence stay
 outside this crate.
+
+## Module map
+
+```text
+src/functional.rs                CORE-04 registry: product intent × frontend surface
+│                                decision (shared/local/accepted-difference/unsupported)
+src/command.rs  keybindings.rs  navigation.rs  focus.rs  message.rs
+                                 shared interaction vocabulary
+src/columns.rs  icon.rs  capabilities.rs   column, icon and capability contracts
+src/accessibility/               neutral accessibility model and snapshots
+```

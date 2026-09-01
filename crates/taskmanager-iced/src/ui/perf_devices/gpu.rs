@@ -285,7 +285,7 @@ pub(crate) fn gpu_section(
 ) -> Element<'_, Message, iced::Theme, iced::Renderer> {
     let snapshot = app.shell.projection().snapshot.as_ref();
     let theme_snapshot = app.theme();
-    let color = taskmanager_theme::iced::color(theme_snapshot.gpu);
+    let color = crate::theme_binding::color(theme_snapshot.gpu);
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let rows = match (gpu_section_state(snapshot), snapshot) {
         (tables::ListState::Loading, _) => {

@@ -157,10 +157,10 @@ impl RenderOnce for Segmented {
             // capsules. overflow_hidden clips the active/hovered segment fills
             // to the rounded outer corners (the focus ring is an outset shadow
             // on the track itself, NOT clipped by overflow).
-            .rounded(palette.control_radius)
+            .rounded(crate::theme_binding::absolute(palette.control_radius))
             .border_1()
-            .border_color(palette.border)
-            .bg(palette.surface)
+            .border_color(crate::theme_binding::hsla(palette.border))
+            .bg(crate::theme_binding::fill(palette.surface))
             .overflow_hidden()
             // WCAG 2.4.7: one tab stop for the whole control. The ring mirrors
             // elements::focus_ring_shadow exactly (accent hue, 0.6 alpha, 2px
@@ -177,7 +177,7 @@ impl RenderOnce for Segmented {
                 s.shadow(vec![BoxShadow {
                     color: Rgba {
                         a: 0.6 * palette.ring.a,
-                        ..palette.ring.into()
+                        ..crate::theme_binding::rgba(palette.ring)
                     }
                     .into(),
                     offset: Point::default(),
@@ -224,7 +224,7 @@ impl RenderOnce for Segmented {
             // (arrow) path both land on the same on_click.
             let mut cell = div()
                 .id(seg.id)
-                .px(tokens::SPACE_10)
+                .px(crate::theme_binding::definite_length(tokens::SPACE_10))
                 .h(px(24.0))
                 .flex()
                 .items_center()
@@ -235,14 +235,18 @@ impl RenderOnce for Segmented {
                 .on_hover(move |hov, win, cx| on_hover(hov, win, cx));
             // Hairline divider between adjacent segments (skip the first).
             if i > 0 {
-                cell = cell.border_l_1().border_color(palette.border);
+                cell = cell
+                    .border_l_1()
+                    .border_color(crate::theme_binding::hsla(palette.border));
             }
             cell = match fill {
                 SegmentFill::Active => cell
-                    .bg(palette.accent)
-                    .text_color(on_accent(palette.accent)),
-                SegmentFill::Hovered => cell.bg(palette.hover).text_color(palette.fg),
-                SegmentFill::Idle => cell.text_color(palette.fg),
+                    .bg(crate::theme_binding::fill(palette.accent))
+                    .text_color(crate::theme_binding::hsla(on_accent(palette.accent))),
+                SegmentFill::Hovered => cell
+                    .bg(crate::theme_binding::fill(palette.hover))
+                    .text_color(crate::theme_binding::hsla(palette.fg)),
+                SegmentFill::Idle => cell.text_color(crate::theme_binding::hsla(palette.fg)),
             };
             track = track.child(cell.child(label));
         }

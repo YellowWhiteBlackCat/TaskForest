@@ -102,12 +102,14 @@ impl RenderOnce for ScrollbarRail {
         };
         let mut track = div()
             .absolute()
-            .top(tokens::SPACE_4)
-            .bottom(tokens::SPACE_4)
+            .top(crate::theme_binding::length(tokens::SPACE_4))
+            .bottom(crate::theme_binding::length(tokens::SPACE_4))
             .right(px((SCROLLBAR_WIDTH - 1.0) / 2.0))
             .w(px(1.0))
             .rounded_full()
-            .bg(palette.border.with_alpha(track_alpha))
+            .bg(crate::theme_binding::fill(
+                palette.border.with_alpha(track_alpha),
+            ))
             .when(show != ScrollbarShow::Always, |track| track.opacity(0.0));
         if let Some(selector) = track_debug_selector {
             track = track.debug_selector(move || selector.to_string());

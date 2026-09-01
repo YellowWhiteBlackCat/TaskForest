@@ -21,7 +21,7 @@ pub fn alert_center_overlay<'a>(
     appear: f32,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let muted = theme::muted_text_color(theme_snapshot);
-    let accent = taskmanager_theme::iced::color(theme_snapshot.palette().accent);
+    let accent = crate::theme_binding::color(theme_snapshot.palette().accent);
 
     let quiet_status = if policy.quiet_hours.is_some() {
         text(t("common.enabled"))
@@ -65,10 +65,10 @@ pub fn alert_center_overlay<'a>(
         for ev in events.iter().rev() {
             let sev_color = match ev.alert.severity {
                 AlertSeverity::Critical => {
-                    taskmanager_theme::iced::color(theme_snapshot.palette().danger)
+                    crate::theme_binding::color(theme_snapshot.palette().danger)
                 }
                 AlertSeverity::Warning => {
-                    taskmanager_theme::iced::color(theme_snapshot.palette().warning)
+                    crate::theme_binding::color(theme_snapshot.palette().warning)
                 }
                 AlertSeverity::Info => accent,
             };

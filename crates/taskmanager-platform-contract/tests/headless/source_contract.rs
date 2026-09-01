@@ -48,14 +48,10 @@ fn composite_source_failure_does_not_discard_successful_fields() {
 
 #[test]
 fn device_discovery_authority_is_independent_of_enrichment_failure() {
-    let snapshot = DeviceSourceSnapshot::from_source_status(
+    let snapshot = DeviceSourceSnapshot::from_discovery(
         vec!["disk0"],
-        vec![DeviceId::new("disk0")],
-        SourceStatus {
-            provider: ProviderId::borrowed("fixture.block.inventory"),
-            outcome: SourceOutcome::Available,
-            item_count: 1,
-        },
+        ProviderId::borrowed("fixture.block.inventory"),
+        DeviceDiscovery::Available(vec![DeviceId::new("disk0")]),
         vec![SourceStatus {
             provider: ProviderId::borrowed("fixture.smart"),
             outcome: SourceOutcome::Unavailable(FailureKind::PermissionDenied),
@@ -72,13 +68,12 @@ fn device_discovery_authority_is_independent_of_enrichment_failure() {
 
 #[test]
 fn partial_device_discovery_cannot_confirm_absence() {
-    let snapshot = DeviceSourceSnapshot::from_source_status(
+    let snapshot = DeviceSourceSnapshot::from_discovery(
         vec!["nic0"],
-        vec![DeviceId::new("nic0")],
-        SourceStatus {
-            provider: ProviderId::borrowed("fixture.net.inventory"),
-            outcome: SourceOutcome::Partial(FailureKind::PermissionDenied),
-            item_count: 1,
+        ProviderId::borrowed("fixture.net.inventory"),
+        DeviceDiscovery::Partial {
+            discovered_devices: vec![DeviceId::new("nic0")],
+            failure: FailureKind::PermissionDenied,
         },
         Vec::new(),
     );

@@ -101,3 +101,14 @@ Real terminal evidence can target these non-default surfaces with
 Keep real terminal evidence separate from deterministic frames; shared
 boundaries are defined in `../../docs/ARCH.md` and
 `../../docs/screenshots/README.md`.
+
+## Module map
+
+```text
+src/main.rs → surface.rs  terminal.rs   terminal host (TestBackend covers reference
+│                                      sizes and the 54×16 minimum)
+src/runtime/                   keys, modals, navigation, semantic mapping, seam
+src/ui/                        page rendering
+src/command_palette/           command palette (surface_protocol.rs)
+src/bindings.rs  capabilities.rs  functional.rs   keys, capabilities, CORE-04 declarations
+```

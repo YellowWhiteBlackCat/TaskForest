@@ -24,13 +24,25 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 try:
-    from validate_capture_evidence import EvidenceError, file_sha256, png_chunk, png_receipt
+    from capture_supervisor import SupervisorError, validate_supervised_metadata
+    from validate_capture_evidence import (
+        EvidenceError,
+        file_sha256,
+        png_chunk,
+        png_receipt,
+        validate_source_manifest,
+    )
 except ModuleNotFoundError:  # Allow direct library-style imports from the repository root.
+    from scripts.capture_supervisor import (  # type: ignore[no-redef]
+        SupervisorError,
+        validate_supervised_metadata,
+    )
     from scripts.validate_capture_evidence import (  # type: ignore[no-redef]
         EvidenceError,
         file_sha256,
         png_chunk,
         png_receipt,
+        validate_source_manifest,
     )
 
 
@@ -62,6 +74,13 @@ def read_metadata(path: Path) -> dict[str, str]:
     required = {
         "schema_version",
         "run_id",
+        "run_uuid",
+        "frontend",
+        "run_root",
+        "runtime_root",
+        "supervisor_pid",
+        "cgroup_path",
+        "dbus_address_sha256",
         "captured_at",
         "git_head",
         "worktree",
@@ -83,6 +102,11 @@ def read_metadata(path: Path) -> dict[str, str]:
         "capture_backend",
         "window_identity",
         "runtime_isolation",
+        "dbus_isolation",
+        "kwin_pid",
+        "kwin_pid_start_time",
+        "kwin_runtime",
+        "kwin_socket",
         "tmpdir",
         "cargo_target_dir",
         "image",
@@ -306,6 +330,10 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
     root = args.repo_root.resolve()
     run_dir = args.run_dir.resolve()
     metadata = read_metadata(args.metadata)
+    try:
+        validate_supervised_metadata(metadata, root, args.metadata, "host-wayland")
+    except SupervisorError as error:
+        raise EvidenceError(str(error)) from error
     logical_size = parse_size(args.logical_size)
     if metadata["schema_version"] != "1":
         raise EvidenceError("unsupported host diagnostic schema")
@@ -319,14 +347,26 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         raise EvidenceError("host diagnostic must not declare a durable output")
     if metadata["capture_backend"] != "spectacle-active-window":
         raise EvidenceError("unexpected host capture backend")
-    if metadata["window_identity"] != "active-window-selector-unverified":
+    private_kwin = metadata["runtime_isolation"] == "private-kwin-wayland"
+    if private_kwin:
+        if metadata["window_identity"] != "kwin-script-stacking-order":
+            raise EvidenceError("private KWin capture lacks its exact window identity mode")
+    elif metadata["window_identity"] != "active-window-selector-unverified":
         raise EvidenceError("host window identity is not explicitly unverified")
-    if metadata["runtime_isolation"] != "host-wayland-target-only":
+    if not private_kwin and metadata["runtime_isolation"] != "host-wayland-target-only":
         raise EvidenceError("unexpected runtime isolation declaration")
-    if metadata["build_status"] != "success" or metadata["build_command"] != "cargo build --locked --quiet":
+    if metadata["build_status"] != "success" or metadata["build_command"] != "cargo build --locked --quiet -p taskmanager-gpui --bin taskforest-g":
         raise EvidenceError("diagnostic lacks the required locked current-build receipt")
     if metadata["app_pid_exe_verified"] != "true":
         raise EvidenceError("app PID executable was not verified before capture")
+    if metadata["runtime_isolation"] == "private-kwin-wayland":
+        for field in ("kwin_pid", "kwin_pid_start_time"):
+            if not metadata[field].isdigit() or int(metadata[field]) <= 0:
+                raise EvidenceError(f"invalid private KWin receipt: {field}")
+        if not metadata["kwin_runtime"].startswith("/tmp/taskforest-capture-host-wayland-"):
+            raise EvidenceError("private KWin runtime is not run-owned")
+        if not metadata["kwin_socket"].startswith(metadata["kwin_runtime"] + "/"):
+            raise EvidenceError("private KWin socket escaped its runtime")
     for field in ("app_pid", "app_pid_start_time"):
         if not metadata[field].isdigit() or int(metadata[field]) <= 0:
             raise EvidenceError(f"invalid exact PID receipt: {field}")
@@ -334,22 +374,50 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         raise EvidenceError("invalid current binary hash")
 
     binary = require_relative_to(root / metadata["binary"], root, "binary")
-    expected_binary = (root / "target" / "debug" / "taskforest-g").resolve()
+    expected_binary = (run_dir / "bin" / "taskforest-g").resolve()
     if binary != expected_binary:
-        raise EvidenceError(f"diagnostic binary is not the current target binary: {binary}")
+        raise EvidenceError(f"diagnostic binary is not the run-owned target binary: {binary}")
     if metadata["app_exe"] != str(binary):
         raise EvidenceError("app PID executable path differs from current binary")
     if file_sha256(binary) != metadata["binary_sha256"]:
         raise EvidenceError("current binary hash differs from capture receipt")
 
     target = require_relative_to(Path(metadata["cargo_target_dir"]), root, "Cargo target")
-    if target != expected_binary.parent.parent:
+    if target != (root / "target").resolve():
         raise EvidenceError("Cargo target is not the shared repository target")
     tmpdir = require_relative_to(Path(metadata["tmpdir"]), root, "TMPDIR")
     if not tmpdir.is_relative_to(root / ".tmp" / "agent-runs"):
         raise EvidenceError("TMPDIR is not under the repository agent-run scratch area")
     if str(tmpdir).startswith("/tmp"):
         raise EvidenceError("TMPDIR points at shared /tmp")
+
+    if private_kwin:
+        if metadata.get("dbus_isolation") != "private-session":
+            raise EvidenceError("private KWin capture must use a private D-Bus session")
+        for field in (
+            "source_manifest",
+            "source_manifest_sha256",
+            "window_info",
+            "window_info_sha256",
+        ):
+            if not metadata.get(field):
+                raise EvidenceError(f"private capture metadata is missing {field}")
+        source_manifest = require_relative_to(
+            root / metadata["source_manifest"], root, "source manifest"
+        )
+        if file_sha256(source_manifest) != metadata["source_manifest_sha256"]:
+            raise EvidenceError("GPUI source manifest hash differs from metadata")
+        validate_source_manifest(source_manifest, root)
+        window_info = safe_child(run_dir, metadata["window_info"])
+        if file_sha256(window_info) != metadata["window_info_sha256"]:
+            raise EvidenceError("private KWin window-info receipt hash drifted")
+        window_info_text = window_info.read_text(encoding="utf-8")
+        if (
+            metadata["app_pid"] not in window_info_text
+            or "TaskForestG" not in window_info_text
+            or "active=true" not in window_info_text
+        ):
+            raise EvidenceError("private KWin window-info receipt is not bound to TaskForestG")
 
     image = safe_child(run_dir, metadata["image"])
     if image != args.image.resolve():
@@ -391,8 +459,13 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         raise EvidenceError("runtime log hash drifted")
     if file_sha256(markers) != metadata["markers_sha256"]:
         raise EvidenceError("marker receipt hash drifted")
-    log_text = log.read_text(encoding="utf-8")
-    marker_text = markers.read_text(encoding="utf-8")
+    # Tracing output may carry SGR color sequences when the capture session
+    # runs on a TTY. Strip them before any substring provenance check so
+    # field markers (backend="spectacle-active-window", CAPTURE_MARKER ...)
+    # match the emitted text, not its presentation.
+    ansi_sgr = re.compile(r"\x1b\[[0-9;]*[A-Za-z]")
+    log_text = ansi_sgr.sub("", log.read_text(encoding="utf-8"))
+    marker_text = ansi_sgr.sub("", markers.read_text(encoding="utf-8"))
     marker_base = f"scenario={args.scenario}"
     required_markers = (
         f"CAPTURE_MARKER event=theme_ready {marker_base} theme={args.theme} high_contrast=false",
@@ -404,6 +477,46 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
     for marker in required_markers:
         if marker not in log_text or marker not in marker_text:
             raise EvidenceError(f"missing strict marker: {marker}")
+
+    native_receipt = None
+    if private_kwin:
+        native_image = safe_child(run_dir, metadata["native_image"])
+        native_png = png_receipt(native_image)
+        claimed_native = (
+            int(metadata["native_width"]),
+            int(metadata["native_height"]),
+            int(metadata["native_bytes"]),
+            metadata["native_sha256"],
+        )
+        actual_native = (
+            native_png.width,
+            native_png.height,
+            native_png.size,
+            native_png.sha256,
+        )
+        if claimed_native != actual_native:
+            raise EvidenceError(
+                f"native PNG receipt mismatch: claimed={claimed_native}, actual={actual_native}"
+            )
+        if (native_png.width, native_png.height) != (image_receipt.width, image_receipt.height):
+            raise EvidenceError("native and external active-window PNG dimensions differ")
+        if native_png.size <= 5000:
+            raise EvidenceError("native active-window PNG is unexpectedly small")
+        if "current-window PNG capture completed" not in log_text:
+            raise EvidenceError("native current-window completion is missing from the app log")
+        if 'backend="spectacle-active-window"' not in log_text:
+            raise EvidenceError("native Spectacle backend provenance is missing from the app log")
+        visual_receipt(native_image)
+        native_ocr = ocr_text(native_image)
+        reject_skeleton_text(native_ocr)
+        native_receipt = {
+            "image": metadata["native_image"],
+            "width": native_png.width,
+            "height": native_png.height,
+            "bytes": native_png.size,
+            "sha256": native_png.sha256,
+            "ocr_sha256": hashlib.sha256(native_ocr.encode("utf-8")).hexdigest(),
+        }
 
     visual = visual_receipt(image)
     ocr = ocr_text(image)
@@ -423,6 +536,7 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         "diagnostic_only": True,
         "parity_evidence": False,
         "run_id": metadata["run_id"],
+        "run_uuid": metadata["run_uuid"],
         "git_head": metadata["git_head"],
         "worktree": metadata["worktree"],
         "rust": metadata["rust"],
@@ -436,6 +550,9 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
         "image_sha256": image_receipt.sha256,
         "log_sha256": metadata["log_sha256"],
         "markers_sha256": metadata["markers_sha256"],
+        "source_manifest_sha256": metadata.get("source_manifest_sha256"),
+        "window_identity": metadata["window_identity"],
+        "native_window_capture": native_receipt,
         "visual": {
             "visible_pixels": visual.visible_pixels,
             "sampled_pixels": visual.sampled_pixels,

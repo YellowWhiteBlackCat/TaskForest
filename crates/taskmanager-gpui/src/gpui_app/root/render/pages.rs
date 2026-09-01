@@ -17,6 +17,8 @@ use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+
+const PERFORMANCE_REPLAY_ENTRY_HEIGHT: f32 = 30.0;
 use taskmanager_ui::layout::{PageFrame, PageScaffold};
 
 mod inventory;
@@ -72,8 +74,22 @@ impl RootView {
         match self.page {
             TopPage::Performance => {
                 let hardware = self.hardware_rc().clone();
+                // The replay action occupies a fixed row inside the same
+                // Performance PageFrame as the device view. Account for it
+                // before deriving the page budget; otherwise a lower graph
+                // band could pass its fit check against pixels already owned
+                // by the replay control and clip at the bottom.
+                let replay_entry_visible = self.history_replay_startup_unavailable()
+                    || self.history_replay_entry_available();
+                let mut performance_frame = frame;
+                if replay_entry_visible {
+                    performance_frame.content.size.height =
+                        px((f32::from(performance_frame.content.size.height)
+                            - PERFORMANCE_REPLAY_ENTRY_HEIGHT)
+                            .max(0.0));
+                }
                 let performance_layout = responsive::PerformancePageBudget::from_frame(
-                    frame,
+                    performance_frame,
                     self.sidebar_visible,
                     f32::from(sidebar_preferences.width),
                 );
@@ -84,6 +100,7 @@ impl RootView {
                         t,
                         self.history_replay_state(),
                         &self.local_time_rules,
+                        performance_layout.content_height,
                         cx.entity(),
                     )
                 } else if self.selected_device_missing {
@@ -94,7 +111,6 @@ impl RootView {
                         SelectedDevice::Cpu => cpu_view::render_cpu(
                             cpu_view::CpuViewProps {
                                 theme: t,
-                                stats_scroll: self.performance_stats_scroll.clone(),
                                 snap,
                                 telemetry,
                                 hardware: &hardware,
@@ -116,7 +132,6 @@ impl RootView {
                                 },
                             },
                             &mut self.cpu_core_history,
-                            cx,
                         ),
                         SelectedDevice::Memory => {
                             perf_views::render_memory(perf_views::MemoryViewProps {
@@ -124,7 +139,6 @@ impl RootView {
                                 snap,
                                 telemetry,
                                 performance,
-                                stats_scroll: self.performance_stats_scroll.clone(),
                                 hover_slot: &self.graph_hover,
                                 memory_history: &mut self.memory_history,
                                 budget: performance_layout,
@@ -133,7 +147,6 @@ impl RootView {
                         SelectedDevice::Disk(i) => perf_views::render_disk(
                             perf_views::DiskViewProps {
                                 theme: t,
-                                stats_scroll: self.performance_stats_scroll.clone(),
                                 snap,
                                 telemetry,
                                 index: i,
@@ -151,7 +164,6 @@ impl RootView {
                                 telemetry,
                                 index: i,
                                 performance,
-                                stats_scroll: self.performance_stats_scroll.clone(),
                                 hover_slot: &self.graph_hover,
                                 budget: performance_layout,
                             })
@@ -173,10 +185,8 @@ impl RootView {
                                         performance_layout.chart_inventory,
                                     ),
                                     performance,
-                                    stats_scroll: self.performance_stats_scroll.clone(),
                                     budget: performance_layout,
                                 },
-                                cx,
                                 &self.graph_hover,
                             )
                         }
@@ -187,7 +197,6 @@ impl RootView {
                                 telemetry,
                                 index: i,
                                 performance,
-                                stats_scroll: self.performance_stats_scroll.clone(),
                                 hover_slot: &self.graph_hover,
                                 budget: performance_layout,
                             })
@@ -199,7 +208,6 @@ impl RootView {
                                 telemetry,
                                 index: i,
                                 performance,
-                                stats_scroll: self.performance_stats_scroll.clone(),
                                 hover_slot: &self.graph_hover,
                                 budget: performance_layout,
                             })
@@ -220,8 +228,8 @@ impl RootView {
                             .flex_row()
                             .justify_end()
                             .items_center()
-                            .text_size(tokens::FONT_11)
-                            .text_color(t.fg_dim)
+                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                            .text_color(taskmanager_ui::theme_binding::hsla(t.fg_dim))
                             .child(taskmanager_application::i18n::t(
                                 "perf.replay.startup_unavailable",
                             ))
@@ -528,7 +536,9 @@ impl RootView {
                         .flex_col()
                         .flex_1()
                         .min_h(px(0.0))
-                        .gap(tokens::SPACE_6)
+                        .gap(taskmanager_ui::theme_binding::definite_length(
+                            tokens::SPACE_6,
+                        ))
                         .child(dashboard::render_system_header(
                             t,
                             &self.dashboard,

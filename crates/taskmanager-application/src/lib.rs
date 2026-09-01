@@ -72,6 +72,7 @@ mod service_lifecycle;
 pub mod snapshot_export;
 mod source_status;
 mod telemetry_refresh_policy;
+pub mod window_capture;
 
 pub use action::{AppAction, AppPage, FocusDirection, SelectionDirection};
 pub use alert_suggestion_window::{AlertSuggestionWindow, DEFAULT_SUGGESTION_WINDOW_CAPACITY};

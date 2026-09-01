@@ -26,12 +26,20 @@ pub(super) fn status_footer(theme: &Theme, status: DeviceStatus) -> Option<AnyEl
     }
     Some(
         div()
-            .px(tokens::SPACE_10)
-            .py(tokens::SPACE_7)
-            .rounded(tokens::small_radius(theme))
-            .bg(theme.accent.with_alpha(0.12))
-            .text_size(tokens::FONT_12)
-            .text_color(theme.fg)
+            .px(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_10,
+            ))
+            .py(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_7,
+            ))
+            .rounded(taskmanager_ui::theme_binding::absolute(
+                tokens::small_radius(theme),
+            ))
+            .bg(taskmanager_ui::theme_binding::fill(
+                theme.accent.with_alpha(0.12),
+            ))
+            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
             .child(i18n::t(device_action_i18n_key(status)))
             .into_any_element(),
     )

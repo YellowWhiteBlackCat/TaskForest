@@ -21,5 +21,15 @@ adapter; the application host receives only safe probes and owned paths.
 Linux currently provides validated local-time rules. macOS and Windows return
 typed `Unsupported` until their native time-zone adapters exist; the selector
 never substitutes UTC for an unavailable local zone.
+Current-window PNG capture is selected here as well: Linux delegates to its
+Wayland-capable adapter, while other targets return typed `Unsupported`.
 Verify cfg edges, feature closure and reverse dependency firewalls whenever an
 adapter or composition dependency changes.
+
+## Module map
+
+```text
+src/instance.rs   compile-time selection of the one native OS adapter (ADR-009)
+src/tray.rs       tray adapter selection
+src/lib.rs        executable composition boundary and native capture selection
+```

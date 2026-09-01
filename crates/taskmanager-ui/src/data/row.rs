@@ -78,14 +78,16 @@ impl DataRow {
             .w_full()
             .min_w(px(0.0))
             .items_center()
-            .gap(tokens::SPACE_8)
-            .px(self.padding_x)
-            .py(self.padding_y)
-            .rounded(self.radius)
-            .bg(self.background)
+            .gap(crate::theme_binding::definite_length(tokens::SPACE_8))
+            .px(crate::theme_binding::definite_length(self.padding_x))
+            .py(crate::theme_binding::definite_length(self.padding_y))
+            .rounded(crate::theme_binding::absolute(self.radius))
+            .bg(crate::theme_binding::fill(self.background))
             .children(self.cells);
         if let Some(color) = self.bottom_border {
-            row = row.border_b_1().border_color(color);
+            row = row
+                .border_b_1()
+                .border_color(crate::theme_binding::hsla(color));
         }
         row
     }

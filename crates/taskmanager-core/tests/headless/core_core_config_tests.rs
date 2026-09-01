@@ -20,6 +20,7 @@ fn custom_config_round_trips_through_json() {
         ui_size: "future-size-token".to_string(),
         text_rendering: TEXT_RENDERING_SUBPIXEL.to_string(),
         motion: MOTION_REDUCED.to_string(),
+        window_decorations: WINDOW_DECORATIONS_NATIVE.to_string(),
         show_cpu: true,
         show_memory: false,
         show_disks: true,
@@ -350,4 +351,48 @@ fn default_startup_page_remembers_the_last_page() {
     // so a fixed startup page can be applied by overriding the restored page.
     assert_eq!(STARTUP_PAGE_PERFORMANCE, PAGE_PERFORMANCE);
     assert_eq!(STARTUP_PAGE_PROCESSES, "apps");
+}
+
+#[test]
+fn default_window_decorations_follows_the_compositor_negotiation() {
+    // Cold-start + serde default for window_decorations must be the System
+    // sentinel ("" token) so a missing config (and an old config file) keeps
+    // the request-native + follow-the-grant behavior — never a forced mode.
+    assert_eq!(
+        Config::default().window_decorations,
+        WINDOW_DECORATIONS_SYSTEM
+    );
+    let legacy: Config = serde_json::from_str("{}").unwrap();
+    assert_eq!(
+        legacy.window_decorations, WINDOW_DECORATIONS_SYSTEM,
+        "a config file written before the field existed must parse to System"
+    );
+}
+
+#[test]
+fn window_decorations_tokens_round_trip_and_unknown_tokens_stay_opaque() {
+    // Explicit choices survive the exact JSON form ConfigStore writes.
+    for token in [
+        WINDOW_DECORATIONS_NATIVE,
+        WINDOW_DECORATIONS_CUSTOM,
+        WINDOW_DECORATIONS_SYSTEM,
+    ] {
+        let config = Config {
+            window_decorations: token.to_string(),
+            ..Config::default()
+        };
+        let json = serde_json::to_string_pretty(&config).unwrap();
+        let restored: Config = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored.window_decorations, token);
+    }
+
+    // Core carries opaque strings: an unknown future token is preserved
+    // verbatim on read, and the FRONTEND normalization fails closed to
+    // System. Never a panic, never a fabricated frame mode.
+    let config = Config {
+        window_decorations: "future-mode".to_string(),
+        ..Config::default()
+    };
+    let restored: Config = serde_json::from_str(&serde_json::to_string(&config).unwrap()).unwrap();
+    assert_eq!(restored.window_decorations, "future-mode");
 }

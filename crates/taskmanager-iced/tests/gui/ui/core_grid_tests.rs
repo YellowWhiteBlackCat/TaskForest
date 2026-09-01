@@ -9,27 +9,27 @@ fn tier_color_bands_match_the_grid_rule() {
     let theme = Theme::dark();
     assert_eq!(
         tier_color(&theme, 0.0),
-        taskmanager_theme::iced::color(theme.success)
+        crate::theme_binding::color(theme.success)
     );
     assert_eq!(
         tier_color(&theme, 59.9),
-        taskmanager_theme::iced::color(theme.success)
+        crate::theme_binding::color(theme.success)
     );
     assert_eq!(
         tier_color(&theme, 60.0),
-        taskmanager_theme::iced::color(theme.warning)
+        crate::theme_binding::color(theme.warning)
     );
     assert_eq!(
         tier_color(&theme, 84.9),
-        taskmanager_theme::iced::color(theme.warning)
+        crate::theme_binding::color(theme.warning)
     );
     assert_eq!(
         tier_color(&theme, 85.0),
-        taskmanager_theme::iced::color(theme.danger)
+        crate::theme_binding::color(theme.danger)
     );
     assert_eq!(
         tier_color(&theme, 100.0),
-        taskmanager_theme::iced::color(theme.danger)
+        crate::theme_binding::color(theme.danger)
     );
 }
 
@@ -40,11 +40,11 @@ fn tier_color_clamps_out_of_range_readings_into_the_bands() {
     let theme = Theme::dark();
     assert_eq!(
         tier_color(&theme, -50.0),
-        taskmanager_theme::iced::color(theme.success)
+        crate::theme_binding::color(theme.success)
     );
     assert_eq!(
         tier_color(&theme, 250.0),
-        taskmanager_theme::iced::color(theme.danger)
+        crate::theme_binding::color(theme.danger)
     );
 }
 

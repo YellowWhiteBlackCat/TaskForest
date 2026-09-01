@@ -152,7 +152,7 @@ pub(crate) fn source_notice_banner<'a>(
             row![
                 text("⚠")
                     .size(f32::from(tokens::FONT_16))
-                    .color(taskmanager_theme::iced::color(
+                    .color(crate::theme_binding::color(
                         theme_snapshot.palette().warning
                     )),
                 column![
@@ -202,7 +202,7 @@ fn source_notice_action<'a>(
 
 fn source_panel_style(theme_snapshot: &Theme) -> iced::widget::container::Style {
     let mut style = theme::panel_style(theme_snapshot);
-    style.border.color = taskmanager_theme::iced::color(theme_snapshot.palette().warning);
+    style.border.color = crate::theme_binding::color(theme_snapshot.palette().warning);
     style
 }
 

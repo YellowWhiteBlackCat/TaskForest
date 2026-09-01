@@ -24,7 +24,9 @@ pub(super) fn density_row(
     div()
         .flex()
         .flex_row()
-        .gap(tokens::SPACE_6)
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_6,
+        ))
         .child(pill(
             t,
             "density-comfortable",

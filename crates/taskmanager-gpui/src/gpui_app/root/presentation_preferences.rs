@@ -5,13 +5,14 @@
 //! Settings actions replace or mutate the typed sections here, while renderers
 //! consume immutable snapshots.
 
-use gpui::{Context, Pixels, SharedString};
+use gpui::{Context, Pixels, SharedString, Window};
 
+use crate::gpui_app::chrome::WindowDecorationsPreference;
 use crate::gpui_app::graph::DEFAULT_GRAPH_DATA_POINTS_CONFIG;
 use taskmanager_application::i18n;
 use taskmanager_core::core::config::{
     COLOR_SCHEME_SYSTEM, STARTUP_PAGE_REMEMBER, SidebarDeviceOverrideConfig,
-    TEXT_RENDERING_PLATFORM_DEFAULT,
+    TEXT_RENDERING_PLATFORM_DEFAULT, WINDOW_DECORATIONS_SYSTEM,
 };
 use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens::RowDensity;
@@ -194,6 +195,10 @@ pub struct PresentationSnapshot {
     pub(crate) sidebar: SidebarPreferences,
     pub(crate) gray_zero_values: bool,
     pub(crate) startup_page: SharedString,
+    /// Persisted window-frame policy token (see
+    /// [`WindowDecorationsPreference`]). Normalized on every config fold, so
+    /// the value here is always one of the three canonical tokens.
+    pub(crate) window_decorations: SharedString,
     pub(crate) fingerprint: PresentationFingerprint,
 }
 
@@ -207,6 +212,7 @@ impl Default for PresentationSnapshot {
             sidebar: SidebarPreferences::default(),
             gray_zero_values: false,
             startup_page: SharedString::from(STARTUP_PAGE_REMEMBER),
+            window_decorations: SharedString::from(WINDOW_DECORATIONS_SYSTEM),
             fingerprint: PresentationFingerprint::default(),
         }
     }
@@ -343,6 +349,11 @@ impl PresentationSnapshot {
     pub fn startup_page(&self) -> &str {
         self.startup_page.as_str()
     }
+
+    #[must_use]
+    pub fn window_decorations(&self) -> &str {
+        self.window_decorations.as_str()
+    }
 }
 
 #[derive(Clone, Debug, Default)]
@@ -382,7 +393,10 @@ impl PresentationPreferences {
     pub(super) fn replace(&mut self, mut next: PresentationSnapshot) {
         let current = &self.snapshot;
         let mut fingerprint = current.fingerprint;
-        if next.appearance != current.appearance || next.startup_page != current.startup_page {
+        if next.appearance != current.appearance
+            || next.startup_page != current.startup_page
+            || next.window_decorations != current.window_decorations
+        {
             fingerprint.appearance = bump(fingerprint.appearance);
         }
         if next.devices != current.devices {
@@ -466,6 +480,13 @@ impl PresentationPreferences {
         }
     }
 
+    pub(super) fn set_window_decorations(&mut self, window_decorations: SharedString) {
+        if self.snapshot.window_decorations != window_decorations {
+            self.snapshot.window_decorations = window_decorations;
+            self.snapshot.fingerprint.appearance = bump(self.snapshot.fingerprint.appearance);
+        }
+    }
+
     pub(super) fn set_gray_zero_values(&mut self, enabled: bool) {
         if self.snapshot.gray_zero_values != enabled {
             self.snapshot.gray_zero_values = enabled;
@@ -532,6 +553,27 @@ impl super::RootView {
         cx: &mut Context<Self>,
     ) {
         self.presentation.set_startup_page(startup_page);
+        cx.notify();
+    }
+
+    /// Apply a new window-frame preference: persist the canonical token,
+    /// re-arm the honest-outcome latch, and re-request the decoration mode on
+    /// the LIVE window (gpui's Wayland backend applies `request_decorations`
+    /// immediately and the compositor confirms or corrects it via the next
+    /// configure). Rendering keeps following the granted fact, so the chrome
+    /// switches when the window system agrees; a refusal surfaces through the
+    /// render-time outcome check instead of being silently dropped.
+    pub fn set_window_decorations_preference(
+        &mut self,
+        pref: WindowDecorationsPreference,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
+        self.presentation
+            .set_window_decorations(SharedString::from(pref.config_token()));
+        self.window_decorations_pref = pref;
+        self.decoration_outcome_reported = false;
+        window.request_decorations(pref.requested_decorations());
         cx.notify();
     }
 

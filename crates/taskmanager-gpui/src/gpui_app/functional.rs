@@ -39,6 +39,7 @@ const fn reference_route(intent: ProductIntent) -> &'static str {
         ProductIntent::ProcessAffinityEditor => "processes.affinity",
         ProductIntent::SmartSelfTest => "system.smart-self-test",
         ProductIntent::DiagnosticBundle => "system.diagnostic-bundle",
+        ProductIntent::CurrentWindowScreenshot => "root.current-window-screenshot",
         ProductIntent::FirstRunSetup => "first-run.setup",
         ProductIntent::GpuMetricInspection => "performance.gpu.metric-families",
         ProductIntent::TransientFeedback => "root.toast",

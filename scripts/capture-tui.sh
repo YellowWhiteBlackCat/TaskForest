@@ -7,14 +7,39 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
+if [ "${TM_CAPTURE_SUPERVISED:-0}" != "1" ] \
+  || [ "${TM_CAPTURE_SUPERVISOR_TOKEN:-}" != "${TM_CAPTURE_RUN_UUID:-}" ]; then
+  command -v python3 >/dev/null 2>&1 \
+    || { printf 'capture requires the supervisor interpreter\n' >&2; exit 2; }
+  command -v timeout >/dev/null 2>&1 \
+    || { printf 'capture requires timeout for supervisor lifetime bounding\n' >&2; exit 2; }
+  exec timeout --kill-after=10s 30m python3 "$REPO/scripts/capture_supervisor.py" \
+    --repo-root "$REPO" --frontend tui -- bash "$0" "$@"
+fi
+CAPTURE_RUN_UUID="${TM_CAPTURE_RUN_UUID:-}"
+CAPTURE_RUN_ROOT="${TM_CAPTURE_RUN_ROOT:-}"
+CAPTURE_RUNTIME_ROOT="${TM_CAPTURE_RUNTIME_ROOT:-}"
+if [ -z "$CAPTURE_RUN_UUID" ] || [ -z "$CAPTURE_RUN_ROOT" ] || [ -z "$CAPTURE_RUNTIME_ROOT" ]; then
+  printf 'capture must be started by the private supervisor\n' >&2
+  exit 2
+fi
+
+if [ "${TM_CAPTURE_NIRI_BACKGROUND:-1}" = "1" ] \
+  && [ "${TM_CAPTURE_PRIVATE_DBUS:-0}" != "1" ]; then
+  command -v dbus-run-session >/dev/null 2>&1 \
+    || { printf 'background TUI capture requires dbus-run-session\n' >&2; exit 2; }
+  private_session_config="$(cd "$(dirname "$0")" && pwd)/private-session.conf"
+  TM_CAPTURE_PRIVATE_DBUS=1 exec dbus-run-session \
+    --config-file="$private_session_config" -- bash "$0" "$@"
+fi
+
 cd "$REPO"
 eval "$(scripts/agent-workdir.sh enter tui-capture)"
 # The shared sccache socket exceeds Linux SUN_LEN for this repository path;
 # keep Cargo on the shared target but use rustc directly for this bounded run.
 export RUSTC_WRAPPER=
-# ADR-029: single binary — the TUI shape is `taskmanager` built with
-# --no-default-features --features ui-tui.
-APP="$REPO/target/debug/taskmanager"
+# ADR-051: the TUI product is the taskmanager-tui crate's own bin.
+APP="$CAPTURE_RUN_ROOT/bin/taskmanager-tui"
 OUT="$REPO/target/tui-evidence/latest"
 EVIDENCE_ROOT="$REPO/target/tui-evidence"
 APP_ID="taskmanager-tui"
@@ -66,8 +91,9 @@ if [ -n "$(git -C "$REPO" status --porcelain 2>/dev/null)" ]; then
 else
   WORKTREE_STATE=clean
 fi
-RUN_ID="${RUN_STAMP}_${GIT_HEAD}_${WORKTREE_STATE}"
-RUN_DIR="$EVIDENCE_ROOT/$RUN_ID"
+RUN_ID="$CAPTURE_RUN_UUID"
+RUN_DIR="$CAPTURE_RUN_ROOT"
+RUN_RELATIVE="${RUN_DIR#"$REPO/"}"
 CONF="$RUN_DIR/config.kdl"
 MARKERS="$RUN_DIR/tui-capture-markers.log"
 METADATA="$RUN_DIR/tui-capture-metadata.txt"
@@ -87,6 +113,8 @@ WINDOW_PGID=""
 KWIN_PID=""
 KWIN_PGID=""
 KWIN_RUNTIME=""
+KWIN_ROOT=""
+KWIN_SOCKET=""
 KWIN_DISPLAY=""
 
 for command in cargo file git jq niri ps rustc sha256sum setsid stat timeout; do
@@ -96,21 +124,38 @@ for command in cargo file git jq niri ps rustc sha256sum setsid stat timeout; do
   fi
 done
 case "$CAPTURE_NIRI_BACKGROUND" in
-  0|1) ;;
+  1) ;;
+  0) printf 'visible TUI capture is disabled; use the private background route\n' >&2; exit 2 ;;
   *)
-    printf 'TM_CAPTURE_NIRI_BACKGROUND must be 0 or 1: %s\n' \
+    printf 'TM_CAPTURE_NIRI_BACKGROUND must be 1: %s\n' \
       "$CAPTURE_NIRI_BACKGROUND" >&2
     exit 2
     ;;
 esac
 if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ] \
   && ! command -v kwin_wayland >/dev/null 2>&1; then
-  printf 'background TUI capture requires kwin_wayland --virtual; set TM_CAPTURE_NIRI_BACKGROUND=0 for visible nested debug mode\n' >&2
+  printf 'background TUI capture requires kwin_wayland --virtual; visible mode is disabled\n' >&2
   exit 2
 fi
+if [ "$CAPTURE_NIRI_BACKGROUND" -eq 1 ]; then
+  case "${DBUS_SESSION_BUS_ADDRESS:-}" in
+    unix:path=/tmp/dbus-*,guid=*) ;;
+    *)
+      printf 'background TUI capture requires the private-session D-Bus address\n' >&2
+      exit 2
+      ;;
+  esac
+fi
+DBUS_ADDRESS_SHA256="$(printf '%s' "${DBUS_SESSION_BUS_ADDRESS:-}" | sha256sum | cut -d' ' -f1)"
+case "$DBUS_ADDRESS_SHA256" in
+  [0-9a-f][0-9a-f][0-9a-f][0-9a-f]*) ;;
+  *) printf 'private D-Bus address hash could not be recorded\n' >&2; exit 2 ;;
+esac
 
-mkdir -p "$RUN_DIR" "$OUT"
-RUNTIME_DIR="$(mktemp -d /tmp/taskmanager-tui-niri.XXXXXX)"
+mkdir -p "$RUN_DIR" "$RUN_DIR/bin" "$EVIDENCE_ROOT"
+RUNTIME_DIR="$CAPTURE_RUNTIME_ROOT/niri"
+mkdir -p "$RUNTIME_DIR" "$RUNTIME_DIR/config" "$RUNTIME_DIR/data" \
+  "$RUNTIME_DIR/cache" "$RUNTIME_DIR/state"
 chmod 700 "$RUNTIME_DIR"
 
 process_group() {
@@ -147,8 +192,11 @@ cleanup() {
   terminate_owned "$ALACRITTY_PID" "$ALACRITTY_PGID"
   terminate_owned "$NIRI_PID" "$NIRI_PGID"
   terminate_owned "$KWIN_PID" "$KWIN_PGID"
-  if [ -n "$KWIN_RUNTIME" ] && [ -d "$KWIN_RUNTIME" ]; then
-    rm -rf -- "$KWIN_RUNTIME"
+  if [ -n "$KWIN_ROOT" ] && [ -d "$KWIN_ROOT" ]; then
+    case "$KWIN_ROOT" in
+      "$CAPTURE_RUNTIME_ROOT/kwin") rm -rf -- "$KWIN_ROOT" ;;
+      *) printf 'cleanup refused unexpected KWin root: %s\n' "$KWIN_ROOT" >&2 ;;
+    esac
   fi
   if [ -d "$RUNTIME_DIR" ]; then
     rm -rf -- "$RUNTIME_DIR"
@@ -168,7 +216,11 @@ PYTHONDONTWRITEBYTECODE=1 timeout 60s python3 scripts/frontend_source_manifest.p
   --frontend tui --repo-root "$REPO" --output "$SOURCE_MANIFEST"
 SOURCE_MANIFEST_SHA256="$(sha256sum "$SOURCE_MANIFEST" | cut -d' ' -f1)"
 
-(cd "$REPO" && timeout --kill-after=10s 20m cargo build --locked --quiet --no-default-features --features ui-tui)
+(cd "$REPO" && timeout --kill-after=10s 20m python3 scripts/capture_build.py \
+  --repo-root "$REPO" --source "$REPO/target/debug/taskmanager-tui" \
+  --destination "$APP" -- cargo build --locked --quiet -p taskmanager-tui --bin taskmanager-tui)
+BINARY_SHA256="$(sha256sum "$APP" | cut -d' ' -f1)"
+APP_RELATIVE="${APP#"$REPO/"}"
 
 cat >"$CONF" <<KDL
 screenshot-path "$RUN_DIR/shot-%Y-%m-%d-%H-%M-%S.png"
@@ -190,13 +242,19 @@ start_capture_host() {
   # Niri's nested winit backend is itself a host window. Put it inside a
   # private virtual KWin compositor so the capture never steals focus or
   # paints over the operator's desktop.
-  KWIN_RUNTIME="$(mktemp -d /tmp/taskmanager-tui-kwin.XXXXXX)"
-  KWIN_DISPLAY="$KWIN_RUNTIME/wayland-outer"
-  mkdir -p "$KWIN_RUNTIME"
+  KWIN_ROOT="$CAPTURE_RUNTIME_ROOT/kwin"
+  KWIN_RUNTIME="$KWIN_ROOT/runtime"
+  KWIN_SOCKET="wayland-${CAPTURE_RUN_UUID%%-*}"
+  mkdir -p "$KWIN_ROOT/config" "$KWIN_ROOT/data" "$KWIN_ROOT/cache" \
+    "$KWIN_ROOT/state" "$KWIN_RUNTIME"
+  KWIN_DISPLAY="$KWIN_RUNTIME/$KWIN_SOCKET"
   chmod 700 "$KWIN_RUNTIME"
-  XDG_RUNTIME_DIR="$KWIN_RUNTIME" WAYLAND_DISPLAY= DISPLAY= \
-    QT_QPA_PLATFORM=wayland setsid timeout --foreground --kill-after=10s 20m \
-    kwin_wayland --virtual --socket=wayland-outer --width=1920 --height=1080 \
+  XDG_RUNTIME_DIR="$KWIN_RUNTIME" XDG_CONFIG_HOME="$KWIN_ROOT/config" \
+    XDG_DATA_HOME="$KWIN_ROOT/data" XDG_CACHE_HOME="$KWIN_ROOT/cache" \
+    XDG_STATE_HOME="$KWIN_ROOT/state" WAYLAND_DISPLAY= DISPLAY= \
+    LIBGL_ALWAYS_SOFTWARE=1 QT_QPA_PLATFORM=wayland \
+    setsid timeout --foreground --kill-after=10s 20m \
+    kwin_wayland --virtual --socket="$KWIN_SOCKET" --width=1920 --height=1080 \
       --scale=1 --no-global-shortcuts --no-lockscreen \
       >"$RUN_DIR/kwin-wayland.log" 2>&1 &
   KWIN_PID=$!
@@ -229,7 +287,9 @@ start_capture_host || exit 1
 # is degraded (KWin "atomic commit failed" storms), EGL initialization hangs
 # and windows never map or present. llvmpipe renders the same frame; pixel
 # content is unchanged. Applied to both the nested compositor and Alacritty.
-XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$NIRI_PARENT_WAYLAND" DISPLAY= \
+XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
+  XDG_DATA_HOME="$RUNTIME_DIR/data" XDG_CACHE_HOME="$RUNTIME_DIR/cache" \
+  XDG_STATE_HOME="$RUNTIME_DIR/state" WAYLAND_DISPLAY="$NIRI_PARENT_WAYLAND" DISPLAY= \
   LIBGL_ALWAYS_SOFTWARE=1 RUST_LOG=niri=info \
   setsid timeout --foreground --kill-after=10s 20m niri --config "$CONF" \
   >"$RUN_DIR/niri.log" 2>&1 &
@@ -267,7 +327,9 @@ fi
 # whose GPU context is degraded (KWin "atomic commit failed" storms), EGL
 # initialization against the nested compositor hangs and the terminal never
 # maps a window. llvmpipe renders the same frame; pixel content is unchanged.
-XDG_RUNTIME_DIR="$RUNTIME_DIR" WAYLAND_DISPLAY="$SOCK" \
+XDG_RUNTIME_DIR="$RUNTIME_DIR" XDG_CONFIG_HOME="$RUNTIME_DIR/config" \
+  XDG_DATA_HOME="$RUNTIME_DIR/data" XDG_CACHE_HOME="$RUNTIME_DIR/cache" \
+  XDG_STATE_HOME="$RUNTIME_DIR/state" WAYLAND_DISPLAY="$SOCK" \
   TM_TUI_CAPTURE_MARKER_FILE="$MARKERS" \
   TM_TUI_CAPTURE_PAGE="$CAPTURE_PAGE" \
   TM_TUI_CAPTURE_DEVICE="$CAPTURE_DEVICE" \
@@ -345,6 +407,12 @@ NIRI_VERSION="$(niri --version)"
 CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 {
   printf 'run_id=%s\n' "$RUN_ID"
+  printf 'run_uuid=%s\n' "$CAPTURE_RUN_UUID"
+  printf 'frontend=tui\n'
+  printf 'run_root=%s\n' "$RUN_RELATIVE"
+  printf 'runtime_root=%s\n' "$CAPTURE_RUNTIME_ROOT"
+  printf 'supervisor_pid=%s\n' "${TM_CAPTURE_SUPERVISOR_PID:-}"
+  printf 'cgroup_path=%s\n' "${TM_CAPTURE_CGROUP_PATH:-}"
   printf 'captured_at=%s\n' "$CAPTURED_AT"
   printf 'git_head=%s\n' "$GIT_HEAD"
   printf 'worktree=%s\n' "$WORKTREE_STATE"
@@ -353,6 +421,8 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   printf 'terminal=%s\n' "$(alacritty --version)"
   printf 'stack=ratatui 0.30.2 + crossterm 0.29.0\n'
   printf 'app_id=%s\n' "$APP_ID"
+  printf 'binary=%s\n' "$APP_RELATIVE"
+  printf 'binary_sha256=%s\n' "$BINARY_SHA256"
   printf 'app_pid=%s\n' "$WINDOW_PID"
   printf 'launcher_pid=%s\n' "$ALACRITTY_PID"
   printf 'window_id=%s\n' "$WINDOW_ID"
@@ -363,6 +433,8 @@ CAPTURED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
     printf 'niri_host=host-wayland-visible\n'
   fi
   printf 'niri_background=%s\n' "$CAPTURE_NIRI_BACKGROUND"
+  printf 'dbus_isolation=private-session\n'
+  printf 'dbus_address_sha256=%s\n' "$DBUS_ADDRESS_SHA256"
   printf 'windows_receipt=%s\n' "$WINDOWS"
   printf 'action_receipt=%s\n' "$ACTION"
   printf 'source_scope=tui\n'
@@ -387,11 +459,6 @@ PYTHONDONTWRITEBYTECODE=1 timeout 30s python3 "$REPO/scripts/validate_tui_eviden
   --repo-root "$REPO" \
   --current-worktree
 
-install -m0644 "$IMAGE" "$OUT/tui-mvp.png"
-install -m0644 "$MARKERS" "$OUT/tui-capture-markers.log"
-install -m0644 "$METADATA" "$OUT/tui-capture-metadata.txt"
-install -m0644 "$MANIFEST" "$OUT/tui-capture-manifest.tsv"
-install -m0644 "$RECEIPT" "$OUT/tui-capture-validation.json"
-install -m0644 "$SOURCE_MANIFEST" "$OUT/tui-source-manifest.sha256"
-printf '%s\n' "$RUN_ID" >"$EVIDENCE_ROOT/latest.txt"
+PYTHONDONTWRITEBYTECODE=1 timeout --kill-after=5s 30s python3 "$REPO/scripts/capture_publish.py" \
+  --repo-root "$REPO" --frontend tui --run-root "$RUN_DIR" --run-uuid "$RUN_ID"
 printf 'TUI capture evidence: PASS -> %s\n' "$RUN_DIR"
