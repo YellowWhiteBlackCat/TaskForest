@@ -8,7 +8,7 @@ fn sessions_rows_reuse_the_provider_snapshot_until_generation_changes(cx: &mut T
     root.update(cx, |view, _cx| {
         view.replace_sessions_for_test(
             vec![SessionItem {
-                id: "session-1".to_owned(),
+                id: "session-1".to_owned().into(),
                 user: "alice".to_owned(),
                 ..SessionItem::default()
             }],
@@ -16,7 +16,7 @@ fn sessions_rows_reuse_the_provider_snapshot_until_generation_changes(cx: &mut T
         );
 
         let first = view.sessions_rows();
-        assert_eq!(first[0].id, "session-1");
+        assert_eq!(first[0].id.as_str(), "session-1");
         let second = view.sessions_rows();
         assert!(
             Rc::ptr_eq(&first, &second),
@@ -45,12 +45,12 @@ fn header_sort_click_flows_through_the_shell_slot_and_reorders_the_memo(cx: &mut
         view.replace_sessions_for_test(
             vec![
                 SessionItem {
-                    id: "2".to_owned(),
+                    id: "2".to_owned().into(),
                     user: "alice".to_owned(),
                     ..SessionItem::default()
                 },
                 SessionItem {
-                    id: "1".to_owned(),
+                    id: "1".to_owned().into(),
                     user: "root".to_owned(),
                     ..SessionItem::default()
                 },

@@ -150,7 +150,7 @@ impl PendingConfirmationView {
                 };
                 let headline = t("confirm.session_headline")
                     .replace("{action}", action_label)
-                    .replace("{id}", &pending.session.id)
+                    .replace("{id}", pending.session.id.as_str())
                     .replace("{user}", &pending.session.user);
                 Some(Self {
                     kind: ConfirmationKind::SessionControl,

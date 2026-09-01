@@ -40,7 +40,7 @@ use taskmanager_core::core::StableDeviceSelection;
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::target::ServiceId;
+use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_platform_contract::{OperationFailure, RequestId};
 use taskmanager_theme::{FontAvailability, Theme, WindowCorner};
 use taskmanager_ui::theme_binding::detect_font_availability;
@@ -317,8 +317,8 @@ pub struct RootView {
     pub selected_service: Option<ServiceId>,
     /// Provider-issued identity of the currently-selected startup entry.
     pub selected_startup: Option<StartupEntryId>,
-    /// Id of the currently-selected session row on the Users page, or `None`.
-    pub selected_session: Option<String>,
+    /// Provider-issued identity of the currently-selected session row.
+    pub selected_session: Option<SessionId>,
     pub desktop_appearance: DesktopAppearance,
     /// Native-adapter source truth used to choose the initial visual skin.
     pub desktop_appearance_sources: Vec<SourceStatus>,

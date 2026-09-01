@@ -44,7 +44,7 @@ fn startup_entry(id: &str, name: &str, enabled: bool) -> StartupEntry {
 
 fn session_item(id: &str, user: &str) -> SessionItem {
     SessionItem {
-        id: id.to_owned(),
+        id: id.to_owned().into(),
         uid: 1000,
         user: user.to_owned(),
         seat: Some("seat0".to_owned()),
@@ -182,7 +182,7 @@ fn the_sessions_menu_freezes_disconnect_and_lock_verbs() {
         SessionControlAction::Disconnect,
         "the menu's verb froze"
     );
-    assert_eq!(pending.session.id, "c2", "the session froze");
+    assert_eq!(pending.session.id.as_str(), "c2", "the session froze");
 
     // The typed confirm re-emits the frozen session request.
     let effect = shell.confirm_session_control();

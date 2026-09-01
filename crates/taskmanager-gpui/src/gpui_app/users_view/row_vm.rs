@@ -34,7 +34,7 @@ pub struct UserRowVm {
 /// localized yes/no for `remote`).
 pub fn user_row_vm(row: &SessionItem) -> UserRowVm {
     UserRowVm {
-        session: row.id.clone(),
+        session: row.id.to_string(),
         user: row.user.clone(),
         seat: row.seat.clone().unwrap_or_else(missing_value),
         tty: row.tty.clone().unwrap_or_else(missing_value),

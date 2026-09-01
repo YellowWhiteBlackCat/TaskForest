@@ -53,7 +53,7 @@ use crate::window::tests::HeadlessFrontendPlugins;
 
 fn session_item(id: &str, user: &str, seat: Option<&str>, tty: Option<&str>) -> SessionItem {
     SessionItem {
-        id: id.to_owned(),
+        id: id.to_owned().into(),
         uid: 1000,
         user: user.to_owned(),
         seat: seat.map(str::to_owned),
@@ -188,7 +188,7 @@ fn row_targets(app: &mut App) -> Vec<(usize, String)> {
     app.world_mut()
         .query_filtered::<&SessionsRowMarker, ()>()
         .iter(app.world())
-        .map(|marker| (marker.0, marker.1.clone()))
+        .map(|marker| (marker.0, marker.1.to_string()))
         .collect()
 }
 
@@ -196,7 +196,7 @@ fn row_entities(app: &mut App) -> Vec<(Entity, String)> {
     app.world_mut()
         .query_filtered::<(Entity, &SessionsRowMarker), ()>()
         .iter(app.world())
-        .map(|(entity, marker)| (entity, marker.1.clone()))
+        .map(|(entity, marker)| (entity, marker.1.to_string()))
         .collect()
 }
 
@@ -216,7 +216,7 @@ fn selected_row_target(app: &mut App) -> Option<String> {
         .query_filtered::<(&SessionsRowMarker, &BackgroundColor), ()>()
         .iter(app.world())
         .find(|(_, fill)| fill.0.to_srgba() == highlight)
-        .map(|(marker, _)| marker.1.clone())
+        .map(|(marker, _)| marker.1.to_string())
 }
 
 // ---- pure: row model, seat/tty summary, feedback, selection ----
@@ -245,7 +245,7 @@ fn rows_project_through_the_shared_sessions_sort() {
     ]));
     let provider_order: Vec<String> = session_rows(&shell)
         .into_iter()
-        .map(|row| row.target)
+        .map(|row| row.target.to_string())
         .collect();
     assert_eq!(provider_order, ["5", "2", "9"]);
     shell.set_info_sort(InfoTable::Users, InfoSortCol::Name);
@@ -284,20 +284,20 @@ fn selection_is_id_keyed_and_survives_a_sort_flip() {
         session_item("2", "ada", None, None),
     ]));
     let selection = SessionSelection {
-        target: Some("2".to_owned()),
+        target: Some(SessionId::new("2")),
     };
     let rows = session_rows(&shell);
     assert_eq!(selected_row(&rows, &selection), Some(1));
     shell.set_info_sort(InfoTable::Users, InfoSortCol::Name);
     let rows = session_rows(&shell);
     assert_eq!(
-        selection.target.as_deref(),
+        selection.target.as_ref().map(SessionId::as_str),
         Some("2"),
         "the target id never drifts"
     );
     assert_eq!(selected_row(&rows, &selection), Some(0));
     let gone = SessionSelection {
-        target: Some("404".to_owned()),
+        target: Some(SessionId::new("404")),
     };
     assert_eq!(selected_row(&rows, &gone), None);
 }

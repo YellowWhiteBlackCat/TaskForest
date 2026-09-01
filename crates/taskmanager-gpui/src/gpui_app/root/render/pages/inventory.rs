@@ -136,7 +136,7 @@ impl RootView {
                     theme,
                     rows: self.sessions_rows(),
                     sources: &sources,
-                    selected: selected.as_deref(),
+                    selected: selected.as_ref(),
                     feedback: self.session_feedback(),
                     hovered: hovered.cloned(),
                     search_query: self.process_query(),

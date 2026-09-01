@@ -386,7 +386,7 @@ impl TuiApp {
         let Some(session) = self.sorted_session_at(self.selected) else {
             return false;
         };
-        if session.id.is_empty() {
+        if session.id.as_str().is_empty() {
             self.report_notice(
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,

@@ -241,7 +241,7 @@ impl SessionInventoryProvider for MacSessionInventoryProvider {
                 id_output.trim().parse::<u32>().unwrap_or(0)
             });
             items.push(SessionItem {
-                id: format!("macos:session:{tty}"),
+                id: format!("macos:session:{tty}").into(),
                 uid,
                 user,
                 seat: None,

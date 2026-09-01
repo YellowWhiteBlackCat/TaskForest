@@ -29,7 +29,7 @@ impl ShellApp {
         self.data.session_control_feedback = None;
         Some(PlatformEffect::SessionControl(SessionControlTarget {
             request_id,
-            session_id: session_id.into(),
+            session_id,
             action,
         }))
     }
@@ -48,7 +48,7 @@ impl ShellApp {
         session: &SessionItem,
         action: SessionControlAction,
     ) -> bool {
-        if session.id.is_empty() {
+        if session.id.as_str().is_empty() {
             return false;
         }
         let request_id = self.data.session_control_requests.begin();

@@ -10,6 +10,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::session::SessionControlAction;
+use taskmanager_core::core::target::SessionId;
 use taskmanager_platform_contract::SubmissionErrorKind;
 
 impl RootView {
@@ -46,13 +47,13 @@ impl RootView {
     /// Queue a login-session action without invoking native tools on the UI thread.
     pub(crate) fn request_session_control(
         &mut self,
-        session_id: String,
+        session_id: SessionId,
         action: SessionControlAction,
     ) {
         let request_id = self.shell.begin_session_control();
         self.submit_session_control_target(SessionControlTarget {
             request_id,
-            session_id: session_id.clone().into(),
+            session_id,
             action,
         });
     }

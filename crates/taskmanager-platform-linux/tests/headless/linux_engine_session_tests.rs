@@ -1,6 +1,7 @@
 use super::*;
 #[cfg(unix)]
 use std::os::unix::process::ExitStatusExt;
+use taskmanager_core::SessionId;
 
 #[cfg(unix)]
 fn successful_session_scan(
@@ -52,7 +53,7 @@ fn scan_executes_the_bounded_provider_and_returns_its_parsed_session() {
     let sessions = manager.try_scan().expect("fixture provider should succeed");
 
     assert_eq!(sessions.len(), 1);
-    assert_eq!(sessions[0].id, "fixture");
+    assert_eq!(sessions[0].id, SessionId::new("fixture"));
     assert_eq!(sessions[0].uid, 1000);
     assert_eq!(sessions[0].user, "alice");
     assert_eq!(sessions[0].seat.as_deref(), Some("seat0"));
@@ -84,7 +85,7 @@ fn parse_classic_layout_local_session() {
     let out = "2 1000 alice seat0 tty2 no Thu 2026-07-28 10:00:00 +0800";
     let s = parse_loginctl_sessions(out);
     assert_eq!(s.len(), 1);
-    assert_eq!(s[0].id, "2");
+    assert_eq!(s[0].id, SessionId::new("2"));
     assert_eq!(s[0].uid, 1000);
     assert_eq!(s[0].user, "alice");
     assert_eq!(s[0].seat.as_deref(), Some("seat0"));
@@ -167,8 +168,8 @@ fn parse_skips_blank_header_and_short_rows() {
     let s = parse_loginctl_sessions(&out);
     // header dropped, short row dropped → 2 real sessions.
     assert_eq!(s.len(), 2);
-    assert_eq!(s[0].id, "2");
-    assert_eq!(s[1].id, "8");
+    assert_eq!(s[0].id, SessionId::new("2"));
+    assert_eq!(s[1].id, SessionId::new("8"));
     assert_eq!(s[1].seat, None);
     assert!(s[1].remote, "no seat ⇒ inferred remote");
     assert_eq!(s[1].tty, None);
@@ -198,9 +199,9 @@ fn parse_multiple_sessions_preserve_order() {
     .join("\n");
     let s = parse_loginctl_sessions(&out);
     assert_eq!(s.len(), 3);
-    assert_eq!(s[0].id, "2");
-    assert_eq!(s[1].id, "3");
-    assert_eq!(s[2].id, "4");
+    assert_eq!(s[0].id, SessionId::new("2"));
+    assert_eq!(s[1].id, SessionId::new("3"));
+    assert_eq!(s[2].id, SessionId::new("4"));
     assert!(s[1].remote);
     assert!(!s[0].remote);
 }

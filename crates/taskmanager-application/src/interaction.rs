@@ -151,7 +151,7 @@ impl PendingConfirmation {
             Self::SessionControl(pending) => {
                 Some(PlatformEffect::SessionControl(SessionControlTarget {
                     request_id: pending.request_id,
-                    session_id: pending.session.id.into(),
+                    session_id: pending.session.id.clone(),
                     action: pending.action,
                 }))
             }

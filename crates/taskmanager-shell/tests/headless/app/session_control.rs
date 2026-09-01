@@ -55,7 +55,7 @@ fn confirm_emits_the_frozen_identity_and_clears_the_gate() {
     let Some(PlatformEffect::SessionControl(target)) = shell.confirm_session_control() else {
         panic!("confirm must emit a SessionControl effect");
     };
-    assert_eq!(target.session_id.as_str(), session.id);
+    assert_eq!(target.session_id, session.id);
     assert_eq!(target.action, SessionControlAction::Disconnect);
     assert_eq!(target.request_id, armed_id);
     assert!(shell.pending_session().is_none());

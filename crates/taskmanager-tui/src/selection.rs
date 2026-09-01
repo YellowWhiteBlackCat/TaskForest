@@ -15,7 +15,7 @@ use std::collections::HashSet;
 use taskmanager_application::{AppPage, PlatformEffect};
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_core::core::startup::StartupEntryId;
-use taskmanager_core::core::target::ServiceId;
+use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_shell::{InfoTable, ProcessRowId};
 
 use crate::TuiApp;
@@ -42,7 +42,7 @@ pub(crate) enum ApplicationRowAnchor {
 pub(crate) enum InventoryRowAnchor {
     Service(ServiceId),
     Startup(StartupEntryId),
-    Session(String),
+    Session(SessionId),
 }
 
 /// Cross-page selection anchor. The shell owns ONE `selected` index for every
@@ -107,7 +107,7 @@ impl TuiApp {
                 .map(|entry| InventoryRowAnchor::Startup(entry.id.clone())),
             AppPage::Users => self
                 .sorted_session_at(self.selected)
-                .filter(|session| !session.id.is_empty())
+                .filter(|session| !session.id.as_str().is_empty())
                 .map(|session| InventoryRowAnchor::Session(session.id.clone())),
             _ => None,
         }

@@ -99,7 +99,7 @@ pub fn parse_loginctl_sessions(output: &str) -> Vec<SessionItem> {
         };
 
         out.push(SessionItem {
-            id,
+            id: id.into(),
             uid,
             user,
             seat,

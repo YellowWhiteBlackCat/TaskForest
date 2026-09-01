@@ -141,7 +141,9 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
             let selected = shell.selected;
             // The open Users-row menu re-hosts its row, so its session id is
             // both the lazy-invalidation marker and the mount condition.
-            let open_menu_session = app.user_menu_session().map(|session| session.id.clone());
+            let open_menu_session = app
+                .user_menu_session()
+                .map(|session| session.id.to_string());
             let base_key = inventory_table_key(InventoryTableKey {
                 theme_snapshot,
                 generation: projection_generation,
@@ -185,7 +187,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                                 cell.into()
                             };
                             let row = row![
-                                text(session.id.clone()).width(columns.session.length()),
+                                text(session.id.to_string()).width(columns.session.length()),
                                 text(session.user.clone()).width(columns.name.length()),
                                 text(optional_text(session.seat.as_deref()))
                                     .width(columns.seat.length()),
@@ -214,7 +216,7 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
                                 // The open menu floats on its own row: anchored
                                 // by the popover primitive and dismissed by an
                                 // outside press without touching what's below.
-                                let panel = user_menu_panel(table_theme, session.id.clone());
+                                let panel = user_menu_panel(table_theme, session.id.to_string());
                                 crate::ui::components::Popover::new(
                                     row,
                                     panel,
@@ -456,7 +458,7 @@ pub(crate) fn user_rows(shell: &ShellApp) -> Vec<UserRow> {
         .filter_map(|index| {
             let session = sessions.get(index)?;
             Some(UserRow {
-                id: session.id.clone(),
+                id: session.id.to_string(),
                 uid: session.uid,
                 user: session.user.clone(),
                 seat: session.seat.clone(),

@@ -188,7 +188,7 @@ impl RootView {
         if self
             .selected_session
             .as_ref()
-            .is_some_and(|id| !self.sessions().iter().any(|session| &session.id == id))
+            .is_some_and(|id| !self.sessions().iter().any(|session| session.id == *id))
         {
             self.selected_session = None;
         }

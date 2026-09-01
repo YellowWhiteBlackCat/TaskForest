@@ -243,7 +243,7 @@ fn startup_identity(app: &TuiApp) -> Option<String> {
 
 fn session_identity(app: &TuiApp) -> Option<String> {
     app.sorted_session_at(app.selected)
-        .map(|row| row.id.clone())
+        .map(|row| row.id.to_string())
 }
 
 #[test]

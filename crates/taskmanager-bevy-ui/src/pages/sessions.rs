@@ -42,6 +42,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
 use taskmanager_core::core::session::{SessionControlAction, SessionItem};
 use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::target::SessionId;
 
 use taskmanager_shell::presentation::{MISSING_VALUE, control_error_detail};
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
@@ -58,7 +59,7 @@ pub(crate) mod menu;
 
 /// One Users-table row: display material plus the provider session id.
 pub(crate) struct SessionRowModel {
-    pub(crate) target: String,
+    pub(crate) target: SessionId,
     pub(crate) session: String,
     pub(crate) user: String,
     pub(crate) seat: String,
@@ -74,7 +75,7 @@ pub(crate) fn session_rows(shell: &ShellApp) -> Vec<SessionRowModel> {
         .into_iter()
         .map(|session: &SessionItem| SessionRowModel {
             target: session.id.clone(),
-            session: session.id.clone(),
+            session: session.id.to_string(),
             user: session.user.clone(),
             seat: session_seat_text(session),
             tty: session_tty_text(session),
@@ -166,15 +167,15 @@ pub(crate) fn status_line_text(shell: &ShellApp, rows: usize) -> String {
 /// 对接点 (W4 menu/dialog): disconnect/lock verbs read the id from here.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Resource)]
 pub(crate) struct SessionSelection {
-    pub(crate) target: Option<String>,
+    pub(crate) target: Option<SessionId>,
 }
 
 pub(crate) fn selected_row(
     rows: &[SessionRowModel],
     selection: &SessionSelection,
 ) -> Option<usize> {
-    let target = selection.target.as_deref()?;
-    rows.iter().position(|row| row.target == target)
+    let target = selection.target.as_ref()?;
+    rows.iter().position(|row| row.target == *target)
 }
 
 /// Clamp-move a row cursor: saturates at the first/last row; an empty table
@@ -260,7 +261,7 @@ pub(crate) struct SessionsBody;
 pub(crate) struct SessionsStatusLine;
 
 #[derive(Clone, Component, Default)]
-pub(crate) struct SessionsRowMarker(pub(crate) usize, pub(crate) String);
+pub(crate) struct SessionsRowMarker(pub(crate) usize, pub(crate) SessionId);
 
 #[derive(Clone, Component, Default)]
 pub(crate) struct SessionsSortHeader(pub(crate) Option<InfoSortCol>);
@@ -289,7 +290,7 @@ pub(crate) struct SessionSelectionMoved(pub(crate) isize);
 /// Published on every accepted selection change. Grammar-complete today; the
 /// W4 menu observers consume the payload when that surface lands.
 #[derive(Event)]
-pub(crate) struct SessionTargetSelected(#[allow(dead_code)] pub(crate) String);
+pub(crate) struct SessionTargetSelected(#[allow(dead_code)] pub(crate) SessionId);
 
 // ---- render adapters (bsn!) ----
 
