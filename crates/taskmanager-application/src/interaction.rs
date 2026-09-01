@@ -83,8 +83,8 @@ impl ProcessTerminationConfirmation {
             ProcessTerminationAction::ForceKill | ProcessTerminationAction::EndProcessTree => {
                 let action = match self.action {
                     ProcessTerminationAction::ForceKill => ProcessBatchAction::Kill,
-                    ProcessTerminationAction::EndTask
-                    | ProcessTerminationAction::EndProcessTree => ProcessBatchAction::End,
+                    ProcessTerminationAction::EndTask => ProcessBatchAction::End,
+                    ProcessTerminationAction::EndProcessTree => ProcessBatchAction::EndProcessTree,
                 };
                 PlatformEffect::ExecuteBatch(ProcessBatchIntent {
                     action,

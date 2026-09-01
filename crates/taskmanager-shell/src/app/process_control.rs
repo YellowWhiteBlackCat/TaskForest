@@ -170,6 +170,18 @@ pub(crate) fn process_control_intent(
     selected: &[ProcessLiveKey],
     action: ProcessBatchAction,
 ) -> Option<ProcessBatchIntent> {
+    // An application row always expands to its frozen descendant tree. Keep
+    // the semantic verb aligned with that target scope even when a caller
+    // arrives through the generic End command (Delete/action bar); otherwise a
+    // tree request would execute correctly but be presented as a single-task
+    // action.
+    let action = if matches!(active_row, Some(ProcessRowId::Application(_)))
+        && action == ProcessBatchAction::End
+    {
+        ProcessBatchAction::EndProcessTree
+    } else {
+        action
+    };
     let intent = match active_row {
         Some(ProcessRowId::Application(root)) => {
             ProcessBatchIntent::freeze_tree(processes, root, action)

@@ -193,7 +193,7 @@ fn end_process_tree_gates_the_shared_pending_batch_with_a_frozen_tree() {
     // The frozen intent covers the whole tree leaf-first through the shared
     // core traversal.
     let intent = app.shell.pending_batch().expect("pending batch");
-    assert_eq!(intent.action, ProcessBatchAction::End);
+    assert_eq!(intent.action, ProcessBatchAction::EndProcessTree);
     assert_eq!(
         intent
             .targets
@@ -654,6 +654,132 @@ fn batch_menu_actions_route_through_the_shared_batch_path() {
                     && intent.targets.len() == 2
         ),
         "the High tier row must submit SetPriority(High) over the marked set"
+    );
+}
+
+/// Render the whole app and flatten the frame so a confirmation overlay can
+/// be asserted on its painted text. English is pinned for the duration (the
+/// labels resolve through the process-global `t()`).
+fn overlay_text(app: &TuiApp, width: u16, height: u16) -> String {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    let backend = ratatui::backend::TestBackend::new(width, height);
+    let mut terminal = ratatui::Terminal::new(backend).expect("test terminal");
+    terminal
+        .draw(|frame| crate::ui::render(frame, app, crate::TuiTheme::default()))
+        .expect("draw");
+    terminal.backend().to_string()
+}
+
+#[test]
+fn the_batch_confirmation_names_the_verb_it_will_run() {
+    use crate::ui::batch_menu::BatchMenuAction;
+    // A reversible batch over a marked set is gated too, so the overlay must
+    // name Suspend — the dedicated batch title stays the destructive verb's
+    // receipt and must not claim a kill the overlay is not about to run.
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('m'),
+            KeyModifiers::NONE,
+        ),
+    );
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Down,
+            KeyModifiers::SHIFT,
+        ),
+    );
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('B'),
+            KeyModifiers::SHIFT,
+        ),
+    );
+    let suspend = crate::ui::batch_menu::MENU_ACTIONS
+        .iter()
+        .position(|a| *a == BatchMenuAction::Suspend)
+        .expect("suspend row");
+    for _ in 0..suspend {
+        let _ = handle_key(
+            &mut app,
+            KeyEvent::new(ratatui::crossterm::event::KeyCode::Down, KeyModifiers::NONE),
+        );
+    }
+    let effect = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Enter,
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(effect.is_none(), "a marked-set Suspend is gated");
+
+    let text = overlay_text(&app, 100, 30);
+    assert!(
+        text.contains("Suspend 2 processes?"),
+        "the overlay must headline the suspended verb and scope, got:\n{text}"
+    );
+    assert!(
+        !text.contains("Confirm batch kill"),
+        "a reversible batch must not reuse the batch-kill title, got:\n{text}"
+    );
+
+    // The destructive verb keeps the dedicated batch title and its headline.
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('m'),
+            KeyModifiers::NONE,
+        ),
+    );
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Down,
+            KeyModifiers::SHIFT,
+        ),
+    );
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('B'),
+            KeyModifiers::SHIFT,
+        ),
+    );
+    let kill = crate::ui::batch_menu::MENU_ACTIONS
+        .iter()
+        .position(|a| *a == BatchMenuAction::Kill)
+        .expect("kill row");
+    for _ in 0..kill {
+        let _ = handle_key(
+            &mut app,
+            KeyEvent::new(ratatui::crossterm::event::KeyCode::Down, KeyModifiers::NONE),
+        );
+    }
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Enter,
+            KeyModifiers::NONE,
+        ),
+    );
+    let text = overlay_text(&app, 100, 30);
+    assert!(
+        text.contains("Confirm batch kill"),
+        "Kill keeps the dedicated batch title, got:\n{text}"
+    );
+    assert!(
+        text.contains("Force kill 2 processes?"),
+        "the overlay must headline the kill verb and scope, got:\n{text}"
     );
 }
 

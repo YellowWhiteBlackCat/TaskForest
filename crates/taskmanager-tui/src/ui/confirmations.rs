@@ -171,19 +171,28 @@ pub(super) fn render_startup_control_confirmation_at(
     );
 }
 
-/// The gated destructive batch (Kill) confirmation overlay. The request is
-/// only emitted by the shell's `confirm_process_batch` (y); n / Esc clears
-/// the pending intent without submitting. The target scope shows the full
-/// frozen set so a multi-select Kill reads as "N processes" rather than the
-/// single first row.
+/// The gated batch confirmation overlay. The request is only emitted by the
+/// shell's `confirm_process_batch` (y); n / Esc clears the pending intent
+/// without submitting. The target scope shows the full frozen set so a
+/// multi-select action reads as "N processes" rather than the single first
+/// row.
 pub(super) fn render_batch_confirmation_at(
     frame: &mut Frame<'_>,
     theme: TuiTheme,
     intent: &taskmanager_core::core::process::ProcessBatchIntent,
     popup: Rect,
 ) {
-    let inner = Modal::alert(theme, theme.danger, t("confirm.batch_title")).render(frame, popup);
+    // The dedicated batch title is a kill receipt; a reversible batch keeps
+    // the process-action title so the overlay never names a verb it is not
+    // about to run.
+    let title = if taskmanager_shell::ShellApp::process_batch_is_destructive(intent.action) {
+        t("confirm.batch_title")
+    } else {
+        t("confirm.process_title")
+    };
+    let inner = Modal::alert(theme, theme.danger, title).render(frame, popup);
     let targets = &intent.targets;
+    let action = taskmanager_shell::presentation::process_batch_action_label(intent.action);
     let scope = if targets.len() <= 1 {
         targets.first().map_or_else(
             || t("confirm.selected_process").to_owned(),
@@ -196,7 +205,7 @@ pub(super) fn render_batch_confirmation_at(
         Paragraph::new(vec![
             Line::from(Span::styled(
                 t("confirm.action_headline")
-                    .replace("{action}", t("proc.kill"))
+                    .replace("{action}", &action)
                     .replace("{target}", &scope),
                 Style::new()
                     .fg(theme.color(Color::White))

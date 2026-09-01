@@ -1,6 +1,7 @@
 //! Platform-fold side effects into shell history, feedback and view hygiene.
 
 use super::*;
+use crate::presentation::process_batch_action_label;
 use taskmanager_platform_contract::RequestId;
 
 impl ShellApp {
@@ -359,29 +360,5 @@ fn process_control_action_label(kind: &ProcessControlKind) -> String {
         ProcessControlKind::ResourceLimits(_) => {
             taskmanager_application::i18n::t("proc_insights.resource_limits").to_owned()
         }
-    }
-}
-
-fn process_batch_action_label(
-    action: taskmanager_core::core::process::ProcessBatchAction,
-) -> String {
-    match action {
-        taskmanager_core::core::process::ProcessBatchAction::End => {
-            taskmanager_application::i18n::t("proc.end_task").to_owned()
-        }
-        taskmanager_core::core::process::ProcessBatchAction::Kill => {
-            taskmanager_application::i18n::t("proc.kill").to_owned()
-        }
-        taskmanager_core::core::process::ProcessBatchAction::Suspend => {
-            taskmanager_application::i18n::t("proc.suspend").to_owned()
-        }
-        taskmanager_core::core::process::ProcessBatchAction::Resume => {
-            taskmanager_application::i18n::t("proc.resume").to_owned()
-        }
-        taskmanager_core::core::process::ProcessBatchAction::SetPriority(tier) => format!(
-            "{} ({})",
-            taskmanager_application::i18n::t("proc.priority"),
-            crate::presentation::priority_tier_label(tier)
-        ),
     }
 }

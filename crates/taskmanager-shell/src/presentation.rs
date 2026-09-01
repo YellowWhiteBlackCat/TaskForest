@@ -7,7 +7,7 @@ use taskmanager_application::{AppPage, CommandId, KeyCode, Modifiers, default_bi
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::{DiskMetrics, GpuMetrics, SmartAvailability};
-use taskmanager_core::core::process::PriorityTier;
+use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_ui_contract::{IconId, MessageKey, descriptor, page_descriptors, page_shortcut};
 
@@ -83,6 +83,59 @@ pub fn optional_duration(value: Option<u64>) -> String {
     value.map_or_else(missing_value, duration)
 }
 
+/// Format a process CPU time as the whole-second cell the terminal and Bevy
+/// tables render: `12s`, so a measured zero stays a number instead of
+/// collapsing into the missing-value dash. This is the SINGLE whole-seconds
+/// spelling (ADR-020); the width-bounded mixed-unit ladder lives in
+/// [`cpu_time_compact`]. (`{:.1}` on the `u64` source the frontends held was
+/// an integer minimum-digit spec, not a decimal place — the visible text was
+/// always a whole second count, and stays exactly that.)
+#[must_use]
+pub fn cpu_time_seconds(seconds: u64) -> String {
+    format!("{seconds}s")
+}
+
+/// [`cpu_time_seconds`] with `None` rendering the honest dash.
+#[must_use]
+pub fn optional_cpu_time_seconds(value: Option<u64>) -> String {
+    value.map_or_else(missing_value, cpu_time_seconds)
+}
+
+/// Format a process CPU time as the width-bounded ladder the desktop process
+/// table renders: `{d}d {h}h` past a day, `{h}h {m}m` past an hour, `{m}m {s}s`
+/// past a minute, `{s}s` otherwise. Segments are never zero-padded (the
+/// ladder grows left instead), and a process that has accumulated nothing yet
+/// renders the shared dash rather than a believable `0s`. This is the SINGLE
+/// compact-ladder spelling (ADR-020).
+#[must_use]
+pub fn cpu_time_compact(seconds: u64) -> String {
+    if seconds == 0 {
+        return missing_value();
+    }
+    let days = seconds / 86_400;
+    let hours = (seconds % 86_400) / 3_600;
+    let minutes = (seconds % 3_600) / 60;
+    let seconds = seconds % 60;
+    if days > 0 {
+        // Drop the minutes segment once a process is at least a day old: the
+        // CpuTime column is width-bounded, and "{days}d {hours}h" stays well
+        // inside it even for multi-year accumulations.
+        format!("{days}d {hours}h")
+    } else if hours > 0 {
+        format!("{hours}h {minutes}m")
+    } else if minutes > 0 {
+        format!("{minutes}m {seconds}s")
+    } else {
+        format!("{seconds}s")
+    }
+}
+
+/// [`cpu_time_compact`] with `None` rendering the honest dash.
+#[must_use]
+pub fn optional_cpu_time_compact(value: Option<u64>) -> String {
+    value.map_or_else(missing_value, cpu_time_compact)
+}
+
 /// Format an optional niceness value, signing a positive priority (`+10`) so it
 /// is visually distinct from a measured zero; `None` renders an honest dash.
 #[must_use]
@@ -103,6 +156,26 @@ pub fn optional_nice(value: Option<i32>) -> String {
 #[must_use]
 pub fn priority_tier_label(tier: PriorityTier) -> &'static str {
     i18n::t(tier.i18n_key())
+}
+
+/// Localized label for one neutral process-batch action. This is the single
+/// action→display fold used by confirmations, menus, and completion feedback
+/// in every frontend. Platform words such as a raw nice value or signal name
+/// never enter this projection.
+#[must_use]
+pub fn process_batch_action_label(action: ProcessBatchAction) -> String {
+    match action {
+        ProcessBatchAction::End => i18n::t("proc.end_task").to_owned(),
+        ProcessBatchAction::EndProcessTree => i18n::t("proc.end_process_tree").to_owned(),
+        ProcessBatchAction::Kill => i18n::t("proc.kill").to_owned(),
+        ProcessBatchAction::Suspend => i18n::t("proc.suspend").to_owned(),
+        ProcessBatchAction::Resume => i18n::t("proc.resume").to_owned(),
+        ProcessBatchAction::SetPriority(tier) => format!(
+            "{} ({})",
+            i18n::t("proc.priority"),
+            priority_tier_label(tier)
+        ),
+    }
 }
 
 /// Format an injected Unix process start instant as the user's local `HH:MM`.
@@ -228,6 +301,23 @@ pub fn power_w_precise(value: f32) -> String {
 #[must_use]
 pub fn megahertz(value: f32) -> String {
     format!("{value:.0} MHz")
+}
+
+/// Map a Wi-Fi signal level in dBm onto the 0..=100 quality percentage every
+/// frontend renders: `-90 dBm → 0%`, `-30 dBm → 100%`, anything outside that
+/// window clamped. This is the SINGLE mapping (ADR-020) behind the sidebar
+/// rail caption, the network detail summary, and any signal progress bar, so
+/// two surfaces can never disagree about the same radio.
+#[must_use]
+pub fn wifi_signal_quality_percent(dbm: i32) -> f32 {
+    ((dbm as f32 + 90.0) / 60.0 * 100.0).clamp(0.0, 100.0)
+}
+
+/// [`wifi_signal_quality_percent`] over an optional dBm observation: a
+/// missing reading stays missing instead of becoming a fabricated `0%`.
+#[must_use]
+pub fn optional_wifi_signal_quality_percent(dbm: Option<i32>) -> Option<f32> {
+    dbm.map(wifi_signal_quality_percent)
 }
 
 /// Finite statistics for one renderer-facing history graph.

@@ -678,13 +678,7 @@ pub(super) fn confirm_batch_bar<'a>(
         Message::DismissOverlay,
         false,
     );
-    let action_label = match intent.action {
-        taskmanager_core::core::process::ProcessBatchAction::End => t("proc.end_process_tree"),
-        taskmanager_core::core::process::ProcessBatchAction::Kill => t("proc.kill"),
-        taskmanager_core::core::process::ProcessBatchAction::Suspend => t("proc.suspend"),
-        taskmanager_core::core::process::ProcessBatchAction::Resume => t("proc.resume"),
-        taskmanager_core::core::process::ProcessBatchAction::SetPriority(_) => t("proc.priority"),
-    };
+    let action_label = taskmanager_shell::presentation::process_batch_action_label(intent.action);
     // Surface the full target scope so a multi-target destructive action reads
     // as a frozen identity set rather than the single first row (mirrors the
     // GPUI confirmation scope).

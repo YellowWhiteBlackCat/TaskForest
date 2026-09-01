@@ -52,10 +52,8 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_core::core::process::ProcessLiveKey;
 
-use taskmanager_shell::presentation::{MISSING_VALUE, bytes, optional_nice, start_clock_local};
 use taskmanager_shell::process_semantic_key;
 use taskmanager_shell::{ShellApp, SortCol, SortDir};
 use taskmanager_ui_contract::ProcessColumnSpec;
@@ -73,6 +71,8 @@ use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod details;
 pub(crate) mod input;
+pub(crate) mod menu;
+pub(crate) mod projection;
 
 /// Height of the scrollable rows area in px. The bevy_ui flexbox cannot report
 /// a computed node height to an observer without a layout system, so M1 fixes
@@ -114,69 +114,6 @@ pub(crate) fn sort_projection(sort: (SortCol, SortDir)) -> Option<SortProjection
         column,
         descending: direction == SortDir::Desc,
     })
-}
-
-/// One cell's text for a contract column id. Unavailable scalars render the
-/// shared `MISSING_VALUE` dash, exactly like the TUI cells — a provider
-/// failure is never shown as a zero. The Start column uses the unsupported
-/// local-time observation, so it renders `—` until this frontend observes a
-/// timezone (the same output the TUI shows on an unsupported host).
-fn cell_text(process: &ProcessItem, column: &str) -> String {
-    match column {
-        "Name" => process.name.clone(),
-        "User" => process
-            .current_user()
-            .unwrap_or_else(|| MISSING_VALUE.to_owned()),
-        "PID" => process.pid.to_string(),
-        "Threads" => process
-            .current_threads()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| value.to_string()),
-        "StartTime" => start_clock_local(
-            process.current_start_time_secs(),
-            &LocalTimeRulesObservation::unsupported(0),
-        ),
-        "Status" => process.status.clone(),
-        "CPU" => process
-            .current_cpu_percentage()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| format!("{value:.1}%")),
-        "Memory" => process
-            .current_memory_bytes()
-            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
-        "Swap" => process
-            .current_swap_bytes()
-            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
-        "DiskRead" => process
-            .current_disk_read_bytes_per_sec()
-            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
-        "DiskWrite" => process
-            .current_disk_write_bytes_per_sec()
-            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
-        "CPUTime" => process
-            .current_cpu_time_secs()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| format!("{value:.1}s")),
-        "FDs" => process
-            .current_fds()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| value.to_string()),
-        "Nice" => optional_nice(process.current_nice()),
-        _ => MISSING_VALUE.to_owned(),
-    }
-}
-
-/// One row's cell vector over the contract columns (contract order, widths,
-/// and numeric alignment come from the shared vocabulary, never a local copy).
-/// The selected row prefixes the Name cell with the TUI's `›` cursor marker.
-fn row_cells(process: &ProcessItem, columns: &[&ProcessColumnSpec], selected: bool) -> Vec<String> {
-    columns
-        .iter()
-        .map(|column| {
-            let text = cell_text(process, column.id);
-            if selected && column.id == "Name" {
-                format!("› {text}")
-            } else {
-                text
-            }
-        })
-        .collect()
 }
 
 /// The rendered rows of one virtual window: pure over (shell, viewport,
@@ -224,7 +161,7 @@ pub(crate) fn rows_projection(
                 index,
                 semantic_id: process_semantic_key(process),
                 name: process.name.clone(),
-                cells: row_cells(process, &columns, Some(index) == selected),
+                cells: projection::row_cells(process, &columns, Some(index) == selected),
                 selected: Some(index) == selected,
             }
         })

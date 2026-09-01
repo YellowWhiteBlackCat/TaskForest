@@ -48,10 +48,18 @@ impl PriorityTier {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProcessBatchAction {
+    /// End each explicitly selected process target.
     End,
+    /// End a frozen descendant tree; providers execute the same end primitive
+    /// while the semantic label remains distinct for confirmation/history.
+    EndProcessTree,
+    /// Force-kill each target.
     Kill,
+    /// Suspend each target through the provider's native mapping.
     Suspend,
+    /// Resume each target through the provider's native mapping.
     Resume,
+    /// Apply one neutral scheduling-priority tier to each target.
     SetPriority(PriorityTier),
 }
 

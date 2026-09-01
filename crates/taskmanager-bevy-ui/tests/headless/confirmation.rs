@@ -29,6 +29,7 @@ use taskmanager_core::core::process::{
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
+use taskmanager_shell::presentation::process_batch_action_label;
 use taskmanager_theme::Theme;
 
 use super::{ArmedConfirmation, ConfirmationOverlay, PendingConfirmationView};
@@ -186,6 +187,42 @@ fn the_armed_view_echoes_the_frozen_target() {
         freeze([900, 301]),
         "a different target set is a different identity"
     );
+}
+
+#[test]
+fn batch_confirmation_names_the_requested_action() {
+    for action in [
+        ProcessBatchAction::End,
+        ProcessBatchAction::EndProcessTree,
+        ProcessBatchAction::Kill,
+        ProcessBatchAction::Suspend,
+        ProcessBatchAction::Resume,
+        ProcessBatchAction::SetPriority(taskmanager_core::core::process::PriorityTier::High),
+    ] {
+        let intent = ProcessBatchIntent {
+            action,
+            scope: Default::default(),
+            targets: vec![frozen_identity(4242, "worker")],
+        };
+        let pending = taskmanager_application::PendingConfirmation::ProcessBatch(intent);
+        let view = PendingConfirmationView::from_pending(&pending)
+            .expect("every process batch action has a confirmation view");
+        let expected = process_batch_action_label(action);
+        assert!(
+            view.body.contains(&expected),
+            "confirmation body must name {expected:?}: {}",
+            view.body
+        );
+        if action != ProcessBatchAction::Kill {
+            assert!(
+                !view
+                    .body
+                    .contains(taskmanager_application::i18n::t("proc.kill")),
+                "non-kill action {expected:?} must not use kill copy: {}",
+                view.body
+            );
+        }
+    }
 }
 
 #[test]

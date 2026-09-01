@@ -91,6 +91,27 @@ fn priority_tier_labels_resolve_non_empty_and_distinct_for_every_tier() {
 }
 
 #[test]
+fn process_batch_action_labels_are_complete_and_action_specific() {
+    use taskmanager_core::core::process::ProcessBatchAction;
+
+    i18n::set_language(i18n::Language::En);
+    let actions = [
+        (ProcessBatchAction::End, "End task"),
+        (ProcessBatchAction::EndProcessTree, "End process tree"),
+        (ProcessBatchAction::Kill, "Force kill"),
+        (ProcessBatchAction::Suspend, "Suspend"),
+        (ProcessBatchAction::Resume, "Resume"),
+        (
+            ProcessBatchAction::SetPriority(PriorityTier::High),
+            "Priority (High)",
+        ),
+    ];
+    for (action, expected) in actions {
+        assert_eq!(process_batch_action_label(action), expected);
+    }
+}
+
+#[test]
 fn nice_formats_purely_without_a_wall_clock() {
     // Nice signs a positive priority and leaves zero/negative bare.
     assert_eq!(optional_nice(Some(10)), "+10");
@@ -326,4 +347,44 @@ fn value_with_peak_renders_bare_value_without_peak_and_dash_without_data() {
     assert_eq!(value_with_peak(None, Some("4.0%".into())), "— (peak 4.0%)");
     // Nothing collected: the shared dash placeholder.
     assert_eq!(value_with_peak(None, None), MISSING_VALUE);
+}
+
+#[test]
+fn cpu_time_seconds_keeps_a_measured_zero_a_number() {
+    // The terminal/Bevy cell is a whole second count, never a dash for zero.
+    assert_eq!(cpu_time_seconds(0), "0s");
+    assert_eq!(cpu_time_seconds(12), "12s");
+    assert_eq!(cpu_time_seconds(90), "90s");
+    assert_eq!(optional_cpu_time_seconds(Some(7)), "7s");
+    assert_eq!(optional_cpu_time_seconds(None), MISSING_VALUE);
+}
+
+#[test]
+fn cpu_time_compact_ladder_matches_every_segment_boundary() {
+    // Nothing accumulated yet is the honest dash, not a believable "0s".
+    assert_eq!(cpu_time_compact(0), MISSING_VALUE);
+    assert_eq!(cpu_time_compact(1), "1s");
+    assert_eq!(cpu_time_compact(59), "59s");
+    assert_eq!(cpu_time_compact(60), "1m 0s");
+    assert_eq!(cpu_time_compact(3_599), "59m 59s");
+    assert_eq!(cpu_time_compact(3_600), "1h 0m");
+    assert_eq!(cpu_time_compact(86_400), "1d 0h");
+    // Multi-day accumulations drop the minutes segment to stay width-bounded.
+    assert_eq!(cpu_time_compact(2 * 86_400 + 3_600 + 61), "2d 1h");
+    // None renders the dash through the optional wrapper too.
+    assert_eq!(optional_cpu_time_compact(Some(3_600)), "1h 0m");
+    assert_eq!(optional_cpu_time_compact(None), MISSING_VALUE);
+}
+
+#[test]
+fn wifi_signal_quality_percent_clamps_the_ninety_to_thirty_window() {
+    // The shared -90..-30 dBm → 0..100 mapping, clamped on both ends.
+    assert_eq!(wifi_signal_quality_percent(-90), 0.0);
+    assert_eq!(wifi_signal_quality_percent(-60), 50.0);
+    assert_eq!(wifi_signal_quality_percent(-30), 100.0);
+    assert_eq!(wifi_signal_quality_percent(-120), 0.0);
+    assert_eq!(wifi_signal_quality_percent(0), 100.0);
+    // A missing dBm observation stays missing instead of becoming a fake 0%.
+    assert_eq!(optional_wifi_signal_quality_percent(Some(-60)), Some(50.0));
+    assert_eq!(optional_wifi_signal_quality_percent(None), None);
 }

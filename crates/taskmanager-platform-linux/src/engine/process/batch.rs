@@ -17,7 +17,9 @@ pub(crate) fn execute_process_batch(intent: ProcessBatchIntent) -> ProcessBatchR
     execute_process_batch_with(intent, &live, |action, target| {
         super::validate_exact_start_token(target)?;
         let direct = match action {
-            ProcessBatchAction::End => ProcessManager::terminate_process(target.pid),
+            ProcessBatchAction::End | ProcessBatchAction::EndProcessTree => {
+                ProcessManager::terminate_process(target.pid)
+            }
             ProcessBatchAction::Kill => ProcessManager::kill_process(target.pid),
             ProcessBatchAction::Suspend => ProcessManager::pause_process(target.pid),
             ProcessBatchAction::Resume => ProcessManager::resume_process(target.pid),

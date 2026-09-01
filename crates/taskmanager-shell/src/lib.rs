@@ -55,5 +55,6 @@ pub use keys::{LocalBinding, ShellKeyEvent, route_key, shell_local_bindings};
 pub use memory::{MemSegment, MemSegmentKind, SwapBreakdown, memory_segments, swap_breakdown};
 pub use presentation::{
     CommandHelp, GraphSummary, PageHelp, command_help, graph_summary, page_help,
+    process_batch_action_label,
 };
 pub use process_filter::{ProcessStatusFilter, matches_process_query};

@@ -34,6 +34,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, ConfirmationKind, PendingConfirmation, PlatformEffect};
+use taskmanager_shell::presentation::process_batch_action_label;
 
 use crate::app::FrontendTrack;
 use crate::input::PendingEffects;
@@ -90,12 +91,14 @@ impl PendingConfirmationView {
                 } else {
                     format!("{} {}", targets.len(), t("proc.process_count"))
                 };
+                let action = process_batch_action_label(intent.action);
                 let headline = t("confirm.action_headline")
-                    .replace("{action}", t("proc.kill"))
+                    .replace("{action}", &action)
                     .replace("{target}", &scope);
                 Some(Self {
                     kind: ConfirmationKind::ProcessBatch,
-                    title: t("confirm.batch_title").to_owned(),
+                    title: t("proc.batch_confirm_title")
+                        .replace("{count}", &targets.len().to_string()),
                     body: format!("{headline}\n{}", t("confirm.frozen_body")),
                     confirm_label: t("common.confirm").to_owned(),
                     cancel_label: t("common.cancel").to_owned(),

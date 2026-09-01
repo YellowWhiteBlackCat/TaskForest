@@ -11,10 +11,20 @@ impl ShellApp {
     /// identities at the point of submission.
     #[must_use]
     pub fn process_control_availability(&self) -> super::ProcessControlAvailability {
+        // The numeric cursor is a compatibility coordinate. If no typed row
+        // has been written yet, project it read-only into the current live
+        // identity so availability is useful before the first control request
+        // (the request path still performs the mutating promotion itself).
+        let active_row = self.selected_row.or_else(|| {
+            (!self.process_selection_invalidated)
+                .then(|| self.row_identity_at(self.selected))
+                .flatten()
+                .map(ProcessRowId::Process)
+        });
         let selected: Vec<_> = self.selected_rows.iter().copied().collect();
         super::process_control::process_control_availability(
             self.data.processes_slice(),
-            self.selected_row,
+            active_row,
             &selected,
             self.data
                 .capability_status(&taskmanager_platform_contract::CapabilityId::PROCESS_CONTROL),
@@ -199,7 +209,10 @@ impl ShellApp {
     /// whatever it targets.
     #[must_use]
     pub const fn process_batch_is_destructive(action: ProcessBatchAction) -> bool {
-        matches!(action, ProcessBatchAction::Kill | ProcessBatchAction::End)
+        matches!(
+            action,
+            ProcessBatchAction::Kill | ProcessBatchAction::End | ProcessBatchAction::EndProcessTree
+        )
     }
 
     /// The SINGLE authority for whether one frozen batch intent must pass the
@@ -289,7 +302,8 @@ impl ShellApp {
             self.report_process_control_unavailable();
             return;
         }
-        let Some(intent) = self.freeze_tree_for_identity(root, ProcessBatchAction::End) else {
+        let Some(intent) = self.freeze_tree_for_identity(root, ProcessBatchAction::EndProcessTree)
+        else {
             self.report_process_identity_unavailable();
             return;
         };
