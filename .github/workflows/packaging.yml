@@ -136,7 +136,10 @@ jobs:
             -p taskmanager-setup-helper \
             -p taskmanager-privilege-helper \
             -p taskmanager-net-launcher \
-            -p taskmanager-process-control-helper
+            -p taskmanager-process-control-helper \
+            -p taskmanager-smbios-helper \
+            -p taskmanager-rapl-helper \
+            -p taskmanager-msr-helper
       - name: Resolve package version
         id: version
         run: |
