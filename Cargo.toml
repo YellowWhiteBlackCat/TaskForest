@@ -15,7 +15,7 @@ resolver = "2"
 # unification live here because the workspace root lives here.
 [package]
 name = "taskmanager-gates"
-version = "0.1.0-rc8"
+version = "0.1.0-rc9"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "Cross-crate conformance gate host for the TaskForest workspace (no binary)"
