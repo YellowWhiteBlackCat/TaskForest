@@ -362,6 +362,7 @@ impl Plugin for FrontendWindowPlugin {
                 taskmanager_shell::ShellApp::new()
             },
             initial_refresh_submitted: app.world().contains_resource::<DemoMode>(),
+            process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
         });
         app.insert_resource(WindowPalette {
             inner: self.palette.clone(),

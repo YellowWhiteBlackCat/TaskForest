@@ -507,7 +507,7 @@ pub(super) fn render_process_details_with_focus_from_canonical_indexed(
     theme: TuiTheme,
     area: Rect,
     focused: bool,
-    ids: &[crate::process_view::CanonicalRowId],
+    ids: &[taskmanager_shell::ProcessTreeRow],
     visible: &crate::process_view::VisibleProcesses<'_>,
 ) {
     let selected = visible.id_process(ids, app.selected);
@@ -524,7 +524,7 @@ fn render_details_for_selection(
     theme: TuiTheme,
     area: Rect,
     focused: bool,
-    ids: &[crate::process_view::CanonicalRowId],
+    ids: &[taskmanager_shell::ProcessTreeRow],
     selected: Option<&ProcessItem>,
 ) {
     let Some(process) = selected else {
@@ -532,8 +532,8 @@ fn render_details_for_selection(
             && matches!(
                 ids.get(app.selected),
                 Some(
-                    crate::process_view::CanonicalRowId::Category { .. }
-                        | crate::process_view::CanonicalRowId::AppRoot { .. }
+                    taskmanager_shell::ProcessTreeRow::Category { .. }
+                        | taskmanager_shell::ProcessTreeRow::Application { .. }
                 )
             );
         let hint = if on_group_header {

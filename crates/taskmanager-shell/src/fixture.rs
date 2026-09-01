@@ -140,6 +140,10 @@ pub fn seed_process_batch_loading(
 #[derive(Clone, Debug)]
 pub enum DirectTrackSeedFact {
     NpuInventory(NpuInventorySnapshot),
+    /// Install a deterministic process snapshot through the same projection
+    /// owner used by the live direct track. This exists only for headless
+    /// renderer tests and never exposes a mutable projection reference.
+    Processes(Vec<ProcessItem>),
 }
 
 pub fn seed_direct_track_fact(app: &mut crate::DirectTrackState, fact: DirectTrackSeedFact) {

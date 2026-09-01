@@ -12,22 +12,22 @@ use std::collections::{HashMap, HashSet};
 use taskmanager_application::i18n;
 use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_shell::ProcessRowId;
+use taskmanager_shell::app_tree_expansion_key_for_identity;
 use taskmanager_theme::Color;
 use taskmanager_ui_contract::{IconId, ProcessColumnSpec};
 
 mod cells;
 mod formatting;
-mod groups;
 use cells::append_body_cells;
 use projection::{StructuralArrow, structural_arrow_action};
 use taskmanager_shell::SortCol;
 use taskmanager_theme::tokens;
 pub(crate) mod projection;
 pub use projection::{
-    ProcRowProps, ProjectionCache, RowCellText, Toggle, VisibleRow, VisibleRowsProps,
-    application_root_count, category_tree_rows, default_category_expansions,
-    effective_process_hidden_cols, effective_process_sort_col, sort_col_step, sort_id,
-    visible_rows, visible_rows_with_local_time, visible_sort_cols,
+    ProcRowProps, ProjectionCache, RowCellText, ShellVisibleRowsProps, Toggle, VisibleRow,
+    VisibleRowsProps, application_root_count, category_tree_rows, default_category_expansions,
+    effective_process_hidden_cols, effective_process_sort_col, project_visible_rows_from_shell,
+    sort_col_step, sort_id, visible_rows, visible_rows_with_local_time, visible_sort_cols,
 };
 
 // ── GPUI column kit over the shell `SortCol` ─────────────────────────────────
@@ -328,11 +328,18 @@ fn set_expansion(view: &mut RootView, toggle: &Toggle, expanded: bool) {
             }
         }
         Toggle::GroupApp(identity) => {
-            let name = format!("app-tree:{}", identity.stable_key());
+            let name = app_tree_expansion_key_for_identity(*identity);
             if expanded {
                 view.processes_state.expanded_apps.insert(name);
             } else {
                 view.processes_state.expanded_apps.remove(&name);
+            }
+        }
+        Toggle::GroupAppUnknown(name) => {
+            if expanded {
+                view.processes_state.expanded_apps.insert(name.clone());
+            } else {
+                view.processes_state.expanded_apps.remove(name);
             }
         }
         // Category headers share the hierarchy expansion set with application
@@ -355,7 +362,8 @@ fn toggle_expansion(view: &mut RootView, toggle: &Toggle) {
         Toggle::GroupApp(identity) => view
             .processes_state
             .expanded_apps
-            .contains(&format!("app-tree:{}", identity.stable_key())),
+            .contains(&app_tree_expansion_key_for_identity(*identity)),
+        Toggle::GroupAppUnknown(name) => view.processes_state.expanded_apps.contains(name),
         Toggle::GroupCategory(category) => view
             .processes_state
             .expanded_apps

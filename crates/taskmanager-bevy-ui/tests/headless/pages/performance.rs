@@ -507,8 +507,10 @@ fn content_spawns_from_a_cold_context_with_strip_markers() {
     let shell = ShellApp::new();
     let palette = ui_palette(&Theme::dark());
     let history = crate::pages::history::HistoryProjectionResource::default();
+    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
         shell: &shell,
+        process_tree_expansion: &process_tree_expansion,
         palette: &palette,
         body: palette.body.clone(),
         heading: palette.heading.clone(),

@@ -109,8 +109,10 @@ fn headless_page_app(palette: UiPalette, shell: ShellApp) -> App {
     // The context borrows the shell while the scene captures what it needs;
     // only then does the shell move into the world's track.
     let history = crate::pages::history::HistoryProjectionResource::default();
+    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = PageContext {
         shell: &shell,
+        process_tree_expansion: &process_tree_expansion,
         palette: &palette,
         body: palette.body.clone(),
         heading: palette.heading.clone(),
@@ -124,6 +126,7 @@ fn headless_page_app(palette: UiPalette, shell: ShellApp) -> App {
     app.insert_non_send(FrontendTrack {
         shell,
         initial_refresh_submitted: true,
+        process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     app
 }

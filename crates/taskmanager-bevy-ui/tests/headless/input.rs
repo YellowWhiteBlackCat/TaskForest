@@ -81,6 +81,7 @@ fn input_app(shell: ShellApp) -> App {
     app.insert_non_send(FrontendTrack {
         shell,
         initial_refresh_submitted: true,
+        process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     app.add_systems(Startup, |mut commands: Commands| {
         commands.spawn(ContentSlot);

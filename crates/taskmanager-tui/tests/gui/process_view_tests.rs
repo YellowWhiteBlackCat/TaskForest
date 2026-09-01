@@ -1,7 +1,10 @@
 use super::*;
+use std::collections::HashSet;
+
 use taskmanager_core::core::FailureKind;
 use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::{SortCol, SortDir, project_process_tree_rows};
 
 fn key(pid: u32) -> ProcessLiveKey {
     ProcessLiveKey::from_parts(pid, taskmanager_test_support::fixture_start_token(pid))
@@ -305,7 +308,7 @@ fn owned_id_slice_materializes_exactly_like_the_reference_build() {
 
     for (expanded, collapsed) in shapes {
         let fresh = process_view_support::build_process_rows(&refs, expanded, collapsed, sort, 10);
-        let ids = build_canonical_row_ids(&refs, expanded, collapsed, sort, 10);
+        let ids = project_process_tree_rows(&refs, expanded, collapsed, sort, 10);
         let materialized = materialize_rows(&ids, &refs);
         assert_eq!(
             digests(&materialized),
@@ -316,7 +319,7 @@ fn owned_id_slice_materializes_exactly_like_the_reference_build() {
         // And the pure builder is deterministic per input, so a cache that
         // stores one emission can never diverge from a later rebuild under
         // the same key.
-        let rebuilt = build_canonical_row_ids(&refs, expanded, collapsed, sort, 10);
+        let rebuilt = project_process_tree_rows(&refs, expanded, collapsed, sort, 10);
         assert_eq!(ids, rebuilt, "the id build must be a pure function");
     }
 }

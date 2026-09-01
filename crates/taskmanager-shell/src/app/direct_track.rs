@@ -27,6 +27,7 @@
 
 use std::collections::HashSet;
 
+use taskmanager_application::process_sort::compare_processes;
 use taskmanager_application::{InteractionState, ServiceDependenciesLifecycle};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem};
@@ -36,6 +37,7 @@ use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_platform_contract::{CapabilitySnapshot, RequestId};
 
 use super::process_rows::ProcessRowId;
+use super::sort_axis::sort_axis;
 use super::sorting::{InfoSortCol, InfoTable, SortCol, SortDir};
 use crate::ProcessStatusFilter;
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -214,12 +216,39 @@ impl DirectTrackState {
                 self.projection.npu_inventory = Some(snapshot);
                 self.projection.system_revision = self.projection.system_revision.saturating_add(1);
             }
+            crate::fixture::DirectTrackSeedFact::Processes(processes) => {
+                self.projection.processes = Some(std::sync::Arc::new(processes));
+                self.projection.processes_observed_at_ms = 0;
+                self.projection.process_revision =
+                    self.projection.process_revision.saturating_add(1);
+            }
         }
     }
 
     #[must_use]
     pub const fn projection(&self) -> &super::SystemProjectionStore {
         &self.projection
+    }
+
+    /// Return the filtered and sorted Applications list for the direct-track
+    /// frontend. The shell owns the query, status bucket, and ordering; a
+    /// renderer receives this list and only adapts it into toolkit rows.
+    #[must_use]
+    pub fn visible_processes(&self) -> Vec<&ProcessItem> {
+        let query = self.processes.query();
+        let filter = self.processes.status_filter();
+        let (column, direction) = self.processes.sort();
+        let ascending = direction == SortDir::Asc;
+        let axis = sort_axis(column);
+        let mut visible: Vec<_> = self
+            .projection
+            .processes_slice()
+            .iter()
+            .filter(|process| filter.matches(&process.status))
+            .filter(|process| crate::matches_process_query(process, query))
+            .collect();
+        visible.sort_by(|left, right| compare_processes(left, right, axis, ascending));
+        visible
     }
 
     pub fn apply_capability_snapshot(&mut self, snapshot: CapabilitySnapshot) -> bool {

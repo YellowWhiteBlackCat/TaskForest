@@ -89,6 +89,10 @@ pub(crate) struct FrontendTrack {
     /// the only projection authority any page may read.
     pub(crate) shell: ShellApp,
     pub(crate) initial_refresh_submitted: bool,
+    /// Persistent expansion/collapse state for the Applications tree strip.
+    /// It is frontend interaction state, not process data; keeping it beside
+    /// the shell track prevents fold-driven scene rebuilds from resetting it.
+    pub(crate) process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion,
 }
 
 /// **The page-agent data entry.** Typed read-only view over the folded shell
@@ -127,6 +131,13 @@ impl ShellTrack<'_> {
     #[allow(dead_code)]
     pub(crate) fn projection(&self) -> &SystemProjectionStore {
         self.track.shell.projection()
+    }
+
+    /// The Bevy-local expansion state consumed by the process-tree adapter.
+    pub(crate) fn process_tree_expansion(
+        &self,
+    ) -> &crate::pages::process_tree::ProcessTreeExpansion {
+        &self.track.process_tree_expansion
     }
 }
 
@@ -450,6 +461,8 @@ pub(crate) struct PageMount {
 pub(crate) struct PageContext<'a> {
     /// The shell: projection store + memoized row projections. Read-only.
     pub(crate) shell: &'a ShellApp,
+    /// Persistent Bevy-local process-tree expansion state.
+    pub(crate) process_tree_expansion: &'a crate::pages::process_tree::ProcessTreeExpansion,
     /// Resolved theme tokens for this window (see [`crate::palette`]).
     pub(crate) palette: &'a UiPalette,
     /// Body type metrics (size/weight; the style observers stamp the font
@@ -498,6 +511,7 @@ fn mount_page_system(
     }
     let context = PageContext {
         shell: track.shell(),
+        process_tree_expansion: track.process_tree_expansion(),
         palette: &palette.inner,
         body: palette.inner.body.clone(),
         heading: palette.inner.heading.clone(),

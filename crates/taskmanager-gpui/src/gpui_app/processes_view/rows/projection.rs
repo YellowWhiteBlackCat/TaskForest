@@ -1,37 +1,34 @@
 //! Canonical category-tree row projection and cache shared by rendering and
 //! keyboard paging.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 
-use crate::gpui_app::processes_view::rows::groups::{
-    AggregateGroup, aggregate_group_from_members, aggregate_row,
-};
 use crate::gpui_app::root::RootView;
 use gpui::Entity;
 use taskmanager_application::i18n;
-use taskmanager_application::process_category_projection::{
-    category_buckets, process_memory_observation_for_display,
-};
-use taskmanager_application::process_sort::compare_processes;
 use taskmanager_core::core::process::aggregate::AggregateMetric;
 use taskmanager_core::core::process::{
-    ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey, ProcessNode,
-    application_group_name, build_process_tree, process_category,
+    ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
 };
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_core::core::units::UnitPreferences;
-use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::ProcessStatusFilter;
+use taskmanager_shell::SortCol;
 use taskmanager_shell::matches_process_query;
 use taskmanager_shell::presentation::missing_value;
-use taskmanager_shell::{SortCol, sort_axis};
+use taskmanager_shell::{
+    ProcessRowAggregate, ProcessRowId, ProcessTreeRow, SortDir, project_process_tree_rows,
+};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens::{RowDensity, UiSize};
 
 /// Stable expansion-set key for one category bucket (the shared neutral
 /// implementation): the `category:`-prefixed [`ProcessCategory::stable_key`],
 /// which can never collide with a normalized app-group name.
-use taskmanager_application::process_category_projection::category_expansion_key;
+use taskmanager_application::process_category_projection::{
+    category_expansion_key, process_memory_observation_for_display,
+};
 
 /// Seed the canonical category tree expanded on first use. The set is also
 /// used by capture/bootstrap paths, so every surface starts with the same
@@ -149,6 +146,10 @@ pub enum Toggle {
     None,
     Tree(ProcessLiveKey),
     GroupApp(ProcessLiveKey),
+    /// An application aggregate whose root currently lacks a live identity.
+    /// The row remains visible and expandable, but it cannot become an
+    /// actionable process target.
+    GroupAppUnknown(String),
     /// The typed core category whose member rows are toggled, derived into the prefixed
     /// [`category_expansion_key`] entries of `RootView::processes.expanded_apps`
     /// (the shared hierarchy expansion set).
@@ -332,99 +333,6 @@ impl VisibleRow {
     }
 }
 
-/// Recursive tree sort by a caller-supplied DIRECTED item comparator — the
-/// view-layer counterpart of `sort_nodes`. The comparator already carries the
-/// direction (the neutral `compare_processes` applies it plus the
-/// direction-independent pid tie-break); this helper only recurses the same
-/// ordering into every child level.
-fn sort_nodes_by<'a, F>(nodes: &mut [ProcessNode<'a>], cmp: &F)
-where
-    F: Fn(&ProcessItem, &ProcessItem) -> std::cmp::Ordering,
-{
-    nodes.sort_by(|a, b| cmp(a.item, b.item));
-    for n in nodes.iter_mut() {
-        sort_nodes_by(&mut n.children, cmp);
-    }
-}
-
-fn tree_row_from_node(
-    node: &ProcessNode<'_>,
-    depth_offset: usize,
-    collapsed: &HashSet<ProcessLiveKey>,
-    parent_key: Option<ProcessRowId>,
-) -> VisibleRow {
-    let has_children = !node.children.is_empty();
-    let row = VisibleRow {
-        name: node.item.name.clone(),
-        selection_key: ProcessRowId::from_process(node.item),
-        process_identity: ProcessLiveKey::from_process(node.item),
-        application_identity: node.item.current_application_identity().cloned(),
-        user: node.item.current_user().unwrap_or_else(missing_value),
-        status: node.item.status.clone(),
-        cpu: node.item.current_cpu_percentage(),
-        mem: memory_for_display(node.item),
-        cpu_aggregate: None,
-        memory_aggregate: None,
-        swap: node.item.current_swap_bytes(),
-        disk_read: node.item.current_disk_read_bytes_per_sec(),
-        disk_write: node.item.current_disk_write_bytes_per_sec(),
-        threads: node.item.current_threads(),
-        start_time_secs: node.item.current_start_time_secs(),
-        cpu_time_secs: node.item.current_cpu_time_secs(),
-        fds: node.item.current_fds(),
-        nice: node.item.current_nice(),
-        cpu_history: Rc::from(node.item.cpu_history.as_slice()),
-        name_highlights: Vec::new(),
-        cell_text: RowCellText::default(),
-        depth: node.depth.saturating_add(depth_offset),
-        has_children,
-        collapsed: ProcessLiveKey::from_process(node.item)
-            .is_some_and(|identity| collapsed.contains(&identity)),
-        parent_key,
-        badge: None,
-        toggle: if has_children {
-            ProcessLiveKey::from_process(node.item).map_or(Toggle::None, Toggle::Tree)
-        } else {
-            Toggle::None
-        },
-    };
-    // Cell text is precomputed once by the projection loop below, so every
-    // row — tree or category — takes the same single build path.
-    row
-}
-
-fn push_tree_rows<'a>(
-    node: &ProcessNode<'a>,
-    depth_offset: usize,
-    collapsed: &HashSet<ProcessLiveKey>,
-    rows: &mut Vec<VisibleRow>,
-    parent_key: Option<ProcessRowId>,
-) {
-    rows.push(tree_row_from_node(
-        node,
-        depth_offset,
-        collapsed,
-        parent_key,
-    ));
-    if !node.children.is_empty()
-        && !ProcessLiveKey::from_process(node.item)
-            .is_some_and(|identity| collapsed.contains(&identity))
-    {
-        for child in &node.children {
-            // The in-tree parent is always rendered directly above (the row
-            // is only skipped when the subtree is hidden entirely), so its
-            // real pid is the child's nearest visible selectable ancestor.
-            push_tree_rows(
-                child,
-                depth_offset,
-                collapsed,
-                rows,
-                ProcessRowId::from_process(node.item),
-            );
-        }
-    }
-}
-
 /// One bare structural arrow's meaning on a row that owns a subtree — the
 /// tree-keyboard-navigation matrix shared verbatim with the iced frontend's
 /// `toggle_at_visual_cursor` (same semantics, per-frontend execution). Pure
@@ -460,35 +368,6 @@ pub(crate) fn structural_arrow_action(
     }
 }
 
-/// Flatten one process-tree root into the members owned by its application
-/// aggregate. The root itself is included: unlike the old tree-parent
-/// projection, the aggregate row owns the sum while every process row below it
-/// keeps its own sample and PID.
-fn collect_tree_members<'a>(node: &ProcessNode<'a>, members: &mut Vec<&'a ProcessItem>) {
-    members.push(node.item);
-    for child in &node.children {
-        collect_tree_members(child, members);
-    }
-}
-
-fn app_group_from_tree_root<'a>(
-    root: &ProcessNode<'a>,
-    observed_at_ms: u64,
-) -> Option<AggregateGroup> {
-    let mut members = Vec::new();
-    collect_tree_members(root, &mut members);
-    aggregate_group_from_members(
-        root.item
-            .current_application_name()
-            .map(str::to_owned)
-            .unwrap_or_else(|| application_group_name(root.item)),
-        root.item.pid,
-        root.item.current_application_identity().cloned(),
-        &members,
-        observed_at_ms,
-    )
-}
-
 /// Localized aggregate-row label for one category bucket.
 fn category_label(category: ProcessCategory) -> &'static str {
     match category {
@@ -498,17 +377,9 @@ fn category_label(category: ProcessCategory) -> &'static str {
     }
 }
 
-/// Canonical process projection: split the filtered processes into the honest core
-/// [`ProcessCategory`] buckets — via the neutral
-/// [`category_buckets`](taskmanager_application::process_category_projection)
-/// projection, the shared skeleton of every frontend's category mode (fixed
-/// `ALL` order, empty buckets omitted, members in input order) — and emit one
-/// aggregate header row per NON-EMPTY bucket; an empty bucket never renders a
-/// fabricated header. Each header has no PID and totals its members. The
-/// Applications bucket expands to application-root aggregate rows (also with
-/// no PID), followed by the real process tree whose every row keeps its own
-/// PID and own observations. Background and Uncategorized retain their direct
-/// process tree because they do not have an application-root projection.
+/// Adapt the shell-owned structural projection into GPUI's renderer row.
+/// Filtering and formatting remain GPUI concerns; category order, hierarchy,
+/// expansion, identity and typed aggregate facts do not.
 pub fn category_tree_rows(
     processes: &[&ProcessItem],
     observed_at_ms: u64,
@@ -518,89 +389,193 @@ pub fn category_tree_rows(
     collapsed: &HashSet<ProcessLiveKey>,
     units: UnitPreferences,
 ) -> Vec<VisibleRow> {
-    let by_pid: HashMap<u32, &ProcessItem> = processes
-        .iter()
-        .map(|process| (process.pid, *process))
-        .collect();
-    let mut rows = Vec::new();
-    for bucket in category_buckets(processes, |process| process_category(process)) {
-        let category = bucket.category();
-        let bucket_members: Vec<&ProcessItem> =
-            bucket.members().iter().map(|member| **member).collect();
-        let key = category_expansion_key(category);
-        let is_expanded = expanded.contains(&key);
-        let mut pids: Vec<u32> = bucket_members.iter().map(|process| process.pid).collect();
-        pids.sort_unstable();
-        let Some(main_pid) = pids.first().copied() else {
-            continue;
-        };
-        let Some(group) =
-            aggregate_group_from_members(key, main_pid, None, &bucket_members, observed_at_ms)
-        else {
-            continue;
-        };
-        let mut aggregate = aggregate_row(&group, &by_pid, Toggle::GroupCategory(category), units);
-        aggregate.name = category_label(category).to_owned();
-        aggregate.badge = None;
-        aggregate.collapsed = !is_expanded;
-        rows.push(aggregate);
-        if is_expanded {
-            // Each category owns the same core parent/child tree as the
-            // standalone Tree view. Sorting is recursive and uses the neutral
-            // comparator, so the visible hierarchy cannot diverge by frontend.
-            let mut tree = build_process_tree(&bucket_members);
-            let axis = sort_axis(column);
-            sort_nodes_by(&mut tree, &|a, b| compare_processes(a, b, axis, ascending));
-            if category == ProcessCategory::Application {
-                // A process-tree root is the application aggregate boundary.
-                // Grouping by each process' desktop identity would split
-                // launchers/sandboxes/helpers such as bwrap and glycin-svg;
-                // grouping by the root keeps the complete app tree together,
-                // exactly like the reference process monitors.
-                let mut app_groups: Vec<AggregateGroup> = tree
-                    .iter()
-                    .filter_map(|root| app_group_from_tree_root(root, observed_at_ms))
-                    .collect();
-                super::groups::sort_groups(&mut app_groups, column, ascending);
-                for group in app_groups {
-                    let Some(root) = tree.iter().find(|node| node.item.pid == group.main_pid)
-                    else {
-                        continue;
-                    };
-                    let Some(root_identity) = ProcessLiveKey::from_process(root.item) else {
-                        continue;
-                    };
-                    let expansion_key = format!("app-tree:{}", root_identity.stable_key());
-                    let mut app_row =
-                        aggregate_row(&group, &by_pid, Toggle::GroupApp(root_identity), units);
-                    app_row.selection_key = ProcessRowId::application_of(root.item);
-                    app_row.depth = 1;
-                    app_row.badge = None;
-                    app_row.collapsed = !expanded.contains(&expansion_key);
-                    rows.push(app_row);
-                    if expanded.contains(&expansion_key) {
-                        // The app aggregate row is the visible parent of the
-                        // root process row: Left on that root climbs to it.
-                        push_tree_rows(
-                            root,
-                            2,
-                            collapsed,
-                            &mut rows,
-                            ProcessRowId::application_of(root.item),
-                        );
-                    }
-                }
-            } else {
-                for node in &tree {
-                    // The parent of a category-tree root is the structural
-                    // category header — not selectable, so `None` (Left on a
-                    // collapsed root is an honest no-op, matching iced).
-                    push_tree_rows(node, 1, collapsed, &mut rows, None);
-                }
-            }
+    let direction = if ascending {
+        taskmanager_shell::SortDir::Asc
+    } else {
+        taskmanager_shell::SortDir::Desc
+    };
+    project_process_tree_rows(
+        processes,
+        expanded,
+        collapsed,
+        (column, direction),
+        observed_at_ms,
+    )
+    .into_iter()
+    .filter_map(|row| visible_row_from_shared(row, processes, units))
+    .collect()
+}
+
+fn visible_row_from_shared(
+    row: ProcessTreeRow,
+    processes: &[&ProcessItem],
+    units: UnitPreferences,
+) -> Option<VisibleRow> {
+    match row {
+        ProcessTreeRow::Category {
+            category,
+            representative_index,
+            expanded,
+            aggregate,
+            ..
+        } => {
+            let representative = processes.get(representative_index)?;
+            Some(group_row_from_shared(
+                representative,
+                GroupRowInput {
+                    selection_key: None,
+                    name: category_label(category).to_owned(),
+                    expanded,
+                    aggregate,
+                    toggle: Toggle::GroupCategory(category),
+                    depth: 0,
+                },
+                units,
+            ))
+        }
+        ProcessTreeRow::Application {
+            visible_index,
+            row_key,
+            expansion_key,
+            expanded,
+            aggregate,
+            ..
+        } => {
+            let representative = processes.get(visible_index)?;
+            let toggle = row_key.and_then(ProcessRowId::live_key).map_or_else(
+                || Toggle::GroupAppUnknown(expansion_key.clone()),
+                Toggle::GroupApp,
+            );
+            Some(group_row_from_shared(
+                representative,
+                GroupRowInput {
+                    selection_key: row_key,
+                    name: representative
+                        .current_application_name()
+                        .unwrap_or(representative.name.as_str())
+                        .to_owned(),
+                    expanded,
+                    aggregate,
+                    toggle,
+                    depth: 1,
+                },
+                units,
+            ))
+        }
+        ProcessTreeRow::Process {
+            visible_index,
+            row_key,
+            parent_key,
+            depth,
+            has_children,
+            collapsed,
+        } => {
+            let process = processes.get(visible_index)?;
+            let parent_key = match parent_key {
+                Some(ProcessRowId::Category(_)) => None,
+                other => other,
+            };
+            let row = VisibleRow {
+                name: process.name.clone(),
+                selection_key: row_key,
+                process_identity: row_key.and_then(ProcessRowId::live_key),
+                application_identity: process.current_application_identity().cloned(),
+                user: process.current_user().unwrap_or_else(missing_value),
+                status: process.status.clone(),
+                cpu: process.current_cpu_percentage(),
+                mem: memory_for_display(process),
+                cpu_aggregate: None,
+                memory_aggregate: None,
+                swap: process.current_swap_bytes(),
+                disk_read: process.current_disk_read_bytes_per_sec(),
+                disk_write: process.current_disk_write_bytes_per_sec(),
+                threads: process.current_threads(),
+                start_time_secs: process.current_start_time_secs(),
+                cpu_time_secs: process.current_cpu_time_secs(),
+                fds: process.current_fds(),
+                nice: process.current_nice(),
+                cpu_history: Rc::from(process.cpu_history.as_slice()),
+                name_highlights: Vec::new(),
+                cell_text: RowCellText::default(),
+                depth,
+                has_children,
+                collapsed,
+                parent_key,
+                badge: None,
+                toggle: if has_children {
+                    row_key
+                        .and_then(ProcessRowId::live_key)
+                        .map_or(Toggle::None, Toggle::Tree)
+                } else {
+                    Toggle::None
+                },
+            };
+            let mut row = row;
+            row.cell_text = RowCellText::build(&row, units);
+            Some(row)
         }
     }
-    rows
+}
+
+struct GroupRowInput {
+    selection_key: Option<ProcessRowId>,
+    name: String,
+    expanded: bool,
+    aggregate: ProcessRowAggregate,
+    toggle: Toggle,
+    depth: usize,
+}
+
+fn group_row_from_shared(
+    representative: &ProcessItem,
+    input: GroupRowInput,
+    units: UnitPreferences,
+) -> VisibleRow {
+    let GroupRowInput {
+        selection_key,
+        name,
+        expanded,
+        aggregate,
+        toggle,
+        depth,
+    } = input;
+    let mut row = VisibleRow {
+        name,
+        selection_key,
+        process_identity: None,
+        application_identity: representative.current_application_identity().cloned(),
+        user: representative.current_user().unwrap_or_else(missing_value),
+        status: representative.status.clone(),
+        cpu: aggregate.cpu().current_value().copied(),
+        mem: aggregate.memory().current_value().copied(),
+        cpu_aggregate: Some(aggregate.cpu().clone()),
+        memory_aggregate: Some(aggregate.memory().clone()),
+        swap: aggregate.swap().current_value().copied(),
+        disk_read: aggregate.disk_read().current_value().copied(),
+        disk_write: aggregate.disk_write().current_value().copied(),
+        threads: aggregate
+            .threads()
+            .current_value()
+            .and_then(|value| u32::try_from(*value).ok()),
+        start_time_secs: representative.current_start_time_secs(),
+        cpu_time_secs: aggregate.cpu_time().current_value().copied(),
+        fds: aggregate
+            .fds()
+            .current_value()
+            .and_then(|value| u32::try_from(*value).ok()),
+        nice: representative.current_nice(),
+        cpu_history: Rc::from([]),
+        name_highlights: Vec::new(),
+        cell_text: RowCellText::default(),
+        depth,
+        has_children: true,
+        collapsed: !expanded,
+        parent_key: None,
+        badge: None,
+        toggle,
+    };
+    row.cell_text = RowCellText::build(&row, units);
+    row
 }
 
 /// A body cell for a numeric column: RIGHT-aligned and rendered in the theme's
@@ -658,10 +633,7 @@ pub struct VisibleRowsProps<'a> {
 }
 
 pub fn visible_rows(props: VisibleRowsProps<'_>) -> Vec<VisibleRow> {
-    visible_rows_with_local_time(
-        props,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
-    )
+    visible_rows_with_local_time(props, &LocalTimeRulesObservation::unsupported(0))
 }
 
 /// Build visible rows against composition-injected local-time rules. The
@@ -669,7 +641,7 @@ pub fn visible_rows(props: VisibleRowsProps<'_>) -> Vec<VisibleRow> {
 /// independent by supplying an explicit unsupported observation.
 pub fn visible_rows_with_local_time(
     props: VisibleRowsProps<'_>,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> Vec<VisibleRow> {
     let VisibleRowsProps {
         processes,
@@ -693,8 +665,49 @@ pub fn visible_rows_with_local_time(
         .copied()
         .filter(|process| filter.matches(&process.status) && matches_process_query(process, query))
         .collect();
+    project_visible_rows_from_shell(ShellVisibleRowsProps {
+        processes: &filtered,
+        observed_at_ms,
+        query,
+        sort_col,
+        sort_asc,
+        collapsed,
+        expanded_apps,
+        units,
+        local_time_rules,
+    })
+}
+
+/// Adapt the already filtered/sorted shell process list into GPUI rows.
+/// Production GPUI calls this after [`RootView`]'s direct-track shell has
+/// applied the query and status filter. The compatibility-shaped
+/// [`visible_rows_with_local_time`] remains only for isolated projection tests.
+pub struct ShellVisibleRowsProps<'a> {
+    pub processes: &'a [&'a ProcessItem],
+    pub observed_at_ms: u64,
+    pub query: &'a str,
+    pub sort_col: SortCol,
+    pub sort_asc: bool,
+    pub collapsed: &'a HashSet<ProcessLiveKey>,
+    pub expanded_apps: &'a HashSet<String>,
+    pub units: UnitPreferences,
+    pub local_time_rules: &'a LocalTimeRulesObservation,
+}
+
+pub fn project_visible_rows_from_shell(props: ShellVisibleRowsProps<'_>) -> Vec<VisibleRow> {
+    let ShellVisibleRowsProps {
+        processes,
+        observed_at_ms,
+        query,
+        sort_col,
+        sort_asc,
+        collapsed,
+        expanded_apps,
+        units,
+        local_time_rules,
+    } = props;
     let mut rows = category_tree_rows(
-        &filtered,
+        processes,
         observed_at_ms,
         sort_col,
         sort_asc,
@@ -727,12 +740,17 @@ pub fn visible_rows_with_local_time(
 /// the page title claim that zero apps are running.
 #[must_use]
 pub fn application_root_count(processes: &[&ProcessItem]) -> usize {
-    let applications: Vec<&ProcessItem> = processes
-        .iter()
-        .copied()
-        .filter(|process| process_category(process) == ProcessCategory::Application)
-        .collect();
-    build_process_tree(&applications).len()
+    let expanded = HashSet::from([category_expansion_key(ProcessCategory::Application)]);
+    project_process_tree_rows(
+        processes,
+        &expanded,
+        &HashSet::new(),
+        (SortCol::Pid, SortDir::Asc),
+        0,
+    )
+    .iter()
+    .filter(|row| matches!(row, ProcessTreeRow::Application { .. }))
+    .count()
 }
 
 /// Cached visible-row projection for the processes table. Rebuilt only when
@@ -756,12 +774,10 @@ pub struct ProjectionCache {
     pub units: UnitPreferences,
 }
 
-/// Pairwise parity: the gpui `category_rows` projection vs the neutral
-/// `category_buckets` skeleton from `taskmanager-application`, on the shared
-/// fixture. Bucket order, expansion keys (recovered from the typed toggle),
-/// per-bucket aggregates, member counts, and expanded member order must agree
-/// — the frontend owns only labels, row shape, and the PSS-preferred memory
-/// metric it folds itself.
+/// Adapter parity: GPUI's renderer row is derived from the shell-owned
+/// `ProcessTreeRow` structure. The shared fixture pins bucket order, expansion
+/// keys, typed aggregates, member counts, and expanded member order; GPUI owns
+/// only labels, cells, and toolkit row shape.
 #[cfg(test)]
 #[path = "../../../../tests/gui/gpui_gpui_app_processes_view_rows_projection_category_projection_parity.rs"]
 mod category_projection_parity;

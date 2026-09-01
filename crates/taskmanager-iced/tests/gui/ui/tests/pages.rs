@@ -351,7 +351,10 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
     observations.swap_bytes = taskmanager_core::core::metrics::ScalarObservation::available(0, 1);
     process.apply_scalar_observations(observations);
 
-    let cells = crate::ui::process_projection::build_row_cells(&process);
+    let cells = crate::ui::process_projection::build_row_cells_with_rules(
+        &process,
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+    );
     assert_eq!(cells.pss, "512.0 MiB");
     assert_eq!(cells.swap, "0 B");
 
@@ -359,7 +362,10 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
     observations.memory_pss_bytes = taskmanager_core::core::metrics::ScalarObservation::default();
     observations.swap_bytes = taskmanager_core::core::metrics::ScalarObservation::default();
     process.apply_scalar_observations(observations);
-    let cells = crate::ui::process_projection::build_row_cells(&process);
+    let cells = crate::ui::process_projection::build_row_cells_with_rules(
+        &process,
+        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
+    );
     assert_eq!(
         (cells.pss.as_str(), cells.swap.as_str()),
         ("—", "—"),

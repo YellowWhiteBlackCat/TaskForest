@@ -10,6 +10,7 @@ use std::collections::HashSet;
 use crate::widgets::controls::{ControlTone, ControlVisual};
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
+use bevy::ecs::event::Event;
 use bevy::ecs::hierarchy::{ChildOf, Children};
 use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::observer::On;
@@ -22,18 +23,15 @@ use bevy::ui::prelude::{AlignItems, BorderRadius, Node, UiRect, Val, percent, px
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 use taskmanager_application::i18n::t;
-use taskmanager_application::process_category_projection::{
-    category_buckets, category_expansion_key,
-};
+use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_core::core::process::aggregate::AggregateMetric;
-use taskmanager_core::core::process::group_aggregate::aggregate_process_group_typed;
-use taskmanager_core::core::process::{
-    ProcessCategory, ProcessItem, ProcessLiveKey, application_group_name, build_process_tree,
-    flatten_tree_visible, process_category,
-};
+use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
 
-use taskmanager_shell::ProcessRowId;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
+use taskmanager_shell::{
+    ProcessRowId, ProcessTreeRow, SortCol, SortDir, app_tree_expansion_key_for_identity,
+    process_semantic_key, project_process_tree_rows,
+};
 
 use crate::app::{FrontendTrack, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
@@ -45,35 +43,42 @@ use crate::window::{Role, TextRole, WindowPalette};
 /// Stable expansion state for the Applications tree.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ProcessTreeExpansion {
-    expanded_categories: HashSet<String>,
-    expanded_applications: HashSet<ProcessLiveKey>,
+    expanded_groups: HashSet<String>,
     collapsed_processes: HashSet<ProcessLiveKey>,
 }
 
 impl ProcessTreeExpansion {
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) fn category_expanded(&self, category: ProcessCategory) -> bool {
-        self.expanded_categories
+        self.expanded_groups
             .contains(&category_expansion_key(category))
     }
 
-    #[allow(dead_code)]
     pub(crate) fn toggle_category(&mut self, category: ProcessCategory) {
         let key = category_expansion_key(category);
-        if !self.expanded_categories.insert(key.clone()) {
-            self.expanded_categories.remove(&key);
+        if !self.expanded_groups.insert(key.clone()) {
+            self.expanded_groups.remove(&key);
         }
     }
 
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) fn application_expanded(&self, root: ProcessLiveKey) -> bool {
-        self.expanded_applications.contains(&root)
+        self.expanded_groups
+            .contains(&app_tree_expansion_key_for_identity(root))
     }
 
-    #[allow(dead_code)]
     pub(crate) fn toggle_application(&mut self, root: ProcessLiveKey) {
-        if !self.expanded_applications.insert(root) {
-            self.expanded_applications.remove(&root);
+        let key = app_tree_expansion_key_for_identity(root);
+        if !self.expanded_groups.insert(key.clone()) {
+            self.expanded_groups.remove(&key);
+        }
+    }
+
+    pub(crate) fn toggle_group_key(&mut self, key: String) {
+        if !self.expanded_groups.insert(key.clone()) {
+            self.expanded_groups.remove(&key);
         }
     }
 
@@ -83,7 +88,6 @@ impl ProcessTreeExpansion {
         self.collapsed_processes.contains(&identity)
     }
 
-    #[allow(dead_code)]
     pub(crate) fn toggle_process(&mut self, identity: ProcessLiveKey) {
         if !self.collapsed_processes.insert(identity) {
             self.collapsed_processes.remove(&identity);
@@ -93,16 +97,20 @@ impl ProcessTreeExpansion {
     fn collapsed_set(&self) -> &HashSet<ProcessLiveKey> {
         &self.collapsed_processes
     }
+
+    fn shared_expanded_groups(&self) -> HashSet<String> {
+        self.expanded_groups.clone()
+    }
 }
 
-/// One row in the tree projection. Category and application rows have no
-/// process reference; only a real process row carries an item, so a visual
-/// aggregate can never be mistaken for an executable target. Aggregate
-/// headers carry typed cpu/memory metrics whose availability survives to the
-/// renderer — a missing value stays missing instead of reading as zero.
+/// Bevy's scene-facing adaptation of one shell-owned structural row. The
+/// shared row remains the source of identity, hierarchy, and typed metrics;
+/// this view adds only borrowed labels and Bevy-independent scene data.
 #[derive(Clone, Debug, PartialEq)]
-pub(crate) struct ProcessTreeRow<'a> {
-    pub(crate) key: ProcessRowId,
+pub(crate) struct ProcessTreeRowView<'a> {
+    pub(crate) key: Option<ProcessRowId>,
+    pub(crate) semantic_key: String,
+    pub(crate) expansion_key: Option<String>,
     pub(crate) depth: usize,
     pub(crate) label: String,
     pub(crate) member_count: usize,
@@ -113,135 +121,116 @@ pub(crate) struct ProcessTreeRow<'a> {
     pub(crate) item: Option<&'a ProcessItem>,
 }
 
-/// Project the complete visible process inventory into category/tree rows.
-///
-/// Category order and classification come from the application layer. Empty
-/// buckets are omitted; unavailable application identity remains in the
-/// explicit Uncategorized bucket. The caller owns the input snapshot, while
-/// rows borrow it without cloning every process. `observed_at_ms` is the
-/// accepted process snapshot timestamp behind `items`.
+/// Typed local action emitted by a tree row. It changes only Bevy's
+/// expansion state; process controls continue to use the shell's atomic
+/// frozen-identity requests.
+#[derive(Clone, Debug, PartialEq, Eq)]
+enum ProcessTreeToggle {
+    Category(ProcessCategory),
+    Application(ProcessLiveKey),
+    Process(ProcessLiveKey),
+    UnknownGroup(String),
+}
+
+/// Adapt the shell-owned structural projection into Bevy's local row payload.
+/// Bevy owns only its scene-facing label and borrowed process reference; it no
+/// longer decides category order, tree depth, expansion, or aggregate rules.
 #[must_use]
 pub(crate) fn project_items<'a>(
     items: &'a [ProcessItem],
     expansion: &ProcessTreeExpansion,
     observed_at_ms: u64,
-) -> Vec<ProcessTreeRow<'a>> {
-    let buckets = category_buckets(items, process_category);
-    let mut rows = Vec::new();
-
-    let bucket_specs: Vec<(ProcessCategory, usize)> = buckets
-        .iter()
-        .map(|bucket| (bucket.category(), bucket.member_count()))
-        .collect();
-    for (category, member_count) in bucket_specs {
-        // Reborrow from the caller's slice rather than from the temporary
-        // bucket projection. This keeps the returned rows tied to `items`,
-        // never to the local category-bucket container.
-        let members: Vec<&ProcessItem> = items
-            .iter()
-            .filter(|item| process_category(item) == category)
-            .collect();
-        let bucket = buckets
-            .iter()
-            .find(|bucket| bucket.category() == category)
-            .expect("bucket exists for its own category");
-        let category_expanded = expansion.category_expanded(category);
-        rows.push(ProcessTreeRow {
-            key: ProcessRowId::Category(category),
+) -> Vec<ProcessTreeRowView<'a>> {
+    let refs: Vec<&ProcessItem> = items.iter().collect();
+    let expanded_groups = expansion.shared_expanded_groups();
+    project_process_tree_rows(
+        &refs,
+        &expanded_groups,
+        expansion.collapsed_set(),
+        (SortCol::Pid, SortDir::Asc),
+        observed_at_ms,
+    )
+    .into_iter()
+    .filter_map(|row| match row {
+        ProcessTreeRow::Category {
+            category,
+            expansion_key,
+            expanded,
+            member_count,
+            aggregate,
+            ..
+        } => Some(ProcessTreeRowView {
+            key: Some(ProcessRowId::Category(category)),
+            semantic_key: ProcessRowId::Category(category).stable_key(),
+            expansion_key: Some(expansion_key),
             depth: 0,
             label: category_label(category),
             member_count,
-            cpu: bucket.aggregate_process_cpu(observed_at_ms),
-            memory: bucket.aggregate_process_memory_for_display(observed_at_ms),
+            cpu: Some(aggregate.cpu().clone()),
+            memory: Some(aggregate.memory().clone()),
             has_children: true,
-            expanded: category_expanded,
+            expanded,
             item: None,
-        });
-        if !category_expanded {
-            continue;
+        }),
+        ProcessTreeRow::Application {
+            visible_index,
+            row_key,
+            expansion_key,
+            expanded,
+            member_count,
+            aggregate,
+            has_children,
+            ..
+        } => {
+            let root = items.get(visible_index)?;
+            let semantic_key = row_key.map_or_else(
+                || format!("application:{expansion_key}"),
+                |key| key.stable_key(),
+            );
+            Some(ProcessTreeRowView {
+                key: row_key,
+                semantic_key,
+                expansion_key: Some(expansion_key),
+                depth: 1,
+                label: root
+                    .current_application_name()
+                    .unwrap_or(root.name.as_str())
+                    .to_owned(),
+                member_count,
+                cpu: Some(aggregate.cpu().clone()),
+                memory: Some(aggregate.memory().clone()),
+                has_children,
+                expanded,
+                item: None,
+            })
         }
-
-        let roots = build_process_tree(&members);
-        if category == ProcessCategory::Application {
-            for root in roots {
-                let Some(root_identity) = ProcessLiveKey::from_process(root.item) else {
-                    continue;
-                };
-                let application_expanded = expansion.application_expanded(root_identity);
-                let mut tree_members = Vec::new();
-                collect_tree_members(&root, &mut tree_members);
-                let group = aggregate_process_group_typed(
-                    application_group_name(root.item),
-                    Some(root_identity),
-                    root.item.current_application_identity().cloned(),
-                    &tree_members,
-                    observed_at_ms,
-                );
-                rows.push(ProcessTreeRow {
-                    key: ProcessRowId::Application(root_identity),
-                    depth: 1,
-                    label: root
-                        .item
-                        .current_application_name()
-                        .unwrap_or(root.item.name.as_str())
-                        .to_owned(),
-                    member_count: tree_size(&root),
-                    cpu: group.as_ref().map(|group| group.cpu().clone()),
-                    memory: group.as_ref().map(|group| group.memory().clone()),
-                    has_children: !root.children.is_empty(),
-                    expanded: application_expanded,
-                    item: None,
-                });
-                if application_expanded {
-                    push_process_rows(&root, 2, expansion.collapsed_set(), &mut rows);
-                }
-            }
-        } else {
-            for root in roots {
-                push_process_rows(&root, 1, expansion.collapsed_set(), &mut rows);
-            }
+        ProcessTreeRow::Process {
+            visible_index,
+            row_key,
+            depth,
+            has_children,
+            collapsed,
+            ..
+        } => {
+            let process = items.get(visible_index)?;
+            let semantic_key =
+                row_key.map_or_else(|| process_semantic_key(process), |key| key.stable_key());
+            Some(ProcessTreeRowView {
+                key: row_key,
+                semantic_key,
+                expansion_key: None,
+                depth,
+                label: process.name.clone(),
+                member_count: 1,
+                cpu: None,
+                memory: None,
+                has_children,
+                expanded: !collapsed,
+                item: Some(process),
+            })
         }
-    }
-
-    rows
-}
-
-fn push_process_rows<'a>(
-    root: &taskmanager_core::core::process::ProcessNode<'a>,
-    depth_offset: usize,
-    collapsed: &HashSet<ProcessLiveKey>,
-    rows: &mut Vec<ProcessTreeRow<'a>>,
-) {
-    for flat in flatten_tree_visible(std::slice::from_ref(root), collapsed) {
-        let Some(identity) = ProcessLiveKey::from_process(flat.item) else {
-            continue;
-        };
-        rows.push(ProcessTreeRow {
-            key: ProcessRowId::Process(identity),
-            depth: depth_offset + flat.depth,
-            label: flat.item.name.clone(),
-            member_count: 1,
-            cpu: None,
-            memory: None,
-            has_children: flat.has_children,
-            expanded: !collapsed.contains(&identity),
-            item: Some(flat.item),
-        });
-    }
-}
-
-fn collect_tree_members<'a>(
-    node: &taskmanager_core::core::process::ProcessNode<'a>,
-    members: &mut Vec<&'a ProcessItem>,
-) {
-    members.push(node.item);
-    for child in &node.children {
-        collect_tree_members(child, members);
-    }
-}
-
-fn tree_size(node: &taskmanager_core::core::process::ProcessNode<'_>) -> usize {
-    1 + node.children.iter().map(tree_size).sum::<usize>()
+    })
+    .collect()
 }
 
 fn category_label(category: ProcessCategory) -> String {
@@ -254,7 +243,7 @@ fn category_label(category: ProcessCategory) -> String {
 
 /// Minimal themed row scene. The full page will add selection and observer
 /// components when this projection is mounted into the route.
-pub(crate) fn row_scene(row: &ProcessTreeRow<'_>, palette: &UiPalette) -> impl Scene + use<> {
+pub(crate) fn row_scene(row: &ProcessTreeRowView<'_>, palette: &UiPalette) -> impl Scene + use<> {
     let mut label = if row.member_count > 1 || row.item.is_none() {
         format!("{} · {}", row.label, row.member_count)
     } else {
@@ -268,10 +257,22 @@ pub(crate) fn row_scene(row: &ProcessTreeRow<'_>, palette: &UiPalette) -> impl S
         ));
     }
     let left_padding = space_8() * (row.depth as f32 + 1.0);
-    let semantic = SemanticAddress(stable_semantic_address(
-        "process-tree",
-        &semantic_key(row.key),
-    ));
+    let semantic = SemanticAddress(stable_semantic_address("process-tree", &row.semantic_key));
+    let toggle = row.key.map_or_else(
+        || {
+            row.expansion_key
+                .clone()
+                .map(ProcessTreeToggle::UnknownGroup)
+        },
+        |key| match key {
+            ProcessRowId::Category(category) => Some(ProcessTreeToggle::Category(category)),
+            ProcessRowId::Application(identity) => Some(ProcessTreeToggle::Application(identity)),
+            ProcessRowId::Process(identity) if row.has_children => {
+                Some(ProcessTreeToggle::Process(identity))
+            }
+            ProcessRowId::Process(_) => None,
+        },
+    );
     bsn! {
         Node {
             width: percent(100),
@@ -279,7 +280,9 @@ pub(crate) fn row_scene(row: &ProcessTreeRow<'_>, palette: &UiPalette) -> impl S
             align_items: AlignItems::Center,
             padding: UiRect::left(Val::Px(left_padding)),
         }
-        ProcessTreeRowMarker({ row.key })
+        ProcessTreeRowMarker({ toggle })
+        Button
+        on(on_tree_row_activated)
         SemanticAddress({ semantic.0.clone() })
         Children [
             ( Text(label) TextRole(Role::Body) ),
@@ -293,10 +296,6 @@ fn metric_text(value: Option<String>) -> String {
     value.unwrap_or_else(|| MISSING_VALUE.to_owned())
 }
 
-fn semantic_key(key: ProcessRowId) -> String {
-    key.stable_key()
-}
-
 /// Compact tree strip mounted above the existing Applications table. The
 /// flat table remains the interaction/detail surface (search, sort, and row
 /// reducers), while this strip makes category/application/process identity
@@ -304,8 +303,7 @@ fn semantic_key(key: ProcessRowId) -> String {
 pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
     let items = context.shell.projection().processes_slice();
     let observed_at_ms = context.shell.projection().processes_observed_at_ms;
-    let expansion = ProcessTreeExpansion::default();
-    let rows = project_items(items, &expansion, observed_at_ms);
+    let rows = project_items(items, context.process_tree_expansion, observed_at_ms);
     let row_scenes: Vec<Box<dyn Scene>> = rows
         .iter()
         .map(|row| Box::new(row_scene(row, context.palette)) as Box<dyn Scene>)
@@ -380,6 +378,39 @@ fn bind_tree_observer(mut world: DeferredWorld<'_>, _context: HookContext) {
     }
     world.commands().insert_resource(TreeObserverBound);
     world.commands().add_observer(refresh_tree_on_fold);
+    world.commands().add_observer(refresh_tree_on_expansion);
+}
+
+#[derive(Event)]
+struct ProcessTreeExpansionChanged;
+
+fn on_tree_row_activated(
+    activate: On<bevy::ui_widgets::Activate>,
+    markers: Query<&ProcessTreeRowMarker>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut commands: Commands,
+) {
+    let Ok(marker) = markers.get(activate.event().entity) else {
+        return;
+    };
+    let Some(toggle) = marker.0.clone() else {
+        return;
+    };
+    match toggle {
+        ProcessTreeToggle::Category(category) => {
+            track.process_tree_expansion.toggle_category(category);
+        }
+        ProcessTreeToggle::Application(identity) => {
+            track.process_tree_expansion.toggle_application(identity);
+        }
+        ProcessTreeToggle::Process(identity) => {
+            track.process_tree_expansion.toggle_process(identity);
+        }
+        ProcessTreeToggle::UnknownGroup(key) => {
+            track.process_tree_expansion.toggle_group_key(key);
+        }
+    }
+    commands.trigger(ProcessTreeExpansionChanged);
 }
 
 fn refresh_tree_on_fold(
@@ -387,13 +418,37 @@ fn refresh_tree_on_fold(
     track: ShellTrack,
     palette: Res<WindowPalette>,
     roots: Query<(Entity, &Children), With<ProcessTreeRows>>,
-    mut counts: Query<&mut Text, With<ProcessTreeCountLine>>,
+    counts: Query<&mut Text, With<ProcessTreeCountLine>>,
     mut commands: Commands,
 ) {
     let items = track.shell().projection().processes_slice();
     let observed_at_ms = track.shell().projection().processes_observed_at_ms;
-    let expansion = ProcessTreeExpansion::default();
-    let rows = project_items(items, &expansion, observed_at_ms);
+    let rows = project_items(items, track.process_tree_expansion(), observed_at_ms);
+    refresh_tree_rows(&palette, roots, counts, &mut commands, rows, items);
+}
+
+fn refresh_tree_on_expansion(
+    _changed: On<ProcessTreeExpansionChanged>,
+    track: ShellTrack,
+    palette: Res<WindowPalette>,
+    roots: Query<(Entity, &Children), With<ProcessTreeRows>>,
+    counts: Query<&mut Text, With<ProcessTreeCountLine>>,
+    mut commands: Commands,
+) {
+    let items = track.shell().projection().processes_slice();
+    let observed_at_ms = track.shell().projection().processes_observed_at_ms;
+    let rows = project_items(items, track.process_tree_expansion(), observed_at_ms);
+    refresh_tree_rows(&palette, roots, counts, &mut commands, rows, items);
+}
+
+fn refresh_tree_rows(
+    palette: &WindowPalette,
+    roots: Query<(Entity, &Children), With<ProcessTreeRows>>,
+    mut counts: Query<&mut Text, With<ProcessTreeCountLine>>,
+    commands: &mut Commands,
+    rows: Vec<ProcessTreeRowView<'_>>,
+    items: &[ProcessItem],
+) {
     for (root, children) in roots.iter() {
         let stale: Vec<Entity> = children.iter().copied().collect();
         for entity in stale {
@@ -432,12 +487,14 @@ fn on_end_tree_activated(
 }
 
 /// Identity marker for later pointer/keyboard observers.
-#[derive(Component, Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) struct ProcessTreeRowMarker(pub(crate) ProcessRowId);
+#[derive(Component, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ProcessTreeRowMarker(Option<ProcessTreeToggle>);
 
 impl Default for ProcessTreeRowMarker {
     fn default() -> Self {
-        Self(ProcessRowId::Category(ProcessCategory::Application))
+        Self(Some(ProcessTreeToggle::Category(
+            ProcessCategory::Application,
+        )))
     }
 }
 

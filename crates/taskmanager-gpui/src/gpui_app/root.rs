@@ -519,22 +519,20 @@ impl RootView {
                 cache.query.clone(),
             );
         }
-        let procs_refs: Vec<&taskmanager_core::core::process::ProcessItem> =
-            self.processes().iter().collect();
+        let procs_refs = self.shell.visible_processes();
         let application_count = processes_view::rows::application_root_count(&procs_refs);
-        let rows = processes_view::rows::visible_rows_with_local_time(
-            processes_view::rows::VisibleRowsProps {
+        let rows = processes_view::rows::project_visible_rows_from_shell(
+            processes_view::rows::ShellVisibleRowsProps {
                 processes: &procs_refs,
                 observed_at_ms: self.processes_observed_at_ms(),
                 query: &query,
                 sort_col,
                 sort_asc,
-                filter,
                 collapsed: &self.processes_state.collapsed,
                 expanded_apps: &self.processes_state.expanded_apps,
                 units,
+                local_time_rules: &self.local_time_rules,
             },
-            &self.local_time_rules,
         );
         let rows = std::rc::Rc::new(rows);
         let process_identities = std::rc::Rc::new(

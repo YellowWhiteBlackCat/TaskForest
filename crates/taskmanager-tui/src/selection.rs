@@ -16,7 +16,10 @@ use taskmanager_application::{AppPage, PlatformEffect};
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
 use taskmanager_core::core::startup::StartupEntryId;
 use taskmanager_core::core::target::{ServiceId, SessionId};
-use taskmanager_shell::{InfoTable, ProcessRowId};
+use taskmanager_shell::{
+    APP_TREE_EXPANSION_KEY_PREFIX, InfoTable, ProcessRowId, ProcessTreeRow,
+    project_process_tree_rows,
+};
 
 use crate::TuiApp;
 use crate::process_view;
@@ -60,7 +63,7 @@ pub(crate) enum PageRowAnchor {
     Inventory(InventoryRowAnchor),
 }
 
-/// Small, owned cache key for the Applications canonical-row projection. It
+/// Small, owned cache key for the Applications shared-row projection. It
 /// contains only presentation inputs, never borrowed process facts, so the
 /// cache cannot outlive or redefine the shell projection. Every input that
 /// can change the row slice's shape or content is part of the key: the
@@ -76,9 +79,9 @@ pub(crate) struct VisualRowCountKey {
     collapsed_tree: Vec<ProcessLiveKey>,
 }
 
-/// The TUI's one presentation cache for the Applications canonical-row
+/// The TUI's one presentation cache for the Applications shared-row
 /// projection (TUI-006). On a key hit it serves BOTH the visual row count and
-/// the fully-owned [`process_view::CanonicalRowId`] slice, so the per-frame
+/// the fully-owned [`ProcessTreeRow`] slice, so the per-frame
 /// cost of the Applications page follows the visible window instead of the
 /// whole O(N) tree rebuild. The stored ids borrow nothing from the process
 /// data; the key pins the exact visible list they index into.
@@ -86,7 +89,7 @@ pub(crate) struct VisualRowCountKey {
 pub(crate) struct VisualRowCountCache {
     key: VisualRowCountKey,
     count: usize,
-    canonical_rows: Vec<process_view::CanonicalRowId>,
+    rows: Vec<ProcessTreeRow>,
 }
 
 impl TuiApp {
@@ -278,7 +281,7 @@ impl TuiApp {
             let selected = target_pid
                 .and_then(|pid| {
                     ids.iter().position(|row| {
-                        matches!(row, process_view::CanonicalRowId::Process { .. }
+                        matches!(row, ProcessTreeRow::Process { .. }
                             if visible.process_of(row).is_some_and(|process| process.pid == pid))
                     })
                 })
@@ -318,13 +321,9 @@ impl TuiApp {
         {
             return count;
         }
-        let canonical_rows = self.build_canonical_rows();
-        let count = canonical_rows.len();
-        *self.visual_row_count_cache.borrow_mut() = Some(VisualRowCountCache {
-            key,
-            count,
-            canonical_rows,
-        });
+        let rows = self.build_canonical_rows();
+        let count = rows.len();
+        *self.visual_row_count_cache.borrow_mut() = Some(VisualRowCountCache { key, count, rows });
         count
     }
 
@@ -343,12 +342,12 @@ impl TuiApp {
 
     /// Test-visible delegate of the cache-hit probe (see
     /// [`Self::canonical_row_cache_is_valid`]).
-    /// The pure O(N) rebuild of the owned canonical row-id slice from the
-    /// live projection. The only producer of cache entries.
-    fn build_canonical_rows(&self) -> Vec<process_view::CanonicalRowId> {
+    /// The pure O(N) rebuild of the owned shared row slice from the live
+    /// projection. The only producer of cache entries.
+    fn build_canonical_rows(&self) -> Vec<ProcessTreeRow> {
         let visible = self.visible_processes();
         let observed_at_ms = self.shell.projection().processes_observed_at_ms;
-        process_view::build_canonical_row_ids(
+        project_process_tree_rows(
             &visible,
             &self.expanded_groups,
             &self.collapsed_tree,
@@ -357,7 +356,7 @@ impl TuiApp {
         )
     }
 
-    /// Read the cached owned canonical row-id slice together with the visible
+    /// Read the cached owned shared row slice together with the visible
     /// process list it indexes into, rebuilding the cache first when the
     /// presentation key changed. This is the BORROWED-SLICE entry: the read
     /// closure receives a fully materialized `&[&ProcessItem]`, so it pays
@@ -374,13 +373,13 @@ impl TuiApp {
     /// mutation stays outside the closure; only reads happen inside.
     pub(crate) fn with_canonical_rows<'s, R>(
         &'s self,
-        read: impl FnOnce(&[process_view::CanonicalRowId], &[&'s ProcessItem]) -> R,
+        read: impl FnOnce(&[ProcessTreeRow], &[&'s ProcessItem]) -> R,
     ) -> R {
         self.ensure_canonical_row_cache();
         let cache = self.visual_row_count_cache.borrow();
         let visible = self.visible_processes();
         match cache.as_ref() {
-            Some(cache) => read(&cache.canonical_rows, &visible),
+            Some(cache) => read(&cache.rows, &visible),
             // The rebuild above always installs an entry, so an empty cell
             // here cannot happen; if it ever did, the honest read is the
             // empty projection — no rows are invented.
@@ -402,7 +401,7 @@ impl TuiApp {
     /// happen inside.
     pub(crate) fn with_canonical_rows_indexed<'s, R>(
         &'s self,
-        read: impl FnOnce(&[process_view::CanonicalRowId], &process_view::VisibleProcesses<'s>) -> R,
+        read: impl FnOnce(&[ProcessTreeRow], &process_view::VisibleProcesses<'s>) -> R,
     ) -> R {
         self.ensure_canonical_row_cache();
         let cache = self.visual_row_count_cache.borrow();
@@ -414,7 +413,7 @@ impl TuiApp {
             self.shell.projection().processes_slice(),
         );
         match cache.as_ref() {
-            Some(cache) => read(&cache.canonical_rows, &visible),
+            Some(cache) => read(&cache.rows, &visible),
             // The rebuild above always installs an entry, so an empty cell
             // here cannot happen; if it ever did, the honest read is the
             // empty projection — no rows are invented.
@@ -428,17 +427,14 @@ impl TuiApp {
     fn ensure_canonical_row_cache(&self) {
         if !self.canonical_row_cache_is_valid() {
             let key = self.visual_row_count_key();
-            let canonical_rows = self.build_canonical_rows();
-            let count = canonical_rows.len();
-            *self.visual_row_count_cache.borrow_mut() = Some(VisualRowCountCache {
-                key,
-                count,
-                canonical_rows,
-            });
+            let rows = self.build_canonical_rows();
+            let count = rows.len();
+            *self.visual_row_count_cache.borrow_mut() =
+                Some(VisualRowCountCache { key, count, rows });
         }
     }
 
-    /// The presentation key behind the canonical-row cache. Deliberately NOT
+    /// The presentation key behind the shared-row cache. Deliberately NOT
     /// self-cached: the two per-frame probes re-derive it on every call
     /// (~4-8 allocations — the sorted `expanded_groups` clones — roughly 1%
     /// of the measured steady-state frame in
@@ -483,7 +479,7 @@ impl TuiApp {
     }
 
     /// Cursor motion built once per key event: resolve the clamped cursor +
-    /// owned selected process from the cached canonical id slice under the
+    /// owned selected process from the cached shared row slice under the
     /// shared borrow, then mutate via
     /// [`Self::apply_selection_resolution`]. This is the per-frame reuse path —
     /// O(1) id resolutions instead of a full row materialization. The scoped
@@ -586,21 +582,21 @@ impl TuiApp {
         }
         self.with_canonical_rows_indexed(|ids, visible| {
             match ids.get(self.selected)? {
-                process_view::CanonicalRowId::Category { .. } => {
+                ProcessTreeRow::Category { .. } => {
                     // A structural category header anchors on its
                     // locale-neutral expansion key; it has no pid.
                     visible
                         .expansion_key_of(ids.get(self.selected)?)
                         .map(ApplicationRowAnchor::Structural)
                 }
-                process_view::CanonicalRowId::AppRoot { .. } => {
+                ProcessTreeRow::Application { .. } => {
                     let key = visible.row_key_of(ids.get(self.selected)?)?;
                     Some(ApplicationRowAnchor::Actionable {
                         key,
                         start_token: self.process_start_token_for_key(key)?,
                     })
                 }
-                process_view::CanonicalRowId::Process { .. } => {
+                ProcessTreeRow::Process { .. } => {
                     let process = visible.process_of(ids.get(self.selected)?)?;
                     Some(ApplicationRowAnchor::Actionable {
                         key: ProcessRowId::from_process(process)?,
@@ -677,7 +673,7 @@ impl TuiApp {
         self.collapsed_tree
             .retain(|identity| current.contains(identity));
         self.expanded_groups.retain(|key| {
-            key.strip_prefix(process_view::APP_TREE_EXPANSION_KEY_PREFIX)
+            key.strip_prefix(APP_TREE_EXPANSION_KEY_PREFIX)
                 .is_none_or(|suffix| {
                     current
                         .iter()
@@ -691,7 +687,7 @@ impl TuiApp {
     /// renders its honest empty state. Owned so it can outlive the borrow on
     /// the shell's process vector.
     ///
-    /// Resolves through the cached canonical id slice — O(1) on a cache hit.
+    /// Resolves through the cached shared row slice — O(1) on a cache hit.
     #[must_use]
     pub(crate) fn selected_detail_process(&self) -> Option<ProcessItem> {
         if self.shell.visible_process_count() == 0 {
@@ -819,17 +815,16 @@ impl TuiApp {
     /// matching rule the anchors have always used.
     fn application_row_id_matches(
         &self,
-        row: &process_view::CanonicalRowId,
+        row: &ProcessTreeRow,
         visible: &process_view::VisibleProcesses<'_>,
         anchor: &ApplicationRowAnchor,
     ) -> bool {
         match (row, anchor) {
+            (ProcessTreeRow::Category { .. }, ApplicationRowAnchor::Structural(anchor_key)) => {
+                visible.expansion_key_of(row).as_deref() == Some(anchor_key.as_str())
+            }
             (
-                process_view::CanonicalRowId::Category { .. },
-                ApplicationRowAnchor::Structural(anchor_key),
-            ) => visible.expansion_key_of(row).as_deref() == Some(anchor_key.as_str()),
-            (
-                process_view::CanonicalRowId::AppRoot { .. },
+                ProcessTreeRow::Application { .. },
                 ApplicationRowAnchor::Actionable {
                     key: anchor_key,
                     start_token,
@@ -839,7 +834,7 @@ impl TuiApp {
                     && self.process_start_token_for_key(*anchor_key) == Some(*start_token)
             }
             (
-                process_view::CanonicalRowId::Process { .. },
+                ProcessTreeRow::Process { .. },
                 ApplicationRowAnchor::Actionable {
                     key: ProcessRowId::Process(anchor_identity),
                     start_token,
