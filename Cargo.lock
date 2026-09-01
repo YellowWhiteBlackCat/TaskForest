@@ -9616,7 +9616,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-gates"
-version = "0.1.0-rc7"
+version = "0.1.0-rc8"
 dependencies = [
  "chrono",
  "crossbeam-channel",

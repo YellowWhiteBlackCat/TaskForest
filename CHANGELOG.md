@@ -8,6 +8,16 @@
 
 ## [Unreleased]
 
+## [0.1.0-rc8] — 2026-09-01
+
+### 修复
+
+- 修复干净 CI checkout 下诊断包、窗口捕获和快照导出测试的仓库 scratch 目录初始化。
+- 修复 Windows 非 Linux 构建中误编译 current-window capture 状态机和 Linux-only 测试的问题。
+- 修复 macOS portability 测试范围与主线程限定的原生菜单测试边界。
+- 修复 Linux 多架构打包遗漏 SMBIOS、RAPL 和 MSR helper 的问题；RC8 Rehearsal 已验证
+  amd64/arm64 DEB、RPM 以及 Windows x64/arm64 MSI 和 checksum 清单。
+
 ## [0.1.0-rc7] — 2026-09-01
 
 ### 变更
