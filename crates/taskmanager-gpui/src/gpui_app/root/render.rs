@@ -8,6 +8,7 @@
 /// observe it.
 pub const TELEMETRY_READY_BODY_SELECTOR: &str = "tm-telemetry-ready-body";
 
+#[cfg(target_os = "linux")]
 use std::time::Duration;
 
 use super::{

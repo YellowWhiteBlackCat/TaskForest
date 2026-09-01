@@ -32,6 +32,9 @@ mod history_replay_runtime;
 mod presentation;
 mod process_termination;
 mod snapshot_export_runtime;
+#[cfg(test)]
+#[path = "../tests/common/test_support.rs"]
+mod test_support;
 mod window_capture_runtime;
 mod worker_fault;
 use diagnostic_bundle_runtime::DiagnosticBundleCoordinator;

@@ -52,6 +52,7 @@ impl SystemHealthCaptureOutcome {
     }
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum WindowCaptureSchedule {
     #[default]
@@ -64,12 +65,14 @@ pub(crate) enum WindowCaptureSchedule {
     Failed,
 }
 
+#[cfg(target_os = "linux")]
 impl WindowCaptureSchedule {
     pub(crate) const fn active(self) -> bool {
         !matches!(self, Self::Inactive)
     }
 }
 
+#[cfg(target_os = "linux")]
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum WindowCaptureChain {
     #[default]
@@ -77,6 +80,7 @@ pub(crate) enum WindowCaptureChain {
     Active,
 }
 
+#[cfg(target_os = "linux")]
 impl WindowCaptureChain {
     pub(crate) const fn active(self) -> bool {
         matches!(self, Self::Active)
@@ -156,9 +160,11 @@ pub(crate) struct CaptureEvidence {
     pub(super) event_history_fixture: Option<Vec<AlertEvent>>,
     /// Capture-only state machine that waits for two rendered frames before
     /// submitting the current-window provider request, then becomes terminal.
+    #[cfg(target_os = "linux")]
     pub(super) window_capture_schedule: WindowCaptureSchedule,
     /// Explicit opt-in for the private current-window provider receipt. This
     /// is kept outside the visual scenario enum because nested Niri cannot
     /// exercise Spectacle's outer-KWin active-window selector faithfully.
+    #[cfg(target_os = "linux")]
     pub(super) window_capture_chain: WindowCaptureChain,
 }

@@ -1,8 +1,8 @@
 //! Capture coordinator transitions and scenario preparation.
 
-use super::super::{
-    CaptureEvidence, CaptureMode, HistoryReplayOpenState, WindowCaptureChain, WindowCaptureSchedule,
-};
+use super::super::{CaptureEvidence, CaptureMode, HistoryReplayOpenState};
+#[cfg(target_os = "linux")]
+use super::super::{WindowCaptureChain, WindowCaptureSchedule};
 use super::CaptureScenario;
 use std::path::PathBuf;
 use taskmanager_core::core::setup::SetupScriptInfo;
@@ -49,6 +49,7 @@ impl CaptureEvidence {
         let explicitly_enabled = std::env::var("TM_CAPTURE_EVIDENCE")
             .ok()
             .is_some_and(|value| !value.is_empty() && value != "0");
+        #[cfg(target_os = "linux")]
         let window_capture_chain = if std::env::var("TM_CAPTURE_WINDOW_CHAIN")
             .ok()
             .is_some_and(|value| !value.is_empty() && value != "0")
@@ -57,19 +58,26 @@ impl CaptureEvidence {
         } else {
             WindowCaptureChain::default()
         };
+        #[cfg(target_os = "linux")]
         let window_capture_schedule = if window_capture_chain.active() {
             WindowCaptureSchedule::AwaitingFrame
         } else {
             WindowCaptureSchedule::Inactive
         };
+        #[cfg(target_os = "linux")]
+        let window_capture_enabled = window_capture_chain.active();
+        #[cfg(not(target_os = "linux"))]
+        let window_capture_enabled = false;
         Self {
-            mode: if explicitly_enabled || scenario.is_some() || window_capture_chain.active() {
+            mode: if explicitly_enabled || scenario.is_some() || window_capture_enabled {
                 CaptureMode::Enabled
             } else {
                 CaptureMode::default()
             },
             scenario,
+            #[cfg(target_os = "linux")]
             window_capture_schedule,
+            #[cfg(target_os = "linux")]
             window_capture_chain,
             ..Self::default()
         }
@@ -191,6 +199,7 @@ impl CaptureEvidence {
     /// only after live telemetry and list data have reached the root. The
     /// native provider completion, rather than request submission, certifies
     /// this scenario.
+    #[cfg(target_os = "linux")]
     pub(crate) fn window_capture_requested(&self) -> bool {
         self.is_enabled()
             && self.window_capture_chain.active()
@@ -200,6 +209,7 @@ impl CaptureEvidence {
             && self.window_capture_schedule == WindowCaptureSchedule::AwaitingFrame
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn window_capture_output(&self) -> Option<PathBuf> {
         self.window_capture_schedule
             .active()
@@ -208,12 +218,14 @@ impl CaptureEvidence {
             .map(PathBuf::from)
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn mark_window_capture_submitted(&mut self) {
         if self.window_capture_schedule == WindowCaptureSchedule::ReadyToSubmit {
             self.window_capture_schedule = WindowCaptureSchedule::Submitted;
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn schedule_window_capture_frame(&mut self) -> bool {
         if self.window_capture_requested() {
             self.window_capture_schedule = WindowCaptureSchedule::FrameScheduled;
@@ -223,6 +235,7 @@ impl CaptureEvidence {
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn schedule_window_capture_submission(&mut self) -> bool {
         if self.window_capture_schedule == WindowCaptureSchedule::FrameScheduled {
             self.window_capture_schedule = WindowCaptureSchedule::Settling;
@@ -232,26 +245,31 @@ impl CaptureEvidence {
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn mark_window_capture_settled(&mut self) {
         if self.window_capture_schedule == WindowCaptureSchedule::Settling {
             self.window_capture_schedule = WindowCaptureSchedule::ReadyToSubmit;
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn window_capture_settling(&self) -> bool {
         self.window_capture_schedule == WindowCaptureSchedule::Settling
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn window_capture_submission_requested(&self) -> bool {
         self.window_capture_schedule == WindowCaptureSchedule::ReadyToSubmit
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn mark_window_capture_failed(&mut self) {
         if self.window_capture_schedule == WindowCaptureSchedule::ReadyToSubmit {
             self.window_capture_schedule = WindowCaptureSchedule::Failed;
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn mark_window_capture_ready(&mut self) {
         if self.window_capture_chain.active()
             && self.window_capture_schedule == WindowCaptureSchedule::Submitted

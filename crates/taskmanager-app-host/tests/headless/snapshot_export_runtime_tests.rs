@@ -1,5 +1,5 @@
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use crossbeam_channel::bounded;
 use taskmanager_application::snapshot_export::{
@@ -24,16 +24,7 @@ fn request(
 }
 
 fn test_directory(label: &str) -> std::path::PathBuf {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or(Duration::ZERO)
-        .as_nanos();
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.tmp")
-        .join(format!(
-            "taskforest-snapshot-export-{label}-{}-{stamp}",
-            std::process::id()
-        ))
+    crate::test_support::repo_temp_dir().join(format!("taskforest-snapshot-export-{label}"))
 }
 
 #[test]

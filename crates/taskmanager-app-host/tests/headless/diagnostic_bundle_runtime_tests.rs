@@ -1,4 +1,4 @@
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 use taskmanager_core::{DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource};
@@ -17,16 +17,7 @@ fn plan(contents: &str) -> DiagnosticBundlePlan {
 }
 
 fn test_directory(label: &str) -> PathBuf {
-    let stamp = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap_or(Duration::ZERO)
-        .as_nanos();
-    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../.tmp")
-        .join(format!(
-            "taskforest-diagnostic-{label}-{}-{stamp}",
-            std::process::id()
-        ))
+    crate::test_support::repo_temp_dir().join(format!("taskforest-diagnostic-{label}"))
 }
 
 fn wait_for_completion(

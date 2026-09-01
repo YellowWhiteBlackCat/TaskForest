@@ -6,12 +6,17 @@ use gpui::{
     StatefulInteractiveElement, Styled, div, px,
 };
 use taskmanager_app_host::WindowCaptureClient;
-use taskmanager_application::window_capture::{WindowCaptureSession, WindowCaptureState};
+#[cfg(target_os = "linux")]
+use taskmanager_application::window_capture::WindowCaptureSession;
+#[cfg(target_os = "linux")]
+use taskmanager_application::window_capture::WindowCaptureState;
 #[cfg(target_os = "linux")]
 use taskmanager_application::window_capture::{WindowCaptureSubmitError, WindowCaptureTarget};
+#[cfg(target_os = "linux")]
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 #[cfg(target_os = "linux")]
 use taskmanager_ui_contract::IconId;
+#[cfg(target_os = "linux")]
 use tracing::{info, warn};
 
 #[cfg(target_os = "linux")]
@@ -19,20 +24,30 @@ use crate::gpui_app::elements;
 
 #[cfg(target_os = "linux")]
 use super::Hover;
+#[cfg(target_os = "linux")]
 use super::RootView;
 
 #[derive(Debug, Default)]
 pub(crate) enum WindowCaptureRuntime {
     #[default]
     Unavailable,
+    #[cfg(target_os = "linux")]
     Active(WindowCaptureSession<WindowCaptureClient>),
 }
 
 impl WindowCaptureRuntime {
     pub(crate) fn install(&mut self, client: WindowCaptureClient) {
-        *self = Self::Active(WindowCaptureSession::new(client));
+        #[cfg(target_os = "linux")]
+        {
+            *self = Self::Active(WindowCaptureSession::new(client));
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            let _ = client;
+        }
     }
 
+    #[cfg(target_os = "linux")]
     fn active_mut(&mut self) -> Option<&mut WindowCaptureSession<WindowCaptureClient>> {
         match self {
             Self::Unavailable => None,
@@ -118,6 +133,7 @@ pub(crate) fn current_window_capture_btn(
     .into_any_element()
 }
 
+#[cfg(target_os = "linux")]
 impl RootView {
     #[cfg(target_os = "linux")]
     pub(crate) fn request_current_window_capture(&mut self) -> bool {
@@ -187,6 +203,7 @@ impl RootView {
         }
     }
 
+    #[cfg(target_os = "linux")]
     pub(crate) fn drain_window_capture_completions(&mut self) -> bool {
         let Some(session) = self.window_capture.active_mut() else {
             return false;
