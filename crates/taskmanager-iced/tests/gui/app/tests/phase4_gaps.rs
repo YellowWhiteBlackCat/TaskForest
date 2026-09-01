@@ -202,40 +202,111 @@ fn test_heterogeneous_cpu_core_breakdown_and_tags() {
 }
 
 #[test]
-fn test_run_new_task_modal_lifecycle_and_elevation() {
+fn test_run_new_task_modal_lifecycle() {
     let mut app = IcedApp::demo();
     assert!(!app.run_task_open());
 
     // 1. Open
     let _ = app.update(Message::OpenRunTask);
     assert!(app.run_task_open());
-    assert!(!app.run_task.as_admin);
     assert!(app.run_task.error_msg.is_none());
 
     // 2. Edit command
     let _ = app.update(Message::UpdateRunTaskCommand("pwsh.exe".to_string()));
     assert_eq!(app.run_task.command, "pwsh.exe");
 
-    // 3. Toggle admin
-    let _ = app.update(Message::ToggleRunTaskAdmin);
-    assert!(app.run_task.as_admin);
-    let _ = app.update(Message::ToggleRunTaskAdmin);
-    assert!(!app.run_task.as_admin);
-
-    // 4. Submit non-empty
+    // 3. Submit non-empty
     let _ = app.update(Message::SubmitRunTask);
     assert!(!app.run_task_open());
     assert!(app.run_task.command.is_empty());
 
-    // 5. Submit empty triggers error
+    // 4. Submit empty triggers error
     let _ = app.update(Message::OpenRunTask);
     let _ = app.update(Message::SubmitRunTask);
     assert!(app.run_task_open());
     assert!(app.run_task.error_msg.is_some());
 
-    // 6. Close
+    // 5. Close
     let _ = app.update(Message::CloseRunTask);
     assert!(!app.run_task_open());
+}
+
+/// Submitting the Run New Task dialog must reach the platform lane: the
+/// dialog closes AND a `CommandLaunchRequest` carries the trimmed command.
+/// The former reducer only dismissed the surface, so the dialog closed with
+/// success semantics and nothing ever launched.
+#[test]
+fn submitting_run_task_launches_the_command_through_the_platform_lane() {
+    use taskmanager_application::{
+        CommandLaunchRequest, IntegrationFacets, PlatformClient, PlatformFacets, PlatformHandle,
+    };
+    use taskmanager_platform_contract::{RequestEnvelope, RequestPort, SubmissionError};
+
+    #[derive(Default)]
+    struct RecordingLaunch(std::sync::Mutex<Vec<String>>);
+
+    impl RequestPort for RecordingLaunch {
+        type Request = CommandLaunchRequest;
+
+        fn try_submit(
+            &self,
+            envelope: RequestEnvelope<Self::Request>,
+        ) -> Result<(), SubmissionError> {
+            self.0
+                .lock()
+                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .push(envelope.payload.command);
+            Ok(())
+        }
+    }
+
+    #[derive(Default)]
+    struct EmptyCapabilities;
+    impl taskmanager_platform_contract::CapabilityCatalog for EmptyCapabilities {
+        fn snapshot(&self) -> taskmanager_platform_contract::CapabilitySnapshot {
+            taskmanager_platform_contract::CapabilitySnapshot::default()
+        }
+    }
+
+    #[derive(Default)]
+    struct EmptyEvents;
+    impl taskmanager_platform_contract::EventPort for EmptyEvents {
+        type Event = taskmanager_application::PlatformEvent;
+
+        fn try_recv(
+            &self,
+        ) -> Result<
+            Option<taskmanager_platform_contract::EventEnvelope<Self::Event>>,
+            taskmanager_platform_contract::EventPortError,
+        > {
+            Ok(None)
+        }
+    }
+
+    let recorded = std::sync::Arc::new(RecordingLaunch::default());
+    let client = PlatformClient::new(PlatformHandle::new(
+        std::sync::Arc::new(EmptyCapabilities),
+        std::sync::Arc::new(EmptyEvents),
+        PlatformFacets::default()
+            .with_integration(IntegrationFacets::default().with_command_launch(recorded.clone())),
+    ));
+    let mut app = IcedApp::new(Some(client));
+    let _ = app.update(Message::OpenRunTask);
+    let _ = app.update(Message::UpdateRunTaskCommand(
+        "  alacritty -e htop  ".to_string(),
+    ));
+
+    let _ = app.update(Message::SubmitRunTask);
+    assert!(!app.run_task_open(), "a submitted launch closes the dialog");
+    assert_eq!(
+        recorded
+            .0
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .as_slice(),
+        &["alacritty -e htop".to_string()],
+        "the dialog's command must reach the platform request port"
+    );
 }
 
 #[test]

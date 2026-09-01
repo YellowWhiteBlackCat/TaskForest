@@ -2,12 +2,27 @@
 //!
 //! Provides formatting helpers to export processes as TSV/JSON, and
 //! system information as redacted Markdown suitable for bug reports.
+//!
+//! JSON is produced by `serde_json`, so a command line carrying quotes,
+//! newlines or other control characters still yields valid JSON. Redaction is
+//! delegated to the audited core diagnostics contract
+//! ([`DiagnosticBundlePlan::prepare`]) — this module spells no redaction rule
+//! of its own, and the summary core returns travels with the report instead of
+//! being dropped.
 
+use taskmanager_core::core::diagnostics::RedactionSummary;
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::{
+    DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan, DiagnosticSource,
+};
 
 use taskmanager_shell::presentation::{bytes, duration, missing_value};
+
+/// The logical source name the diagnostics report travels under. A constant
+/// because the core bundle validates names and rejects paths.
+const DIAGNOSTICS_SOURCE_NAME: &str = "system-diagnostics.md";
 
 /// Format a single process item as tab-separated values (TSV).
 #[must_use]
@@ -30,20 +45,28 @@ pub fn process_to_tsv(process: &ProcessItem) -> String {
     )
 }
 
+/// One JSON string literal, escaped by serde (quotes, backslashes, and every
+/// control character) instead of a hand-rolled rule.
+fn json_string(value: &str) -> String {
+    serde_json::to_string(value).unwrap_or_else(|_| "\"\"".to_owned())
+}
+
 /// Format a process item as a clean JSON object string.
+///
+/// The field set (`pid`, `name`, `cpu_usage`, `memory_bytes`, `user`,
+/// `status`, `cmdline`), their order, and the numeric spellings are the
+/// published ones; every string literal is escaped by serde, so a command line
+/// carrying quotes, newlines or other control characters still yields legal
+/// JSON.
 #[must_use]
 pub fn process_to_json(process: &ProcessItem) -> String {
-    let user_str = process.current_user().map_or_else(
-        || "null".to_owned(),
-        |user| format!("\"{}\"", user.replace('\\', "\\\\").replace('"', "\\\"")),
-    );
-    let cmd_str = if process.cmdline.is_empty() {
-        "null".to_string()
+    let user = process
+        .current_user()
+        .map_or_else(|| "null".to_owned(), |user| json_string(&user));
+    let cmdline = if process.cmdline.is_empty() {
+        "null".to_owned()
     } else {
-        format!(
-            "\"{}\"",
-            process.cmdline.replace('\\', "\\\\").replace('"', "\\\"")
-        )
+        json_string(&process.cmdline)
     };
     let cpu = process
         .current_cpu_percentage()
@@ -52,42 +75,77 @@ pub fn process_to_json(process: &ProcessItem) -> String {
         .current_memory_bytes()
         .map_or_else(|| "null".to_owned(), |value| value.to_string());
     format!(
-        "{{\n  \"pid\": {},\n  \"name\": \"{}\",\n  \"cpu_usage\": {},\n  \"memory_bytes\": {},\n  \"user\": {},\n  \"status\": \"{}\",\n  \"cmdline\": {}\n}}",
+        "{{\n  \"pid\": {},\n  \"name\": {},\n  \"cpu_usage\": {},\n  \"memory_bytes\": {},\n  \"user\": {},\n  \"status\": {},\n  \"cmdline\": {}\n}}",
         process.pid,
-        process.name.replace('\\', "\\\\").replace('"', "\\\""),
+        json_string(&process.name),
         cpu,
         memory,
-        user_str,
-        process.status,
-        cmd_str
+        user,
+        json_string(&process.status),
+        cmdline
     )
 }
 
-/// Redact sensitive identifiable text (usernames, IPv4 subnets, MAC endings).
-#[must_use]
-pub fn redact_sensitive_text(text: &str) -> String {
-    let mut result = text.to_string();
-    // Redact typical home paths
-    if let Some(pos) = result.find("/home/") {
-        let after = &result[pos + 6..];
-        if let Some(slash) = after.find('/') {
-            let user = &after[..slash];
-            result = result.replace(user, "<user>");
-        }
-    }
-    if let Some(pos) = result.find("C:\\Users\\") {
-        let after = &result[pos + 9..];
-        if let Some(slash) = after.find('\\') {
-            let user = &after[..slash];
-            result = result.replace(user, "<user>");
-        }
-    }
-    result
+/// The diagnostics report after core's audited redaction contract ran over it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RedactedDiagnosticsReport {
+    /// Clipboard-ready Markdown with every private occurrence replaced.
+    pub markdown: String,
+    /// What core removed, so the export path accounts for its redactions.
+    pub redactions: RedactionSummary,
 }
 
-/// Generate a comprehensive Markdown system diagnostics bundle report with redacted private fields.
-#[must_use]
+/// Redact `text` with the core diagnostics contract and report what it removed.
+///
+/// The plan keeps its sanitized sources private and exposes the already-cleaned
+/// text through one read-only core accessor. No redaction rule is re-implemented
+/// here, and a plan whose named source cannot be recovered fails the export
+/// instead of leaking the input.
+pub fn redact_with_summary(
+    text: &str,
+    usernames: impl IntoIterator<Item = String>,
+) -> Result<RedactedDiagnosticsReport, DiagnosticBundleError> {
+    let plan = DiagnosticBundlePlan::prepare(
+        vec![DiagnosticSource {
+            name: DIAGNOSTICS_SOURCE_NAME.to_string(),
+            contents: text.to_string(),
+        }],
+        usernames,
+    )?;
+    let redactions = plan.preview().redactions;
+    let contents = plan
+        .sanitized_contents(DIAGNOSTICS_SOURCE_NAME)
+        .ok_or_else(|| {
+            DiagnosticBundleError::with_detail(
+                DiagnosticBundleErrorKind::Encode,
+                "sanitized diagnostics source missing from the plan",
+            )
+        })?
+        .to_owned();
+    Ok(RedactedDiagnosticsReport {
+        markdown: contents,
+        redactions,
+    })
+}
+
+/// Generate a comprehensive Markdown system diagnostics bundle report with
+/// private material removed by the core redaction contract.
+///
+/// `usernames` are the account labels observed on this host; core replaces
+/// them (and every filesystem path and IP address) before the text reaches the
+/// clipboard.
 pub fn system_diagnostics_markdown(
+    hardware: Option<&HardwareInfo>,
+    snapshot: Option<&SystemSnapshot>,
+    usernames: impl IntoIterator<Item = String>,
+) -> Result<String, DiagnosticBundleError> {
+    redact_with_summary(&diagnostics_markdown_body(hardware, snapshot), usernames)
+        .map(|report| report.markdown)
+}
+
+/// The unredacted report body. Private material stays here only until
+/// [`system_diagnostics_markdown`] hands the whole text to core.
+fn diagnostics_markdown_body(
     hardware: Option<&HardwareInfo>,
     snapshot: Option<&SystemSnapshot>,
 ) -> String {
@@ -170,7 +228,7 @@ pub fn system_diagnostics_markdown(
     }
 
     out.push_str("```\n");
-    redact_sensitive_text(&out)
+    out
 }
 
 #[cfg(test)]

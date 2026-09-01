@@ -154,6 +154,7 @@ impl IcedApp {
             config.ui_font.as_str(),
             config.mono_font.as_str(),
             &font_availability,
+            self.configuration.observed_color_scheme(),
         );
         (preferences, theme)
     }
@@ -196,10 +197,11 @@ pub(super) fn build_resolved_theme(
     ui_font_token: &str,
     mono_font_token: &str,
     availability: &FontAvailability,
+    observed_color_scheme: Option<super::appearance::OsColorScheme>,
 ) -> Theme {
     Theme::build(
         skin,
-        super::appearance::resolve_color_mode(mode),
+        super::appearance::resolve_color_mode_with(mode, observed_color_scheme),
         if high_contrast {
             HighContrast::On
         } else {

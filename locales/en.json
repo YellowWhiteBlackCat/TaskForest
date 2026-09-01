@@ -849,7 +849,6 @@
   "proc.category_background": "Background processes",
   "proc.category_uncategorized": "Uncategorized",
   "proc.run_new_task": "Run new task",
-  "proc.run_as_admin": "Create this task with administrative privileges",
   "proc.end_task": "End task",
   "proc.actions": "Process actions",
   "proc.open_location": "Open file location",

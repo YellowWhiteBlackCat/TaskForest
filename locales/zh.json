@@ -850,7 +850,6 @@
   "proc.category_background": "后台进程",
   "proc.category_uncategorized": "未分类",
   "proc.run_new_task": "运行新任务",
-  "proc.run_as_admin": "以系统管理员权限创建此任务",
   "proc.end_task": "结束任务",
   "proc.actions": "进程操作",
   "proc.open_location": "打开文件位置",

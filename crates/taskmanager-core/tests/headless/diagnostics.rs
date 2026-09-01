@@ -38,6 +38,18 @@ fn preview_and_encoded_bundle_contain_only_redacted_content() {
 }
 
 #[test]
+fn sanitized_contents_is_a_read_only_core_view_of_the_encoded_plan() {
+    let plan = plan("status=ready path=/home/<user>/bin/tool");
+    let contents = plan
+        .sanitized_contents("facts.txt")
+        .expect("the named sanitized source is available");
+
+    assert!(contents.contains("<redacted-path>"));
+    assert_eq!(contents.len(), plan.preview().files[0].bytes);
+    assert_eq!(plan.sanitized_contents("missing.txt"), None);
+}
+
+#[test]
 fn invalid_and_duplicate_sources_are_typed_without_losing_log_detail() {
     let invalid = DiagnosticBundlePlan::prepare(
         vec![DiagnosticSource {

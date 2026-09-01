@@ -9,26 +9,15 @@
 //! re-resolves the theme through the ordinary settings bridge — no renderer
 //! ever queries the desktop itself.
 
-use std::sync::atomic::{AtomicU8, Ordering};
-
 use super::*;
 
-/// The last OS color scheme observed through the platform channel
-/// (0 = not yet observed, 1 = light, 2 = dark).
-///
-/// Process-global is honest here: the desktop color scheme is process-wide
-/// environment state, the iced product is single-instance (the launcher's
-/// instance guard), and `IcedApp` owns the one window — there is no second
-/// desktop observation this could cross.
-static OS_COLOR_SCHEME: AtomicU8 = AtomicU8::new(0);
-
-/// The OS color scheme as observed from the platform. The discriminants are
-/// the stored encoding (see [`OS_COLOR_SCHEME`]): 0 stays reserved for
-/// "not yet observed".
+/// The OS color scheme as observed from the platform. It is stored in the
+/// per-`IcedApp` configuration state, never in a process-global slot, so two
+/// headless windows/tests cannot overwrite each other's theme input.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum OsColorScheme {
-    Light = 1,
-    Dark = 2,
+    Light,
+    Dark,
 }
 
 impl OsColorScheme {
@@ -53,23 +42,6 @@ pub(crate) fn resolve_os_color_scheme(mode: iced::theme::Mode) -> OsColorScheme 
     }
 }
 
-/// The stored observation (`None` before the first platform event).
-#[must_use]
-pub(crate) fn observed_color_scheme() -> Option<OsColorScheme> {
-    match OS_COLOR_SCHEME.load(Ordering::Relaxed) {
-        1 => Some(OsColorScheme::Light),
-        2 => Some(OsColorScheme::Dark),
-        _ => None,
-    }
-}
-
-/// Store one observation, returning the previous stored value.
-fn store_observed_color_scheme(scheme: OsColorScheme) -> Option<OsColorScheme> {
-    let previous = observed_color_scheme();
-    OS_COLOR_SCHEME.store(scheme as u8, Ordering::Relaxed);
-    previous
-}
-
 /// Resolve the persisted color-mode token against one observation: explicit
 /// choices win absolutely; `System` follows the observation and falls back to
 /// Dark before the first platform event arrives (the pre-provider default
@@ -87,12 +59,6 @@ pub(crate) fn resolve_color_mode_with(
     }
 }
 
-/// [`resolve_color_mode_with`] against the currently stored observation.
-#[must_use]
-pub(crate) fn resolve_color_mode(mode: ModeChoice) -> LightDark {
-    resolve_color_mode_with(mode, observed_color_scheme())
-}
-
 impl IcedApp {
     /// Apply one observed OS color scheme (the subscription event or the boot
     /// query). The observation is always stored; the theme rebuild happens
@@ -102,9 +68,10 @@ impl IcedApp {
     /// observation never churns the config bridge.
     pub(crate) fn apply_observed_color_scheme(&mut self, mode: iced::theme::Mode) {
         let scheme = resolve_os_color_scheme(mode);
-        if store_observed_color_scheme(scheme) == Some(scheme) {
+        if self.configuration.observed_color_scheme() == Some(scheme) {
             return;
         }
+        self.configuration.set_observed_color_scheme(Some(scheme));
         let config = self.config_draft();
         if ModeChoice::from_token(config.mode.as_str()) != ModeChoice::System {
             return;

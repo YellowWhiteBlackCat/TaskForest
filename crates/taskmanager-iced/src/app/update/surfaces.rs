@@ -61,11 +61,7 @@ impl IcedApp {
             message @ (Message::OpenRunTask
             | Message::CloseRunTask
             | Message::UpdateRunTaskCommand(_)
-            | Message::ToggleRunTaskAdmin
-            | Message::SubmitRunTask) => {
-                self.handle_run_task_message(message);
-                None
-            }
+            | Message::SubmitRunTask) => self.handle_run_task_message(message),
             _ => None,
         }
     }

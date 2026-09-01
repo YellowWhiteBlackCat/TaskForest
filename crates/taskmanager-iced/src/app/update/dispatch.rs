@@ -155,7 +155,6 @@ fn route(message: Message) -> MessageDomain {
         | Message::OpenRunTask
         | Message::CloseRunTask
         | Message::UpdateRunTaskCommand(_)
-        | Message::ToggleRunTaskAdmin
         | Message::SubmitRunTask) => MessageDomain::Surface(message),
 
         message @ (Message::SelectPerformanceGraphPoints(_)

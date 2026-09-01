@@ -15,6 +15,7 @@ pub(super) struct IcedConfiguration {
     preferences: PresentationPreferences,
     language: Language,
     theme: Theme,
+    observed_color_scheme: Option<super::appearance::OsColorScheme>,
 }
 
 impl IcedConfiguration {
@@ -29,6 +30,7 @@ impl IcedConfiguration {
             preferences: PresentationPreferences::with_font_availability(font_availability),
             language: Language::En,
             theme: Theme::dark(),
+            observed_color_scheme: None,
         }
     }
 
@@ -62,6 +64,17 @@ impl IcedConfiguration {
 
     pub(super) const fn theme(&self) -> &Theme {
         &self.theme
+    }
+
+    pub(super) const fn observed_color_scheme(&self) -> Option<super::appearance::OsColorScheme> {
+        self.observed_color_scheme
+    }
+
+    pub(super) fn set_observed_color_scheme(
+        &mut self,
+        observed: Option<super::appearance::OsColorScheme>,
+    ) {
+        self.observed_color_scheme = observed;
     }
 
     /// Atomically replace every renderer-visible value derived from one
