@@ -210,8 +210,8 @@ pub(crate) fn system_fact_rows(hardware: Option<&HardwareInfo>) -> Vec<SystemFac
 fn status_line_text(hardware: Option<&HardwareInfo>) -> String {
     match hardware {
         None => t("common.waiting_inventory").to_owned(),
-        Some(_) => {
-            let count = system_fact_rows(Some(hardware.expect("checked"))).len();
+        Some(hardware) => {
+            let count = system_fact_rows(Some(hardware)).len();
             t("system.facts_ready").replacen("{count}", &count.to_string(), 1)
         }
     }
@@ -324,10 +324,10 @@ pub(crate) fn paint_system(world: &mut bevy::ecs::world::World) {
     for entity in stale {
         let _ = world.despawn(entity);
     }
-    let fresh = world
-        .spawn_scene(scene)
-        .expect("the system body resolves without assets")
-        .id();
+    let fresh = match world.spawn_scene(scene) {
+        Ok(entity) => entity.id(),
+        Err(_) => return,
+    };
     world
         .entity_mut(body)
         .add_one_related::<bevy::ecs::hierarchy::ChildOf>(fresh);
