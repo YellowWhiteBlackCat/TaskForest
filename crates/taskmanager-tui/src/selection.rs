@@ -145,7 +145,7 @@ impl TuiApp {
             };
             self.selected.min(count.saturating_sub(1))
         });
-        self.selected = target;
+        self.shell.move_selection_to(target);
     }
 
     /// Preserve the selected inventory identity while the shared shell
@@ -498,7 +498,7 @@ impl TuiApp {
         });
         let effect = self.apply_selection_resolution_with_row(new_selected, process, row_key);
         if let Some(ProcessRowId::Process(identity)) = row_key {
-            self.shell.selected_rows.insert(identity);
+            self.shell.add_selected_identity(identity);
         }
         effect
     }
@@ -519,21 +519,9 @@ impl TuiApp {
         if self.selected != new_selected {
             self.detail_scroll_reset();
         }
-        self.selected = new_selected;
-        self.shell.selected_row = if self.page() == AppPage::Applications {
-            row_key
-        } else {
-            None
-        };
-        self.shell.selected_rows.clear();
-        let identity = process
-            .as_ref()
-            .and_then(FrozenProcessIdentity::from_process);
-        self.application.selected_process = if self.page() == AppPage::Applications {
-            identity
-        } else {
-            None
-        };
+        self.shell.move_selection_to(new_selected);
+        self.shell.set_row_selection(row_key, process.as_ref());
+        self.shell.clear_selected_rows();
         self.refresh_selected_process_insights_with(process)
     }
 
@@ -630,7 +618,7 @@ impl TuiApp {
         if self.selected != target {
             self.detail_scroll_reset();
         }
-        self.selected = target;
+        self.shell.move_selection_to(target);
         self.sync_grouped_application_selection();
     }
 
@@ -711,33 +699,22 @@ impl TuiApp {
     /// honestly rather than letting a destructive action target a stale/wrong
     /// PID.
     pub(crate) fn sync_grouped_application_selection(&mut self) {
-        let (identity, row_key) = self.with_canonical_rows_indexed(|ids, visible| {
+        let (process, row_key) = self.with_canonical_rows_indexed(|ids, visible| {
             if visible.is_empty() {
                 (None, None)
             } else {
                 let process = visible.id_process(ids, self.selected).cloned();
                 let row_key = visible.id_row_key(ids, self.selected);
-                (
-                    process
-                        .as_ref()
-                        .and_then(FrozenProcessIdentity::from_process),
-                    row_key,
-                )
+                (process, row_key)
             }
         });
-        self.shell.selected_row = if self.page() == AppPage::Applications {
-            row_key
-        } else {
-            None
-        };
+        self.shell.set_row_selection(row_key, process.as_ref());
+        // An application aggregate is a single target the user is looking at,
+        // never a member of the marked set: it stays PID-less and the marked
+        // set is emptied so a later batch cannot widen onto a stale member.
         if matches!(row_key, Some(ProcessRowId::Application(_))) {
-            self.shell.selected_rows.clear();
+            self.shell.clear_selected_rows();
         }
-        self.application.selected_process = if self.page() == AppPage::Applications {
-            identity
-        } else {
-            None
-        };
     }
 
     /// Re-request process insights for the currently selected Applications

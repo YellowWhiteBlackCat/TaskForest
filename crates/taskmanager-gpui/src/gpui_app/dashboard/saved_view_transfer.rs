@@ -1,40 +1,30 @@
 //! Versioned, strict import/export for user-created process view presets.
 //!
-//! This module deliberately owns JSON conversion but no filesystem access. The
-//! GPUI surface can move the resulting text through an injected boundary (the
-//! clipboard today) without doing blocking file I/O during render.
+//! The transfer PROTOCOL — format tag, version, size ceilings, error
+//! vocabulary, document shape, and the collision-renaming rules — is
+//! core-owned: `taskmanager_core::core::config` is its single source, shared
+//! with the Iced dashboard. This module only maps GPUI's local preset
+//! vocabulary (`ProcessStatusFilter` / `SortCol` / hideable columns) through
+//! the neutral [`ProcessViewPresetConfig`] and drives the core functions over
+//! the dashboard state. It still owns no filesystem access: the GPUI surface
+//! moves the resulting text through an injected boundary (the clipboard
+//! today) without doing blocking file I/O during render.
 
 use std::collections::HashSet;
 
-use serde::{Deserialize, Serialize};
+use taskmanager_core::core::config::{
+    ProcessViewPresetConfig, SavedViewTransferError, allocate_saved_view_ids,
+    export_saved_views_document, import_saved_views_document, resolve_saved_view_import_names,
+    saved_view_name_is_portable,
+};
 
 use crate::gpui_app::processes_view::rows::is_hideable;
-use taskmanager_core::core::config::ProcessViewPresetConfig;
 use taskmanager_shell::ProcessStatusFilter;
 use taskmanager_shell::SortCol;
 
 use super::{DashboardState, SavedViewPreset};
 
-pub const SAVED_VIEW_TRANSFER_FORMAT: &str = "taskmanager.saved-process-views";
-pub const SAVED_VIEW_TRANSFER_VERSION: u64 = 1;
-
-const MAX_TRANSFER_BYTES: usize = 1_048_576;
-const MAX_TRANSFER_PRESETS: usize = 1_000;
-const MAX_PRESET_NAME_CHARS: usize = 80;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SavedViewTransferError {
-    TooLarge,
-    InvalidDocument,
-    UnsupportedFormat,
-    UnsupportedVersion { found: u64 },
-    TooManyPresets,
-    InvalidPreset { index: usize },
-    IdSpaceExhausted,
-    NameSpaceExhausted,
-}
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct SavedViewImportSummary {
     pub imported: usize,
     pub renamed: usize,
@@ -49,14 +39,6 @@ pub enum SavedViewTransferFeedback {
     ImportInvalid,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct TransferDocument {
-    format: String,
-    version: u64,
-    presets: Vec<ProcessViewPresetConfig>,
-}
-
 pub fn export_saved_views_json(
     dashboard: &DashboardState,
 ) -> Result<String, SavedViewTransferError> {
@@ -67,15 +49,7 @@ pub fn export_saved_views_json(
         .enumerate()
         .map(|(index, preset)| wire_from_preset(preset, index))
         .collect::<Result<_, _>>()?;
-    if presets.len() > MAX_TRANSFER_PRESETS {
-        return Err(SavedViewTransferError::TooManyPresets);
-    }
-    serde_json::to_string_pretty(&TransferDocument {
-        format: SAVED_VIEW_TRANSFER_FORMAT.to_string(),
-        version: SAVED_VIEW_TRANSFER_VERSION,
-        presets,
-    })
-    .map_err(|_| SavedViewTransferError::InvalidDocument)
+    export_saved_views_document(&presets)
 }
 
 /// Parse and append a transfer atomically. Existing presets, especially the
@@ -85,46 +59,34 @@ pub fn import_saved_views_json(
     dashboard: &mut DashboardState,
     json: &str,
 ) -> Result<SavedViewImportSummary, SavedViewTransferError> {
-    if json.len() > MAX_TRANSFER_BYTES {
-        return Err(SavedViewTransferError::TooLarge);
-    }
-    let document: TransferDocument =
-        serde_json::from_str(json).map_err(|_| SavedViewTransferError::InvalidDocument)?;
-    if document.format != SAVED_VIEW_TRANSFER_FORMAT {
-        return Err(SavedViewTransferError::UnsupportedFormat);
-    }
-    if document.version != SAVED_VIEW_TRANSFER_VERSION {
-        return Err(SavedViewTransferError::UnsupportedVersion {
-            found: document.version,
-        });
-    }
-    if document.presets.len() > MAX_TRANSFER_PRESETS {
-        return Err(SavedViewTransferError::TooManyPresets);
-    }
-
-    // Validate the complete payload before changing live state.
+    // Core parses and validates the whole document before GPUI touches live
+    // state; the frontend column/sort/filter vocabulary maps afterwards.
+    let document = import_saved_views_document(json)?;
     let mut imported = document
-        .presets
         .into_iter()
         .enumerate()
         .map(|(index, preset)| preset_from_wire(preset, index))
         .collect::<Result<Vec<_>, _>>()?;
-    let ids = allocate_ids(dashboard, imported.len())?;
 
-    let mut names: HashSet<String> = dashboard
+    let occupied_ids: HashSet<u64> = dashboard
+        .saved_views
+        .iter()
+        .map(|preset| preset.id)
+        .collect();
+    let ids = allocate_saved_view_ids(&occupied_ids, dashboard.next_saved_view_id, imported.len())?;
+
+    let occupied_names: HashSet<String> = dashboard
         .saved_views
         .iter()
         .map(SavedViewPreset::display_name)
         .collect();
-    let mut renamed = 0;
-    for preset in &mut imported {
-        let original = preset.custom_name.clone();
-        let unique = unique_name(&original, &names)?;
-        if unique != original {
-            renamed += 1;
-            preset.custom_name = unique;
-        }
-        names.insert(preset.custom_name.clone());
+    let requested = imported
+        .iter()
+        .map(|preset| preset.custom_name.clone())
+        .collect();
+    let names = resolve_saved_view_import_names(&occupied_names, requested)?;
+    for (preset, name) in imported.iter_mut().zip(&names.names) {
+        preset.custom_name = name.clone();
     }
 
     let imported_count = imported.len();
@@ -135,67 +97,8 @@ pub fn import_saved_views_json(
     dashboard.next_saved_view_id = ids.next_id;
     Ok(SavedViewImportSummary {
         imported: imported_count,
-        renamed,
+        renamed: names.renamed,
     })
-}
-
-struct AllocatedIds {
-    ids: Vec<u64>,
-    next_id: u64,
-}
-
-fn allocate_ids(
-    dashboard: &DashboardState,
-    count: usize,
-) -> Result<AllocatedIds, SavedViewTransferError> {
-    let occupied: HashSet<u64> = dashboard
-        .saved_views
-        .iter()
-        .map(|preset| preset.id)
-        .collect();
-    let mut ids = Vec::with_capacity(count);
-    let mut candidate = dashboard.next_saved_view_id;
-    while ids.len() < count {
-        if !occupied.contains(&candidate) {
-            ids.push(candidate);
-        }
-        candidate = candidate
-            .checked_add(1)
-            .ok_or(SavedViewTransferError::IdSpaceExhausted)?;
-    }
-    Ok(AllocatedIds {
-        ids,
-        next_id: candidate,
-    })
-}
-
-fn unique_name(base: &str, occupied: &HashSet<String>) -> Result<String, SavedViewTransferError> {
-    if !occupied.contains(base) {
-        return Ok(base.to_string());
-    }
-    // There are `occupied.len()` names, so testing one more suffix than that
-    // must find a free candidate (pigeonhole principle).
-    for offset in 0..=occupied.len() {
-        let index = u64::try_from(offset)
-            .ok()
-            .and_then(|offset| 2_u64.checked_add(offset))
-            .ok_or(SavedViewTransferError::NameSpaceExhausted)?;
-        let suffix = format!(" ({index})");
-        let stem_len = MAX_PRESET_NAME_CHARS.saturating_sub(suffix.chars().count());
-        let stem: String = base.chars().take(stem_len).collect();
-        let candidate = format!("{stem}{suffix}");
-        if !occupied.contains(&candidate) {
-            return Ok(candidate);
-        }
-    }
-    Err(SavedViewTransferError::NameSpaceExhausted)
-}
-
-fn valid_transfer_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.trim() == name
-        && name.chars().count() <= MAX_PRESET_NAME_CHARS
-        && !name.chars().any(char::is_control)
 }
 
 fn wire_from_preset(
@@ -204,7 +107,7 @@ fn wire_from_preset(
 ) -> Result<ProcessViewPresetConfig, SavedViewTransferError> {
     let name = preset
         .user_name()
-        .filter(|name| valid_transfer_name(name))
+        .filter(|name| saved_view_name_is_portable(name))
         .ok_or(SavedViewTransferError::InvalidPreset { index })?;
     Ok(ProcessViewPresetConfig::new(
         name.to_string(),
@@ -219,9 +122,6 @@ fn preset_from_wire(
     preset: ProcessViewPresetConfig,
     index: usize,
 ) -> Result<SavedViewPreset, SavedViewTransferError> {
-    if !valid_transfer_name(&preset.name) {
-        return Err(SavedViewTransferError::InvalidPreset { index });
-    }
     Ok(SavedViewPreset::restored(
         preset.name,
         filter_from_token(&preset.filter).ok_or(SavedViewTransferError::InvalidPreset { index })?,
@@ -245,7 +145,7 @@ pub(crate) fn preset_to_config(preset: &SavedViewPreset) -> Option<ProcessViewPr
 
 pub(crate) fn preset_from_config(config: &ProcessViewPresetConfig) -> Option<SavedViewPreset> {
     let name = config.name.trim();
-    if !valid_transfer_name(name) {
+    if !saved_view_name_is_portable(name) {
         return None;
     }
     Some(SavedViewPreset::restored(

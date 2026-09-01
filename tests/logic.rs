@@ -89,5 +89,8 @@ mod control_vocabulary_boundary;
 #[path = "logic/control_semantic_parity.rs"]
 mod control_semantic_parity;
 
+#[path = "logic/shared_fold_write_boundary.rs"]
+mod shared_fold_write_boundary;
+
 #[path = "common/test_support.rs"]
 mod test_support;

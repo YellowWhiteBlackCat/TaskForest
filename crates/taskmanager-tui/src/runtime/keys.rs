@@ -533,11 +533,16 @@ fn selection_extension_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch
     };
     let previously_marked = app.shell.selected_identities().clone();
     let effect = app.move_nonflat_selection_oneshot(delta);
-    app.shell.selected_rows.extend(previously_marked);
+    // The arrow step re-ran the single-select collapse, so the previously
+    // marked set is restored member by member before the newly landed row
+    // joins it — all through the shell's authorized multi-select writer.
+    for identity in previously_marked {
+        app.shell.add_selected_identity(identity);
+    }
     if let Some(process) = app.selected_detail_process()
         && let Some(identity) = ProcessLiveKey::from_process(&process)
     {
-        app.shell.selected_rows.insert(identity);
+        app.shell.add_selected_identity(identity);
     }
     InputDispatch::consumed(effect)
 }

@@ -2,6 +2,7 @@
 
 use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::{NetworkAdapterType, NetworkMetrics};
+use taskmanager_shell::presentation::optional_wifi_signal_quality_percent;
 
 /// Per-network-category visibility policy projected from the Settings/RootView
 /// preference state. This is presentation policy only: providers publish all
@@ -47,9 +48,10 @@ pub(crate) fn network_category_label(adapter_type: NetworkAdapterType) -> &'stat
 /// Second caption line for a NIC. Wireless surfaces SSID · signal% · link Mbps;
 /// wired surfaces the interface name · link Mbps. Each piece is gated on its
 /// source being present, so absent observations are omitted rather than printing a
-/// dangling separator. Signal dBm→% reuses the -90..-30 → 0..100 mapping of the
-/// network detail view (`perf_views`) for cross-view consistency; when nothing
-/// is available the line falls back to the IPv4 address (or interface name).
+/// dangling separator. Signal dBm→% reads the shared -90..-30 → 0..100 fold the
+/// network detail view (`perf_views`) renders, so the two views can never
+/// disagree; when nothing is available the line falls back to the IPv4 address
+/// (or interface name).
 pub(crate) fn nic_caption_line2(n: &NetworkMetrics) -> String {
     let mut parts: Vec<String> = Vec::new();
     if n.adapter_type() == NetworkAdapterType::WiFi {
@@ -58,8 +60,7 @@ pub(crate) fn nic_caption_line2(n: &NetworkMetrics) -> String {
         {
             parts.push(ssid.to_string());
         }
-        if let Some(sig) = n.current_signal_dbm() {
-            let pct = ((sig as f32 + 90.0) / 60.0 * 100.0).clamp(0.0, 100.0);
+        if let Some(pct) = optional_wifi_signal_quality_percent(n.current_signal_dbm()) {
             parts.push(format!("{pct:.0}%"));
         }
     } else {

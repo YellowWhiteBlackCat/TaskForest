@@ -91,7 +91,9 @@ fn test_diagnostics_report_generation() {
     let report = crate::export::system_diagnostics_markdown(
         app.shell.projection().hardware.as_ref(),
         app.shell.projection().snapshot.as_ref(),
-    );
+        Vec::new(),
+    )
+    .expect("the demo report redacts and publishes");
     assert!(report.contains("TaskForest System Diagnostics Report"));
     assert!(report.contains("OS:"));
     assert!(report.contains("Kernel:"));

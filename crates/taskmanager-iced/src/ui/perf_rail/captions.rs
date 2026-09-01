@@ -10,7 +10,7 @@ use taskmanager_core::core::sensors::SensorReading;
 
 use taskmanager_shell::presentation::{
     device_status_i18n_key, effective_smart_status, gpu_display_identity, missing_value,
-    smart_section_visible,
+    smart_section_visible, wifi_signal_quality_percent,
 };
 
 use super::super::UnitPrefs;
@@ -214,7 +214,7 @@ fn nic_caption_line2(nic: &NetworkMetrics) -> String {
             parts.push(ssid.to_string());
         }
         if let Some(signal) = nic.current_signal_dbm() {
-            let pct = super::super::perf_devices::network::wifi_signal_quality_percent(signal);
+            let pct = wifi_signal_quality_percent(signal);
             parts.push(format!("{pct:.0}%"));
         }
     } else {

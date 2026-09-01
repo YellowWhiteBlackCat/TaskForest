@@ -33,7 +33,7 @@ impl IcedApp {
         }
         let row_count = self.shell.table_row_count().unwrap_or(0);
         if self.shell.selected >= row_count {
-            self.shell.selected = row_count.saturating_sub(1);
+            self.shell.move_selection_to(row_count.saturating_sub(1));
         }
         self.sync_visual_cursor();
     }

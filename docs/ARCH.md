@@ -143,7 +143,9 @@ application-owned command/reducer/projection。`taskmanager-app-host` 与
    `Unsupported`。降维映射允许，但必须落在 adapter 内且覆盖枚举全域，不允许部分覆盖
    静默丢弃。
 3. **同一律**：同一事实→显示的折叠全代码库只存在一份，归宿在 shell 折叠层；同一控制
-   语义的 label 折叠同理一份。
+   语义的 label 折叠同理一份。守门：`shared_fold_write_boundary`（dBm 折叠、
+   saved-view 传输协议、shell 选择字段的写入口）、`control_semantic_parity`
+   （tier label 折叠）。
 4. **语义平价律**：同一投影、同一控制命令在四端三平台渲染与执行的语义必须相同——
    标签、缺失性、行序、行为后果；像素与交互手势允许不同，语义不同即缺陷。守门：
    `dual_track_policy_parity`、`renderer_fold_boundary`、`control_semantic_parity`。

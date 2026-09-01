@@ -14,7 +14,7 @@ use taskmanager_core::core::power::BatteryInfo;
 use taskmanager_core::core::units::format_quantity_with;
 use taskmanager_shell::memory::{self, MemSegment, SwapBreakdown};
 use taskmanager_shell::presentation::{
-    MISSING_VALUE, missing_value, optional_bytes, temperature_c,
+    MISSING_VALUE, missing_value, optional_bytes, temperature_c, wifi_signal_quality_percent,
 };
 
 use super::units::{
@@ -373,11 +373,6 @@ pub(super) struct NetworkData {
     pub(super) wireless: Option<WirelessData>,
 }
 
-#[must_use]
-pub(super) fn signal_quality_pct(dbm: i32) -> f32 {
-    ((dbm as f32 + 90.0) / 60.0 * 100.0).clamp(0.0, 100.0)
-}
-
 pub(super) fn network_data(
     network: &NetworkMetrics,
     use_bytes: bool,
@@ -407,7 +402,7 @@ pub(super) fn network_data(
             signal: network
                 .current_signal_dbm()
                 .map_or_else(missing_value, |dbm| {
-                    let quality = signal_quality_pct(dbm);
+                    let quality = wifi_signal_quality_percent(dbm);
                     format!("{dbm} dBm ({quality:.0}%)")
                 }),
             bssid: network.current_bssid().map(str::to_owned),

@@ -9,6 +9,7 @@ use taskmanager_application::i18n;
 use taskmanager_core::core::metrics::NetworkMetrics;
 
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskmanager_shell::presentation::wifi_signal_quality_percent;
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::{device_status_i18n_key, rate_str};
@@ -114,7 +115,7 @@ pub(super) fn network_stats(
     }
     // ── Wireless signal level (dBm; only for associated wireless links) ──
     if let Some(sig) = n.current_signal_dbm() {
-        let quality = ((sig as f32 + 90.0) / 60.0 * 100.0).clamp(0.0, 100.0);
+        let quality = wifi_signal_quality_percent(sig);
         stats.push(StatRow::text(
             i18n::t("common.signal"),
             Some(format!("{sig} dBm ({quality:.0}%)")),

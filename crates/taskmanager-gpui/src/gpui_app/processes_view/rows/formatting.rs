@@ -1,6 +1,7 @@
 //! Process-table numeric and local start-time formatting.
 
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskmanager_shell::presentation::cpu_time_compact;
 
 /// Disk-throughput cell on the Drive ladder (a `/s` rate).
 pub(super) fn format_bytes_rate(units: UnitPreferences, bytes: u64) -> String {
@@ -36,27 +37,12 @@ pub(super) fn optional_f32_dash(value: Option<f32>, format: fn(f32) -> String) -
     value.map_or_else(crate::gpui_app::formatting::missing_value, format)
 }
 
+/// CpuTime cell: the shell's width-bounded compact ladder (`{d}d {h}h` past a
+/// day, `{h}h {m}m`, `{m}m {s}s`, `{s}s`; nothing accumulated renders the
+/// shared dash). The ladder lives in one place so the desktop table can never
+/// drift from the other frontends.
 pub(super) fn format_cpu_time(seconds: u64) -> String {
-    if seconds == 0 {
-        return crate::gpui_app::formatting::missing_value();
-    }
-    let days = seconds / 86_400;
-    let hours = (seconds % 86_400) / 3_600;
-    let minutes = (seconds % 3_600) / 60;
-    let seconds = seconds % 60;
-    if days > 0 {
-        // Drop the minutes segment once a process is at least a day old: the
-        // CpuTime column is width-bounded, and "{days}d {hours}h" stays well
-        // inside it even for multi-year uptimes (where "{minutes}m" would push
-        // the right-aligned mono digits leftward into DiskWrite).
-        format!("{days}d {hours}h")
-    } else if hours > 0 {
-        format!("{hours}h {minutes}m")
-    } else if minutes > 0 {
-        format!("{minutes}m {seconds}s")
-    } else {
-        format!("{seconds}s")
-    }
+    cpu_time_compact(seconds)
 }
 
 pub(super) fn format_nice(nice: i32) -> String {

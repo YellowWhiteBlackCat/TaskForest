@@ -98,6 +98,8 @@ mod process_control;
 mod request_sessions;
 #[path = "app/row_identity.rs"]
 mod row_identity;
+#[path = "app/selection_writes.rs"]
+mod selection_writes;
 
 /// Resolve one demo process's validated row identity by pid (fixtures carry
 /// deterministic start tokens).
@@ -663,12 +665,14 @@ fn multi_select_toggle_extend_and_freeze_the_whole_set() {
     assert_eq!(app.selected_identities(), &grown);
 
     // The batch intent freezes the entire multi-select set (4 targets), not
-    // just the keyboard anchor.
-    let effect = app
-        .request_process_batch(ProcessBatchAction::Suspend)
-        .expect("multi-select should produce a batch intent");
-    let PlatformEffect::ExecuteBatch(intent) = effect else {
-        panic!("batch action must cross the typed platform-effect boundary");
+    // just the keyboard anchor. A four-row Suspend is reversible but not
+    // local to the row the user is looking at, so the shared authority gates
+    // it behind the same confirmation a Kill gets.
+    assert!(app.selection_requires_batch_confirmation(ProcessBatchAction::Suspend));
+    assert_eq!(app.request_process_batch(ProcessBatchAction::Suspend), None);
+    assert!(app.pending_batch().is_some());
+    let Some(PlatformEffect::ExecuteBatch(intent)) = app.confirm_process_batch() else {
+        panic!("confirming the armed multi-select gate must emit the frozen batch");
     };
     assert_eq!(intent.action, ProcessBatchAction::Suspend);
     assert_eq!(intent.targets.len(), 4);

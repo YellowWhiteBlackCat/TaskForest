@@ -1,10 +1,10 @@
 //! source-inspection: static-policy
 //!
-//! Structural gate: the TUI and Iced frontends must never call
-//! `PlatformClient` submit methods directly — every platform request crosses
-//! the shared `ShellApp`/`PlatformEffect`/`queue_effect` seam (ADR-027, the
-//! G-03 convergence). GPUI is the sanctioned dual-track consumer and is
-//! explicitly out of scope here.
+//! Structural gate: the shell-track frontends (TUI, Iced, Bevy) must never
+//! call `PlatformClient` submit methods directly — every platform request
+//! crosses the shared `ShellApp`/`PlatformEffect`/`queue_effect` seam
+//! (ADR-027, the G-03 convergence). GPUI is the sanctioned dual-track
+//! consumer and is explicitly out of scope here.
 //!
 //! This is the meta-gate class CLAUDE.md rule 6 sanctions: an
 //! absence/ownership invariant asserted over source shape, complementing the
@@ -38,8 +38,12 @@ fn rust_sources(root: &Path) -> Vec<PathBuf> {
 }
 
 #[test]
-fn tui_and_iced_submit_only_through_the_shell_effect_seam() {
-    for frontend in ["crates/taskmanager-tui", "crates/taskmanager-iced"] {
+fn shell_track_frontends_submit_only_through_the_shell_effect_seam() {
+    for frontend in [
+        "crates/taskmanager-tui",
+        "crates/taskmanager-iced",
+        "crates/taskmanager-bevy-ui",
+    ] {
         let root = repository().join(frontend);
         let mut violations = Vec::new();
         for path in rust_sources(&root) {

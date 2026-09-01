@@ -88,6 +88,39 @@ impl<T> SystemTelemetryDomainState<T> {
     pub const fn is_current(&self) -> bool {
         matches!(self, Self::Current(_) | Self::Partial(_))
     }
+
+    /// The value a renderer may show for this domain, through the shared
+    /// staleness fold: a current or partial domain reads the live observation,
+    /// while a stale — or unavailable-but-once-observed — domain keeps its last
+    /// known one. A domain that stopped refreshing therefore degrades to its
+    /// previous fact instead of regressing into a fabricated zero.
+    ///
+    /// `Pending`, and an unavailable domain that never observed anything, have
+    /// nothing honest to show: `None` tells the caller to render its missing
+    /// marker, never a placeholder value.
+    ///
+    /// The accessors are function pointers so the fold stays observation-type
+    /// neutral; every domain's own `current_value`/`last_known_value` pair is
+    /// the intended argument.
+    #[must_use]
+    pub fn usable<'a, V>(
+        &'a self,
+        current: fn(&'a T) -> Option<V>,
+        last_known: fn(&'a T) -> Option<V>,
+    ) -> Option<V> {
+        match self {
+            Self::Current(observation) | Self::Partial(observation) => current(observation),
+            Self::Stale(observation)
+            | Self::Unavailable {
+                observation: Some(observation),
+                ..
+            } => last_known(observation),
+            Self::Pending
+            | Self::Unavailable {
+                observation: None, ..
+            } => None,
+        }
+    }
 }
 
 #[derive(Clone, Debug)]

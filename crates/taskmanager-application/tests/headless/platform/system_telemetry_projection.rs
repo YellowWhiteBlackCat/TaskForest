@@ -621,3 +621,67 @@ fn shared_lifecycle_policy_updates_three_independent_partitions() {
     );
     assert_eq!(diagnostics.len(), 3);
 }
+
+#[test]
+fn the_usable_fold_reads_the_live_observation_while_the_domain_is_fresh() {
+    let current = SystemTelemetryDomainState::Current(30_u32);
+    let partial = SystemTelemetryDomainState::Partial(31_u32);
+    for (state, expected) in [(&current, 30), (&partial, 31)] {
+        assert_eq!(
+            state.usable(|value| Some(*value), |value| Some(value.wrapping_add(100))),
+            Some(expected),
+            "a fresh domain must read the live observation, never the fallback"
+        );
+    }
+}
+
+#[test]
+fn the_usable_fold_keeps_the_last_known_fact_of_a_degraded_domain() {
+    let stale = SystemTelemetryDomainState::Stale(9_u32);
+    assert_eq!(
+        stale.usable(|_| None, |value| Some(*value)),
+        Some(9),
+        "a stale domain degrades to its last known fact instead of a zero"
+    );
+    let unavailable = SystemTelemetryDomainState::Unavailable {
+        observation: Some(9_u32),
+        reason: SystemTelemetryUnavailable::Provider(FailureKind::PermissionDenied),
+    };
+    assert_eq!(
+        unavailable.usable(|_| None, |value| Some(*value)),
+        Some(9),
+        "an unavailable domain that once observed a fact keeps it"
+    );
+}
+
+#[test]
+fn the_usable_fold_reports_nothing_without_an_observation() {
+    let pending: SystemTelemetryDomainState<u32> = SystemTelemetryDomainState::Pending;
+    assert_eq!(
+        pending.usable(|value| Some(*value), |value| Some(*value)),
+        None
+    );
+    let blind: SystemTelemetryDomainState<u32> = SystemTelemetryDomainState::Unavailable {
+        observation: None,
+        reason: SystemTelemetryUnavailable::Provider(FailureKind::PermissionDenied),
+    };
+    assert_eq!(
+        blind.usable(|value| Some(*value), |value| Some(*value)),
+        None,
+        "a domain that never observed anything has no honest value"
+    );
+}
+
+#[test]
+fn the_usable_fold_drives_a_real_domain_through_its_own_accessors() {
+    let observation =
+        CpuTelemetryObservation::current(CpuMetrics::default(), 11, source("fixture.cpu"));
+    fn fold(state: &SystemTelemetryDomainState<CpuTelemetryObservation>) -> Option<&CpuMetrics> {
+        state.usable(
+            CpuTelemetryObservation::current_value,
+            CpuTelemetryObservation::last_known_value,
+        )
+    }
+    assert!(fold(&SystemTelemetryDomainState::Current(observation.clone())).is_some());
+    assert!(fold(&SystemTelemetryDomainState::Stale(observation)).is_some());
+}
