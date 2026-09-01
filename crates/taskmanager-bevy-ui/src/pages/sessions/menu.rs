@@ -3,8 +3,10 @@
 //! `select_session_control` (which freezes the provider-issued session
 //! identity, the action, and a fresh correlation id).
 
+use taskmanager_application::PlatformEffect;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::session::{SessionControlAction, SessionItem};
+use taskmanager_core::core::target::SessionId;
 
 use taskmanager_shell::ShellApp;
 
@@ -37,8 +39,11 @@ impl ActionMenuContext for SessionMenuCtx {
         }
     }
 
-    fn commit(&self, pick: usize, shell: &mut ShellApp) {
+    fn commit(&self, pick: usize, shell: &mut ShellApp) -> Vec<PlatformEffect> {
+        // Freezes the target only; the platform request comes from the gate's
+        // typed confirm path, so there is no effect to queue here.
         let _ = shell.select_session_control(&self.0, MENU_ACTIONS[pick]);
+        Vec::new()
     }
 }
 
@@ -47,11 +52,11 @@ pub(crate) type SessionMenuModal = MenuModal<SessionMenuCtx>;
 
 /// Open the menu for one selected session, resolved through the shell's
 /// `sorted_sessions` (the single "row → target" authority).
-pub(crate) fn open_for(modal: &mut SessionMenuModal, shell: &ShellApp, target: &str) -> bool {
+pub(crate) fn open_for(modal: &mut SessionMenuModal, shell: &ShellApp, target: &SessionId) -> bool {
     let Some(session) = shell
         .sorted_sessions()
         .into_iter()
-        .find(|session| session.id == target)
+        .find(|session| session.id == *target)
     else {
         return false;
     };

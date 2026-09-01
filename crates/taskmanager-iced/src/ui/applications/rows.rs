@@ -434,15 +434,15 @@ fn group_header_row(
     // The typed aggregate keeps the PSS-preferred display metric and the PSS
     // metric separate. Only current values become strings; stale and
     // unavailable values remain explicit dashes.
-    let (cpu_text, cpu_zero) = aggregate_f32_text(&metrics.cpu, |cpu| format!("{cpu:>5.1}%"));
-    let memory = metrics.memory_display.current_value().copied();
-    let pss = metrics.memory_pss.current_value().copied();
-    let swap = metrics.swap.current_value().copied();
-    let disk_read = metrics.disk_read.current_value().copied();
-    let disk_write = metrics.disk_write.current_value().copied();
-    let cpu_time = metrics.cpu_time.current_value().copied();
-    let threads = aggregate_count_text(&metrics.threads);
-    let fds = aggregate_count_text(&metrics.fds);
+    let (cpu_text, cpu_zero) = aggregate_f32_text(metrics.cpu(), |cpu| format!("{cpu:>5.1}%"));
+    let memory = metrics.memory().current_value().copied();
+    let pss = metrics.memory_pss().current_value().copied();
+    let swap = metrics.swap().current_value().copied();
+    let disk_read = metrics.disk_read().current_value().copied();
+    let disk_write = metrics.disk_write().current_value().copied();
+    let cpu_time = metrics.cpu_time().current_value().copied();
+    let threads = aggregate_count_text(metrics.threads());
+    let fds = aggregate_count_text(metrics.fds());
     // The fused leading cell spans Pid+Name while Pid is visible and collapses
     // to the Name extent once Pid is hidden, so the identity column keeps its
     // boundary aligned with the member rows beneath it.

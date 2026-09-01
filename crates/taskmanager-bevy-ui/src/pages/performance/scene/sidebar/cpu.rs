@@ -78,13 +78,10 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
 fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> impl Scene + use<> {
     let field = CpuField::Core(index);
     let label = format!("Core {:02}", index + 1);
-    // The fill's FIRST paint comes from the same observation the number
-    // renders — a page without a pending fold still shows bars that agree
-    // with their numeric facts (capture and cold start included).
-    let initial_pct = cpu_metrics(shell)
-        .and_then(|cpu| cpu.current_core_usage_pct(index))
-        .filter(|value| value.is_finite())
-        .map_or(0.0, |value| value.clamp(0.0, 100.0));
+    // The fill's FIRST paint comes from the same folded observation the
+    // number renders — a page without a pending fold still shows bars that
+    // agree with their numeric facts (capture and cold start included).
+    let initial_pct = core_usage_fill_pct(shell, index);
     bsn! {
         Node {
             width: percent(48.0),
@@ -148,9 +145,7 @@ fn core_bar_row_scene(shell: &ShellApp, index: usize, palette: &UiPalette) -> im
 }
 
 fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
-    let core_count = cpu_metrics(shell)
-        .map(|cpu| cpu.current_core_usage_len())
-        .unwrap_or(0);
+    let core_count = core_usage_count(shell);
     let rows: Vec<Box<dyn Scene>> = (0..core_count)
         .map(|index| Box::new(core_bar_row_scene(shell, index, palette)) as Box<dyn Scene>)
         .collect();

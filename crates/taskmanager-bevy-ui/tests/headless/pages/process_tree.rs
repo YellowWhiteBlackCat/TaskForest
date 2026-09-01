@@ -3,7 +3,9 @@ use taskmanager_application::process_category_projection::category_buckets;
 use taskmanager_core::core::FailureKind;
 use taskmanager_core::core::metrics::{ScalarAvailability, ScalarObservation};
 use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_core::core::process::{ProcessApplicationIdentity, ProcessMetadataObservation};
+use taskmanager_core::core::process::{
+    ProcessApplicationIdentity, ProcessMetadataObservation, process_category,
+};
 
 /// Fixture accepted-snapshot timestamp matching the observations below, whose
 /// `last_success_ms` is 1.
@@ -53,19 +55,21 @@ fn application(pid: u32, parent_pid: Option<u32>, name: &str) -> ProcessItem {
 #[test]
 fn expansion_keys_are_stable_and_typed() {
     let mut expansion = ProcessTreeExpansion::default();
-    assert!(!expansion.category_expanded(ProcessCategory::Application));
+    let category_key = category_expansion_key(ProcessCategory::Application);
+    assert!(!expansion.expanded_groups.contains(&category_key));
     let identity = key_of(taskmanager_shell::ProcessRowId::Process, 7)
         .live_key()
         .expect("fixture identity");
-    assert!(!expansion.application_expanded(identity));
-    assert!(!expansion.process_collapsed(identity));
+    let application_key = app_tree_expansion_key_for_identity(identity);
+    assert!(!expansion.expanded_groups.contains(&application_key));
+    assert!(!expansion.collapsed_processes.contains(&identity));
 
     expansion.toggle_category(ProcessCategory::Application);
     expansion.toggle_application(identity);
     expansion.toggle_process(identity);
-    assert!(expansion.category_expanded(ProcessCategory::Application));
-    assert!(expansion.application_expanded(identity));
-    assert!(expansion.process_collapsed(identity));
+    assert!(expansion.expanded_groups.contains(&category_key));
+    assert!(expansion.expanded_groups.contains(&application_key));
+    assert!(expansion.collapsed_processes.contains(&identity));
 
     expansion.toggle_category(ProcessCategory::Application);
     expansion.toggle_application(identity);
@@ -88,9 +92,15 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
     assert_eq!(
         collapsed.iter().map(|row| row.key).collect::<Vec<_>>(),
         vec![
-            taskmanager_shell::ProcessRowId::Category(ProcessCategory::Application),
-            taskmanager_shell::ProcessRowId::Category(ProcessCategory::Background),
-            taskmanager_shell::ProcessRowId::Category(ProcessCategory::Uncategorized),
+            Some(taskmanager_shell::ProcessRowId::Category(
+                ProcessCategory::Application
+            )),
+            Some(taskmanager_shell::ProcessRowId::Category(
+                ProcessCategory::Background
+            )),
+            Some(taskmanager_shell::ProcessRowId::Category(
+                ProcessCategory::Uncategorized
+            )),
         ]
     );
     assert_eq!(collapsed[0].member_count, 2);
@@ -100,7 +110,7 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
     let category_open = project_items(&items, &expansion, SNAPSHOT_MS);
     assert_eq!(
         category_open[1].key,
-        key_of(taskmanager_shell::ProcessRowId::Application, 10)
+        Some(key_of(taskmanager_shell::ProcessRowId::Application, 10))
     );
     assert_eq!(category_open[1].member_count, 2);
 
@@ -112,11 +122,11 @@ fn projection_keeps_category_aggregate_and_process_identities_distinct() {
     let tree_open = project_items(&items, &expansion, SNAPSHOT_MS);
     assert_eq!(
         tree_open[2].key,
-        key_of(taskmanager_shell::ProcessRowId::Process, 10)
+        Some(key_of(taskmanager_shell::ProcessRowId::Process, 10))
     );
     assert_eq!(
         tree_open[3].key,
-        key_of(taskmanager_shell::ProcessRowId::Process, 11)
+        Some(key_of(taskmanager_shell::ProcessRowId::Process, 11))
     );
     assert_eq!(tree_open[2].item.map(|item| item.pid), Some(10));
     assert_eq!(tree_open[1].item, None);
@@ -183,10 +193,12 @@ fn process_collapse_hides_only_descendants() {
     assert_eq!(
         rows.iter().map(|row| row.key).collect::<Vec<_>>(),
         vec![
-            taskmanager_shell::ProcessRowId::Category(ProcessCategory::Application),
-            key_of(taskmanager_shell::ProcessRowId::Application, 50),
-            key_of(taskmanager_shell::ProcessRowId::Process, 50),
-            key_of(taskmanager_shell::ProcessRowId::Process, 51),
+            Some(taskmanager_shell::ProcessRowId::Category(
+                ProcessCategory::Application
+            )),
+            Some(key_of(taskmanager_shell::ProcessRowId::Application, 50)),
+            Some(key_of(taskmanager_shell::ProcessRowId::Process, 50)),
+            Some(key_of(taskmanager_shell::ProcessRowId::Process, 51)),
         ]
     );
     assert!(rows[3].has_children);

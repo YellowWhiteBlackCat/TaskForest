@@ -34,6 +34,7 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, ConfirmationKind, PendingConfirmation, PlatformEffect};
+use taskmanager_shell::presentation::process_batch_action_label;
 
 use crate::app::FrontendTrack;
 use crate::input::PendingEffects;
@@ -90,12 +91,14 @@ impl PendingConfirmationView {
                 } else {
                     format!("{} {}", targets.len(), t("proc.process_count"))
                 };
+                let action = process_batch_action_label(intent.action);
                 let headline = t("confirm.action_headline")
-                    .replace("{action}", t("proc.kill"))
+                    .replace("{action}", &action)
                     .replace("{target}", &scope);
                 Some(Self {
                     kind: ConfirmationKind::ProcessBatch,
-                    title: t("confirm.batch_title").to_owned(),
+                    title: t("proc.batch_confirm_title")
+                        .replace("{count}", &targets.len().to_string()),
                     body: format!("{headline}\n{}", t("confirm.frozen_body")),
                     confirm_label: t("common.confirm").to_owned(),
                     cancel_label: t("common.cancel").to_owned(),
@@ -150,7 +153,7 @@ impl PendingConfirmationView {
                 };
                 let headline = t("confirm.session_headline")
                     .replace("{action}", action_label)
-                    .replace("{id}", &pending.session.id)
+                    .replace("{id}", pending.session.id.as_str())
                     .replace("{user}", &pending.session.user);
                 Some(Self {
                     kind: ConfirmationKind::SessionControl,
@@ -241,7 +244,7 @@ pub(crate) fn confirm_armed(
         ConfirmationKind::ServiceControl => shell.apply_action(AppAction::ConfirmServiceControl),
         ConfirmationKind::StartupControl => shell.confirm_startup_control(),
         ConfirmationKind::SessionControl => shell.confirm_session_control(),
-        ConfirmationKind::ProcessTermination | ConfirmationKind::SmartSelfTest => None,
+        ConfirmationKind::SmartSelfTest => None,
     }
 }
 
@@ -368,8 +371,8 @@ fn overlay_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Sc
     }
 }
 
-/// The dialog panel: title, echoed body, and the two typed choice buttons —
-/// the interactive counterpart of the reserved `widgets::dialog` skeleton.
+/// The confirmation panel: title, echoed body, and the two typed choice
+/// buttons.
 fn panel_scene(view: &PendingConfirmationView, palette: &UiPalette) -> impl Scene + use<> {
     let title = view.title.clone();
     let body = view.body.clone();

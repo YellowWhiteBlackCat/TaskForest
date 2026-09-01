@@ -44,7 +44,7 @@ fn sensor_event_preserves_physical_device_generation_and_lifecycle() {
                     device_id.as_str().to_owned(),
                     DeviceLifecycle {
                         presence: DevicePresence::Present,
-                        generation: 2,
+                        generation: DeviceGeneration::new(2),
                         ..Default::default()
                     },
                 )]),
@@ -68,6 +68,6 @@ fn sensor_event_preserves_physical_device_generation_and_lifecycle() {
             .device_lifecycles
             .get(device_id.as_str())
             .map(|lifecycle| lifecycle.generation),
-        Some(2)
+        Some(DeviceGeneration::new(2))
     );
 }

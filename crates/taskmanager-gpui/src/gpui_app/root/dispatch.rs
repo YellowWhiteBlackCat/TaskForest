@@ -7,6 +7,7 @@
 use super::{ProcMenuAction, RootView, TopPage};
 use gpui::Entity;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_shell::presentation::search_url_for;
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem};
 
 use crate::gpui_app::sidebar::SelectedDevice;
@@ -201,7 +202,8 @@ pub fn build_proc_menu(entity: Entity<RootView>, identity: ProcessLiveKey) -> Ve
 
 /// "Search online" action body: open a Google search for the selected process's name
 /// in the default browser via `xdg-open`. The name is percent-encoded per RFC 3986
-/// (`url_encode_query`) so spaces / `/` / `&` / non-ASCII don't corrupt the URL.
+/// (`taskmanager_shell::presentation::url_encode_query`) so spaces / `/` / `&` /
+/// non-ASCII don't corrupt the URL.
 /// Sets a transient feedback when there's no name to search or the launch fails.
 pub fn apply_search_online(
     v: &mut RootView,
@@ -220,27 +222,7 @@ pub fn apply_search_online(
         v.show_local_feedback("No process name to search", cx);
         return;
     }
-    let url = format!(
-        "https://www.google.com/search?q={}",
-        url_encode_query(&name)
-    );
-    v.request_open_url(url, cx);
-}
-
-fn url_encode_query(value: &str) -> String {
-    let mut output = String::with_capacity(value.len());
-    for &byte in value.as_bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' => {
-                output.push(char::from(byte));
-            }
-            _ => {
-                output.push('%');
-                output.push_str(&format!("{byte:02X}"));
-            }
-        }
-    }
-    output
+    v.request_open_url(search_url_for(&name), cx);
 }
 
 #[cfg(test)]

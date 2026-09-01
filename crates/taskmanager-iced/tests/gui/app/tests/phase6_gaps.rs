@@ -102,7 +102,8 @@ fn test_network_wifi_signal_formatting() {
 
 #[test]
 fn test_wifi_quality_mapping_and_hardware_facts_live_in_the_stats_rail() {
-    use crate::ui::perf_devices::network::{network_summary_lines, wifi_signal_quality_percent};
+    use crate::ui::perf_devices::network::network_summary_lines;
+    use taskmanager_shell::presentation::wifi_signal_quality_percent;
     assert_eq!(wifi_signal_quality_percent(-90), 0.0);
     assert_eq!(wifi_signal_quality_percent(-60), 50.0);
     assert_eq!(wifi_signal_quality_percent(-30), 100.0);

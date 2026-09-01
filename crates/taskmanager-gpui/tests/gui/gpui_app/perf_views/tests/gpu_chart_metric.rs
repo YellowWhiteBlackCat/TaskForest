@@ -32,7 +32,7 @@ fn chart_metric_observation(
         taskmanager_core::core::DeviceLifecycle {
             presence: taskmanager_core::core::DevicePresence::Present,
             state: taskmanager_core::core::DeviceState::healthy(observed_at_ms),
-            generation: 1,
+            generation: DeviceGeneration::INITIAL,
             first_seen_ms: Some(observed_at_ms),
             last_seen_ms: Some(observed_at_ms),
             absent_since_ms: None,
@@ -190,7 +190,7 @@ fn seed_tracks_frames(
             taskmanager_core::core::DeviceLifecycle {
                 presence: taskmanager_core::core::DevicePresence::Present,
                 state: taskmanager_core::core::DeviceState::healthy(observed_at_ms),
-                generation: 1,
+                generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(observed_at_ms),
                 last_seen_ms: Some(observed_at_ms),
                 absent_since_ms: None,

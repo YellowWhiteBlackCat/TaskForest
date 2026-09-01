@@ -3,6 +3,7 @@
 //! `request_startup_control_for` (which arms the shared confirmation and
 //! freezes the exact provider-issued entry).
 
+use taskmanager_application::PlatformEffect;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::startup::StartupEntry;
 use taskmanager_core::core::startup::StartupEntryId;
@@ -36,9 +37,12 @@ impl ActionMenuContext for StartupMenuCtx {
         }
     }
 
-    fn commit(&self, pick: usize, shell: &mut ShellApp) {
+    fn commit(&self, pick: usize, shell: &mut ShellApp) -> Vec<PlatformEffect> {
         let enabled = MENU_ACTIONS_ENABLED[pick];
+        // Arms the shared gate; the platform request comes from the gate's
+        // typed confirm path, so there is no effect to queue here.
         let _ = shell.request_startup_control_for(self.0.clone(), enabled);
+        Vec::new()
     }
 }
 

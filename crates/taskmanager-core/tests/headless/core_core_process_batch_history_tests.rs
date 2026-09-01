@@ -248,6 +248,37 @@ fn pid_reuse_is_rejected_before_the_executor_runs() {
 }
 
 #[test]
+fn display_name_changes_do_not_change_the_live_process_identity() {
+    let frozen = FrozenProcessIdentity::from_authoritative_parts(20, "old-name", 200, 2_000)
+        .expect("authoritative frozen identity");
+    let mut live = ProcessItem::new(20, "new-name");
+    live.apply_scalar_observations(ProcessScalarObservations {
+        start_token: ScalarObservation::available(2_000, 1),
+        ..ProcessScalarObservations::default()
+    });
+    let mut executed = false;
+    let result = execute_process_batch_with(
+        ProcessBatchIntent {
+            action: ProcessBatchAction::Suspend,
+            scope: Default::default(),
+            targets: vec![frozen],
+        },
+        &[live],
+        |_action, _target| {
+            executed = true;
+            Ok(())
+        },
+    );
+
+    assert!(executed, "a display rename preserves the same incarnation");
+    assert_eq!(
+        result.targets[0].1,
+        ProcessBatchTargetResult::Applied,
+        "PID plus provider start token is the authoritative match"
+    );
+}
+
+#[test]
 fn execution_result_is_recorded_automatically_including_partial_failure() {
     let targets = vec![identity(21, "first"), identity(22, "second")];
     let live = targets

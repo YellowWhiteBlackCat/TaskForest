@@ -25,7 +25,7 @@ fn gpu_observation(utilization: Option<f32>) -> GpuTelemetryObservation {
             taskmanager_core::core::DeviceLifecycle {
                 presence: taskmanager_core::core::DevicePresence::Present,
                 state: taskmanager_core::core::DeviceState::healthy(1),
-                generation: 1,
+                generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(1),
                 last_seen_ms: Some(1),
                 absent_since_ms: None,
@@ -129,7 +129,7 @@ fn split_lifecycles(
         taskmanager_core::core::DeviceLifecycle {
             presence: DevicePresence::Present,
             state: taskmanager_core::core::DeviceState::healthy(observed_at_ms),
-            generation,
+            generation: DeviceGeneration::new(generation),
             first_seen_ms: Some(observed_at_ms),
             last_seen_ms: Some(observed_at_ms),
             absent_since_ms: None,

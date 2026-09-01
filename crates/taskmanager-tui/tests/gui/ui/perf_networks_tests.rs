@@ -1,6 +1,6 @@
-use super::super::perf_data::signal_quality_pct;
 use super::*;
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
+use taskmanager_shell::presentation::wifi_signal_quality_percent;
 
 /// Flatten a ratatui `Line` back to its raw text so a test can assert on
 /// the rendered string.
@@ -42,11 +42,11 @@ fn wireless_network(signal_dbm: Option<i32>) -> NetworkMetrics {
         .build()
 }
 
-/// The RSSI→quality mapping matches the GPUI derivation exactly: -90 dBm
-/// floors at 0%, -30 dBm ceilings at 100%, and the mid-range scales
-/// linearly.
+/// The RSSI→quality mapping the wireless readout consumes is the shell's
+/// single fold (ADR-020), shared with the desktop frontends: -90 dBm floors
+/// at 0%, -30 dBm ceilings at 100%, and the mid-range scales linearly.
 #[test]
-fn signal_quality_pct_maps_the_standard_rssi_range() {
+fn the_shared_signal_quality_fold_maps_the_standard_rssi_range() {
     let cases = [
         (-90, 0.0),
         (-75, 25.0),
@@ -56,15 +56,15 @@ fn signal_quality_pct_maps_the_standard_rssi_range() {
         (-30, 100.0),
     ];
     for (dbm, expected) in cases {
-        let quality = signal_quality_pct(dbm);
+        let quality = wifi_signal_quality_percent(dbm);
         assert!(
             (quality - expected).abs() < 0.01,
             "signal {dbm} dBm should map to {expected}%, got {quality}%"
         );
     }
     // Out-of-range readings clamp to the honest bounds.
-    assert_eq!(signal_quality_pct(-100), 0.0);
-    assert_eq!(signal_quality_pct(-20), 100.0);
+    assert_eq!(wifi_signal_quality_percent(-100), 0.0);
+    assert_eq!(wifi_signal_quality_percent(-20), 100.0);
 }
 
 /// A wireless adapter with an observed signal renders the derived quality

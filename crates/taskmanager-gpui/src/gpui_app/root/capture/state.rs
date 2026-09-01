@@ -4,13 +4,11 @@ use super::ProcessDetailsSection;
 use super::scenarios::CaptureScenario;
 use crate::gpui_app::process_insights::ProcessInsightsState;
 use crate::gpui_app::system_health_view::SmartSelfTestConfirmationRequest;
-use taskmanager_application::ProcessTerminationConfirmation;
 use taskmanager_core::core::process::{ProcessBatchIntent, ProcessLiveKey};
 use taskmanager_core::core::{AlertEvent, SmartSelfTestObservation};
 
 #[derive(Debug, PartialEq)]
 pub enum CaptureProcessAction {
-    Termination(ProcessTerminationConfirmation),
     ApplicationSelection(ProcessLiveKey),
     Batch(ProcessBatchIntent),
     Properties(ProcessLiveKey, ProcessDetailsSection),

@@ -129,6 +129,15 @@ where
         .collect())
 }
 
+mod saved_view_transfer;
+pub use saved_view_transfer::{
+    MAX_PRESET_NAME_CHARS, MAX_TRANSFER_PRESETS, SAVED_VIEW_TRANSFER_FORMAT,
+    SAVED_VIEW_TRANSFER_VERSION, SavedViewIdAllocation, SavedViewImportNames,
+    SavedViewTransferError, allocate_saved_view_ids, export_saved_views_document,
+    import_saved_views_document, resolve_saved_view_import_names, saved_view_name_is_portable,
+    unique_saved_view_name,
+};
+
 /// Platform-neutral serialized form of one user-resized process column width.
 ///
 /// The `column` token is opaque to `core` (the same `"CPU"` / `"Memory"` /

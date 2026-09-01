@@ -1,6 +1,7 @@
 //! Renderer-local input modality for the Iced frontend: which input origin
 //! last pressed in this window, and therefore whether focused controls paint
-//! their focus ring.
+//! their focus ring. The value lives in [`crate::app::InputState`], not in a
+//! process-global variable.
 //!
 //! This is the iced counterpart of the GPUI root's `InputModality` tracker
 //! (taskmanager-gpui `gpui_app/root/input_modality.rs`, GPUI-05 reference
@@ -17,16 +18,6 @@
 //!   iced analog of a capture-phase mouse-down listener (a root `mouse_area`
 //!   cannot do this: it captures the presses it reports).
 //!
-//! Process-global is honest here for the same reason the motion policy is
-//! (`app::motion`): the iced product is single-instance and owns the one
-//! window, so there is no second surface this decision could cross. The
-//! tracker is read during view construction (`theme::focus_ring_color`), and
-//! every message rebuilds the view, so a modality change takes effect on the
-//! frame after the input that caused it — the same frame in which GPUI's
-//! per-frame `with_focus_visible` applies its decision.
-
-use std::sync::atomic::{AtomicU8, Ordering};
-
 use iced::advanced::widget::{Operation, Tree};
 use iced::advanced::{Clipboard, Layout, Shell, Widget};
 use iced::{Element, Event, Length, Rectangle, Size, Vector};
@@ -47,22 +38,6 @@ pub(crate) enum InputModality {
 }
 
 impl InputModality {
-    fn from_u8(value: u8) -> Self {
-        match value {
-            1 => Self::Keyboard,
-            2 => Self::Pointer,
-            _ => Self::Programmatic,
-        }
-    }
-
-    const fn as_u8(self) -> u8 {
-        match self {
-            Self::Programmatic => 0,
-            Self::Keyboard => 1,
-            Self::Pointer => 2,
-        }
-    }
-
     /// Strict focus-visible policy: only keyboard modality paints an outset
     /// ring, matching the shared palette contract (ring alpha encodes
     /// focus-visible) and the GPUI shell's decision.
@@ -70,30 +45,6 @@ impl InputModality {
     pub(crate) const fn shows_focus_ring(self) -> bool {
         matches!(self, Self::Keyboard)
     }
-}
-
-static INPUT_MODALITY: AtomicU8 = AtomicU8::new(InputModality::Programmatic as u8);
-
-fn modality() -> InputModality {
-    InputModality::from_u8(INPUT_MODALITY.load(Ordering::Relaxed))
-}
-
-/// Whether focused controls currently paint their focus ring. Read at view
-/// construction time by `theme::focus_ring_color`.
-#[must_use]
-pub(crate) fn focus_visible() -> bool {
-    modality().shows_focus_ring()
-}
-
-/// Observe one keyboard press. Relaxed ordering suffices: the value is a
-/// plain enum, re-read on the next view build.
-pub(crate) fn observe_keyboard() {
-    INPUT_MODALITY.store(InputModality::Keyboard.as_u8(), Ordering::Relaxed);
-}
-
-/// Observe one pointer button press over the root surface.
-pub(crate) fn observe_pointer() {
-    INPUT_MODALITY.store(InputModality::Pointer.as_u8(), Ordering::Relaxed);
 }
 
 /// The root input observer: a transparent pass-through shell around the whole

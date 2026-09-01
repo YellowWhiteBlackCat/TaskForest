@@ -110,6 +110,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     app.insert_non_send(FrontendTrack {
         shell: shell_with_hardware(Some(fixture_hardware())),
         initial_refresh_submitted: true,
+        process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     app.init_resource::<HistoryProjectionResource>();
     // Mount the REAL page scene: the root's on-insert hook binds the paint
@@ -118,11 +119,11 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     let shell = shell_with_hardware(Some(fixture_hardware()));
     let palette = crate::palette::ui_palette(&Theme::dark());
     let history = HistoryProjectionResource::default();
+    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
         shell: &shell,
+        process_tree_expansion: &process_tree_expansion,
         palette: &palette,
-        body: palette.body.clone(),
-        heading: palette.heading.clone(),
         history: &history.0,
     };
     let world = app.world_mut();
@@ -132,6 +133,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
     app.insert_non_send(FrontendTrack {
         shell,
         initial_refresh_submitted: true,
+        process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
     });
     // NO manual paint: the on-insert bind hook must author the body by
     // itself, exactly as the windowed composition does.
@@ -155,7 +157,7 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
 
     // A refold (the page's only refresh trigger) repaints in place — the
     // fact is still stated exactly once, never duplicated.
-    app.world_mut().trigger(ShellProjectionFolded(1));
+    app.world_mut().trigger(ShellProjectionFolded);
     app.update();
     paint_system(app.world_mut());
     let world = app.world_mut();

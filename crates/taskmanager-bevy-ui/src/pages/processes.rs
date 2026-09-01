@@ -30,10 +30,11 @@
 //! cursor are shell-owned (query + status filter + sort memoized in
 //! `ShellApp::visible_processes`); the header marks the active sort; an
 //! unavailable scalar renders `—`, never zero. M1 differences are deliberate
-//! and declared in the capability note: no grouped tree, no per-row sparkline,
-//! and no multi-select batch verbs yet. StartTime cells render `—` until a
-//! local-time observation reaches this frontend; the selected-process details
-//! panel is the first completed F13 slice.
+//! and declared in the capability note: the compact grouped tree strip is
+//! mounted above the table, while per-row trend and multi-select batch verbs
+//! remain unavailable. StartTime cells render `—` until a local-time
+//! observation reaches this frontend; the selected-process details panel is
+//! the first completed F13 slice.
 
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
@@ -52,10 +53,8 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::Button;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
-use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey};
-use taskmanager_core::core::time::LocalTimeRulesObservation;
+use taskmanager_core::core::process::ProcessLiveKey;
 
-use taskmanager_shell::presentation::{MISSING_VALUE, bytes, optional_nice, start_clock_local};
 use taskmanager_shell::process_semantic_key;
 use taskmanager_shell::{ShellApp, SortCol, SortDir};
 use taskmanager_ui_contract::ProcessColumnSpec;
@@ -73,6 +72,8 @@ use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod details;
 pub(crate) mod input;
+pub(crate) mod menu;
+pub(crate) mod projection;
 
 /// Height of the scrollable rows area in px. The bevy_ui flexbox cannot report
 /// a computed node height to an observer without a layout system, so M1 fixes
@@ -114,69 +115,6 @@ pub(crate) fn sort_projection(sort: (SortCol, SortDir)) -> Option<SortProjection
         column,
         descending: direction == SortDir::Desc,
     })
-}
-
-/// One cell's text for a contract column id. Unavailable scalars render the
-/// shared `MISSING_VALUE` dash, exactly like the TUI cells — a provider
-/// failure is never shown as a zero. The Start column uses the unsupported
-/// local-time observation, so it renders `—` until this frontend observes a
-/// timezone (the same output the TUI shows on an unsupported host).
-fn cell_text(process: &ProcessItem, column: &str) -> String {
-    match column {
-        "Name" => process.name.clone(),
-        "User" => process
-            .current_user()
-            .unwrap_or_else(|| MISSING_VALUE.to_owned()),
-        "PID" => process.pid.to_string(),
-        "Threads" => process
-            .current_threads()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| value.to_string()),
-        "StartTime" => start_clock_local(
-            process.current_start_time_secs(),
-            &LocalTimeRulesObservation::unsupported(0),
-        ),
-        "Status" => process.status.clone(),
-        "CPU" => process
-            .current_cpu_percentage()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| format!("{value:.1}%")),
-        "Memory" => process
-            .current_memory_bytes()
-            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
-        "Swap" => process
-            .current_swap_bytes()
-            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
-        "DiskRead" => process
-            .current_disk_read_bytes_per_sec()
-            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
-        "DiskWrite" => process
-            .current_disk_write_bytes_per_sec()
-            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
-        "CPUTime" => process
-            .current_cpu_time_secs()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| format!("{value:.1}s")),
-        "FDs" => process
-            .current_fds()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| value.to_string()),
-        "Nice" => optional_nice(process.current_nice()),
-        _ => MISSING_VALUE.to_owned(),
-    }
-}
-
-/// One row's cell vector over the contract columns (contract order, widths,
-/// and numeric alignment come from the shared vocabulary, never a local copy).
-/// The selected row prefixes the Name cell with the TUI's `›` cursor marker.
-fn row_cells(process: &ProcessItem, columns: &[&ProcessColumnSpec], selected: bool) -> Vec<String> {
-    columns
-        .iter()
-        .map(|column| {
-            let text = cell_text(process, column.id);
-            if selected && column.id == "Name" {
-                format!("› {text}")
-            } else {
-                text
-            }
-        })
-        .collect()
 }
 
 /// The rendered rows of one virtual window: pure over (shell, viewport,
@@ -224,7 +162,7 @@ pub(crate) fn rows_projection(
                 index,
                 semantic_id: process_semantic_key(process),
                 name: process.name.clone(),
-                cells: row_cells(process, &columns, Some(index) == selected),
+                cells: projection::row_cells(process, &columns, Some(index) == selected),
                 selected: Some(index) == selected,
             }
         })
@@ -329,17 +267,12 @@ pub(crate) struct ProcessQueryCommit {
     pub(crate) text: String,
 }
 
-/// Published whenever the selected row's identity actually changes — the seam
-/// the later details panel observes. `None` means the table emptied or the
-/// selection collapsed; it is a real transition, not a missing value.
+/// Published whenever the selected row's identity actually changes. The
+/// details panel reads the shell projection for the identity; this event is
+/// only its typed refresh signal, so it cannot become a second selection
+/// authority.
 #[derive(Clone, Debug, Event)]
-pub(crate) struct ProcessSelectionChanged(
-    /// Grammar-complete today (the details panel lands with a later
-    /// milestone); the headless tests read the payload to prove what the page
-    /// publishes — the same shape as `RouteChanged`'s reserved payload.
-    #[allow(dead_code)]
-    pub(crate) Option<ProcessLiveKey>,
-);
+pub(crate) struct ProcessSelectionChanged;
 
 /// The virtual scroll surface: exactly one node under the mounted page.
 #[derive(Component, Clone, Default)]
@@ -461,7 +394,7 @@ fn on_select_step(
         return;
     };
     rebuild_table(&mut commands, root, shell, &mut surface);
-    commands.trigger(ProcessSelectionChanged(after));
+    commands.trigger(ProcessSelectionChanged);
 }
 
 /// Click seam: `select_row` is bounded — a stale row index is rejected
@@ -486,7 +419,7 @@ fn on_select_row(
     };
     rebuild_table(&mut commands, root, shell, &mut surface);
     if before != after {
-        commands.trigger(ProcessSelectionChanged(after));
+        commands.trigger(ProcessSelectionChanged);
     }
 }
 
@@ -534,7 +467,7 @@ fn on_query_commit(
         return;
     };
     rebuild_table(&mut commands, root, shell, &mut surface);
-    commands.trigger(ProcessSelectionChanged(selected_identity(shell)));
+    commands.trigger(ProcessSelectionChanged);
 }
 
 // ---- render --------------------------------------------------------------
@@ -701,11 +634,10 @@ fn rows_root_scene(
 pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let palette = context.palette;
     let title = Page::Processes.title();
-    // Honest capability note: grouping and per-row trend remain incubation
-    // seams; Delete arms the shared end-task gate, and details follow the
-    // selected row.
+    // Honest capability note: the grouped tree strip is mounted; per-row
+    // trend and multi-select batch verbs are not part of this frontend yet.
     let note = format!(
-        "{} — grouping and per-row trend are in incubation; Delete arms the shared end-task gate; details follow the selected row",
+        "{} — grouped tree is available; per-row trend and multi-select are unavailable; Delete arms the shared end-task gate; details follow the selected row",
         Page::Processes.nav_label()
     );
     let viewport_rows = rows_in_viewport(TABLE_VIEWPORT_HEIGHT_PX, palette.control_height_px);

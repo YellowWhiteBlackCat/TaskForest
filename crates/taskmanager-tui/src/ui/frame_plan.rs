@@ -754,8 +754,7 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
 
 const fn confirmation_size(kind: taskmanager_application::ConfirmationKind) -> (u16, u16) {
     match kind {
-        taskmanager_application::ConfirmationKind::EndTask
-        | taskmanager_application::ConfirmationKind::ProcessTermination => (58, 9),
+        taskmanager_application::ConfirmationKind::EndTask => (58, 9),
         taskmanager_application::ConfirmationKind::ServiceControl
         | taskmanager_application::ConfirmationKind::StartupControl
         | taskmanager_application::ConfirmationKind::SessionControl => (60, 9),

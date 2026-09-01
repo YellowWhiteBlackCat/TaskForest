@@ -20,7 +20,7 @@ impl SessionInventoryProvider for WinSessionInventoryProvider {
                 let session_name = session.session_name.unwrap_or_default();
                 let remote = session_name.to_ascii_lowercase().starts_with("rdp");
                 SessionItem {
-                    id: format!("windows:session:{}", session.session_id),
+                    id: format!("windows:session:{}", session.session_id).into(),
                     uid: 0,
                     user: session.user_name.unwrap_or_default(),
                     seat: None,

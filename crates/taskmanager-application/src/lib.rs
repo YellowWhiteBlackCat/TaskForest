@@ -123,8 +123,8 @@ pub use history_replay::{
 };
 pub use interaction::{
     ConfirmationKind, InteractionEvent, InteractionReduction, InteractionState,
-    PendingConfirmation, ProcessTerminationAction, ProcessTerminationConfirmation,
-    SessionControlConfirmation, SurfaceDismissReason, SurfaceKind, SurfaceTransition,
+    PendingConfirmation, SessionControlConfirmation, SurfaceDismissReason, SurfaceKind,
+    SurfaceTransition,
 };
 pub use managed_alert_rules::{
     AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,

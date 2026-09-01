@@ -118,6 +118,10 @@ impl RootView {
 
     pub fn replace_processes_for_test(&mut self, processes: Vec<ProcessItem>) {
         let revision = self.processes_generation().saturating_add(1);
+        taskmanager_shell::fixture::seed_direct_track_fact(
+            &mut self.shell,
+            taskmanager_shell::fixture::DirectTrackSeedFact::Processes(processes.clone()),
+        );
         self.materialized.replace_processes(
             revision,
             std::sync::Arc::new(processes),

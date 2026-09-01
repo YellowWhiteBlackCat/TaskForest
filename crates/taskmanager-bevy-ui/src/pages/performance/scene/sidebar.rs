@@ -210,17 +210,6 @@ fn disk_sidebar_title(disk: &DiskMetrics) -> String {
     }
 }
 
-fn disk_sidebar_caption(disk: &DiskMetrics) -> String {
-    let rate = |value: Option<u64>| value.map_or_else(missing_value, bytes);
-    [
-        disk.current_active_time_pct()
-            .map_or_else(missing_value, |value| format!("{value:.0}%")),
-        rate(disk.current_read_bytes_per_sec()),
-        rate(disk.current_write_bytes_per_sec()),
-    ]
-    .join(" · ")
-}
-
 pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
     let mut rows: Vec<Box<dyn Scene>> = vec![Box::new(device_button_scene(
         PerformanceDeviceTarget::Cpu,
@@ -277,7 +266,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                         palette,
                     ),
                     Box::new(bsn! {
-                        Text(disk_sidebar_caption(disk))
+                        Text(disk_caption(disk))
                         TextRole(Role::Mono)
                         template_value(no_wrap_text())
                     }),

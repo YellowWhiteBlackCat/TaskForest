@@ -4,15 +4,11 @@
 //! toolkit-neutral and makes the render seam a small `bsn!` scene. Non-finite
 //! observations create gaps rather than joining across missing data.
 
-#![allow(dead_code)]
-
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::math::Rot2;
 use bevy::scene::{Scene, bsn, template_value};
 use bevy::ui::prelude::{BackgroundColor, Node, PositionType, UiTransform, percent, px};
-
-use crate::palette::UiPalette;
 
 /// Hard upper bound used by the performance chart surface.
 pub(crate) const MAX_CHART_POINTS: usize = 600;
@@ -98,23 +94,6 @@ pub(crate) fn line_segments(
 /// truthful and headlessly inspectable.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ChartSurface(pub(crate) usize);
-
-/// Minimal themed chart surface scene. The Performance page uses the same
-/// projected segment count as a live `ChartSurface` metadata anchor while its
-/// current Bevy UI draw adapter renders bounded bars.
-pub(crate) fn chart_scene(
-    samples: &[f32],
-    width_px: f32,
-    height_px: f32,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    let segment_count = line_segments(samples, width_px, height_px, MAX_CHART_POINTS).len();
-    bsn! {
-        Node { width: percent(100), height: px(height_px) }
-        BackgroundColor({ palette.panel_fill })
-        ChartSurface({ segment_count })
-    }
-}
 
 /// Layout of one segment as an absolutely-positioned rotated rectangle: the
 /// untransformed top-left, the rectangle length along x, and the clockwise

@@ -149,6 +149,51 @@ impl ShellApp {
             .map(|id| ProcessRowAnchor::new(id, self.data.process_projection_generation()))
     }
 
+    /// Write a selection a grouped/tree renderer already resolved against its
+    /// own visual projection: the semantic primary row and the typed detail
+    /// identity move together, and both stay empty outside the Applications
+    /// page. This is the AUTHORIZED writer for that pair (ADR-027: the fields
+    /// are shell-owned, the projection that produced them is not) — a frontend
+    /// must not assign [`ShellApp::selected_row`] or the application state's
+    /// `selected_process` directly.
+    ///
+    /// Unlike [`Self::select_row_id`] this does not resolve the row again and
+    /// does not touch the shell's fail-closed `process_selection_invalidated`
+    /// flag: the caller is reporting a row it is looking at right now, and an
+    /// explicit row outranks that flag in
+    /// [`ShellApp::selected_process_identity`]. It also leaves the multi-select
+    /// set alone — a grouped arrow step clears it with
+    /// [`Self::clear_selected_rows`] and then re-adds the anchor through
+    /// [`Self::add_selected_identity`], while a grouped re-sync keeps a live
+    /// multi-select.
+    pub fn set_row_selection(&mut self, row: Option<ProcessRowId>, process: Option<&ProcessItem>) {
+        let applications = self.page() == AppPage::Applications;
+        self.selected_row = if applications { row } else { None };
+        self.application.selected_process = if applications {
+            process.and_then(FrozenProcessIdentity::from_process)
+        } else {
+            None
+        };
+    }
+
+    /// Add one validated live identity to the multi-select set without
+    /// disturbing its other members, and without re-resolving it against the
+    /// projection. The AUTHORIZED writer for a grouped frontend's "this arrow
+    /// step landed on exactly this process row" collapse — pair it with
+    /// [`Self::clear_selected_rows`] to reproduce a single-select.
+    pub fn add_selected_identity(&mut self, identity: ProcessLiveKey) {
+        self.selected_rows.insert(identity);
+    }
+
+    /// Repoint the positional keyboard anchor without re-deriving the semantic
+    /// row from the flat projection. The AUTHORIZED writer for
+    /// [`ShellApp::selected`]: grouped and tree frontends index an interleaved
+    /// visual list, so their cursor write must not run the flat
+    /// [`Self::select_row`] reconciliation behind it.
+    pub fn move_selection_to(&mut self, index: usize) {
+        self.selected = index;
+    }
+
     /// Select a semantic row that was resolved from the current projection.
     /// Process and application rows must still resolve by their full live
     /// identity; category rows remain structural and never create a process

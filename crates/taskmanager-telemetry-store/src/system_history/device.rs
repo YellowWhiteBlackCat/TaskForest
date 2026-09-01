@@ -211,8 +211,8 @@ fn ingest_present<T>(
     let supplied_input = input.is_some();
     let valid_input = input.filter(|input| {
         !device_id.is_empty()
-            && lifecycle.generation > 0
-            && input.generation == lifecycle.generation
+            && lifecycle.generation.is_valid()
+            && input.generation == lifecycle.generation.get()
     });
     let Some(input) = valid_input else {
         if supplied_input {
@@ -227,7 +227,7 @@ fn ingest_present<T>(
         return;
     };
     match histories.get(device_id) {
-        Some(history) if history.generation > lifecycle.generation => {
+        Some(history) if history.generation > lifecycle.generation.get() => {
             history
                 .metric
                 .push(context.stamp, context.measured_at_ms, None);
@@ -235,11 +235,11 @@ fn ingest_present<T>(
             report.rejected_device_values = report.rejected_device_values.saturating_add(1);
             return;
         }
-        Some(history) if history.generation < lifecycle.generation => {
+        Some(history) if history.generation < lifecycle.generation.get() => {
             histories.insert(
                 DeviceId::new(device_id),
                 DeviceMetricHistory::new(
-                    lifecycle.generation,
+                    lifecycle.generation.get(),
                     context.capacity,
                     context.commit_gate.clone(),
                 ),
@@ -251,7 +251,7 @@ fn ingest_present<T>(
             histories.insert(
                 DeviceId::new(device_id),
                 DeviceMetricHistory::new(
-                    lifecycle.generation,
+                    lifecycle.generation.get(),
                     context.capacity,
                     context.commit_gate.clone(),
                 ),

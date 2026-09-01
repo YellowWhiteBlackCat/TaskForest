@@ -3,8 +3,8 @@ bev-route-keyboard	lib	app::tests::keypress_moves_the_route_and_remounts_one_pag
 bev-route-programmatic	lib	app::tests::programmatic_transition_remounts_through_the_observer_chain	route|lifecycle|success
 bev-route-history	lib	app::tests::shared_page_chords_route_chord_for_chord_like_the_tui	keyboard|route|history
 bev-input-router	lib	input_contract::tests::bevy_page_keys_use_the_shared_router_and_reject_wrong_chords	keyboard|focus|failure
-bev-input-ime	lib	input_contract::tests::focus_traversal_and_process_shortcuts_honor_scope_and_ime_ownership	focus|keyboard|success
-bev-input-semantic	lib	input_contract::tests::semantic_addresses_and_ime_state_are_stable_across_rebuilds	focus|accessibility|lifecycle
+bev-input-ime	lib	input_contract::tests::focus_traversal_and_process_shortcuts_honor_scope_and_text_input	focus|keyboard|success
+bev-input-semantic	lib	input_contract::tests::semantic_addresses_are_stable_across_rebuilds	focus|accessibility|lifecycle
 bev-tree-projection	lib	pages::process_tree::tests::projection_keeps_category_aggregate_and_process_identities_distinct	projection|identity|success
 bev-tree-collapse	lib	pages::process_tree::tests::process_collapse_hides_only_descendants	keyboard|lifecycle|success
 bev-chart-gaps	lib	widgets::chart::tests::unavailable_samples_break_the_line_instead_of_becoming_zero	projection|failure|success
@@ -20,8 +20,7 @@ bev-startup-menu	lib	pages::startup::inventory_menu_tests::the_startup_menu_free
 bev-sessions-menu	lib	pages::startup::inventory_menu_tests::the_sessions_menu_freezes_disconnect_and_lock_verbs	keyboard|confirmation|success
 bev-menu-cancel	lib	pages::startup::inventory_menu_tests::menus_close_without_arming_on_escape	keyboard|confirmation|failure
 bev-chart-bound	lib	widgets::chart::tests::constant_and_all_unavailable_windows_stay_honest_and_bounded	projection|responsive|success
-bev-control-freeze	lib	widgets::control_contract::tests::confirmation_freezes_target_while_navigation_changes_only_verb	keyboard|confirmation|success
-bev-control-disabled	lib	widgets::control_contract::tests::disabled_action_is_visible_but_never_authorized	confirmation|failure|success
+bev-control-disabled	lib	pages::processes::menu::tests::the_menu_projects_unavailable_process_control_as_disabled	confirmation|failure|success
 bev-history-identity	lib	pages::history::tests::stable_typed_identity_joins_three_metrics_without_collapsing_provenance	projection|identity|success
 bev-history-stale	lib	pages::history::tests::stale_last_good_rows_keep_their_source_window_and_error_is_not_hidden	failure|recovery|success
 bev-history-empty	lib	pages::history::tests::empty_collecting_and_error_without_last_good_are_distinct_states	failure|lifecycle|success

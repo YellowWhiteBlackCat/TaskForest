@@ -7,46 +7,10 @@
 //! tick (and the per-frame pump while anything animates) advances it, the
 //! renderer reads the eased progress — never a clock.
 
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::time::{Duration, Instant};
 
 use taskmanager_application::AppPage;
 use taskmanager_theme::tokens::{DURATION_MEDIUM, MotionPolicy};
-
-/// The process-wide motion policy for the iced frontend, stored as state
-/// (never a call-site literal) so the single seam below can repoint it.
-///
-/// The install source is the shared `Config::motion` preference token
-/// ("normal" / "reduced" / "none", the core `MOTION_*` vocabulary): every
-/// configuration snapshot application seeds the policy through
-/// [`install_motion_policy`], and every animation follows. iced 0.14 and its
-/// winit 0.30 backend still expose no OS prefers-reduced-motion capability
-/// (no window event, no `window::Settings` field), so the config preference
-/// is the one honest switch — no OS-derived value is fabricated on top of it.
-///
-/// Process-global is honest here: the OS motion preference is desktop-wide
-/// environment state, the iced product is single-instance (the launcher's
-/// instance guard), and `IcedApp` owns the one window — there is no second
-/// app this state could cross. Headless tests share the global, so only the
-/// runtime edges (config application) write it, never the constructors.
-static MOTION_POLICY: AtomicU8 = AtomicU8::new(MotionPolicy::Normal as u8);
-
-/// The currently installed motion policy.
-#[must_use]
-pub(crate) fn motion_policy_state() -> MotionPolicy {
-    match MOTION_POLICY.load(Ordering::Relaxed) {
-        1 => MotionPolicy::Reduced,
-        2 => MotionPolicy::NoMotion,
-        _ => MotionPolicy::Normal,
-    }
-}
-
-/// Install the process-wide motion policy (one configuration snapshot's
-/// resolved preference). Relaxed ordering is sufficient: the value is a
-/// plain enum carried by value and the next animation start re-reads it.
-pub(crate) fn install_motion_policy(policy: MotionPolicy) {
-    MOTION_POLICY.store(policy as u8, Ordering::Relaxed);
-}
 
 /// The persisted `Config::motion` token for one policy — the shared core
 /// `MOTION_NORMAL` / `MOTION_REDUCED` / `MOTION_NONE` vocabulary.
@@ -185,13 +149,10 @@ pub(crate) fn viewport_compact(size: iced::Size) -> bool {
 pub struct PageNav(pub AppPage);
 
 impl crate::IcedApp {
-    /// The motion policy the iced frontend currently runs: the installed
-    /// configuration preference delivered through [`motion_policy_state`] —
-    /// never a literal at the call sites — so one snapshot application (or a
-    /// Settings change committing a new snapshot) repoints every animation
-    /// in one place (see the `MOTION_POLICY` contract above).
+    /// The motion policy the iced frontend currently runs, resolved from this
+    /// app instance's configuration snapshot.
     pub(crate) fn motion_policy(&self) -> MotionPolicy {
-        motion_policy_state()
+        self.configuration.motion_policy()
     }
 
     /// Advance every frontend-local motion state to `now` and maintain the

@@ -1,4 +1,4 @@
-//! Real-input seam (W4): Bevy keyboard events into the shared shell routers.
+//! Real-input seam: Bevy keyboard events into the shared shell routers.
 //!
 //! This module is the ONLY place raw Bevy input reaches the shell, and it
 //! adds no semantics of its own: every press is forwarded through
@@ -7,7 +7,7 @@
 //! ownership, selection movement, overlay dismissal and the shared command
 //! table stay single-sourced in the shell (ARCH §8.1 semantic-parity law).
 //!
-//! The adapter owns exactly four frontend-local facts:
+//! The adapter owns exactly five frontend-local facts:
 //!
 //! 1. **Route authority**: Alt+1..8 / bare `P` switch this frontend's own
 //!    route ([`crate::app::Page`]; the shared `AppPage` vocabulary has no
@@ -17,11 +17,17 @@
 //! 2. **Dialog-scope Enter**: the shared command table binds Enter to
 //!    `ConfirmEndTask` under `CommandScope::Dialog`, which the shell's
 //!    `dispatch_key` never derives, so an armed gate receives it here.
-//! 3. **Effect bridge**: platform effects returned by the shell cross to the
+//! 3. **Action-menu chords**: the per-inventory action menus
+//!    ([`crate::menu_modal`]) are frontend-local surfaces, so their open
+//!    attempts resolve here ahead of the shell's free bindings — bare Enter
+//!    over a selected inventory row, and the TUI's `a` on Applications. Bare
+//!    Enter stays out of the Applications arm: the shell owns it there (tree
+//!    expansion, next search match).
+//! 4. **Effect bridge**: platform effects returned by the shell cross to the
 //!    platform client through [`PendingEffects`], drained by the `PreUpdate`
 //!    drain system — the one place that holds the client lock (charter
 //!    boundary 4).
-//! 4. **Re-render signal**: any shell mutation triggers
+//! 5. **Re-render signal**: any shell mutation triggers
 //!    [`ShellInteractionApplied`] so mounted pages rebuild from the folded
 //!    state (never polling).
 
@@ -43,6 +49,7 @@ use crate::app::{
 use crate::confirmation::{ConfirmationChanged, PendingConfirmationView};
 use crate::input_contract::{InputModifiers, normalize_key, shared_key};
 use crate::menu_modal::{MenuModal, MenuModalChanged, ModalDriver};
+use crate::pages::processes::menu::ProcessMenuCtx;
 use crate::pages::services::menu::ServiceMenuCtx;
 use crate::pages::sessions::menu::SessionMenuCtx;
 use crate::pages::startup::menu::StartupMenuCtx;
@@ -78,12 +85,12 @@ impl Plugin for InputPlugin {
 
 /// Which surface owns the keyboard this instant. Mirrors the shell's
 /// modal precedence (gate > help > suggestions > search > free) plus this
-/// frontend's own local modal (the Services action menu), which owns the
-/// keyboard ahead of the shell's free bindings — a frontend-local modal can
-/// never have its keys stolen by navigation chords.
+/// frontend's own local modals (the per-inventory action menus), which own
+/// the keyboard ahead of the shell's free bindings — a frontend-local modal
+/// can never have its keys stolen by navigation chords.
 enum KeyboardOwner {
     Gate,
-    ServicesMenu,
+    FrontendMenu,
     ServiceLogPanel,
     SharedSurface,
     Search,
@@ -94,7 +101,7 @@ fn keyboard_owner(shell: &ShellApp, modal_open: bool, page: Page) -> KeyboardOwn
     if shell.confirmation_kind().is_some() {
         KeyboardOwner::Gate
     } else if modal_open {
-        KeyboardOwner::ServicesMenu
+        KeyboardOwner::FrontendMenu
     } else if shell.service_log.is_some() && page == Page::Services {
         KeyboardOwner::ServiceLogPanel
     } else if shell.help_open() || shell.suggestions_open() {
@@ -135,6 +142,7 @@ pub(crate) fn keyboard_dispatch_system(
     mut svc_modal: ResMut<MenuModal<ServiceMenuCtx>>,
     mut stu_modal: ResMut<MenuModal<StartupMenuCtx>>,
     mut ses_modal: ResMut<MenuModal<SessionMenuCtx>>,
+    mut proc_modal: ResMut<MenuModal<ProcessMenuCtx>>,
     svc_selection: Option<Res<crate::pages::services::ServiceSelection>>,
     stu_selection: Option<Res<crate::pages::startup::StartupSelection>>,
     ses_selection: Option<Res<crate::pages::sessions::SessionSelection>>,
@@ -154,7 +162,10 @@ pub(crate) fn keyboard_dispatch_system(
     let armed_before = shell.confirmation_kind();
     let mut applied = false;
     for event in &events {
-        let modal_open = svc_modal.is_open() || stu_modal.is_open() || ses_modal.is_open();
+        let modal_open = svc_modal.is_open()
+            || stu_modal.is_open()
+            || ses_modal.is_open()
+            || proc_modal.is_open();
         let context = keyboard_owner(shell, modal_open, route.page);
         // 0a. Open action menus (frontend-local modals): an open modal owns
         //     the keyboard ahead of navigation chords and the shell; its
@@ -163,14 +174,18 @@ pub(crate) fn keyboard_dispatch_system(
             let svc_before = svc_modal.is_open();
             let stu_before = stu_modal.is_open();
             let ses_before = ses_modal.is_open();
+            let proc_before = proc_modal.is_open();
             if svc_before {
-                applied |= svc_modal.drive(shell, event.key_code);
+                applied |= svc_modal.drive(shell, event.key_code, &mut pending.0);
             }
             if stu_before {
-                applied |= stu_modal.drive(shell, event.key_code);
+                applied |= stu_modal.drive(shell, event.key_code, &mut pending.0);
             }
             if ses_before {
-                applied |= ses_modal.drive(shell, event.key_code);
+                applied |= ses_modal.drive(shell, event.key_code, &mut pending.0);
+            }
+            if proc_before {
+                applied |= proc_modal.drive(shell, event.key_code, &mut pending.0);
             }
             if svc_before && !svc_modal.is_open() {
                 commands.trigger(MenuModalChanged::<ServiceMenuCtx>(
@@ -186,6 +201,12 @@ pub(crate) fn keyboard_dispatch_system(
             }
             if ses_before && !ses_modal.is_open() {
                 commands.trigger(MenuModalChanged::<SessionMenuCtx>(
+                    false,
+                    Default::default(),
+                ));
+            }
+            if proc_before && !proc_modal.is_open() {
+                commands.trigger(MenuModalChanged::<ProcessMenuCtx>(
                     false,
                     Default::default(),
                 ));
@@ -242,6 +263,25 @@ pub(crate) fn keyboard_dispatch_system(
         {
             pending.0.push(effect);
         }
+        // 2a. Applications action menu: the TUI-local `a` chord (TUI
+        //     `OpenProcessMenu` parity) opens the process control menu —
+        //     end task/tree, suspend/resume, force kill, and the neutral
+        //     priority tiers. Bare Enter stays with the shell (it expands a
+        //     tree row / jumps to the next search match there), so this menu
+        //     does not join the inventory Enter arm below.
+        if matches!(context, KeyboardOwner::Free)
+            && route.page == Page::Processes
+            && event.key_code == KeyCode::KeyA
+            && modifiers == Modifiers::NONE
+        {
+            let opened =
+                crate::pages::processes::menu::open_for_selected(proc_modal.as_mut(), shell);
+            if opened {
+                commands.trigger(MenuModalChanged::<ProcessMenuCtx>(true, Default::default()));
+                applied = true;
+                continue;
+            }
+        }
         // 2b. Closed-menu Enter attempt: bare Enter over a selected row on
         //     an inventory page opens that page's action menu (TUI
         //     Enter-actions parity, one arm per inventory).
@@ -251,37 +291,37 @@ pub(crate) fn keyboard_dispatch_system(
         {
             let opened = match route.page {
                 Page::Services => {
-                    let target = svc_selection
+                    match svc_selection
                         .as_ref()
-                        .and_then(|state| state.target.as_ref());
-                    target.is_some()
-                        && crate::pages::services::menu::open_for(
-                            &mut svc_modal,
-                            shell,
-                            target.expect("checked"),
-                        )
+                        .and_then(|state| state.target.as_ref())
+                    {
+                        Some(target) => {
+                            crate::pages::services::menu::open_for(&mut svc_modal, shell, target)
+                        }
+                        None => false,
+                    }
                 }
                 Page::Startup => {
-                    let target = stu_selection
+                    match stu_selection
                         .as_ref()
-                        .and_then(|state| state.target.clone());
-                    target.is_some()
-                        && crate::pages::startup::menu::open_for(
-                            &mut stu_modal,
-                            shell,
-                            &target.expect("checked"),
-                        )
+                        .and_then(|state| state.target.clone())
+                    {
+                        Some(target) => {
+                            crate::pages::startup::menu::open_for(&mut stu_modal, shell, &target)
+                        }
+                        None => false,
+                    }
                 }
                 Page::Sessions => {
-                    let target = ses_selection
+                    match ses_selection
                         .as_ref()
-                        .and_then(|state| state.target.clone());
-                    target.is_some()
-                        && crate::pages::sessions::menu::open_for(
-                            &mut ses_modal,
-                            shell,
-                            &target.expect("checked"),
-                        )
+                        .and_then(|state| state.target.clone())
+                    {
+                        Some(target) => {
+                            crate::pages::sessions::menu::open_for(&mut ses_modal, shell, &target)
+                        }
+                        None => false,
+                    }
                 }
                 _ => false,
             };

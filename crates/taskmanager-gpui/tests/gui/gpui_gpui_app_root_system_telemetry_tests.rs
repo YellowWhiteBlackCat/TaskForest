@@ -14,10 +14,10 @@ use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 use taskmanager_telemetry_store::{CorrelatedIngestionError, SystemHistoryDomain, TelemetryStore};
 
 use taskmanager_core::core::{
-    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, DeviceId, DeviceLifecycle,
-    DevicePresence, DeviceState, FailureKind, GpuTelemetryObservation, HostRuntimeFacts,
-    HostRuntimeObservation, MemoryMetrics, MemoryTelemetryObservation, NetworkTelemetryObservation,
-    ScalarObservation, StorageTelemetryObservation, SystemSnapshot,
+    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, DeviceGeneration, DeviceId,
+    DeviceLifecycle, DevicePresence, DeviceState, FailureKind, GpuTelemetryObservation,
+    HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics, MemoryTelemetryObservation,
+    NetworkTelemetryObservation, ScalarObservation, StorageTelemetryObservation, SystemSnapshot,
 };
 
 use super::*;
@@ -353,7 +353,7 @@ fn lifecycle(now_ms: u64) -> DeviceLifecycle {
     DeviceLifecycle {
         presence: DevicePresence::Present,
         state: DeviceState::healthy(now_ms),
-        generation: 1,
+        generation: DeviceGeneration::INITIAL,
         first_seen_ms: Some(now_ms),
         last_seen_ms: Some(now_ms),
         absent_since_ms: None,

@@ -29,7 +29,7 @@ pub(crate) fn render_process_details_with_focus_from_canonical(
     theme: TuiTheme,
     area: Rect,
     focused: bool,
-    ids: &[crate::process_view::CanonicalRowId],
+    ids: &[taskmanager_shell::ProcessTreeRow],
     visible: &[&taskmanager_core::process::ProcessItem],
 ) {
     let selected =

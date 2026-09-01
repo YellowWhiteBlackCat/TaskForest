@@ -23,7 +23,7 @@
 //!   legal.
 //!
 //! Detection is deliberately structural, mirroring
-//! [`super::renderer_fold_boundary`]: scan every `.rs` under the three UI
+//! [`super::renderer_fold_boundary`]: scan every `.rs` under the four UI
 //! roots with line comments stripped, and flag the observable signatures of a
 //! raw-nice control construction:
 //!   * `SetPriority(-` / `SetPriority(0` / `SetPriority(1` — a numeric
@@ -41,10 +41,11 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const SCAN_ROOTS: [&str; 3] = [
+const SCAN_ROOTS: [&str; 4] = [
     "crates/taskmanager-gpui/src",
     "crates/taskmanager-tui/src",
     "crates/taskmanager-iced/src",
+    "crates/taskmanager-bevy-ui/src",
 ];
 
 /// The observable signatures of a raw-nice control construction in a UI
@@ -99,7 +100,7 @@ fn collect_rs_files(root: &Path, out: &mut Vec<PathBuf>) {
 }
 
 /// Collect the offending `relative-path: meaning (pattern)` entries for one
-/// signature table across the three UI roots.
+/// signature table across the four UI roots.
 fn scan_for_signatures(signatures: &[(&str, &str)]) -> Vec<String> {
     let repo = repository();
     let mut offenders = Vec::new();

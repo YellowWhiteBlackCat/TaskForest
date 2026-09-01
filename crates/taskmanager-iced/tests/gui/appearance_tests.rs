@@ -61,8 +61,7 @@ fn explicit_choices_ignore_the_observation_and_system_follows_it() {
 /// The reducer contract against a live app: an explicit choice is never
 /// overridden by an OS flip, a System preference follows the desktop live,
 /// and switching into System resolves against the observation the app kept
-/// while the explicit choice was active. One sequential test because the
-/// observation store is process state.
+/// while the explicit choice was active.
 #[test]
 fn system_mode_follows_the_desktop_and_explicit_choices_do_not() {
     let mut app = IcedApp::demo();
@@ -90,4 +89,18 @@ fn system_mode_follows_the_desktop_and_explicit_choices_do_not() {
     // An unchanged observation is absorbed without disturbing the theme.
     app.apply_observed_color_scheme(iced::theme::Mode::Light);
     assert_eq!(app.theme().mode, LightDark::Light);
+}
+
+#[test]
+fn os_observations_are_isolated_between_app_instances() {
+    let mut light = IcedApp::demo();
+    let mut dark = IcedApp::demo();
+    light.apply_settings_change(SettingsChange::Mode(ModeChoice::System));
+    dark.apply_settings_change(SettingsChange::Mode(ModeChoice::System));
+
+    light.apply_observed_color_scheme(iced::theme::Mode::Light);
+    dark.apply_observed_color_scheme(iced::theme::Mode::Dark);
+
+    assert_eq!(light.theme().mode, LightDark::Light);
+    assert_eq!(dark.theme().mode, LightDark::Dark);
 }

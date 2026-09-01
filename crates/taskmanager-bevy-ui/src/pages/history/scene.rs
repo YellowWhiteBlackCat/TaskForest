@@ -288,10 +288,10 @@ fn paint_history(world: &mut World) {
     for entity in stale {
         let _ = world.despawn(entity);
     }
-    let fresh = world
-        .spawn_scene(scene)
-        .expect("the repainted history body resolves without assets")
-        .id();
+    let fresh = match world.spawn_scene(scene) {
+        Ok(entity) => entity.id(),
+        Err(_) => return,
+    };
     world.entity_mut(body).add_one_related::<ChildOf>(fresh);
     let mut lines = world.query_filtered::<&mut Text, With<HistoryStatusLine>>();
     if let Ok(mut line) = lines.single_mut(world) {

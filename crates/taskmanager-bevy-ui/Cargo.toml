@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.97.1"
 license = "Apache-2.0"
-description = "Bevy UI fourth frontend skeleton for the TaskForest native system monitor (M0)"
+description = "Bevy UI fourth frontend for the TaskForest native system monitor"
 readme = "README.md"
 publish = false
 
@@ -23,7 +23,7 @@ taskmanager-app-host = { path = "../taskmanager-app-host" }
 taskmanager-shell = { path = "../taskmanager-shell" }
 taskmanager-theme = { path = "../taskmanager-theme" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
-# Bundled font bytes (ADR-026 fonts policy): the placeholder window registers
+# Bundled font bytes (ADR-026 fonts policy): the live window registers
 # the same embedded faces the other frontends use; zero toolkit types cross.
 taskmanager-assets = { path = "../taskmanager-assets" }
 # Semantic icon → embedded asset path resolution (ADR-017). The gpui adapter
@@ -74,13 +74,13 @@ bevy = { version = "=0.19.1", default-features = false }
 #   owns the corresponding runtime plugins, not this frontend composition.
 # - bevy_ui_render: the UiRenderPlugin draw pass. bevy 0.19 splits ui layout
 #   from ui rendering, so `bevy_ui` alone lays nodes out without ever painting
-#   them; a windowed skeleton must close over the ui render node too.
+#   them; a windowed app must close over the ui render node too.
 # - bevy_core_pipeline: the render-graph phase host the ui render node plugs
 #   into, plus the camera clear pass a UI camera needs.
 # - bevy_render: the render graph a bevy_ui surface needs (bevy_ui depends on
 #   it; declared explicitly because we talk to its window-clear color).
 # - bevy_asset: AssetPlugin, i.e. the `Assets<Font>`/`Assets<Image>` stores
-#   the placeholder text pipeline reads. The bevy_asset subcrate is already in
+#   the text pipeline reads. The bevy_asset subcrate is already in
 #   the dependency graph via bevy_text; only this feature adds the plugin to
 #   DefaultPlugins, whose membership is feature-gated, not dependency-gated.
 # - bevy_winit: the window/event-loop host; no raw winit use of our own.
@@ -95,8 +95,8 @@ bevy = { version = "=0.19.1", default-features = false }
 #   second native adapter. Non-Linux bridges are a later milestone.
 # - default-features off: no audio, no gilrs, no scene/pbr/gltf animation, no
 #   state/log/reflect-auto-register app defaults, no
-#   dynamic linking, no dev-tools. `multi_threaded` stays off for the M0
-#   skeleton: without it PipelinedRenderingPlugin is simply absent and the
+#   dynamic linking, no dev-tools. `multi_threaded` stays off for this
+#   frontend: without it PipelinedRenderingPlugin is simply absent and the
 #   render pass runs inline on the app thread, which the drain seam cannot
 #   observe.
 [target.'cfg(target_os = "linux")'.dependencies]

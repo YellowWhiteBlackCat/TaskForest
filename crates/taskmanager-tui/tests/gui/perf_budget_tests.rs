@@ -24,6 +24,7 @@ use std::time::{Duration, Instant};
 
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use taskmanager_application::process_category_projection::category_expansion_key;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::metrics::{CpuMetrics, MemoryMetrics, SystemSnapshot};
 use taskmanager_core::core::process::{
@@ -31,6 +32,7 @@ use taskmanager_core::core::process::{
 };
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
+use taskmanager_shell::{SortCol, SortDir};
 
 use crate::{TuiApp, TuiTheme, render};
 
@@ -91,7 +93,7 @@ impl TreeFixture {
         for index in 0..self.apps {
             groups.insert(format!(
                 "{}{}",
-                APP_TREE_EXPANSION_KEY_PREFIX,
+                taskmanager_shell::APP_TREE_EXPANSION_KEY_PREFIX,
                 ProcessLiveKey::from_parts(
                     root_pid(index),
                     taskmanager_test_support::fixture_start_token(root_pid(index)),
@@ -363,7 +365,7 @@ fn visual_row_count_matches_the_canonical_slice_and_invalidates_per_input() {
     for index in 0..fixture.apps {
         app.expanded_groups.insert(format!(
             "{}{}",
-            APP_TREE_EXPANSION_KEY_PREFIX,
+            taskmanager_shell::APP_TREE_EXPANSION_KEY_PREFIX,
             ProcessLiveKey::from_parts(
                 root_pid(index),
                 taskmanager_test_support::fixture_start_token(root_pid(index)),

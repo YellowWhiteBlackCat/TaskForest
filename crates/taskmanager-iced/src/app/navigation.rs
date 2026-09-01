@@ -170,7 +170,7 @@ impl IcedApp {
             }
         };
         let Some((target, flat_index, row_key)) = target else {
-            self.shell.selected = 0;
+            self.shell.move_selection_to(0);
             self.process_presentation.visual_cursor = 0;
             return;
         };

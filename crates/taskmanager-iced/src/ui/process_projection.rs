@@ -24,24 +24,20 @@
 //! Category buckets keep the fixed core `ProcessCategory::ALL` order;
 //! application aggregates and recursive nodes sort by the active column.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::rc::Rc;
 
 use taskmanager_application::i18n::t;
-use taskmanager_application::process_category_projection::{
-    category_buckets, category_expansion_key, process_memory_observation_for_display,
-};
-use taskmanager_core::core::process::aggregate::{AggregateMetric, aggregate_u32_widened};
-use taskmanager_core::core::process::{
-    ProcessCategory, ProcessItem, ProcessLiveKey, ProcessNode, build_process_tree, process_category,
-};
+use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 
 use taskmanager_shell::presentation::{
     bytes, missing_value, optional_bytes, optional_count, optional_duration, optional_nice,
 };
-use taskmanager_shell::{ProcessRowId, ProcessStatusFilter, SortCol, SortDir};
-
-mod category;
+use taskmanager_shell::{
+    ProcessRowAggregate, ProcessRowId, ProcessStatusFilter, ProcessTreeRow, SortCol, SortDir,
+    project_process_tree_rows,
+};
 
 /// One visible row of the Applications table's canonical hierarchy.
 ///
@@ -72,7 +68,7 @@ pub(crate) enum ProjectedRow {
         /// All group scalar cells retain their typed availability and
         /// coverage. Renderers may choose a current-value string, but they
         /// cannot mistake an unavailable aggregate for a measured zero.
-        metrics: Box<GroupMetrics>,
+        metrics: Box<ProcessRowAggregate>,
         /// Facts inherited from the group's main process (typed observations —
         /// an unavailable nice/start renders an honest dash, like gpui).
         user: String,
@@ -182,21 +178,145 @@ impl ProcessRowFacts {
     }
 }
 
-/// Visibility: `pub(crate)` so the Apps-page tests can assert the exact
-/// pre-formatted cell strings (the old per-frame helper's contract). CPU, fds,
-/// nice, and the start clock read the typed `current_*` observations (like the
-/// gpui `VisibleRow` projection): an unavailable or stale scalar renders an
-/// honest dash instead of the legacy field's zero sentinel.
-pub(crate) fn build_row_cells(process: &ProcessItem) -> RowCells {
-    build_row_cells_with_rules(
-        process,
-        &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
-    )
+fn category_label(category: ProcessCategory) -> &'static str {
+    match category {
+        ProcessCategory::Application => t("proc.category_apps"),
+        ProcessCategory::Background => t("proc.category_background"),
+        ProcessCategory::Uncategorized => t("proc.category_uncategorized"),
+    }
 }
 
-fn build_row_cells_with_rules(
+fn projected_row_from_shared(
+    row: ProcessTreeRow,
+    flat: &[&ProcessItem],
+    local_time_rules: &LocalTimeRulesObservation,
+) -> Option<ProjectedRow> {
+    match row {
+        ProcessTreeRow::Category {
+            category,
+            expansion_key,
+            representative_index,
+            expanded,
+            member_count,
+            aggregate,
+        } => group_header_from_shared(
+            flat.get(representative_index)?,
+            GroupHeaderInput {
+                row_key: None,
+                expansion_key,
+                name: category_label(category).to_owned(),
+                expanded,
+                member_count,
+                aggregate,
+                flat_index: representative_index,
+                local_time_rules,
+            },
+        ),
+        ProcessTreeRow::Application {
+            visible_index,
+            row_key,
+            expansion_key,
+            expanded,
+            member_count,
+            aggregate,
+            ..
+        } => {
+            let root = flat.get(visible_index)?;
+            group_header_from_shared(
+                root,
+                GroupHeaderInput {
+                    row_key,
+                    expansion_key,
+                    name: root
+                        .current_application_name()
+                        .unwrap_or(root.name.as_str())
+                        .to_owned(),
+                    expanded,
+                    member_count,
+                    aggregate,
+                    flat_index: visible_index,
+                    local_time_rules,
+                },
+            )
+        }
+        ProcessTreeRow::Process {
+            visible_index,
+            row_key,
+            parent_key,
+            depth,
+            has_children,
+            collapsed,
+        } => {
+            let process = flat.get(visible_index)?;
+            let parent_pid = parent_key.and_then(|key| match key {
+                ProcessRowId::Process(identity) => Some(identity.pid()),
+                ProcessRowId::Category(_) | ProcessRowId::Application(_) => None,
+            });
+            Some(ProjectedRow::Tree {
+                flat_index: visible_index,
+                pid: process.pid,
+                row_key,
+                depth,
+                has_children,
+                collapsed,
+                parent_pid,
+                cells: build_row_cells_with_rules(process, local_time_rules),
+            })
+        }
+    }
+}
+
+struct GroupHeaderInput<'a> {
+    row_key: Option<ProcessRowId>,
+    expansion_key: String,
+    name: String,
+    expanded: bool,
+    member_count: usize,
+    aggregate: ProcessRowAggregate,
+    flat_index: usize,
+    local_time_rules: &'a LocalTimeRulesObservation,
+}
+
+fn group_header_from_shared(
+    root: &ProcessItem,
+    input: GroupHeaderInput<'_>,
+) -> Option<ProjectedRow> {
+    let GroupHeaderInput {
+        row_key,
+        expansion_key,
+        name,
+        expanded,
+        member_count,
+        aggregate,
+        flat_index,
+        local_time_rules,
+    } = input;
+    Some(ProjectedRow::GroupHeader {
+        flat_index,
+        main_pid: root.pid,
+        row_key,
+        name,
+        expansion_key,
+        member_count,
+        expanded,
+        metrics: Box::new(aggregate),
+        user: root.current_user().unwrap_or_else(missing_value),
+        status: root.status.clone(),
+        nice: root.current_nice(),
+        start_time_secs: root.current_start_time_secs(),
+        start_clock: taskmanager_shell::presentation::start_clock_local(
+            root.current_start_time_secs(),
+            local_time_rules,
+        ),
+    })
+}
+
+/// Build the renderer's cell strings from typed observations and injected
+/// local-time rules. An unavailable or stale scalar renders an honest dash
+/// instead of the legacy field's zero sentinel.
+pub(crate) fn build_row_cells_with_rules(
     process: &ProcessItem,
-    local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    local_time_rules: &LocalTimeRulesObservation,
 ) -> RowCells {
     RowCells {
         pid: process.pid.to_string(),
@@ -244,35 +364,22 @@ impl ProcessProjection {
         sort: (SortCol, SortDir),
         expanded_groups: &HashSet<String>,
         expanded_tree: &HashSet<ProcessLiveKey>,
-        local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+        local_time_rules: &LocalTimeRulesObservation,
         observed_at_ms: u64,
     ) -> Self {
-        let by_pid: HashMap<u32, usize> = flat
-            .iter()
-            .enumerate()
-            .map(|(index, process)| (process.pid, index))
-            .collect();
         let process_facts = flat
             .iter()
             .map(|process| ProcessRowFacts::from_process(process))
             .collect();
-        let mut rows = category::category_rows(
-            flat,
-            &by_pid,
-            sort,
-            expanded_groups,
-            expanded_tree,
-            observed_at_ms,
-        );
+        let shared_rows =
+            project_process_tree_rows(flat, expanded_groups, expanded_tree, sort, observed_at_ms);
+        let mut rows: Vec<ProjectedRow> = shared_rows
+            .into_iter()
+            .filter_map(|row| projected_row_from_shared(row, flat, local_time_rules))
+            .collect();
         for row in &mut rows {
             match row {
-                ProjectedRow::Tree {
-                    flat_index, cells, ..
-                } => {
-                    if let Some(process) = flat.get(*flat_index) {
-                        *cells = build_row_cells_with_rules(process, local_time_rules);
-                    }
-                }
+                ProjectedRow::Tree { .. } => {}
                 ProjectedRow::GroupHeader {
                     start_time_secs,
                     start_clock,
@@ -394,204 +501,9 @@ impl ProcessProjectionFingerprint {
     }
 
     #[must_use]
-    pub(crate) fn with_local_time_rules(
-        mut self,
-        rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
-    ) -> Self {
+    pub(crate) fn with_local_time_rules(mut self, rules: &LocalTimeRulesObservation) -> Self {
         self.local_time_rules = Some(rules.cache_key());
         self
-    }
-}
-
-/// Typed aggregate metrics carried by every category/application header.
-///
-/// The row renderer may project current values into strings, but this object
-/// remains attached to the row so measured zero, partial coverage, stale
-/// history, unavailable data, and unknown data cannot collapse into one
-/// `Option` or a fabricated numeric zero.
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct GroupMetrics {
-    pub(super) cpu: AggregateMetric<f32>,
-    pub(super) memory_display: AggregateMetric<u64>,
-    pub(super) memory_pss: AggregateMetric<u64>,
-    pub(super) swap: AggregateMetric<u64>,
-    pub(super) disk_read: AggregateMetric<u64>,
-    pub(super) disk_write: AggregateMetric<u64>,
-    pub(super) threads: AggregateMetric<u64>,
-    pub(super) cpu_time: AggregateMetric<u64>,
-    pub(super) fds: AggregateMetric<u64>,
-}
-
-/// One aggregate group used only while building this frontend's row
-/// projection. Its metrics delegate their folds to the typed owner API.
-#[derive(Debug, Clone)]
-pub(super) struct GroupProjection {
-    pub(super) name: String,
-    pub(super) main_pid: u32,
-    pub(super) process_count: usize,
-    pub(super) metrics: GroupMetrics,
-}
-
-/// Aggregate one non-empty process group through the application projection's
-/// typed fold API. `observed_at_ms` is the accepted process snapshot time,
-/// never a timestamp inferred from one member.
-pub(super) fn aggregate_group_metrics(
-    members: &[&ProcessItem],
-    observed_at_ms: u64,
-) -> Option<GroupMetrics> {
-    let bucket = category_buckets(members, |_| {
-        taskmanager_core::core::process::ProcessCategory::Application
-    })
-    .into_iter()
-    .next()?;
-    Some(GroupMetrics {
-        cpu: bucket.aggregate_f32(observed_at_ms, |process| {
-            &process.scalar_observations().cpu_percentage
-        })?,
-        memory_display: bucket.aggregate_u64(observed_at_ms, |process| {
-            process_memory_observation_for_display(process)
-        })?,
-        memory_pss: bucket.aggregate_u64(observed_at_ms, |process| {
-            &process.scalar_observations().memory_pss_bytes
-        })?,
-        swap: bucket.aggregate_u64(observed_at_ms, |process| {
-            &process.scalar_observations().swap_bytes
-        })?,
-        disk_read: bucket.aggregate_u64(observed_at_ms, |process| {
-            &process.scalar_observations().disk_read_bytes_per_sec
-        })?,
-        disk_write: bucket.aggregate_u64(observed_at_ms, |process| {
-            &process.scalar_observations().disk_write_bytes_per_sec
-        })?,
-        threads: aggregate_u32_widened(
-            members
-                .iter()
-                .map(|process| &process.scalar_observations().threads),
-            observed_at_ms,
-        )?,
-        cpu_time: bucket.aggregate_u64(observed_at_ms, |process| {
-            &process.scalar_observations().cpu_time_secs
-        })?,
-        fds: aggregate_u32_widened(
-            members
-                .iter()
-                .map(|process| &process.scalar_observations().fds),
-            observed_at_ms,
-        )?,
-    })
-}
-
-fn compare_f32(left: &AggregateMetric<f32>, right: &AggregateMetric<f32>) -> std::cmp::Ordering {
-    left.current_value()
-        .partial_cmp(&right.current_value())
-        .unwrap_or(std::cmp::Ordering::Equal)
-}
-
-fn compare_u64(left: &AggregateMetric<u64>, right: &AggregateMetric<u64>) -> std::cmp::Ordering {
-    left.current_value().cmp(&right.current_value())
-}
-
-/// Re-sort aggregate groups by the established Iced group semantics while
-/// comparing typed current values. Missing values remain ordered as `None`
-/// rather than becoming a numeric zero.
-pub(super) fn sort_groups(groups: &mut [GroupProjection], sort: (SortCol, SortDir)) {
-    let (column, direction) = sort;
-    let ascending = direction == SortDir::Asc;
-    groups.sort_by(|left, right| {
-        let ordering = match column {
-            SortCol::Pid => left.main_pid.cmp(&right.main_pid),
-            SortCol::Name => left.name.cmp(&right.name),
-            SortCol::Cpu => compare_f32(&left.metrics.cpu, &right.metrics.cpu),
-            SortCol::CpuTime => compare_u64(&left.metrics.cpu_time, &right.metrics.cpu_time),
-            SortCol::Memory => {
-                compare_u64(&left.metrics.memory_display, &right.metrics.memory_display)
-            }
-            SortCol::Pss => compare_u64(&left.metrics.memory_pss, &right.metrics.memory_pss),
-            SortCol::Swap => compare_u64(&left.metrics.swap, &right.metrics.swap),
-            SortCol::DiskRead => compare_u64(&left.metrics.disk_read, &right.metrics.disk_read),
-            SortCol::DiskWrite => compare_u64(&left.metrics.disk_write, &right.metrics.disk_write),
-            SortCol::User | SortCol::State | SortCol::StartTime | SortCol::Nice => {
-                left.name.cmp(&right.name)
-            }
-            SortCol::Threads => compare_u64(&left.metrics.threads, &right.metrics.threads),
-            SortCol::Fds => compare_u64(&left.metrics.fds, &right.metrics.fds),
-        }
-        .then_with(|| left.name.cmp(&right.name))
-        .then_with(|| left.main_pid.cmp(&right.main_pid));
-        if ascending {
-            ordering
-        } else {
-            ordering.reverse()
-        }
-    });
-}
-
-/// Recursively sort a process tree by the active column. EVERY column sorts
-/// through the neutral comparator (`taskmanager_application::process_sort`)
-/// via the shell's single `sort_axis` translation — the same ordering the
-/// GPUI canonical tree and shell `visible_processes` paths apply — so recursive
-/// process ordering cannot drift between frontends.
-fn sort_tree(nodes: &mut [ProcessNode<'_>], sort: (SortCol, SortDir)) {
-    let (column, direction) = sort;
-    let ascending = direction == SortDir::Asc;
-    let axis = taskmanager_shell::sort_axis(column);
-    // The comparator already carries the direction (the neutral
-    // `compare_processes` applies it plus the direction-independent pid
-    // tie-break); the recursion below only forwards it.
-    sort_nodes_by(nodes, &|left, right| {
-        taskmanager_application::process_sort::compare_processes(left, right, axis, ascending)
-    });
-}
-
-fn sort_nodes_by<'a, F>(nodes: &mut [ProcessNode<'a>], cmp: &F)
-where
-    F: Fn(&ProcessItem, &ProcessItem) -> std::cmp::Ordering,
-{
-    nodes.sort_by(|left, right| cmp(left.item, right.item));
-    for node in nodes.iter_mut() {
-        sort_nodes_by(&mut node.children, cmp);
-    }
-}
-
-/// Depth-first flatten that also records each node's parent pid, so Left on a
-/// collapsed node can move the cursor up to its parent (gpui parity).
-fn flatten_with_parents<'a>(
-    nodes: &[ProcessNode<'a>],
-    collapsed: &HashSet<ProcessLiveKey>,
-    by_pid: &HashMap<u32, usize>,
-    rows: &mut Vec<ProjectedRow>,
-    depth: usize,
-    parent_pid: Option<u32>,
-) {
-    for node in nodes {
-        let has_children = !node.children.is_empty();
-        if let Some(flat_index) = by_pid.get(&node.item.pid).copied() {
-            rows.push(ProjectedRow::Tree {
-                flat_index,
-                pid: node.item.pid,
-                row_key: ProcessRowId::from_process(node.item),
-                depth,
-                has_children,
-                collapsed: has_children
-                    && ProcessLiveKey::from_process(node.item)
-                        .is_some_and(|identity| collapsed.contains(&identity)),
-                parent_pid,
-                cells: build_row_cells(node.item),
-            });
-        }
-        if has_children
-            && !ProcessLiveKey::from_process(node.item)
-                .is_some_and(|identity| collapsed.contains(&identity))
-        {
-            flatten_with_parents(
-                &node.children,
-                collapsed,
-                by_pid,
-                rows,
-                depth + 1,
-                Some(node.item.pid),
-            );
-        }
     }
 }
 

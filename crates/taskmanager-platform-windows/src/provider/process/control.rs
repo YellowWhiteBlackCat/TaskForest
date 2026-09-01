@@ -276,12 +276,12 @@ impl ProcessControlProvider for WinProcessControlProvider {
         let targets = intent.targets.clone();
         for target in targets {
             let outcome = match intent.action {
-                ProcessBatchAction::End | ProcessBatchAction::Kill => {
-                    match self.kill_process_from_snapshot(&target) {
-                        Ok(()) => ProcessBatchTargetResult::Applied,
-                        Err(failure) => ProcessBatchTargetResult::Failed(failure.kind()),
-                    }
-                }
+                ProcessBatchAction::End
+                | ProcessBatchAction::EndProcessTree
+                | ProcessBatchAction::Kill => match self.kill_process_from_snapshot(&target) {
+                    Ok(()) => ProcessBatchTargetResult::Applied,
+                    Err(failure) => ProcessBatchTargetResult::Failed(failure.kind()),
+                },
                 ProcessBatchAction::SetPriority(tier) => {
                     match self.set_priority_from_snapshot(&target, tier) {
                         Ok(()) => ProcessBatchTargetResult::Applied,

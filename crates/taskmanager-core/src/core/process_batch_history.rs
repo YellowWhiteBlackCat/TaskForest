@@ -191,7 +191,7 @@ struct AuditResult<'a> {
 
 fn action_parts(action: ProcessBatchAction) -> (&'static str, Option<i32>) {
     match action {
-        ProcessBatchAction::End => ("end", None),
+        ProcessBatchAction::End | ProcessBatchAction::EndProcessTree => ("end", None),
         ProcessBatchAction::Kill => ("kill", None),
         ProcessBatchAction::Suspend => ("suspend", None),
         ProcessBatchAction::Resume => ("resume", None),

@@ -252,7 +252,7 @@ fn per_frame_allocation_budget_10k_and_50k() {
     //      10k processes: 644 allocations / 789,450 bytes
     //      50k processes: 644 allocations / 789,475 bytes
     //    (Intermediate evidence, kept for honesty — after the
-    //    revision-keyed CanonicalRowId projection cache, before the lazy
+    //    revision-keyed ProcessTreeRow projection cache, before the lazy
     //    index accessor: 661 allocations, 871,643 vs 1,191,668 bytes — the
     //    +320 KB byte growth was the per-frame O(N) `Vec<&ProcessItem>`
     //    pointer vector this slice removed. Pre-cache evidence: 8,777 /

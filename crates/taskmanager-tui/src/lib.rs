@@ -82,9 +82,10 @@ use taskmanager_core::core::directory_usage::{
 };
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
-use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessItem, ProcessLiveKey};
+use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InputDispatch, ShellKeyEvent, SortCol,
+    matches_process_query,
 };
 
 /// Inactivity window (micros) after which the Applications-page prefix jump
@@ -472,7 +473,10 @@ impl TuiApp {
             self.system_scroll = 0;
         }
         if self.page() == AppPage::Applications && self.query != query_before {
-            self.application.selected_process = None;
+            // Drop the stale detail identity before the cursor re-derives its
+            // row: the reconciliation then falls back to the positional anchor
+            // instead of chasing a row the old query had selected.
+            self.shell.set_row_selection(None, None);
             self.reconcile_applications_cursor();
         }
         if self.shell.interaction_surface().is_some()
@@ -499,7 +503,7 @@ impl TuiApp {
         let query_before = self.query.clone();
         let effect = self.shell.handle_local_char(character, modifiers);
         if self.page() == AppPage::Applications && self.query != query_before {
-            self.application.selected_process = None;
+            self.shell.set_row_selection(None, None);
             self.reconcile_applications_cursor();
         }
         if self.shell.interaction_surface().is_some()
@@ -635,21 +639,18 @@ impl TuiApp {
     /// match through its group name. A non-empty query with no further match
     /// leaves the cursor put. Returns the insights re-request effect for the
     /// landing row.
+    ///
+    /// Process rows resolve through the shell's single query matcher
+    /// ([`matches_process_query`]) — the same fold the shell's visible-row
+    /// filter runs — so Enter lands on a row the filter is actually showing,
+    /// including the structured `pid:`/`user:`/`status:`/`cmd:`/`name:`
+    /// tokens a plain-field walk would silently miss.
     #[must_use]
     pub(crate) fn jump_to_next_search_match(&mut self) -> Option<PlatformEffect> {
         let query = self.query.trim().to_owned();
         if query.is_empty() {
             return None;
         }
-        let matches = |process: &ProcessItem| {
-            taskmanager_core::core::text::contains_ascii_ci(&process.name, &query)
-                || taskmanager_core::core::text::contains_ascii_ci(&process.cmdline, &query)
-                || process.current_user().is_some_and(|user| {
-                    taskmanager_core::core::text::contains_ascii_ci(&user, &query)
-                })
-                || (query.bytes().all(|b| b.is_ascii_digit())
-                    && process.pid.to_string().contains(&query))
-        };
         let rows = self.process_rows_snapshot();
         let start = self.selected.saturating_add(1);
         let index = rows
@@ -662,7 +663,9 @@ impl TuiApp {
                 crate::process_view::ProcessRow::Group { label, .. } => {
                     taskmanager_core::core::text::contains_ascii_ci(label, &query)
                 }
-                crate::process_view::ProcessRow::TreeNode { process, .. } => matches(process),
+                crate::process_view::ProcessRow::TreeNode { process, .. } => {
+                    matches_process_query(process, &query)
+                }
             })
             .map(|(index, _)| index);
         let index = index?;

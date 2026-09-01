@@ -156,9 +156,8 @@ impl IcedApp {
             self.request_history_frontend(config.history_persistence);
         }
         crate::i18n::sync_shared_language(language);
-        super::motion::install_motion_policy(super::motion::motion_policy_from_token(
-            config.motion.as_str(),
-        ));
+        self.configuration
+            .set_focus_visible(self.input.modality.shows_focus_ring());
         self.shell
             .set_telemetry_interval(TelemetryInterval::clamped(Duration::from_millis(
                 config.refresh_ms,

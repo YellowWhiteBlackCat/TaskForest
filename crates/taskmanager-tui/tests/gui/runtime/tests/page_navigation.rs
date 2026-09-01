@@ -104,7 +104,7 @@ fn flat_inventory_sort_keeps_the_selected_provider_identity() {
                 .sorted_session_at(app.selected)
                 .expect("session row")
                 .id
-                .clone(),
+                .to_string(),
         };
 
         app.cycle_info_sort_column_preserving_anchor(table);
@@ -119,7 +119,7 @@ fn flat_inventory_sort_keeps_the_selected_provider_identity() {
                 .is_some_and(|entry| entry.id.as_str() == identity.as_str()),
             taskmanager_shell::InfoTable::Users => app
                 .sorted_session_at(app.selected)
-                .is_some_and(|session| session.id == identity.as_str()),
+                .is_some_and(|session| session.id.as_str() == identity.as_str()),
         };
         assert!(
             still_selected,

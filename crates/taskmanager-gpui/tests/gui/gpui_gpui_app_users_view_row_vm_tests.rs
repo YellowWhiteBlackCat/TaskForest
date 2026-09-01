@@ -7,7 +7,7 @@ fn session(
     remote: bool,
 ) -> SessionItem {
     SessionItem {
-        id: "session-7".to_owned(),
+        id: "session-7".to_owned().into(),
         uid: 1000,
         user: "alice".to_owned(),
         seat: seat.map(str::to_owned),

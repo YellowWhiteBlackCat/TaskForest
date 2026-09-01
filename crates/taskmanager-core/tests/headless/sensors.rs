@@ -195,7 +195,7 @@ mod lifecycle_tests {
             tracker
                 .lifecycle("hwmon:pci:0000:00:01.0")
                 .map(|lifecycle| lifecycle.generation),
-            Some(1)
+            Some(DeviceGeneration::INITIAL)
         );
         assert_eq!(first.readings[0].device_generation().get(), 1);
 
@@ -238,7 +238,7 @@ mod lifecycle_tests {
             tracker
                 .lifecycle("hwmon:pci:0000:00:01.0")
                 .map(|lifecycle| lifecycle.generation),
-            Some(2)
+            Some(DeviceGeneration::new(2))
         );
         assert_eq!(readded.readings[0].device_generation().get(), 2);
     }

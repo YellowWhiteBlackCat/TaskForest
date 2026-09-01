@@ -161,24 +161,22 @@ impl RequestPort for DemoRequests {
     }
 }
 
-static DEMO_RUNTIME: RuntimeCache = RuntimeCache::new();
+static DEMO_RUNTIME: OnceLock<SharedRuntime> = OnceLock::new();
 
 /// A no-I/O runtime handle for the capture/demo composition. It exists only
 /// to satisfy the same typed plugin shape as production; the demo plugin does
 /// not install the platform drain system.
 pub fn demo_platform_runtime() -> &'static SharedRuntime {
-    DEMO_RUNTIME
-        .get_or_init(|| {
-            Ok(PlatformClient::new(PlatformHandle::new(
-                std::sync::Arc::new(DemoCapabilities),
-                std::sync::Arc::new(DemoEvents),
-                PlatformFacets::default().with_system(
-                    taskmanager_application::SystemFacets::default()
-                        .with_host(std::sync::Arc::new(DemoRequests)),
-                ),
-            )))
-        })
-        .expect("the Bevy demo runtime is an in-memory no-op")
+    DEMO_RUNTIME.get_or_init(|| {
+        SharedRuntime::new(PlatformClient::new(PlatformHandle::new(
+            std::sync::Arc::new(DemoCapabilities),
+            std::sync::Arc::new(DemoEvents),
+            PlatformFacets::default().with_system(
+                taskmanager_application::SystemFacets::default()
+                    .with_host(std::sync::Arc::new(DemoRequests)),
+            ),
+        )))
+    })
 }
 
 /// Resolve the process-wide platform runtime, spawning it on first use.

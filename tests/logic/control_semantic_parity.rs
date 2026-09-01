@@ -4,12 +4,17 @@
 //!
 //! [`super::control_vocabulary_boundary`] pins the NEGATIVE side of the
 //! control vocabulary (no raw nice payloads, no POSIX stop/continue signal
-//! names in a UI tree). This file pins the POSITIVE side: the three
-//! frontends must OFFER the same control semantics — the same priority tier
+//! names in a UI tree). This file pins the POSITIVE side: the frontends must
+//! OFFER the same control semantics — the same priority tier
 //! set, the same suspend/resume vocabulary, and the one shared tier→label
 //! fold. `dual_track_policy_parity` is the behavioral template for policy
 //! semantics; this gate extends the same discipline to the control surface,
 //! the way `renderer_fold_boundary` extends the display fold.
+//!
+//! The scan roots cover all four product frontends. The designated OFFER
+//! surfaces (`TIER_OFFER_FILES`) name one file per frontend: Bevy's is the
+//! Applications action menu (`pages/processes/menu.rs`), which offers the
+//! same three tiers through the shell's batch track as the other three.
 //!
 //! Scanning is deliberately structural, mirroring
 //! [`super::control_vocabulary_boundary`]: a parity gate on the vocabulary
@@ -27,16 +32,17 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const SCAN_ROOTS: [&str; 3] = [
+const SCAN_ROOTS: [&str; 4] = [
     "crates/taskmanager-gpui/src",
     "crates/taskmanager-tui/src",
     "crates/taskmanager-iced/src",
+    "crates/taskmanager-bevy-ui/src",
 ];
 
 /// The priority-preset surface of each frontend — the one file whose typed
 /// tier references constitute the offer (GPUI action-bar presets, TUI
-/// process-menu picker, Iced pick_list model).
-const TIER_OFFER_FILES: [(&str, &str); 3] = [
+/// process-menu picker, Iced pick_list model, Bevy Applications action menu).
+const TIER_OFFER_FILES: [(&str, &str); 4] = [
     (
         "GPUI",
         "crates/taskmanager-gpui/src/gpui_app/processes_view/chrome/action_bar.rs",
@@ -45,6 +51,10 @@ const TIER_OFFER_FILES: [(&str, &str); 3] = [
     (
         "Iced",
         "crates/taskmanager-iced/src/ui/applications/priority_choice.rs",
+    ),
+    (
+        "Bevy",
+        "crates/taskmanager-bevy-ui/src/pages/processes/menu.rs",
     ),
 ];
 
@@ -105,21 +115,22 @@ fn tier_offer(code: &str) -> Vec<&'static str> {
         .collect()
 }
 
-/// Tier parity (§8.1 语义平价律): each frontend's priority surface offers
+/// Tier parity (§8.1 语义平价律): each designated priority surface offers
 /// EXACTLY the neutral `PriorityTier` set {High, Normal, Low} — a frontend
 /// that drops a tier or invents one makes the same control command mean
 /// different things per frontend, which is a parity bug, not a style choice.
 /// The platform adapter owns tier→native; nothing here may widen to raw
-/// numbers (that negative side is `control_vocabulary_boundary`).
+/// numbers (that negative side is `control_vocabulary_boundary`). Bevy is
+/// not designated yet — a surface must exist before it can be pinned.
 #[test]
-fn all_three_frontends_offer_exactly_the_high_normal_low_priority_tiers() {
+fn the_designated_surfaces_offer_exactly_the_high_normal_low_priority_tiers() {
     for (frontend, rel_path) in TIER_OFFER_FILES {
         let code = read_stripped(rel_path);
         let offered = tier_offer(&code);
         assert_eq!(
             offered, TIERS,
             "{frontend} priority offer drifted: found {offered:?} in {rel_path}, expected \
-             exactly [High, Normal, Low] (ARCH.md §8.1 语义平价律: the three frontends must \
+             exactly [High, Normal, Low] (ARCH.md §8.1 语义平价律: every frontend must \
              offer the same tier set; a missing tier is a dropped capability, an extra tier \
              is a private vocabulary)."
         );
@@ -134,6 +145,21 @@ fn all_three_frontends_offer_exactly_the_high_normal_low_priority_tiers() {
                 "{frontend} presets stopped constructing the typed \
                  ProcessBatchAction::SetPriority in {rel_path}"
             ),
+            // Bevy's action menu submits the same typed batch action through
+            // the shell's single-row batch track, and labels its tiers only
+            // through the shared fold.
+            "Bevy" => {
+                assert!(
+                    code.contains("ProcessBatchAction::SetPriority"),
+                    "{frontend} action menu stopped constructing the typed \
+                     ProcessBatchAction::SetPriority in {rel_path}"
+                );
+                assert!(
+                    code.contains("presentation::priority_tier_label"),
+                    "{frontend} action menu stopped labelling tiers through the shared \
+                     priority_tier_label fold in {rel_path}"
+                );
+            }
             // TUI's picker maps three ProcessMenuAction variants through the
             // `priority_tier` fold in ui/process_menu.rs.
             "TUI" => {
@@ -167,15 +193,15 @@ fn all_three_frontends_offer_exactly_the_high_normal_low_priority_tiers() {
                     );
                 }
             }
-            _ => unreachable!("TIER_OFFER_FILES names only the three frontends"),
+            _ => unreachable!("TIER_OFFER_FILES names only the four frontends"),
         }
     }
 }
 
 /// Suspend/resume parity (§8.1 语义完备律 + 语义平价律): every frontend
 /// expresses the suspend CONCEPT through the neutral vocabulary — GPUI's
-/// direct track composes `ProcessControlRequest::Suspend/Resume`, TUI/Iced
-/// submit `ProcessBatchAction::Suspend/Resume` through the shell batch
+/// direct track composes `ProcessControlRequest::Suspend/Resume`, TUI/Iced/
+/// Bevy submit `ProcessBatchAction::Suspend/Resume` through the shell batch
 /// track. The two lanes are the documented dual-track split (ADR-027) and
 /// are both legitimate; this gate pins the VOCABULARY (the concept is never
 /// expressed as a stop/continue signal — that negative side is
@@ -215,9 +241,16 @@ fn suspend_resume_reach_every_adapter_through_the_neutral_vocabulary() {
         );
     }
 
-    // TUI + Iced shell batch track: the process menu must submit the neutral
-    // batch action for both concepts.
-    for (frontend, rel_path) in [("TUI", TUI_MENU_DISPATCH), ("Iced", ICED_MENU_DISPATCH)] {
+    // TUI + Iced + Bevy shell batch track: the process menu must submit the
+    // neutral batch action for both concepts.
+    for (frontend, rel_path) in [
+        ("TUI", TUI_MENU_DISPATCH),
+        ("Iced", ICED_MENU_DISPATCH),
+        (
+            "Bevy",
+            "crates/taskmanager-bevy-ui/src/pages/processes/menu.rs",
+        ),
+    ] {
         let code = read_stripped(rel_path);
         for concept in ["Suspend", "Resume"] {
             assert!(

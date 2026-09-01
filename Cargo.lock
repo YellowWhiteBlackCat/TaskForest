@@ -9616,12 +9616,15 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-gates"
-version = "0.1.0-rc8"
+version = "0.1.0-rc9"
 dependencies = [
  "chrono",
  "crossbeam-channel",
+ "proc-macro2",
+ "quote",
  "serde",
  "serde_json",
+ "syn 2.0.119",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",

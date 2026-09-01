@@ -3,6 +3,7 @@
 use std::rc::Rc;
 
 use super::*;
+use taskmanager_shell::presentation::wifi_signal_quality_percent;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
@@ -50,14 +51,6 @@ pub(crate) fn network_vital_line(nic: &NetworkMetrics) -> String {
         segments.push(format!("{speed} Mbps"));
     }
     segments.join(" · ")
-}
-
-/// The single dBm → percentage mapping for Wi-Fi signal quality
-/// (-90 dBm → 0%, -30 dBm → 100%, clamped). Shared by the rail caption, the
-/// detail summary, and the progress bar so every surface agrees.
-#[must_use]
-pub(crate) fn wifi_signal_quality_percent(dbm: i32) -> f32 {
-    ((dbm as f32 + 90.0) / 60.0 * 100.0).clamp(0.0, 100.0)
 }
 
 /// Whether the adapter is currently associated/carrier-up.
@@ -153,6 +146,8 @@ pub(crate) fn network_summary_lines(
 
     if is_wireless {
         if let Some(dbm) = observed.signal_dbm {
+            // The shell's single dBm→percent fold (ADR-020): the rail caption
+            // and the detail progress bar read the same mapping.
             let quality = wifi_signal_quality_percent(dbm);
             rows.push(StatRow::text(
                 t("common.signal"),

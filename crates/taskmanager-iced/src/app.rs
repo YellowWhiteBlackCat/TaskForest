@@ -457,8 +457,6 @@ pub enum Message {
     CloseRunTask,
     /// Update the Run New Task command string.
     UpdateRunTaskCommand(String),
-    /// Toggle the administrative privileges checkbox for Run New Task.
-    ToggleRunTaskAdmin,
     /// Submit the Run New Task action.
     SubmitRunTask,
 }

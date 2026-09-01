@@ -2,6 +2,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use super::target::SessionId;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum SessionControlAction {
     Disconnect,
@@ -10,7 +12,7 @@ pub enum SessionControlAction {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct SessionItem {
-    pub id: String,
+    pub id: SessionId,
     pub uid: u32,
     pub user: String,
     pub seat: Option<String>,

@@ -45,7 +45,7 @@ use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
 
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
-use crate::app::{FrontendTrack, PageContext, Route, RouteChanged, SharedRuntimeHandle};
+use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
 use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, space_8};
 use crate::window::{Role, TextRole};
@@ -57,7 +57,7 @@ use crate::window::{Role, TextRole};
 /// their own observers": shared files register app-wide observers at plugin
 /// build time; pages carry theirs inside their scenes.
 ///
-/// Hosted here (not a shared module) because W4's scope adds no module
+/// Hosted here (not a shared module) because the current scope adds no module
 /// declarations to the shared `pages.rs`; hoisting it is a one-line move the
 /// day a later milestone opens that file anyway.
 pub(crate) struct PageObserver {
@@ -93,12 +93,8 @@ where
 /// shell's route machinery to remount the mounted page, which re-reads the
 /// projection through the standard mount system. Fired only from fold or
 /// intent observers, so an idle frame never redraws.
-pub(crate) fn request_projection_refresh(
-    _fold: On<ShellProjectionFolded>,
-    route: Res<Route>,
-    mut commands: Commands,
-) {
-    commands.trigger(RouteChanged(route.page));
+pub(crate) fn request_projection_refresh(_fold: On<ShellProjectionFolded>, mut commands: Commands) {
+    commands.trigger(RouteChanged);
 }
 
 /// The alerts page's fold observer: submit every desktop notification the
@@ -109,7 +105,6 @@ fn alerts_fold_observer(
     _fold: On<ShellProjectionFolded>,
     mut track: NonSendMut<FrontendTrack>,
     runtime: Res<SharedRuntimeHandle>,
-    route: Res<Route>,
     mut commands: Commands,
 ) {
     let mut client = runtime.shared.lock_client();
@@ -120,7 +115,7 @@ fn alerts_fold_observer(
             PlatformEffect::DesktopNotification(request),
         );
     }
-    commands.trigger(RouteChanged(route.page));
+    commands.trigger(RouteChanged);
 }
 
 /// Identity of one rule-toggle row: the canonical rule id, the same id
@@ -141,7 +136,6 @@ fn rule_toggle_observer(
     change: On<ValueChange<bool>>,
     targets: Query<&AlertRuleToggleTarget>,
     mut track: NonSendMut<FrontendTrack>,
-    route: Res<Route>,
     mut commands: Commands,
 ) {
     let requested = change.event().value;
@@ -171,7 +165,7 @@ fn rule_toggle_observer(
             return;
         }
     }
-    commands.trigger(RouteChanged(route.page));
+    commands.trigger(RouteChanged);
 }
 
 // ---- view model (pure; the headless-test surface) ----

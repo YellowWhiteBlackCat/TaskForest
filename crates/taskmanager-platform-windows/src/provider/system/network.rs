@@ -79,7 +79,7 @@ impl NetworkTelemetryProvider for WinNetworkTelemetryProvider {
             let lifecycle =
                 self.lifecycles
                     .observe(device_id.as_str(), device_state, observed_at_ms);
-            let device_generation = taskmanager_core::DeviceGeneration::new(lifecycle.generation);
+            let device_generation = lifecycle.generation;
             let (rx_total, tx_total) = (data.total_received(), data.total_transmitted());
             let counters = self.rate_counters.entry(name.clone()).or_default();
             let rx_rate = counters

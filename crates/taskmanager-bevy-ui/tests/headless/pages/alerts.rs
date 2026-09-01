@@ -395,7 +395,7 @@ fn fold_event_remounts_the_page_and_idle_frames_redraw_nothing() {
     mount_alerts(&mut app);
     let mounted = mounted_page_entity(app.world_mut());
 
-    app.world_mut().commands().trigger(ShellProjectionFolded(1));
+    app.world_mut().commands().trigger(ShellProjectionFolded);
     app.update();
     let refreshed = mounted_page_entity(app.world_mut());
     assert_ne!(
@@ -418,10 +418,10 @@ fn fold_event_remounts_the_page_and_idle_frames_redraw_nothing() {
 // because the shared test currently cannot pass for unrelated pages) ----
 
 #[test]
-fn w4_pages_assemble_and_despawn_in_a_bare_scene_world() {
+fn pages_assemble_and_despawn_in_a_bare_scene_world() {
     // The shared page census spawns every page scene in a bare
     // MinimalPlugins world with no app resources; a page whose scene needs a
-    // resource at spawn or observer-dispatch time breaks it. The W4 pages
+    // resource at spawn or observer-dispatch time breaks it. The page
     // embed only event-triggered observers, so they must assemble, census,
     // and despawn cleanly with no resources present.
     let mut app = App::new();
@@ -436,11 +436,11 @@ fn w4_pages_assemble_and_despawn_in_a_bare_scene_world() {
     let fixture_shell = ShellApp::new();
     let fixture_palette = ui_palette(&Theme::dark());
     let fixture_history = crate::pages::history::HistoryProjectionResource::default();
+    let process_tree_expansion = crate::pages::process_tree::ProcessTreeExpansion::default();
     let context = crate::app::PageContext {
         shell: &fixture_shell,
+        process_tree_expansion: &process_tree_expansion,
         palette: &fixture_palette,
-        body: fixture_palette.body.clone(),
-        heading: fixture_palette.heading.clone(),
         history: &fixture_history.0,
     };
     for page in [Page::Alerts, Page::Settings] {

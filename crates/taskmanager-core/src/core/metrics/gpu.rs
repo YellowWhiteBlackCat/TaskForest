@@ -185,7 +185,7 @@ impl GpuEngineMetricPoint {
 
     #[must_use]
     pub const fn is_generation_scoped(&self) -> bool {
-        self.device_generation.get() != 0
+        self.device_generation.is_valid()
     }
 }
 

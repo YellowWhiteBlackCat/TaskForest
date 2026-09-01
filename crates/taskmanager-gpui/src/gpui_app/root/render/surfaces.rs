@@ -8,10 +8,7 @@ use super::super::{
 };
 use super::overlays;
 use gpui::{AnyElement, App, Context, Div, IntoElement, ParentElement, Stateful, Window, px};
-use taskmanager_application::{
-    PendingConfirmation, ProcessTerminationAction, ProcessTerminationConfirmation,
-    SurfaceDismissReason, SurfaceKind,
-};
+use taskmanager_application::{PendingConfirmation, SurfaceDismissReason, SurfaceKind};
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_theme::Theme;
 
@@ -77,22 +74,9 @@ fn compose_shared_surface(
         }
         SurfaceKind::Confirmation(_) => match view.pending_confirmation().cloned() {
             Some(PendingConfirmation::EndTask(target)) => {
-                root.child(termination::render_process_termination_dialog(
+                root.child(termination::render_end_task_confirmation_dialog(
                     theme,
-                    ProcessTerminationConfirmation {
-                        action: ProcessTerminationAction::EndTask,
-                        root: target,
-                        descendants_leaf_first: Vec::new(),
-                    },
-                    close_entity,
-                    window,
-                    cx,
-                ))
-            }
-            Some(PendingConfirmation::ProcessTermination(intent)) => {
-                root.child(termination::render_process_termination_dialog(
-                    theme,
-                    intent,
+                    target,
                     close_entity,
                     window,
                     cx,

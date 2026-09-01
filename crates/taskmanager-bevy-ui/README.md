@@ -24,20 +24,23 @@ curves, sidebar mini-graphs, and the memory composition bar through one
 gap-aware adapter), and the semantic accessibility channel (ui-contract
 `SemanticSnapshot` plus `bevy_a11y` nodes published through the
 `accesskit_unix` bridge on Linux). Remaining open surface is declared, never
-hidden: the GPU-engine detail cards, service log streaming, startup/session
-control verbs, settings persistence across sessions, the tray seam, and
-multi-window composition. Feathers (the official skin system) is not
+hidden: per-row process trends, multi-select process verbs, notification
+history, GPU-engine detail cards, service log streaming, settings persistence
+across sessions, the tray seam, and multi-window composition.
+Feathers (the official skin system) is not
 adopted — theme tokens are the only skin authority.
 
 ## Module map
 
-- `src/app.rs` — the frontend-owned route model (eight pages), the nav rail,
+- `src/app.rs` — the frontend-owned route model (nine pages), the nav rail,
   page mounting, and `ShellTrack`: the SystemParam every page reads the
   folded projection through (the page-agent data entry).
-- `src/input.rs` — the real-input seam (W4): Bevy keyboard events forwarded
+- `src/input.rs` — the real-input seam: Bevy keyboard events forwarded
   through the shell's own routers (`handle_local_key`/`handle_local_char`),
-  the frontend-owned route chords, the Dialog-scope Enter mapping, the
-  `PendingEffects` effect bridge to the drain, and the one-shot quit forward.
+  the frontend-owned route chords (the shell page always follows the visible
+  page), the Dialog-scope Enter mapping, the per-inventory action-menu open
+  chords, the `PendingEffects` effect bridge to the drain, and the one-shot
+  quit forward.
 - `src/confirmation.rs` — the shell's armed destructive-action gate rendered
   as one modal under the app shell root, with typed confirm/dismiss paths
   and republished gate transitions.
@@ -51,17 +54,17 @@ adopted — theme tokens are the only skin authority.
   data-refresh event).
 - `src/palette.rs` — the theme-token → bevy adapter; the only place tokens
   become bevy colors/type metrics.
-- `src/pages.rs` + `src/pages/` — eight mounted page modules, one file each
+- `src/pages.rs` + `src/pages/` — nine mounted page modules, one file each
   (`content(&PageContext) -> impl Scene`), plus the mounted `process_tree.rs`
   projection and `history.rs` connector adapter: the M1
   process table, performance summary/curves/device blocks, the three
   read-only inventory tables (services/startup/sessions), settings, and the
   alert center.
-- `src/widgets.rs` + `src/widgets/` — the owned component layer: table and
-  sparkline pure cores + bsn! render adapters, the M1.5 bounded `chart.rs`
-  projection and `control_contract.rs`, plus menu/dialog skeletons (W4).
-- `src/input_contract.rs` — M1.5 Bevy-key normalization through the shared
-  command router, stable semantic addresses and explicit IME ownership.
+- `src/widgets.rs` + `src/widgets/` — the owned component layer: table/chart
+  projection cores, bsn! render adapters, controls, and the keyboard-first
+  action menu.
+- `src/input_contract.rs` — Bevy-key normalization through the shared command
+  router and stable semantic addresses for rendered rows.
 - `src/runtime.rs` — the process-wide platform client via the app-host
   `OnceLock` cache pattern.
 
@@ -124,8 +127,8 @@ and current worktree.
 Seam and projection tests are headless in `tests/headless/` (drain bound and
 idle behavior against scripted event ports, runtime-cache singleton
 semantics, palette token mapping, routing/keyboard semantics and nav
-highlight, virtual-table-window and sparkline math, page/widget scene
-assembly on `MinimalPlugins`, plus the drain→summary-line wiring without a
+highlight, virtual-table-window and chart math, page/widget scene assembly
+on `MinimalPlugins`, plus the drain→summary-line wiring without a
 compositor); real-window pixel evidence belongs to the capture flow defined
 in [`docs/QUALITY_GATES.md`](../../docs/QUALITY_GATES.md). Check the shared
 workspace resolution keeps `bevy_app`/`bevy_ecs` at one 0.19 version across

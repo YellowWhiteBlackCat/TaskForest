@@ -33,7 +33,8 @@ use taskmanager_theme::tokens;
 ///
 /// Captured at request time (not re-derived at confirm time) so a live list
 /// refresh can never silently change what the confirmation represents — the same
-/// freeze-at-request discipline `ProcessTerminationConfirmation` applies to PIDs.
+/// freeze-at-request discipline of the shared confirmation payloads applies to
+/// process identities, service ids, and startup entries alike.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) enum ServiceControlConfirmation {
     /// A gated service lifecycle action: Stop, Restart, or Disable. Start and
@@ -53,7 +54,7 @@ pub(super) enum ServiceControlConfirmation {
 
 impl ServiceControlConfirmation {
     /// High-blast-radius actions render in the destructive accent so the dialog
-    /// reads as a warning, matching `render_process_termination_dialog`.
+    /// reads as a warning, matching the process confirmation renderer.
     fn is_high_risk(&self) -> bool {
         matches!(
             self,
@@ -231,7 +232,6 @@ pub(super) fn confirmation_dialog(view: &RootView) -> Option<ServiceControlConfi
             enabled: request.enabled,
         }),
         PendingConfirmation::EndTask(_)
-        | PendingConfirmation::ProcessTermination(_)
         | PendingConfirmation::ProcessBatch(_)
         | PendingConfirmation::SessionControl(_)
         | PendingConfirmation::SmartSelfTest(_) => None,
@@ -239,7 +239,7 @@ pub(super) fn confirmation_dialog(view: &RootView) -> Option<ServiceControlConfi
 }
 
 /// Build the complete service/startup control confirmation dialog. Sibling of
-/// `render_process_termination_dialog`. Closing via X / scrim and the Cancel
+/// the process confirmation renderer. Closing via X / scrim and the Cancel
 /// button only clear pending state; the confirm button is the sole UI path to
 /// [`RootView::confirm_service_control_confirmation`].
 pub(super) fn render_service_control_confirmation_dialog(

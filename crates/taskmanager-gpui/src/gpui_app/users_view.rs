@@ -36,6 +36,7 @@ use taskmanager_application::RefreshRequest;
 use taskmanager_application::i18n;
 use taskmanager_core::core::session::{SessionControlAction, SessionItem};
 use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::target::SessionId;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
@@ -363,7 +364,7 @@ pub struct UsersViewProps<'a> {
     pub theme: &'a Theme,
     pub rows: Rc<Vec<SessionItem>>,
     pub sources: &'a [SourceStatus],
-    pub selected: Option<&'a str>,
+    pub selected: Option<&'a SessionId>,
     pub feedback: Option<ActionFeedback>,
     pub hovered: Option<Hover>,
     pub search_query: &'a str,
@@ -388,14 +389,14 @@ pub fn render_users(
         retry_button,
     } = props;
     let theme = *theme;
-    let selected = selected.map(|s| s.to_string());
+    let selected = selected.cloned();
 
     let count = rows.len();
 
     // Map RootView.selected_session → row index in `rows` (None if absent).
     let selected_row_ix = selected
         .as_ref()
-        .and_then(|id| rows.iter().position(|s| &s.id == id));
+        .and_then(|id| rows.iter().position(|s| s.id == *id));
 
     let header = div()
         .flex()
@@ -405,7 +406,7 @@ pub fn render_users(
         ))
         .child(action_bar(
             &theme,
-            selected.as_deref(),
+            selected.as_ref(),
             hovered.as_ref(),
             feedback,
             cx,
@@ -492,7 +493,7 @@ pub fn render_users(
 /// on the UI thread.
 fn action_bar(
     theme: &Theme,
-    selected: Option<&str>,
+    selected: Option<&SessionId>,
     hovered: Option<&Hover>,
     feedback: Option<ActionFeedback>,
     cx: &mut Context<RootView>,
@@ -501,7 +502,7 @@ fn action_bar(
     // present. The feedback itself (success/failure color + text) is rendered
     // by the shared `list_view::feedback_status_line`, identical to the
     // services/startup action bars.
-    let hint = match selected {
+    let hint = match selected.map(SessionId::as_str) {
         Some(id) => format!("{} {}", i18n::t("hint.selected_session"), id),
         None => i18n::t("hint.select_session").to_string(),
     };

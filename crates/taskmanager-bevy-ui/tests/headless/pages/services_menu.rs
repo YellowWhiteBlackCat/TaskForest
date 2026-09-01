@@ -135,8 +135,13 @@ fn enter_opens_the_menu_and_confirm_arms_the_shared_gate() {
     // Down lands on Stop (clamped list, no wrap) and Enter commits: the
     // frozen intent crosses into the shell's shared gate — no platform
     // request yet.
-    let _ = modal.drive(&mut shell, KeyCode::ArrowDown);
-    let _ = modal.drive(&mut shell, KeyCode::Enter);
+    let mut effects = Vec::new();
+    let _ = modal.drive(&mut shell, KeyCode::ArrowDown, &mut effects);
+    let _ = modal.drive(&mut shell, KeyCode::Enter, &mut effects);
+    assert!(
+        effects.is_empty(),
+        "an inventory menu only arms the gate; it queues no platform effect"
+    );
     assert!(modal.session.is_none(), "a committed menu closes");
     let pending = shell.pending_service_control().expect("the gate armed");
     assert_eq!(pending.action, ServiceAction::Stop, "the menu's verb froze");
@@ -168,7 +173,9 @@ fn escape_cancels_the_menu_without_arming_anything() {
         KeyCode::Enter,
         &selection
     ));
-    let _ = modal.drive(&mut shell, KeyCode::Escape);
+    let mut effects = Vec::new();
+    let _ = modal.drive(&mut shell, KeyCode::Escape, &mut effects);
+    assert!(effects.is_empty(), "cancel queues no platform effect");
     assert!(modal.session.is_none(), "Escape closes the menu");
     assert!(
         shell.pending_confirmation().is_none() && shell.pending_service_control().is_none(),

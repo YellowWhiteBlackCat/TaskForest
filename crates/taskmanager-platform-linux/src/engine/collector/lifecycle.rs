@@ -113,7 +113,7 @@ pub(super) fn reconcile_discovered_devices<T: LifecycleMetric>(
             continue;
         };
         device.set_state(lifecycle.state);
-        device.set_generation(DeviceGeneration::new(lifecycle.generation));
+        device.set_generation(lifecycle.generation);
     }
     delta
 }

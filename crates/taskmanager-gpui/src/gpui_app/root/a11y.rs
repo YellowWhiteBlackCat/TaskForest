@@ -12,21 +12,47 @@
 //! adapter's `update_if_active` is a no-op until an assistive technology
 //! subscribes, so this is free when no screen reader is running.
 
-use std::cmp::Ordering;
-
+use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
 use taskmanager_ui_contract::{
     AccessibilityBridge, GraphSummary, ModalInput, ProcessRowInput, SemanticSnapshotBuilder,
 };
 
 use super::RootView;
-use taskmanager_application::ProcessTerminationAction;
+use taskmanager_application::PendingConfirmation;
+use taskmanager_shell::presentation::process_batch_action_label;
 
 /// Maximum number of process rows published to the accessibility tree. The
 /// process list can contain thousands of entries; a screen reader reads the
 /// tree top-down, so the highest-CPU rows are by far the most useful and the
 /// tree is kept bounded for AT responsiveness.
 const MAX_PUBLISHED_ROWS: usize = 64;
+
+fn process_confirmation_copy(
+    pending: Option<&PendingConfirmation>,
+) -> Option<(String, u32, String, &'static str)> {
+    match pending? {
+        PendingConfirmation::EndTask(target) => Some((
+            taskmanager_application::i18n::t("proc.end_task").to_owned(),
+            target.pid,
+            target.name.clone(),
+            "end-task-confirmation",
+        )),
+        PendingConfirmation::ProcessBatch(intent) => {
+            let target = intent.targets.last().or_else(|| intent.targets.first())?;
+            Some((
+                process_batch_action_label(intent.action),
+                target.pid,
+                target.name.clone(),
+                "process-batch-confirmation",
+            ))
+        }
+        PendingConfirmation::ServiceControl(_)
+        | PendingConfirmation::StartupControl(_)
+        | PendingConfirmation::SessionControl(_)
+        | PendingConfirmation::SmartSelfTest(_) => None,
+    }
+}
 
 impl RootView {
     /// Build one semantic snapshot from the current view state and publish it
@@ -82,18 +108,10 @@ fn build_snapshot(
     // semantic builder also publishes a typed modal node below. The status is
     // retained for screen readers that announce live-region changes without
     // moving focus. Data-driven (action + target pid), never widget copy.
-    let status = match view.process_termination_confirmation() {
-        Some(intent) => format!(
-            "confirming: {} for {}",
-            match intent.action {
-                ProcessTerminationAction::EndTask => "end task",
-                ProcessTerminationAction::ForceKill => "force kill",
-                ProcessTerminationAction::EndProcessTree => "end process tree",
-            },
-            intent.root.pid,
-        ),
-        None => format!("{} processes", view.processes().len()),
-    };
+    let status = process_confirmation_copy(view.pending_confirmation()).map_or_else(
+        || format!("{} processes", view.processes().len()),
+        |(action, pid, _, _)| format!("confirming: {action} for {pid}"),
+    );
 
     let mut builder = SemanticSnapshotBuilder::new(revision)
         .application_name(product::GPUI_NAME)
@@ -108,14 +126,14 @@ fn build_snapshot(
         });
     }
 
-    // Publish the highest-CPU rows first; the AT reads them top-down.
+    // Publish the highest-CPU rows first; the AT reads them top-down. The
+    // ordering is the shared process-sort authority on its CPU axis
+    // (`total_cmp` places an unmeasured/NaN sample deterministically, and the
+    // direction-independent pid tie-break keeps equal readings stable across
+    // refresh ticks), never a local float compare.
     let mut rows: Vec<&taskmanager_core::core::process::ProcessItem> =
         view.processes().iter().collect();
-    rows.sort_by(|a, b| {
-        b.current_cpu_percentage()
-            .partial_cmp(&a.current_cpu_percentage())
-            .unwrap_or(Ordering::Equal)
-    });
+    rows.sort_by(|left, right| compare_processes(left, right, ProcessSortAxis::Cpu, false));
     for item in rows.iter().take(MAX_PUBLISHED_ROWS) {
         let memory_percent = memory_total.and_then(|total| {
             item.current_memory_bytes()
@@ -132,14 +150,11 @@ fn build_snapshot(
         });
     }
 
-    if let Some(intent) = view.process_termination_confirmation() {
+    if let Some((action, pid, name, id)) = process_confirmation_copy(view.pending_confirmation()) {
         builder = builder.modal(ModalInput {
-            id: String::from("end-task-confirmation"),
-            name: String::from("End task confirmation"),
-            description: Some(format!(
-                "Confirm the requested action for process {} ({})",
-                intent.root.pid, intent.root.name
-            )),
+            id: id.to_owned(),
+            name: format!("{action} confirmation"),
+            description: Some(format!("Confirm {action} for process {pid} ({name})")),
         });
     }
 

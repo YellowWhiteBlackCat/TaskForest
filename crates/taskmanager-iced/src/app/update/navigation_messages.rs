@@ -54,7 +54,7 @@ impl IcedApp {
             Message::SortInfoTable { table, column } => self.shell.set_info_sort(table, column),
             Message::SearchChanged(query) => {
                 self.shell.query = query;
-                self.shell.selected = 0;
+                self.shell.move_selection_to(0);
                 self.shell.sync_application_selection();
                 self.process_presentation.visual_cursor = 0;
             }

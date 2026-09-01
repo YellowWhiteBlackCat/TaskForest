@@ -8,7 +8,9 @@ use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::ProcessItem;
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences, format_quantity_f64};
-use taskmanager_shell::presentation::{MISSING_VALUE, optional_nice, peak_of, start_clock_local};
+use taskmanager_shell::presentation::{
+    MISSING_VALUE, optional_cpu_time_seconds, optional_nice, peak_of, start_clock_local,
+};
 
 pub(super) struct ProcessCellData {
     pub(super) cpu: Option<f32>,
@@ -45,9 +47,7 @@ pub(super) fn process_cell_data(
             .map_or_else(|| MISSING_VALUE.to_owned(), |value| value.to_string()),
         nice: optional_nice(process.current_nice()),
         start_time: start_clock_local(process.current_start_time_secs(), local_time_rules),
-        cpu_time: process
-            .current_cpu_time_secs()
-            .map_or_else(|| MISSING_VALUE.to_owned(), |value| format!("{value:.1}s")),
+        cpu_time: optional_cpu_time_seconds(process.current_cpu_time_secs()),
         disk_read: process.current_disk_read_bytes_per_sec(),
         disk_write: process.current_disk_write_bytes_per_sec(),
     }

@@ -8,8 +8,7 @@ use std::sync::OnceLock;
 
 use taskmanager_application::{
     AppAction, CommandContext, CommandRouter, CommandScope, ConfirmationKind, FocusDirection,
-    KeyChord, KeyCode, Modifiers, ProcessTerminationAction, SelectionDirection, SurfaceKind,
-    default_router,
+    KeyChord, KeyCode, Modifiers, SelectionDirection, SurfaceKind, default_router,
 };
 
 use taskmanager_ui::focus::restore_modal;
@@ -220,8 +219,8 @@ fn help_toggle_chord(event: &KeyDownEvent) -> bool {
 
 fn confirm_active_surface(view: &mut RootView, cx: &mut Context<RootView>) {
     match view.shell.interaction.confirmation_kind() {
-        Some(ConfirmationKind::ProcessTermination) => {
-            view.confirm_process_termination(cx);
+        Some(ConfirmationKind::EndTask) => {
+            view.confirm_end_task(cx);
         }
         Some(ConfirmationKind::ServiceControl | ConfirmationKind::StartupControl) => {
             view.confirm_service_control_confirmation(cx);
@@ -232,7 +231,7 @@ fn confirm_active_surface(view: &mut RootView, cx: &mut Context<RootView>) {
         Some(ConfirmationKind::SmartSelfTest) => {
             view.confirm_system_health_self_test(cx);
         }
-        Some(ConfirmationKind::EndTask | ConfirmationKind::SessionControl) | None => {}
+        Some(ConfirmationKind::SessionControl) | None => {}
     }
 }
 
@@ -256,12 +255,28 @@ fn apply_app_action(
         }
         AppAction::Refresh(_) => view.request_refresh(RefreshRequest::Processes),
         AppAction::RequestEndTask => {
-            if view.selected_application_root().is_some() {
-                view.request_process_batch(
-                    taskmanager_core::core::process::ProcessBatchAction::End,
-                );
-            } else if let Some(identity) = view.selected_process_identity() {
-                view.request_process_termination(ProcessTerminationAction::EndTask, identity);
+            let availability = view.process_control_availability();
+            if availability.is_ready() {
+                match availability.scope() {
+                    Some(taskmanager_shell::ProcessControlScope::Tree) => {
+                        view.request_process_batch(
+                            taskmanager_core::core::process::ProcessBatchAction::EndProcessTree,
+                            cx,
+                        );
+                    }
+                    Some(taskmanager_shell::ProcessControlScope::Batch) => {
+                        view.request_process_batch(
+                            taskmanager_core::core::process::ProcessBatchAction::End,
+                            cx,
+                        );
+                    }
+                    Some(taskmanager_shell::ProcessControlScope::Single) => {
+                        if let Some(identity) = view.selected_process_identity() {
+                            view.request_end_task_confirmation(identity);
+                        }
+                    }
+                    None => {}
+                }
             }
         }
         AppAction::OpenProperties => {

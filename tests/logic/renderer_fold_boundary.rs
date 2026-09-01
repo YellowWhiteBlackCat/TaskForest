@@ -9,43 +9,32 @@
 //! known exception in the same change as its replacement. This policy test has
 //! no migration allowlist and is not evidence that a migration is complete.
 //!
-//! Since 2026-08-20 the gate covers all three product frontends, each with
+//! Since 2026-08-20 the gate covers the product frontends, each with
 //! its own scan root and paint signature:
 //!   * GPUI — `crates/taskmanager-gpui/src/gpui_app`;
 //!   * Iced — `crates/taskmanager-iced/src`;
-//!   * TUI  — `crates/taskmanager-tui/src`.
+//!   * TUI  — `crates/taskmanager-tui/src`;
+//!   * Bevy — `crates/taskmanager-bevy-ui/src`.
 //!
-//! Detection is deliberately fail-closed and structural — it flags the
-//! observable signature of an inline fold in a render module:
-//!   * a `current_*` observation READ against a typed metrics/observation
-//!     accessor inside the same file that also paints (`fn render`,
-//!     `impl TableDelegate`, or a gpui `div()` builder — per-frontend paint
-//!     idioms below).
+//! Detection is deliberately fail-closed and syntax-aware — it flags the
+//! observable signature of an inline fold in the exact function or trait
+//! method that paints (`fn render`, `impl TableDelegate`, or a gpui `div()`
+//! builder — per-frontend paint idioms below). Rust is parsed with `syn`, and
+//! `ExprMethodCall` nodes are inspected individually. A non-observation call
+//! in the same file or function can therefore never hide a real
+//! `current_*` observation call.
 //!
 //! The rule matches the `current_*` accessor family by PREFIX, not by an
 //! exhaustive suffix whitelist. A suffix list fails OPEN: accessors outside
-//! the enumerated suffixes (e.g. `current_link_speed_mbps()`,
-//! `current_slots_used()`, `current_used_rate_mib_per_sec()`,
-//! `current_compressed_swap_cache_enabled()`) silently escape the gate,
-//! which is exactly the drift the gate exists to catch. Prefix matching
-//! fails CLOSED: an unknown `current_*` call in a paint module trips the
-//! gate, and a reviewer decides whether it is a real fold (move the read to
-//! the page's data-layer module) or a surveyed non-observation idiom (add
-//! it to the documented denylist in `has_observation_read`).
-//!
-//! The denylist is small and every entry names WHY it is not a scalar
-//! observation read:
-//!   * `.current_value(` / `.current_number(` — sensor/fan/measurement
-//!     reads on the core `Observation` type (GPUI parity: the GPUI signature
-//!     does not count the sensor read either; its sensor modules are caught
-//!     via co-located `_pct()` reads).
-//!   * `.current_user(` / `.current_start_token(` / `.current_exe_path(` —
-//!     process/session identity accessors, not scalar observations.
-//!   * `"alerts.current_value"` — an i18n key literal whose dotted name
-//!     coincidentally starts with `.current_`.
+//! the enumerated suffixes silently escape the gate. Prefix matching fails
+//! CLOSED: an unknown `current_*` call in a paint function trips the gate.
+//! A small method-level exception list covers accessors that return identity or
+//! an already-folded aggregate (`current_value` / `current_number` and the
+//! process identity accessors); the exception is evaluated per AST call, not
+//! as a file-wide negative condition.
 //!
 //! Direct `*Availability::` pattern matches stay out by design: they fold
-//! availability STATE, not scalar observation values, and matching enum
+//! availability state, not scalar observation values, and matching enum
 //! variants by prefix would be a different (and noisier) gate.
 //!
 //! A finding is fixed by moving the read into the page's data-layer module and
@@ -54,108 +43,259 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use proc_macro2::{TokenStream, TokenTree};
+use quote::quote;
+use syn::visit::{self, Visit};
+use syn::{Block, Expr, ExprCall, ExprMethodCall, ImplItem, Item, ItemImpl, Macro, Signature};
+
 const GPUI_SCAN_ROOT: &str = "crates/taskmanager-gpui/src/gpui_app";
 const ICED_SCAN_ROOT: &str = "crates/taskmanager-iced/src";
 const TUI_SCAN_ROOT: &str = "crates/taskmanager-tui/src";
+const BEVY_SCAN_ROOT: &str = "crates/taskmanager-bevy-ui/src";
 
-type PaintDetector = fn(&str) -> bool;
-type FrontendScan = (&'static str, PaintDetector);
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Frontend {
+    Gpui,
+    Iced,
+    Tui,
+    Bevy,
+}
 
 fn repository() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).to_path_buf()
 }
 
-fn strip_line_comments(source: &str) -> String {
-    source
-        .lines()
-        .map(|line| line.split_once("//").map_or(line, |(code, _)| code))
-        .collect::<Vec<_>>()
-        .join("\n")
-}
-
-/// `current_*` call sites surveyed as NOT typed scalar observation reads.
-///
-/// Kept on a documented denylist (module docs) so the prefix rule fails
-/// closed: anything matching `.current_` and NOT listed here is treated as
-/// an observation read and trips the gate in a paint module.
-const NON_OBSERVATION_READ_IDS: &[&str] = &[
-    // Sensor/fan/measurement reads on the core `Observation` type (GPUI
-    // parity) — see module docs.
-    ".current_value(",
-    ".current_number(",
-    // Identity/token accessors, not scalar observations.
-    ".current_user(",
-    ".current_start_token(",
-    ".current_exe_path(",
-    // i18n key literal with a coincidental ".current_" prefix.
-    "\"alerts.current_value\"",
+/// `current_*` calls surveyed as NOT scalar observation reads. The exception
+/// is intentionally method-level: it cannot suppress a different call in the
+/// same function.
+const NON_OBSERVATION_READ_METHODS: &[&str] = &[
+    "current_value",
+    "current_number",
+    "current_user",
+    "current_start_token",
+    "current_exe_path",
 ];
 
-/// The observable signature of an inline fact fold: a typed observation
-/// read. Matches the `current_*` accessor family by PREFIX and fails
-/// closed against the surveyed non-observation denylist above.
-fn has_observation_read(code: &str) -> bool {
-    code.contains(".current_") && !NON_OBSERVATION_READ_IDS.iter().any(|id| code.contains(id))
+#[derive(Default)]
+struct ObservationReadFinder {
+    found: bool,
 }
 
-/// The observable signature of a render module: it paints. Per frontend:
-///   * GPUI — `fn render*`, `impl TableDelegate`, or a `div()` builder.
-fn paints_gpui(code: &str) -> bool {
-    code.contains("fn render") || code.contains("impl TableDelegate") || code.contains("div()")
+impl<'ast> Visit<'ast> for ObservationReadFinder {
+    fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
+        let method = node.method.to_string();
+        if method.starts_with("current_")
+            && !NON_OBSERVATION_READ_METHODS.contains(&method.as_str())
+        {
+            self.found = true;
+        }
+        visit::visit_expr_method_call(self, node);
+    }
+
+    fn visit_macro(&mut self, node: &'ast Macro) {
+        if macro_tokens_have_observation_read(&node.tokens) {
+            self.found = true;
+        }
+        visit::visit_macro(self, node);
+    }
 }
 
-///   * Iced — a page/view entry (`fn render` / `fn view(`), a custom widget
-///     (`impl Widget`, e.g. `focus/widget.rs`), or any `-> Element` builder
-///     fn (the repo's helper builders all return
-///     `Element<'a, Message, iced::Theme, iced::Renderer>`, e.g.
-///     `icons.rs`/`focus.rs`/`saved_views.rs`). `fn view(` is
-///     paren-anchored so the app-logic `fn viewport_*` accessor family
-///     (`app/motion.rs`, `app/scroll.rs`, `app/prefs_accessors.rs`) is not
-///     mistaken for painting.
-fn paints_iced(code: &str) -> bool {
-    code.contains("fn view(")
-        || code.contains("fn render")
-        || code.contains("impl Widget")
-        || code.contains("-> Element")
+/// Inspect macro token trees as well as ordinary expressions. Declarative
+/// scene macros can contain embedded Rust expressions that `syn` must retain
+/// as an opaque token stream; ignoring them would leave a new renderer fold
+/// hidden inside `bsn!` or another scene builder.
+fn macro_tokens_have_observation_read(tokens: &TokenStream) -> bool {
+    let trees: Vec<TokenTree> = tokens.clone().into_iter().collect();
+    for (index, tree) in trees.iter().enumerate() {
+        if matches!(tree, TokenTree::Punct(punct) if punct.as_char() == '.')
+            && let Some(TokenTree::Ident(method)) = trees.get(index + 1)
+        {
+            let method = method.to_string();
+            if method.starts_with("current_")
+                && !NON_OBSERVATION_READ_METHODS.contains(&method.as_str())
+            {
+                return true;
+            }
+        }
+        if let TokenTree::Group(group) = tree
+            && macro_tokens_have_observation_read(&group.stream())
+        {
+            return true;
+        }
+    }
+    false
 }
 
-///   * TUI (Ratatui) — the repo paints via `fn render*` helpers taking
-///     `frame: &mut Frame<'_>` (`Frame<` anchors on that signature type, not
-///     the bare import). `impl Widget for` and `fn draw` are the other
-///     standard Ratatui paint idioms; zero occurrences exist today, they are
-///     kept for forward coverage at no false-positive cost.
-fn paints_tui(code: &str) -> bool {
-    code.contains("fn render")
-        || code.contains("impl Widget for")
-        || code.contains("Frame<")
-        || code.contains("fn draw")
+/// Detect an observation call in one exact function body.
+fn has_observation_read(block: &Block) -> bool {
+    let mut finder = ObservationReadFinder::default();
+    finder.visit_block(block);
+    finder.found
 }
 
-fn collect_rs_files(root: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(root) else {
-        return;
+#[derive(Default)]
+struct CallFinder<'a> {
+    method: Option<&'a str>,
+    free_function: Option<&'a str>,
+    found: bool,
+}
+
+impl<'ast> Visit<'ast> for CallFinder<'_> {
+    fn visit_expr_method_call(&mut self, node: &'ast ExprMethodCall) {
+        if self.method.is_some_and(|expected| node.method == expected) {
+            self.found = true;
+        }
+        visit::visit_expr_method_call(self, node);
+    }
+
+    fn visit_expr_call(&mut self, node: &'ast ExprCall) {
+        if let Some(expected) = self.free_function
+            && let Expr::Path(path) = node.func.as_ref()
+            && path
+                .path
+                .segments
+                .last()
+                .is_some_and(|segment| segment.ident == expected)
+        {
+            self.found = true;
+        }
+        visit::visit_expr_call(self, node);
+    }
+}
+
+fn has_method_call(block: &Block, method: &str) -> bool {
+    let mut finder = CallFinder {
+        method: Some(method),
+        ..CallFinder::default()
     };
-    for entry in entries.flatten() {
+    finder.visit_block(block);
+    finder.found
+}
+
+fn has_free_function_call(block: &Block, function: &str) -> bool {
+    let mut finder = CallFinder {
+        free_function: Some(function),
+        ..CallFinder::default()
+    };
+    finder.visit_block(block);
+    finder.found
+}
+
+fn signature_contains(signature: &Signature, needle: &str) -> bool {
+    quote!(#signature).to_string().contains(needle)
+}
+
+/// Whether one exact function is a render/scene function for its frontend.
+fn paints_function(frontend: Frontend, signature: &Signature, body: &Block) -> bool {
+    let name = signature.ident.to_string();
+    match frontend {
+        Frontend::Gpui => {
+            name.starts_with("render")
+                || signature_contains(signature, "Div")
+                || has_free_function_call(body, "div")
+        }
+        Frontend::Iced => {
+            name == "view" || name.starts_with("render") || signature_contains(signature, "Element")
+        }
+        Frontend::Tui => {
+            name.starts_with("render") || name == "draw" || signature_contains(signature, "Frame")
+        }
+        Frontend::Bevy => {
+            name == "content"
+                || name.starts_with("render")
+                || name.starts_with("paint")
+                || signature_contains(signature, "Scene")
+                || has_method_call(body, "spawn_scene")
+        }
+    }
+}
+
+fn paints_impl(frontend: Frontend, item: &ItemImpl) -> bool {
+    let Some((_, path, _)) = &item.trait_ else {
+        return false;
+    };
+    let Some(name) = path
+        .segments
+        .last()
+        .map(|segment| segment.ident.to_string())
+    else {
+        return false;
+    };
+    match frontend {
+        Frontend::Gpui => matches!(name.as_str(), "TableDelegate" | "Widget"),
+        Frontend::Iced | Frontend::Tui => name == "Widget",
+        Frontend::Bevy => name == "Scene",
+    }
+}
+
+fn scan_items(items: &[Item], frontend: Frontend) -> bool {
+    for item in items {
+        match item {
+            Item::Fn(function)
+                if paints_function(frontend, &function.sig, &function.block)
+                    && has_observation_read(&function.block) =>
+            {
+                return true;
+            }
+            Item::Impl(item_impl) => {
+                let impl_paints = paints_impl(frontend, item_impl);
+                for impl_item in &item_impl.items {
+                    let ImplItem::Fn(function) = impl_item else {
+                        continue;
+                    };
+                    if (impl_paints || paints_function(frontend, &function.sig, &function.block))
+                        && has_observation_read(&function.block)
+                    {
+                        return true;
+                    }
+                }
+            }
+            Item::Mod(module) => {
+                if let Some((_, nested)) = &module.content
+                    && scan_items(nested, frontend)
+                {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+fn source_has_inline_observation_fold(
+    source: &str,
+    frontend: Frontend,
+) -> Result<bool, syn::Error> {
+    let file = syn::parse_file(source)?;
+    Ok(scan_items(&file.items, frontend))
+}
+
+fn collect_rs_files(root: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
+    for entry in fs::read_dir(root)? {
+        let entry = entry?;
         let path = entry.path();
         if path.is_dir() {
-            collect_rs_files(&path, out);
+            collect_rs_files(&path, out)?;
         } else if path.extension().is_some_and(|ext| ext == "rs") {
             out.push(path);
         }
     }
+    Ok(())
 }
 
 #[test]
 fn render_modules_gain_no_new_inline_observation_folds() {
     let repo = repository();
-    let frontends: [FrontendScan; 3] = [
-        (GPUI_SCAN_ROOT, paints_gpui),
-        (ICED_SCAN_ROOT, paints_iced),
-        (TUI_SCAN_ROOT, paints_tui),
+    let frontends: [(&str, Frontend); 4] = [
+        (GPUI_SCAN_ROOT, Frontend::Gpui),
+        (ICED_SCAN_ROOT, Frontend::Iced),
+        (TUI_SCAN_ROOT, Frontend::Tui),
+        (BEVY_SCAN_ROOT, Frontend::Bevy),
     ];
 
     let mut offenders = Vec::new();
-    for (scan_root, paints) in frontends {
+    for (scan_root, frontend) in frontends {
         // A moved/renamed frontend crate must fail the gate, not skip it.
         let root_path = repo.join(scan_root);
         assert!(
@@ -163,21 +303,42 @@ fn render_modules_gain_no_new_inline_observation_folds() {
             "scan root missing: {scan_root} — update the gate's frontend roots"
         );
         let mut files = Vec::new();
-        collect_rs_files(&root_path, &mut files);
+        if let Err(error) = collect_rs_files(&root_path, &mut files) {
+            offenders.push(format!("{scan_root} (scan failed: {error})"));
+            continue;
+        }
         assert!(!files.is_empty(), "scan root empty: {scan_root}");
 
         for path in &files {
-            let Ok(source) = fs::read_to_string(path) else {
-                continue;
+            let source = match fs::read_to_string(path) {
+                Ok(source) => source,
+                Err(error) => {
+                    let relative = path
+                        .strip_prefix(&root_path)
+                        .expect("scanned path is inside the scan root")
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    offenders.push(format!("{scan_root}/{relative} (read failed: {error})"));
+                    continue;
+                }
             };
-            let code = strip_line_comments(&source);
-            if has_observation_read(&code) && paints(&code) {
-                let relative = path
-                    .strip_prefix(&root_path)
-                    .expect("scanned path is inside the scan root")
-                    .to_string_lossy()
-                    .replace('\\', "/");
-                offenders.push(format!("{scan_root}/{relative}"));
+            match source_has_inline_observation_fold(&source, frontend) {
+                Ok(true) => {
+                    let relative = path
+                        .strip_prefix(&root_path)
+                        .expect("scanned path is inside the scan root")
+                        .to_string_lossy()
+                        .replace('\\', "/");
+                    offenders.push(format!("{scan_root}/{relative}"));
+                }
+                Ok(false) => {}
+                Err(error) => offenders.push(format!(
+                    "{scan_root}/{} (Rust parse failed: {error})",
+                    path.strip_prefix(&root_path)
+                        .expect("scanned path is inside the scan root")
+                        .to_string_lossy()
+                        .replace('\\', "/")
+                )),
             }
         }
     }
@@ -188,4 +349,38 @@ fn render_modules_gain_no_new_inline_observation_folds() {
          read into the page's data-layer module (ARCH.md §8.1) and pass the folded \
          ViewModel down; renderer exceptions are not accepted."
     );
+}
+
+#[test]
+fn observation_detection_is_per_call_not_file_wide() {
+    let source = r#"
+        fn content() -> impl Scene {
+            let _ = sensor.current_value();
+            let _ = process.current_cpu_percentage();
+            bsn! { Node {} }
+        }
+    "#;
+    assert!(source_has_inline_observation_fold(source, Frontend::Bevy).unwrap());
+}
+
+#[test]
+fn non_observation_calls_do_not_hide_or_create_a_finding() {
+    let source = r#"
+        fn content() -> impl Scene {
+            let _ = sensor.current_value();
+            let _ = "alerts.current_value";
+            bsn! { Node {} }
+        }
+    "#;
+    assert!(!source_has_inline_observation_fold(source, Frontend::Bevy).unwrap());
+}
+
+#[test]
+fn observation_detection_enters_scene_macro_tokens() {
+    let source = r#"
+        fn content() -> impl Scene {
+            bsn! { Text({ process.current_cpu_percentage() }) }
+        }
+    "#;
+    assert!(source_has_inline_observation_fold(source, Frontend::Bevy).unwrap());
 }

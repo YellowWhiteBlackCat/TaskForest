@@ -20,6 +20,7 @@ struct Fixture {
     shell: ShellApp,
     palette: UiPalette,
     history: crate::pages::history::HistoryProjectionResource,
+    process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion,
 }
 
 impl Fixture {
@@ -28,15 +29,15 @@ impl Fixture {
             shell: ShellApp::new(),
             palette: ui_palette(&Theme::dark()),
             history: crate::pages::history::HistoryProjectionResource::default(),
+            process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
         }
     }
 
     fn context(&self) -> PageContext<'_> {
         PageContext {
             shell: &self.shell,
+            process_tree_expansion: &self.process_tree_expansion,
             palette: &self.palette,
-            body: self.palette.body.clone(),
-            heading: self.palette.heading.clone(),
             history: &self.history.0,
         }
     }

@@ -55,9 +55,8 @@ fn theme_weight(weight: taskmanager_theme::Weight) -> FontWeight {
 pub(crate) struct UiPalette {
     /// Window clear color — the theme's window backdrop token.
     pub(crate) window_clear: Color,
-    /// Card/panel fill — the theme's derived elevated surface. Read by
-    /// the menu/dialog panels; their call sites land with W4.
-    #[allow(dead_code)]
+    /// Card/panel fill — the theme's derived elevated surface, shared by
+    /// menus, confirmations, and page cards.
     pub(crate) panel_fill: Color,
     /// Content-region backdrop — the theme's view surface.
     pub(crate) content_bg: Color,
@@ -71,9 +70,8 @@ pub(crate) struct UiPalette {
     pub(crate) selection_bg: Color,
     /// Text/icon ink used on the active navigation accent surface.
     pub(crate) nav_active_ink: Color,
-    /// Modal scrim — the theme's dimming overlay token. Read by the
-    /// dialog scrim; its call site lands with W4.
-    #[allow(dead_code)]
+    /// Modal scrim — the theme's dimming overlay token, shared by modal
+    /// surfaces and status treatments.
     pub(crate) scrim: Color,
     /// Card corner radius in px, from the theme's radius scale.
     pub(crate) panel_radius_px: f32,

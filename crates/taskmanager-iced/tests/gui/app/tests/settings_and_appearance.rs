@@ -179,10 +179,10 @@ fn language_preference_persists_and_applies_at_startup() {
 }
 
 /// The motion preference round-trips through the shared `Config::motion`
-/// token (G-23) and seeds the frontend's process-wide policy at both config
-/// edges: the Settings segmented control writes the token and installs the
-/// policy live, a fresh launch installs the persisted policy from disk, and
-/// a hostile token degrades to the full-motion default without a panic.
+/// token (G-23) and seeds the owning app instance at both config edges: the
+/// Settings segmented control writes the token and updates motion live, a
+/// fresh launch restores the persisted policy from disk, and a hostile token
+/// degrades to the full-motion default without a panic.
 // test-intent: behavior
 #[test]
 fn motion_preference_seeds_the_policy_and_round_trips() {
@@ -198,12 +198,12 @@ fn motion_preference_seeds_the_policy_and_round_trips() {
     assert_eq!(
         app.motion_policy(),
         MotionPolicy::Reduced,
-        "the live settings edge installs the policy"
+        "the live settings edge updates this app's policy"
     );
     assert_eq!(app.preferences().motion, "reduced");
     app.wait_for_config_where(|config| config.motion == "reduced");
 
-    // A fresh launch installs the persisted policy from disk.
+    // A fresh launch restores the persisted policy from disk.
     let reloaded = IcedApp::with_config_store(None, ConfigStore::new(&path));
     assert_eq!(
         reloaded.motion_policy(),
@@ -274,6 +274,19 @@ fn no_motion_preference_drops_the_modal_entrance_to_the_final_state() {
         !app.frame_pump_active(),
         "a finished entrance never drives the frame pump"
     );
+}
+
+#[test]
+fn motion_policy_is_isolated_between_app_instances() {
+    let normal = IcedApp::demo();
+    let mut no_motion = IcedApp::demo();
+
+    let _ = no_motion.update(Message::SettingsChanged(SettingsChange::Motion(
+        MotionPolicy::NoMotion,
+    )));
+
+    assert_eq!(normal.motion_policy(), MotionPolicy::Normal);
+    assert_eq!(no_motion.motion_policy(), MotionPolicy::NoMotion);
 }
 
 #[test]

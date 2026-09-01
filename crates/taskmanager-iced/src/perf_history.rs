@@ -16,6 +16,14 @@
 //! ~1 Hz sampling path while the overlay stays open. On mac/win, where the
 //! provider leaves those windows empty, the live sampling alone fills the
 //! ring — the unchanged fallback.
+//!
+//! Authority note: this ring is a presentation-derived cache, never an
+//! independent fact source. Its only writers are the seed above and
+//! `IcedApp::sample_process_history` (see `app/accessors.rs`), both reading
+//! core/provider facts — the `ProcessItem` history windows and the projected
+//! snapshot scalars — so the whole window is reproducible from the projection
+//! at any tick. Delete it and the same series re-derive from those windows;
+//! nothing here widens what the backend measured.
 
 use std::collections::VecDeque;
 use std::rc::Rc;

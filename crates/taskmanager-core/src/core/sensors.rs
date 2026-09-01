@@ -236,9 +236,7 @@ impl SensorLifecycleTracker {
             let generation = self
                 .registry
                 .get(&device_id)
-                .map_or(reading.device_generation, |lifecycle| {
-                    DeviceGeneration::new(lifecycle.generation)
-                });
+                .map_or(reading.device_generation, |lifecycle| lifecycle.generation);
             let observation = self
                 .channel_observations
                 .get(reading.id())
@@ -287,7 +285,7 @@ impl SensorLifecycleTracker {
         for reading in &mut snapshot.readings {
             let device_id = sensor_device_id(reading);
             if let Some(lifecycle) = self.registry.get(&device_id) {
-                reading.set_device_generation(DeviceGeneration::new(lifecycle.generation));
+                reading.set_device_generation(lifecycle.generation);
                 if let Some(retained) = self.channel_observations.get_mut(reading.id()) {
                     retained.device_generation = reading.device_generation();
                 }
@@ -307,12 +305,12 @@ impl SensorLifecycleTracker {
         }
         for zone in &mut snapshot.thermal_control.zones {
             if let Some(lifecycle) = self.registry.get(zone.device_id.as_str()) {
-                zone.device_generation = DeviceGeneration::new(lifecycle.generation);
+                zone.device_generation = lifecycle.generation;
             }
         }
         for device in &mut snapshot.thermal_control.cooling_devices {
             if let Some(lifecycle) = self.registry.get(device.device_id.as_str()) {
-                device.device_generation = DeviceGeneration::new(lifecycle.generation);
+                device.device_generation = lifecycle.generation;
             }
         }
         if outcome == DeviceRefreshOutcome::Complete {

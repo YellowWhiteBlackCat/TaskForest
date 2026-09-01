@@ -44,7 +44,7 @@ fn startup_entry(id: &str, name: &str, enabled: bool) -> StartupEntry {
 
 fn session_item(id: &str, user: &str) -> SessionItem {
     SessionItem {
-        id: id.to_owned(),
+        id: id.to_owned().into(),
         uid: 1000,
         user: user.to_owned(),
         seat: Some("seat0".to_owned()),
@@ -129,8 +129,13 @@ fn the_startup_menu_freezes_enable_and_disable_verbs() {
 
     // Commit pick 1 (Disable): the frozen entry arms the shared gate with
     // enabled=false — no platform request yet.
-    let _ = modal.drive(&mut shell, KeyCode::ArrowDown);
-    let _ = modal.drive(&mut shell, KeyCode::Enter);
+    let mut effects = Vec::new();
+    let _ = modal.drive(&mut shell, KeyCode::ArrowDown, &mut effects);
+    let _ = modal.drive(&mut shell, KeyCode::Enter, &mut effects);
+    assert!(
+        effects.is_empty(),
+        "an inventory menu only arms the gate; it queues no platform effect"
+    );
     assert!(modal.session.is_none(), "a committed menu closes");
     let pending = shell.pending_startup().expect("the gate armed");
     assert!(!pending.enabled, "the Disable verb froze enabled=false");
@@ -174,7 +179,12 @@ fn the_sessions_menu_freezes_disconnect_and_lock_verbs() {
     );
 
     // Commit pick 0 (Disconnect): the frozen session arms the shared gate.
-    let _ = modal.drive(&mut shell, KeyCode::Enter);
+    let mut effects = Vec::new();
+    let _ = modal.drive(&mut shell, KeyCode::Enter, &mut effects);
+    assert!(
+        effects.is_empty(),
+        "an inventory menu only arms the gate; it queues no platform effect"
+    );
     assert!(modal.session.is_none(), "a committed menu closes");
     let pending = shell.pending_session().expect("the gate armed");
     assert_eq!(
@@ -182,7 +192,7 @@ fn the_sessions_menu_freezes_disconnect_and_lock_verbs() {
         SessionControlAction::Disconnect,
         "the menu's verb froze"
     );
-    assert_eq!(pending.session.id, "c2", "the session froze");
+    assert_eq!(pending.session.id.as_str(), "c2", "the session froze");
 
     // The typed confirm re-emits the frozen session request.
     let effect = shell.confirm_session_control();
@@ -207,7 +217,9 @@ fn menus_close_without_arming_on_escape() {
         &shell,
         &entry.id,
     ));
-    let _ = startup_modal.drive(&mut shell, KeyCode::Escape);
+    let mut effects = Vec::new();
+    let _ = startup_modal.drive(&mut shell, KeyCode::Escape, &mut effects);
+    assert!(effects.is_empty(), "cancel queues no platform effect");
     assert!(startup_modal.session.is_none());
     assert!(
         shell.pending_confirmation().is_none() && shell.pending_startup().is_none(),

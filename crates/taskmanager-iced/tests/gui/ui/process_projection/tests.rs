@@ -1,6 +1,7 @@
 use super::*;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessLiveKey;
+use taskmanager_core::core::time::LocalTimeRulesObservation;
 
 /// Expected row id for a fixture process (single source: the fixture
 /// builder's default start token).
@@ -186,33 +187,70 @@ fn row_cells_keep_unavailable_values_honest() {
         taskmanager_core::core::failure::FailureKind::PermissionDenied,
     );
     process.apply_scalar_observations(observations);
-    let cells = build_row_cells(&process);
+    let cells = build_row_cells_with_rules(&process, &LocalTimeRulesObservation::unsupported(0));
     assert_eq!(cells.pid, "7");
     assert_eq!(cells.memory, taskmanager_shell::presentation::MISSING_VALUE);
     assert_eq!(cells.pss, taskmanager_shell::presentation::MISSING_VALUE);
 }
 
 #[test]
-fn aggregate_groups_sort_disk_columns_by_their_own_typed_metrics() {
-    fn group(pid: u32, memory: u64, disk_read: u64, disk_write: u64) -> GroupProjection {
+fn shared_application_rows_sort_disk_columns_by_typed_group_metrics() {
+    fn app(pid: u32, disk_read: u64, disk_write: u64) -> ProcessItem {
+        use taskmanager_core::core::process::{
+            ProcessApplicationIdentity, ProcessMetadataObservation,
+        };
+
+        let identity = ProcessApplicationIdentity::new(
+            format!("org.example.app{pid}"),
+            format!("app-{pid}"),
+            None,
+        )
+        .expect("fixture identity");
         let mut process = proc(pid, "app", None);
+        process.apply_application_identity(ProcessMetadataObservation::available(identity, 10));
         let mut observations = *process.scalar_observations();
-        observations.memory_bytes = ScalarObservation::available(memory, 10);
         observations.disk_read_bytes_per_sec = ScalarObservation::available(disk_read, 10);
         observations.disk_write_bytes_per_sec = ScalarObservation::available(disk_write, 10);
         process.apply_scalar_observations(observations);
-        let members = [&process];
-        GroupProjection {
-            name: format!("app-{pid}"),
-            main_pid: pid,
-            process_count: 1,
-            metrics: aggregate_group_metrics(&members, 10).expect("non-empty group metrics"),
-        }
+        process
     }
 
-    let mut groups = [group(1, 900, 100, 900), group(2, 100, 900, 100)];
-    sort_groups(&mut groups, (SortCol::DiskRead, SortDir::Desc));
-    assert_eq!(groups[0].main_pid, 2);
-    sort_groups(&mut groups, (SortCol::DiskWrite, SortDir::Desc));
-    assert_eq!(groups[0].main_pid, 1);
+    let items = [app(1, 100, 900), app(2, 900, 100)];
+    let expanded = HashSet::from([
+        "category:application".to_owned(),
+        taskmanager_shell::app_tree_expansion_key(&items[0]),
+        taskmanager_shell::app_tree_expansion_key(&items[1]),
+    ]);
+    let refs: Vec<_> = items.iter().collect();
+    let read_rows = taskmanager_shell::project_process_tree_rows(
+        &refs,
+        &expanded,
+        &HashSet::new(),
+        (SortCol::DiskRead, SortDir::Desc),
+        10,
+    );
+    let read_root = read_rows.iter().find_map(|row| match row {
+        taskmanager_shell::ProcessTreeRow::Application {
+            row_key: Some(taskmanager_shell::ProcessRowId::Application(identity)),
+            ..
+        } => Some(identity.pid()),
+        _ => None,
+    });
+    assert_eq!(read_root, Some(2));
+
+    let write_rows = taskmanager_shell::project_process_tree_rows(
+        &refs,
+        &expanded,
+        &HashSet::new(),
+        (SortCol::DiskWrite, SortDir::Desc),
+        10,
+    );
+    let write_root = write_rows.iter().find_map(|row| match row {
+        taskmanager_shell::ProcessTreeRow::Application {
+            row_key: Some(taskmanager_shell::ProcessRowId::Application(identity)),
+            ..
+        } => Some(identity.pid()),
+        _ => None,
+    });
+    assert_eq!(write_root, Some(1));
 }

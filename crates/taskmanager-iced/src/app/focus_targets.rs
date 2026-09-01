@@ -222,7 +222,6 @@ pub enum FocusTarget {
     /// Run new task modal controls.
     RunTaskOpen,
     RunTaskCommandInput,
-    RunTaskAdminToggle,
     RunTaskSubmit,
     RunTaskCancel,
     /// The frontend-local Alerts page tab (the eighth nav-strip pill; the
@@ -241,7 +240,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 143] = [
+    pub const ALL: [Self; 142] = [
         Self::ModalClose,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
@@ -374,7 +373,6 @@ impl FocusTarget {
         Self::ProcessMenuCopyJson,
         Self::RunTaskOpen,
         Self::RunTaskCommandInput,
-        Self::RunTaskAdminToggle,
         Self::RunTaskSubmit,
         Self::RunTaskCancel,
         Self::AlertsPageTab,

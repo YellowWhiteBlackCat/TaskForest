@@ -14,6 +14,13 @@ fn string_representation_round_trips_verbatim() {
 }
 
 #[test]
+fn generation_validity_reserves_zero_for_unbound_state() {
+    assert!(!super::DeviceGeneration::default().is_valid());
+    assert!(super::DeviceGeneration::INITIAL.is_valid());
+    assert!(super::DeviceGeneration::new(2).is_valid());
+}
+
+#[test]
 fn empty_device_id_is_valid_and_serializes_transparently() {
     let id = DeviceId::new("");
     assert_eq!(id.as_str(), "");

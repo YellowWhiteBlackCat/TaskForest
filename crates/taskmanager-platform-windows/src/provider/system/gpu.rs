@@ -582,7 +582,7 @@ impl GpuTelemetryProvider for WinGpuTelemetryProvider {
             let lifecycle =
                 self.lifecycles
                     .observe(gpu.device_id.as_str(), device_state, observed_at_ms);
-            gpu.device_generation = taskmanager_core::DeviceGeneration::new(lifecycle.generation);
+            gpu.device_generation = lifecycle.generation;
             gpu.device_state = device_state;
         }
 

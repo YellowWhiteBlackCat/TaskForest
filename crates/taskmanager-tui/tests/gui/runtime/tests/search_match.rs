@@ -113,6 +113,54 @@ fn enter_with_an_active_search_jumps_to_the_next_matching_row() {
 }
 
 #[test]
+fn enter_jumps_to_the_row_a_structured_token_query_filtered_to() {
+    // Seed a process only its command line identifies, then query it with the
+    // shell's structured `cmd:` token — the SAME matcher the shell's filter
+    // runs. Enter must land on the row the filter is showing: before the jump
+    // shared the filter's matcher, a `cmd:` query filtered the list but the
+    // walk matched the raw query text against name/user/cmdline and never
+    // moved.
+    let mut app = app_on_processes();
+    let processes = app.projection().processes.clone().expect("demo processes");
+    let mut first = processes.first().expect("demo has processes").clone();
+    first.cmdline = "/usr/bin/servicemanager --daemonize --config run.conf".to_owned();
+    first.name = "smd".to_owned();
+    let mut updated = processes.as_ref().clone();
+    updated[0] = first;
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut app.shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(updated)),
+    );
+
+    app.query = "cmd:daemonize".to_owned();
+    app.open_search();
+    assert!(app.search_active());
+    assert_eq!(
+        app.visible_processes()
+            .iter()
+            .map(|process| process.name.as_str())
+            .collect::<Vec<_>>(),
+        vec!["smd"],
+        "the structured token filter keeps exactly the cmdline match"
+    );
+
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Enter,
+            KeyModifiers::NONE,
+        ),
+    );
+    assert_eq!(
+        app.selected_detail_process()
+            .as_ref()
+            .map(|process| process.name.as_str()),
+        Some("smd"),
+        "Enter must land on the row the token query filtered to"
+    );
+}
+
+#[test]
 fn enter_with_an_empty_search_keeps_the_cursor_put() {
     let mut app = app_on_processes();
     let _ = handle_key(

@@ -4,7 +4,7 @@ use std::collections::{HashMap, HashSet};
 
 use serde::{Deserialize, Serialize};
 
-use super::{DeviceId, FailureKind, SourceOutcome};
+use super::{DeviceGeneration, DeviceId, FailureKind, SourceOutcome};
 
 /// Grace period during which confirmed-absent device identities remain
 /// available for selection recovery and diagnostics.
@@ -166,7 +166,7 @@ pub enum DevicePresence {
 pub struct DeviceLifecycle {
     pub presence: DevicePresence,
     pub state: DeviceState,
-    pub generation: u64,
+    pub generation: DeviceGeneration,
     pub first_seen_ms: Option<u64>,
     pub last_seen_ms: Option<u64>,
     pub absent_since_ms: Option<u64>,
@@ -264,14 +264,14 @@ impl DeviceLifecycleRegistry {
             .or_insert_with(|| DeviceLifecycle {
                 presence: DevicePresence::Present,
                 state: DeviceState::default().merge_observation(observed_state, now_ms),
-                generation: 1,
+                generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(now_ms),
                 last_seen_ms: Some(now_ms),
                 absent_since_ms: None,
             });
 
         if lifecycle.presence == DevicePresence::Absent {
-            lifecycle.generation = lifecycle.generation.saturating_add(1);
+            lifecycle.generation = lifecycle.generation.next();
             self.reappeared.insert(stable_id);
         }
         lifecycle.presence = DevicePresence::Present;

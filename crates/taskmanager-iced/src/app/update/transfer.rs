@@ -112,11 +112,28 @@ impl IcedApp {
                 }
             }
             Message::GenerateDiagnosticsReport => {
-                let report = crate::export::system_diagnostics_markdown(
+                // The account labels observed on this host join the paths and
+                // addresses core already redacts, matching the GPUI bundle's
+                // source preparation.
+                let usernames: Vec<String> = self
+                    .shell
+                    .projection()
+                    .processes
+                    .as_deref()
+                    .into_iter()
+                    .flatten()
+                    .filter_map(taskmanager_core::core::process::ProcessItem::current_user)
+                    .collect();
+                // Fail closed: a report whose redaction could not be verified
+                // is never written to the clipboard, so no unredacted text can
+                // leak by way of a failure path.
+                if let Ok(report) = crate::export::system_diagnostics_markdown(
                     self.shell.projection().hardware.as_ref(),
                     self.shell.projection().snapshot.as_ref(),
-                );
-                task = Some(iced::clipboard::write(report));
+                    usernames,
+                ) {
+                    task = Some(iced::clipboard::write(report));
+                }
             }
             _ => return UpdateDispatch::none(),
         }

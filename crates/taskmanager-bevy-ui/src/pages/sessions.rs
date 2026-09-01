@@ -14,12 +14,12 @@
 //!   source-status notice — never "no sessions";
 //! - the last accepted session-control outcome renders as one caption line
 //!   under the table (GPUI feedback-status parity, read-only: the Disconnect/
-//!   Lock verbs themselves belong to the W4 menu work).
+//!   Lock verbs are routed by the action menu).
 //!
-//! 对接点 (W4 menu/dialog): the disconnect/lock verbs read the current target
-//! from [`SessionSelection`] / [`SessionTargetSelected`]; the pointer and key
-//! adapters fire [`SessionSortClicked`], [`SessionRowClicked`] and
-//! [`SessionSelectionMoved`]. Colors are palette roles only.
+//! Action-menu seam: the disconnect/lock verbs read the current target
+//! from [`SessionSelection`]; the pointer and key adapters fire
+//! [`SessionSortClicked`], [`SessionRowClicked`] and [`SessionSelectionMoved`].
+//! Colors are palette roles only.
 
 use bevy::color::Color;
 use bevy::ecs::component::Component;
@@ -42,6 +42,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
 use taskmanager_core::core::session::{SessionControlAction, SessionItem};
 use taskmanager_core::core::source::SourceStatus;
+use taskmanager_core::core::target::SessionId;
 
 use taskmanager_shell::presentation::{MISSING_VALUE, control_error_detail};
 use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
@@ -58,7 +59,7 @@ pub(crate) mod menu;
 
 /// One Users-table row: display material plus the provider session id.
 pub(crate) struct SessionRowModel {
-    pub(crate) target: String,
+    pub(crate) target: SessionId,
     pub(crate) session: String,
     pub(crate) user: String,
     pub(crate) seat: String,
@@ -74,7 +75,7 @@ pub(crate) fn session_rows(shell: &ShellApp) -> Vec<SessionRowModel> {
         .into_iter()
         .map(|session: &SessionItem| SessionRowModel {
             target: session.id.clone(),
-            session: session.id.clone(),
+            session: session.id.to_string(),
             user: session.user.clone(),
             seat: session_seat_text(session),
             tty: session_tty_text(session),
@@ -163,18 +164,18 @@ pub(crate) fn status_line_text(shell: &ShellApp, rows: usize) -> String {
 // ---- pure core: id-keyed selection model ----
 
 /// The page's selection state: the provider session id, never a row index.
-/// 对接点 (W4 menu/dialog): disconnect/lock verbs read the id from here.
+/// Action-menu target: disconnect/lock verbs read the id from here.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Resource)]
 pub(crate) struct SessionSelection {
-    pub(crate) target: Option<String>,
+    pub(crate) target: Option<SessionId>,
 }
 
 pub(crate) fn selected_row(
     rows: &[SessionRowModel],
     selection: &SessionSelection,
 ) -> Option<usize> {
-    let target = selection.target.as_deref()?;
-    rows.iter().position(|row| row.target == target)
+    let target = selection.target.as_ref()?;
+    rows.iter().position(|row| row.target == *target)
 }
 
 /// Clamp-move a row cursor: saturates at the first/last row; an empty table
@@ -260,7 +261,7 @@ pub(crate) struct SessionsBody;
 pub(crate) struct SessionsStatusLine;
 
 #[derive(Clone, Component, Default)]
-pub(crate) struct SessionsRowMarker(pub(crate) usize, pub(crate) String);
+pub(crate) struct SessionsRowMarker(pub(crate) usize, pub(crate) SessionId);
 
 #[derive(Clone, Component, Default)]
 pub(crate) struct SessionsSortHeader(pub(crate) Option<InfoSortCol>);
@@ -273,23 +274,18 @@ struct SessionsRenderState {
     rendered_revision: Option<u64>,
 }
 
-/// 对接点 (W4 pointer picking): a header cell was clicked.
+/// Pointer input: a header cell was clicked.
 #[derive(Event)]
 pub(crate) struct SessionSortClicked(pub(crate) InfoSortCol);
 
-/// 对接点 (W4 pointer picking): a row was clicked; the payload is the VISUAL
+/// Pointer input: a row was clicked; the payload is the VISUAL
 /// row index, resolved through the shell's `sorted_session_at` only.
 #[derive(Event)]
 pub(crate) struct SessionRowClicked(pub(crate) usize);
 
-/// 对接点 (M3 key routing): the selection moved by a row delta.
+/// Keyboard input: the selection moved by a row delta.
 #[derive(Event)]
 pub(crate) struct SessionSelectionMoved(pub(crate) isize);
-
-/// Published on every accepted selection change. Grammar-complete today; the
-/// W4 menu observers consume the payload when that surface lands.
-#[derive(Event)]
-pub(crate) struct SessionTargetSelected(#[allow(dead_code)] pub(crate) String);
 
 // ---- render adapters (bsn!) ----
 
@@ -627,9 +623,7 @@ fn on_sessions_row_clicked(
     let Some(session) = track.shell().sorted_session_at(click.event().0) else {
         return;
     };
-    let target = session.id.clone();
-    selection.target = Some(target.clone());
-    commands.trigger(SessionTargetSelected(target));
+    selection.target = Some(session.id.clone());
     commands.queue(paint_sessions);
 }
 
@@ -648,9 +642,7 @@ fn on_sessions_selection_moved(
     let Some(session) = track.shell().sorted_session_at(next) else {
         return;
     };
-    let target = session.id.clone();
-    selection.target = Some(target.clone());
-    commands.trigger(SessionTargetSelected(target));
+    selection.target = Some(session.id.clone());
     commands.queue(paint_sessions);
 }
 

@@ -50,12 +50,12 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::window::{Window, WindowPlugin, WindowResolution};
 use taskmanager_app_host::NativeAppHost;
-use taskmanager_core::core::metrics::{CpuMetrics, ScalarObservation, ScalarObservationGroup};
 
 use taskmanager_assets::product;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
 use crate::app::{AppShellPlugin, ContentSlot, Page, Route, nav_strip_scene};
+use crate::demo_fixture::demo_shell;
 use crate::drain::{self, CapabilitySummaryChanged};
 use crate::pages::history::HistoryProjectionResource;
 use crate::pages::performance::{PerformanceLayoutState, sync_performance_layout};
@@ -362,6 +362,7 @@ impl Plugin for FrontendWindowPlugin {
                 taskmanager_shell::ShellApp::new()
             },
             initial_refresh_submitted: app.world().contains_resource::<DemoMode>(),
+            process_tree_expansion: crate::pages::process_tree::ProcessTreeExpansion::default(),
         });
         app.insert_resource(WindowPalette {
             inner: self.palette.clone(),
@@ -390,6 +391,7 @@ impl Plugin for FrontendWindowPlugin {
         app.add_plugins(AppShellPlugin);
         crate::icons::register(app);
         crate::confirmation::register(app);
+        crate::menu_modal::register::<crate::pages::processes::menu::ProcessMenuCtx>(app);
         crate::menu_modal::register::<crate::pages::services::menu::ServiceMenuCtx>(app);
         crate::menu_modal::register::<crate::pages::startup::menu::StartupMenuCtx>(app);
         crate::menu_modal::register::<crate::pages::sessions::menu::SessionMenuCtx>(app);
@@ -407,52 +409,6 @@ impl Plugin for FrontendWindowPlugin {
             app.add_systems(PreUpdate, drain::drain_system);
         }
     }
-}
-
-/// Build the capture-only shell with a warm, deterministic graph window.
-/// `demo_app` intentionally starts with one honest sample for general fixture
-/// consumers; the visual contract needs a populated curve window, so the
-/// capture shell records a short adjacent sequence without changing
-/// production collection or the shared fixture's semantics.
-fn demo_shell() -> taskmanager_shell::ShellApp {
-    let mut shell = taskmanager_shell::demo_app();
-    if let Some(seed) = shell.projection().snapshot.clone() {
-        for offset in 1..=24_u64 {
-            let mut next = seed.clone();
-            next.timestamp_ms = next
-                .timestamp_ms
-                .saturating_add(offset.saturating_mul(1_000));
-            next.cpu = demo_cpu_frame(&next.cpu, next.timestamp_ms, offset);
-            taskmanager_shell::fixture::record_demo_history_frame(&mut shell, &next, None, None);
-        }
-    }
-    shell
-}
-
-fn demo_cpu_frame(seed: &CpuMetrics, timestamp_ms: u64, offset: u64) -> CpuMetrics {
-    let usage = if offset == 24 {
-        37.4
-    } else {
-        24.0 + f32::from((offset.saturating_mul(7) % 26) as u8)
-    };
-    let mut observations = seed.scalar_observations().clone();
-    observations.global_usage_pct = ScalarObservation::available(usage, timestamp_ms);
-    let core_values = (0..seed.current_core_usage_len())
-        .map(|index| (usage + (index as f32 * 4.0) - (offset % 3) as f32 * 2.0).clamp(0.0, 100.0))
-        .collect();
-    observations.core_usage_group = ScalarObservationGroup::available(core_values, timestamp_ms);
-    let mut frame = CpuMetrics::from_observations(observations);
-    frame.brand = seed.brand.clone();
-    frame.frequency_source = seed.frequency_source;
-    frame.temperature_source = seed.temperature_source;
-    frame.physical_cores = seed.physical_cores;
-    frame.logical_cores = seed.logical_cores;
-    frame.l1d_cache_kb = seed.l1d_cache_kb;
-    frame.l1i_cache_kb = seed.l1i_cache_kb;
-    frame.l2_cache_kb = seed.l2_cache_kb;
-    frame.l3_cache_kb = seed.l3_cache_kb;
-    frame.performance_policy = seed.performance_policy.clone();
-    frame
 }
 
 /// Register the bundled faces every other frontend embeds (ADR-026) into the

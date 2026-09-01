@@ -43,14 +43,9 @@ pub(crate) struct CapabilitySummaryChanged(pub(crate) String);
 /// into the shell this frame. **This is the pages' data-refresh trigger** —
 /// page observers re-read the projection ([`crate::app::ShellTrack`]) when it
 /// fires, so live tables/curves repaint exactly when new facts landed and
-/// never poll. Carries the folded batch count for cheap change gating.
+/// never poll. Domain revisions provide the fine-grained change gate.
 #[derive(Event)]
-pub(crate) struct ShellProjectionFolded(
-    /// Grammar-complete today; M1 page observers consume it for change
-    /// gating when the first live table lands.
-    #[allow(dead_code)]
-    pub(crate) usize,
-);
+pub(crate) struct ShellProjectionFolded;
 
 /// Observer event carrying the shell's status/feedback line after it changed.
 /// Control submissions (`queue_effect` reports the honest outcome) and their
@@ -133,7 +128,7 @@ pub(crate) fn run_drain_cycle(
     }
 }
 
-/// Render the capability inventory as the placeholder's one summary line.
+/// Render the capability inventory as the app shell's one summary line.
 ///
 /// Counts only — never a fabricated zero: an inventory with no observations
 /// says so explicitly instead of reporting `0 available`.
@@ -207,7 +202,7 @@ pub(crate) fn drain_system(
         taskmanager_shell::queue_effect(&mut track.shell, &mut client, effect);
     }
     if cycle.folded_batches > 0 {
-        commands.trigger(ShellProjectionFolded(cycle.folded_batches));
+        commands.trigger(ShellProjectionFolded);
     }
     if let Some(summary) = cycle.capability_summary {
         commands.trigger(CapabilitySummaryChanged(summary));

@@ -13,7 +13,9 @@ use taskmanager_escalation::polkit::{
 
 pub(crate) fn batch_operation(action: ProcessBatchAction) -> ForeignProcessControlOperation {
     match action {
-        ProcessBatchAction::End => ForeignProcessControlOperation::End,
+        ProcessBatchAction::End | ProcessBatchAction::EndProcessTree => {
+            ForeignProcessControlOperation::End
+        }
         ProcessBatchAction::Kill => ForeignProcessControlOperation::Kill,
         ProcessBatchAction::Suspend => ForeignProcessControlOperation::Suspend,
         ProcessBatchAction::Resume => ForeignProcessControlOperation::Resume,

@@ -29,7 +29,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const SCAN_ROOTS: [&str; 29] = [
+const SCAN_ROOTS: [&str; 30] = [
     "src",
     "crates/taskmanager-app-host/src",
     "crates/taskmanager-application/src",
@@ -40,6 +40,7 @@ const SCAN_ROOTS: [&str; 29] = [
     "crates/taskmanager-platform-runtime/src",
     "crates/taskmanager-platform-windows/src",
     "crates/taskmanager-tui/src",
+    "crates/taskmanager-bevy-ui/src",
     "crates/taskmanager-ui/src",
     "crates/taskmanager-telemetry-store/src",
     "crates/taskmanager-privilege-helper/src",

@@ -147,7 +147,7 @@ fn sync_after_shell_interaction(
     let identity = selected_identity(shell);
     if memory.0 != identity {
         memory.0 = identity;
-        commands.trigger(ProcessSelectionChanged(identity));
+        commands.trigger(ProcessSelectionChanged);
     }
 }
 

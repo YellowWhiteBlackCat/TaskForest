@@ -198,7 +198,7 @@ fn lifecycle(device_id: &str, observed_at_ms: u64) -> BTreeMap<DeviceId, DeviceL
         DeviceLifecycle {
             presence: DevicePresence::Present,
             state: DeviceState::healthy(observed_at_ms),
-            generation: 1,
+            generation: DeviceGeneration::INITIAL,
             first_seen_ms: Some(observed_at_ms),
             last_seen_ms: Some(observed_at_ms),
             absent_since_ms: None,

@@ -9,7 +9,6 @@ use taskmanager_core::core::{ContainerRollup, ContainerSummary, DeviceState, Iso
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
 use super::RootView;
-use taskmanager_application::ProcessTerminationAction;
 use taskmanager_theme::Theme;
 
 fn process(pid: u32, name: &str, cpu: f32, mem: u64) -> ProcessItem {
@@ -142,11 +141,14 @@ async fn process_materialization_is_single_fold_and_shared_by_render_and_input(
             assert_eq!(rendered_identity.pid(), 4242);
 
             view.select_process_single(rendered_identity);
-            view.request_process_termination(ProcessTerminationAction::EndTask, rendered_identity);
+            view.request_end_task_confirmation(rendered_identity);
             let confirmation = view
-                .process_termination_confirmation()
+                .pending_confirmation()
                 .expect("input path freezes the visible process");
-            assert_eq!(confirmation.root.pid, rendered_identity.pid());
+            let taskmanager_application::PendingConfirmation::EndTask(target) = confirmation else {
+                panic!("single-process end must use the shared EndTask branch")
+            };
+            assert_eq!(target.pid, rendered_identity.pid());
             assert_eq!(view.processes_generation(), generation);
 
             let unrelated =

@@ -31,6 +31,7 @@ use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, PositionType,
     UiRect, Val, percent, px,
 };
+use taskmanager_application::PlatformEffect;
 use taskmanager_shell::ShellApp;
 
 use crate::widgets::menu::{MenuInput, MenuSpec, MenuState, menu_scene_at};
@@ -42,10 +43,13 @@ pub(crate) trait ActionMenuContext: Clone + Send + Sync + 'static {
     /// The menu entries (labels + enablement), in display order.
     fn spec(&self) -> MenuSpec;
     /// Freeze the picked verb (the confirmed entry index, into
-    /// [`MenuSpec::items`]) into the shell's shared gate. Mirrors the TUI
-    /// flow: arm only — the platform request comes from the gate's typed
-    /// confirm path, never from the menu.
-    fn commit(&self, pick: usize, shell: &mut ShellApp);
+    /// [`MenuSpec::items`]) into the shell's shared gate, returning the
+    /// platform effects the caller must queue for the drain. Mirrors the TUI
+    /// flow: the surfaces that only arm the gate return nothing — the
+    /// platform request comes from the gate's typed confirm path — while a
+    /// verb that submits through the shell's batch track carries its own
+    /// [`PlatformEffect`] (`ExecuteBatch`) when no confirmation is needed.
+    fn commit(&self, pick: usize, shell: &mut ShellApp) -> Vec<PlatformEffect>;
 }
 
 /// One open modal: the frozen target context plus the keyboard cursor.
@@ -86,8 +90,14 @@ impl<Ctx: ActionMenuContext> MenuModal<Ctx> {
     /// Drive an open menu with one key. Returns `true` when the key was
     /// consumed — an open modal swallows EVERY key it does not use, so a
     /// frontend-local modal can never leak a chord to navigation or the
-    /// shell. Confirm freezes the picked verb into the shell's gate.
-    pub(crate) fn drive(&mut self, shell: &mut ShellApp, key: KeyCode) -> bool {
+    /// shell. Confirm freezes the picked verb into the shell's gate; any
+    /// platform effect the freeze produced is appended to `effects`.
+    pub(crate) fn drive(
+        &mut self,
+        shell: &mut ShellApp,
+        key: KeyCode,
+        effects: &mut Vec<PlatformEffect>,
+    ) -> bool {
         let Some(session) = self.session.as_mut() else {
             return false;
         };
@@ -106,7 +116,7 @@ impl<Ctx: ActionMenuContext> MenuModal<Ctx> {
             Some(crate::widgets::menu::MenuOutcome::Confirmed(index)) => {
                 let frozen = session.frozen.clone();
                 self.session = None;
-                frozen.commit(index, shell);
+                effects.extend(frozen.commit(index, shell));
                 true
             }
             Some(crate::widgets::menu::MenuOutcome::Canceled) => {
@@ -135,7 +145,12 @@ impl<Ctx> Copy for MenuModalChanged<Ctx> {}
 /// swallows every key (TUI modal parity).
 pub(crate) trait ModalDriver {
     fn is_open(&self) -> bool;
-    fn drive(&mut self, shell: &mut ShellApp, key: KeyCode) -> bool;
+    fn drive(
+        &mut self,
+        shell: &mut ShellApp,
+        key: KeyCode,
+        effects: &mut Vec<PlatformEffect>,
+    ) -> bool;
 }
 
 impl<Ctx: ActionMenuContext> ModalDriver for MenuModal<Ctx> {
@@ -143,8 +158,13 @@ impl<Ctx: ActionMenuContext> ModalDriver for MenuModal<Ctx> {
         self.session.is_some()
     }
 
-    fn drive(&mut self, shell: &mut ShellApp, key: KeyCode) -> bool {
-        MenuModal::<Ctx>::drive(self, shell, key)
+    fn drive(
+        &mut self,
+        shell: &mut ShellApp,
+        key: KeyCode,
+        effects: &mut Vec<PlatformEffect>,
+    ) -> bool {
+        MenuModal::<Ctx>::drive(self, shell, key, effects)
     }
 }
 
@@ -153,8 +173,13 @@ impl<Ctx: ActionMenuContext> ModalDriver for bevy::ecs::system::ResMut<'_, MenuM
         self.session.is_some()
     }
 
-    fn drive(&mut self, shell: &mut ShellApp, key: KeyCode) -> bool {
-        MenuModal::<Ctx>::drive(self, shell, key)
+    fn drive(
+        &mut self,
+        shell: &mut ShellApp,
+        key: KeyCode,
+        effects: &mut Vec<PlatformEffect>,
+    ) -> bool {
+        MenuModal::<Ctx>::drive(self, shell, key, effects)
     }
 }
 

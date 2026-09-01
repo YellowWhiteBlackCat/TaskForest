@@ -85,6 +85,6 @@ fn users_menu_action_keeps_the_frozen_session_after_inventory_reorder() {
     else {
         panic!("the frozen Users menu should emit a session-control effect");
     };
-    assert_eq!(target.session_id.as_str(), expected_id);
+    assert_eq!(target.session_id, expected_id);
     assert!(app.user_menu_session().is_none());
 }

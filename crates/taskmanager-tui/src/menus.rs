@@ -20,7 +20,7 @@ use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::smart::self_test::SmartSelfTestKind;
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
 use taskmanager_core::core::target::StorageDeviceKey;
-use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ProcessRowId};
 
 /// The frozen batch-control menu target: the menu cursor plus the count of
 /// marked processes the actions will apply to. The shell's `selected_pids`
@@ -124,14 +124,6 @@ impl TuiApp {
         }
     }
 
-    /// The shell's flat position of the frozen menu row, matched by pid +
-    /// provider start token so a reused PID can never redirect the request.
-    fn flat_index_of_frozen(&self, identity: ProcessLiveKey) -> Option<usize> {
-        self.visible_processes()
-            .iter()
-            .position(|process| ProcessLiveKey::from_process(process) == Some(identity))
-    }
-
     /// Resolve the chosen process action into a [`PlatformEffect`]. Control
     /// actions (End / End process tree / Suspend / Resume / Kill / priority)
     /// route through the shell's shared batch path — Kill, End-task, and the
@@ -149,34 +141,34 @@ impl TuiApp {
             .get(menu.selection)
             .copied()
             .unwrap_or(ui::process_menu::ProcessMenuAction::OpenLocation);
+        let is_control = matches!(
+            action,
+            ui::process_menu::ProcessMenuAction::EndTask
+                | ui::process_menu::ProcessMenuAction::EndProcessTree
+                | ui::process_menu::ProcessMenuAction::Suspend
+                | ui::process_menu::ProcessMenuAction::Resume
+                | ui::process_menu::ProcessMenuAction::Kill
+                | ui::process_menu::ProcessMenuAction::PriorityHigh
+                | ui::process_menu::ProcessMenuAction::PriorityNormal
+                | ui::process_menu::ProcessMenuAction::PriorityLow
+        );
+        if is_control
+            && !self
+                .shell
+                .select_row_id(ProcessRowId::Process(menu.identity))
+        {
+            self.report_notice(
+                FeedbackSource::Interaction,
+                FeedbackSeverity::Warning,
+                FeedbackLifecycle::SHORT,
+                "The frozen process is no longer in the list",
+            );
+            return None;
+        }
         match action {
-            ui::process_menu::ProcessMenuAction::EndTask => {
-                // The frozen menu row — not the shell's flat cursor — is the
-                // target authority: in the grouped tree the shell's flat
-                // `selected` can drift from the TUI's visual cursor, and a
-                // destructive action must never follow that drift. Re-point
-                // the shell cursor at the frozen row's flat position (pid +
-                // provider start token, so a reused PID cannot redirect the
-                // request) before arming the gate; a vanished row fails
-                // closed with an honest notice instead of end-tasking a
-                // neighbor.
-                match self.flat_index_of_frozen(menu.identity) {
-                    Some(flat) => {
-                        self.shell.selected = flat;
-                        self.shell
-                            .apply_action(taskmanager_application::AppAction::RequestEndTask)
-                    }
-                    None => {
-                        self.report_notice(
-                            FeedbackSource::Interaction,
-                            FeedbackSeverity::Warning,
-                            FeedbackLifecycle::SHORT,
-                            "The frozen process is no longer in the list",
-                        );
-                        None
-                    }
-                }
-            }
+            ui::process_menu::ProcessMenuAction::EndTask => self
+                .shell
+                .apply_action(taskmanager_application::AppAction::RequestEndTask),
             ui::process_menu::ProcessMenuAction::EndProcessTree => {
                 self.shell.request_process_tree_end(menu.identity);
                 None
@@ -228,7 +220,13 @@ impl TuiApp {
         if self.page() != AppPage::Applications {
             return false;
         }
-        let marked_count = self.shell.selected_identities().len();
+        let marked_count = if self.shell.selected_identities().is_empty() {
+            0
+        } else {
+            self.shell
+                .marked_process_control_availability()
+                .target_count()
+        };
         if marked_count == 0 {
             self.report_notice(
                 FeedbackSource::Interaction,
@@ -386,7 +384,7 @@ impl TuiApp {
         let Some(session) = self.sorted_session_at(self.selected) else {
             return false;
         };
-        if session.id.is_empty() {
+        if session.id.as_str().is_empty() {
             self.report_notice(
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,

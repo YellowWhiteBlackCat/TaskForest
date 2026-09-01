@@ -9,6 +9,13 @@
 
 use taskmanager_core::core::process::{ProcessCategory, ProcessItem, ProcessLiveKey};
 
+mod tree;
+
+pub use tree::{
+    APP_TREE_EXPANSION_KEY_PREFIX, ProcessRowAggregate, ProcessTreeRow, app_tree_expansion_key,
+    app_tree_expansion_key_for_identity, project_process_tree_rows,
+};
+
 /// Stable identity of a row in the canonical Applications hierarchy.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ProcessRowId {

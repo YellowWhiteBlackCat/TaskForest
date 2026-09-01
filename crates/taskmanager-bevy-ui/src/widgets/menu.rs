@@ -1,9 +1,3 @@
-#![allow(dead_code)]
-// ^ Library component awaiting its first in-product call site (the
-// destructive-action wiring on the table pages). The interaction core and
-// render adapter are production-shaped but not yet reachable from a page, so
-// the allow mirrors the skeleton reservation the module was seeded with.
-
 //! Context menu: typed interaction core + themed bsn! render adapter.
 //!
 //! **Why not the `bevy_ui_widgets` menu primitives** (`MenuButton`/
@@ -80,15 +74,6 @@ pub(crate) struct MenuState {
 }
 
 impl MenuState {
-    pub(crate) const fn new() -> Self {
-        Self { selection: 0 }
-    }
-
-    /// Current cursor index.
-    pub(crate) const fn selection(self) -> usize {
-        self.selection
-    }
-
     /// Pure transition: apply one input, answer the activation outcome if
     /// this input completes the interaction. `Confirm` on a disabled or
     /// missing entry answers `None` (the menu stays open; an unavailable
@@ -122,13 +107,6 @@ pub(crate) fn menu_row_background(highlighted: bool, palette: &UiPalette) -> Col
     } else {
         Color::NONE
     }
-}
-
-/// Render at the default cursor (title row 0): the shape future call sites
-/// get when they only need the panel. Kept for the skeleton's original
-/// callers; interactive call sites use [`menu_scene_at`].
-pub(crate) fn menu_scene(spec: &MenuSpec, palette: &UiPalette) -> impl Scene + use<> {
-    menu_scene_at(spec, &MenuState::new(), palette)
 }
 
 /// Full render: panel + title + one row per entry, the cursor row filled by

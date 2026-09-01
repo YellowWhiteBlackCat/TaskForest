@@ -131,6 +131,18 @@ impl DiagnosticBundlePlan {
         &self.preview
     }
 
+    /// Borrow the already-sanitized contents of one logical source. The
+    /// redaction algorithm and file storage remain private; consumers that
+    /// need clipboard/report text must read this accessor rather than treating
+    /// the encoded wire document as an internal field API.
+    #[must_use]
+    pub fn sanitized_contents(&self, name: &str) -> Option<&str> {
+        self.files
+            .iter()
+            .find(|file| file.name == name)
+            .map(|file| file.contents.as_str())
+    }
+
     /// Serialize only sanitized content. No recollection or re-redaction occurs.
     pub fn encoded(&self) -> Result<Vec<u8>, DiagnosticBundleError> {
         self.encoded_with(serde_json::to_vec_pretty)

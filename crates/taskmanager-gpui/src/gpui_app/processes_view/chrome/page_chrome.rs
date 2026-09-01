@@ -16,7 +16,7 @@ use crate::gpui_app::list_view;
 use crate::gpui_app::root::{Hover, RootView};
 use taskmanager_application::i18n;
 use taskmanager_core::core::process::ProcessLiveKey;
-use taskmanager_shell::SortCol;
+use taskmanager_shell::{ProcessControlAvailability, SortCol};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 use taskmanager_theme::tokens::UiSize;
@@ -102,8 +102,7 @@ pub(super) fn process_overview(props: ProcessOverviewProps<'_>) -> Div {
 pub(super) struct ProcessControlChromeProps<'a> {
     pub theme: &'a Theme,
     pub selected_identity: Option<ProcessLiveKey>,
-    pub application_selected: bool,
-    pub selected_target_count: usize,
+    pub control: ProcessControlAvailability,
     pub hidden_cols: &'a HashSet<SortCol>,
     pub swap_auto_hidden: bool,
     pub hovered: Option<&'a Hover>,
@@ -121,8 +120,7 @@ pub(super) fn process_control_chrome(
     let ProcessControlChromeProps {
         theme,
         selected_identity,
-        application_selected,
-        selected_target_count,
+        control,
         hidden_cols,
         swap_auto_hidden,
         hovered,
@@ -136,8 +134,7 @@ pub(super) fn process_control_chrome(
         ProcessActionBarProps {
             theme,
             selected_identity,
-            application_selected,
-            selected_target_count,
+            control,
             hidden_cols,
             swap_auto_hidden,
             hovered,

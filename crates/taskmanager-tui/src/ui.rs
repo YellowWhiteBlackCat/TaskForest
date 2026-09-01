@@ -156,16 +156,6 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
                     popup,
                 );
             }
-            Some(taskmanager_application::PendingConfirmation::ProcessTermination(intent)) => {
-                confirmations::render_end_confirmation_at(
-                    frame,
-                    app,
-                    theme,
-                    intent.root.name.as_str(),
-                    intent.root.pid,
-                    popup,
-                );
-            }
             Some(taskmanager_application::PendingConfirmation::ProcessBatch(intent)) => {
                 confirmations::render_batch_confirmation_at(frame, theme, intent, popup);
             }

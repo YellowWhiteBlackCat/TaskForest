@@ -16,6 +16,12 @@ pass its own frontend tests without being represented in shared coverage.
 1. Keep ADR-029's one-binary contract unchanged: the root `taskmanager`
    package continues to select exactly one of GPUI, Iced, or Ratatui through
    its `ui-*` features. Bevy is not added as a fourth root feature.
+
+   > 过时注记：本条的"根包 `ui-*` features 三选一"已被
+   > [ADR-051](051-four-frontend-products-zero-ui-features.md) 取代 —— 现行为是
+   > 四个前端产品、四份二进制（`taskforest-g` / `taskforest-i` /
+   > `taskmanager-tui` / `taskforest-b`），工作区零 `ui-*` features，`cfg` 仅属
+   > 平台轴。下文其余各条仍然有效。
 2. Add Bevy to the toolkit-neutral `FrontendShape` contract and require an
    explicit Bevy declaration for every shared command binding, product intent,
    and component capability.

@@ -11,7 +11,6 @@
 //! The page still keeps the distinction between a mounted route and continuous
 //! real in-process persistence evidence explicit.
 
-#![allow(dead_code)]
 use std::sync::Arc;
 
 use bevy::ecs::component::Component;
@@ -392,20 +391,6 @@ impl HistoryRuntime {
     pub(crate) fn projection(&self) -> ApplicationHistoryProjection {
         self.controller
             .application_history_projection(self.capability())
-    }
-
-    pub(crate) fn select_window(&mut self, window: HistoryWindow) {
-        let Ok(request) = self.controller.select_window(window) else {
-            return;
-        };
-        self.submit(request);
-    }
-
-    pub(crate) fn refresh(&mut self) {
-        let Ok(request) = self.controller.refresh() else {
-            return;
-        };
-        self.submit(request);
     }
 
     /// Drain only non-blocking completion lanes. The returned flag is an ECS

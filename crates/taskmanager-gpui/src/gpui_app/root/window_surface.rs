@@ -9,8 +9,7 @@ use crate::gpui_app::dashboard::DashboardPanel;
 use crate::gpui_app::root::diagnostic_bundle::DiagnosticBundleUiState;
 use taskmanager_application::{
     ConfirmationKind, InteractionEvent, InteractionReduction, PendingConfirmation, PlatformEffect,
-    ProcessTerminationConfirmation, ServiceControlTarget, SurfaceDismissReason, SurfaceKind,
-    SurfaceTransition,
+    ServiceControlTarget, SurfaceDismissReason, SurfaceKind, SurfaceTransition,
 };
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessBatchIntent, ProcessLiveKey};
 use taskmanager_core::core::system_health::SmartSelfTestIntent;
@@ -423,14 +422,6 @@ impl super::RootView {
     #[must_use]
     pub const fn process_properties_target(&self) -> Option<&FrozenProcessIdentity> {
         self.shell.interaction.process_properties()
-    }
-
-    #[must_use]
-    pub fn process_termination_confirmation(&self) -> Option<&ProcessTerminationConfirmation> {
-        match self.shell.interaction.pending_confirmation() {
-            Some(PendingConfirmation::ProcessTermination(intent)) => Some(intent),
-            _ => None,
-        }
     }
 
     #[must_use]

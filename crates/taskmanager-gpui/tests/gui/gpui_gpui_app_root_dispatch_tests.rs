@@ -1,5 +1,8 @@
-use super::url_encode_query;
+use taskmanager_shell::presentation::{search_url_for, url_encode_query};
 
+/// GPUI owns no percent-encoding of its own: the "Search online" URL is the
+/// shell's single-source builder. These receipts pin the bytes this surface
+/// hands to the platform's URL-open port.
 #[test]
 fn unreserved_characters_pass_through_unchanged() {
     assert_eq!(
@@ -29,4 +32,13 @@ fn empty_and_ascii_control_inputs_are_harmless() {
     assert_eq!(url_encode_query(""), "");
     assert_eq!(url_encode_query("\n"), "%0A");
     assert_eq!(url_encode_query("\t"), "%09");
+}
+
+#[test]
+fn the_search_online_url_is_the_shared_single_source_url() {
+    assert_eq!(
+        search_url_for("Media Player"),
+        "https://www.google.com/search?q=Media%20Player",
+        "the GPUI search action must open exactly the shared search URL"
+    );
 }

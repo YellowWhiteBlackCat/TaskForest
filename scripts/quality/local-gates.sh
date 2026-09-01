@@ -9,8 +9,9 @@
 #              python policy gates, test-runner policy, install-manager
 #              smoke, line/doc/test-layout/source-inspection/bevy-bsn/headless
 #              side-effect guards, per-crate coverage gate self-test, and the
-#              private A/B capture-isolation check when a host Wayland session
-#              is available (or TM_CAPTURE_ISOLATION_GATE=1 forces it).
+#              private A/B capture-isolation check when a host Wayland/KWin
+#              session and writable user cgroup are available (or
+#              TM_CAPTURE_ISOLATION_GATE=1 forces it).
 #   standard   ~ the blocking Linux CI surface: quick + cargo deny + clippy + the
 #              nextest workspace split into core/logic/gui/perf layers
 #              (failure attribution per layer; `--only nextest-core` gives a
@@ -53,8 +54,9 @@
 #   SKIP_INSTALL_MANAGER_SMOKE=1  defer that smoke until the release build
 #                                 has produced its helper binaries
 #   TM_CAPTURE_ISOLATION_GATE=auto|0|1  run the real private A/B capture test;
-#                                 auto runs it only on a ready Wayland host,
-#                                 1 fails closed when its prerequisites are absent
+#                                 auto runs it only when Wayland/KWin and the
+#                                 writable user cgroup preflight are ready;
+#                                 1 fails closed when prerequisites are absent
 
 set -u
 
@@ -502,12 +504,28 @@ if maybe capture-isolation; then
                 break
             fi
         done
+        if [[ "$capture_isolation_host_ready" == "1" ]]; then
+            capture_isolation_preflight_file="$scratch/capture-isolation-preflight.txt"
+            timeout --kill-after=2s 10s python3 scripts/test_capture_isolation.py \
+                --preflight --repo-root "$repo" >"$capture_isolation_preflight_file" 2>&1
+            preflight_rc=$?
+            sed -n '1,20p' "$capture_isolation_preflight_file"
+            if [[ "$preflight_rc" == "3" ]]; then
+                capture_isolation_host_ready=0
+                capture_isolation_skip_reason="private capture preflight unavailable"
+            elif [[ "$preflight_rc" != "0" ]]; then
+                capture_isolation_host_ready=0
+                run_stage capture-isolation-preflight quick false
+            fi
+        fi
     fi
     if [[ "$capture_isolation_gate" == "1" || ( "$capture_isolation_gate" == "auto" && "$capture_isolation_host_ready" == "1" ) ]]; then
         run_stage capture-isolation quick timeout --kill-after=10s 240s python3 scripts/test_capture_isolation.py --repo-root "$repo"
     else
         reason="TM_CAPTURE_ISOLATION_GATE=$capture_isolation_gate"
-        [[ "$capture_isolation_gate" == "auto" ]] && reason="$reason; no private Wayland/KWin host"
+        if [[ "$capture_isolation_gate" == "auto" ]]; then
+            reason="$reason; ${capture_isolation_skip_reason:-no private Wayland/KWin/cgroup host}"
+        fi
         echo "SKIP capture-isolation ($reason)"
         record capture-isolation quick SKIP 0
     fi

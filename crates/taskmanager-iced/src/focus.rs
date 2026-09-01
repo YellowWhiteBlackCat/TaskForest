@@ -154,7 +154,6 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::ProcessMenuCopyJson => "iced-process-menu-copy-json".to_owned(),
         FocusTarget::RunTaskOpen => "iced-run-task-open".to_owned(),
         FocusTarget::RunTaskCommandInput => "iced-run-task-command-input".to_owned(),
-        FocusTarget::RunTaskAdminToggle => "iced-run-task-admin-toggle".to_owned(),
         FocusTarget::RunTaskSubmit => "iced-run-task-submit".to_owned(),
         FocusTarget::RunTaskCancel => "iced-run-task-cancel".to_owned(),
         FocusTarget::AlertsPageTab => "iced-alerts-page-tab".to_owned(),
@@ -205,20 +204,31 @@ pub(crate) fn button<'a>(
     on_press: Message,
     destructive: bool,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    button_enabled(theme_snapshot, target, label, on_press, destructive, true)
+}
+
+/// Build a process-control button whose pointer and keyboard paths share one
+/// runtime availability bit. Disabled controls remain visible for layout and
+/// discoverability, but cannot publish a request through either input path.
+pub(crate) fn button_enabled<'a>(
+    theme_snapshot: &'a taskmanager_theme::Theme,
+    target: FocusTarget,
+    label: &'static str,
+    on_press: Message,
+    destructive: bool,
+    enabled: bool,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let mut inner = iced::widget::button(label)
+        .style(move |_theme, status| {
+            crate::theme::button_style_status(theme_snapshot, destructive, status)
+        })
+        .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)]);
+    if enabled {
+        inner = inner.on_press(on_press.clone());
+    }
     FocusableButton::new(
         focus_id(target),
-        iced::widget::button(label)
-            .style(move |_theme, status| {
-                crate::theme::button_style_status(theme_snapshot, destructive, status)
-            })
-            .padding([f32::from(tokens::SPACE_4), f32::from(tokens::SPACE_10)])
-            // The INNER button owns the pointer path: an iced button without
-            // `on_press` is disabled — it never publishes on click AND its
-            // style never leaves Status::Disabled (no hover/pressed states).
-            // The wrapper owns the keyboard Enter/Space path and captures
-            // those events, so exactly one of the two paths fires per input.
-            .on_press(on_press.clone())
-            .into(),
+        inner.into(),
         on_press,
         target,
         // The focused shell draws the shared ring token (see
@@ -227,6 +237,7 @@ pub(crate) fn button<'a>(
         f32::from(theme_snapshot.palette().control_radius),
         false,
     )
+    .with_enabled(enabled)
     .into()
 }
 

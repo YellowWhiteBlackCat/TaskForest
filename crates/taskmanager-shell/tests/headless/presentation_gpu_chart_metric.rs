@@ -377,7 +377,7 @@ fn chart_metric_utilization_window_matches_the_usage_ring() {
             DeviceLifecycle {
                 presence: DevicePresence::Present,
                 state: DeviceState::healthy(observed_at_ms),
-                generation: 1,
+                generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(observed_at_ms),
                 last_seen_ms: Some(observed_at_ms),
                 absent_since_ms: None,

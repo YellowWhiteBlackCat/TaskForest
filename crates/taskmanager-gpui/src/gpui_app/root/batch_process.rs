@@ -15,24 +15,13 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{
     ProcessBatchAction, ProcessBatchHistory, ProcessBatchHistoryExportError,
     ProcessBatchHistoryFormat, ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult,
-    ProcessLiveKey, descendant_live_keys, export_process_batch_history,
+    ProcessLiveKey, export_process_batch_history,
 };
 use taskmanager_theme::Theme;
 
+use taskmanager_shell::{ProcessControlScope, ShellApp, process_batch_action_label};
 use taskmanager_theme::tokens;
 use taskmanager_ui::layout::{BoundedScrollRailSpec, bounded_scroll_region_with_rail};
-
-fn action_label(action: ProcessBatchAction) -> &'static str {
-    match action {
-        ProcessBatchAction::End => i18n::t("proc.end_task"),
-        ProcessBatchAction::Kill => i18n::t("proc.kill"),
-        ProcessBatchAction::Suspend => i18n::t("proc.suspend"),
-        ProcessBatchAction::Resume => i18n::t("proc.resume"),
-        // Shared tier mapping (求同): the confirmation and the result toast
-        // agree, and the tier word is the honest cross-platform phrasing.
-        ProcessBatchAction::SetPriority(tier) => super::process_feedback::priority_tier_label(tier),
-    }
-}
 
 fn result_summary(result: &ProcessBatchResult) -> String {
     let (applied, skipped, failed) = result_counts(result);
@@ -132,36 +121,55 @@ impl RootView {
     /// The application-root branch expands through the same core tree walk;
     /// ordinary selection uses the shell's identity set directly.
     pub fn batch_process_identities(&self) -> Vec<ProcessLiveKey> {
-        self.selected_application_root().map_or_else(
-            || self.shell.selection.batch_identities(),
-            |root| descendant_live_keys(self.processes(), root),
-        )
+        self.shell.process_control_targets()
     }
 
-    /// Freeze the exact live identities now. A later refresh cannot change
-    /// what the confirmation represents.
-    pub fn request_process_batch(&mut self, action: ProcessBatchAction) {
-        let intent = self.selected_application_root().map_or_else(
-            || {
-                ProcessBatchIntent::freeze(
-                    self.processes(),
-                    self.batch_process_identities(),
-                    action,
-                )
-            },
-            |root| ProcessBatchIntent::freeze_tree(self.processes(), root, action),
-        );
-        if !intent.targets.is_empty() {
-            self.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
+    /// Freeze the exact live identities now, then let the shell's SINGLE
+    /// batch-confirmation authority decide whether the frozen intent still
+    /// needs the shared gate. A later refresh cannot change what either
+    /// outcome represents.
+    ///
+    /// GPUI keeps no per-frontend rule here: `Tree` selections freeze a whole
+    /// subtree and `Batch` selections reach past the row the user is looking
+    /// at, so both arm, exactly as
+    /// [`taskmanager_shell::ShellApp::process_batch_requires_confirmation`]
+    /// demands — while an explicit reversible verb on one target submits at
+    /// once.
+    pub fn request_process_batch(&mut self, action: ProcessBatchAction, cx: &mut Context<Self>) {
+        let availability = self.shell.process_control_availability();
+        if !availability.is_ready() {
+            return;
         }
+        let Some(intent) = self.shell.process_control_intent(action) else {
+            return;
+        };
+        let application_tree = availability.scope() == Some(ProcessControlScope::Tree);
+        if ShellApp::process_batch_requires_confirmation(
+            action,
+            availability.target_count(),
+            application_tree,
+        ) {
+            self.arm_confirmation(PendingConfirmation::ProcessBatch(intent));
+            return;
+        }
+        self.submit_process_batch_intent(intent, cx);
     }
 
+    /// Submit one explicit single-target batch verb without a gate.
+    ///
+    /// Callers reach this only after the shell authority left the verb
+    /// immediate (`ShellApp::process_batch_requires_confirmation` over the
+    /// `Single` scope: one explicit, reversible target); destructive verbs
+    /// keep their own termination-confirmation path.
     pub(crate) fn submit_process_batch_immediate(
         &mut self,
         action: ProcessBatchAction,
         identity: ProcessLiveKey,
         cx: &mut Context<Self>,
     ) -> bool {
+        if !self.shell.process_control_availability().is_ready() {
+            return false;
+        }
         let intent = ProcessBatchIntent::freeze(self.processes(), [identity], action);
         if intent.targets.is_empty() {
             return false;
@@ -263,9 +271,10 @@ pub(super) fn render_process_batch_dialog(
     cx: &mut Context<RootView>,
 ) -> AnyElement {
     let count = intent.targets.len();
+    let action = process_batch_action_label(intent.action);
     let title = i18n::t("proc.batch_confirm_title").replace("{count}", &count.to_string());
     let message = i18n::t("proc.batch_confirm_message")
-        .replace("{action}", action_label(intent.action))
+        .replace("{action}", &action)
         .replace("{count}", &count.to_string());
     let close = entity.clone();
     let on_close = move |_window: &mut Window, cx: &mut App| {
@@ -356,7 +365,7 @@ pub(super) fn render_process_batch_dialog(
                 .child(elements::pill(
                     theme,
                     "process-batch-confirm",
-                    action_label(intent.action),
+                    &action,
                     true,
                     false,
                     move |_window, cx| {

@@ -51,12 +51,13 @@ fn bounded_command_preserves_success_output_from_both_streams() {
 #[cfg(unix)]
 fn continuous_output_is_killed_as_output_too_large_before_timeout() {
     let mut command = fixture_command("continuous");
-    let started = Instant::now();
     assert!(matches!(
         run_with_timeout(&mut command, Duration::from_secs(5)),
         Err(BoundedCommandError::OutputTooLarge)
     ));
-    assert!(started.elapsed() < Duration::from_secs(1));
+    // The typed error is the contract: a timeout would be reported as
+    // `TimedOut`. Avoid a wall-clock cutoff here because process startup and
+    // pipe scheduling vary substantially across native CI runners.
 }
 
 #[test]

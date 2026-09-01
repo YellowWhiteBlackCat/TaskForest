@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::DeviceGeneration;
 use taskmanager_core::core::device_state::{DevicePresence, DeviceRefreshOutcome, DeviceStatus};
 
 #[test]
@@ -22,7 +23,7 @@ fn fixture_add_stale_absent_readd_preserves_identity_and_unknowns() {
         registry
             .get("disk:wwid:fixture")
             .map(|lifecycle| lifecycle.generation),
-        Some(1)
+        Some(DeviceGeneration::INITIAL)
     );
     assert_eq!(disks[0].device_generation.get(), 1);
 
@@ -79,7 +80,7 @@ fn fixture_add_stale_absent_readd_preserves_identity_and_unknowns() {
     let readded = registry
         .get("disk:wwid:fixture")
         .expect("stable identity should reconnect");
-    assert_eq!(readded.generation, 2);
+    assert_eq!(readded.generation, DeviceGeneration::new(2));
     assert_eq!(readded.state.last_success_ms, Some(40));
     assert_eq!(disks[0].device_generation.get(), 2);
 
@@ -142,7 +143,7 @@ fn network_readd_preserves_stable_identity_and_advances_generation() {
         registry
             .get("net:mac:fixture")
             .map(|lifecycle| lifecycle.generation),
-        Some(2)
+        Some(DeviceGeneration::new(2))
     );
     assert_eq!(networks[0].device_generation.get(), 2);
     assert_eq!(networks[0].device_state.last_success_ms, Some(30));
@@ -285,13 +286,13 @@ fn disk_network_and_gpu_share_one_reconciliation_contract() {
         network_registry
             .get("net:mac:01")
             .map(|lifecycle| lifecycle.generation),
-        Some(1)
+        Some(DeviceGeneration::INITIAL)
     );
     assert_eq!(
         gpu_registry
             .get("gpu:pci:0000:01:00.0")
             .map(|lifecycle| lifecycle.generation),
-        Some(1)
+        Some(DeviceGeneration::INITIAL)
     );
     assert_eq!(networks[0].device_generation.get(), 1);
     assert_eq!(gpus[0].device_generation.get(), 1);

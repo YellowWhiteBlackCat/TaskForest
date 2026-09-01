@@ -1,16 +1,23 @@
 //! Saved process view presets and clipboard JSON transfer for Iced.
 //!
-//! Provides strict versioned export/import (`taskmanager.saved-process-views` v1)
-//! matching GPUI's exchange protocol, along with the ribbon widget for
+//! The transfer protocol itself (format tag, version, size ceilings, the
+//! strict error vocabulary, and the document shape) is owned by
+//! `taskmanager-core`'s saved-view transfer contract; this module only maps
+//! the local [`SavedViewPreset`] through the neutral
+//! [`ProcessViewPresetConfig`], keeping the filter/sort/column token
+//! vocabulary on the frontend side. It also renders the ribbon widget for
 //! one-click preset switching.
 
 use std::collections::HashSet;
 
 use iced::widget::{container, row, text};
 use iced::{Element, Length};
-use serde::{Deserialize, Serialize};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::config::ProcessViewPresetConfig;
+use taskmanager_core::core::config::{
+    ProcessViewPresetConfig, SavedViewTransferError, allocate_saved_view_ids,
+    export_saved_views_document, import_saved_views_document, resolve_saved_view_import_names,
+    saved_view_name_is_portable,
+};
 use taskmanager_shell::SortCol;
 use taskmanager_theme::tokens;
 
@@ -18,25 +25,6 @@ use crate::app::{FocusTarget, Message};
 use crate::focus;
 use crate::theme;
 use taskmanager_shell::ProcessStatusFilter;
-
-pub const SAVED_VIEW_TRANSFER_FORMAT: &str = "taskmanager.saved-process-views";
-pub const SAVED_VIEW_TRANSFER_VERSION: u64 = 1;
-
-const MAX_TRANSFER_BYTES: usize = 1_048_576;
-const MAX_TRANSFER_PRESETS: usize = 1_000;
-const MAX_PRESET_NAME_CHARS: usize = 80;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum SavedViewTransferError {
-    TooLarge,
-    InvalidDocument,
-    UnsupportedFormat,
-    UnsupportedVersion { found: u64 },
-    TooManyPresets,
-    InvalidPreset { index: usize },
-    IdSpaceExhausted,
-    NameSpaceExhausted,
-}
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SavedViewImportSummary {
@@ -51,14 +39,6 @@ pub enum SavedViewTransferFeedback {
     Imported(SavedViewImportSummary),
     ClipboardEmpty,
     ImportInvalid,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct TransferDocument {
-    format: String,
-    version: u64,
-    presets: Vec<ProcessViewPresetConfig>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -169,15 +149,7 @@ pub fn export_saved_views_json(
         .enumerate()
         .map(|(index, preset)| wire_from_preset(preset, index))
         .collect::<Result<_, _>>()?;
-    if wire_presets.len() > MAX_TRANSFER_PRESETS {
-        return Err(SavedViewTransferError::TooManyPresets);
-    }
-    serde_json::to_string_pretty(&TransferDocument {
-        format: SAVED_VIEW_TRANSFER_FORMAT.to_string(),
-        version: SAVED_VIEW_TRANSFER_VERSION,
-        presets: wire_presets,
-    })
-    .map_err(|_| SavedViewTransferError::InvalidDocument)
+    export_saved_views_document(&wire_presets)
 }
 
 pub fn import_saved_views_json(
@@ -185,83 +157,47 @@ pub fn import_saved_views_json(
     next_id: &mut u64,
     json: &str,
 ) -> Result<SavedViewImportSummary, SavedViewTransferError> {
-    if json.len() > MAX_TRANSFER_BYTES {
-        return Err(SavedViewTransferError::TooLarge);
-    }
-    let document: TransferDocument =
-        serde_json::from_str(json).map_err(|_| SavedViewTransferError::InvalidDocument)?;
-    if document.format != SAVED_VIEW_TRANSFER_FORMAT {
-        return Err(SavedViewTransferError::UnsupportedFormat);
-    }
-    if document.version != SAVED_VIEW_TRANSFER_VERSION {
-        return Err(SavedViewTransferError::UnsupportedVersion {
-            found: document.version,
-        });
-    }
-    if document.presets.len() > MAX_TRANSFER_PRESETS {
-        return Err(SavedViewTransferError::TooManyPresets);
-    }
-
-    let mut imported = document
-        .presets
+    let imported = import_saved_views_document(json)?
         .into_iter()
         .enumerate()
         .map(|(index, preset)| preset_from_wire(preset, index))
         .collect::<Result<Vec<_>, _>>()?;
-
-    let mut names: HashSet<String> = existing.iter().map(SavedViewPreset::display_name).collect();
-    let mut renamed = 0;
-    for preset in &mut imported {
-        let original = preset.custom_name.clone();
-        let unique = unique_name(&original, &names)?;
-        if unique != original {
-            renamed += 1;
-            preset.custom_name = unique;
-        }
-        names.insert(preset.custom_name.clone());
-    }
-
     let imported_count = imported.len();
-    for mut preset in imported {
-        let id = *next_id;
-        *next_id = next_id
-            .checked_add(1)
-            .ok_or(SavedViewTransferError::IdSpaceExhausted)?;
+
+    // Names are resolved for the whole batch at once, so a document holding a
+    // name twice still yields distinct presets.
+    let names: HashSet<String> = existing.iter().map(SavedViewPreset::display_name).collect();
+    let resolved = resolve_saved_view_import_names(
+        &names,
+        imported
+            .iter()
+            .map(|preset| preset.custom_name.clone())
+            .collect(),
+    )?;
+    let renamed = resolved.renamed;
+    let imported: Vec<SavedViewPreset> = imported
+        .into_iter()
+        .zip(resolved.names)
+        .map(|(mut preset, name)| {
+            preset.custom_name = name;
+            preset
+        })
+        .collect();
+
+    // Ids skip the live presets instead of trusting the caller's counter, so a
+    // drifted counter can never collide two views.
+    let occupied: HashSet<u64> = existing.iter().map(|preset| preset.id).collect();
+    let allocation = allocate_saved_view_ids(&occupied, *next_id, imported.len())?;
+    for (mut preset, id) in imported.into_iter().zip(allocation.ids) {
         preset.id = id;
         existing.push(preset);
     }
+    *next_id = allocation.next_id;
 
     Ok(SavedViewImportSummary {
         imported: imported_count,
         renamed,
     })
-}
-
-fn unique_name(base: &str, occupied: &HashSet<String>) -> Result<String, SavedViewTransferError> {
-    if !occupied.contains(base) {
-        return Ok(base.to_string());
-    }
-    for offset in 0..=occupied.len() {
-        let index = u64::try_from(offset)
-            .ok()
-            .and_then(|offset| 2_u64.checked_add(offset))
-            .ok_or(SavedViewTransferError::NameSpaceExhausted)?;
-        let suffix = format!(" ({index})");
-        let stem_len = MAX_PRESET_NAME_CHARS.saturating_sub(suffix.chars().count());
-        let stem: String = base.chars().take(stem_len).collect();
-        let candidate = format!("{stem}{suffix}");
-        if !occupied.contains(&candidate) {
-            return Ok(candidate);
-        }
-    }
-    Err(SavedViewTransferError::NameSpaceExhausted)
-}
-
-fn valid_transfer_name(name: &str) -> bool {
-    !name.is_empty()
-        && name.trim() == name
-        && name.chars().count() <= MAX_PRESET_NAME_CHARS
-        && !name.chars().any(char::is_control)
 }
 
 fn wire_from_preset(
@@ -270,7 +206,7 @@ fn wire_from_preset(
 ) -> Result<ProcessViewPresetConfig, SavedViewTransferError> {
     let name = preset
         .user_name()
-        .filter(|name| valid_transfer_name(name))
+        .filter(|name| saved_view_name_is_portable(name))
         .ok_or(SavedViewTransferError::InvalidPreset { index })?;
     Ok(ProcessViewPresetConfig::new(
         name.to_string(),
@@ -285,7 +221,7 @@ fn preset_from_wire(
     preset: ProcessViewPresetConfig,
     index: usize,
 ) -> Result<SavedViewPreset, SavedViewTransferError> {
-    if !valid_transfer_name(&preset.name) {
+    if !saved_view_name_is_portable(&preset.name) {
         return Err(SavedViewTransferError::InvalidPreset { index });
     }
     Ok(SavedViewPreset::restored(

@@ -285,7 +285,7 @@ fn startup_order_is_enabled_first_under_ascending_status() {
 #[test]
 fn session_order_covers_user_session_and_seat() {
     let session = |id: &str, user: &str, seat: &str| SessionItem {
-        id: id.to_owned(),
+        id: id.to_owned().into(),
         user: user.to_owned(),
         seat: Some(seat.to_owned()),
         ..SessionItem::default()
@@ -297,7 +297,7 @@ fn session_order_covers_user_session_and_seat() {
     order_session_rows(&mut rows, Some((InfoSortCol::Name, SortDir::Asc)));
     assert_eq!(rows[0].user, "alice");
     order_session_rows(&mut rows, Some((InfoSortCol::Session, SortDir::Asc)));
-    assert_eq!(rows[0].id, "1");
+    assert_eq!(rows[0].id, taskmanager_core::SessionId::new("1"));
     order_session_rows(&mut rows, Some((InfoSortCol::Seat, SortDir::Desc)));
     assert_eq!(rows[0].seat.as_deref(), Some("seat1"));
 }

@@ -33,7 +33,7 @@ fn application_root_batch_freezes_the_exact_tree_without_a_representative_pid(
             .build()
     };
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
-    root.update(cx, |view, _cx| {
+    root.update(cx, |view, cx| {
         view.replace_processes_for_test(vec![
             process(10, None, 100),
             process(11, Some(10), 110),
@@ -41,7 +41,7 @@ fn application_root_batch_freezes_the_exact_tree_without_a_representative_pid(
         ]);
         view.select_application_root(ProcessLiveKey::from_parts(10, 100).expect("root identity"));
         assert_eq!(view.selected_process_identity(), None);
-        view.request_process_batch(ProcessBatchAction::End);
+        view.request_process_batch(ProcessBatchAction::End, cx);
     });
 
     let pids = root.read_with(cx, |view, _cx| {
@@ -53,6 +53,92 @@ fn application_root_batch_freezes_the_exact_tree_without_a_representative_pid(
             .collect::<Vec<_>>()
     });
     assert_eq!(pids, vec![12, 11, 10]);
+}
+
+/// The shell's batch-confirmation authority (`ShellApp::
+/// process_batch_requires_confirmation`) is the gate GPUI obeys: a reversible
+/// verb (Suspend) that reaches past the row the user is looking at — a
+/// multi-select set — must arm the shared confirmation instead of submitting,
+/// exactly as the other frontends do.
+#[gpui::test]
+fn multi_select_reversible_verb_arms_the_shared_confirmation(cx: &mut gpui::TestAppContext) {
+    use crate::gpui_app::root::RootView;
+    use gpui::AppContext;
+    use taskmanager_core::core::ScalarObservation;
+    use taskmanager_core::core::process::ProcessScalarObservations;
+    use taskmanager_theme::Theme;
+
+    let process = |pid: u32, name: String| {
+        taskmanager_test_support::ProcessItemFixtureBuilder::new()
+            .pid(pid)
+            .name(name)
+            .scalar_observations(ProcessScalarObservations {
+                start_token: ScalarObservation::available(u64::from(pid) + 100, 1),
+                ..ProcessScalarObservations::default()
+            })
+            .build()
+    };
+    let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
+    root.update(cx, |view, cx| {
+        view.replace_processes_for_test(vec![
+            process(30, "worker-30".into()),
+            process(31, "worker-31".into()),
+        ]);
+        view.replace_process_selection(
+            [
+                ProcessLiveKey::from_parts(30, 130).expect("first identity"),
+                ProcessLiveKey::from_parts(31, 131).expect("second identity"),
+            ],
+            Some(ProcessLiveKey::from_parts(30, 130).expect("anchor identity")),
+        );
+        view.request_process_batch(ProcessBatchAction::Suspend, cx);
+    });
+
+    let armed = root.read_with(cx, |view, _cx| {
+        view.process_batch_confirmation()
+            .map(|intent| (intent.action, intent.targets.len()))
+    });
+    assert_eq!(
+        armed,
+        Some((ProcessBatchAction::Suspend, 2)),
+        "a multi-select Suspend must pass the shared confirmation gate"
+    );
+}
+
+/// One explicit, reversible target stays immediate under the same authority:
+/// the single-target path submits without the shared gate (its own
+/// termination confirmation for Kill/End is unchanged).
+#[gpui::test]
+fn single_reversible_verb_submits_without_the_shared_gate(cx: &mut gpui::TestAppContext) {
+    use crate::gpui_app::root::RootView;
+    use gpui::AppContext;
+    use taskmanager_core::core::ScalarObservation;
+    use taskmanager_core::core::process::ProcessScalarObservations;
+    use taskmanager_theme::Theme;
+
+    let item = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        .pid(44)
+        .name("worker-44".to_string())
+        .scalar_observations(ProcessScalarObservations {
+            start_token: ScalarObservation::available(144, 1),
+            ..ProcessScalarObservations::default()
+        })
+        .build();
+    let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
+    root.update(cx, |view, cx| {
+        view.replace_processes_for_test(vec![item]);
+        view.replace_process_selection(
+            [ProcessLiveKey::from_parts(44, 144).expect("fixture identity")],
+            Some(ProcessLiveKey::from_parts(44, 144).expect("fixture identity")),
+        );
+        view.request_process_batch(ProcessBatchAction::Suspend, cx);
+    });
+
+    let armed = root.read_with(cx, |view, _cx| view.process_batch_confirmation().is_some());
+    assert!(
+        !armed,
+        "a single reversible Suspend must not be gated by the shared confirmation"
+    );
 }
 
 #[test]

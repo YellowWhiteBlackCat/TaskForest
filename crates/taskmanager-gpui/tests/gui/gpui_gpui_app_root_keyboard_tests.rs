@@ -183,7 +183,6 @@ async fn question_is_suppressed_while_a_text_input_is_focused(cx: &mut TestAppCo
 /// modal on top of the new page.
 #[gpui::test]
 async fn page_navigation_closes_help_and_pending_confirmations(cx: &mut TestAppContext) {
-    use taskmanager_application::ProcessTerminationAction;
     let win = root(cx);
     win.update(cx, |view, _window, cx| {
         view.replace_processes_for_test(vec![
@@ -219,12 +218,14 @@ async fn page_navigation_closes_help_and_pending_confirmations(cx: &mut TestAppC
     // Pending end-task confirmation + a page chord: the confirmation is
     // dismissed without executing any process control.
     win.update(cx, |view, _window, cx| {
-        view.request_process_termination(
-            ProcessTerminationAction::EndTask,
+        view.request_end_task_confirmation(
             ProcessLiveKey::from_parts(42, 4_200).expect("fixture identity"),
         );
         assert!(
-            view.process_termination_confirmation().is_some(),
+            matches!(
+                view.pending_confirmation(),
+                Some(taskmanager_application::PendingConfirmation::EndTask(_))
+            ),
             "the request must stage a confirmation"
         );
         cx.notify();
@@ -233,7 +234,7 @@ async fn page_navigation_closes_help_and_pending_confirmations(cx: &mut TestAppC
     cx.dispatch_keystroke(win.into(), Keystroke::parse("alt-3").unwrap());
     assert!(
         win.read_with(cx, |view, _cx| {
-            view.process_termination_confirmation().is_none() && view.page == TopPage::Services
+            view.pending_confirmation().is_none() && view.page == TopPage::Services
         })
         .unwrap(),
         "a page chord must dismiss the pending confirmation and navigate"

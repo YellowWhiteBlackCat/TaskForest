@@ -49,7 +49,6 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, ScrollArea};
 use bevy::window::{PrimaryWindow, Window};
-use taskmanager_application::SystemTelemetryDomainState;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuTelemetryObservation, DiskMetrics, GpuMetrics, GpuTelemetryObservation,
@@ -81,9 +80,10 @@ mod metrics;
 use bevy::math::Rot2;
 use bevy::ui::UiTransform;
 use metrics::{
-    cpu_field_text, cpu_metrics, curve_caption, curve_samples, curve_wanted, curve_warm,
-    dyn_field_text, gpu_devices, gpu_fact_line, memory_metrics, network_devices, nic_fact_line,
-    section_keys, segment_key, segment_line, summary_value,
+    core_usage_count, core_usage_fill_pct, cpu_field_text, cpu_metrics, curve_caption,
+    curve_samples, curve_wanted, curve_warm, disk_caption, dyn_field_text, gpu_devices,
+    gpu_fact_line, memory_metrics, network_devices, nic_fact_line, section_keys, segment_key,
+    segment_value, summary_value,
 };
 use scene::blocks::block_scene;
 
@@ -555,10 +555,7 @@ fn rewrite_texts(shell: &ShellApp, texts: &mut Query<(&DynText, &mut Text)>) {
 fn rewrite_core_bars(shell: &ShellApp, bars: &mut Query<(&DynBar, &mut Node), Without<DynText>>) {
     for (field, mut node) in bars.iter_mut() {
         let pct = match &field.0 {
-            CpuField::Core(index) => cpu_metrics(shell)
-                .and_then(|cpu| cpu.current_core_usage_pct(*index))
-                .filter(|value| value.is_finite())
-                .map_or(0.0, |value| value.clamp(0.0, 100.0)),
+            CpuField::Core(index) => core_usage_fill_pct(shell, *index),
             _ => 0.0,
         };
         let wanted = Val::Percent(pct);

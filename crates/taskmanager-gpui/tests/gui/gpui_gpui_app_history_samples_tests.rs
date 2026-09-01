@@ -83,7 +83,7 @@ fn storage_temperature_projection_is_identity_and_generation_scoped() {
             DeviceLifecycle {
                 presence: DevicePresence::Present,
                 state: DeviceState::healthy(10),
-                generation: 1,
+                generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(10),
                 last_seen_ms: Some(10),
                 absent_since_ms: None,
@@ -143,7 +143,7 @@ fn engine_projection_keeps_missing_engine_samples_as_gaps() {
             DeviceLifecycle {
                 presence: DevicePresence::Present,
                 state: DeviceState::healthy(1),
-                generation: 1,
+                generation: DeviceGeneration::INITIAL,
                 first_seen_ms: Some(1),
                 last_seen_ms: Some(1),
                 absent_since_ms: None,

@@ -40,7 +40,7 @@ use taskmanager_core::core::StableDeviceSelection;
 use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::source::SourceStatus;
-use taskmanager_core::core::target::ServiceId;
+use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_platform_contract::{OperationFailure, RequestId};
 use taskmanager_theme::{FontAvailability, Theme, WindowCorner};
 use taskmanager_ui::theme_binding::detect_font_availability;
@@ -111,7 +111,7 @@ mod window_capture;
 pub(crate) use telemetry_warmup::TelemetryWarmupPhase;
 pub mod system_health;
 mod system_telemetry;
-pub mod termination;
+mod termination;
 mod tooltip;
 mod tray;
 mod units;
@@ -144,7 +144,6 @@ pub use responsive::*;
 use startup::page_token;
 pub use startup::{StartupEnvironment, StartupRuntime, init};
 use system_telemetry::SystemHistoryIngestionDiagnostic;
-pub use termination::*;
 pub(crate) use tooltip::ProcessHistories;
 pub(crate) use tooltip::ProcessTooltipIndex;
 pub use window_surface::{
@@ -317,8 +316,8 @@ pub struct RootView {
     pub selected_service: Option<ServiceId>,
     /// Provider-issued identity of the currently-selected startup entry.
     pub selected_startup: Option<StartupEntryId>,
-    /// Id of the currently-selected session row on the Users page, or `None`.
-    pub selected_session: Option<String>,
+    /// Provider-issued identity of the currently-selected session row.
+    pub selected_session: Option<SessionId>,
     pub desktop_appearance: DesktopAppearance,
     /// Native-adapter source truth used to choose the initial visual skin.
     pub desktop_appearance_sources: Vec<SourceStatus>,
@@ -519,22 +518,20 @@ impl RootView {
                 cache.query.clone(),
             );
         }
-        let procs_refs: Vec<&taskmanager_core::core::process::ProcessItem> =
-            self.processes().iter().collect();
+        let procs_refs = self.shell.visible_processes();
         let application_count = processes_view::rows::application_root_count(&procs_refs);
-        let rows = processes_view::rows::visible_rows_with_local_time(
-            processes_view::rows::VisibleRowsProps {
+        let rows = processes_view::rows::project_visible_rows_from_shell(
+            processes_view::rows::ShellVisibleRowsProps {
                 processes: &procs_refs,
                 observed_at_ms: self.processes_observed_at_ms(),
                 query: &query,
                 sort_col,
                 sort_asc,
-                filter,
                 collapsed: &self.processes_state.collapsed,
                 expanded_apps: &self.processes_state.expanded_apps,
                 units,
+                local_time_rules: &self.local_time_rules,
             },
-            &self.local_time_rules,
         );
         let rows = std::rc::Rc::new(rows);
         let process_identities = std::rc::Rc::new(

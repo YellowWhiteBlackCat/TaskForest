@@ -29,7 +29,7 @@ async fn disk_page_projects_the_active_time_graph_from_its_own_ring(cx: &mut Tes
     let lifecycle = DeviceLifecycle {
         presence: DevicePresence::Present,
         state: DeviceState::healthy(10),
-        generation: 1,
+        generation: DeviceGeneration::INITIAL,
         first_seen_ms: Some(10),
         last_seen_ms: Some(10),
         absent_since_ms: None,

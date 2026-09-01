@@ -7,8 +7,8 @@
 //! loop; the raw pointer/keyboard event delivery itself is not
 //! headless-drivable in iced.
 
-use super::{focus_visible, observe_keyboard, observe_pointer};
 use crate::app::Message;
+use crate::input_modality::InputModality;
 use crate::keys::IcedKey;
 use crate::theme::focus_ring_color;
 use crate::theme_binding::color;
@@ -16,14 +16,11 @@ use taskmanager_theme::Theme;
 
 #[test]
 fn pointer_input_clears_the_keyboard_ring_source() {
-    observe_keyboard();
-    assert!(focus_visible(), "keyboard input is the ring source");
-
-    observe_pointer();
-    assert!(!focus_visible(), "a pointer press clears it");
+    assert!(InputModality::Keyboard.shows_focus_ring());
+    assert!(!InputModality::Pointer.shows_focus_ring());
     // Programmatic focus inherits the previous origin: it never rings by
-    // itself while the tracker sits on pointer input.
-    assert!(!focus_visible());
+    // itself while the window's modality is programmatic.
+    assert!(!InputModality::Programmatic.shows_focus_ring());
 }
 
 #[test]
@@ -31,8 +28,8 @@ fn ring_color_encodes_the_visibility_decision() {
     let theme = Theme::dark();
     let ring = color(theme.palette().ring);
 
-    observe_keyboard();
-    let stroke = focus_ring_color(&theme, false);
+    let keyboard_theme = theme.with_focus_visible(true);
+    let stroke = focus_ring_color(&keyboard_theme, false);
     assert_eq!(
         (stroke.r, stroke.g, stroke.b),
         (ring.r, ring.g, ring.b),
@@ -40,8 +37,8 @@ fn ring_color_encodes_the_visibility_decision() {
     );
     assert_eq!(stroke.a, 1.0, "keyboard focus ⇒ ring drawn opaquely");
 
-    observe_pointer();
-    let pointer_stroke = focus_ring_color(&theme, false);
+    let pointer_theme = theme.with_focus_visible(false);
+    let pointer_stroke = focus_ring_color(&pointer_theme, false);
     assert_eq!(
         (pointer_stroke.r, pointer_stroke.g, pointer_stroke.b),
         (ring.r, ring.g, ring.b)
@@ -54,8 +51,8 @@ fn destructive_rings_follow_the_same_visibility_rule() {
     let theme = Theme::dark();
     let danger = color(theme.palette().danger);
 
-    observe_keyboard();
-    let stroke = focus_ring_color(&theme, true);
+    let keyboard_theme = theme.with_focus_visible(true);
+    let stroke = focus_ring_color(&keyboard_theme, true);
     assert_eq!(
         (stroke.r, stroke.g, stroke.b),
         (danger.r, danger.g, danger.b),
@@ -63,20 +60,38 @@ fn destructive_rings_follow_the_same_visibility_rule() {
     );
     assert_eq!(stroke.a, 1.0);
 
-    observe_pointer();
-    assert_eq!(focus_ring_color(&theme, true).a, 0.0);
+    let pointer_theme = theme.with_focus_visible(false);
+    assert_eq!(focus_ring_color(&pointer_theme, true).a, 0.0);
 }
 
 #[test]
 fn root_messages_feed_the_modality_tracker() {
     let mut app = crate::IcedApp::demo();
-    observe_pointer();
+    assert!(!app.theme().focus_visible());
 
     // Any key press counts as keyboard input, even an unmappable one (the
     // `Other` bucket covers bare modifiers too).
     let _ = app.update(Message::Key(IcedKey::Other));
-    assert!(focus_visible(), "a key press marks keyboard input");
+    assert!(
+        app.theme().focus_visible(),
+        "a key press marks keyboard input"
+    );
 
     let _ = app.update(Message::PointerPressed);
-    assert!(!focus_visible(), "a pointer press over the root clears it");
+    assert!(
+        !app.theme().focus_visible(),
+        "a pointer press over the root clears it"
+    );
+}
+
+#[test]
+fn modality_is_isolated_between_app_instances() {
+    let mut keyboard = crate::IcedApp::demo();
+    let mut pointer = crate::IcedApp::demo();
+
+    let _ = keyboard.update(Message::Key(IcedKey::Other));
+    let _ = pointer.update(Message::PointerPressed);
+
+    assert!(keyboard.theme().focus_visible());
+    assert!(!pointer.theme().focus_visible());
 }
