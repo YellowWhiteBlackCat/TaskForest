@@ -104,8 +104,10 @@ fn snapshot_targets_keep_explicit_paths_distinct_from_local_names() {
     ] {
         assert!(!SnapshotExportTarget::current_directory(stem).is_valid());
     }
-    assert!(!SnapshotExportTarget::current_directory(&"a".repeat(256)).is_valid());
-    assert!(SnapshotExportTarget::current_directory(&"a".repeat(255)).is_valid());
+    let too_long = "a".repeat(256);
+    let maximum = "a".repeat(255);
+    assert!(!SnapshotExportTarget::current_directory(too_long.as_str()).is_valid());
+    assert!(SnapshotExportTarget::current_directory(maximum.as_str()).is_valid());
     assert!(SnapshotExportTarget::current_directory("name.with.multiple.extensions").is_valid());
     assert!(SnapshotExportTarget::base_path("../explicit/snapshot").is_valid());
 }

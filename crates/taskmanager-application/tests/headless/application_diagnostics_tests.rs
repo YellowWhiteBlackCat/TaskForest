@@ -120,8 +120,10 @@ fn diagnostic_targets_share_the_portable_filename_contract() {
     ] {
         assert!(!DiagnosticBundleTarget::current_directory(file_name).is_valid());
     }
-    assert!(!DiagnosticBundleTarget::current_directory(&"a".repeat(256)).is_valid());
-    assert!(DiagnosticBundleTarget::current_directory(&"a".repeat(255)).is_valid());
+    let too_long = "a".repeat(256);
+    let maximum = "a".repeat(255);
+    assert!(!DiagnosticBundleTarget::current_directory(too_long.as_str()).is_valid());
+    assert!(DiagnosticBundleTarget::current_directory(maximum.as_str()).is_valid());
     assert!(DiagnosticBundleTarget::current_directory("诊断包-01.json").is_valid());
     assert!(DiagnosticBundleTarget::path("../explicit/bundle.json").is_valid());
 }
