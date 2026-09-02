@@ -497,11 +497,13 @@ pub(crate) fn render_chart(
 }
 
 /// The chart's latest/avg/peak readout as an overlay pinned to the card's
-/// TOP-LEFT corner (the value badge owns the top-right): a full-width row
-/// under the card spent vertical space the charts need. The pill background
-/// keeps the numbers readable over the grid lines.
+/// BOTTOM-LEFT corner. The canvas value badge owns the top-right corner and
+/// is painted independently, so keeping the summary in the opposite vertical
+/// band gives the two readouts a real exclusion zone instead of relying on
+/// their text widths to happen not to collide. The bottom inset is part of
+/// the card's safety band: the pill never rides the rounded border.
 fn summary_overlay(theme: &Theme, row: Div) -> Div {
-    div().absolute().top(px(6.0)).left(px(8.0)).child(
+    div().absolute().bottom(px(6.0)).left(px(8.0)).child(
         row.rounded(taskmanager_ui::theme_binding::absolute(
             tokens::control_radius(theme),
         ))
