@@ -3,7 +3,8 @@
 //! The state is **per-window**: it lives on the owning window's `RootView`
 //! (`RootView.service_details`), so opening the details dialog in one window
 //! never leaks the other window's selected service / logs / pause state into
-//! it. (A shared `thread_local` used to cross window boundaries.)
+//! it. The request correlation and feed are part of that same window-owned
+//! state, so an asynchronous result cannot cross into another dialog.
 
 use std::path::PathBuf;
 
@@ -55,6 +56,7 @@ pub struct ServiceDetailsSnapshot {
 
 pub struct ServiceDetailsState {
     logs: ServiceLogState,
+    snapshot_request_id: Option<RequestId>,
     copy_feedback: Option<ServiceLogCopyFeedback>,
     last_stream_request_ms: u64,
     feed: ServiceLogFeed,
@@ -66,6 +68,7 @@ impl ServiceDetailsState {
     pub(crate) fn new() -> Self {
         Self {
             logs: ServiceLogState::Empty,
+            snapshot_request_id: None,
             copy_feedback: None,
             last_stream_request_ms: 0,
             feed: ServiceLogFeed::default(),
@@ -81,6 +84,7 @@ impl ServiceDetailsState {
     pub fn select(&mut self, service_id: &ServiceId) -> bool {
         if self.stream.target() != Some(service_id) {
             self.logs = ServiceLogState::Loading;
+            self.snapshot_request_id = None;
             self.copy_feedback = None;
             self.feed = ServiceLogFeed::default();
             self.stream = ServiceLogStreamLifecycle::open(service_id.clone());
@@ -93,6 +97,7 @@ impl ServiceDetailsState {
 
     pub(crate) fn close(&mut self) {
         self.stream.close();
+        self.snapshot_request_id = None;
         if let ServiceLogExportRuntime::Active(session) = &mut self.export {
             session.close();
         }
@@ -101,8 +106,14 @@ impl ServiceDetailsState {
     pub fn apply(&mut self, update: ServiceUpdate) {
         match update {
             ServiceUpdate::Action(_) => {}
-            ServiceUpdate::Logs(result) if self.stream.target() == Some(&result.service_id) => {
-                self.logs = result.state;
+            ServiceUpdate::Logs {
+                request_id,
+                snapshot,
+            } if self.stream.target() == Some(&snapshot.service_id)
+                && self.snapshot_request_id == Some(request_id) =>
+            {
+                self.snapshot_request_id = None;
+                self.logs = snapshot.state;
                 self.copy_feedback = None;
             }
             ServiceUpdate::LogStream {
@@ -116,7 +127,7 @@ impl ServiceDetailsState {
             }
             ServiceUpdate::Dependencies { .. }
             | ServiceUpdate::DependenciesUnavailable { .. }
-            | ServiceUpdate::Logs(_)
+            | ServiceUpdate::Logs { .. }
             | ServiceUpdate::LogStream { .. } => {}
         }
     }
@@ -226,11 +237,36 @@ impl ServiceDetailsState {
     pub(crate) fn begin_log_refresh(&mut self, service_id: &ServiceId) -> bool {
         if self.stream.target() == Some(service_id) {
             self.logs = ServiceLogState::Loading;
+            self.snapshot_request_id = None;
             self.copy_feedback = None;
             true
         } else {
             false
         }
+    }
+
+    pub(crate) fn accept_log_snapshot(
+        &mut self,
+        service_id: &ServiceId,
+        request_id: RequestId,
+    ) -> bool {
+        if self.stream.target() != Some(service_id) {
+            return false;
+        }
+        self.snapshot_request_id = Some(request_id);
+        true
+    }
+
+    pub(crate) fn reject_log_snapshot(&mut self, service_id: &ServiceId, failure: FailureKind) {
+        if self.stream.target() != Some(service_id) {
+            return;
+        }
+        self.snapshot_request_id = None;
+        self.logs = ServiceLogState::Unavailable(ServiceLogFailure::with_detail(
+            ServiceLogErrorKind::from_failure(failure),
+            format!("service log request was rejected: {failure:?}"),
+        ));
+        self.copy_feedback = None;
     }
 
     pub(crate) fn toggle_pause(&mut self, service_id: &ServiceId) {
@@ -242,6 +278,7 @@ impl ServiceDetailsState {
 
     pub(crate) fn cycle_level(&mut self, service_id: &ServiceId) {
         if self.stream.target() == Some(service_id) {
+            self.snapshot_request_id = None;
             self.feed.level = match self.feed.level {
                 ServiceLogLevelFilter::All => ServiceLogLevelFilter::Errors,
                 ServiceLogLevelFilter::Errors => ServiceLogLevelFilter::WarningsAndErrors,
@@ -255,6 +292,7 @@ impl ServiceDetailsState {
 
     pub(crate) fn cycle_time(&mut self, service_id: &ServiceId) {
         if self.stream.target() == Some(service_id) {
+            self.snapshot_request_id = None;
             self.feed.time = match self.feed.time {
                 ServiceLogTimeFilter::All => ServiceLogTimeFilter::LastHour,
                 ServiceLogTimeFilter::LastHour => ServiceLogTimeFilter::LastDay,

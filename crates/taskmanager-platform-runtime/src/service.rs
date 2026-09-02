@@ -192,9 +192,14 @@ pub fn spawn_service_lanes(
     spawn_lazy_typed_outcome_lane(workers, control, events.clone(), move |_, request| {
         control_event(request, &mut execute_control)
     })?;
-    spawn_lazy_typed_outcome_lane(workers, log_snapshot, events.clone(), move |_, request| {
-        log_snapshot_event(request, &mut execute_log_snapshot)
-    })?;
+    spawn_lazy_typed_outcome_lane(
+        workers,
+        log_snapshot,
+        events.clone(),
+        move |request_id, request| {
+            log_snapshot_event(request_id, request, &mut execute_log_snapshot)
+        },
+    )?;
     spawn_lazy_typed_outcome_lane(workers, log_stream, events, move |request_id, request| {
         log_stream_event(request_id, request, &mut execute_log_stream, clock_ms())
     })
@@ -248,6 +253,7 @@ fn control_event(
 }
 
 fn log_snapshot_event(
+    request_id: RequestId,
     ServiceLogSnapshotRequest { service_id }: ServiceLogSnapshotRequest,
     execute: &mut LogSnapshotExecutor,
 ) -> (PlatformEvent, Result<(), ProviderFailure>) {
@@ -260,9 +266,10 @@ fn log_snapshot_event(
         ))
     });
     (
-        PlatformEvent::Services(ServiceEvent::Update(ServiceUpdate::Logs(
-            ServiceLogSnapshot { service_id, state },
-        ))),
+        PlatformEvent::Services(ServiceEvent::Update(ServiceUpdate::Logs {
+            request_id,
+            snapshot: ServiceLogSnapshot { service_id, state },
+        })),
         provider_result,
     )
 }

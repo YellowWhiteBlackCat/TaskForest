@@ -30,9 +30,10 @@ pub use overlays::{
     dialog_overlay, dialog_overlay_width, more_rows_hint, more_rows_label, tooltip,
     tooltip_overlay, truncated_text,
 };
+pub(crate) use visual::sparkline;
 pub use visual::{
-    focus_ring, focus_ring_shadow, highlighted_text, highlighted_text_with_ranges, sparkline,
-    status_bar, titlebar_border,
+    focus_ring, focus_ring_shadow, highlighted_text, highlighted_text_with_ranges, status_bar,
+    titlebar_border,
 };
 
 // ── stateful entity factory (Input box wiring) ─────────────────────────────

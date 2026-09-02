@@ -45,18 +45,17 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (SearchInput, Ported),
         (
             TextSelection,
-            // `components::SelectableText`: pointer drag selection (working
-            // past the widget bounds), double-click word, triple-click all,
-            // one active selection per window, drag finish publishes the
-            // primary clipboard, Ctrl/Cmd-C copies through the standard
-            // clipboard. Registered difference: keyboard select-all (Ctrl-A)
-            // is NOT ported — Ctrl-A belongs to the shared command vocabulary
-            // (row-summary copy) in this frontend. Multi-line blocks (service
-            // log lines) select ROW-WISE by design: the paragraph layer
-            // exposes no line metrics, so a block-wide highlight could only
-            // be approximate; whole-block export stays on the copy/export
-            // actions.
-            Ported,
+            Divergent {
+                // `components::SelectableText`: pointer drag selection
+                // (working past widget bounds), double-click word,
+                // triple-click all, one active selection per window,
+                // drag-finish clipboard, and Ctrl/Cmd-C are ported. Keyboard
+                // select-all (Ctrl-A) remains the shared row-summary command
+                // in this product, and multi-line service logs select
+                // row-wise because the paragraph layer exposes no line
+                // metrics; block export stays on copy/export actions.
+                reason: "Iced ports pointer/word/block selection but keeps Ctrl-A on the shared row-summary command and uses row-wise selection for multi-line logs",
+            },
         ),
         (Switch, Ported),
         (Slider, Ported),

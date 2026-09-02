@@ -233,14 +233,19 @@ jobs:
         with:
           cache-workspace-crates: true
       # GPUI product only — the release surface deliberately skips the Iced
-      # build. The Windows edge embeds the exe icon on the native MSVC toolchain.
+      # build. The fixed UAC process-control helper is built for the same
+      # native target and installed beside the app so the runas path can find
+      # the exact helper it names.
       - name: Build release exe
         shell: bash
         run: |
           cargo build --locked --release --target "$RUST_TARGET" -j 4 \
-            -p taskmanager-gpui
+            -p taskmanager-gpui -p taskmanager-process-control-helper
           mkdir -p msi-stage
           install -m755 "target/$RUST_TARGET/release/taskforest-g.exe" msi-stage/taskforest-g.exe
+          install -m755 \
+            "target/$RUST_TARGET/release/taskmanager-process-control-helper.exe" \
+            msi-stage/taskmanager-process-control-helper.exe
           install -m644 LICENSE msi-stage/
       # WiX v4+ ships the standard dialog sets (WixUI_InstallDir et al.) as an
       # optional extension; without it `wix build -ext WixToolset.UI.wixext`
@@ -295,6 +300,7 @@ jobs:
             -o msi-decompile/taskforest.wxs "$msi"
           test -s msi-decompile/taskforest.wxs
           grep -Eiq 'taskforest-g\.exe' msi-decompile/taskforest.wxs
+          grep -Eiq 'taskmanager-process-control-helper\.exe' msi-decompile/taskforest.wxs
           grep -Eiq 'license' msi-decompile/taskforest.wxs
           # The full Cargo version (rcN included) must ride inside the package,
           # not just in the file name.
@@ -309,6 +315,7 @@ jobs:
           signtool sign /fd sha256 /td sha256 \
             /tr https://time.certum.pl \
             /f cert.pfx /p "${{ secrets.WINDOWS_CERT_PASSWORD }}" \
+            msi-stage/taskmanager-process-control-helper.exe \
             "TaskForest-G-${{ steps.version.outputs.full }}-${{ matrix.arch }}.msi"
           rm -f cert.pfx
       - name: Emit sha256 checksums

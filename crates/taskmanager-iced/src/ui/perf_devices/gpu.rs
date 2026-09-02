@@ -71,7 +71,7 @@ pub(crate) fn gpu_vram_vital_line(gpu: &GpuMetrics, units: UnitPrefs) -> String 
 }
 
 /// Project one GPU's honest scalar readouts as pre-folded shell [`StatRow`]s
-/// (GPUI `gpu_stats` parity: one fold, three renderers). Headline facts whose
+/// (GPUI `gpu_stats` parity: one fold, all renderers). Headline facts whose
 /// absence is a sampling gap (utilization) keep their row and render the
 /// shared dash; facts that simply do not exist on this GPU family (power
 /// draw, temperature, VRAM pairs, throttle reason) omit their rows entirely.

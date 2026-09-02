@@ -18,7 +18,7 @@ use taskmanager_theme::tokens;
 // but the `Entity<SliderState>` MUST persist (it owns the thumb position, drag
 // state, and current value). Each window owns one such entity on its `RootView`
 // (field `RootView::settings_slider`, created lazily on the first Settings
-// render via [`init_slider_entity`]) — never a shared `thread_local`, which
+// render via [`init_slider_entity`]) — never a shared process-wide entity, which
 // would cross window boundaries and leak drag/thumb/value state between
 // windows (the same ownership rule as `RootView::services_table`).
 

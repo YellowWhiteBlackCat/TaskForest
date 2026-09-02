@@ -37,14 +37,15 @@ fn gpu_observation(utilization: Option<f32>) -> GpuTelemetryObservation {
 #[test]
 fn device_sample_cache_reuses_until_the_ring_advances() {
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let graph_cache = crate::gpui_app::graph::new_graph_cache();
     ingestor
         .ingest_correlated_gpu(stamp(1), &gpu_observation(Some(42.0)))
         .expect("accepted");
 
     let generation = DeviceGeneration::new(1);
-    let first = gpu_usage_samples(&store.system_history, "gpu:cache", generation);
+    let first = gpu_usage_samples(&graph_cache, &store.system_history, "gpu:cache", generation);
     assert_eq!(&*first, &[42.0][..]);
-    let second = gpu_usage_samples(&store.system_history, "gpu:cache", generation);
+    let second = gpu_usage_samples(&graph_cache, &store.system_history, "gpu:cache", generation);
     assert!(
         std::rc::Rc::ptr_eq(&first, &second),
         "an unchanged ring must reuse the cached sample vector"
@@ -54,7 +55,7 @@ fn device_sample_cache_reuses_until_the_ring_advances() {
     ingestor
         .ingest_correlated_gpu(stamp(2), &gpu_observation(Some(50.0)))
         .expect("accepted");
-    let third = gpu_usage_samples(&store.system_history, "gpu:cache", generation);
+    let third = gpu_usage_samples(&graph_cache, &store.system_history, "gpu:cache", generation);
     assert!(!std::rc::Rc::ptr_eq(&first, &third));
     assert_eq!(&*third, &[42.0, 50.0][..]);
 }
@@ -154,6 +155,7 @@ fn classify(samples: &[f32]) -> Vec<Option<f32>> {
 fn disk_split_windows_keep_direction_identity_and_cache_reuse() {
     let device_id = "disk:wwid:split-cache";
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let graph_cache = crate::gpui_app::graph::new_graph_cache();
     let available = |value: u64, at_ms: u64| ScalarObservation::available(value, at_ms);
     let generation = DeviceGeneration::new(1);
 
@@ -183,9 +185,11 @@ fn disk_split_windows_keep_direction_identity_and_cache_reuse() {
         )
         .expect("read-only disk tick");
 
-    let read = storage_read_rate_samples(&store.system_history, device_id, generation);
-    let write = storage_write_rate_samples(&store.system_history, device_id, generation);
-    let sum = storage_rate_samples(&store.system_history, device_id, generation);
+    let read =
+        storage_read_rate_samples(&graph_cache, &store.system_history, device_id, generation);
+    let write =
+        storage_write_rate_samples(&graph_cache, &store.system_history, device_id, generation);
+    let sum = storage_rate_samples(&graph_cache, &store.system_history, device_id, generation);
     assert_eq!(
         classify(&read),
         vec![Some(2.0), Some(4.0)],
@@ -204,9 +208,12 @@ fn disk_split_windows_keep_direction_identity_and_cache_reuse() {
 
     // Identical watermark across all three families → each cached vector is
     // reused as-is, and the three families never serve one shared entry.
-    let read_again = storage_read_rate_samples(&store.system_history, device_id, generation);
-    let write_again = storage_write_rate_samples(&store.system_history, device_id, generation);
-    let sum_again = storage_rate_samples(&store.system_history, device_id, generation);
+    let read_again =
+        storage_read_rate_samples(&graph_cache, &store.system_history, device_id, generation);
+    let write_again =
+        storage_write_rate_samples(&graph_cache, &store.system_history, device_id, generation);
+    let sum_again =
+        storage_rate_samples(&graph_cache, &store.system_history, device_id, generation);
     assert!(std::rc::Rc::ptr_eq(&read, &read_again));
     assert!(std::rc::Rc::ptr_eq(&write, &write_again));
     assert!(std::rc::Rc::ptr_eq(&sum, &sum_again));
@@ -224,11 +231,16 @@ fn disk_split_windows_keep_direction_identity_and_cache_reuse() {
             ),
         )
         .expect("new-generation disk tick");
-    let read_new =
-        storage_read_rate_samples(&store.system_history, device_id, DeviceGeneration::new(2));
+    let read_new = storage_read_rate_samples(
+        &graph_cache,
+        &store.system_history,
+        device_id,
+        DeviceGeneration::new(2),
+    );
     assert_eq!(classify(&read_new), vec![Some(1.0)]);
     assert_eq!(
         classify(&storage_read_rate_samples(
+            &graph_cache,
             &store.system_history,
             device_id,
             generation,
@@ -246,6 +258,7 @@ fn disk_split_windows_keep_direction_identity_and_cache_reuse() {
 fn network_split_windows_keep_direction_identity() {
     let device_id = "net:mac:split-cache";
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(8);
+    let graph_cache = crate::gpui_app::graph::new_graph_cache();
     let available = |value: u64, at_ms: u64| ScalarObservation::available(value, at_ms);
     let generation = DeviceGeneration::new(1);
 
@@ -274,9 +287,9 @@ fn network_split_windows_keep_direction_identity() {
         )
         .expect("tx-only network tick");
 
-    let rx = network_rx_rate_samples(&store.system_history, device_id, generation);
-    let tx = network_tx_rate_samples(&store.system_history, device_id, generation);
-    let sum = network_rate_samples(&store.system_history, device_id, generation);
+    let rx = network_rx_rate_samples(&graph_cache, &store.system_history, device_id, generation);
+    let tx = network_tx_rate_samples(&graph_cache, &store.system_history, device_id, generation);
+    let sum = network_rate_samples(&graph_cache, &store.system_history, device_id, generation);
     assert_eq!(
         classify(&rx),
         vec![Some(3.0), None],
@@ -285,7 +298,8 @@ fn network_split_windows_keep_direction_identity() {
     assert_eq!(classify(&tx), vec![Some(6.0), Some(12.0)]);
     assert_eq!(classify(&sum), vec![Some(9.0), None]);
 
-    let rx_again = network_rx_rate_samples(&store.system_history, device_id, generation);
+    let rx_again =
+        network_rx_rate_samples(&graph_cache, &store.system_history, device_id, generation);
     assert!(std::rc::Rc::ptr_eq(&rx, &rx_again));
     assert!(!std::rc::Rc::ptr_eq(&rx, &tx));
     assert!(!std::rc::Rc::ptr_eq(&rx, &sum));

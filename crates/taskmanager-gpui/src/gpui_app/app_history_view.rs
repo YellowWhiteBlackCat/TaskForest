@@ -3,7 +3,7 @@
 //! The page renders the application-owned [`ApplicationHistoryProjection`].
 //! It never reads the live process list and never records a frontend-local
 //! sample: identity correlation, three-metric joining and lifecycle honesty
-//! are shared by GPUI, Iced and TUI.
+//! are shared by GPUI, Iced, TUI and Bevy.
 
 use std::rc::Rc;
 
@@ -22,6 +22,7 @@ use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
+use crate::gpui_app::graph::GraphCacheHandle;
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::{LayoutProfile, PageLayoutBudget};
 use taskmanager_application::i18n;
@@ -43,6 +44,7 @@ pub struct AppHistoryViewProps<'a> {
     pub rows: Rc<Vec<AppHistoryRow>>,
     pub scroll: &'a UniformListScrollHandle,
     pub entity: Entity<RootView>,
+    pub(crate) graph_cache: GraphCacheHandle,
     pub ui_size: taskmanager_theme::tokens::UiSize,
     pub columns: AppHistoryColumns,
     /// Presentation unit preferences for the peak-memory column.
@@ -86,6 +88,7 @@ pub fn render_app_history(props: AppHistoryViewProps<'_>) -> Div {
             props.ui_size,
             props.columns,
             props.units,
+            props.graph_cache,
         ),
         ApplicationHistoryStatus::Disabled => state_panel(
             theme,
@@ -141,6 +144,7 @@ fn history_table(
     ui_size: taskmanager_theme::tokens::UiSize,
     columns: AppHistoryColumns,
     units: UnitPreferences,
+    graph_cache: GraphCacheHandle,
 ) -> AnyElement {
     let row_count = rows.len();
     let row_theme = *theme;
@@ -170,7 +174,15 @@ fn history_table(
                     range
                         .filter_map(|index| {
                             rows.get(index).map(|row| {
-                                row_for_projected(&row_theme, row, index, ui_size, columns, units)
+                                row_for_projected(
+                                    &row_theme,
+                                    row,
+                                    index,
+                                    ui_size,
+                                    columns,
+                                    units,
+                                    graph_cache.clone(),
+                                )
                             })
                         })
                         .collect::<Vec<_>>()
@@ -323,6 +335,7 @@ fn row_for_projected(
     ui_size: taskmanager_theme::tokens::UiSize,
     columns: AppHistoryColumns,
     units: UnitPreferences,
+    graph_cache: GraphCacheHandle,
 ) -> Div {
     let cpu = row
         .peak_cpu_usage
@@ -351,7 +364,7 @@ fn row_for_projected(
         &count,
         &cpu,
         &memory,
-        trend_cell_from_samples(theme, &row.cpu_samples, ui_size),
+        trend_cell_from_samples(theme, &row.cpu_samples, ui_size, graph_cache),
         false,
         ui_size,
         columns,
@@ -370,6 +383,7 @@ fn trend_cell_from_samples(
     theme: &Theme,
     samples: &Rc<[f32]>,
     ui_size: taskmanager_theme::tokens::UiSize,
+    graph_cache: GraphCacheHandle,
 ) -> Div {
     let cell = div().w(px(TREND_W)).min_w(px(0.0)).flex().items_center();
     if samples.iter().filter(|sample| sample.is_finite()).count() >= MIN_TREND_SAMPLES {
@@ -378,6 +392,7 @@ fn trend_cell_from_samples(
             taskmanager_ui::theme_binding::rgba(theme.accent),
             TREND_W,
             TREND_H,
+            graph_cache,
         ))
     } else {
         cell.text_size(taskmanager_ui::theme_binding::absolute(

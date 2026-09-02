@@ -1,6 +1,7 @@
 //! Shared GPU chart-metric selection model and availability reconcile
-//! (ADR-034 stage 1 typed contract; stage 2 wires the three frontends onto
-//! it through the per-tick viewed-GPU folds defined here).
+//! (ADR-034 stage 1 typed contract; stage 2 wires GPUI, Iced and TUI onto it
+//! through the per-tick viewed-GPU folds defined here. Bevy keeps this intent
+//! explicitly unsupported until it has a metric-selection surface).
 //!
 //! The vocabulary is the telemetry-store GPU series families: one
 //! [`GpuChartMetric`] per chartable `GpuMetricPoint` field, in the ADR-034
@@ -28,7 +29,7 @@
 //!
 //! Everything here is pure: no I/O, threads, or time (ADR-034 阶段 1:
 //! “此阶段不触碰任何 renderer”; stage 2 wires the frontends onto this
-//! contract, stage 3 adds Bevy).
+//! contract; Bevy does not yet expose this selection surface).
 
 use taskmanager_core::core::metrics::GpuMetrics;
 use taskmanager_telemetry_store::GpuMetricPoint;
@@ -246,8 +247,9 @@ impl GpuChartMetricGate {
 }
 
 /// The unit family one GPU chart series measures (from
-/// [`GpuChartMetric::unit`]). Renderer-neutral so the three frontends map it
-/// onto their own scale/badge types without disagreeing about the family.
+/// [`GpuChartMetric::unit`]). Renderer-neutral so the GPUI, Iced and TUI
+/// surfaces that expose metric selection map it onto their own scale/badge
+/// types without disagreeing about the family.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum GpuChartMetricUnit {
     /// A 0..=100 percentage (utilization, memory families, idle residency).
@@ -405,7 +407,7 @@ impl GpuChartMetricSelection {
         }
     }
 
-    /// The per-tick fold the three frontends drive through their shell state
+    /// The per-tick fold the GPUI, Iced and TUI surfaces drive through their shell state
     /// (ADR-034 stage 2: “每 tick 折叠”): the viewed device's gate —
     /// availability from its latest typed point plus its generation —
     /// reconciled into the selection. A gate with no viewed device leaves

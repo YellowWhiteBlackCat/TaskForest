@@ -111,12 +111,15 @@ fn missing_and_duplicate_intents_are_drift() {
 
 #[test]
 fn reference_role_and_explanations_are_enforced() {
-    let stolen = reference_declaration(FrontendShape::Tui);
-    assert!(
-        functional_findings(&stolen)
-            .iter()
-            .all(|finding| finding.kind == FunctionalFindingKind::ReferenceOutsideReferenceShape)
-    );
+    for frontend in [FrontendShape::Iced, FrontendShape::Tui, FrontendShape::Bevy] {
+        let stolen = reference_declaration(frontend);
+        assert!(
+            functional_findings(&stolen).iter().all(
+                |finding| finding.kind == FunctionalFindingKind::ReferenceOutsideReferenceShape
+            ),
+            "non-reference frontend {frontend:?} must not claim the GPUI reference role"
+        );
+    }
 
     let mut deferred = reference_declaration(FrontendShape::Gpui);
     deferred.entries[0] = entry(

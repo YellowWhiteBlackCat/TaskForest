@@ -34,6 +34,8 @@ icon_path=$(cygpath -w "$script_dir/taskmanager.ico" 2>/dev/null \
 
 [[ -f "$stage/taskforest-g.exe" ]] \
     || { echo "build-msi: $stage is missing the GPUI exe" >&2; exit 1; }
+[[ -f "$stage/taskmanager-process-control-helper.exe" ]] \
+    || { echo "build-msi: $stage is missing the Windows UAC process-control helper" >&2; exit 1; }
 [[ -s "$script_dir/taskmanager.ico" ]] \
     || { echo "build-msi: TaskForest Windows icon is missing or empty" >&2; exit 1; }
 command -v wix >/dev/null || { echo "build-msi: wix not installed (dotnet tool install --global wix)" >&2; exit 1; }

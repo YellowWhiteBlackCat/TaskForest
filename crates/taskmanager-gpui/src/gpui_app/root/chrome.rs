@@ -16,6 +16,7 @@ use gpui::{
 use crate::gpui_app::chrome;
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::missing_value;
+use crate::gpui_app::graph::GraphCacheHandle;
 use crate::gpui_app::process_insights::{
     ProcessInsightsLabels, ProcessInsightsRenderState, render_process_insights,
 };
@@ -304,6 +305,7 @@ fn details_section_tabs(
 /// One full-width 60-second resource graph with explicit current, peak, and
 /// unit metadata. Values are formatted by the caller while the original f32
 /// series feeds the sparkline unchanged.
+#[allow(clippy::too_many_arguments)]
 fn prop_history_graph(
     t: &Theme,
     label: &str,
@@ -312,6 +314,7 @@ fn prop_history_graph(
     unit: &str,
     samples: &std::rc::Rc<[f32]>,
     color: Rgba,
+    graph_cache: GraphCacheHandle,
 ) -> Div {
     div()
         .flex()
@@ -365,6 +368,7 @@ fn prop_history_graph(
             color,
             396.0,
             36.0,
+            graph_cache,
         ))
 }
 
@@ -449,6 +453,7 @@ fn details_performance(
     item: &ProcessItem,
     histories: &super::ProcessHistories,
     local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
+    graph_cache: GraphCacheHandle,
 ) -> Div {
     let prefs = properties_unit_preferences();
     let vm = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
@@ -472,6 +477,7 @@ fn details_performance(
             "%",
             &histories.cpu,
             taskmanager_ui::theme_binding::rgba(t.cpu),
+            graph_cache.clone(),
         ))
         .child(prop_history_graph(
             t,
@@ -484,6 +490,7 @@ fn details_performance(
             "B",
             &histories.memory,
             taskmanager_ui::theme_binding::rgba(t.memory),
+            graph_cache.clone(),
         ))
         .child(prop_history_graph(
             t,
@@ -493,6 +500,7 @@ fn details_performance(
             i18n::t("prop.bytes_per_second"),
             &histories.disk_read,
             taskmanager_ui::theme_binding::rgba(t.disk),
+            graph_cache.clone(),
         ))
         .child(prop_history_graph(
             t,
@@ -502,6 +510,7 @@ fn details_performance(
             i18n::t("prop.bytes_per_second"),
             &histories.disk_write,
             taskmanager_ui::theme_binding::rgba(t.disk),
+            graph_cache,
         ))
 }
 
@@ -536,6 +545,7 @@ pub(crate) struct DetailsPanelProps<'a> {
     pub(crate) entity: Entity<RootView>,
     pub(crate) local_time_rules: &'a taskmanager_core::core::time::LocalTimeRulesObservation,
     pub(crate) units: taskmanager_core::core::units::UnitPreferences,
+    pub(crate) graph_cache: GraphCacheHandle,
 }
 
 /// Properties content split into explicit Overview / Performance / Command
@@ -552,11 +562,12 @@ pub(crate) fn details_panel_content(props: DetailsPanelProps<'_>) -> Div {
         entity,
         local_time_rules,
         units,
+        graph_cache,
     } = props;
     let section = match active {
         ProcessDetailsSection::Overview => details_overview(t, item, local_time_rules),
         ProcessDetailsSection::Performance => {
-            details_performance(t, item, histories, local_time_rules)
+            details_performance(t, item, histories, local_time_rules, graph_cache)
         }
         ProcessDetailsSection::Command => details_command(t, item, local_time_rules),
         ProcessDetailsSection::Insights => render_process_insights(

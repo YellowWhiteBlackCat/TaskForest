@@ -8,13 +8,14 @@
 // recursion-limit error on the attribute itself (same landmine documented in
 // `system_view::tests`). Keeping this scope minimal resolves `#[test]` to
 // the std built-in.
+use super::cache::GraphPresentationCache;
 use super::hover::sample_index_at_cursor_x;
 use super::slide::{GRAPH_SLIDE_DURATION, slide_progress_value, slide_timing_for};
 use super::{
     GraphOpts, GraphSampleState, GraphSettings, MAX_GRAPH_DATA_POINTS, MIN_GRAPH_DATA_POINTS,
     SMOOTH_TENSION, catmull_rom_controls, compute_column_count, finite_sample_runs,
-    graph_sample_state, graph_slide_spacing, latest_finite_sample, latest_samples_rc,
-    latest_samples_rc_for_slide, sample_x, sample_x_slide,
+    graph_sample_state, graph_slide_spacing, latest_finite_sample, latest_samples_rc, sample_x,
+    sample_x_slide,
 };
 use gpui::{Bounds, ElementId, Pixels, point, px, size};
 use std::rc::Rc;
@@ -461,14 +462,15 @@ fn slide_timing_is_per_graph_id() {
 #[test]
 fn full_graph_slide_ignores_unrelated_revision_and_fresh_allocations() {
     let mut ledger = Default::default();
+    let mut cache = GraphPresentationCache::default();
     let id = ElementId::from("full-graph-revision-regression");
     let source: Rc<[f32]> = Rc::from((0..600).map(|i| i as f32).collect::<Vec<_>>().as_slice());
-    let slice = latest_samples_rc_for_slide(Rc::clone(&source), 60);
+    let slice = cache.latest_samples(Rc::clone(&source), 60, true);
     let first = slide_timing_for(&mut ledger, &id, &slice, Instant::now());
 
     // One frame later the graph is rebuilt with the same source; the memo
     // hands back the SAME slice, and the ledger must keep the same start.
-    let next_frame = latest_samples_rc_for_slide(Rc::clone(&source), 60);
+    let next_frame = cache.latest_samples(Rc::clone(&source), 60, true);
     assert!(Rc::ptr_eq(&slice, &next_frame));
     assert_eq!(
         slide_timing_for(&mut ledger, &id, &next_frame, Instant::now()),
@@ -521,26 +523,47 @@ fn slide_progress_is_monotonic_and_settles_after_duration() {
 /// re-tessellates (the “filled graph” jank).
 #[test]
 fn full_ring_slide_slice_is_memoized_by_source_identity() {
+    let mut cache = GraphPresentationCache::default();
     let source: Rc<[f32]> = Rc::from((0..600).map(|i| i as f32).collect::<Vec<_>>().as_slice());
-    let first = latest_samples_rc_for_slide(Rc::clone(&source), 60);
-    let second = latest_samples_rc_for_slide(Rc::clone(&source), 60);
+    let first = cache.latest_samples(Rc::clone(&source), 60, true);
+    let second = cache.latest_samples(Rc::clone(&source), 60, true);
     assert_eq!(first.len(), 61);
     assert!(
         Rc::ptr_eq(&first, &second),
         "the same full ring must reuse the memoized tail slice"
     );
-    let smaller = latest_samples_rc_for_slide(Rc::clone(&source), 120);
+    let smaller = cache.latest_samples(Rc::clone(&source), 120, true);
     assert!(
         !Rc::ptr_eq(&first, &smaller),
         "a different window length gets its own slice"
     );
     let other_source: Rc<[f32]> =
         Rc::from((0..600).map(|i| i as f32).collect::<Vec<_>>().as_slice());
-    let other = latest_samples_rc_for_slide(Rc::clone(&other_source), 60);
+    let other = cache.latest_samples(Rc::clone(&other_source), 60, true);
     assert!(
         !Rc::ptr_eq(&first, &other),
         "a distinct source allocation must not reuse another ring's slice"
     );
+}
+
+/// Window-owned graph caches must not reuse an allocation or a timing budget
+/// from another RootView, even when both windows render identical telemetry.
+#[test]
+fn graph_cache_handles_are_isolated_between_windows() {
+    let first = super::new_graph_cache();
+    let second = super::new_graph_cache();
+    let source: Rc<[f32]> = Rc::from((0..600).map(|i| i as f32).collect::<Vec<_>>().as_slice());
+    let first_slice = first
+        .borrow_mut()
+        .latest_samples(Rc::clone(&source), 60, true);
+    let second_slice = second
+        .borrow_mut()
+        .latest_samples(Rc::clone(&source), 60, true);
+
+    assert!(!Rc::ptr_eq(&first_slice, &second_slice));
+    let now = Instant::now();
+    assert!(first.borrow_mut().hover_refresh_due(now));
+    assert!(second.borrow_mut().hover_refresh_due(now));
 }
 
 /// A series longer than the configured window pays exactly one tail-slice

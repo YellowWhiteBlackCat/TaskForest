@@ -349,8 +349,11 @@ fn log_truth_controls_domain_event_and_capability_health_together() {
         assert_registered_service_provider(&event);
         let envelope_request_id = event.request_id;
         match event.outcome {
-            Ok(PlatformEvent::Services(ServiceEvent::Update(ServiceUpdate::Logs(snapshot))))
-                if matches!(
+            Ok(PlatformEvent::Services(ServiceEvent::Update(ServiceUpdate::Logs {
+                request_id,
+                snapshot,
+            }))) if request_id == envelope_request_id
+                && matches!(
                     snapshot.state,
                     ServiceLogState::Unavailable(ServiceLogFailure {
                         kind: ServiceLogErrorKind::PermissionDenied,

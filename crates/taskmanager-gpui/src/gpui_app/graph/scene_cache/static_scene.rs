@@ -1,7 +1,7 @@
 //! Static graph grid and fill scene cache.
 
 use super::{
-    Background, Bounds, GRAPH_STATIC_SCENES, GraphOpts, GraphStaticSceneEntry, GraphStaticSceneKey,
+    Background, Bounds, GraphOpts, GraphSceneCache, GraphStaticSceneEntry, GraphStaticSceneKey,
     MAX_GRAPH_STATIC_SCENE_ENTRIES, Pixels, Rgba, Window, build_graph_static_geometry,
     evict_static, rgba_bits,
 };
@@ -11,6 +11,7 @@ use super::{
 /// carries no sample identity, so it is assembled directly from the
 /// bounds/theme/options inputs.
 pub(super) fn paint_graph_static_scene(
+    cache: &mut GraphSceneCache,
     window: &mut Window,
     bounds: Bounds<Pixels>,
     base: Rgba,
@@ -28,20 +29,19 @@ pub(super) fn paint_graph_static_scene(
         gradient_fill: opts.gradient_fill,
         ref_lines: opts.ref_lines,
     };
-    GRAPH_STATIC_SCENES.with_borrow_mut(|store| {
-        let index = match store.iter().position(|entry| entry.key == static_key) {
-            Some(index) => index,
-            None => {
-                evict_static(store, MAX_GRAPH_STATIC_SCENE_ENTRIES);
-                store.push(GraphStaticSceneEntry {
-                    key: static_key,
-                    geometry: build_graph_static_geometry(bounds, base, opts),
-                });
-                store.len() - 1
-            }
-        };
-        let entry = &store[index];
-        entry.geometry.paint(window);
-        entry.geometry.fill()
-    })
+    let store = &mut cache.static_scenes;
+    let index = match store.iter().position(|entry| entry.key == static_key) {
+        Some(index) => index,
+        None => {
+            evict_static(store, MAX_GRAPH_STATIC_SCENE_ENTRIES);
+            store.push(GraphStaticSceneEntry {
+                key: static_key,
+                geometry: build_graph_static_geometry(bounds, base, opts),
+            });
+            store.len() - 1
+        }
+    };
+    let entry = &store[index];
+    entry.geometry.paint(window);
+    entry.geometry.fill()
 }

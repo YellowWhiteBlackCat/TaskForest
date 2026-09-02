@@ -15,7 +15,7 @@
 //! `set_process_status_filter` / `set_process_query`). The search grammar is
 //! the shared `taskmanager_shell::matches_process_query` (structured
 //! `pid:`/`user:`/`status:`/`cmd:`/`name:` selectors plus the multi-field
-//! fallback), so all three frontends filter identically.
+//! fallback), so all four frontends filter identically.
 
 pub mod chrome;
 pub mod rows;

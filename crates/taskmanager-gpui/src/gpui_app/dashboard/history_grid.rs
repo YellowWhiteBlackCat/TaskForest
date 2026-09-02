@@ -1,7 +1,7 @@
 //! Dashboard history-card grid composition.
 
 use super::{DashboardState, HistoryCardProps, history_card};
-use crate::gpui_app::graph::GraphHover;
+use crate::gpui_app::graph::{GraphCacheHandle, GraphHover};
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::SystemPageBudget;
 use crate::gpui_app::timeline::{TimelineMetric, TimelineSeries};
@@ -19,6 +19,7 @@ pub(super) fn render_history_grid(
     layout: SystemPageBudget,
     entity: Entity<RootView>,
     hover_slot: Rc<RefCell<Option<GraphHover>>>,
+    graph_cache: GraphCacheHandle,
 ) -> Div {
     let disk_max = finite_peak(&series.disk_mib_per_sec);
     let network_max = finite_peak(&series.network_mib_per_sec);
@@ -35,6 +36,7 @@ pub(super) fn render_history_grid(
             active: state.history_selection,
             entity,
             hover_slot: hover_slot.clone(),
+            graph_cache: graph_cache.clone(),
         })
     };
     div()

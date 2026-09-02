@@ -75,6 +75,13 @@ fn filesystem_failure_remains_typed() {
 }
 
 #[test]
+fn invalid_current_directory_target_is_rejected_before_resolution() {
+    let error = resolve_target(&DiagnosticBundleTarget::current_directory("../escape.json"))
+        .expect_err("path traversal must not reach current_dir().join()");
+    assert_eq!(error.kind(), DiagnosticBundleErrorKind::InvalidTarget);
+}
+
+#[test]
 fn executor_panic_resolves_the_request_and_types_the_dead_lane() {
     let coordinator = DiagnosticBundleCoordinator::start_with_executor(Arc::new(|_request| {
         panic!("fixture bundle fault");

@@ -382,7 +382,21 @@ pub fn queue_effect_result(
             vec![submission]
         }
         PlatformEffect::ServiceLogSnapshot(request) => {
-            vec![platform.submit_service_log_snapshot(request.clone(), now_ms)]
+            let open_for_target = app
+                .service_log
+                .as_ref()
+                .is_some_and(|open| open.service_id() == Some(&request.service_id));
+            if open_for_target && let Some(open) = app.service_log.as_mut() {
+                open.begin_snapshot();
+            }
+            let submission = platform.submit_service_log_snapshot(request.clone(), now_ms);
+            if open_for_target
+                && let Ok(request_id) = &submission
+                && let Some(open) = app.service_log.as_mut()
+            {
+                open.accept_snapshot(*request_id);
+            }
+            vec![submission]
         }
         PlatformEffect::ProcessAffinity(request) => {
             let attempt = app.begin_process_affinity_read(request.target.clone());

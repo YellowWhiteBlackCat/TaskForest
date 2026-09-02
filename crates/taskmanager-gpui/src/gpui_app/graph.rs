@@ -9,17 +9,18 @@ use gpui::{
     Pixels, Point, Rgba, Styled, Window, canvas, div, linear_color_stop, linear_gradient, point,
     px,
 };
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::time::Instant;
 
+pub(crate) mod cache;
 mod hover;
 pub(crate) mod scene_cache;
 pub(crate) mod slide;
-pub use hover::{
-    GraphHover, GraphSecondarySeries, graph_element_hover, graph_element_hover_dual, graph_hover,
-};
+pub(crate) use cache::{GraphCacheHandle, new_graph_cache};
+pub use hover::{GraphHover, GraphSecondarySeries, graph_hover};
+pub(crate) use hover::{graph_element_hover, graph_element_hover_dual};
 
-use slide::{slide_progress, slide_timing_for_window};
+use slide::slide_progress;
 
 pub(crate) const MIN_GRAPH_DATA_POINTS: usize = 10;
 pub(crate) const MAX_GRAPH_DATA_POINTS: usize = 600;
@@ -190,71 +191,6 @@ pub fn latest_samples_rc(samples: Rc<[f32]>, data_points: usize) -> Rc<[f32]> {
     } else {
         Rc::from(&samples[samples.len() - limit..])
     }
-}
-
-/// Tail-limit a shared series to the graph window **plus one older sample**.
-///
-/// Mission Center's slide needs one sample more than the settled window: the
-/// extra point sits at the left edge at progress 0 and exits left while the
-/// newest sample enters from the right. Normal graphs still truncate to the
-/// exact window via [`latest_samples_rc`].
-pub(crate) fn latest_samples_rc_for_slide(samples: Rc<[f32]>, data_points: usize) -> Rc<[f32]> {
-    let limit = GraphSettings::clamp_data_points(data_points).saturating_add(1);
-    if samples.len() <= limit {
-        samples
-    } else {
-        slide_slice_for(samples, limit)
-    }
-}
-
-/// One memoized tail slice: the source projection plus the exact `limit`
-/// it was cut to. The source `Rc` is pinned so a recycled address can never
-/// serve a stale slice.
-struct SlideSliceEntry {
-    source: Rc<[f32]>,
-    limit: usize,
-    slice: Rc<[f32]>,
-}
-
-thread_local! {
-    static SLIDE_SLICE_CACHE: RefCell<Vec<SlideSliceEntry>> = const { RefCell::new(Vec::new()) };
-}
-
-const MAX_SLIDE_SLICE_ENTRIES: usize = 512;
-
-/// Return a STABLE tail-slice `Rc` for a full source ring.
-///
-/// A naive `Rc::from(&samples[..])` allocates a fresh slice on every frame
-/// once the ring exceeds the slide window. That changes the scene-cache key
-/// (`samples_addr`) every frame, so a full graph re-tessellates during every
-/// animation frame and the slide stutters. Memoizing by source identity keeps
-/// one slice per telemetry generation: UI-only and animation frames replay
-/// the cached scene.
-fn slide_slice_for(source: Rc<[f32]>, limit: usize) -> Rc<[f32]> {
-    SLIDE_SLICE_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if let Some(entry) = cache
-            .iter()
-            .find(|entry| entry.limit == limit && Rc::ptr_eq(&entry.source, &source))
-        {
-            return Rc::clone(&entry.slice);
-        }
-        let slice = Rc::from(&source[source.len() - limit..]);
-        if cache.len() >= MAX_SLIDE_SLICE_ENTRIES {
-            // Drop entries whose source only the memo still references; live
-            // generations are re-added on their next frame.
-            cache.retain(|entry| Rc::strong_count(&entry.source) > 1);
-            if cache.len() >= MAX_SLIDE_SLICE_ENTRIES {
-                cache.clear();
-            }
-        }
-        cache.push(SlideSliceEntry {
-            source: Rc::clone(&source),
-            limit,
-            slice: Rc::clone(&slice),
-        });
-        slice
-    })
 }
 
 /// Whether a graph has the extra older sample required for a natural slide.
@@ -826,25 +762,29 @@ fn latest_finite_sample(samples: &[f32]) -> Option<f32> {
 /// `graph::scene_cache` module): a repaint with unchanged samples and bounds
 /// replays the cached paths instead of re-running the spline + tessellation
 /// pass.
-pub fn graph_element(
+pub(crate) fn graph_element(
     id: impl Into<ElementId>,
     samples: impl Into<Rc<[f32]>>,
     base: Rgba,
     opts: GraphOpts,
+    cache: GraphCacheHandle,
 ) -> AnyElement {
     let id: ElementId = id.into();
-    let samples = if opts.sliding {
-        latest_samples_rc_for_slide(samples.into(), opts.data_points)
-    } else {
-        latest_samples_rc(samples.into(), opts.data_points)
-    };
+    let samples = cache
+        .borrow_mut()
+        .latest_samples(samples.into(), opts.data_points, opts.sliding);
     let sliding = opts.sliding && graph_slide_supported(&samples, opts.data_points);
     let slide_key = id.clone();
+    let paint_cache = cache;
     let graph = canvas(
         |_bounds, _window, _cx| (),
         move |bounds, _t, window, cx| {
-            let slide_started_at =
-                sliding.then(|| slide_timing_for_window(window, &slide_key, &samples));
+            let mut cache = paint_cache.borrow_mut();
+            let slide_started_at = sliding.then(|| {
+                cache
+                    .slides_mut()
+                    .timing_for(&slide_key, &samples, Instant::now())
+            });
             let progress =
                 slide_started_at.map_or(1.0, |started_at| slide_progress(started_at, window));
             let offset = if sliding {
@@ -853,7 +793,16 @@ pub fn graph_element(
             } else {
                 px(0.0)
             };
-            scene_cache::paint_graph_scene(window, cx, bounds, &samples, base, opts, offset);
+            scene_cache::paint_graph_scene(
+                cache.scenes_mut(),
+                window,
+                cx,
+                bounds,
+                &samples,
+                base,
+                opts,
+                offset,
+            );
         },
     )
     .size_full();

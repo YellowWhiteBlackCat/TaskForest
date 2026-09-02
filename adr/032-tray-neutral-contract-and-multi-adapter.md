@@ -66,7 +66,8 @@
 - 不把 audited 边界扩成通用 Win32 框架：只加一个有界消息泵。
 - 不给托盘造 request port / capability：托盘是进程生命周期对象，不是 worker-lane
   capability，事件走前端自有通道，不经 platform-runtime 车道。
-- 当前不实现三个前端的完整宿主接线；该边界需要各前端分别满足自己的线程模型与证据门。
+- 不把托盘强行接入 TUI 或 Bevy：它们当前没有桌面托盘宿主契约；桌面图形前端必须各自
+  满足自己的线程模型与证据门，不能把 GPUI/Iced 的实现伪装成所有产品共有的能力。
 
 ## 验收约束
 
@@ -80,9 +81,8 @@
 
 ## Current integration status
 
-- GPUI 已有托盘宿主接线；其窗口、i18n 和退出语义仍按 GPUI crate README 与当前视觉/交互 receipt 验收。
-- GPUI 托盘生命周期已闭环：主窗口关闭只最小化并保留 root/ECS/单例守卫，托盘 Quit 才退出进程；二次启动通过单例事件恢复并激活原窗口。托盘不可用时保留无托盘退出回退，Linux D-Bus 激活通知有界且不会让二次进程悬挂。
-- 单例 seam 已由 platform contract/native 与 Windows boundary 承载；跨平台 release claim 仍要求对应 native receipt。
-- Iced 宿主接线和品牌 RGBA 图标仍是开放项；TUI 桌面托盘明确不适用。
+- GPUI 与 Iced 都已有托盘宿主接线，并各自构造带产品身份、品牌 RGBA 图标和本地化菜单的中立 spec；TUI 与 Bevy 不声称桌面托盘支持。
+- GPUI/Iced 托盘生命周期已闭环：主窗口关闭只最小化并保留 renderer/runtime/单例守卫，托盘 Quit 才退出进程；二次启动通过单例事件恢复、解除最小化并请求激活原窗口。托盘不可用时保留无托盘退出回退，Linux D-Bus 激活通知有界且不会让二次进程悬挂。
+- 单例 seam 已由 platform contract/native 与各 OS adapter 承载；代码与 headless 行为可验证不等于跨平台 release claim，后者仍要求对应 native receipt。
 
 历史逐项跟踪属于私有发布准备材料，不进入当前公开 ADR 路由。

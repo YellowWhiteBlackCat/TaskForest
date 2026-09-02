@@ -70,7 +70,10 @@ fn ecs_sources_cannot_bypass_the_application_projection_boundary() {
 }
 
 #[test]
-fn frontends_consume_shared_projection_without_ecs_dependency() {
+fn non_bevy_frontends_consume_shared_projection_without_ecs_dependency() {
+    // Bevy is intentionally excluded: its own product contract owns Bevy ECS
+    // as the renderer/runtime surface and has a separate dependency-closure
+    // gate. This assertion is specifically for GPUI, Iced and Ratatui.
     for frontend in ["taskmanager-gpui", "taskmanager-iced", "taskmanager-tui"] {
         let source_root = repository().join("crates").join(frontend).join("src");
         let manifest = read(&format!("crates/{frontend}/Cargo.toml"));

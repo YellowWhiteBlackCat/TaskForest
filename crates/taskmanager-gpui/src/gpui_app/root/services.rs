@@ -8,9 +8,7 @@ use taskmanager_application::{
     ServiceLogSnapshotRequest, ServiceLogStreamRequest, ServiceUpdate,
 };
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::services::{
-    ServiceAction, ServiceLogErrorKind, ServiceLogFailure, ServiceLogSnapshot, ServiceLogState,
-};
+use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::SubmissionErrorKind;
 
@@ -122,14 +120,18 @@ impl RootView {
                         },
                         submitted_at_ms,
                     )
-                    .map(|_| ())
                     .map_err(|error| {
                         taskmanager_application::service_submission_failure(error.kind)
                     })
             });
-        if let Err(error) = logs {
-            self.service_details
-                .apply(log_failure_update(&service_id, error));
+        match logs {
+            Ok(request_id) => {
+                self.service_details
+                    .accept_log_snapshot(&service_id, request_id);
+            }
+            Err(error) => {
+                self.service_details.reject_log_snapshot(&service_id, error);
+            }
         }
     }
 
@@ -150,14 +152,18 @@ impl RootView {
                         },
                         submitted_at_ms,
                     )
-                    .map(|_| ())
                     .map_err(|error| {
                         taskmanager_application::service_submission_failure(error.kind)
                     })
             });
-        if let Err(error) = result {
-            self.service_details
-                .apply(log_failure_update(service_id, error));
+        match result {
+            Ok(request_id) => {
+                self.service_details
+                    .accept_log_snapshot(service_id, request_id);
+            }
+            Err(error) => {
+                self.service_details.reject_log_snapshot(service_id, error);
+            }
         }
     }
 
@@ -309,17 +315,6 @@ const fn control_submission_failure(kind: SubmissionErrorKind) -> FailureKind {
         }
         SubmissionErrorKind::InvalidRequest => FailureKind::ProviderFault,
     }
-}
-
-fn log_failure_update(service_id: &ServiceId, failure: FailureKind) -> ServiceUpdate {
-    let kind = ServiceLogErrorKind::from_failure(failure);
-    ServiceUpdate::Logs(ServiceLogSnapshot {
-        service_id: service_id.clone(),
-        state: ServiceLogState::Unavailable(ServiceLogFailure::with_detail(
-            kind,
-            format!("service log request was rejected: {failure:?}"),
-        )),
-    })
 }
 
 fn service_action_label(action: ServiceAction) -> &'static str {

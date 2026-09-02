@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use taskmanager_core::core::services::ServiceLogEntry;
 use taskmanager_core::{DiagnosticBundleError, DiagnosticBundleErrorKind, DiagnosticBundlePlan};
 
+use crate::path_contract::is_single_filename;
+
 /// Prepare a privacy-safe service-log export using the same diagnostic bundle
 /// redaction contract as the full diagnostics surface.
 pub fn prepare_service_log_bundle(
@@ -49,6 +51,14 @@ impl DiagnosticBundleTarget {
     #[must_use]
     pub fn path(path: impl Into<PathBuf>) -> Self {
         Self::Path(path.into())
+    }
+
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Self::CurrentDirectory { file_name } => is_single_filename(file_name),
+            Self::Path(_) => true,
+        }
     }
 }
 
@@ -121,6 +131,11 @@ impl<P: DiagnosticBundlePort> DiagnosticBundleSession<P> {
     ) -> Result<DiagnosticBundleRequestId, DiagnosticBundleError> {
         if self.active.is_some() {
             return Err(DiagnosticBundleError::new(DiagnosticBundleErrorKind::Busy));
+        }
+        if !target.is_valid() {
+            return Err(DiagnosticBundleError::new(
+                DiagnosticBundleErrorKind::InvalidTarget,
+            ));
         }
         let Some(next) = self.next_request else {
             return Err(DiagnosticBundleError::new(

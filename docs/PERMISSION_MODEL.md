@@ -34,8 +34,8 @@ perf-ioctl 的 `#[repr(C)]` 布局）无攻击者可控输入，豁免 fuzz、�
 `runas` 传输已在代码层接线（ADR-035 stage 2：`taskmanager-windows-api` 的
 `ShellExecuteExW("runas")` + 有界等待 call group，`taskmanager-platform-windows` 的
 driver 加一次性随机命名回传文件），并已通过 `x86_64-pc-windows-msvc` 交叉编译验证，
-但 helper 尚未打包、没有目标机 receipt——现装机器上仍以 typed `HelperUnavailable`
-诚实失败，不伪造提权。macOS native authorization 的 typed 词汇与纯映射已落地
+固定 helper 已纳入 Windows MSI 并安装在 GPUI 同目录，但尚无目标机成功/拒绝 receipt——
+开发或损坏安装仍以 typed `HelperUnavailable` 诚实失败，不伪造提权。macOS native authorization 的 typed 词汇与纯映射已落地
 （`taskmanager-escalation::authorization`），Security-framework 跨界保持未接线
 （typed `Unsupported`），等待 signed privileged-helper 的 ADR。不得把普通同 token
 子进程宣称为提权。用户拒绝、授权

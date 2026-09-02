@@ -241,10 +241,16 @@ pub fn descendant_live_keys(
     else {
         return Vec::new();
     };
-    let by_pid: HashMap<u32, &ProcessItem> = processes
-        .iter()
-        .map(|process| (process.pid, process))
-        .collect();
+    let mut by_pid = HashMap::with_capacity(processes.len());
+    for process in processes {
+        // Parent links are PID-based, so a provider snapshot containing two
+        // rows for one PID is ambiguous even when their start tokens differ.
+        // Refuse the whole tree rather than allowing the lookup map to pick a
+        // different incarnation than the root identity that was selected.
+        if by_pid.insert(process.pid, process).is_some() {
+            return Vec::new();
+        }
+    }
     let mut children: HashMap<u32, Vec<u32>> = HashMap::new();
     for process in processes {
         if let Some(parent) = process.parent_pid

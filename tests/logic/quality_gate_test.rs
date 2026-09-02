@@ -123,30 +123,31 @@ fn t_call_keys(line: &str) -> Vec<&str> {
     out
 }
 
-/// Walk every Rust source tree that renders localized copy — `src/` (the gpui
-/// shell) plus the `taskmanager-tui` and `taskmanager-iced` front-ends — and
-/// assert each `t("...")` call-site's literal is a key present in the catalog.
+/// Walk every Rust source tree that renders localized copy — the GPUI, Iced,
+/// TUI, and Bevy product crates — and assert each `t("...")` call-site's
+/// literal is a key present in the catalog.
 ///
 /// `t` accepts `&'static str` and on a miss returns the *key itself* (i18n.rs),
 /// so a typo like `t("proc.batch_histor")` renders the raw literal into the UI
 /// with no compile error and no test failure. The en/zh parity test above can't
 /// catch this; only a call-site ↔ catalog cross-check can. This previously
-/// scanned `src/` alone, which let tui/iced-only keys (`chrome.cancel`,
-/// `proc.priority_normal`, `proc_insights.enable_network_capture`, …) slip
-/// through undetected — the gate now covers all three copy-emitting trees.
+/// A previous version scanned the workspace gate host's `src/` directory
+/// instead of the GPUI crate, which left the reference product's copy
+/// unvalidated. The gate now covers the actual four copy-emitting trees.
 /// Non-literal call-sites (`t(label)`, `t(some_fn())`) are skipped: the scanner
 /// anchors on `t("` so an argument that isn't a `"..."` literal won't match.
 #[test]
 fn every_i18n_t_callsite_literal_exists_in_the_catalog() {
     let en = locale_messages(include_str!("../../locales/en.json"));
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    // The three source trees that render user-visible localized copy. The
+    // The four source trees that render user-visible localized copy. The
     // shared `taskmanager-application` crate is deliberately excluded: it owns
     // the i18n module whose `mod tests` exercises `t("no.such.key")` fixtures.
     let mut pending: Vec<std::path::PathBuf> = vec![
-        manifest.join("src"),
+        manifest.join("crates/taskmanager-gpui/src"),
         manifest.join("crates/taskmanager-tui/src"),
         manifest.join("crates/taskmanager-iced/src"),
+        manifest.join("crates/taskmanager-bevy-ui/src"),
     ];
     let mut unknown: Vec<String> = Vec::new();
 
@@ -211,6 +212,31 @@ fn github_actions_release_gate_runs_on_push_pull_request_and_dispatch() {
     assert!(trigger_block.contains("workflow_dispatch:"));
     assert!(trigger_block.contains("pull_request:"));
     assert!(trigger_block.contains("push:"));
+}
+
+#[test]
+fn windows_uac_helper_is_built_staged_and_checked_inside_the_msi() {
+    let wix = include_str!("../../packaging/windows/taskforest.wxs");
+    let packaging = include_str!("../../.github/workflows/packaging.yml");
+    let build_script = include_str!("../../packaging/windows/build-msi.sh");
+    let helper = "taskmanager-process-control-helper.exe";
+
+    assert!(
+        wix.contains(helper),
+        "WiX must carry the UAC helper payload"
+    );
+    assert!(
+        packaging.contains("-p taskmanager-process-control-helper"),
+        "Windows packaging must build the helper for the selected native target"
+    );
+    assert!(
+        packaging.contains(helper),
+        "Windows packaging must stage and validate the helper"
+    );
+    assert!(
+        build_script.contains(helper),
+        "the local MSI builder must reject a stage without the helper"
+    );
 }
 
 /// A `#[test]`/`#[tokio::test]`/`#[gpui::test]` that prints a diagnostic but

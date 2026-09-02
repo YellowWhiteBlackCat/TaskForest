@@ -12,11 +12,10 @@ use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{
     GraphUnit, PerformanceSettings, format_drive_graph_megabytes, format_network_graph_megabytes,
 };
-use crate::gpui_app::graph::GraphHover;
+use crate::gpui_app::graph::{GraphCacheHandle, GraphHover};
 use crate::gpui_app::history_samples::{
-    f32_history_samples, network_rate_samples, network_rx_rate_samples, network_tx_rate_samples,
-    storage_activity_samples, storage_rate_samples, storage_read_rate_samples,
-    storage_temperature_samples, storage_write_rate_samples,
+    DiskGraphSamples, NetworkGraphSamples, disk_graph_samples, f32_history_samples,
+    network_graph_samples,
 };
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::{
@@ -294,6 +293,7 @@ pub(crate) struct MemoryViewProps<'a> {
     pub(crate) telemetry: &'a TelemetryStore,
     pub(crate) performance: PerformanceSettings,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub(crate) graph_cache: GraphCacheHandle,
     pub(crate) memory_history: &'a mut MemoryHistoryCache,
     pub(crate) budget: PerformancePageBudget,
 }
@@ -305,6 +305,7 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
         telemetry,
         performance,
         hover_slot,
+        graph_cache,
         memory_history,
         budget,
     } = props;
@@ -402,6 +403,7 @@ pub(crate) fn render_memory(props: MemoryViewProps<'_>) -> Div {
         stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: None,
         hover_slot,
+        graph_cache,
         graph_settings: performance.graph,
         budget,
     })
@@ -418,6 +420,7 @@ pub(crate) struct DiskViewProps<'a> {
     pub performance: PerformanceSettings,
     pub directory_usage: Option<&'a DirectoryUsageSnapshot>,
     pub hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub graph_cache: GraphCacheHandle,
     pub budget: PerformancePageBudget,
 }
 
@@ -467,6 +470,7 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
         performance,
         directory_usage,
         hover_slot,
+        graph_cache,
         budget,
     } = props;
     let units = performance.units;
@@ -478,17 +482,19 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
     // aggregate summary and first-frame state honest. Each direction keeps
     // its own gap evidence; the shared max is the greater finite peak of the
     // two windows so the directions stay directly comparable.
-    let read_samples =
-        storage_read_rate_samples(&telemetry.system_history, &d.device_id, d.device_generation);
-    let write_samples =
-        storage_write_rate_samples(&telemetry.system_history, &d.device_id, d.device_generation);
-    let samples =
-        storage_rate_samples(&telemetry.system_history, &d.device_id, d.device_generation);
+    let DiskGraphSamples {
+        read: read_samples,
+        write: write_samples,
+        aggregate: samples,
+        temperature: temperature_samples,
+        activity: activity_samples,
+    } = disk_graph_samples(
+        &graph_cache,
+        &telemetry.system_history,
+        &d.device_id,
+        d.device_generation,
+    );
     let observed_max = finite_series_peak(&read_samples).max(finite_series_peak(&write_samples));
-    let temperature_samples =
-        storage_temperature_samples(&telemetry.system_history, &d.device_id, d.device_generation);
-    let activity_samples =
-        storage_activity_samples(&telemetry.system_history, &d.device_id, d.device_generation);
     // Active-time percentage window beneath the throughput pair (the battery
     // power / fan temperature secondary-chart precedent): this disk's own
     // generation-scoped activity ring on the shared 0..100 percent scale. The
@@ -543,6 +549,7 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
             performance.graph,
             budget.vertical,
             hover_slot,
+            graph_cache.clone(),
         )
         .into_any_element()
     });
@@ -630,6 +637,7 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
         stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: smart_footer,
         hover_slot,
+        graph_cache,
         graph_settings: performance.graph,
         budget,
     })
@@ -643,6 +651,7 @@ pub(crate) struct NetworkViewProps<'a> {
     pub(crate) index: usize,
     pub(crate) performance: PerformanceSettings,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub(crate) graph_cache: GraphCacheHandle,
     pub(crate) budget: PerformancePageBudget,
 }
 
@@ -654,6 +663,7 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
         index: i,
         performance,
         hover_slot,
+        graph_cache,
         budget,
     } = props;
     let units = performance.units;
@@ -666,12 +676,16 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
     // link-speed ceiling when dynamic scaling is off, otherwise the greater
     // finite peak of the two directions, so rx and tx stay directly
     // comparable.
-    let rx_samples =
-        network_rx_rate_samples(&telemetry.system_history, &n.device_id, n.device_generation);
-    let tx_samples =
-        network_tx_rate_samples(&telemetry.system_history, &n.device_id, n.device_generation);
-    let samples =
-        network_rate_samples(&telemetry.system_history, &n.device_id, n.device_generation);
+    let NetworkGraphSamples {
+        receive: rx_samples,
+        transmit: tx_samples,
+        aggregate: samples,
+    } = network_graph_samples(
+        &graph_cache,
+        &telemetry.system_history,
+        &n.device_id,
+        n.device_generation,
+    );
     let observed_max = finite_series_peak(&rx_samples).max(finite_series_peak(&tx_samples));
     let max = if performance.graph.network_dynamic_scaling {
         observed_max
@@ -709,6 +723,7 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
         stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: status_footer(theme, n.device_state.status),
         hover_slot,
+        graph_cache,
         graph_settings: performance.graph,
         budget,
     })

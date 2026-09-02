@@ -1,4 +1,4 @@
-//! Keyboard-shortcut and help overlay modal for Iced (GPUI/TUI parity).
+//! Keyboard-shortcut and help overlay modal for Iced (shared command parity).
 //!
 //! Rows are derived from the shared shell presentation
 //! (`taskmanager_shell::page_help` / `command_help`), ensuring the overlay

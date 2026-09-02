@@ -63,7 +63,7 @@ impl SystemProjectionStore {
                 }
                 Some(ServiceUpdate::Action(outcome))
             }
-            ServiceUpdate::Logs(_)
+            ServiceUpdate::Logs { .. }
             | ServiceUpdate::LogStream { .. }
             | ServiceUpdate::Dependencies { .. }
             | ServiceUpdate::DependenciesUnavailable { .. } => Some(update),

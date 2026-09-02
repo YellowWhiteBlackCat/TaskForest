@@ -1,10 +1,10 @@
 //! Toolkit-neutral native application composition.
 //!
-//! The three UI crates still own their event loops and renderer state, but
-//! they all receive the same native composition seam from this crate.  This
-//! keeps the platform axis (`cfg(target_os)` inside
-//! `taskmanager-platform-native`) orthogonal to the UI axis (the selected
-//! GPUI, Iced, or Ratatui feature).
+//! Each graphical product and the terminal product own their event loops and
+//! renderer state, but all receive the same native composition seam from this
+//! crate. This keeps the platform axis (`cfg(target_os)` inside
+//! `taskmanager-platform-native`) orthogonal to the product axis: GPUI, Iced,
+//! Ratatui and Bevy are independent crates and binaries, not UI features.
 
 #![forbid(unsafe_code)]
 

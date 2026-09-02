@@ -480,7 +480,7 @@ fn render_cpu_utilization_graph(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiT
 
 /// Render one compact graph-statistics segment. The reduction is shared with
 /// Iced and GPUI, so gaps and a single finite sample have identical semantics
-/// in all three frontends.
+/// in all frontend products that expose the Performance overview.
 fn summary_line(
     label: &str,
     samples: &[f32],

@@ -10,8 +10,7 @@
 //! (`Entity<TextInputState>`) and the table (`Entity<TableState<ServicesDelegate>>`) are
 //! per-window too: both are created lazily by `RootView::render` and owned on the
 //! `RootView` fields (`services_search` / `services_table`), so two windows never share an
-//! entity (`Entity` is `!Send`; a shared `thread_local` used to cross window boundaries and
-//! re-enter `root.update`). An `InputEvent::Change` subscription writes the new value back
+//! entity (`Entity` is `!Send`). An `InputEvent::Change` subscription writes the new value back
 //! into `RootView.services_state.query` so [`filter_services`] keeps working.
 
 use std::rc::Rc;
@@ -55,13 +54,10 @@ pub use projection::{ServiceFilter, filter_services, sorted_services};
 // ── persistent search-box Entity<InputState> ──────────────────────────────────
 //
 // `InputState::new` requires `&mut Window`, and the `Entity` it produces is `!Send`
-// (FocusHandle inside). The UI is single-threaded, so a `thread_local` holds the entity
-// across renders — exactly the pattern the services `TABLE` uses in this same file.
+// (FocusHandle inside). RootView owns the entity for the window that created it.
 
 /// The search-box `Entity<TextInputState>`, owned per window on the
-/// `RootView` that renders the Services page (mirrors the Apps-page pattern —
-/// a shared `thread_local` crosses window boundaries and re-enters
-/// `root.update` from the Change subscription, panicking on real input).
+/// `RootView` that renders the Services page.
 pub(crate) fn init_search_entity(
     cx: &mut Context<RootView>,
 ) -> gpui::Entity<taskmanager_ui::inputs::text_input::TextInputState> {
@@ -96,8 +92,7 @@ pub(crate) fn focus_search(
 // `Entity<TableState<ServicesDelegate>>` MUST persist across renders (TableState
 // owns the scroll position, selection, focus handle, etc.). The RootView owns
 // one such entity per window (field `RootView::services_table`, created lazily
-// on the first Services render) — never a shared `thread_local`, which would
-// cross window boundaries and leak scroll/sort/selection between windows.
+// on the first Services render), so scroll/sort/selection stay window-local.
 
 /// Table delegate for the Services list. Holds the per-render snapshot of rows and
 /// the resolved `Theme` (so `render_td` can color the Status column) plus a clone of

@@ -10,6 +10,8 @@ use std::sync::Arc;
 
 use taskmanager_core::{ProcessItem, SystemSnapshot};
 
+use crate::path_contract::is_single_filename;
+
 pub const MAX_SNAPSHOT_EXPORT_ERROR_CHARS: usize = 512;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -47,6 +49,14 @@ impl SnapshotExportTarget {
         match self {
             Self::CurrentDirectory { .. } => None,
             Self::BasePath(path) => Some(path),
+        }
+    }
+
+    #[must_use]
+    pub fn is_valid(&self) -> bool {
+        match self {
+            Self::CurrentDirectory { stem } => is_single_filename(stem),
+            Self::BasePath(_) => true,
         }
     }
 }
@@ -223,6 +233,7 @@ impl SnapshotExportState {
 pub enum SnapshotExportStartError {
     Busy(SnapshotExportRequestId),
     RequestSpaceExhausted,
+    InvalidTarget,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -278,6 +289,12 @@ impl<P: SnapshotExportPort> SnapshotExportSession<P> {
                 SnapshotExportStartError::Busy(request) => SnapshotExportSubmitError::Busy(request),
                 SnapshotExportStartError::RequestSpaceExhausted => {
                     SnapshotExportSubmitError::RequestSpaceExhausted
+                }
+                SnapshotExportStartError::InvalidTarget => {
+                    SnapshotExportSubmitError::Rejected(SnapshotExportError::new(
+                        SnapshotExportErrorKind::Inspect,
+                        "snapshot export target must be one portable filename component",
+                    ))
                 }
             })?;
         let id = request.id();
@@ -339,6 +356,9 @@ impl SnapshotExportController {
     ) -> Result<SnapshotExportRequest, SnapshotExportStartError> {
         if let Some(request) = self.state.request_id().filter(|_| self.state.is_active()) {
             return Err(SnapshotExportStartError::Busy(request));
+        }
+        if !payload.target().is_valid() {
+            return Err(SnapshotExportStartError::InvalidTarget);
         }
         let Some(next) = self.next_request else {
             return Err(SnapshotExportStartError::RequestSpaceExhausted);

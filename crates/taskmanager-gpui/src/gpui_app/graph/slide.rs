@@ -5,18 +5,16 @@
 //! stable `ElementId` in another window cannot inherit it. Both the window
 //! registry and each per-window graph ledger are bounded.
 
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
 
-use gpui::{ElementId, Window, WindowId, ease_in_out};
+use gpui::{ElementId, Window, ease_in_out};
 
 /// The freshly shifted series enters from the right by one sample slot.
 pub(super) const GRAPH_SLIDE_DURATION: Duration = Duration::from_millis(180);
 
 const MAX_SLIDE_LEDGER_ENTRIES: usize = 1024;
-const MAX_SLIDE_LEDGER_WINDOWS: usize = 64;
 
 #[derive(Clone)]
 pub(super) struct SlideTiming {
@@ -28,14 +26,20 @@ pub(super) struct SlideTiming {
 
 pub(super) type SlideLedger = HashMap<ElementId, SlideTiming>;
 
-struct WindowSlideLedger {
-    timings: SlideLedger,
-    last_painted_at: Instant,
+#[derive(Default)]
+pub(crate) struct SlideCache {
+    ledger: SlideLedger,
 }
 
-thread_local! {
-    static SLIDE_LEDGERS: RefCell<HashMap<WindowId, WindowSlideLedger>> =
-        RefCell::new(HashMap::new());
+impl SlideCache {
+    pub(super) fn timing_for(
+        &mut self,
+        id: &ElementId,
+        samples: &Rc<[f32]>,
+        now: Instant,
+    ) -> Instant {
+        slide_timing_for(&mut self.ledger, id, samples, now)
+    }
 }
 
 /// Return one graph generation's stable start time inside a supplied ledger.
@@ -70,35 +74,6 @@ pub(super) fn slide_timing_for(
         },
     );
     now
-}
-
-pub(super) fn slide_timing_for_window(
-    window: &Window,
-    id: &ElementId,
-    samples: &Rc<[f32]>,
-) -> Instant {
-    let window_id = window.window_handle().window_id();
-    let now = Instant::now();
-    SLIDE_LEDGERS.with(|ledgers| {
-        let mut ledgers = ledgers.borrow_mut();
-        if !ledgers.contains_key(&window_id) && ledgers.len() >= MAX_SLIDE_LEDGER_WINDOWS {
-            let least_recent = ledgers
-                .iter()
-                .min_by_key(|(_, ledger)| ledger.last_painted_at)
-                .map(|(id, _)| *id);
-            if let Some(least_recent) = least_recent {
-                ledgers.remove(&least_recent);
-            }
-        }
-        let window_ledger = ledgers
-            .entry(window_id)
-            .or_insert_with(|| WindowSlideLedger {
-                timings: HashMap::new(),
-                last_painted_at: now,
-            });
-        window_ledger.last_painted_at = now;
-        slide_timing_for(&mut window_ledger.timings, id, samples, now)
-    })
 }
 
 fn samples_bit_eq(left: &[f32], right: &[f32]) -> bool {

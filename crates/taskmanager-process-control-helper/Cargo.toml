@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 rust-version = "1.97.1"
 license = "Apache-2.0"
-description = "Privileged helper: one identity-checked Linux process-control operation per polkit invocation"
+description = "Privileged helper: one identity-checked process-control operation per native authorization"
 publish = false
 
 # A dedicated helper keeps CAP_KILL/CAP_SYS_NICE authority out of the main

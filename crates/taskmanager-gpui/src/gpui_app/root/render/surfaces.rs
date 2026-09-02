@@ -196,6 +196,7 @@ fn render_process_properties(
             entity: close_entity,
             local_time_rules: &view.local_time_rules,
             units: view.display_units(),
+            graph_cache: view.graph_cache.clone(),
         }),
     )
     .into_any_element();

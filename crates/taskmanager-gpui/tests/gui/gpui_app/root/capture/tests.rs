@@ -809,6 +809,7 @@ fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
     let mut processes = Vec::new();
     evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(32);
+    let graph_cache = crate::gpui_app::graph::new_graph_cache();
     let live_graph = LiveGraphHistory::from_store(store.clone(), 32);
     assert!(evidence.seed_gpu_engine_inventory_history(
         &store.system_history,
@@ -831,6 +832,7 @@ fn gpu_engine_inventory_capture_seeds_five_typed_aggregate_and_engine_frames() {
     );
     for engine in ["Render/3D", "Video Decode"] {
         let samples = gpu_engine_samples(
+            &graph_cache,
             &store.system_history,
             "gpu:capture:engine-inventory",
             DeviceGeneration::new(1),

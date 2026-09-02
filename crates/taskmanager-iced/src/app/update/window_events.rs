@@ -16,13 +16,12 @@ pub(super) fn close_latest_window() -> Task<Message> {
 
 pub(super) fn restore_latest_window() -> Task<Message> {
     iced::window::latest().then(|id| match id {
-        Some(id) => Task::batch(vec![
-            iced::window::minimize(id, false),
-            iced::window::request_user_attention(
+        Some(id) => iced::window::minimize(id, false)
+            .chain(iced::window::gain_focus(id))
+            .chain(iced::window::request_user_attention(
                 id,
                 Some(iced::window::UserAttention::Informational),
-            ),
-        ]),
+            )),
         None => Task::none(),
     })
 }

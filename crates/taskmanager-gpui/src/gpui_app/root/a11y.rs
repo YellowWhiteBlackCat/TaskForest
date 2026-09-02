@@ -15,11 +15,13 @@
 use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
 use taskmanager_ui_contract::{
-    AccessibilityBridge, GraphSummary, ModalInput, ProcessRowInput, SemanticSnapshotBuilder,
+    AccessibilityActionRejection, AccessibilityActionRequest, AccessibilityBridge, GraphSummary,
+    ModalInput, ProcessRowInput, SemanticAction, SemanticSnapshot, SemanticSnapshotBuilder,
 };
 
 use super::RootView;
 use taskmanager_application::PendingConfirmation;
+use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::presentation::process_batch_action_label;
 
 /// Maximum number of process rows published to the accessibility tree. The
@@ -73,21 +75,79 @@ impl RootView {
         if self.a11y_bridge.capability().is_ready()
             && let Some(snapshot) = build_snapshot(self, revision)
         {
-            let _ = self.a11y_bridge.try_publish(snapshot);
+            if self.a11y_bridge.try_publish(snapshot.clone()).is_ok() {
+                self.a11y_snapshot = Some(snapshot);
+            } else {
+                self.a11y_snapshot = None;
+            }
+        } else {
+            self.a11y_snapshot = None;
         }
-        // Drain inbound AT actions so the queue cannot grow unbounded. The
-        // bridge fully captures and validates these into the contract's
-        // `AccessibilityActionRequest`; dispatching them back into gpui focus
-        // and selection state is the next wiring step and is intentionally
-        // traced rather than silently dropped.
+        // Drain inbound AT actions so the queue cannot grow unbounded. Every
+        // request is checked against the exact snapshot revision before the
+        // typed selection/surface action is applied.
         while let Ok(Some(request)) = self.a11y_bridge.try_recv_action() {
-            tracing::debug!(
-                node = %request.node,
-                action = ?request.action,
-                "accessibility action received from assistive technology",
-            );
+            let Some(snapshot) = self.a11y_snapshot.clone() else {
+                tracing::debug!(
+                    node = %request.node,
+                    action = ?request.action,
+                    "accessibility action ignored without a published snapshot",
+                );
+                continue;
+            };
+            if let Err(rejection) = apply_accessibility_action(self, &request, &snapshot) {
+                tracing::debug!(
+                    node = %request.node,
+                    action = ?request.action,
+                    ?rejection,
+                    "accessibility action rejected",
+                );
+            }
         }
     }
+}
+
+/// Validate and execute one assistive-technology action against the frozen
+/// semantic snapshot. Process rows use the same stable identity helper as the
+/// published tree; selecting one is the renderer's focus proxy because the
+/// periodic drain has no `Window` handle. Modal dismissal uses the shared
+/// surface owner, never a parallel accessibility-only close flag.
+pub(crate) fn apply_accessibility_action(
+    view: &mut RootView,
+    request: &AccessibilityActionRequest,
+    snapshot: &SemanticSnapshot,
+) -> Result<(), AccessibilityActionRejection> {
+    request.validate_against(snapshot)?;
+
+    if let Some(identity) = view.processes().iter().find_map(|process| {
+        (format!("row:{}", taskmanager_shell::process_semantic_key(process))
+            == request.node.as_str())
+        .then(|| ProcessLiveKey::from_process(process))
+        .flatten()
+    }) {
+        match request.action {
+            SemanticAction::Focus | SemanticAction::Select => {
+                view.page = super::TopPage::Apps;
+                view.select_process_single(identity);
+            }
+            SemanticAction::Press
+            | SemanticAction::Toggle
+            | SemanticAction::Expand
+            | SemanticAction::Collapse
+            | SemanticAction::Increment
+            | SemanticAction::Decrement
+            | SemanticAction::SetValue
+            | SemanticAction::Dismiss
+            | SemanticAction::ReadPreviousValue
+            | SemanticAction::ReadNextValue => {}
+        }
+        return Ok(());
+    }
+
+    if request.action == SemanticAction::Dismiss && request.node.as_str().starts_with("modal:") {
+        view.dismiss_current_surface(super::WindowSurfaceDismissReason::Escape);
+    }
+    Ok(())
 }
 
 /// Assemble the canonical snapshot from view state. Returns `None` only if the

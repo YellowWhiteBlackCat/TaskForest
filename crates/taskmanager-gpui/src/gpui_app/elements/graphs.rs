@@ -2,7 +2,7 @@
 
 use super::{CARD_SHADOW_AMBIENT_ALPHA, CARD_SHADOW_AMBIENT_BLUR, CARD_SHADOW_AMBIENT_DROP};
 use crate::gpui_app::graph::{
-    GraphOpts, GraphSampleState, GraphSettings, graph_element, graph_sample_state,
+    GraphCacheHandle, GraphOpts, GraphSampleState, GraphSettings, graph_element, graph_sample_state,
 };
 use gpui::{
     BoxShadow, Div, ElementId, InteractiveElement, IntoElement, ParentElement, Point, Styled, div,
@@ -161,6 +161,7 @@ pub(crate) fn mini_graph_cell(
     color: taskmanager_theme::Color,
     label: &str,
     settings: GraphSettings,
+    cache: GraphCacheHandle,
 ) -> Div {
     let opts = GraphOpts {
         gradient_fill: true,
@@ -176,6 +177,7 @@ pub(crate) fn mini_graph_cell(
             Rc::clone(&samples),
             taskmanager_ui::theme_binding::rgba(color),
             opts,
+            cache,
         ),
         &samples,
     )

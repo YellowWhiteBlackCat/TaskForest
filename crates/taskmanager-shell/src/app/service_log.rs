@@ -53,6 +53,7 @@ pub const fn next_log_time(time: ServiceLogTimeFilter) -> ServiceLogTimeFilter {
 pub struct OpenServiceLog {
     pub feed: ServiceLogFeed,
     pub lifecycle: ServiceLogStreamLifecycle,
+    snapshot_request_id: Option<RequestId>,
 }
 
 impl OpenServiceLog {
@@ -62,12 +63,29 @@ impl OpenServiceLog {
         Self {
             lifecycle: ServiceLogStreamLifecycle::open(service_id.clone()),
             feed: ServiceLogFeed::default(),
+            snapshot_request_id: None,
         }
     }
 
     #[must_use]
     pub fn service_id(&self) -> Option<&ServiceId> {
         self.lifecycle.target()
+    }
+
+    pub(super) fn begin_snapshot(&mut self) {
+        self.snapshot_request_id = None;
+    }
+
+    pub(super) fn accept_snapshot(&mut self, request_id: RequestId) {
+        self.snapshot_request_id = Some(request_id);
+    }
+
+    fn resolve_snapshot(&mut self, request_id: RequestId) -> bool {
+        if self.snapshot_request_id != Some(request_id) {
+            return false;
+        }
+        self.snapshot_request_id = None;
+        true
     }
 }
 
@@ -205,13 +223,14 @@ impl ShellApp {
     /// equivalent stream-shaped state (full-filter query, no cursor).
     pub(super) fn apply_service_log_snapshot(
         &mut self,
+        request_id: RequestId,
         service_id: ServiceId,
         state: ServiceLogState,
     ) {
         let Some(open) = self.service_log.as_mut() else {
             return;
         };
-        if open.lifecycle.target() != Some(&service_id) {
+        if open.lifecycle.target() != Some(&service_id) || !open.resolve_snapshot(request_id) {
             return;
         }
         let entries = match state {

@@ -95,6 +95,7 @@ async fn disk_and_network_pages_paint_two_series_legends_from_split_lanes(cx: &m
         );
     }
     let (win, view) = wrapped_root(cx);
+    cx.simulate_window_resize(win.into(), size(px(720.0), px(760.0)));
     view.update(cx, |v, cx| {
         v.mark_telemetry_frame_ready();
         v.page = TopPage::Performance;
@@ -148,6 +149,24 @@ async fn disk_and_network_pages_paint_two_series_legends_from_split_lanes(cx: &m
             "each disk direction must own its legend swatch ({swatch})"
         );
     }
+    let card = vcx
+        .debug_bounds("tm-perf-chart-card:main-graph")
+        .expect("the disk headline card must expose its shared bounds");
+    let summary = vcx
+        .debug_bounds("tm-perf-chart-summary:main-graph")
+        .expect("the measured disk graph must expose its summary bounds");
+    assert!(
+        summary.origin.y >= card.origin.y + px(20.0),
+        "the summary must leave the canvas value badge's top band clear: summary={summary:?}, card={card:?}"
+    );
+    assert!(
+        summary.bottom() <= card.bottom() - px(4.0),
+        "the summary must keep the card's bottom safety band: summary={summary:?}, card={card:?}"
+    );
+    assert!(
+        summary.origin.x >= card.origin.x + px(4.0) && summary.right() <= card.right() - px(4.0),
+        "the summary must stay inside the graph card: summary={summary:?}, card={card:?}"
+    );
     drop(vcx);
 
     view.update(cx, |v, cx| {
@@ -177,19 +196,19 @@ async fn disk_and_network_pages_paint_two_series_legends_from_split_lanes(cx: &m
         let generation = DeviceGeneration::new(1);
         let system = &v.telemetry.system_history;
         assert_eq!(
-            &*storage_read_rate_samples(system, "disk:wwid:legend", generation),
+            &*storage_read_rate_samples(&v.graph_cache, system, "disk:wwid:legend", generation),
             &[2.0][..]
         );
         assert_eq!(
-            &*storage_write_rate_samples(system, "disk:wwid:legend", generation),
+            &*storage_write_rate_samples(&v.graph_cache, system, "disk:wwid:legend", generation),
             &[0.5][..]
         );
         assert_eq!(
-            &*network_rx_rate_samples(system, "net:mac:legend", generation),
+            &*network_rx_rate_samples(&v.graph_cache, system, "net:mac:legend", generation),
             &[3.0][..]
         );
         assert_eq!(
-            &*network_tx_rate_samples(system, "net:mac:legend", generation),
+            &*network_tx_rate_samples(&v.graph_cache, system, "net:mac:legend", generation),
             &[6.0][..]
         );
     });

@@ -14,13 +14,11 @@ use gpui::{
     fill, point, px, size,
 };
 
-use super::scene_cache::{
-    hover_refresh_due, paint_graph_dual_scene, paint_graph_scene, reset_hover_refresh_gate,
-};
-use super::slide::{slide_progress, slide_timing_for_window};
+use super::scene_cache::{paint_graph_dual_scene, paint_graph_scene};
+use super::slide::slide_progress;
 use super::{
-    DualGraphSeries, GraphOpts, GraphSettings, graph_slide_spacing, graph_slide_supported,
-    latest_samples_rc, latest_samples_rc_for_slide, sample_x, sample_x_slide, stroke_path,
+    DualGraphSeries, GraphCacheHandle, GraphOpts, GraphSettings, graph_slide_spacing,
+    graph_slide_supported, sample_x, sample_x_slide, stroke_path,
 };
 
 /// A live graph hover: the window-space cursor position plus the formatted
@@ -242,7 +240,8 @@ fn draw_graph_crosshair(
 /// projection is already generation-cached (per-core grid, memory page) pass
 /// the `Rc` so a UI-only frame (hover, resize, animation repaint) pays one
 /// `Rc` clone instead of copying the whole history window into the element.
-pub fn graph_element_hover(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn graph_element_hover(
     id: impl Into<ElementId>,
     slide_key: impl Into<ElementId>,
     samples: impl Into<Rc<[f32]>>,
@@ -250,6 +249,7 @@ pub fn graph_element_hover(
     opts: GraphOpts,
     format_value: impl Fn(f32) -> String + 'static,
     slot: Rc<RefCell<Option<GraphHover>>>,
+    cache: GraphCacheHandle,
 ) -> AnyElement {
     graph_element_hover_impl(
         id,
@@ -260,6 +260,7 @@ pub fn graph_element_hover(
         opts,
         format_value,
         slot,
+        cache,
     )
 }
 
@@ -268,7 +269,7 @@ pub fn graph_element_hover(
 /// white, both through one shared slot grid and one shared `opts.max`.
 /// `primary_label` prefixes the primary direction in the composed tooltip.
 #[allow(clippy::too_many_arguments)]
-pub fn graph_element_hover_dual(
+pub(crate) fn graph_element_hover_dual(
     id: impl Into<ElementId>,
     slide_key: impl Into<ElementId>,
     samples: impl Into<Rc<[f32]>>,
@@ -278,6 +279,7 @@ pub fn graph_element_hover_dual(
     opts: GraphOpts,
     format_value: impl Fn(f32) -> String + 'static,
     slot: Rc<RefCell<Option<GraphHover>>>,
+    cache: GraphCacheHandle,
 ) -> AnyElement {
     graph_element_hover_impl(
         id,
@@ -288,6 +290,7 @@ pub fn graph_element_hover_dual(
         opts,
         format_value,
         slot,
+        cache,
     )
 }
 
@@ -301,6 +304,7 @@ fn graph_element_hover_impl(
     opts: GraphOpts,
     format_value: impl Fn(f32) -> String + 'static,
     slot: Rc<RefCell<Option<GraphHover>>>,
+    cache: GraphCacheHandle,
 ) -> AnyElement {
     let id: ElementId = id.into();
     let slide_key: ElementId = slide_key.into();
@@ -317,24 +321,46 @@ fn graph_element_hover_impl(
             graph_slide_supported(&secondary.samples, opts.data_points)
         });
     let (samples_rc, secondary_rc) = match (&dual, opts.sliding) {
-        (_, false) => (
-            latest_samples_rc(samples, opts.data_points),
-            dual.as_ref().map(|(_, secondary)| {
-                latest_samples_rc(Rc::clone(&secondary.samples), opts.data_points)
-            }),
-        ),
-        (None, true) => (latest_samples_rc_for_slide(samples, opts.data_points), None),
+        (_, false) => {
+            let primary = cache
+                .borrow_mut()
+                .latest_samples(samples, opts.data_points, false);
+            let secondary = dual.as_ref().map(|(_, secondary)| {
+                cache.borrow_mut().latest_samples(
+                    Rc::clone(&secondary.samples),
+                    opts.data_points,
+                    false,
+                )
+            });
+            (primary, secondary)
+        }
+        (None, true) => {
+            let primary = cache
+                .borrow_mut()
+                .latest_samples(samples, opts.data_points, true);
+            (primary, None)
+        }
         (Some((_, secondary)), true) => {
-            let primary = latest_samples_rc_for_slide(Rc::clone(&samples), opts.data_points);
-            let secondary_samples =
-                latest_samples_rc_for_slide(Rc::clone(&secondary.samples), opts.data_points);
+            let primary =
+                cache
+                    .borrow_mut()
+                    .latest_samples(Rc::clone(&samples), opts.data_points, true);
+            let secondary_samples = cache.borrow_mut().latest_samples(
+                Rc::clone(&secondary.samples),
+                opts.data_points,
+                true,
+            );
             if slide_supported {
                 (primary, Some(secondary_samples))
             } else {
-                (
-                    latest_samples_rc(primary, opts.data_points),
-                    Some(latest_samples_rc(secondary_samples, opts.data_points)),
-                )
+                let primary = cache
+                    .borrow_mut()
+                    .latest_samples(primary, opts.data_points, false);
+                let secondary =
+                    cache
+                        .borrow_mut()
+                        .latest_samples(secondary_samples, opts.data_points, false);
+                (primary, Some(secondary))
             }
         }
     };
@@ -350,12 +376,17 @@ fn graph_element_hover_impl(
         .as_ref()
         .map(|(primary_label, secondary)| (primary_label.clone(), secondary.label.clone()));
     let paint_hover_slot = slot.clone();
+    let paint_cache = cache.clone();
     let graph_canvas = canvas(
         |_bounds, _window, _cx| (),
         move |bnd, _t, window, cx| {
             *paint_bounds.borrow_mut() = Some(bnd);
-            let slide_started_at =
-                sliding.then(|| slide_timing_for_window(window, &slide_key, &paint_samples));
+            let mut cache = paint_cache.borrow_mut();
+            let slide_started_at = sliding.then(|| {
+                cache
+                    .slides_mut()
+                    .timing_for(&slide_key, &paint_samples, Instant::now())
+            });
             let progress =
                 slide_started_at.map_or(1.0, |started_at| slide_progress(started_at, window));
             let offset = if sliding {
@@ -370,6 +401,7 @@ fn graph_element_hover_impl(
                 (Some(secondary), Some(secondary_base)) => {
                     let labels = paint_dual_labels.as_ref();
                     paint_graph_dual_scene(
+                        cache.scenes_mut(),
                         window,
                         cx,
                         bnd,
@@ -387,7 +419,16 @@ fn graph_element_hover_impl(
                         offset,
                     );
                 }
-                _ => paint_graph_scene(window, cx, bnd, &paint_samples, base, opts, offset),
+                _ => paint_graph_scene(
+                    cache.scenes_mut(),
+                    window,
+                    cx,
+                    bnd,
+                    &paint_samples,
+                    base,
+                    opts,
+                    offset,
+                ),
             }
             let cursor = paint_hover_slot.borrow().as_ref().map(|hover| hover.cursor);
             draw_graph_crosshair(
@@ -413,6 +454,7 @@ fn graph_element_hover_impl(
         .map(|(label, secondary)| (label.clone(), secondary_rc.clone(), secondary.label.clone()));
     let mv_fmt = format_value;
     let mv_slot = slot.clone();
+    let move_cache = cache.clone();
     let mv_index = Rc::new(Cell::new(None::<usize>));
     let move_index = mv_index.clone();
     let move_handler = move |ev: &MouseMoveEvent, win: &mut Window, _cx: &mut App| {
@@ -467,8 +509,7 @@ fn graph_element_hover_impl(
             // leaves the painted state and the slot consistent, so the
             // crosshair trails the pointer by at most one gate interval
             // instead of freezing at a stale position.
-            let window_id = win.window_handle().window_id();
-            if !hover_refresh_due(window_id, Instant::now()) {
+            if !move_cache.borrow_mut().hover_refresh_due(Instant::now()) {
                 return;
             }
             if let Some(hover) = mv_slot.borrow_mut().as_mut() {
@@ -479,8 +520,7 @@ fn graph_element_hover_impl(
             // A value change is equally gated: the tooltip content would
             // otherwise mutate without a repaint, desynchronizing the painted
             // tooltip from the slot until the next unrelated refresh.
-            let window_id = win.window_handle().window_id();
-            if !hover_refresh_due(window_id, Instant::now()) {
+            if !move_cache.borrow_mut().hover_refresh_due(Instant::now()) {
                 return;
             }
             move_index.set(index);
@@ -510,13 +550,14 @@ fn graph_element_hover_impl(
 
     let hov_slot = slot.clone();
     let hov_index = mv_index;
+    let hover_cache = cache;
     let hover_handler = move |is_hov: &bool, win: &mut Window, _cx: &mut App| {
         if !is_hov {
             hov_index.set(None);
             *hov_slot.borrow_mut() = None;
             // Leaving the graph must always repaint immediately (clear the
             // crosshair/tooltip) and re-arm the gate for the next enter.
-            reset_hover_refresh_gate(win.window_handle().window_id());
+            hover_cache.borrow_mut().reset_hover_refresh();
             win.refresh();
         }
     };

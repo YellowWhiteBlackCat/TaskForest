@@ -163,6 +163,7 @@ fn diagnostic_failure_state(error: DiagnosticBundleError) -> DiagnosticBundleUiS
 const fn diagnostic_failure_feedback_key(kind: DiagnosticBundleErrorKind) -> &'static str {
     match kind {
         DiagnosticBundleErrorKind::InvalidSource => "diagnostics.failure_invalid_source",
+        DiagnosticBundleErrorKind::InvalidTarget => "diagnostics.failure_invalid_target",
         DiagnosticBundleErrorKind::Encode => "diagnostics.failure_encode",
         DiagnosticBundleErrorKind::Io => "diagnostics.failure_io",
         DiagnosticBundleErrorKind::Busy => "diagnostics.failure_busy",

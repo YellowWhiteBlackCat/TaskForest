@@ -603,7 +603,10 @@ if [ "$FAILURES" -ne 0 ]; then
   exit 1
 fi
 
-PYTHONDONTWRITEBYTECODE=1 timeout 30s python3 scripts/validate_iced_matrix.py \
+# Hashing and inspecting the complete 31-image matrix is bounded work, but can
+# exceed thirty seconds on a loaded developer host. Keep the validator finite
+# while giving the full receipt a stable local budget.
+PYTHONDONTWRITEBYTECODE=1 timeout 120s python3 scripts/validate_iced_matrix.py \
   --matrix "$MATRIX" \
   --manifest "$MANIFEST" \
   --run-dir "$RUN_DIR" \

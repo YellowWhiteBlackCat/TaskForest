@@ -32,7 +32,7 @@ pub use projection::{
 
 // ── GPUI column kit over the shell `SortCol` ─────────────────────────────────
 //
-// The shell enum carries the three-frontend superset (including `Pss`).
+// The shell enum carries the shared frontend superset (including `Pss`).
 // GPUI does not surface a PSS column (out of scope for this view), so the
 // kit below enumerates only the renderable GPUI columns; the `Pss` arms in
 // the exhaustive matches exist for compiler totality and are unreachable
@@ -420,6 +420,7 @@ pub fn proc_row_with_layout(
         gray_zero_values,
         density,
         ui_size,
+        graph_cache,
     } = props;
     // Row background — subtle + theme-aware (Win11 TM parity): selected rows get
     // a soft accent tint, hovered (non-selected) rows a fainter accent tint, and
@@ -847,6 +848,7 @@ pub fn proc_row_with_layout(
             entity,
             gray_zero_values,
             ui_size,
+            graph_cache,
         },
     )
 }

@@ -4,6 +4,7 @@ use super::*;
 fn failure_kinds_have_stable_snake_case_tokens() {
     let cases = [
         (DiagnosticBundleErrorKind::InvalidSource, "invalid_source"),
+        (DiagnosticBundleErrorKind::InvalidTarget, "invalid_target"),
         (DiagnosticBundleErrorKind::Encode, "encode"),
         (DiagnosticBundleErrorKind::Io, "io"),
         (DiagnosticBundleErrorKind::Busy, "busy"),

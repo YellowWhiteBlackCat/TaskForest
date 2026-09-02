@@ -7,9 +7,9 @@
   Design notes:
 
   - No service or autostart registration is installed by this MSI.
-  - No privileged helpers ship here: the pkexec/polkit escalation seams are
-    Linux-native; Windows escalation stays the typed Unsupported surface until
-    the UAC chain lands.
+  - The identity-checked Windows UAC process-control helper ships next to the
+    GPUI executable. Other privileged helpers and Linux polkit policies remain
+    Linux-native and are not part of this MSI.
   - AllowSameVersionUpgrades lets an rc build (numeric version collared to
     x.y.z) upgrade in place for the final release.
   - Unsigned until an Authenticode secret exists; SmartScreen will warn.
@@ -40,6 +40,11 @@
       <Directory Id="INSTALLFOLDER" Name="TaskForest">
         <Component Id="TaskForestGExecutable" Guid="64F61D3A-68C5-46CB-B8E0-3BAB0639CAFE">
           <File Id="TaskForestGExe" Source="$(var.StageDir)/taskforest-g.exe" KeyPath="yes" />
+        </Component>
+        <Component Id="TaskForestProcessControlHelper" Guid="8D2D0F43-CB9A-4B2E-8A45-5DF8F6C56E1B">
+          <File Id="TaskForestProcessControlHelperExe"
+                Source="$(var.StageDir)/taskmanager-process-control-helper.exe"
+                KeyPath="yes" />
         </Component>
         <Component Id="LicenseNotice" Guid="691EEA03-C18E-46DC-9A5B-26FC9813C76C">
           <File Id="LicenseFile" Source="$(var.StageDir)/LICENSE" />

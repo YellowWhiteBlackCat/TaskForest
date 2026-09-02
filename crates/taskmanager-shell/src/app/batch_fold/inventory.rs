@@ -38,7 +38,7 @@ pub(super) fn apply_services(
                         fold.output.service_control_outcomes.push(outcome.clone());
                         fold.mark_updated();
                     }
-                    ServiceUpdate::Logs(_) | ServiceUpdate::LogStream { .. } => {
+                    ServiceUpdate::Logs { .. } | ServiceUpdate::LogStream { .. } => {
                         fold.output.service_log_updates.push(update);
                     }
                     ServiceUpdate::Dependencies { .. }

@@ -73,7 +73,8 @@ pub(super) fn compose_primary_dialogs(
         // The refresh slider's persistent SliderState is owned per window on
         // `RootView::settings_slider`, created lazily on the first Settings
         // render (see `settings_view::refresh::init_slider_entity`) — the shared
-        // `thread_local` it replaced leaked drag state across windows.
+        // The per-window entity prevents the old shared drag state from
+        // leaking across windows.
         let refresh_secs = view
             .telemetry_refresh_policy
             .interval()

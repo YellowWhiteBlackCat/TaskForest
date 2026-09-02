@@ -1,11 +1,12 @@
-//! Process-insights three-frontend parity ledger — a fail-silent gate, not a
+//! Process-insights four-frontend parity ledger — a fail-silent gate, not a
 //! behavior acceptance test.
 //!
-//! The Process Properties "Insights" surface spans five independently
-//! scheduled domains (threads / network / gpu / resources+cgroup / isolation,
-//! plus the open-files enrichment — see `docs/CORE_100_CLOSURE.md`
-//! CORE-PROCESS-INSIGHTS-01). The three frontends drifted to different depths
-//! with no explicit record, so gaps could exist silently. This ledger makes
+//! The Process Properties "Insights" surface spans independently scheduled
+//! domains (threads / network / gpu / resources+cgroup / isolation /
+//! environment, plus the open-files enrichment — see
+//! `docs/CORE_100_CLOSURE.md` CORE-PROCESS-INSIGHTS-01). The frontends drifted
+//! to different depths with no explicit record, so gaps could exist silently.
+//! This ledger makes
 //! every (facet, frontend) combination an explicit status declaration:
 //!
 //! - `Ready` — the facet renders in that frontend (with its honesty contract),
@@ -13,14 +14,16 @@
 //! - `Partial(reason)` — the facet renders but with a stated capability gap.
 //! - `Missing` — the facet does not render there at all.
 //!
-//! This file is an honest status snapshot, taken from a code scan on
-//! 2026-08-20 of:
+//! This file is an honest status snapshot taken from the current source
+//! surfaces:
 //! - GPUI: `crates/taskmanager-gpui/src/gpui_app/process_insights.rs`,
 //!   `.../process_insights/{view.rs, view/, worker.rs}` and
 //!   `.../root/process_insights_ui.rs`
 //! - Iced: `crates/taskmanager-iced/src/ui/insights.rs` (+ `insights/tests.rs`)
 //! - TUI: `crates/taskmanager-tui/src/ui/process_details/insights.rs` (+ the
 //!   process-properties modal that reuses it)
+//! - Bevy: `crates/taskmanager-bevy-ui/src/pages/processes/details.rs` (+ its
+//!   selected-process details scene)
 //!
 //! The `evidence` strings are signposts for human verification (file:line or
 //! test name at snapshot time); this test never reads source files and never
@@ -30,19 +33,28 @@
 //! combination, evidence on `Ready`, a reason on `Partial`, and an
 //! anti-regression ceiling on the `Missing` count.
 
-/// The three equal product frontends that render process insights.
+/// The four product frontends that render a process-details surface. Bevy's
+/// entries are explicit `Partial`/`Missing` cells where its compact summary
+/// intentionally does not expose the full facet list of the three mature
+/// surfaces.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Frontend {
     Gpui,
     Iced,
     Tui,
+    Bevy,
 }
 
 impl Frontend {
-    const ALL: [Frontend; 3] = [Frontend::Gpui, Frontend::Iced, Frontend::Tui];
+    const ALL: [Frontend; 4] = [
+        Frontend::Gpui,
+        Frontend::Iced,
+        Frontend::Tui,
+        Frontend::Bevy,
+    ];
 }
 
-/// The facet union across the three frontends, derived from the code scan
+/// The facet union across the four frontends, derived from the code scan
 /// (not invented): six per-facet user-visible capabilities plus the
 /// cross-cutting axes every frontend must decide about.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -81,6 +93,8 @@ enum Facet {
     // Open-files enrichment.
     /// fd → target rows with the unreadable marker and count header.
     OpenFilesList,
+    /// Bounded environment key/value rows with filtering or a compact count.
+    Environment,
     // Cross-cutting axes.
     /// Frozen-identity request with revision/target-correlated application.
     RequestLifecycle,
@@ -97,7 +111,7 @@ enum Facet {
 }
 
 impl Facet {
-    const ALL: [Facet; 20] = [
+    const ALL: [Facet; 21] = [
         Facet::NetworkThroughput,
         Facet::NetworkConnections,
         Facet::NetworkEscalation,
@@ -112,6 +126,7 @@ impl Facet {
         Facet::IsolationSandboxed,
         Facet::ThreadsList,
         Facet::OpenFilesList,
+        Facet::Environment,
         Facet::RequestLifecycle,
         Facet::LoadingState,
         Facet::TypedUnavailable,
@@ -141,8 +156,7 @@ struct LedgerEntry {
     evidence: &'static str,
 }
 
-/// Snapshot date: 2026-08-20 (code scan of the three insight surfaces).
-const LEDGER: [LedgerEntry; 60] = [
+const LEDGER: [LedgerEntry; 84] = [
     // ---- GPUI -------------------------------------------------------------
     LedgerEntry {
         facet: Facet::NetworkThroughput,
@@ -241,6 +255,13 @@ const LEDGER: [LedgerEntry; 60] = [
         status: Status::Ready,
         reason: "",
         evidence: "view/open_files.rs:39-109 fd → target list, unreadable count in header",
+    },
+    LedgerEntry {
+        facet: Facet::Environment,
+        frontend: Frontend::Gpui,
+        status: Status::Missing,
+        reason: "the GPUI process-insights surface has no environment key/value section",
+        evidence: "crates/taskmanager-gpui/src/gpui_app/process_insights/view.rs:188-231 rendered facet set",
     },
     LedgerEntry {
         facet: Facet::RequestLifecycle,
@@ -384,6 +405,13 @@ const LEDGER: [LedgerEntry; 60] = [
         evidence: "insights.rs:413-464 count (+ unreadable) heading, fd → target rows",
     },
     LedgerEntry {
+        facet: Facet::Environment,
+        frontend: Frontend::Iced,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-iced/src/ui/overlays/process_details.rs:277-378 bounded environment key/value section",
+    },
+    LedgerEntry {
         facet: Facet::RequestLifecycle,
         frontend: Frontend::Iced,
         status: Status::Ready,
@@ -525,6 +553,13 @@ const LEDGER: [LedgerEntry; 60] = [
         evidence: "insights.rs:360-402 count (+ unreadable) header + fd → target rows; test :592",
     },
     LedgerEntry {
+        facet: Facet::Environment,
+        frontend: Frontend::Tui,
+        status: Status::Missing,
+        reason: "the TUI process-insights panel has no environment key/value section",
+        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs:48-201 rendered facet set",
+    },
+    LedgerEntry {
         facet: Facet::RequestLifecycle,
         frontend: Frontend::Tui,
         status: Status::Ready,
@@ -566,13 +601,161 @@ const LEDGER: [LedgerEntry; 60] = [
         reason: "TestBackend unit renders only; no insights-modal scene in scripts/capture-tui.sh",
         evidence: "insights.rs in-file tests (:434 render_text harness)",
     },
+    // ---- Bevy -------------------------------------------------------------
+    LedgerEntry {
+        facet: Facet::NetworkThroughput,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:270-276 network_summary renders RX/TX rates from the matching projection",
+    },
+    LedgerEntry {
+        facet: Facet::NetworkConnections,
+        frontend: Frontend::Bevy,
+        status: Status::Partial,
+        reason: "the compact Bevy details card renders the connection count but not transport/local/remote endpoint rows",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:270-276 network_summary",
+    },
+    LedgerEntry {
+        facet: Facet::NetworkEscalation,
+        frontend: Frontend::Bevy,
+        status: Status::Missing,
+        reason: "the Bevy process-details surface has no network-capture escalation action",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:148-207 insight_cards",
+    },
+    LedgerEntry {
+        facet: Facet::GpuDevices,
+        frontend: Frontend::Bevy,
+        status: Status::Partial,
+        reason: "the compact Bevy card reports device/engine counts but not per-device identity, utilization, or VRAM rows",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:296-304 gpu_summary",
+    },
+    LedgerEntry {
+        facet: Facet::GpuEngines,
+        frontend: Frontend::Bevy,
+        status: Status::Partial,
+        reason: "the compact Bevy card reports an engine count but not per-engine rate or cumulative counter rows",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:296-304 gpu_summary",
+    },
+    LedgerEntry {
+        facet: Facet::ResourcesMemory,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:248-267 resources_summary projects usage and limit",
+    },
+    LedgerEntry {
+        facet: Facet::ResourcesCpuQuota,
+        frontend: Frontend::Bevy,
+        status: Status::Missing,
+        reason: "the compact Bevy resources card does not expose a CPU quota/period row",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:248-267 resources_summary",
+    },
+    LedgerEntry {
+        facet: Facet::ResourcesPidLimits,
+        frontend: Frontend::Bevy,
+        status: Status::Partial,
+        reason: "the compact Bevy resources card exposes process count when present but not the count/limit pair",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:248-267 resources_summary",
+    },
+    LedgerEntry {
+        facet: Facet::ResourcesCgroupLocator,
+        frontend: Frontend::Bevy,
+        status: Status::Missing,
+        reason: "the compact Bevy process-details surface does not expose the resource-group locator",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:148-207 insight_cards",
+    },
+    LedgerEntry {
+        facet: Facet::IsolationKind,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:306-324 isolation_summary projects the typed container kind",
+    },
+    LedgerEntry {
+        facet: Facet::IsolationContainerId,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:306-324 isolation_summary appends the matching container id",
+    },
+    LedgerEntry {
+        facet: Facet::IsolationSandboxed,
+        frontend: Frontend::Bevy,
+        status: Status::Missing,
+        reason: "the compact Bevy isolation card does not expose the typed sandboxed yes/no fact",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:306-324 isolation_summary",
+    },
+    LedgerEntry {
+        facet: Facet::ThreadsList,
+        frontend: Frontend::Bevy,
+        status: Status::Partial,
+        reason: "the compact Bevy details card reports thread count only; it does not render per-thread rows",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:233-242 threads_summary",
+    },
+    LedgerEntry {
+        facet: Facet::OpenFilesList,
+        frontend: Frontend::Bevy,
+        status: Status::Partial,
+        reason: "the compact Bevy details card reports readable/unreadable counts only; it does not render fd target rows",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:245-258 open_files_summary",
+    },
+    LedgerEntry {
+        facet: Facet::Environment,
+        frontend: Frontend::Bevy,
+        status: Status::Partial,
+        reason: "the compact Bevy details card reports environment-entry count only; it does not render key/value rows or the filter",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:317-327 environment_summary",
+    },
+    LedgerEntry {
+        facet: Facet::RequestLifecycle,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:411-430 queue_selected_process_insights freezes the selected identity before submission",
+    },
+    LedgerEntry {
+        facet: Facet::LoadingState,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:210-217 facet_value renders the collecting state for pending facets",
+    },
+    LedgerEntry {
+        facet: Facet::TypedUnavailable,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:221-239 unavailable_text maps typed provider/submission failures",
+    },
+    LedgerEntry {
+        facet: Facet::PartialDisplay,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:148-207 insight_cards renders each facet independently",
+    },
+    LedgerEntry {
+        facet: Facet::GapHonesty,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:221-324 typed unavailable, missing-value and empty-facet folds",
+    },
+    LedgerEntry {
+        facet: Facet::CaptureEvidence,
+        frontend: Frontend::Bevy,
+        status: Status::Missing,
+        reason: "the canonical Bevy capture matrix has no selected-process details scenario",
+        evidence: "scripts/capture_bevy_scenarios.tsv; crates/taskmanager-bevy-ui/tests/headless/pages/processes.rs",
+    },
 ];
 
 /// Anti-regression baseline for the `Missing` count. This is a direction
 /// guard (the gap may only shrink), NOT a behavior proof — a `Missing` count
 /// above this number means a frontend silently lost a facet and must be an
 /// explicit ledger edit instead. Update it downward only when a gap closes.
-const MISSING_BASELINE: usize = 7;
+const MISSING_BASELINE: usize = 14;
 
 /// Every (facet, frontend) combination must be declared exactly once: the
 /// facet union times the frontend set is the complete grid, so a new facet or

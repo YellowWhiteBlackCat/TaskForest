@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "snake_case")]
 pub enum DiagnosticBundleErrorKind {
     InvalidSource,
+    InvalidTarget,
     Encode,
     Io,
     Busy,
@@ -19,6 +20,7 @@ impl DiagnosticBundleErrorKind {
     pub const fn stable_code(self) -> &'static str {
         match self {
             Self::InvalidSource => "invalid_source",
+            Self::InvalidTarget => "invalid_target",
             Self::Encode => "encode",
             Self::Io => "io",
             Self::Busy => "busy",

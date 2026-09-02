@@ -210,7 +210,23 @@ fn path_start(chars: &[char], index: usize) -> bool {
         let inside_url = chars[token_start..index]
             .windows(3)
             .any(|window| window == [':', '/', '/']);
+        if next == Some('/') {
+            return !inside_url
+                && previous != Some(':')
+                && previous != Some('/')
+                && previous.is_none_or(|character| {
+                    character.is_whitespace()
+                        || matches!(character, '=' | '(' | '[' | '{' | '"' | '\'' | ',' | ';')
+                });
+        }
         return !inside_url && previous != Some(':') && previous != Some('/') && next != Some('/');
+    }
+    if current == '\\' && chars.get(index + 1) == Some(&'\\') {
+        let previous = index.checked_sub(1).and_then(|i| chars.get(i)).copied();
+        return previous.is_none_or(|character| {
+            character.is_whitespace()
+                || matches!(character, '=' | '(' | '[' | '{' | '"' | '\'' | ',' | ';')
+        });
     }
     if current == '~' && chars.get(index + 1) == Some(&'/') {
         return true;

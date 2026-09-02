@@ -154,13 +154,13 @@ pub fn filter_startup(
 // ── persistent search-box Entity<InputState> ──────────────────────────────────
 //
 // `InputState::new` requires `&mut Window`, and the `Entity` it produces is `!Send`
-// (FocusHandle inside). The UI is single-threaded, so a `thread_local` holds the entity
-// across renders — exactly the pattern the services `TABLE` uses.
+// (FocusHandle inside). The RootView field keeps this entity alive across renders
+// without sharing it across windows.
 
 /// The search-box `Entity<TextInputState>`, owned per window on the
-/// `RootView` that renders the Startup page (mirrors the Apps-page pattern —
-/// a shared `thread_local` crosses window boundaries and re-enters
-/// `root.update` from the Change subscription, panicking on real input).
+/// `RootView` that renders the Startup page. A shared entity would cross window
+/// boundaries and re-enter `root.update` from the Change subscription, so the
+/// owner remains the individual RootView.
 pub(crate) fn init_search_entity(
     cx: &mut Context<RootView>,
 ) -> gpui::Entity<taskmanager_ui::inputs::text_input::TextInputState> {
@@ -195,7 +195,7 @@ pub(crate) fn focus_search(
 // `Entity<TableState<StartupDelegate>>` MUST persist across renders (TableState owns
 // the scroll position, selection, focus handle, etc.). The RootView owns one such
 // entity per window (field `RootView::startup_table`, created lazily on the first
-// Startup render) — never a shared `thread_local`, which would cross window
+// Startup render) — never a shared process-wide entity, which would cross window
 // boundaries and leak scroll/sort/selection between windows.
 
 /// Table delegate for the Startup list. Holds the per-render snapshot of rows + the

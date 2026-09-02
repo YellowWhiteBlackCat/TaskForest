@@ -56,6 +56,7 @@ impl RootView {
         } = frame;
         let layout = frame.page_layout();
         let performance = self.performance_settings();
+        let graph_cache = std::rc::Rc::clone(&self.graph_cache);
         let page_padding = frame.content.page_padding;
         let presentation = self.presentation_snapshot();
         let devices = presentation.devices;
@@ -102,6 +103,7 @@ impl RootView {
                         &self.local_time_rules,
                         performance_layout.content_height,
                         cx.entity(),
+                        graph_cache.clone(),
                     )
                 } else if self.selected_device_missing {
                     responsive::disconnected_device(t, self.stable_device_selection.selected_id())
@@ -116,6 +118,7 @@ impl RootView {
                                 hardware: &hardware,
                                 hover_slot: &self.graph_hover,
                                 graph_settings: performance.graph,
+                                graph_cache: graph_cache.clone(),
                                 layout: performance_layout,
                                 units: self.display_units(),
                                 package_power: cpu_view::PackagePowerInputs {
@@ -140,6 +143,7 @@ impl RootView {
                                 telemetry,
                                 performance,
                                 hover_slot: &self.graph_hover,
+                                graph_cache: graph_cache.clone(),
                                 memory_history: &mut self.memory_history,
                                 budget: performance_layout,
                             })
@@ -153,6 +157,7 @@ impl RootView {
                                 performance,
                                 directory_usage: self.directory_usage(),
                                 hover_slot: &self.graph_hover,
+                                graph_cache: graph_cache.clone(),
                                 budget: performance_layout,
                             },
                             cx,
@@ -165,6 +170,7 @@ impl RootView {
                                 index: i,
                                 performance,
                                 hover_slot: &self.graph_hover,
+                                graph_cache: graph_cache.clone(),
                                 budget: performance_layout,
                             })
                         }
@@ -186,6 +192,7 @@ impl RootView {
                                     ),
                                     performance,
                                     budget: performance_layout,
+                                    graph_cache: graph_cache.clone(),
                                 },
                                 &self.graph_hover,
                             )
@@ -198,6 +205,7 @@ impl RootView {
                                 index: i,
                                 performance,
                                 hover_slot: &self.graph_hover,
+                                graph_cache: graph_cache.clone(),
                                 budget: performance_layout,
                             })
                         }
@@ -209,6 +217,7 @@ impl RootView {
                                 index: i,
                                 performance,
                                 hover_slot: &self.graph_hover,
+                                graph_cache: graph_cache.clone(),
                                 budget: performance_layout,
                             })
                         }
@@ -348,6 +357,7 @@ impl RootView {
                             sidebar_device_overrides: &sidebar_preferences.device_overrides,
                             edit_mode: self.sidebar_edit_mode,
                             hovered,
+                            graph_cache: graph_cache.clone(),
                             corner_factor: corner_radius_factor,
                         },
                         cx,
@@ -409,6 +419,7 @@ impl RootView {
                             processes_scroll: &self.processes_scroll.vertical,
                             horizontal_scroll: &self.processes_scroll.horizontal,
                             column_cursor: self.processes_state.column_cursor,
+                            graph_cache: graph_cache.clone(),
                             gray_zero_values: presentation.gray_zero_values,
                             density: appearance.density,
                             ui_size: appearance.ui_size,
@@ -467,6 +478,7 @@ impl RootView {
                             layout: system_layout,
                             entity: entity.clone(),
                             hover_slot: self.graph_hover.clone(),
+                            graph_cache: graph_cache.clone(),
                         })
                         .into_any_element()
                     }
@@ -587,6 +599,7 @@ impl RootView {
                                 rows: history_rows,
                                 scroll: &self.app_history_scroll,
                                 entity: cx.entity(),
+                                graph_cache: graph_cache.clone(),
                                 ui_size: appearance.ui_size,
                                 columns: app_history_view::AppHistoryColumns::from_page_layout(
                                     layout,

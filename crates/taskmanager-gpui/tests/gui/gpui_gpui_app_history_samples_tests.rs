@@ -101,6 +101,7 @@ fn storage_temperature_projection_is_identity_and_generation_scoped() {
             .build()
     };
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let graph_cache = crate::gpui_app::graph::new_graph_cache();
     ingestor
         .ingest_correlated_storage(
             stamp(1),
@@ -115,13 +116,23 @@ fn storage_temperature_projection_is_identity_and_generation_scoped() {
         .expect("two-device storage history");
 
     assert_eq!(
-        storage_temperature_samples(&store.system_history, "disk:a", DeviceGeneration::new(1),)
-            .as_ref(),
+        storage_temperature_samples(
+            &graph_cache,
+            &store.system_history,
+            "disk:a",
+            DeviceGeneration::new(1),
+        )
+        .as_ref(),
         [32.0]
     );
     assert!(
-        storage_temperature_samples(&store.system_history, "disk:a", DeviceGeneration::new(2),)
-            .is_empty(),
+        storage_temperature_samples(
+            &graph_cache,
+            &store.system_history,
+            "disk:a",
+            DeviceGeneration::new(2),
+        )
+        .is_empty(),
         "a reattached generation cannot inherit disk A's old curve"
     );
 }
@@ -164,6 +175,7 @@ fn engine_projection_keeps_missing_engine_samples_as_gaps() {
         )
     };
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(4);
+    let graph_cache = crate::gpui_app::graph::new_graph_cache();
     for (revision, observed_at_ms, engines) in [
         (
             1,
@@ -202,12 +214,14 @@ fn engine_projection_keeps_missing_engine_samples_as_gaps() {
     }
 
     let render = gpu_engine_samples(
+        &graph_cache,
         &store.system_history,
         device_id,
         DeviceGeneration::new(1),
         "Render/3D",
     );
     let decode = gpu_engine_samples(
+        &graph_cache,
         &store.system_history,
         device_id,
         DeviceGeneration::new(1),

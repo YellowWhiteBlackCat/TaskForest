@@ -164,8 +164,8 @@ fn unavailable_performance_metrics_do_not_become_zero_percent() {
 
 /// The composition-bar segment color is the iced-specific edge of the shared
 /// breakdown: each semantic kind maps onto its neutral theme token (the same
-/// tokens gpui/tui use), resolved through [`theme::color`]. Pinning the
-/// mapping keeps the three frontends consistent.
+/// tokens the other frontends use), resolved through [`theme::color`]. Pinning
+/// the mapping keeps every frontend on the shared semantic palette.
 #[test]
 fn segment_color_maps_each_kind_to_its_theme_token() {
     use taskmanager_shell::memory::MemSegmentKind;

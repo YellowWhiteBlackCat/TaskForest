@@ -548,33 +548,6 @@ fn classify_io(error: io::Error, context: String) -> HelperError {
 }
 
 #[cfg(windows)]
-fn validate_start_token(pid: u32, expected: u64) -> Result<(), HelperError> {
-    let actual =
-        taskmanager_windows_api::process_creation_time_100ns(pid).map_err(|err| match err {
-            taskmanager_windows_api::WindowsApiError::PermissionDenied => {
-                HelperError::PermissionDenied(format!(
-                    "could not inspect process {pid}: permission denied"
-                ))
-            }
-            taskmanager_windows_api::WindowsApiError::IdentityChanged
-            | taskmanager_windows_api::WindowsApiError::QueryFailed => {
-                HelperError::IdentityChanged(format!("process {pid} no longer exists"))
-            }
-            taskmanager_windows_api::WindowsApiError::Unsupported => {
-                HelperError::Unsupported("process inspection unsupported".to_owned())
-            }
-            _ => HelperError::OperationFailed(format!("could not inspect process {pid}: {err}")),
-        })?;
-    if actual == expected {
-        Ok(())
-    } else {
-        Err(HelperError::IdentityChanged(format!(
-            "process PID {pid} was reused before the privileged operation"
-        )))
-    }
-}
-
-#[cfg(windows)]
 fn apply_operation(pid: u32, expected: u64, operation: &Operation) -> Result<(), HelperError> {
     match operation {
         Operation::End | Operation::Kill => {

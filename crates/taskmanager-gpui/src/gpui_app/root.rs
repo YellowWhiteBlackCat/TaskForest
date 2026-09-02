@@ -23,6 +23,7 @@ use crate::gpui_app::cpu_view::{self, CpuHistoryCache};
 use crate::gpui_app::dashboard::{self, DashboardState};
 use crate::gpui_app::elements;
 use crate::gpui_app::first_run;
+use crate::gpui_app::graph;
 use crate::gpui_app::perf_views::{self, MemoryHistoryCache};
 use crate::gpui_app::processes_view;
 use crate::gpui_app::services_view;
@@ -34,7 +35,8 @@ use crate::gpui_app::system_view;
 use crate::gpui_app::users_view;
 use taskmanager_application::i18n;
 use taskmanager_application::{
-    ConfigClient, PlatformClient, RefreshRequest, TelemetryRefreshPolicy,
+    CommandRouter, ConfigClient, PlatformClient, RefreshRequest, TelemetryRefreshPolicy,
+    default_router,
 };
 use taskmanager_core::core::StableDeviceSelection;
 use taskmanager_core::core::appearance::DesktopAppearance;
@@ -153,6 +155,10 @@ pub use window_surface::{
 
 pub struct RootView {
     pub theme: Theme,
+    /// Immutable command grammar owned by this window. Keeping the router on
+    /// the view avoids a process-global singleton while preserving one shared
+    /// application routing contract for every input event.
+    pub(crate) command_router: Option<CommandRouter>,
     /// Immutable native local-time rules injected at composition startup.
     /// Projection/render paths never discover host files or environment state.
     pub(crate) local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation,
@@ -297,6 +303,10 @@ pub struct RootView {
     /// Private owner of every revision/fingerprint-keyed renderer projection.
     /// Callers receive immutable `Rc` snapshots; no `RefCell` guard escapes.
     projection_caches: projection_caches::GpuiProjectionCaches,
+    /// Per-window graph scene, tail-slice, slide, and hover-refresh caches.
+    /// Canvas closures clone this handle, but no process-global graph state is
+    /// retained between windows.
+    pub(crate) graph_cache: graph::GraphCacheHandle,
     /// Cached per-core CPU utilization projection for the CPU page, invalidated
     /// on every accepted CPU-domain telemetry outcome (see `CpuHistoryCache`).
     pub(crate) cpu_core_history: CpuHistoryCache,
@@ -332,7 +342,7 @@ pub struct RootView {
     /// dialog (owns the thumb position, drag state, and current value).
     /// Created lazily on the first Settings render (see
     /// `settings_view::init_slider_entity`); never shared between windows —
-    /// the old shared `thread_local SLIDER` leaked drag/thumb/value state
+    /// the old shared slider leaked drag/thumb/value state
     /// across windows.
     pub settings_slider: Option<Entity<SliderState>>,
     /// Per-window persistent Data Points slider state for Performance
@@ -368,7 +378,7 @@ pub struct RootView {
     window_capture: window_capture::WindowCaptureRuntime,
     pub(crate) diagnostic_bundle_runtime: diagnostic_bundle::DiagnosticBundleRuntime,
     /// Per-window background dependency/log/export state behind the service
-    /// details dialog. Owned here (never a shared `thread_local`, which crossed
+    /// details dialog. Owned here (never shared process-wide, which crossed
     /// window boundaries): each window's dialog shows only its lifecycle target,
     /// log feed and orthogonal pause/level/time filters. Export outcomes enter
     /// the shell's typed feedback authority.
@@ -429,7 +439,7 @@ pub struct RootView {
     /// Per-window persistent Table entity for the Services page (owns the scroll
     /// position, sort, selection, and focus of the services table). Created lazily on
     /// the first Services render (see `services_view::init_table_entity`); never shared
-    /// between windows — a shared `thread_local` used to leak scroll/sort/selection
+    /// between windows — shared process-wide state used to leak scroll/sort/selection
     /// across windows.
     pub services_table: Option<Entity<TableState<services_view::ServicesDelegate>>>,
     pub startup_state: StartupState,
@@ -470,6 +480,10 @@ pub struct RootView {
     /// Monotonic revision stamped onto each published accessibility snapshot.
     /// Adapters reject stale inbound actions against this revision.
     pub(crate) a11y_revision: u64,
+    /// The exact semantic snapshot most recently accepted by the linked
+    /// accessibility bridge. Inbound AT actions validate against this frozen
+    /// revision before they can touch selection or surfaces.
+    pub(crate) a11y_snapshot: Option<taskmanager_ui_contract::SemanticSnapshot>,
 }
 
 impl RootView {
@@ -658,6 +672,7 @@ impl RootView {
         }
         Self {
             theme,
+            command_router: default_router().ok(),
             local_time_rules: taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(
                 0,
             ),
@@ -685,6 +700,7 @@ impl RootView {
             history_runtime: history_runtime::HistoryRuntimeState::default(),
             motion_token: taskmanager_core::core::config::MOTION_NORMAL.to_string(),
             projection_caches: projection_caches::GpuiProjectionCaches::default(),
+            graph_cache: graph::new_graph_cache(),
             system_history_ingestion_diagnostics: Vec::new(),
             telemetry_refresh_policy,
             tray_controller: None,
@@ -757,6 +773,7 @@ impl RootView {
             capture_evidence,
             a11y_bridge: AppAccessibilityBridge::default(),
             a11y_revision: 0,
+            a11y_snapshot: None,
         }
     }
 

@@ -91,6 +91,44 @@ fn close_makes_late_completion_inert() {
 }
 
 #[test]
+fn session_rejects_invalid_current_directory_target_before_port_admission() {
+    let mut session = DiagnosticBundleSession::new(FakePort::default());
+    let error = session
+        .submit(
+            plan("safe"),
+            DiagnosticBundleTarget::current_directory("../escape.json"),
+        )
+        .expect_err("current-directory target must be one filename component");
+
+    assert_eq!(error.kind(), DiagnosticBundleErrorKind::InvalidTarget);
+    assert_eq!(session.active_request(), None);
+    assert!(session.port.submitted.is_empty());
+}
+
+#[test]
+fn diagnostic_targets_share_the_portable_filename_contract() {
+    assert!(DiagnosticBundleTarget::current_directory("bundle.json").is_valid());
+    for file_name in [
+        "",
+        ".",
+        "..",
+        "nested/bundle.json",
+        r"nested\bundle.json",
+        r"C:\bundle.json",
+        "CON.json",
+        "trailing-dot.",
+    ] {
+        assert!(!DiagnosticBundleTarget::current_directory(file_name).is_valid());
+    }
+    let too_long = "a".repeat(256);
+    let maximum = "a".repeat(255);
+    assert!(!DiagnosticBundleTarget::current_directory(too_long.as_str()).is_valid());
+    assert!(DiagnosticBundleTarget::current_directory(maximum.as_str()).is_valid());
+    assert!(DiagnosticBundleTarget::current_directory("诊断包-01.json").is_valid());
+    assert!(DiagnosticBundleTarget::path("../explicit/bundle.json").is_valid());
+}
+
+#[test]
 fn service_log_plan_is_sanitized_before_crossing_the_port() {
     let entries = [ServiceLogEntry {
         cursor: "1".into(),

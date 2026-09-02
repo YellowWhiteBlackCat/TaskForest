@@ -25,6 +25,7 @@ use bevy::ecs::system::ResMut;
 use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::ScrollArea;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::{
@@ -413,8 +414,23 @@ fn details_panel_mounts_and_follows_the_selected_identity() {
         detail_roots, 1,
         "one page-scoped details surface is mounted"
     );
+    let detail_scroll_owners = app
+        .world_mut()
+        .query_filtered::<Entity, (With<ProcessDetailsRoot>, With<ScrollArea>)>()
+        .iter(app.world())
+        .count();
+    assert_eq!(
+        detail_scroll_owners, 1,
+        "selected-process details must own an explicit wheel scroll surface instead of clipping its lower facets"
+    );
     let texts = row_texts(&mut app);
     assert!(texts.iter().any(|text| text == t("prop.process_details")));
+    assert!(
+        texts
+            .iter()
+            .any(|text| text == t("proc_insights.scroll_hint")),
+        "the wheel-only details surface must advertise that lower facets are scrollable"
+    );
     assert!(
         texts.iter().any(|text| text == "alpha"),
         "the details header follows the initial selected row"

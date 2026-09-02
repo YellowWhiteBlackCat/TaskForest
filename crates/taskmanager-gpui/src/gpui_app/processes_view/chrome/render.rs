@@ -81,6 +81,8 @@ pub struct ProcessesViewProps<'a> {
     /// Product-wide interface size; owns readable type/icon metrics and is
     /// deliberately independent from row density.
     pub ui_size: UiSize,
+    /// Per-window graph scene cache shared by process-row sparklines.
+    pub(crate) graph_cache: crate::gpui_app::graph::GraphCacheHandle,
     /// Page-specific typed allocation derived from the frame's global layout
     /// budget. It changes placement only, never commands or process facts.
     pub presentation: ProcessChromePresentation,
@@ -162,6 +164,7 @@ pub fn render_processes(
         gray_zero_values,
         density,
         ui_size,
+        graph_cache,
         presentation,
     } = props;
     let theme = *theme;
@@ -295,6 +298,7 @@ pub fn render_processes(
                             gray_zero_values,
                             density,
                             ui_size,
+                            graph_cache: graph_cache.clone(),
                         },
                         &render_hidden_cols_owned,
                         &col_widths_owned,

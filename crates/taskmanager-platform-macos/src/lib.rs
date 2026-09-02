@@ -40,7 +40,7 @@ mod bindings;
 mod config;
 mod provider;
 // Neutral system-tray seam implementation (NSStatusItem via tray-icon,
-// ADR-0NN); the frontends reach it through `taskmanager-platform-native::tray`.
+// ADR-032); the frontends reach it through `taskmanager-platform-native::tray`.
 pub mod tray;
 // Single-instance adapter (per-user Unix socket, borrowed core from
 // tauri-plugin-single-instance; ADR-032 follow-up).

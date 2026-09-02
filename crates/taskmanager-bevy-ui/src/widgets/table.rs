@@ -2,7 +2,7 @@
 //!
 //! **Pure core** (no bevy types): the column vocabulary comes verbatim from
 //! the ui-contract single source ([`PROCESS_COLUMNS`]) so the bevy table can
-//! never drift from the GPUI/Iced/TUI column semantics; the sort projection
+//! never drift from the shared frontend column semantics; the sort projection
 //! input is the contract's stable column token; and the virtual-scroll
 //! window is a plain clamping function over (total, viewport, scroll).
 //!

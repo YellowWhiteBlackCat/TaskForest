@@ -1,6 +1,24 @@
+use std::collections::VecDeque;
 use std::sync::Arc;
 
 use super::*;
+
+#[derive(Debug, Default)]
+struct FakePort {
+    submitted: Vec<SnapshotExportRequest>,
+    completions: VecDeque<SnapshotExportCompletion>,
+}
+
+impl SnapshotExportPort for FakePort {
+    fn try_submit(&mut self, request: SnapshotExportRequest) -> Result<(), SnapshotExportError> {
+        self.submitted.push(request);
+        Ok(())
+    }
+
+    fn drain(&mut self) -> Vec<SnapshotExportCompletion> {
+        self.completions.drain(..).collect()
+    }
+}
 
 fn payload(label: &str) -> SnapshotExportPayload {
     SnapshotExportPayload::new(
@@ -55,6 +73,62 @@ fn active_request_rejects_reentry_and_submission_failure_is_terminal() {
         controller.state(),
         SnapshotExportState::Failed { error: actual, .. } if actual == &error
     ));
+}
+
+#[test]
+fn invalid_current_directory_target_is_rejected_before_request_allocation() {
+    let mut controller = SnapshotExportController::new();
+    assert!(matches!(
+        controller.begin(payload("../escape")),
+        Err(SnapshotExportStartError::InvalidTarget)
+    ));
+    assert!(matches!(controller.state(), SnapshotExportState::Closed));
+    let request = controller
+        .begin(payload("valid-stem"))
+        .expect("valid request");
+    assert_eq!(request.id().get(), 1);
+}
+
+#[test]
+fn snapshot_targets_keep_explicit_paths_distinct_from_local_names() {
+    assert!(SnapshotExportTarget::current_directory("snapshot").is_valid());
+    for stem in [
+        "",
+        ".",
+        "..",
+        "nested/snapshot",
+        r"nested\snapshot",
+        "NUL",
+        "COM1.txt",
+        "trailing-space ",
+    ] {
+        assert!(!SnapshotExportTarget::current_directory(stem).is_valid());
+    }
+    let too_long = "a".repeat(256);
+    let maximum = "a".repeat(255);
+    assert!(!SnapshotExportTarget::current_directory(too_long.as_str()).is_valid());
+    assert!(SnapshotExportTarget::current_directory(maximum.as_str()).is_valid());
+    assert!(SnapshotExportTarget::current_directory("name.with.multiple.extensions").is_valid());
+    assert!(SnapshotExportTarget::base_path("../explicit/snapshot").is_valid());
+}
+
+#[test]
+fn session_turns_invalid_target_into_a_typed_inspection_failure() {
+    let mut session = SnapshotExportSession::new(FakePort::default());
+    let error = session
+        .submit(SnapshotExportPayload::new(
+            SystemSnapshot::default(),
+            Arc::<[ProcessItem]>::from([]),
+            SnapshotExportTarget::current_directory("../escape"),
+        ))
+        .expect_err("invalid current-directory target");
+    assert!(matches!(
+        error,
+        SnapshotExportSubmitError::Rejected(error)
+            if error.kind() == SnapshotExportErrorKind::Inspect
+    ));
+    assert!(matches!(session.state(), SnapshotExportState::Closed));
+    assert!(session.port.submitted.is_empty());
 }
 
 #[test]

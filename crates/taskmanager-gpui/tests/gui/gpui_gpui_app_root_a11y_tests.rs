@@ -1,10 +1,13 @@
-use super::build_snapshot;
+use super::{apply_accessibility_action, build_snapshot};
 use crate::gpui_app::root::{ProcessDetailsSection, RootView, TopPage};
 use gpui::{AppContext, Entity, TestAppContext};
 use taskmanager_core::core::process::{ProcessItem, ProcessLiveKey, ProcessScalarObservations};
 use taskmanager_core::core::{CpuScalarObservations, ScalarObservation};
 use taskmanager_theme::Theme;
-use taskmanager_ui_contract::{SemanticAction, SemanticNodeId, SemanticRole};
+use taskmanager_ui_contract::{
+    AccessibilityActionRejection, AccessibilityActionRequest, SemanticAction, SemanticNodeId,
+    SemanticRole,
+};
 
 /// Build a bare RootView (no window needed — `build_snapshot` only reads
 /// view state) inside a `#[gpui::test]` app context.
@@ -314,4 +317,68 @@ async fn rows_are_published_highest_cpu_first_with_a_deterministic_tie_break(
         vec![2002, 4004],
         "equal CPU readings must fall back to the ascending pid tie-break"
     );
+}
+
+#[gpui::test]
+async fn assistive_technology_process_actions_use_the_published_revision_and_selection_owner(
+    cx: &mut TestAppContext,
+) {
+    let root = make_root(cx);
+    root.update(cx, |view, _| {
+        view.mark_telemetry_frame_ready();
+        view.page = TopPage::Performance;
+        view.replace_processes_for_test(vec![process(1001, "alpha"), process(2002, "bravo")]);
+    });
+    let snapshot = snapshot_of(cx, &root, 19);
+    let request = AccessibilityActionRequest {
+        snapshot_revision: snapshot.revision(),
+        node: process_row_id(2002),
+        action: SemanticAction::Select,
+        value: None,
+    };
+    root.update(cx, |view, _| {
+        apply_accessibility_action(view, &request, &snapshot).expect("matching AT action");
+    });
+    root.read_with(cx, |view, _| {
+        assert_eq!(view.page, TopPage::Apps);
+        assert!(view.is_process_selected(&process(2002, "bravo")));
+    });
+
+    let stale = AccessibilityActionRequest {
+        snapshot_revision: snapshot.revision().saturating_sub(1),
+        ..request
+    };
+    let rejection = root.update(cx, |view, _| {
+        apply_accessibility_action(view, &stale, &snapshot).expect_err("stale AT action")
+    });
+    assert!(matches!(
+        rejection,
+        AccessibilityActionRejection::StaleSnapshot {
+            current: 19,
+            requested: 18
+        }
+    ));
+}
+
+#[gpui::test]
+async fn assistive_technology_modal_dismissal_uses_the_shared_surface_owner(
+    cx: &mut TestAppContext,
+) {
+    let root = make_root(cx);
+    root.update(cx, |view, _| {
+        view.mark_telemetry_frame_ready();
+        view.replace_processes_for_test(vec![process(3, "hog")]);
+        view.request_end_task_confirmation(identity(3));
+    });
+    let snapshot = snapshot_of(cx, &root, 23);
+    let request = AccessibilityActionRequest {
+        snapshot_revision: snapshot.revision(),
+        node: SemanticNodeId::borrowed("modal:end-task-confirmation"),
+        action: SemanticAction::Dismiss,
+        value: None,
+    };
+    root.update(cx, |view, _| {
+        apply_accessibility_action(view, &request, &snapshot).expect("matching modal dismiss");
+        assert!(view.pending_confirmation().is_none());
+    });
 }

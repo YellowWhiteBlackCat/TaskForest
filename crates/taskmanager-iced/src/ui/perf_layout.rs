@@ -6,7 +6,7 @@
 //! statistics rail with an optional footer), driven by the one typed
 //! [`PerformancePageBudget`] instead of a local compact flag. Statistics rows
 //! consume the shared shell [`StatRow`] contract so missing values render the
-//! ONE shared dash in a dim style — the same fold all three renderers read.
+//! ONE shared dash in a dim style — the same fold all frontend renderers read.
 
 use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};

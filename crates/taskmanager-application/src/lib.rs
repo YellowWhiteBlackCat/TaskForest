@@ -45,6 +45,7 @@ mod history_replay;
 pub mod i18n;
 mod interaction;
 mod managed_alert_rules;
+mod path_contract;
 mod persistent_app_history;
 
 mod platform;

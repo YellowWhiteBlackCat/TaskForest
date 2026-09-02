@@ -88,6 +88,7 @@ async fn disk_page_projects_the_active_time_graph_from_its_own_ring(cx: &mut Tes
         use crate::gpui_app::history_samples::storage_activity_samples;
         assert_eq!(
             &*storage_activity_samples(
+                &v.graph_cache,
                 &v.telemetry.system_history,
                 "disk:wwid:activity",
                 DeviceGeneration::new(1),
