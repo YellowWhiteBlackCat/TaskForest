@@ -22,7 +22,10 @@ pub enum ServiceUpdate {
         service_id: ServiceId,
         error: FailureKind,
     },
-    Logs(ServiceLogSnapshot),
+    Logs {
+        request_id: RequestId,
+        snapshot: ServiceLogSnapshot,
+    },
     LogStream {
         request_id: RequestId,
         observed_at_ms: u64,

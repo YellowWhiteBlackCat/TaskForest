@@ -59,7 +59,7 @@ fn format_dependencies(dependencies: &ServiceDeps, kind: &ServiceRelationKind) -
 /// Render the service details dialog body from a snapshot of the per-window
 /// `RootView.service_details` state (taken by the render-edge caller). The
 /// interactive pills mutate that same state through the `RootView` entity they
-/// capture — never a shared `thread_local` (which crossed window boundaries).
+/// capture.
 pub fn render_details(
     theme: &Theme,
     item: &ServiceItem,

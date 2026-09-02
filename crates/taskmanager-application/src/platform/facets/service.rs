@@ -30,7 +30,7 @@ impl ServiceEvent {
             Self::Update(
                 ServiceUpdate::Dependencies { .. } | ServiceUpdate::DependenciesUnavailable { .. },
             ) => capability == &CapabilityId::SERVICE_DEPENDENCIES,
-            Self::Update(ServiceUpdate::Logs(_)) => capability == &CapabilityId::SERVICE_LOGS,
+            Self::Update(ServiceUpdate::Logs { .. }) => capability == &CapabilityId::SERVICE_LOGS,
             Self::Update(ServiceUpdate::LogStream { .. }) => {
                 capability == &CapabilityId::SERVICE_LOG_STREAM
             }

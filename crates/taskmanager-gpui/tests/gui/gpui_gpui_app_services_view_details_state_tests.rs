@@ -23,12 +23,15 @@ fn details_state_projects_only_the_shared_correlated_dependency_session() {
         service_id.clone(),
         dependencies(ServiceRelationKind::Requires, "network.target"),
     ));
-    state.apply(ServiceUpdate::Logs(
-        taskmanager_core::core::services::ServiceLogSnapshot {
+    let log_request_id = RequestId::new(1).expect("fixture id");
+    assert!(state.accept_log_snapshot(&service_id, log_request_id));
+    state.apply(ServiceUpdate::Logs {
+        request_id: log_request_id,
+        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
             service_id: service_id.clone(),
             state: ServiceLogState::from_lines(vec!["ready".into()]),
         },
-    ));
+    });
 
     let snapshot = state.details_for(&service_id, &lifecycle);
     assert_eq!(
@@ -42,6 +45,55 @@ fn details_state_projects_only_the_shared_correlated_dependency_session() {
     assert_eq!(
         snapshot.logs,
         ServiceLogState::from_lines(vec!["ready".into()])
+    );
+}
+
+#[test]
+fn late_log_snapshot_cannot_replace_a_newer_details_request() {
+    let mut state = ServiceDetailsState::new();
+    let service_id = ServiceId::new("fixture.service:application-port-snapshot-race");
+    assert!(state.select(&service_id));
+
+    let first_request = RequestId::new(10).expect("fixture id");
+    assert!(state.accept_log_snapshot(&service_id, first_request));
+    state.apply(ServiceUpdate::Logs {
+        request_id: first_request,
+        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
+            service_id: service_id.clone(),
+            state: ServiceLogState::from_lines(vec!["first".into()]),
+        },
+    });
+
+    assert!(state.begin_log_refresh(&service_id));
+    let second_request = RequestId::new(11).expect("fixture id");
+    assert!(state.accept_log_snapshot(&service_id, second_request));
+
+    state.apply(ServiceUpdate::Logs {
+        request_id: first_request,
+        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
+            service_id: service_id.clone(),
+            state: ServiceLogState::from_lines(vec!["stale".into()]),
+        },
+    });
+    assert_eq!(
+        state
+            .snapshot(&ServiceDependenciesLifecycle::default())
+            .logs,
+        ServiceLogState::Loading
+    );
+
+    state.apply(ServiceUpdate::Logs {
+        request_id: second_request,
+        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
+            service_id,
+            state: ServiceLogState::from_lines(vec!["second".into()]),
+        },
+    });
+    assert_eq!(
+        state
+            .snapshot(&ServiceDependenciesLifecycle::default())
+            .logs,
+        ServiceLogState::from_lines(vec!["second".into()])
     );
 }
 
@@ -84,15 +136,18 @@ fn shared_dependency_failure_and_retry_keep_one_typed_authority() {
         service_id.clone(),
         taskmanager_core::core::failure::FailureKind::Rejected,
     ));
-    state.apply(ServiceUpdate::Logs(
-        taskmanager_core::core::services::ServiceLogSnapshot {
+    let log_request_id = RequestId::new(20).expect("fixture id");
+    assert!(state.accept_log_snapshot(&service_id, log_request_id));
+    state.apply(ServiceUpdate::Logs {
+        request_id: log_request_id,
+        snapshot: taskmanager_core::core::services::ServiceLogSnapshot {
             service_id: service_id.clone(),
             state: ServiceLogState::Unavailable(ServiceLogFailure::with_detail(
                 ServiceLogErrorKind::ProviderFailed,
                 "queue rejected",
             )),
         },
-    ));
+    });
 
     let snapshot = state.snapshot(&lifecycle);
     assert_eq!(

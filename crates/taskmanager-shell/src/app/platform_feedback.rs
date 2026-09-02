@@ -250,8 +250,15 @@ impl ShellApp {
         }
         for update in output.service_log_updates {
             match update {
-                ServiceUpdate::Logs(snapshot) => {
-                    self.apply_service_log_snapshot(snapshot.service_id, snapshot.state);
+                ServiceUpdate::Logs {
+                    request_id,
+                    snapshot,
+                } => {
+                    self.apply_service_log_snapshot(
+                        request_id,
+                        snapshot.service_id,
+                        snapshot.state,
+                    );
                 }
                 ServiceUpdate::LogStream {
                     request_id,

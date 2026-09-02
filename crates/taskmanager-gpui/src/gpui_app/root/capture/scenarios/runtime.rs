@@ -318,6 +318,29 @@ impl CaptureEvidence {
             && !self.scenario_ready()
     }
 
+    /// Capture fixtures are installed into the shared shell projection before
+    /// the GPUI row adapter runs. Production batches never use this path.
+    pub(crate) fn process_fixture_requested(&self) -> bool {
+        self.is_enabled()
+            && (self
+                .scenario
+                .is_some_and(CaptureScenario::is_process_insights)
+                || matches!(
+                    self.scenario,
+                    Some(
+                        CaptureScenario::AppsSearchHighlight
+                            | CaptureScenario::AppsZeroGray
+                            | CaptureScenario::AppsGroupExpanded
+                            | CaptureScenario::AppsIdentityMatrix
+                            | CaptureScenario::ProcessMemoryPssSwap
+                            | CaptureScenario::ProcessTreeConfirm
+                            | CaptureScenario::ProcessBatchConfirm
+                            | CaptureScenario::DiagnosticPreview
+                            | CaptureScenario::ProcessPropertiesPerformance
+                    )
+                ))
+    }
+
     pub fn mark_apps_identity_matrix_ready(&mut self, ready: bool) {
         if self.apps_identity_matrix_requested() && ready {
             self.mark_scenario_ready();

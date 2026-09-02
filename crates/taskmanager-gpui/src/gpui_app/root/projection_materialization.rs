@@ -625,20 +625,38 @@ impl super::RootView {
         &mut self,
         processes_updated: bool,
     ) -> Option<super::CaptureProcessAction> {
-        let (capture_evidence, materialized) = (&mut self.capture_evidence, &mut self.materialized);
-        let processes_observed_at_ms = materialized.processes_observed_at_ms();
-        let action = capture_evidence.on_processes_update(
-            processes_updated,
-            processes_observed_at_ms,
-            Arc::make_mut(&mut materialized.processes.value),
-        );
-        if processes_updated {
-            materialized.running_process_count = materialized
-                .processes
-                .value
-                .iter()
-                .filter(|process| process.status == "Running")
-                .count();
+        let fixture_requested = self.capture_evidence.process_fixture_requested();
+        let action = {
+            let (capture_evidence, materialized) =
+                (&mut self.capture_evidence, &mut self.materialized);
+            let processes_observed_at_ms = materialized.processes_observed_at_ms();
+            let action = capture_evidence.on_processes_update(
+                processes_updated,
+                processes_observed_at_ms,
+                Arc::make_mut(&mut materialized.processes.value),
+            );
+            if processes_updated {
+                materialized.running_process_count = materialized
+                    .processes
+                    .value
+                    .iter()
+                    .filter(|process| process.status == "Running")
+                    .count();
+            }
+            action
+        };
+        if processes_updated && fixture_requested {
+            let fixture_processes = self.materialized.processes().as_ref().clone();
+            taskmanager_shell::fixture::seed_direct_track_fact(
+                &mut self.shell,
+                taskmanager_shell::fixture::DirectTrackSeedFact::Processes(fixture_processes),
+            );
+            let projection = self.shell.projection();
+            let revision = projection.process_revision;
+            let processes = projection.processes.clone().unwrap_or_default();
+            let processes_observed_at_ms = projection.processes_observed_at_ms;
+            self.materialized
+                .replace_processes(revision, processes, processes_observed_at_ms);
         }
         action
     }

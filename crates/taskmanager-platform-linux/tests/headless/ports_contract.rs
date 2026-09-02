@@ -925,8 +925,12 @@ fn service_detail_failures_return_typed_domain_events_and_update_capabilities() 
                 assert_eq!(outcome.result, Err(FailureKind::PermissionDenied));
                 control_seen = true;
             }
-            Ok(PlatformEvent::Services(ServiceEvent::Update(ServiceUpdate::Logs(snapshot)))) => {
+            Ok(PlatformEvent::Services(ServiceEvent::Update(ServiceUpdate::Logs {
+                request_id,
+                snapshot,
+            }))) => {
                 assert_eq!(event.request_id, logs_id);
+                assert_eq!(request_id, logs_id);
                 assert!(matches!(
                     snapshot.state,
                     ServiceLogState::Unavailable(ref failure)

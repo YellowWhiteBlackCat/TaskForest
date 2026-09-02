@@ -5,8 +5,8 @@ use taskmanager_application::{
     CorrelatedEvent, PlatformEventBatch, PlatformEventContext, ServiceEvent, ServiceUpdate,
 };
 use taskmanager_core::core::services::{
-    ServiceLogEntry, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogStreamSnapshot,
-    ServiceLogStreamState, ServiceLogTimeFilter,
+    ServiceLogEntry, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogState,
+    ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
 };
 use taskmanager_platform_contract::{CapabilityId, EventSequence, RequestId};
 
@@ -137,4 +137,48 @@ fn service_log_open_poll_follow_and_close_follow_the_shared_state_machine() {
 
     app.close_service_log();
     assert!(app.service_log.is_none());
+}
+
+#[test]
+fn late_snapshot_is_dropped_after_a_new_snapshot_submission() {
+    let mut app = crate::demo_app();
+    app.application.active_page = AppPage::Services;
+    let effect = app
+        .open_service_log()
+        .expect("selected service should open a log stream");
+    let PlatformEffect::ServiceLogStream(_) = effect else {
+        panic!("log open must cross the typed effect boundary");
+    };
+    let service_id = app
+        .service_log
+        .as_ref()
+        .and_then(OpenServiceLog::service_id)
+        .expect("service log target")
+        .clone();
+
+    let first_request = RequestId::new(10).expect("fixture id");
+    let second_request = RequestId::new(11).expect("fixture id");
+    let open = app.service_log.as_mut().expect("service log stays open");
+    open.begin_snapshot();
+    open.accept_snapshot(first_request);
+    app.apply_service_log_snapshot(
+        first_request,
+        service_id.clone(),
+        ServiceLogState::from_lines(vec!["first".into()]),
+    );
+
+    let open = app.service_log.as_mut().expect("service log stays open");
+    open.begin_snapshot();
+    open.accept_snapshot(second_request);
+    app.apply_service_log_snapshot(
+        first_request,
+        service_id,
+        ServiceLogState::from_lines(vec!["stale".into()]),
+    );
+
+    let entries = app
+        .visible_service_log_entries(0)
+        .expect("open feed exposes entries");
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].message, "first");
 }

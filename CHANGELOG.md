@@ -11,6 +11,7 @@
 ### 修复
 
 - Windows MSI 现在随 GPUI 安装同目录的身份校验 UAC process-control helper；缺失或损坏安装仍以 typed `HelperUnavailable` 失败，不伪造授权成功。
+- 服务日志一次性快照现在携带并校验请求 ID；刷新、重开或切换服务后，迟到的旧快照不会覆盖当前日志状态。Iced 服务详情保持流式请求单一路径。
 
 ## [0.1.0-rc9] — 2026-09-01
 

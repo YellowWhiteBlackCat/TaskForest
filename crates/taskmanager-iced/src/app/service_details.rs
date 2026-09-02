@@ -28,8 +28,7 @@ use super::{IcedApp, LocalSurface, Message, PlatformEffect};
 #[derive(Clone, Debug, PartialEq)]
 pub struct ServiceDetailsSnapshot {
     pub(crate) dependencies: ServiceDependenciesLifecycle,
-    /// The merged log panel's resolved state (stream lines preferred, the
-    /// one-shot snapshot state as fallback) — GPUI `resolve_lines` parity.
+    /// The merged log panel's resolved stream state.
     pub(crate) logs: ServiceLogState,
     /// The merged log panel's feed controls (paused + active filters), so the
     /// view captions the controls without touching live state.
@@ -38,10 +37,8 @@ pub struct ServiceDetailsSnapshot {
     pub(crate) log_time: ServiceLogTimeFilter,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub(crate) struct ServiceDetailsState {
-    /// One-shot log snapshot state (fallback when the stream has no lines).
-    logs: ServiceLogState,
     /// The merged log panel's live stream feed (bounded entries, filters,
     /// pause) — the same core state machine the shell overlay owns.
     feed: ServiceLogFeed,
@@ -49,23 +46,11 @@ pub(crate) struct ServiceDetailsState {
     last_stream_poll_ms: u64,
 }
 
-impl Default for ServiceDetailsState {
-    fn default() -> Self {
-        Self {
-            logs: ServiceLogState::Empty,
-            feed: ServiceLogFeed::default(),
-            stream: ServiceLogStreamLifecycle::default(),
-            last_stream_poll_ms: 0,
-        }
-    }
-}
-
 impl ServiceDetailsState {
     pub(crate) fn select(&mut self, service_id: &ServiceId) -> bool {
         if self.stream.target() == Some(service_id) {
             return false;
         }
-        self.logs = ServiceLogState::Loading;
         self.feed = ServiceLogFeed::default();
         self.stream = ServiceLogStreamLifecycle::open(service_id.clone());
         self.last_stream_poll_ms = 0;
@@ -85,7 +70,6 @@ impl ServiceDetailsState {
     /// control): drop the retained feed + filters and go back to Loading.
     pub(crate) fn begin_log_refresh(&mut self) -> Option<ServiceId> {
         let service_id = self.stream.target()?.clone();
-        self.logs = ServiceLogState::Loading;
         self.feed = ServiceLogFeed::default();
         self.stream = ServiceLogStreamLifecycle::open(service_id.clone());
         self.last_stream_poll_ms = 0;
@@ -184,9 +168,7 @@ impl ServiceDetailsState {
         }
     }
 
-    /// The resolved log state the panel renders: live stream lines preferred
-    /// (through the shared `resolve_lines`), the one-shot snapshot state as
-    /// fallback — the exact merge GPUI's details view applies.
+    /// The resolved log state the panel renders from the live stream.
     #[must_use]
     pub(crate) fn resolved_logs(&self, now_micros: u64) -> ServiceLogState {
         let stream_lines: Vec<String> = self
@@ -197,7 +179,7 @@ impl ServiceDetailsState {
             .collect();
         self.stream
             .projected_state()
-            .resolve_lines(&self.logs, stream_lines)
+            .resolve_lines(&ServiceLogState::Empty, stream_lines)
     }
 
     /// The log text the Copy control writes; `None` when nothing is
@@ -211,9 +193,6 @@ impl ServiceDetailsState {
 
     pub(crate) fn apply(&mut self, update: ServiceUpdate) {
         match update {
-            ServiceUpdate::Logs(result) if self.stream.target() == Some(&result.service_id) => {
-                self.logs = result.state;
-            }
             ServiceUpdate::LogStream {
                 request_id,
                 observed_at_ms,
@@ -226,7 +205,7 @@ impl ServiceDetailsState {
             ServiceUpdate::Action(_)
             | ServiceUpdate::Dependencies { .. }
             | ServiceUpdate::DependenciesUnavailable { .. }
-            | ServiceUpdate::Logs(_)
+            | ServiceUpdate::Logs { .. }
             | ServiceUpdate::LogStream { .. } => {}
         }
     }
