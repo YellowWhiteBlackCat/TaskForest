@@ -168,6 +168,39 @@ fn descendant_live_keys_is_the_one_order_freeze_tree_freezes() {
 }
 
 #[test]
+fn freeze_tree_fails_closed_when_a_snapshot_repeats_a_pid() {
+    let item = |pid, parent_pid, token| {
+        let mut item = ProcessItem::new(pid, format!("p{pid}-{token}"));
+        item.parent_pid = parent_pid;
+        item.apply_scalar_observations(ProcessScalarObservations {
+            start_token: ScalarObservation::available(token, 1),
+            ..ProcessScalarObservations::default()
+        });
+        item
+    };
+    let processes = vec![
+        item(1, None, 11),
+        // A duplicate PID makes the parent_pid graph ambiguous. In
+        // particular, a plain PID map must not replace the selected root's
+        // exact start token with this later incarnation.
+        item(1, None, 12),
+        item(2, Some(1), 22),
+    ];
+    let root = live_key(1, 11);
+
+    assert!(
+        descendant_live_keys(&processes, root).is_empty(),
+        "ambiguous PID topology must not produce actionable identities"
+    );
+    assert!(
+        ProcessBatchIntent::freeze_tree(&processes, root, ProcessBatchAction::Kill)
+            .targets
+            .is_empty(),
+        "tree freezing must fail closed on duplicate provider rows"
+    );
+}
+
+#[test]
 fn freeze_and_freeze_tree_default_to_pid_adjacency_scope() {
     let processes = [live_process(7_500)];
     let identity = live_key(42, 7_500);
