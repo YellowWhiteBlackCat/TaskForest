@@ -474,6 +474,53 @@ pub(crate) fn fan_temperature_samples(
     )
 }
 
+/// All graph lanes the Disk page consumes for one device. Keeping the lookup
+/// set together prevents a page caller from silently mixing a cached lane
+/// with a different generation or direction.
+pub(crate) struct DiskGraphSamples {
+    pub read: Rc<[f32]>,
+    pub write: Rc<[f32]>,
+    pub aggregate: Rc<[f32]>,
+    pub temperature: Rc<[f32]>,
+    pub activity: Rc<[f32]>,
+}
+
+pub(crate) fn disk_graph_samples(
+    graph_cache: &GraphCacheHandle,
+    history: &CorrelatedSystemTelemetryHistory,
+    device_id: &str,
+    generation: DeviceGeneration,
+) -> DiskGraphSamples {
+    DiskGraphSamples {
+        read: storage_read_rate_samples(graph_cache, history, device_id, generation),
+        write: storage_write_rate_samples(graph_cache, history, device_id, generation),
+        aggregate: storage_rate_samples(graph_cache, history, device_id, generation),
+        temperature: storage_temperature_samples(graph_cache, history, device_id, generation),
+        activity: storage_activity_samples(graph_cache, history, device_id, generation),
+    }
+}
+
+/// All graph lanes the Network page consumes for one adapter; receive and
+/// transmit stay distinct from their aggregate summary lane.
+pub(crate) struct NetworkGraphSamples {
+    pub receive: Rc<[f32]>,
+    pub transmit: Rc<[f32]>,
+    pub aggregate: Rc<[f32]>,
+}
+
+pub(crate) fn network_graph_samples(
+    graph_cache: &GraphCacheHandle,
+    history: &CorrelatedSystemTelemetryHistory,
+    device_id: &str,
+    generation: DeviceGeneration,
+) -> NetworkGraphSamples {
+    NetworkGraphSamples {
+        receive: network_rx_rate_samples(graph_cache, history, device_id, generation),
+        transmit: network_tx_rate_samples(graph_cache, history, device_id, generation),
+        aggregate: network_rate_samples(graph_cache, history, device_id, generation),
+    }
+}
+
 fn matching_device_samples<T: Clone>(
     history: Option<DeviceMetricHistory<T>>,
     generation: DeviceGeneration,

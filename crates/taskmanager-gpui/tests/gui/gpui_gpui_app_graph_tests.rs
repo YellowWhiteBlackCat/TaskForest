@@ -8,13 +8,14 @@
 // recursion-limit error on the attribute itself (same landmine documented in
 // `system_view::tests`). Keeping this scope minimal resolves `#[test]` to
 // the std built-in.
+use super::cache::GraphPresentationCache;
 use super::hover::sample_index_at_cursor_x;
 use super::slide::{GRAPH_SLIDE_DURATION, slide_progress_value, slide_timing_for};
 use super::{
-    GraphOpts, GraphPresentationCache, GraphSampleState, GraphSettings, MAX_GRAPH_DATA_POINTS,
-    MIN_GRAPH_DATA_POINTS, SMOOTH_TENSION, catmull_rom_controls, compute_column_count,
-    finite_sample_runs, graph_sample_state, graph_slide_spacing, latest_finite_sample,
-    latest_samples_rc, sample_x, sample_x_slide,
+    GraphOpts, GraphSampleState, GraphSettings, MAX_GRAPH_DATA_POINTS, MIN_GRAPH_DATA_POINTS,
+    SMOOTH_TENSION, catmull_rom_controls, compute_column_count, finite_sample_runs,
+    graph_sample_state, graph_slide_spacing, latest_finite_sample, latest_samples_rc, sample_x,
+    sample_x_slide,
 };
 use gpui::{Bounds, ElementId, Pixels, point, px, size};
 use std::rc::Rc;

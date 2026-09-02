@@ -27,7 +27,7 @@ pub(super) struct SlideTiming {
 pub(super) type SlideLedger = HashMap<ElementId, SlideTiming>;
 
 #[derive(Default)]
-pub(super) struct SlideCache {
+pub(crate) struct SlideCache {
     ledger: SlideLedger,
 }
 

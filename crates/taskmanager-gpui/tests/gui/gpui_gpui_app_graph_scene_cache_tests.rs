@@ -1,7 +1,7 @@
 //! The store's lookup keying, decimation, and rate-gate rules are pure
 //! enough to test without a window; the paint replay itself is exercised
 //! end-to-end by the page-specific render-path suites.
-use super::super::GraphPresentationCache;
+use super::super::cache::GraphPresentationCache;
 use super::{
     BadgeDirections, GraphSceneKey, GraphStaticSceneKey, MAX_GRAPH_SCENE_ENTRIES,
     MAX_GRAPH_STATIC_SCENE_ENTRIES, MAX_SPARK_SCENE_ENTRIES, MIN_HOVER_REFRESH_INTERVAL,

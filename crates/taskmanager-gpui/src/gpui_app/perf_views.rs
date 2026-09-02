@@ -14,9 +14,8 @@ use crate::gpui_app::formatting::{
 };
 use crate::gpui_app::graph::{GraphCacheHandle, GraphHover};
 use crate::gpui_app::history_samples::{
-    f32_history_samples, network_rate_samples, network_rx_rate_samples, network_tx_rate_samples,
-    storage_activity_samples, storage_rate_samples, storage_read_rate_samples,
-    storage_temperature_samples, storage_write_rate_samples,
+    DiskGraphSamples, NetworkGraphSamples, disk_graph_samples, f32_history_samples,
+    network_graph_samples,
 };
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::responsive::{
@@ -483,37 +482,19 @@ pub(crate) fn render_disk(props: DiskViewProps<'_>, cx: &mut Context<RootView>) 
     // aggregate summary and first-frame state honest. Each direction keeps
     // its own gap evidence; the shared max is the greater finite peak of the
     // two windows so the directions stay directly comparable.
-    let read_samples = storage_read_rate_samples(
-        &graph_cache,
-        &telemetry.system_history,
-        &d.device_id,
-        d.device_generation,
-    );
-    let write_samples = storage_write_rate_samples(
-        &graph_cache,
-        &telemetry.system_history,
-        &d.device_id,
-        d.device_generation,
-    );
-    let samples = storage_rate_samples(
+    let DiskGraphSamples {
+        read: read_samples,
+        write: write_samples,
+        aggregate: samples,
+        temperature: temperature_samples,
+        activity: activity_samples,
+    } = disk_graph_samples(
         &graph_cache,
         &telemetry.system_history,
         &d.device_id,
         d.device_generation,
     );
     let observed_max = finite_series_peak(&read_samples).max(finite_series_peak(&write_samples));
-    let temperature_samples = storage_temperature_samples(
-        &graph_cache,
-        &telemetry.system_history,
-        &d.device_id,
-        d.device_generation,
-    );
-    let activity_samples = storage_activity_samples(
-        &graph_cache,
-        &telemetry.system_history,
-        &d.device_id,
-        d.device_generation,
-    );
     // Active-time percentage window beneath the throughput pair (the battery
     // power / fan temperature secondary-chart precedent): this disk's own
     // generation-scoped activity ring on the shared 0..100 percent scale. The
@@ -695,19 +676,11 @@ pub(crate) fn render_network(props: NetworkViewProps<'_>) -> Div {
     // link-speed ceiling when dynamic scaling is off, otherwise the greater
     // finite peak of the two directions, so rx and tx stay directly
     // comparable.
-    let rx_samples = network_rx_rate_samples(
-        &graph_cache,
-        &telemetry.system_history,
-        &n.device_id,
-        n.device_generation,
-    );
-    let tx_samples = network_tx_rate_samples(
-        &graph_cache,
-        &telemetry.system_history,
-        &n.device_id,
-        n.device_generation,
-    );
-    let samples = network_rate_samples(
+    let NetworkGraphSamples {
+        receive: rx_samples,
+        transmit: tx_samples,
+        aggregate: samples,
+    } = network_graph_samples(
         &graph_cache,
         &telemetry.system_history,
         &n.device_id,

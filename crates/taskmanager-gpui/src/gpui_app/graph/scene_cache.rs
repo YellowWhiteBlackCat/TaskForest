@@ -236,7 +236,7 @@ struct GraphStaticSceneEntry {
 }
 
 #[derive(Default)]
-pub(super) struct GraphSceneCache {
+pub(crate) struct GraphSceneCache {
     dynamic: Vec<GraphSceneEntry>,
     static_scenes: Vec<GraphStaticSceneEntry>,
     spark: Vec<SparkSceneEntry>,
