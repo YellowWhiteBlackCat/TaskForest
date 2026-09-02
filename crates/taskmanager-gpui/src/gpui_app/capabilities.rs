@@ -6,8 +6,8 @@
 //! [`CapabilitySupport::Reference`]. The reference shape may not defer a
 //! capability (`Ported`/`Divergent`/`Unsupported` are gate findings): a new
 //! capability enters the shared vocabulary only when the reference layer
-//! grows it. Parallel frontends (Iced, TUI) port these semantics; gaps they
-//! find while porting are written back here, never forked silently.
+//! grows it. Parallel frontends (Iced, TUI, Bevy) port these semantics; gaps
+//! they find while porting are written back here, never forked silently.
 
 use taskmanager_ui_contract::{
     CapabilityEntry, CapabilitySupport, ComponentCapability, FrontendCapabilityDeclaration,

@@ -143,7 +143,7 @@ fn frontend_source_manifests_are_scoped_to_the_selected_shape() {
         "taskmanager-frontend-scope-{}.sha256",
         std::process::id()
     ));
-    for frontend in ["tui", "iced", "gpui"] {
+    for frontend in ["tui", "iced", "gpui", "bevy"] {
         let output = Command::new("python3")
             .args([
                 "scripts/frontend_source_manifest.py",
@@ -183,6 +183,12 @@ fn frontend_source_manifests_are_scoped_to_the_selected_shape() {
                 assert!(manifest.contains("crates/taskmanager-gpui/src/gpui_app/"));
                 assert!(!manifest.contains("crates/taskmanager-tui/src/"));
                 assert!(!manifest.contains("crates/taskmanager-iced/src/"));
+            }
+            "bevy" => {
+                assert!(manifest.contains("crates/taskmanager-bevy-ui/src/"));
+                assert!(!manifest.contains("crates/taskmanager-gpui/src/"));
+                assert!(!manifest.contains("crates/taskmanager-iced/src/"));
+                assert!(!manifest.contains("crates/taskmanager-tui/src/"));
             }
             _ => unreachable!("the table above is exhaustive"),
         }

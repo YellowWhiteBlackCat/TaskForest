@@ -64,7 +64,7 @@ pub(crate) fn network_connected(nic: &NetworkMetrics) -> Option<bool> {
 }
 
 /// Project one network adapter's honest scalar readouts as pre-folded shell
-/// [`StatRow`]s (GPUI `network_stats` parity: one fold, three renderers). A
+/// [`StatRow`]s (GPUI `network_stats` parity: one fold, all renderers). A
 /// field that exists on this host but whose current sample is missing keeps
 /// its row with `None` (the shared dash); a field that simply does not exist
 /// here (no IPv6 address, unknown link speed) omits its row entirely instead

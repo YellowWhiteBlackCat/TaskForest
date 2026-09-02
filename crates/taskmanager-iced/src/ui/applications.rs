@@ -225,7 +225,7 @@ pub(crate) fn sort_col_contract_id(column: SortCol) -> &'static str {
         SortCol::CpuTime => "CPUTime",
         SortCol::Fds => "FDs",
         SortCol::Nice => "Nice",
-        // PSS is part of the three-frontend shell superset but not the
+        // PSS is part of the shared shell superset but not the
         // neutral inventory (GPUI does not surface it either); the token
         // keeps the arm exhaustive and never resolves to a contract row.
         SortCol::Pss => "PSS",

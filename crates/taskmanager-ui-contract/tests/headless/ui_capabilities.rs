@@ -121,6 +121,7 @@ fn reference_role_belongs_to_the_reference_shape() {
     assert!(FrontendShape::Gpui.is_capability_reference_shape());
     assert!(!FrontendShape::Iced.is_capability_reference_shape());
     assert!(!FrontendShape::Tui.is_capability_reference_shape());
+    assert!(!FrontendShape::Bevy.is_capability_reference_shape());
 
     let stolen = full_declaration(FrontendShape::Tui, |_| CapabilitySupport::Reference);
     assert!(capability_drift(&capability_report(&stolen)).is_empty());

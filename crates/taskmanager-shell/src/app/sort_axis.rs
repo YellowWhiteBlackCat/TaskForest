@@ -13,9 +13,10 @@
 //! Canonical fallback rule: every column maps to its REAL axis — the axes
 //! exist for all fifteen columns (`User`, `State`→`Status`, `Threads`,
 //! `StartTime`, `Fds`, `Nice` included), so no column degrades to `Name`,
-//! `Pid`, or `CpuUsage` in tree/group modes anymore. The three frontends'
-//! historic divergent fallbacks (gpui: real axes; iced: `Name` + local
-//! comparators; tui: `Pid`/`CpuUsage`) are replaced by this one table.
+//! `Pid`, or `CpuUsage` in tree/group modes anymore. The original
+//! desktop/terminal frontends' historic divergent fallbacks (gpui: real
+//! axes; iced: `Name` + local comparators; tui: `Pid`/`CpuUsage`) are replaced
+//! by this one table; Bevy enters through the same shared axis.
 //!
 //! [`aggregate_sort_key`] carries the ONE documented fallback that remains:
 //! group headers sort on aggregate-level keys, which genuinely lack per-axis

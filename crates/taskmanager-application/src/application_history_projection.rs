@@ -165,7 +165,7 @@ impl ApplicationHistoryRow {
     }
 }
 
-/// Immutable page projection shared by GPUI, Iced and TUI.
+/// Immutable page projection shared by GPUI, Iced, TUI and Bevy.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ApplicationHistoryProjection {
     pub status: ApplicationHistoryStatus,

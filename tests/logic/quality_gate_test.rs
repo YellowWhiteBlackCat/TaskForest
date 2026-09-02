@@ -123,9 +123,9 @@ fn t_call_keys(line: &str) -> Vec<&str> {
     out
 }
 
-/// Walk every Rust source tree that renders localized copy — `src/` (the gpui
-/// shell) plus the `taskmanager-tui` and `taskmanager-iced` front-ends — and
-/// assert each `t("...")` call-site's literal is a key present in the catalog.
+/// Walk every Rust source tree that renders localized copy — `src/` (the GPUI
+/// shell) plus all four product frontends — and assert each `t("...")`
+/// call-site's literal is a key present in the catalog.
 ///
 /// `t` accepts `&'static str` and on a miss returns the *key itself* (i18n.rs),
 /// so a typo like `t("proc.batch_histor")` renders the raw literal into the UI
@@ -133,20 +133,21 @@ fn t_call_keys(line: &str) -> Vec<&str> {
 /// catch this; only a call-site ↔ catalog cross-check can. This previously
 /// scanned `src/` alone, which let tui/iced-only keys (`chrome.cancel`,
 /// `proc.priority_normal`, `proc_insights.enable_network_capture`, …) slip
-/// through undetected — the gate now covers all three copy-emitting trees.
+/// through undetected — the gate now covers all four copy-emitting trees.
 /// Non-literal call-sites (`t(label)`, `t(some_fn())`) are skipped: the scanner
 /// anchors on `t("` so an argument that isn't a `"..."` literal won't match.
 #[test]
 fn every_i18n_t_callsite_literal_exists_in_the_catalog() {
     let en = locale_messages(include_str!("../../locales/en.json"));
     let manifest = Path::new(env!("CARGO_MANIFEST_DIR"));
-    // The three source trees that render user-visible localized copy. The
+    // The four source trees that render user-visible localized copy. The
     // shared `taskmanager-application` crate is deliberately excluded: it owns
     // the i18n module whose `mod tests` exercises `t("no.such.key")` fixtures.
     let mut pending: Vec<std::path::PathBuf> = vec![
         manifest.join("src"),
         manifest.join("crates/taskmanager-tui/src"),
         manifest.join("crates/taskmanager-iced/src"),
+        manifest.join("crates/taskmanager-bevy-ui/src"),
     ];
     let mut unknown: Vec<String> = Vec::new();
 

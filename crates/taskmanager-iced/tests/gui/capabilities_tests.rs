@@ -27,9 +27,8 @@ fn declaration_is_total_and_every_difference_is_registered() {
 
 /// The registered divergences are exactly the known architecture drivers —
 /// this pins the set so a new divergence cannot appear silently. Text
-/// selection left the list when `SelectableText` ported the reference
-/// semantics (ICED-008); the footer feedback line remains the one deliberate
-/// toast divergence.
+/// selection keeps its registered keyboard/block-selection differences, while
+/// the footer feedback line remains the one deliberate toast divergence.
 #[test]
 fn the_registered_divergences_are_exactly_the_known_drivers() {
     let declaration = capability_declaration();
@@ -44,5 +43,5 @@ fn the_registered_divergences_are_exactly_the_known_drivers() {
         })
         .map(|entry| entry.capability.id())
         .collect();
-    assert_eq!(divergent, ["toast"]);
+    assert_eq!(divergent, ["toast", "text-selection"]);
 }

@@ -3,7 +3,7 @@
 //! The page renders the application-owned [`ApplicationHistoryProjection`].
 //! It never reads the live process list and never records a frontend-local
 //! sample: identity correlation, three-metric joining and lifecycle honesty
-//! are shared by GPUI, Iced and TUI.
+//! are shared by GPUI, Iced, TUI and Bevy.
 
 use std::rc::Rc;
 

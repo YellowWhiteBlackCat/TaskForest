@@ -1,7 +1,7 @@
 //! Toolkit-neutral semantic projection for the terminal frontend.
 //!
 //! This module consumes the same `taskmanager-ui-contract` snapshot builder
-//! as the Iced and GPUI frontends (defect #9: the TUI previously had no
+//! as the Iced, GPUI and Bevy frontends (defect #9: the TUI previously had no
 //! semantic channel at all). It deliberately stops at a validated semantic
 //! tree: the terminal has no linked native accessibility bridge, so —
 //! exactly like Iced's detached projection — a snapshot is not reported as

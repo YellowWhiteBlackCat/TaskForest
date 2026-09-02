@@ -1,8 +1,8 @@
 //! The fixture-side CPU topology generator: typed cluster specs whose
 //! derivations (per-logical-CPU types plus utilization/frequency/temperature
 //! seeds) keep every demo vector one derivation away from the declared
-//! topology, so GPUI, Iced and TUI all read the same elastic fields and none
-//! of them hardcodes a shape.
+//! topology, so GPUI, Iced, TUI and Bevy all read the same elastic fields and
+//! none of them hardcodes a shape.
 
 /// One CPU cluster: physical cores of ONE class sharing one SMT shape.
 /// Free composition across any number of clusters is what makes the model
@@ -27,8 +27,8 @@ pub struct CpuClusterSpec {
 /// GENERATOR only. The core-ized truth every frontend consumes is its
 /// DERIVATION — the per-logical-CPU `hardware.cpu_types` array plus the
 /// declared counts (`cpu_types`/`cpu_cores`/`physical_cores`/
-/// `logical_cores`) — so GPUI, Iced and TUI all read the same elastic fields
-/// and none of them hardcodes a topology.
+/// `logical_cores`) — so GPUI, Iced, TUI and Bevy all read the same elastic
+/// fields and none of them hardcodes a topology.
 #[derive(Clone, Debug)]
 pub struct CpuTopologySpec {
     pub clusters: Vec<CpuClusterSpec>,
