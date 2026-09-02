@@ -379,6 +379,15 @@ pub enum SystemTelemetryProjectionApplyResult {
 #[derive(Clone, Debug, Default)]
 pub struct SystemTelemetryProjection {
     current: Option<ProjectedSystemTelemetry>,
+    /// The projection that was current before the active refresh began.
+    ///
+    /// `begin_domains` temporarily marks due domains as `Pending`, but a
+    /// failed refresh must still retain the previous trusted observation as
+    /// last-known data. This is a bounded transition baseline, not a second
+    /// domain authority; it is replaced at each newer revision and is only
+    /// consulted while converting that revision's pending domain to a typed
+    /// unavailable result.
+    refresh_baseline: Option<ProjectedSystemTelemetry>,
 }
 
 impl SystemTelemetryProjection {
@@ -396,14 +405,15 @@ impl SystemTelemetryProjection {
             .as_ref()
             .is_none_or(|current| current.revision < revision)
         {
-            let mut next = self
-                .current
+            let baseline = self.current.clone();
+            let mut next = baseline
                 .clone()
                 .unwrap_or_else(|| ProjectedSystemTelemetry::pending(revision));
             next.revision = revision;
             for domain in domains {
                 set_pending(&mut next, *domain);
             }
+            self.refresh_baseline = baseline;
             self.current = Some(next);
         }
     }
@@ -461,6 +471,7 @@ impl SystemTelemetryProjection {
         domain: SystemTelemetryDomain,
         reason: SystemTelemetryUnavailable,
     ) -> SystemTelemetryProjectionApplyResult {
+        let baseline = self.refresh_baseline.clone();
         let Some(current) = self.current.as_mut() else {
             return SystemTelemetryProjectionApplyResult::Ignored(
                 SystemTelemetryProjectionRejection::NoActiveRequest,
@@ -476,7 +487,7 @@ impl SystemTelemetryProjection {
                 SystemTelemetryProjectionRejection::DuplicateDomain,
             );
         }
-        set_unavailable(current, domain, reason);
+        set_unavailable(current, domain, reason, baseline.as_ref());
         Self::applied(current)
     }
 
@@ -583,45 +594,66 @@ fn set_unavailable(
     current: &mut ProjectedSystemTelemetry,
     domain: SystemTelemetryDomain,
     reason: SystemTelemetryUnavailable,
+    baseline: Option<&ProjectedSystemTelemetry>,
 ) {
     match domain {
         SystemTelemetryDomain::Host => {
             current.host = SystemTelemetryDomainState::Unavailable {
-                observation: None,
+                observation: pending_baseline(&current.host, baseline.map(|value| &value.host)),
                 reason,
             };
         }
         SystemTelemetryDomain::Cpu => {
             current.cpu = SystemTelemetryDomainState::Unavailable {
-                observation: None,
+                observation: pending_baseline(&current.cpu, baseline.map(|value| &value.cpu)),
                 reason,
             };
         }
         SystemTelemetryDomain::Memory => {
             current.memory = SystemTelemetryDomainState::Unavailable {
-                observation: None,
+                observation: pending_baseline(&current.memory, baseline.map(|value| &value.memory)),
                 reason,
             };
         }
         SystemTelemetryDomain::Storage => {
             current.storage = SystemTelemetryDomainState::Unavailable {
-                observation: None,
+                observation: pending_baseline(
+                    &current.storage,
+                    baseline.map(|value| &value.storage),
+                ),
                 reason,
             };
         }
         SystemTelemetryDomain::Network => {
             current.network = SystemTelemetryDomainState::Unavailable {
-                observation: None,
+                observation: pending_baseline(
+                    &current.network,
+                    baseline.map(|value| &value.network),
+                ),
                 reason,
             };
         }
         SystemTelemetryDomain::Gpu => {
             current.gpu = SystemTelemetryDomainState::Unavailable {
-                observation: None,
+                observation: pending_baseline(&current.gpu, baseline.map(|value| &value.gpu)),
                 reason,
             };
         }
     }
+}
+
+fn pending_baseline<T: Clone>(
+    current: &SystemTelemetryDomainState<T>,
+    baseline: Option<&SystemTelemetryDomainState<T>>,
+) -> Option<T> {
+    current
+        .is_pending()
+        .then(|| {
+            baseline
+                .and_then(SystemTelemetryDomainState::observation)
+                .cloned()
+        })
+        .flatten()
 }
 
 fn lifecycle_conflicts(

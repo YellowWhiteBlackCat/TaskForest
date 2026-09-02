@@ -42,10 +42,24 @@ fn host(revision: SystemTelemetryRevision) -> SystemTelemetryDomainEvent {
 }
 
 fn cpu(revision: SystemTelemetryRevision) -> SystemTelemetryDomainEvent {
+    cpu_with_usage(revision, None)
+}
+
+fn cpu_with_usage(
+    revision: SystemTelemetryRevision,
+    usage: Option<f32>,
+) -> SystemTelemetryDomainEvent {
+    let metrics = usage.map_or_else(CpuMetrics::default, |usage| {
+        let observations = taskmanager_core::CpuScalarObservations {
+            global_usage_pct: ScalarObservation::available(usage, 11),
+            ..Default::default()
+        };
+        CpuMetrics::from_observations(observations)
+    });
     SystemTelemetryDomainEvent::Cpu {
         revision,
         observation: Box::new(CpuTelemetryObservation::current(
-            CpuMetrics::default(),
+            metrics,
             11,
             source("fixture.cpu"),
         )),
@@ -684,4 +698,54 @@ fn the_usable_fold_drives_a_real_domain_through_its_own_accessors() {
     }
     assert!(fold(&SystemTelemetryDomainState::Current(observation.clone())).is_some());
     assert!(fold(&SystemTelemetryDomainState::Stale(observation)).is_some());
+}
+
+#[test]
+fn failed_new_refresh_keeps_the_previous_domain_observation_as_last_known() {
+    let first_revision = SystemTelemetryRevision::new(20);
+    let mut projection = SystemTelemetryProjection::default();
+    projection.begin(first_revision);
+    let _ = projection.apply(&cpu_with_usage(first_revision, Some(42.0)));
+
+    let second_revision = SystemTelemetryRevision::new(21);
+    projection.begin_domains(second_revision, &[SystemTelemetryDomain::Cpu]);
+    assert!(matches!(
+        projection.current().map(|current| &current.cpu),
+        Some(SystemTelemetryDomainState::Pending)
+    ));
+
+    let result = projection.apply_failure(
+        second_revision,
+        SystemTelemetryDomain::Cpu,
+        SystemTelemetryUnavailable::Provider(FailureKind::TimedOut),
+    );
+    assert!(matches!(
+        result,
+        SystemTelemetryProjectionApplyResult::AppliedPartial(_)
+    ));
+
+    let state = projection.current().expect("refresh remains active");
+    let SystemTelemetryDomainState::Unavailable {
+        observation: Some(observation),
+        reason: SystemTelemetryUnavailable::Provider(FailureKind::TimedOut),
+    } = &state.cpu
+    else {
+        panic!("failed refresh must retain the prior observation");
+    };
+    assert_eq!(
+        state
+            .cpu
+            .usable(
+                CpuTelemetryObservation::current_value,
+                CpuTelemetryObservation::last_known_value,
+            )
+            .and_then(CpuMetrics::current_global_usage_pct),
+        Some(42.0)
+    );
+    assert_eq!(
+        observation
+            .last_known_value()
+            .and_then(CpuMetrics::current_global_usage_pct),
+        Some(42.0)
+    );
 }
