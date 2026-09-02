@@ -2,8 +2,8 @@
 
 ## Role
 
-One-shot privileged Linux helper for exactly one identity-checked process
-control operation per polkit invocation.
+One-shot privileged Unix/Windows helper for exactly one identity-checked
+process-control operation per native authorization invocation.
 
 ## Boundary
 
@@ -14,8 +14,8 @@ control, blanket capability or UI state.
 ## Contract and verification
 
 Success, target exit, PID reuse, permission, invalid operation and timeout must
-remain distinguishable. Package staging, policy checks and live installed
-authorization are independent evidence requirements.
+remain distinguishable. Linux package staging/policy checks and Windows MSI
+payload checks are separate from live installed authorization evidence.
 
 ## Module map
 

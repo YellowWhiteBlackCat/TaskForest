@@ -132,10 +132,11 @@ fn create_reply_channel() -> Option<PathBuf> {
 
 /// The packaged helper location: a sidecar binary next to the running app.
 ///
-/// The Windows MSI does not install this helper yet (ADR-035 current-release
-/// boundary), so on today's boxes the launch fails with `ERROR_FILE_NOT_FOUND`
-/// and maps to the typed `HelperUnavailable` — the honest missing-install
-/// answer, never a fabricated crossing.
+/// The Windows MSI installs this helper beside the GPUI executable. A
+/// development checkout, damaged install, or incomplete upgrade can still
+/// produce `ERROR_FILE_NOT_FOUND`, which maps to the typed
+/// `HelperUnavailable` — the honest missing-install answer, never a fabricated
+/// crossing.
 #[cfg(windows)]
 fn packaged_helper_path() -> PathBuf {
     std::env::current_exe()

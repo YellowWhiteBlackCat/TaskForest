@@ -14,8 +14,9 @@ mapping, the install-fact readiness probe, and the pure launch layer (helper
 command-line builder + one-shot reply-channel naming); the runas call group
 lives in the audited `taskmanager-windows-api` boundary and the production
 driver in `taskmanager-platform-windows`, both feeding this mapping — the
-crossing is compile-verified for `x86_64-pc-windows-msvc` but not yet packaged
-or on-box receipted. macOS authorization is typed in the `authorization` module
+crossing is compile-verified for `x86_64-pc-windows-msvc` and the fixed helper
+is part of the Windows MSI beside the GPUI executable; native success/denial is
+not claimed until a Windows desktop receipt exists. macOS authorization is typed in the `authorization` module
 (transport facts, pure mappings, install probe; `aarch64-apple-darwin`
 cross-check passes for this crate); the Security-framework crossing itself
 stays unwired (`Unsupported`) until a signed privileged-helper ADR exists.

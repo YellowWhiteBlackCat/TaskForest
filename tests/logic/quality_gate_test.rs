@@ -213,6 +213,31 @@ fn github_actions_release_gate_runs_on_push_pull_request_and_dispatch() {
     assert!(trigger_block.contains("push:"));
 }
 
+#[test]
+fn windows_uac_helper_is_built_staged_and_checked_inside_the_msi() {
+    let wix = include_str!("../../packaging/windows/taskforest.wxs");
+    let packaging = include_str!("../../.github/workflows/packaging.yml");
+    let build_script = include_str!("../../packaging/windows/build-msi.sh");
+    let helper = "taskmanager-process-control-helper.exe";
+
+    assert!(
+        wix.contains(helper),
+        "WiX must carry the UAC helper payload"
+    );
+    assert!(
+        packaging.contains("-p taskmanager-process-control-helper"),
+        "Windows packaging must build the helper for the selected native target"
+    );
+    assert!(
+        packaging.contains(helper),
+        "Windows packaging must stage and validate the helper"
+    );
+    assert!(
+        build_script.contains(helper),
+        "the local MSI builder must reject a stage without the helper"
+    );
+}
+
 /// A `#[test]`/`#[tokio::test]`/`#[gpui::test]` that prints a diagnostic but
 /// performs no assertion is theatre, not a test: it runs, prints, and passes
 /// regardless of whether the code under test is correct. The deleted

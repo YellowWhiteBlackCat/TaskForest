@@ -53,7 +53,8 @@ Linux amd64/arm64 和 Windows x64/arm64 均使用对应的 GitHub-hosted 原生 
 ## Windows MSI
 
 WiX 文件 `packaging/windows/taskforest.wxs` 是 MSI 文件清单权威。MSI 安装 GPUI 可执行文件、
-LICENSE 和开始菜单入口，不安装后台历史服务或 autostart。
+同目录的身份校验 UAC process-control helper、LICENSE 和开始菜单入口，不安装后台历史服务或
+autostart。Linux 专用 helper 和 polkit policy 不进入 MSI。
 
 MSI 的 `ProductVersion` 属性受 Windows Installer 硬性限制只能为数字段 `X.Y.Z`；完整版本
 （含 `rcN`）出现在文件名、MSI 摘要 Description、ARP comments 以及安装后的

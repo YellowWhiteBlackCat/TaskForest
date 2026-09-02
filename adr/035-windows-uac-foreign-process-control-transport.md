@@ -52,12 +52,11 @@ Stage 2 已完成代码接线（2026-08-30）：runas call group 进入
 `taskmanager-windows-api`（`runas` 模块，含 interactive-session 守卫），生产 driver 位于
 `taskmanager-platform-windows::provider::process::uac`（一次性随机命名回传文件 + 固定
 helper 命令行 + 有界等待），helper 复用可选的第四个回传文件参数，fact→outcome 映射的
-唯一权威保持在 `taskmanager-escalation::uac`。该接线已通过
+唯一权威保持在 `taskmanager-escalation::uac`。Windows MSI 现在为 x64/arm64 构建并安装同一
+`taskmanager-process-control-helper.exe` 到 GPUI 可执行文件旁边，MSI 反编译校验也必须确认该
+payload；开发或不完整安装仍映射为 typed `HelperUnavailable`。该接线已通过
 `cargo check --target x86_64-pc-windows-msvc` 交叉编译验证；尚未在真实 Windows 桌面
-验证，也尚未打包。Windows MSI 仍只安装 GPUI 应用和 LICENSE，不安装该 helper、
-服务或自启动项——因此在现装机器上跨界以 `ERROR_FILE_NOT_FOUND` 失败并映射为 typed
-`HelperUnavailable`（不再是无差别 `Unsupported`；缺失是可修复的安装事实）。
-Windows 签名与打包策略不构成 UAC 行为已经完成的证明；成功/拒绝/超时/无提示/
+验证。Windows 签名与打包策略不构成 UAC 行为已经完成的证明；成功/拒绝/超时/无提示/
 协议损坏/PID 复用的行为验证与真实交互桌面 receipt 仍是接线闭合前的必要条件。
 
 ## 验证

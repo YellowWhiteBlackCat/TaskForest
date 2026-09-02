@@ -14,10 +14,11 @@ audited boundary. Foreign-process escalation crosses the ADR-035 UAC transport:
 builds the fixed helper command line with the escalation crate's pure builder,
 and drives the audited `runas` call group; every raw result is classified by
 `taskmanager-escalation::uac`'s typed transport facts. The crossing is
-compile-verified (`x86_64-pc-windows-msvc`) but not yet packaged or on-box
-receipted, so today's installs surface the honest typed `HelperUnavailable`
-for the missing helper. A normal inherited-token child is never treated as
-elevation.
+compile-verified (`x86_64-pc-windows-msvc`) and included in the Windows MSI
+next to the GPUI executable; a development or damaged install still surfaces
+the honest typed `HelperUnavailable`. Native success/denial has to be
+receipted on a Windows desktop before it becomes a release claim. A normal
+inherited-token child is never treated as elevation.
 
 ## Contract and verification
 
