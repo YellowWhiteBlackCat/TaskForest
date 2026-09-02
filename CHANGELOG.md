@@ -8,6 +8,8 @@
 
 ## [Unreleased]
 
+## [0.1.0] — 2026-09-02
+
 ### 修复
 
 - Windows MSI 现在随 GPUI 安装同目录的身份校验 UAC process-control helper；缺失或损坏安装仍以 typed `HelperUnavailable` 失败，不伪造授权成功。
