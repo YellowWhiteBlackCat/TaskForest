@@ -321,14 +321,22 @@ fn export_request(request: &SnapshotExportRequest) -> SnapshotExportOutcome {
 fn write_snapshot(request: &SnapshotExportRequest) -> Result<PathBuf, SnapshotExportError> {
     let payload = request.payload();
     let base = match payload.target() {
-        SnapshotExportTarget::CurrentDirectory { stem } => std::env::current_dir()
-            .map_err(|error| {
-                runtime_error(
+        SnapshotExportTarget::CurrentDirectory { stem } => {
+            if !payload.target().is_valid() {
+                return Err(runtime_error(
                     SnapshotExportErrorKind::Inspect,
-                    &format!("resolve current export directory: {error}"),
-                )
-            })?
-            .join(stem.as_ref()),
+                    "snapshot export target must be one portable filename component",
+                ));
+            }
+            std::env::current_dir()
+                .map_err(|error| {
+                    runtime_error(
+                        SnapshotExportErrorKind::Inspect,
+                        &format!("resolve current export directory: {error}"),
+                    )
+                })?
+                .join(stem.as_ref())
+        }
         SnapshotExportTarget::BasePath(base) => base.clone(),
     };
     let json = snapshot_to_json(payload.snapshot(), payload.processes());

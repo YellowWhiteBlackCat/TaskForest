@@ -9,6 +9,10 @@ fn every_typed_failure_maps_to_localized_feedback_without_raw_detail() {
             "diagnostics.failure_invalid_source",
         ),
         (
+            DiagnosticBundleErrorKind::InvalidTarget,
+            "diagnostics.failure_invalid_target",
+        ),
+        (
             DiagnosticBundleErrorKind::Encode,
             "diagnostics.failure_encode",
         ),

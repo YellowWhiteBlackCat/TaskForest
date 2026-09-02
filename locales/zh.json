@@ -663,6 +663,7 @@
   "diagnostics.failed": "诊断包导出失败",
   "diagnostics.failed_detail": "诊断包导出失败：{reason}",
   "diagnostics.failure_invalid_source": "诊断数据源无效",
+  "diagnostics.failure_invalid_target": "诊断包文件名无效",
   "diagnostics.failure_encode": "无法编码已审查的诊断包",
   "diagnostics.failure_io": "无法写入诊断包",
   "diagnostics.failure_busy": "已有诊断包导出正在进行",

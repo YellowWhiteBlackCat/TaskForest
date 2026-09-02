@@ -325,11 +325,21 @@ fn run_one_bundle(command: &BundleCommand, execute: &DiagnosticBundleExecutor) -
 
 fn resolve_target(target: &DiagnosticBundleTarget) -> Result<PathBuf, DiagnosticBundleError> {
     match target {
-        DiagnosticBundleTarget::CurrentDirectory { file_name } => std::env::current_dir()
-            .map(|directory| directory.join(file_name))
-            .map_err(|error| {
-                DiagnosticBundleError::with_detail(DiagnosticBundleErrorKind::Io, error.to_string())
-            }),
+        DiagnosticBundleTarget::CurrentDirectory { file_name } => {
+            if !target.is_valid() {
+                return Err(DiagnosticBundleError::new(
+                    DiagnosticBundleErrorKind::InvalidTarget,
+                ));
+            }
+            std::env::current_dir()
+                .map(|directory| directory.join(file_name))
+                .map_err(|error| {
+                    DiagnosticBundleError::with_detail(
+                        DiagnosticBundleErrorKind::Io,
+                        error.to_string(),
+                    )
+                })
+        }
         DiagnosticBundleTarget::Path(path) => Ok(path.clone()),
     }
 }

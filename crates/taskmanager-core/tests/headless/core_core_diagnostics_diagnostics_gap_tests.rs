@@ -76,3 +76,14 @@ fn redact_paths_counts_every_redaction_and_skips_urls() {
     assert!(output.contains("https://x/y"), "URLs are not paths");
     assert_eq!(redact_paths("no paths here").1, 0);
 }
+
+#[test]
+fn redact_paths_covers_unc_forms_without_treating_urls_as_filesystem_paths() {
+    let (output, count) = redact_paths(
+        r"UNC=\\server\share\users\alice //server/share/private https://server/public",
+    );
+    assert_eq!(count, 2, "both UNC path spellings must be redacted");
+    assert!(!output.contains(r"\\server\share"));
+    assert!(!output.contains("//server/share"));
+    assert!(output.contains("https://server/public"));
+}

@@ -662,6 +662,7 @@
   "diagnostics.failed": "Diagnostic bundle failed",
   "diagnostics.failed_detail": "Diagnostic bundle failed: {reason}",
   "diagnostics.failure_invalid_source": "A diagnostic source is invalid",
+  "diagnostics.failure_invalid_target": "The diagnostic export filename is invalid",
   "diagnostics.failure_encode": "The reviewed bundle could not be encoded",
   "diagnostics.failure_io": "The bundle could not be written",
   "diagnostics.failure_busy": "Another diagnostic export is already in progress",
