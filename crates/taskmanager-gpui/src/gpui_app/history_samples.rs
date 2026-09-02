@@ -8,10 +8,11 @@ use taskmanager_telemetry_store::{
     DeviceMetricHistory, DynamicTelemetryHistory,
 };
 
-use std::cell::RefCell;
 use std::collections::{BTreeSet, HashMap};
 use std::rc::Rc;
 use taskmanager_core::core::{DeviceGeneration, DeviceId, GpuEngineMetricPoint, GpuMetrics};
+
+use crate::gpui_app::graph::GraphCacheHandle;
 
 /// Which device-history family a cached sample vector was derived from.
 ///
@@ -62,21 +63,20 @@ struct DeviceSampleKey {
     ring: usize,
 }
 
-// Per-device graph sample vectors, cached by content watermark. These are
-// PURE derived data (a function of the key alone), so — unlike a preference
-// thread_local — sharing them across windows cannot leak one window's state
-// into another: the same key always produces the same vector. Graph
-// animations and hover re-render these projections every frame while the
-// underlying rings tick at ~1-2 Hz; the cache collapses that to an `Rc`
-// clone. Bounded by clearing wholesale past a generous device×family bound.
-thread_local! {
-    static DEVICE_SAMPLE_CACHE: RefCell<HashMap<DeviceSampleKey, Rc<[f32]>>> =
-        RefCell::new(HashMap::new());
+/// Per-device graph sample vectors owned by one GPUI window's graph cache.
+///
+/// These are pure derived values keyed by the accepted ring watermark, but
+/// their allocation lifetime is still renderer state. Keeping the map inside
+/// `RootView` prevents one window from retaining another window's generations.
+#[derive(Default)]
+pub(crate) struct DeviceSampleCache {
+    entries: HashMap<DeviceSampleKey, Rc<[f32]>>,
 }
 
 const DEVICE_SAMPLE_CACHE_BOUND: usize = 512;
 
 fn cached_device_samples<T>(
+    graph_cache: &GraphCacheHandle,
     family: SampleFamily,
     history: Option<&DeviceMetricHistory<T>>,
     device: &str,
@@ -94,12 +94,12 @@ fn cached_device_samples<T>(
         last_revision,
         ring: history.map_or(0, DeviceMetricHistory::ring_id),
     };
-    DEVICE_SAMPLE_CACHE.with(|cache| {
-        let mut cache = cache.borrow_mut();
-        if cache.len() >= DEVICE_SAMPLE_CACHE_BOUND {
-            cache.clear();
+    graph_cache.borrow_mut().with_device_samples(|cache| {
+        if cache.entries.len() >= DEVICE_SAMPLE_CACHE_BOUND {
+            cache.entries.clear();
         }
         cache
+            .entries
             .entry(key)
             // `Rc::from(Vec)` moves the computed buffer; a cache hit hands the
             // SAME unsized `Rc` to every graph on UI-only frames.
@@ -116,6 +116,7 @@ pub(crate) fn f32_history_samples(history: CorrelatedMetricHistory<f32>) -> Vec<
 }
 
 pub(crate) fn storage_activity_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
@@ -123,6 +124,7 @@ pub(crate) fn storage_activity_samples(
     let device = DeviceId::new(device_id.to_owned());
     let handle = history.storage_activity(&device);
     cached_device_samples(
+        graph_cache,
         SampleFamily::StorageActivity,
         handle.as_ref(),
         device_id,
@@ -136,6 +138,7 @@ pub(crate) fn storage_activity_samples(
 }
 
 pub(crate) fn storage_temperature_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
@@ -143,6 +146,7 @@ pub(crate) fn storage_temperature_samples(
     let device = DeviceId::new(device_id.to_owned());
     let handle = history.storage_temperature_c(&device);
     cached_device_samples(
+        graph_cache,
         SampleFamily::StorageTemperature,
         handle.as_ref(),
         device_id,
@@ -156,6 +160,7 @@ pub(crate) fn storage_temperature_samples(
 }
 
 pub(crate) fn network_rate_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
@@ -163,6 +168,7 @@ pub(crate) fn network_rate_samples(
     let device = DeviceId::new(device_id.to_owned());
     let handle = history.network_rate(&device);
     cached_device_samples(
+        graph_cache,
         SampleFamily::NetworkRate,
         handle.as_ref(),
         device_id,
@@ -182,6 +188,7 @@ pub(crate) fn network_rate_samples(
 /// family+device+generation+watermark. `ring` resolves the family's handle on
 /// the correlated history; a missing ring yields the empty collecting window.
 fn device_rate_samples(
+    graph_cache: &GraphCacheHandle,
     family: SampleFamily,
     device_id: &str,
     generation: DeviceGeneration,
@@ -189,35 +196,50 @@ fn device_rate_samples(
 ) -> Rc<[f32]> {
     let device = DeviceId::new(device_id.to_owned());
     let handle = ring(&device);
-    cached_device_samples(family, handle.as_ref(), device_id, "", generation, || {
-        matching_device_samples(handle.clone(), generation).map_or_else(Vec::new, |samples| {
-            u64_samples(&samples, DECIMAL_BYTES_PER_MEGABYTE)
-        })
-    })
+    cached_device_samples(
+        graph_cache,
+        family,
+        handle.as_ref(),
+        device_id,
+        "",
+        generation,
+        || {
+            matching_device_samples(handle.clone(), generation).map_or_else(Vec::new, |samples| {
+                u64_samples(&samples, DECIMAL_BYTES_PER_MEGABYTE)
+            })
+        },
+    )
 }
 
 /// The disk's summed read+write throughput window (decimal MB/s). The disk
 /// page's aggregate summary and first-frame state consume this lane; the main
 /// graph strokes the split-direction companions below.
 pub(crate) fn storage_rate_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
 ) -> Rc<[f32]> {
-    device_rate_samples(SampleFamily::StorageRate, device_id, generation, |device| {
-        history.storage_rate(device)
-    })
+    device_rate_samples(
+        graph_cache,
+        SampleFamily::StorageRate,
+        device_id,
+        generation,
+        |device| history.storage_rate(device),
+    )
 }
 
 /// The disk's read-direction throughput window (decimal MB/s) with its OWN
 /// per-direction gaps — a missing read observation is `NaN`, never a
 /// fabricated zero and never the write lane's value.
 pub(crate) fn storage_read_rate_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
 ) -> Rc<[f32]> {
     device_rate_samples(
+        graph_cache,
         SampleFamily::StorageReadRate,
         device_id,
         generation,
@@ -228,11 +250,13 @@ pub(crate) fn storage_read_rate_samples(
 /// The disk's write-direction throughput window; see
 /// [`storage_read_rate_samples`].
 pub(crate) fn storage_write_rate_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
 ) -> Rc<[f32]> {
     device_rate_samples(
+        graph_cache,
         SampleFamily::StorageWriteRate,
         device_id,
         generation,
@@ -244,11 +268,13 @@ pub(crate) fn storage_write_rate_samples(
 /// OWN per-direction gaps; the summed `network_rate_samples` lane stays the
 /// aggregate summary's authority.
 pub(crate) fn network_rx_rate_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
 ) -> Rc<[f32]> {
     device_rate_samples(
+        graph_cache,
         SampleFamily::NetworkRxRate,
         device_id,
         generation,
@@ -259,11 +285,13 @@ pub(crate) fn network_rx_rate_samples(
 /// The adapter's transmit-direction throughput window; see
 /// [`network_rx_rate_samples`].
 pub(crate) fn network_tx_rate_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
 ) -> Rc<[f32]> {
     device_rate_samples(
+        graph_cache,
         SampleFamily::NetworkTxRate,
         device_id,
         generation,
@@ -272,6 +300,7 @@ pub(crate) fn network_tx_rate_samples(
 }
 
 pub(crate) fn gpu_usage_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
@@ -279,6 +308,7 @@ pub(crate) fn gpu_usage_samples(
     let device = DeviceId::new(device_id.to_owned());
     let handle = history.gpu_usage(&device);
     cached_device_samples(
+        graph_cache,
         SampleFamily::GpuUsage,
         handle.as_ref(),
         device_id,
@@ -321,6 +351,7 @@ pub(crate) fn gpu_engine_series_names(
 /// A missing engine in an otherwise valid point is a gap for that engine only;
 /// it must not reuse a neighboring engine's value.
 pub(crate) fn gpu_engine_samples(
+    graph_cache: &GraphCacheHandle,
     history: &CorrelatedSystemTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
@@ -329,6 +360,7 @@ pub(crate) fn gpu_engine_samples(
     let device_id = DeviceId::new(device_id.to_owned());
     let handle = history.gpu_engine_metrics(&device_id);
     cached_device_samples(
+        graph_cache,
         SampleFamily::GpuEngine,
         handle.as_ref(),
         device_id.as_str(),
@@ -355,6 +387,7 @@ pub(crate) fn gpu_engine_samples(
 }
 
 pub(crate) fn battery_capacity_samples(
+    graph_cache: &GraphCacheHandle,
     history: &DynamicTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
@@ -362,6 +395,7 @@ pub(crate) fn battery_capacity_samples(
     let device = DeviceId::new(device_id.to_owned());
     let handle = history.battery_capacity_pct(&device);
     cached_device_samples(
+        graph_cache,
         SampleFamily::BatteryCapacity,
         handle.as_ref(),
         device_id,
@@ -375,6 +409,7 @@ pub(crate) fn battery_capacity_samples(
 }
 
 pub(crate) fn battery_power_samples(
+    graph_cache: &GraphCacheHandle,
     history: &DynamicTelemetryHistory,
     device_id: &str,
     generation: DeviceGeneration,
@@ -382,6 +417,7 @@ pub(crate) fn battery_power_samples(
     let device = DeviceId::new(device_id.to_owned());
     let handle = history.battery_power_w(&device);
     cached_device_samples(
+        graph_cache,
         SampleFamily::BatteryPower,
         handle.as_ref(),
         device_id,
@@ -395,6 +431,7 @@ pub(crate) fn battery_power_samples(
 }
 
 pub(crate) fn fan_rpm_samples(
+    graph_cache: &GraphCacheHandle,
     history: &DynamicTelemetryHistory,
     channel_id: &str,
     generation: DeviceGeneration,
@@ -402,6 +439,7 @@ pub(crate) fn fan_rpm_samples(
     let channel = DeviceId::new(channel_id.to_owned());
     let handle = history.fan_rpm(&channel);
     cached_device_samples(
+        graph_cache,
         SampleFamily::FanRpm,
         handle.as_ref(),
         channel_id,
@@ -415,6 +453,7 @@ pub(crate) fn fan_rpm_samples(
 }
 
 pub(crate) fn fan_temperature_samples(
+    graph_cache: &GraphCacheHandle,
     history: &DynamicTelemetryHistory,
     channel_id: &str,
     generation: DeviceGeneration,
@@ -422,6 +461,7 @@ pub(crate) fn fan_temperature_samples(
     let channel = DeviceId::new(channel_id.to_owned());
     let handle = history.fan_temperature_c(&channel);
     cached_device_samples(
+        graph_cache,
         SampleFamily::FanTemperature,
         handle.as_ref(),
         channel_id,

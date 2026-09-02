@@ -4,6 +4,7 @@
 use std::collections::HashSet;
 use std::rc::Rc;
 
+use crate::gpui_app::graph::GraphCacheHandle;
 use crate::gpui_app::root::RootView;
 use gpui::Entity;
 use taskmanager_application::i18n;
@@ -611,6 +612,7 @@ pub struct ProcRowProps<'a> {
     pub density: RowDensity,
     /// Product-wide readable type/icon metrics, independent from row density.
     pub ui_size: UiSize,
+    pub(crate) graph_cache: GraphCacheHandle,
 }
 
 /// All inputs to the visible-row projection (design-debt #1 props

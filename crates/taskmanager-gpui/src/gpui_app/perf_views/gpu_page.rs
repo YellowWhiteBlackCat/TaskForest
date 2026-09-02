@@ -14,7 +14,7 @@ use crate::gpui_app::elements;
 use crate::gpui_app::formatting::{
     GraphUnit, PerformanceSettings, gpu_identity_text, missing_value,
 };
-use crate::gpui_app::graph::{GraphHover, GraphSettings};
+use crate::gpui_app::graph::{GraphCacheHandle, GraphHover, GraphSettings};
 use crate::gpui_app::history_samples::{gpu_engine_samples, gpu_engine_series_names};
 use crate::gpui_app::perf_views::gpu_stats::{
     VramCompositionData, gpu_stats, vram_composition_data,
@@ -60,6 +60,7 @@ pub(crate) struct GpuRenderState<'a> {
     pub(crate) chart_layout: GpuChartLayout,
     pub(crate) performance: PerformanceSettings,
     pub(crate) budget: crate::gpui_app::root::responsive::PerformancePageBudget,
+    pub(crate) graph_cache: GraphCacheHandle,
 }
 
 /// The complete GPU chart inventory selected by responsive layout alone.
@@ -101,6 +102,7 @@ struct GpuEngineMiniGridProps<'a> {
     engine_device_id: &'a taskmanager_core::core::identity::DeviceId,
     engine_capability_status: Option<taskmanager_platform_contract::CapabilityStatus>,
     graph_settings: GraphSettings,
+    graph_cache: GraphCacheHandle,
     max_rows: Option<usize>,
 }
 
@@ -113,6 +115,7 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
         engine_device_id,
         engine_capability_status,
         graph_settings,
+        graph_cache,
         max_rows,
     } = props;
     let mut engine_names = gpu_engine_series_names(history, metrics);
@@ -204,6 +207,7 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
                     })
                     .filter(|value| value.is_finite());
                 let samples = gpu_engine_samples(
+                    &graph_cache,
                     history,
                     &metrics.device_id,
                     metrics.device_generation,
@@ -220,6 +224,7 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
                     theme.gpu,
                     &cell_label,
                     graph_settings,
+                    graph_cache.clone(),
                 )
                 .size_full();
                 #[cfg(any(test, feature = "test-support"))]
@@ -306,6 +311,7 @@ pub(crate) fn render_gpu(
                     graph_settings,
                     gpu_state.budget.vertical,
                     hover_slot,
+                    gpu_state.graph_cache.clone(),
                 )
             })
         } else {
@@ -323,6 +329,7 @@ pub(crate) fn render_gpu(
                 engine_device_id: &gpu_state.engine_device_id,
                 engine_capability_status: gpu_state.engine_capability_status,
                 graph_settings,
+                graph_cache: gpu_state.graph_cache.clone(),
                 max_rows: gpu_engine_row_budget(lower_capacity, memory_graph.is_some()),
             })
         })
@@ -366,6 +373,7 @@ pub(crate) fn render_gpu(
         ),
         stats_footer: footer,
         hover_slot,
+        graph_cache: gpu_state.graph_cache,
         graph_settings,
         budget: gpu_state.budget,
     });
@@ -430,6 +438,7 @@ fn gpu_engine_row_budget(lower_capacity: Option<f32>, memory_visible: bool) -> O
 /// the engine group: the current used/total pair controls whether this card
 /// exists, while an empty history produces the shared collecting state rather
 /// than a fabricated flat zero line.
+#[allow(clippy::too_many_arguments)]
 fn render_gpu_memory_graph(
     theme: &Theme,
     live_graph: &LiveGraphHistory,
@@ -438,6 +447,7 @@ fn render_gpu_memory_graph(
     graph_settings: GraphSettings,
     vertical: crate::gpui_app::root::responsive::PerformanceVerticalRunway,
     hover_slot: &Rc<RefCell<Option<GraphHover>>>,
+    graph_cache: GraphCacheHandle,
 ) -> Option<AnyElement> {
     let samples = gpu_chart_metric_history(
         live_graph,
@@ -462,6 +472,7 @@ fn render_gpu_memory_graph(
             graph_settings,
             vertical,
             hover_slot,
+            graph_cache,
         )
         .into_any_element(),
     )

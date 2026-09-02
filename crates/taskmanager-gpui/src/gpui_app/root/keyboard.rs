@@ -4,21 +4,15 @@ use super::{
     ProcessDetailsSection, RefreshRequest, RootView, TopPage, services_view, startup_view,
 };
 use gpui::{App, Context, KeyDownEvent, ModifiersChangedEvent, Window};
-use std::sync::OnceLock;
 
 use taskmanager_application::{
-    AppAction, CommandContext, CommandRouter, CommandScope, ConfirmationKind, FocusDirection,
-    KeyChord, KeyCode, Modifiers, SelectionDirection, SurfaceKind, default_router,
+    AppAction, CommandContext, CommandScope, ConfirmationKind, FocusDirection, KeyChord, KeyCode,
+    Modifiers, SelectionDirection, SurfaceKind,
 };
 
 use taskmanager_ui::focus::restore_modal;
 
 const PROCESS_PAGE_ROWS: usize = 10;
-
-fn command_router() -> Option<&'static CommandRouter> {
-    static ROUTER: OnceLock<Option<CommandRouter>> = OnceLock::new();
-    ROUTER.get_or_init(|| default_router().ok()).as_ref()
-}
 
 fn key_chord(ev: &KeyDownEvent) -> Option<KeyChord> {
     let key = match ev.keystroke.key.as_str() {
@@ -382,10 +376,11 @@ impl RootView {
         let Some(chord) = key_chord(event) else {
             return;
         };
-        let Some(router) = command_router() else {
-            return;
-        };
-        let Some(action) = router.route(chord, context) else {
+        let Some(action) = view
+            .command_router
+            .as_ref()
+            .and_then(|router| router.route(chord, context))
+        else {
             return;
         };
 

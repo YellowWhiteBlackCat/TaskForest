@@ -177,19 +177,19 @@ async fn disk_and_network_pages_paint_two_series_legends_from_split_lanes(cx: &m
         let generation = DeviceGeneration::new(1);
         let system = &v.telemetry.system_history;
         assert_eq!(
-            &*storage_read_rate_samples(system, "disk:wwid:legend", generation),
+            &*storage_read_rate_samples(&v.graph_cache, system, "disk:wwid:legend", generation),
             &[2.0][..]
         );
         assert_eq!(
-            &*storage_write_rate_samples(system, "disk:wwid:legend", generation),
+            &*storage_write_rate_samples(&v.graph_cache, system, "disk:wwid:legend", generation),
             &[0.5][..]
         );
         assert_eq!(
-            &*network_rx_rate_samples(system, "net:mac:legend", generation),
+            &*network_rx_rate_samples(&v.graph_cache, system, "net:mac:legend", generation),
             &[3.0][..]
         );
         assert_eq!(
-            &*network_tx_rate_samples(system, "net:mac:legend", generation),
+            &*network_tx_rate_samples(&v.graph_cache, system, "net:mac:legend", generation),
             &[6.0][..]
         );
     });

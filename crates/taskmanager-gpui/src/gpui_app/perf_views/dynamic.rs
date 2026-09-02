@@ -14,7 +14,7 @@ use super::finite_series_peak_floored;
 use super::smart_status::status_footer;
 use super::{ChartSpec, HeadlineSurface, PerfPageProps, perf_page, render_chart, stats_panel};
 use crate::gpui_app::formatting::{GraphUnit, PerformanceSettings};
-use crate::gpui_app::graph::GraphHover;
+use crate::gpui_app::graph::{GraphCacheHandle, GraphHover};
 use crate::gpui_app::history_samples::{
     battery_capacity_samples, battery_power_samples, fan_rpm_samples, fan_temperature_samples,
 };
@@ -33,6 +33,7 @@ pub(crate) struct BatteryViewProps<'a> {
     pub(crate) index: usize,
     pub(crate) performance: PerformanceSettings,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub(crate) graph_cache: GraphCacheHandle,
     pub(crate) budget: PerformancePageBudget,
 }
 
@@ -44,6 +45,7 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         index,
         performance,
         hover_slot,
+        graph_cache,
         budget,
     } = props;
     let Some(battery) = power_supplies.batteries.get(index) else {
@@ -55,11 +57,13 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         );
     };
     let samples = battery_capacity_samples(
+        &graph_cache,
         &telemetry.dynamic_history,
         &battery.id,
         battery.device_generation,
     );
     let power_samples = battery_power_samples(
+        &graph_cache,
         &telemetry.dynamic_history,
         &battery.id,
         battery.device_generation,
@@ -97,6 +101,7 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
                 performance.graph,
                 budget.vertical,
                 hover_slot,
+                graph_cache.clone(),
             )
             .into_any_element()
         });
@@ -117,6 +122,7 @@ pub(crate) fn render_battery(props: BatteryViewProps<'_>) -> Div {
         stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: status_footer(theme, battery.device_state.status),
         hover_slot,
+        graph_cache,
         graph_settings: performance.graph,
         budget,
     })
@@ -130,6 +136,7 @@ pub(crate) struct FanViewProps<'a> {
     pub(crate) index: usize,
     pub(crate) performance: PerformanceSettings,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub(crate) graph_cache: GraphCacheHandle,
     pub(crate) budget: PerformancePageBudget,
 }
 
@@ -141,6 +148,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
         index,
         performance,
         hover_slot,
+        graph_cache,
         budget,
     } = props;
     let Some(fan) = sensors
@@ -157,6 +165,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
         );
     };
     let samples = fan_rpm_samples(
+        &graph_cache,
         &telemetry.dynamic_history,
         fan.id(),
         fan.device_generation(),
@@ -167,6 +176,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
     });
     let temperature_samples = temperature_reading.map_or_else(Vec::new, |reading| {
         fan_temperature_samples(
+            &graph_cache,
             &telemetry.dynamic_history,
             reading.id(),
             reading.device_generation(),
@@ -197,6 +207,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
                 performance.graph,
                 budget.vertical,
                 hover_slot,
+                graph_cache.clone(),
             )
             .into_any_element()
         });
@@ -220,6 +231,7 @@ pub(crate) fn render_fan(props: FanViewProps<'_>) -> Div {
         stats: stats_panel(theme, stats, budget.details, budget.content_height),
         stats_footer: status_footer(theme, fan.state().status),
         hover_slot,
+        graph_cache,
         graph_settings: performance.graph,
         budget,
     })

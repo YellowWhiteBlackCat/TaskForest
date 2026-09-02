@@ -8,6 +8,8 @@ use std::rc::Rc;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
+use crate::gpui_app::graph::GraphCacheHandle;
+
 // ── window-activation-aware chrome borders (Zed #2610) ────────────────────
 // When the window is inactive, CSD chrome should recede behind the user's
 // other windows: the 1px titlebar border drops to 60% alpha so the frame
@@ -219,19 +221,19 @@ pub fn highlighted_text_with_ranges(
 /// move the canvas or change the data replay the cached paths, and dense runs
 /// are LTTB-decimated to the pixel budget so the per-frame rebuilds that
 /// horizontal scrolling forces stay cheap.
-pub fn sparkline(
+pub(crate) fn sparkline(
     samples: impl Into<Rc<[f32]>>,
     color: gpui::Rgba,
     w: f32,
     h: f32,
+    cache: GraphCacheHandle,
 ) -> impl IntoElement {
     let samples: Rc<[f32]> = samples.into();
     canvas(
         |_bounds, _window, _cx| (),
         move |bounds, _t, window, _cx| {
-            for path in
-                crate::gpui_app::graph::scene_cache::sparkline_paths(&samples, bounds, color)
-            {
+            let mut cache = cache.borrow_mut();
+            for path in cache.sparkline_paths(&samples, bounds, color) {
                 window.paint_path(path, color);
             }
         },

@@ -22,9 +22,8 @@ use gpui::{
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::GraphUnit;
 use crate::gpui_app::graph::{
-    GraphHover, GraphOpts, GraphSecondarySeries, GraphSettings, dual_series_colors,
-    graph_element_hover, graph_element_hover_dual, graph_hover, latest_samples_rc,
-    latest_samples_rc_for_slide,
+    GraphCacheHandle, GraphHover, GraphOpts, GraphSecondarySeries, GraphSettings,
+    dual_series_colors, graph_element_hover, graph_element_hover_dual, graph_hover,
 };
 use crate::gpui_app::perf_views::{
     badge_pct, badge_rpm, badge_temperature, badge_watts, drive_badge_format, graph_summary_row,
@@ -310,12 +309,14 @@ fn format_graph_value(unit: GraphUnit, value: f32) -> String {
 
 /// Tail-limit a shared series to the configured window, preserving the `Rc`
 /// identity when the window already fits (the one UI-only-frame copy rule).
-fn limited_window(settings: GraphSettings, samples: Rc<[f32]>) -> Rc<[f32]> {
-    if settings.sliding_graphs {
-        latest_samples_rc_for_slide(samples, settings.data_points)
-    } else {
-        latest_samples_rc(samples, settings.data_points)
-    }
+fn limited_window(
+    settings: GraphSettings,
+    samples: Rc<[f32]>,
+    graph_cache: &GraphCacheHandle,
+) -> Rc<[f32]> {
+    graph_cache
+        .borrow_mut()
+        .latest_samples(samples, settings.data_points, settings.sliding_graphs)
 }
 
 /// Render one declared chart: card, tier height contract, caption, legend,
@@ -329,6 +330,7 @@ pub(crate) fn render_chart(
     settings: GraphSettings,
     vertical: PerformanceVerticalRunway,
     hover_slot: &Rc<RefCell<Option<GraphHover>>>,
+    graph_cache: GraphCacheHandle,
 ) -> Div {
     let unit = spec.unit;
     let fmt = move |value: f32| format_graph_value(unit, value);
@@ -391,7 +393,7 @@ pub(crate) fn render_chart(
     }
     match spec.series {
         ChartSeries::Single { samples } => {
-            let samples = limited_window(settings, samples);
+            let samples = limited_window(settings, samples, &graph_cache);
             let summary_row = graph_summary_row(theme, &samples, &fmt);
             let graph = graph_element_hover(
                 spec.id.clone(),
@@ -401,6 +403,7 @@ pub(crate) fn render_chart(
                 graph_opts,
                 fmt,
                 hover_slot.clone(),
+                graph_cache.clone(),
             );
             let card = elements::graph_card_with_state(theme, graph, &samples);
             let card = apply_tier_to_card(card, spec.tier, spec.max_height);
@@ -424,7 +427,7 @@ pub(crate) fn render_chart(
         } => {
             // First-frame state comes from the directions' UNION of evidence:
             // the summed lane can be all-gap while one direction is measured.
-            let aggregate = limited_window(settings, aggregate);
+            let aggregate = limited_window(settings, aggregate, &graph_cache);
             let summary_row = graph_summary_row(theme, &aggregate, &fmt);
             let (primary_color, secondary_color) =
                 dual_series_colors(taskmanager_ui::theme_binding::rgba(spec.color));
@@ -442,6 +445,7 @@ pub(crate) fn render_chart(
                 graph_opts,
                 fmt,
                 hover_slot.clone(),
+                graph_cache.clone(),
             );
             let card = elements::graph_card_with_dual_state(theme, graph, &primary, &secondary);
             let card = apply_tier_to_card(card, spec.tier, spec.max_height);
@@ -603,6 +607,7 @@ pub(crate) struct PerfPageProps<'a> {
     pub(crate) stats: Div,
     pub(crate) stats_footer: Option<AnyElement>,
     pub(crate) hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    pub(crate) graph_cache: GraphCacheHandle,
     pub(crate) graph_settings: GraphSettings,
     pub(crate) budget: PerformancePageBudget,
 }
@@ -628,6 +633,7 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         stats,
         stats_footer,
         hover_slot,
+        graph_cache,
         graph_settings,
         budget,
     } = props;
@@ -695,7 +701,15 @@ pub(crate) fn perf_page(props: PerfPageProps<'_>) -> Div {
         HeadlineSurface::Charts(specs) => specs
             .into_iter()
             .map(|spec| {
-                render_chart(theme, spec, graph_settings, runway, hover_slot).into_any_element()
+                render_chart(
+                    theme,
+                    spec,
+                    graph_settings,
+                    runway,
+                    hover_slot,
+                    graph_cache.clone(),
+                )
+                .into_any_element()
             })
             .collect::<Vec<AnyElement>>(),
     };

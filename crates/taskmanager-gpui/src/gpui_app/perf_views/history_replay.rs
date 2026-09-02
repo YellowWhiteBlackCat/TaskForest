@@ -21,7 +21,7 @@ use taskmanager_core::core::{HistorySeriesKey, HistoryWindow};
 
 use super::layout::performance_title_row;
 use crate::gpui_app::elements;
-use crate::gpui_app::graph::{GraphOpts, graph_element};
+use crate::gpui_app::graph::{GraphCacheHandle, GraphOpts, graph_element};
 use crate::gpui_app::root::RootView;
 use taskmanager_application::i18n;
 use taskmanager_theme::Theme;
@@ -272,6 +272,7 @@ pub(crate) fn render_history_replay(
     local_time_rules: &taskmanager_core::core::time::LocalTimeRulesObservation,
     content_height: f32,
     entity: gpui::Entity<RootView>,
+    graph_cache: GraphCacheHandle,
 ) -> AnyElement {
     let window = state.window();
     let mut controls =
@@ -390,7 +391,7 @@ pub(crate) fn render_history_replay(
         let visible_rows = replay_row_budget(content_height);
         let row_limit = state.rows().len().min(visible_rows);
         for (index, row) in state.rows().iter().take(row_limit).enumerate() {
-            column = column.child(replay_row(theme, row, index));
+            column = column.child(replay_row(theme, row, index, graph_cache.clone()));
         }
         if state.rows().len() > row_limit {
             column = column.child(
@@ -432,7 +433,12 @@ fn history_window_label(window: HistoryWindow) -> &'static str {
     })
 }
 
-fn replay_row(theme: &Theme, row: &HistoryReplayRow, index: usize) -> AnyElement {
+fn replay_row(
+    theme: &Theme,
+    row: &HistoryReplayRow,
+    index: usize,
+    graph_cache: GraphCacheHandle,
+) -> AnyElement {
     let summary = match row.peak_value {
         Some(peak) => format!(
             "{} {} · {} {} · {} {}",
@@ -474,6 +480,7 @@ fn replay_row(theme: &Theme, row: &HistoryReplayRow, index: usize) -> AnyElement
                 ref_lines: true,
                 ..GraphOpts::default()
             },
+            graph_cache,
         )))
         .into_any_element()
 }

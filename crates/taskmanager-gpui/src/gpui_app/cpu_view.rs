@@ -35,7 +35,7 @@ use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_telemetry_store::TelemetryStore;
 
 use crate::gpui_app::formatting::{self, GraphUnit};
-use crate::gpui_app::graph::GraphHover;
+use crate::gpui_app::graph::{GraphCacheHandle, GraphHover};
 use crate::gpui_app::perf_views::{
     ChartSpec, HEADLINE_COMPANION_FLOOR, HeadlineSurface, PerfPageProps, perf_page,
 };
@@ -125,6 +125,7 @@ pub(crate) struct CpuViewProps<'a> {
     pub hardware: &'a HardwareInfo,
     pub hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
     pub graph_settings: crate::gpui_app::graph::GraphSettings,
+    pub graph_cache: GraphCacheHandle,
     pub layout: PerformancePageBudget,
     /// Presentation unit preferences for the details panel spec list.
     pub units: UnitPreferences,
@@ -144,6 +145,7 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
         hardware,
         hover_slot,
         graph_settings,
+        graph_cache,
         layout,
         units,
         package_power,
@@ -179,8 +181,15 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
     let below = match chart_layout {
         CpuChartLayout::AggregateOnly => None,
         CpuChartLayout::AggregateWithPerCore if matrix_headline_height.is_some() => Some(
-            per_core_grid::render(theme, &stats, hardware, &core_series, graph_settings)
-                .into_any_element(),
+            per_core_grid::render(
+                theme,
+                &stats,
+                hardware,
+                &core_series,
+                graph_settings,
+                graph_cache.clone(),
+            )
+            .into_any_element(),
         ),
         CpuChartLayout::AggregateWithPerCore => None,
     };
@@ -216,6 +225,7 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
         ),
         stats_footer: None,
         hover_slot,
+        graph_cache,
         graph_settings,
         budget: layout,
     })

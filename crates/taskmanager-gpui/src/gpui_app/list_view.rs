@@ -348,8 +348,8 @@ fn filter_pill<F: FilterSpec>(
 // ── search box ───────────────────────────────────────────────────────────────
 
 /// The recurring list-page search box: the own [`TextInput`] shell bound to
-/// the persistent `Entity<TextInputState>` (held in each view's `SEARCH`
-/// thread_local). The `InputEvent::Change` subscription set up at entity-creation
+/// the persistent `Entity<TextInputState>` held by the owning `RootView`. The
+/// `InputEvent::Change` subscription set up at entity-creation
 /// time (each view's `init_search_entity`) mirrors the value into the page's
 /// `RootView.<page>_state.query`, so this helper only owns the visual shell.
 ///

@@ -98,6 +98,7 @@ pub(super) struct AppendBodyCellsProps<'a> {
     pub entity: &'a Entity<RootView>,
     pub gray_zero_values: bool,
     pub ui_size: UiSize,
+    pub graph_cache: crate::gpui_app::graph::GraphCacheHandle,
 }
 
 pub(super) fn append_body_cells(
@@ -114,6 +115,7 @@ pub(super) fn append_body_cells(
         entity,
         gray_zero_values,
         ui_size,
+        graph_cache,
     } = props;
     let mut line = line;
     if !hidden_cols.contains(&SortCol::User) {
@@ -264,6 +266,7 @@ pub(super) fn append_body_cells(
                             taskmanager_ui::theme_binding::rgba(theme.cpu),
                             48.0,
                             16.0,
+                            graph_cache.clone(),
                         ))
                 } else {
                     div().w(px(56.0))

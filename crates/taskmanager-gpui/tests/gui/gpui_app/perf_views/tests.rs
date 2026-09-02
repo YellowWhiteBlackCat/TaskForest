@@ -808,6 +808,7 @@ async fn mc01_generation_recovery_case_battery_and_fan_history_restarts_at_a_new
     view.read_with(cx, |v, _cx| {
         assert_eq!(
             battery_power_samples(
+                &v.graph_cache,
                 &v.telemetry.dynamic_history,
                 "power-supply:generation-battery",
                 DeviceGeneration::new(1),
@@ -816,6 +817,7 @@ async fn mc01_generation_recovery_case_battery_and_fan_history_restarts_at_a_new
         );
         assert_eq!(
             fan_temperature_samples(
+                &v.graph_cache,
                 &v.telemetry.dynamic_history,
                 "hwmon:generation-fan:temp1_input",
                 DeviceGeneration::new(1),
@@ -890,6 +892,7 @@ async fn mc01_generation_recovery_case_battery_and_fan_history_restarts_at_a_new
     view.read_with(cx, |v, _cx| {
         assert_eq!(
             battery_power_samples(
+                &v.graph_cache,
                 &v.telemetry.dynamic_history,
                 "power-supply:generation-battery",
                 DeviceGeneration::new(2),
@@ -898,6 +901,7 @@ async fn mc01_generation_recovery_case_battery_and_fan_history_restarts_at_a_new
         );
         assert_eq!(
             fan_temperature_samples(
+                &v.graph_cache,
                 &v.telemetry.dynamic_history,
                 "hwmon:generation-fan:temp1_input",
                 DeviceGeneration::new(2),

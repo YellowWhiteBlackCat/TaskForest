@@ -1,11 +1,11 @@
 //! The store's lookup keying, decimation, and rate-gate rules are pure
 //! enough to test without a window; the paint replay itself is exercised
 //! end-to-end by the page-specific render-path suites.
+use super::super::GraphPresentationCache;
 use super::{
     BadgeDirections, GraphSceneKey, GraphStaticSceneKey, MAX_GRAPH_SCENE_ENTRIES,
     MAX_GRAPH_STATIC_SCENE_ENTRIES, MAX_SPARK_SCENE_ENTRIES, MIN_HOVER_REFRESH_INTERVAL,
-    SeriesSlot, SparkSceneKey, compose_badge_text, decimate_run, hover_refresh_due,
-    hover_refresh_is_due, reset_hover_refresh_gate, rgba_bits,
+    SeriesSlot, SparkSceneKey, compose_badge_text, decimate_run, hover_refresh_is_due, rgba_bits,
 };
 use crate::gpui_app::graph::GraphOpts;
 use gpui::{Bounds, Point, Rgba, Size, px};
@@ -367,21 +367,19 @@ fn hover_refresh_gate_interval_rule() {
 /// singleton.
 #[test]
 fn hover_refresh_gate_is_scoped_to_its_window() {
-    let first_window = gpui::WindowId::from((1_u64 << 32) | 10_001);
-    let second_window = gpui::WindowId::from((1_u64 << 32) | 10_002);
     let now = Instant::now();
-    reset_hover_refresh_gate(first_window);
-    reset_hover_refresh_gate(second_window);
+    let mut first_window = GraphPresentationCache::default();
+    let mut second_window = GraphPresentationCache::default();
 
-    assert!(hover_refresh_due(first_window, now));
-    assert!(!hover_refresh_due(first_window, now));
+    assert!(first_window.hover_refresh_due(now));
+    assert!(!first_window.hover_refresh_due(now));
     assert!(
-        hover_refresh_due(second_window, now),
+        second_window.hover_refresh_due(now),
         "another window owns an independent first-refresh allowance"
     );
 
-    reset_hover_refresh_gate(first_window);
-    reset_hover_refresh_gate(second_window);
+    first_window.reset_hover_refresh();
+    second_window.reset_hover_refresh();
 }
 
 /// The capacity caps are part of the memory contract documented in

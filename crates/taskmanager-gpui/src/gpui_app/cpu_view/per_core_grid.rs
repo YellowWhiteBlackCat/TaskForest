@@ -11,7 +11,7 @@ use std::rc::Rc;
 use gpui::{Div, InteractiveElement, ParentElement, Styled, div, px};
 
 use crate::gpui_app::elements;
-use crate::gpui_app::graph::{GraphSettings, compute_column_count};
+use crate::gpui_app::graph::{GraphCacheHandle, GraphSettings, compute_column_count};
 use taskmanager_core::core::hardware::{CpuType, HardwareInfo};
 use taskmanager_theme::Theme;
 
@@ -68,6 +68,7 @@ pub(super) fn render(
     hardware: &HardwareInfo,
     series: &PerCoreSeries<'_>,
     graph_settings: GraphSettings,
+    graph_cache: GraphCacheHandle,
 ) -> Div {
     let core_count = stats.cores.len().max(1);
     let mut grid = div()
@@ -170,6 +171,7 @@ pub(super) fn render(
                     color,
                     stats.cores[core_index].label(),
                     graph_settings,
+                    graph_cache.clone(),
                 )
                 .h_full()
                 .min_w(px(0.0));
@@ -186,8 +188,5 @@ pub(super) fn render(
 }
 
 fn empty_samples() -> Rc<[f32]> {
-    thread_local! {
-        static EMPTY: Rc<[f32]> = Rc::from([]);
-    }
-    EMPTY.with(Rc::clone)
+    Rc::from([])
 }

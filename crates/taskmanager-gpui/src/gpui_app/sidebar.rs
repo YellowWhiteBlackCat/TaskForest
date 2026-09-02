@@ -14,6 +14,7 @@ use taskmanager_telemetry_store::TelemetryStore;
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::formatting::{PerformanceSettings, gpu_identity_text};
+use crate::gpui_app::graph::GraphCacheHandle;
 use crate::gpui_app::history_samples::{
     battery_capacity_samples, fan_rpm_samples, gpu_usage_samples, network_rate_samples,
     storage_activity_samples,
@@ -174,6 +175,7 @@ pub(crate) struct SidebarProps<'a> {
     pub network_visibility: NetworkVisibility,
     pub show_gpus: bool,
     pub performance: PerformanceSettings,
+    pub graph_cache: GraphCacheHandle,
     pub sidebar_order: &'a [String],
     pub sidebar_device_overrides: &'a [SidebarDeviceOverrideConfig],
     pub edit_mode: bool,
@@ -202,6 +204,7 @@ pub(crate) fn render_sidebar(
         network_visibility,
         show_gpus,
         performance,
+        graph_cache,
         sidebar_order,
         sidebar_device_overrides,
         edit_mode,
@@ -259,6 +262,7 @@ pub(crate) fn render_sidebar(
                 base: theme.cpu,
                 max: 100.0,
                 graph_settings,
+                graph_cache: graph_cache.clone(),
                 hovered,
                 id: "dev-cpu".into(),
                 icon: IconId::Cpu,
@@ -287,6 +291,7 @@ pub(crate) fn render_sidebar(
                 base: theme.memory,
                 max: 100.0,
                 graph_settings,
+                graph_cache: graph_cache.clone(),
                 hovered,
                 id: "dev-mem".into(),
                 icon: IconId::Memory,
@@ -304,8 +309,12 @@ pub(crate) fn render_sidebar(
         if !edit_mode && !visible {
             continue;
         }
-        let samples =
-            storage_activity_samples(&telemetry.system_history, &d.device_id, d.device_generation);
+        let samples = storage_activity_samples(
+            &graph_cache,
+            &telemetry.system_history,
+            &d.device_id,
+            d.device_generation,
+        );
         let base = clean_disk_name(&d.name);
         // Prefer the vendor+model string (e.g. "ZHITAI TiPro9000 2TB") as the
         // row title; fall back to the device node when sysfs exposes no model.
@@ -341,6 +350,7 @@ pub(crate) fn render_sidebar(
                 base: theme.disk,
                 max: 100.0,
                 graph_settings,
+                graph_cache: graph_cache.clone(),
                 hovered,
                 id: ("dev-disk", i).into(),
                 icon: IconId::Disk,
@@ -362,8 +372,12 @@ pub(crate) fn render_sidebar(
         if !edit_mode && !visible {
             continue;
         }
-        let samples =
-            network_rate_samples(&telemetry.system_history, &n.device_id, n.device_generation);
+        let samples = network_rate_samples(
+            &graph_cache,
+            &telemetry.system_history,
+            &n.device_id,
+            n.device_generation,
+        );
         // Every category carries the interface name so two adapters of the
         // same type remain distinguishable in the sidebar.
         let heading = format!(
@@ -388,6 +402,7 @@ pub(crate) fn render_sidebar(
                 base: theme.network,
                 max,
                 graph_settings,
+                graph_cache: graph_cache.clone(),
                 hovered,
                 id: ("dev-nic", i).into(),
                 icon: IconId::Network,
@@ -405,8 +420,12 @@ pub(crate) fn render_sidebar(
         if !edit_mode && !visible {
             continue;
         }
-        let samples =
-            gpu_usage_samples(&telemetry.system_history, &g.device_id, g.device_generation);
+        let samples = gpu_usage_samples(
+            &graph_cache,
+            &telemetry.system_history,
+            &g.device_id,
+            g.device_generation,
+        );
         // Consume the same product-first identity projection as the detail
         // page so a resolved model never regresses to a generic adapter label.
         let (heading, _) = gpu_identity_text(g, i);
@@ -426,6 +445,7 @@ pub(crate) fn render_sidebar(
                 base: theme.gpu,
                 max: 100.0,
                 graph_settings,
+                graph_cache: graph_cache.clone(),
                 hovered,
                 id: ("dev-gpu", i).into(),
                 icon: IconId::Gpu,
@@ -446,6 +466,7 @@ pub(crate) fn render_sidebar(
             continue;
         }
         let samples = battery_capacity_samples(
+            &graph_cache,
             &telemetry.dynamic_history,
             &battery.id,
             battery.device_generation,
@@ -475,6 +496,7 @@ pub(crate) fn render_sidebar(
                 base: theme.accent,
                 max: 100.0,
                 graph_settings,
+                graph_cache: graph_cache.clone(),
                 hovered,
                 id: ("dev-battery", i).into(),
                 icon: IconId::Health,
@@ -500,6 +522,7 @@ pub(crate) fn render_sidebar(
             continue;
         }
         let samples = fan_rpm_samples(
+            &graph_cache,
             &telemetry.dynamic_history,
             reading.id(),
             reading.device_generation(),
@@ -520,6 +543,7 @@ pub(crate) fn render_sidebar(
                 base: theme.cpu,
                 max: 3000.0,
                 graph_settings,
+                graph_cache: graph_cache.clone(),
                 hovered,
                 id: ("dev-fan", i).into(),
                 icon: IconId::Health,

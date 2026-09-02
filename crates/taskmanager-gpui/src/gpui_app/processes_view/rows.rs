@@ -420,6 +420,7 @@ pub fn proc_row_with_layout(
         gray_zero_values,
         density,
         ui_size,
+        graph_cache,
     } = props;
     // Row background — subtle + theme-aware (Win11 TM parity): selected rows get
     // a soft accent tint, hovered (non-selected) rows a fainter accent tint, and
@@ -847,6 +848,7 @@ pub fn proc_row_with_layout(
             entity,
             gray_zero_values,
             ui_size,
+            graph_cache,
         },
     )
 }

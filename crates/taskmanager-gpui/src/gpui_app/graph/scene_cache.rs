@@ -11,7 +11,7 @@
 //! they could never hit across frames.
 //!
 //! This module keeps the built geometry OUTSIDE the per-frame element tree,
-//! in a single-threaded UI-thread store keyed by everything that can change
+//! in the window-owned [`GraphSceneCache`] keyed by everything that can change
 //! the geometry:
 //!
 //! - the **identity** of the shared samples `Rc` (the generation-keyed view
@@ -29,12 +29,8 @@
 //! The same module also carries the sparkline scene store (same contract),
 //! the value-badge shaped-text cache, and the hover-refresh rate gate.
 
-use std::cell::RefCell;
-use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::{Duration, Instant};
-
-use gpui::WindowId;
 
 use gpui::{
     App, Background, Bounds, Hsla, Path, PathBuilder, Pixels, Point, Rgba, Window, fill, point, px,
@@ -239,10 +235,11 @@ struct GraphStaticSceneEntry {
     geometry: GraphStaticGeometry,
 }
 
-thread_local! {
-    static GRAPH_SCENES: RefCell<Vec<GraphSceneEntry>> = const { RefCell::new(Vec::new()) };
-    static GRAPH_STATIC_SCENES: RefCell<Vec<GraphStaticSceneEntry>> =
-        const { RefCell::new(Vec::new()) };
+#[derive(Default)]
+pub(super) struct GraphSceneCache {
+    dynamic: Vec<GraphSceneEntry>,
+    static_scenes: Vec<GraphStaticSceneEntry>,
+    spark: Vec<SparkSceneEntry>,
 }
 
 /// Paint a graph through the replay cache: rebuild only when the samples
@@ -250,7 +247,9 @@ thread_local! {
 /// entry was stored; otherwise replay the stored paths. Static grid/fill
 /// geometry is looked up separately so a data revision only rebuilds the
 /// dynamic paths.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn paint_graph_scene(
+    cache: &mut GraphSceneCache,
     window: &mut Window,
     cx: &mut App,
     bounds: Bounds<Pixels>,
@@ -259,8 +258,9 @@ pub(super) fn paint_graph_scene(
     opts: GraphOpts,
     slide_offset: Pixels,
 ) {
-    let fill = paint_graph_static_scene(window, bounds, base, opts);
+    let fill = paint_graph_static_scene(cache, window, bounds, base, opts);
     paint_graph_dynamic_series(
+        cache,
         window,
         cx,
         bounds,
@@ -284,7 +284,9 @@ pub(super) fn paint_graph_scene(
 /// composes BOTH directions' newest values when both series carry labels
 /// (see [`compose_badge_text`], mirroring iced's `readout_text`), so a
 /// read/write or rx/tx graph never shows only one direction's current value.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn paint_graph_dual_scene(
+    cache: &mut GraphSceneCache,
     window: &mut Window,
     cx: &mut App,
     bounds: Bounds<Pixels>,
@@ -293,9 +295,10 @@ pub(super) fn paint_graph_dual_scene(
     opts: GraphOpts,
     slide_offset: Pixels,
 ) {
-    let fill = paint_graph_static_scene(window, bounds, primary.base, opts);
+    let fill = paint_graph_static_scene(cache, window, bounds, primary.base, opts);
     let secondary_fill = graph_fill_background(secondary.base, opts);
     paint_graph_dynamic_series(
+        cache,
         window,
         cx,
         bounds,
@@ -322,6 +325,7 @@ pub(super) fn paint_graph_dual_scene(
         .map(BadgeRequest::Directions)
         .or(Some(BadgeRequest::Value));
     paint_graph_dynamic_series(
+        cache,
         window,
         cx,
         bounds,
@@ -341,6 +345,7 @@ pub(super) fn paint_graph_dual_scene(
 /// selects between the single-value and two-direction readouts.
 #[allow(clippy::too_many_arguments)]
 fn paint_graph_dynamic_series(
+    cache: &mut GraphSceneCache,
     window: &mut Window,
     cx: &mut App,
     bounds: Bounds<Pixels>,
@@ -354,59 +359,58 @@ fn paint_graph_dynamic_series(
 ) {
     let scene_key = GraphSceneKey::for_series(samples, bounds, base, opts, series);
     let key = scene_key.dynamic_key();
-    GRAPH_SCENES.with_borrow_mut(|store| {
-        let index = match store
-            .iter()
-            .position(|entry| entry.key == key && Rc::ptr_eq(&entry.samples, samples))
-        {
-            Some(index) => index,
-            None => {
-                evict_superseded(store, MAX_GRAPH_SCENE_ENTRIES);
-                store.push(GraphSceneEntry {
-                    samples: Rc::clone(samples),
-                    key,
-                    geometry: build_graph_dynamic_geometry(
-                        bounds,
-                        samples.as_ref(),
-                        base,
-                        opts,
-                        fill,
-                        scene_key.x_mapping,
-                    ),
-                    badge: None,
-                });
-                store.len() - 1
-            }
-        };
-        let entry = &mut store[index];
-        if slide_offset == px(0.0) {
-            entry.geometry.paint(window);
-        } else {
-            entry
-                .geometry
-                .paint_translated(window, Point::new(slide_offset, px(0.0)));
-        }
-        if let Some(request) = badge.filter(|_| opts.value_badge) {
-            let directions = match request {
-                BadgeRequest::Value => None,
-                BadgeRequest::Directions(directions) => Some(directions),
-            };
-            let font_size = window.text_style().font_size;
-            draw_value_badge(
-                window,
-                cx,
-                BadgePaintInputs {
+    let store = &mut cache.dynamic;
+    let index = match store
+        .iter()
+        .position(|entry| entry.key == key && Rc::ptr_eq(&entry.samples, samples))
+    {
+        Some(index) => index,
+        None => {
+            evict_superseded(store, MAX_GRAPH_SCENE_ENTRIES);
+            store.push(GraphSceneEntry {
+                samples: Rc::clone(samples),
+                key,
+                geometry: build_graph_dynamic_geometry(
                     bounds,
-                    samples: samples.as_ref(),
+                    samples.as_ref(),
                     base,
                     opts,
-                    font_size,
-                    directions,
-                },
-                &mut entry.badge,
-            );
+                    fill,
+                    scene_key.x_mapping,
+                ),
+                badge: None,
+            });
+            store.len() - 1
         }
-    });
+    };
+    let entry = &mut store[index];
+    if slide_offset == px(0.0) {
+        entry.geometry.paint(window);
+    } else {
+        entry
+            .geometry
+            .paint_translated(window, Point::new(slide_offset, px(0.0)));
+    }
+    if let Some(request) = badge.filter(|_| opts.value_badge) {
+        let directions = match request {
+            BadgeRequest::Value => None,
+            BadgeRequest::Directions(directions) => Some(directions),
+        };
+        let font_size = window.text_style().font_size;
+        draw_value_badge(
+            window,
+            cx,
+            BadgePaintInputs {
+                bounds,
+                samples: samples.as_ref(),
+                base,
+                opts,
+                font_size,
+                directions,
+            },
+            &mut entry.badge,
+        );
+    }
 }
 
 /// Static scenes do not carry a sample handle that can be used for
@@ -665,10 +669,6 @@ impl StoresSamples for SparkSceneEntry {
     }
 }
 
-thread_local! {
-    static SPARK_SCENES: RefCell<Vec<SparkSceneEntry>> = const { RefCell::new(Vec::new()) };
-}
-
 /// Number of retained samples per horizontal pixel above which a run is
 /// LTTB-decimated: a 1 px stroke cannot resolve denser detail, and the extra
 /// points only feed the per-frame tessellation cost during horizontal
@@ -677,7 +677,8 @@ pub(crate) const SPARKLINE_SAMPLES_PER_PIXEL: usize = 2;
 
 /// Build (or replay) a sparkline's stroke paths for `samples` at `bounds`,
 /// stroked in `color`. Pure geometry; the caller owns painting.
-pub(crate) fn sparkline_paths(
+pub(super) fn sparkline_paths(
+    cache: &mut GraphSceneCache,
     samples: &Rc<[f32]>,
     bounds: Bounds<Pixels>,
     color: Rgba,
@@ -689,22 +690,21 @@ pub(crate) fn sparkline_paths(
         size: (f32::from(bounds.size.width), f32::from(bounds.size.height)),
         color_bits: rgba_bits(color),
     };
-    SPARK_SCENES.with_borrow_mut(|store| {
-        if let Some(entry) = store
-            .iter()
-            .find(|entry| entry.key == key && Rc::ptr_eq(&entry.samples, samples))
-        {
-            return entry.paths.clone();
-        }
-        evict_superseded(store, MAX_SPARK_SCENE_ENTRIES);
-        let paths = build_sparkline_paths(samples, bounds, SPARKLINE_SAMPLES_PER_PIXEL);
-        store.push(SparkSceneEntry {
-            samples: Rc::clone(samples),
-            key,
-            paths: paths.clone(),
-        });
-        paths
-    })
+    let store = &mut cache.spark;
+    if let Some(entry) = store
+        .iter()
+        .find(|entry| entry.key == key && Rc::ptr_eq(&entry.samples, samples))
+    {
+        return entry.paths.clone();
+    }
+    evict_superseded(store, MAX_SPARK_SCENE_ENTRIES);
+    let paths = build_sparkline_paths(samples, bounds, SPARKLINE_SAMPLES_PER_PIXEL);
+    store.push(SparkSceneEntry {
+        samples: Rc::clone(samples),
+        key,
+        paths: paths.clone(),
+    });
+    paths
 }
 
 /// Build the sparkline stroke paths: a flat midpoint baseline for an empty
@@ -790,55 +790,18 @@ fn decimate_run(run: &[(usize, f32)], budget: usize) -> Vec<(usize, f32)> {
 
 // ── Hover-refresh rate gate ────────────────────────────────────────────────
 
-const MAX_HOVER_REFRESH_WINDOWS: usize = 64;
-
-thread_local! {
-    static LAST_HOVER_REFRESH: RefCell<HashMap<WindowId, Instant>> =
-        RefCell::new(HashMap::new());
-}
-
 /// Pure decision core of the hover-refresh gate, factored out so the interval
 /// rule is testable without sleeping: a refresh is due when none happened yet
 /// or at least `min_interval` elapsed since the last one.
-fn hover_refresh_is_due(last: Option<Instant>, now: Instant, min_interval: Duration) -> bool {
+pub(super) fn hover_refresh_is_due(
+    last: Option<Instant>,
+    now: Instant,
+    min_interval: Duration,
+) -> bool {
     last.is_none_or(|last| {
         now.checked_duration_since(last)
             .is_some_and(|elapsed| elapsed >= min_interval)
     })
-}
-
-/// Whether a hover-driven `window.refresh()` should be scheduled now.
-/// Records the refresh time when it returns `true`.
-pub(super) fn hover_refresh_due(window_id: WindowId, now: Instant) -> bool {
-    LAST_HOVER_REFRESH.with(|gates| {
-        let mut gates = gates.borrow_mut();
-        let due = hover_refresh_is_due(
-            gates.get(&window_id).copied(),
-            now,
-            MIN_HOVER_REFRESH_INTERVAL,
-        );
-        if due {
-            if !gates.contains_key(&window_id) && gates.len() >= MAX_HOVER_REFRESH_WINDOWS {
-                let least_recent = gates
-                    .iter()
-                    .min_by_key(|(_, refreshed_at)| **refreshed_at)
-                    .map(|(id, _)| *id);
-                if let Some(least_recent) = least_recent {
-                    gates.remove(&least_recent);
-                }
-            }
-            gates.insert(window_id, now);
-        }
-        due
-    })
-}
-
-/// Clear the hover-refresh gate (pointer left the graph: the next enter must
-/// paint immediately).
-pub(super) fn reset_hover_refresh_gate(window_id: WindowId) {
-    LAST_HOVER_REFRESH.with(|gates| {
-        gates.borrow_mut().remove(&window_id);
-    });
 }
 
 #[cfg(test)]

@@ -10,7 +10,7 @@ use taskmanager_ui::primitives::motion::{hover_animation, hover_state_key};
 use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
-use crate::gpui_app::graph::{GraphOpts, GraphSettings, graph_element};
+use crate::gpui_app::graph::{GraphCacheHandle, GraphOpts, GraphSettings, graph_element};
 use crate::gpui_app::root::{Hover, RootView};
 use taskmanager_theme::{Color, Theme};
 
@@ -31,6 +31,7 @@ pub(super) struct DeviceRowProps<'a> {
     pub(super) base: Color,
     pub(super) max: f32,
     pub(super) graph_settings: GraphSettings,
+    pub(super) graph_cache: GraphCacheHandle,
     pub(super) hovered: Option<&'a Hover>,
     pub(super) id: ElementId,
     pub(super) icon: IconId,
@@ -67,6 +68,7 @@ pub(super) fn device_row(
         base,
         max,
         graph_settings,
+        graph_cache,
         hovered,
         id,
         icon,
@@ -180,6 +182,7 @@ pub(super) fn device_row(
                     samples,
                     taskmanager_ui::theme_binding::rgba(base),
                     opts,
+                    graph_cache,
                 )),
         )
         .child(

@@ -12,7 +12,9 @@ use taskmanager_ui_contract::IconId;
 
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting;
-use crate::gpui_app::graph::{GraphHover, GraphOpts, graph_element_hover, graph_hover};
+use crate::gpui_app::graph::{
+    GraphCacheHandle, GraphHover, GraphOpts, graph_element_hover, graph_hover,
+};
 use crate::gpui_app::root::responsive::{SystemPageBudget, SystemSurfacePresentation};
 use crate::gpui_app::root::{RootView, TopPage};
 use crate::gpui_app::sidebar::SelectedDevice;
@@ -363,6 +365,7 @@ struct HistoryCardProps<'a> {
     active: TimelineSelection,
     entity: Entity<RootView>,
     hover_slot: Rc<RefCell<Option<GraphHover>>>,
+    graph_cache: GraphCacheHandle,
 }
 
 /// One history card: readout pills plus the hover graph. The sample buffer
@@ -383,6 +386,7 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
         active,
         entity,
         hover_slot,
+        graph_cache,
     } = props;
     let samples = series.samples(metric);
     div()
@@ -454,6 +458,7 @@ fn history_card(props: HistoryCardProps<'_>) -> Div {
                 },
                 metric_hover_format(unit),
                 hover_slot,
+                graph_cache,
             ),
             &samples,
         ))
@@ -493,6 +498,7 @@ pub struct DashboardViewProps<'a> {
     pub layout: SystemPageBudget,
     pub entity: Entity<RootView>,
     pub hover_slot: Rc<RefCell<Option<GraphHover>>>,
+    pub(crate) graph_cache: GraphCacheHandle,
 }
 
 pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
@@ -507,6 +513,7 @@ pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
         layout,
         entity,
         hover_slot,
+        graph_cache,
     } = props;
     let series = state.timeline.series(history, state.history_window);
     let coverage_minutes = series.covered_ms as f64 / 60_000.0;
@@ -638,6 +645,7 @@ pub fn render_dashboard(props: DashboardViewProps<'_>) -> impl IntoElement {
                 layout,
                 entity,
                 hover_slot.clone(),
+                graph_cache,
             )),
     );
     // Hover tooltip: page-level singleton (one slot, one cursor). Sibling of
