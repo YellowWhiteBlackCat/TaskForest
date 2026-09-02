@@ -23,10 +23,11 @@ use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, UiRect, Val, percent, px,
+    AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Overflow, UiRect, Val, percent,
+    px,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, Button};
+use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskmanager_application::process_details_vm::{
     ProcessDetailsField, detail_value, process_details_rows,
 };
@@ -461,12 +462,14 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
             width: percent(32),
             min_width: px(0.0),
             height: percent(100),
+            overflow: Overflow::scroll_y(),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_8()),
             padding: UiRect::all(Val::Px(space_8())),
             border_radius: BorderRadius::all(Val::Px(palette.panel_radius_px)),
         }
         BackgroundColor({ palette.panel_fill })
+        ScrollArea
         on(bootstrap_details_page)
         ProcessDetailsRoot
         Children [
@@ -506,6 +509,7 @@ fn details_content_scene(
         Node {
             width: percent(100),
             flex_grow: 1.0,
+            flex_shrink: 0.0,
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_8()),
         }
@@ -524,6 +528,7 @@ fn details_content_scene(
                     ( { refresh } ),
                 ]
             ),
+            ( Text(t("proc_insights.scroll_hint")) TextRole(Role::Caption) ),
             ( Text(overview_title) TextRole(Role::Caption) ),
             { overview_rows },
             (

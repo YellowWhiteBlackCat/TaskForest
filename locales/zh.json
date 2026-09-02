@@ -914,6 +914,7 @@
   "prop.last_60_seconds": "最近 60 秒",
   "prop.bytes_per_second": "字节/秒",
   "proc_insights.loading": "正在加载进程洞察…",
+  "proc_insights.scroll_hint": "滚动查看更多详情",
   "proc_insights.connections": "连接",
   "proc_insights.no_connections": "没有活动连接",
   "proc_insights.network_throughput": "网络吞吐",

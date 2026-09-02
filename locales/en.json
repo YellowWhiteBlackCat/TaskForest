@@ -913,6 +913,7 @@
   "prop.last_60_seconds": "Last 60 seconds",
   "prop.bytes_per_second": "bytes/s",
   "proc_insights.loading": "Loading process insights…",
+  "proc_insights.scroll_hint": "Scroll for more details",
   "proc_insights.connections": "Connections",
   "proc_insights.no_connections": "No active connections",
   "proc_insights.network_throughput": "Network throughput",

@@ -76,7 +76,7 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (
             Scrollbar,
             Unsupported {
-                reason: "the current Bevy surfaces have no discoverable scrollbar rail",
+                reason: "Bevy details and long pages use wheel-only ScrollArea surfaces; no visible scrollbar rail is wired",
             },
         ),
         (
