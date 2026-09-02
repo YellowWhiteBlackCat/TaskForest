@@ -1,9 +1,10 @@
-//! Iced frontend launcher (ADR-029): the composition edge of the iced shape.
+//! Iced frontend launcher (ADR-051): the composition edge of the Iced product.
 //!
 //! The shared `taskmanager-app-host` is the only native composition seam: its
-//! client is handed to this frontend through the application port, mirroring
-//! the GPUI and TUI launchers. `demo` runs fixture data with no host I/O.
-//! The single `taskmanager` binary calls this under the `ui-iced` feature.
+//! client is handed to this frontend through the application port, matching
+//! the other product launchers. `demo` runs fixture data with no host I/O.
+//! The independent `taskforest-i` product binary calls this through the shared
+//! `taskmanager-cli` harness.
 
 use std::cell::RefCell;
 use std::sync::mpsc::{Receiver, channel};
@@ -92,7 +93,7 @@ pub fn run(demo: bool) -> iced::Result {
         match host.spawn_client() {
             Ok(client) => Some(client),
             Err(error) => {
-                eprintln!("taskmanager (ui-iced): native platform composition failed: {error}");
+                eprintln!("taskforest-i: native platform composition failed: {error}");
                 std::process::exit(1);
             }
         }

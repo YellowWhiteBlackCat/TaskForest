@@ -42,7 +42,7 @@ pub use local_time::local_time_rules;
 pub fn history_lock_holder_is_gone(pid: u32) -> bool {
     !std::path::Path::new(&format!("/proc/{pid}")).exists()
 }
-// Neutral system-tray seam implementation (ksni StatusNotifierItem, ADR-0NN);
+// Neutral system-tray seam implementation (ksni StatusNotifierItem, ADR-032);
 // the frontends reach it through `taskmanager-platform-native::tray`.
 pub mod tray;
 // Single-instance adapter (D-Bus well-known name, borrowed core from

@@ -15,7 +15,7 @@
 // gated so the module (and its typed `Unsupported` fallback) still compiles
 // — and its contract test still runs — on every other host.
 #[cfg(target_os = "macos")]
-use std::io::{Read, Write};
+use std::io::{ErrorKind, Read, Write};
 #[cfg(target_os = "macos")]
 use std::os::unix::net::{UnixListener, UnixStream};
 #[cfg(target_os = "macos")]
@@ -41,6 +41,11 @@ const ACTIVATE_PAYLOAD: &[u8] = b"activate";
 /// Maximum payload a primary accepts from a connection (bounds work).
 #[cfg(target_os = "macos")]
 const MAX_PAYLOAD_BYTES: usize = 64;
+
+/// An accepted local client is not trusted to finish its write. The primary
+/// must still be able to release the singleton within a bounded interval.
+#[cfg(target_os = "macos")]
+const CLIENT_READ_TIMEOUT: std::time::Duration = std::time::Duration::from_millis(500);
 
 /// Socket path in the process's (per-user on macOS) temp directory.
 #[cfg(any(target_os = "macos", test))]
@@ -136,16 +141,29 @@ fn spawn_accept_loop(
     events: Sender<InstanceEvent>,
     stop: Arc<AtomicBool>,
 ) -> Result<JoinHandle<()>, InstanceFailure> {
+    listener
+        .set_nonblocking(true)
+        .map_err(|_| InstanceFailure::Rejected)?;
     std::thread::Builder::new()
         .name("taskmanager:single-instance".into())
         .spawn(move || {
             while !stop.load(Ordering::Relaxed) {
-                let Ok((mut stream, _addr)) = listener.accept() else {
-                    continue;
-                };
-                let mut buffer = [0u8; MAX_PAYLOAD_BYTES];
-                if stream.read(&mut buffer).is_ok() && buffer.starts_with(ACTIVATE_PAYLOAD) {
-                    let _ = events.send(InstanceEvent::Activate);
+                match listener.accept() {
+                    Ok((mut stream, _addr)) => {
+                        if stream.set_nonblocking(false).is_err() {
+                            continue;
+                        }
+                        let _ = stream.set_read_timeout(Some(CLIENT_READ_TIMEOUT));
+                        let mut buffer = [0u8; MAX_PAYLOAD_BYTES];
+                        if stream.read(&mut buffer).is_ok() && buffer.starts_with(ACTIVATE_PAYLOAD)
+                        {
+                            let _ = events.send(InstanceEvent::Activate);
+                        }
+                    }
+                    Err(error) if error.kind() == ErrorKind::WouldBlock => {
+                        std::thread::sleep(std::time::Duration::from_millis(20));
+                    }
+                    Err(_) => break,
                 }
             }
         })

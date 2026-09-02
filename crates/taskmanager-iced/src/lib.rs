@@ -1,10 +1,9 @@
-//! Iced frontend for TaskForest (ADR-027/028).
+//! Iced frontend product for TaskForest (ADR-027/028/051).
 //!
-//! The third frontend architecture slice, peer to the GPUI desktop shell and
-//! the ratatui TUI: the renderer-independent state machine lives in
-//! `taskmanager-shell`, the
-//! design tokens come from the neutral `taskmanager-theme` (taken with
-//! default features — no gpui), and this crate maps them onto iced 0.14.
+//! This product is a peer to the GPUI desktop shell, Ratatui TUI and Bevy
+//! product: the renderer-independent state machine lives in
+//! `taskmanager-shell`, design tokens come from the neutral
+//! `taskmanager-theme`, and this crate maps them onto Iced 0.14.
 //!
 //! Modules:
 //!

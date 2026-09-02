@@ -70,7 +70,8 @@ Iced owns no `TZ`, zoneinfo filesystem or implicit UTC fallback path.
 - `src/tray.rs` owns the Iced-local tray spec/action mapping; `src/app/runtime.rs`
   owns the non-blocking single-instance activation pump. Production uses the
   `TaskForestI` identity, keeps one primary window/process, and minimizes to the
-  tray when the native tray is available; typed tray failure degrades to a
+  tray when the native tray is available; restore explicitly unminimizes,
+  requests focus and asks for attention. Typed tray failure degrades to a
   window-only process. Demo/capture bypasses native lifetime resources.
 - Keyboard, native-window and tray exits submit distinct shell `QuitReason`
   values; Iced only reads `should_quit()`. Footer activity, settings failures,
@@ -144,7 +145,7 @@ Iced owns no `TZ`, zoneinfo filesystem or implicit UTC fallback path.
   drops unknown tokens.
 - `../../scripts/capture-iced.sh` and its validator own pixel evidence, not product state.
 
-The Applications projection presents the same category-first tree contract as GPUI and TUI:
+The Applications projection presents the same category-first tree contract as the other products:
 Applications, Background and Uncategorized are first-level buckets. Applications inserts a
 selectable PID-less application aggregate before each recursive process tree; the other buckets
 expand directly to real process rows. Legacy grouping tokens are normalized when configuration
