@@ -33,12 +33,15 @@ Delivery diagnostics retain per-class use and rejection counts plus the
 configured control reserve, without exposing runtime queue implementations.
 ECS types and an unbounded event log never cross this crate.
 
-`window_capture.rs` owns the platform-neutral receipt, backend provenance and
-bounded failure vocabulary for one accepted PNG. It contains no Wayland, D-Bus,
-PipeWire or provider-specific object, leaving those details to the native adapter.
-The current native implementation selects a Linux one-shot provider only;
-Portal Screenshot and continuous ScreenCast/PipeWire remain explicit future
-backend values and must not be inferred as supported from this contract alone.
+`window_capture.rs` owns the platform-neutral receipt, backend provenance,
+bounded failure vocabulary, in-process renderer hook and native-adapter trait
+for one accepted PNG. It contains no Wayland, D-Bus, PipeWire or
+provider-specific object, leaving those details to the native adapter. Current
+composition provides Linux Spectacle and Windows.Graphics.Capture backends;
+macOS can remain typed `Unsupported` when no in-process hook is available.
+Portal Screenshot, ScreenCaptureKit and continuous ScreenCast/PipeWire remain
+explicit future backend values and must not be inferred as supported from this
+contract alone.
 
 Physical-device producers use the constrained `DeviceDiscovery` constructor so
 IDs, discovery outcome, and item count are derived together; it is the only

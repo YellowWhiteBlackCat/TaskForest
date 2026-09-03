@@ -74,7 +74,6 @@ fn run_production(app_id: Option<String>) {
     let platform_factory = host.clone();
     let history_connector = host.history_frontend_connector();
 
-    #[cfg(target_os = "linux")]
     taskmanager_app_host::register_in_process_capture(Box::new(|output| {
         let (tx, rx) = std::sync::mpsc::sync_channel(1);
         gpui::request_window_frame_capture_with_channel(output.to_path_buf(), tx);

@@ -37,6 +37,8 @@ use taskmanager_platform_runtime::{
 };
 
 mod bindings;
+pub mod window_capture;
+pub use window_capture::MacosWindowCapture;
 mod config;
 mod provider;
 // Neutral system-tray seam implementation (NSStatusItem via tray-icon,

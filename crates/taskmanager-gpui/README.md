@@ -94,10 +94,13 @@ history, spawn a tray, or execute host actions.
   the current projection into an immutable request, then only drains correlated
   completion into shell feedback; System and Service Details own no file writer,
   current-directory lookup or per-window worker.
-- Linux GPUI exposes a current-window PNG action in the navigation controls. It
-  submits the shared application request and reports the app-host receipt; it does
-  not read Wayland state or invoke Spectacle from the renderer. The native adapter
-  seam reserves Portal Screenshot and ScreenCast/PipeWire for later evolution.
+- GPUI exposes a current-window PNG action in the navigation controls on every
+  product target. It submits the shared application request and reports the
+  app-host receipt; it does not read OS capture state or invoke a provider from
+  the renderer. The host first tries the registered Blade readback hook, then
+  the selected native adapter (Linux Spectacle or Windows.Graphics.Capture);
+  unavailable backends remain typed failures. Portal Screenshot,
+  ScreenCaptureKit and ScreenCast/PipeWire remain later adapter slots.
 - GPUI receives the app-host's narrow enable connector plus the paired read-only replay client
   and in-process writer capability. The root tick drains correlated connection/query
   completions; filesystem writes and teardown remain owned by app-host's bounded worker.

@@ -15,7 +15,6 @@ use super::{
     ProcessBatchAction, ProcessDetailsSection, ProcessItem, ServiceId, SystemHealthCaptureOutcome,
     SystemSection, SystemSnapshot, TopPage,
 };
-#[cfg(target_os = "linux")]
 use super::{WindowCaptureChain, WindowCaptureSchedule};
 use crate::gpui_app::process_insights::ProcessInsightsState;
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -32,7 +31,6 @@ impl CaptureEvidence {
         }
     }
 
-    #[cfg(target_os = "linux")]
     pub(super) fn for_window_capture_test() -> Self {
         Self {
             mode: CaptureMode::Enabled,
@@ -271,7 +269,6 @@ fn settings_permission_center_capture_waits_for_data_and_marks_after_layout() {
     assert!(!evidence.settings_permission_center_requested());
 }
 
-#[cfg(target_os = "linux")]
 #[test]
 fn window_capture_capture_waits_for_native_completion_before_marking_ready() {
     let mut evidence = CaptureEvidence::for_window_capture_test();
@@ -300,7 +297,6 @@ fn window_capture_capture_waits_for_native_completion_before_marking_ready() {
     assert!(evidence.scenario_ready());
 }
 
-#[cfg(target_os = "linux")]
 #[test]
 fn window_capture_failure_is_terminal_and_never_retries() {
     let mut evidence = CaptureEvidence::for_window_capture_test();
@@ -324,6 +320,29 @@ fn window_capture_failure_is_terminal_and_never_retries() {
     evidence.mark_window_capture_ready();
     assert!(!evidence.window_capture_requested());
     assert!(!evidence.window_capture_submission_requested());
+    assert!(!evidence.scenario_ready());
+}
+
+#[test]
+fn window_capture_native_failure_after_submission_is_terminal() {
+    let mut evidence = CaptureEvidence::for_window_capture_test();
+    let mut snapshot = SystemSnapshot::default();
+    evidence.on_snapshot(&mut snapshot);
+    let mut processes = vec![ProcessItem::default()];
+    evidence.on_processes_update(true, PROCESSES_OBSERVED_AT_MS, &mut processes);
+
+    assert!(evidence.schedule_window_capture_frame());
+    assert!(evidence.schedule_window_capture_submission());
+    evidence.mark_window_capture_settled();
+    assert!(evidence.window_capture_submission_requested());
+    evidence.mark_window_capture_submitted();
+    assert!(!evidence.window_capture_submission_requested());
+
+    evidence.mark_window_capture_failed();
+    assert!(!evidence.window_capture_requested());
+    assert!(!evidence.window_capture_submission_requested());
+    assert!(!evidence.window_capture_settling());
+    evidence.mark_window_capture_ready();
     assert!(!evidence.scenario_ready());
 }
 

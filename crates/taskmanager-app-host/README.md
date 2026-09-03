@@ -41,12 +41,14 @@ service-log exports. Frontends only submit immutable typed requests, drain
 correlated completions and project shell feedback; they never construct a
 filesystem adapter or spawn a per-window writer.
 
-Current-window PNG capture follows the same host-owned worker boundary. Its Linux
-adapter uses fixed-argument KDE Spectacle active-window capture on Wayland, the
-worker validates the staged PNG and atomically renames it to the requested path.
-This release exposes only that Linux one-shot path; unsupported platforms never
-fall back to a display-wide or fabricated capture.
-The receipt already records a backend enum so Portal Screenshot and continuous
+Current-window PNG capture follows the same host-owned worker boundary. The host
+first invokes the registered in-process renderer hook, then selects the native
+adapter: Linux uses fixed-argument KDE Spectacle active-window capture on
+Wayland, Windows uses Windows.Graphics.Capture, and macOS remains typed
+`Unsupported` when no renderer hook is available. The worker validates the
+staged PNG and atomically renames it to the requested path; it never falls back
+to a display-wide or fabricated capture. The receipt already records backend
+provenance so Portal Screenshot, ScreenCaptureKit and continuous
 ScreenCast/PipeWire can be added without moving native I/O into a frontend.
 
 The host owns one `StartupLocalTimeCache` shared by every cloned host and

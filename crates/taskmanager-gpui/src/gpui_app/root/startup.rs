@@ -189,7 +189,6 @@ fn spawn_update_loop(
                 if view.drain_snapshot_export_completions() {
                     cx.notify();
                 }
-                #[cfg(target_os = "linux")]
                 if view.drain_window_capture_completions() {
                     cx.notify();
                 }

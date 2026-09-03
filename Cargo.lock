@@ -9886,6 +9886,7 @@ dependencies = [
  "taskmanager-tray-muda",
  "taskmanager-windows-api",
  "tray-icon",
+ "windows-capture",
  "windows-registry 0.6.1",
  "windows-service",
 ]

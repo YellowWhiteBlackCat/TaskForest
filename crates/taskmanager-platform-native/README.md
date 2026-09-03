@@ -21,8 +21,10 @@ adapter; the application host receives only safe probes and owned paths.
 Linux currently provides validated local-time rules. macOS and Windows return
 typed `Unsupported` until their native time-zone adapters exist; the selector
 never substitutes UTC for an unavailable local zone.
-Current-window PNG capture is selected here as well: Linux delegates to its
-Wayland-capable adapter, while other targets return typed `Unsupported`.
+Current-window PNG capture is selected here as well. The selector first tries
+the registered in-process renderer hook, then delegates to the target adapter:
+Linux uses KDE Spectacle, Windows uses Windows.Graphics.Capture, and macOS
+returns typed `Unsupported` when no renderer hook is available.
 Verify cfg edges, feature closure and reverse dependency firewalls whenever an
 adapter or composition dependency changes.
 

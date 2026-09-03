@@ -207,7 +207,6 @@ pub fn nav_strip_horizontal(
                     let controls = div().flex_shrink_0().flex().items_center().gap(
                         taskmanager_ui::theme_binding::definite_length(tokens::SPACE_2),
                     );
-                    #[cfg(target_os = "linux")]
                     let controls =
                         controls.child(super::super::window_capture::current_window_capture_btn(
                             t,
@@ -423,14 +422,13 @@ pub fn nav_strip_vertical(
                         )
                         .child({
                             // The vertical rail is a column regardless of
-                            // whether its page tabs are labeled. The Linux
-                            // capture action has a localized label, so a
-                            // horizontal controls row cannot satisfy the
-                            // rail's width budget even in labeled mode.
+                            // whether its page tabs are labeled. The capture
+                            // action has a localized label, so a horizontal
+                            // controls row cannot satisfy the rail's width
+                            // budget even in labeled mode.
                             let controls = div().flex().flex_col().items_center().gap(
                                 taskmanager_ui::theme_binding::definite_length(tokens::SPACE_2),
                             );
-                            #[cfg(target_os = "linux")]
                             let controls = controls.child(
                                 super::super::window_capture::current_window_capture_btn(
                                     t, hovered, true, cx,

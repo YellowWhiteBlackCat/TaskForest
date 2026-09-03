@@ -39,7 +39,7 @@ runtime wiring.
 src/provider/                  process, storage, system, sensor, service, environment,
 │                              power, gpu, integration providers
 src/bindings.rs                safe system-API bindings with typed degradation
-src/instance.rs  config.rs  tray.rs
+src/instance.rs  config.rs  tray.rs  window_capture.rs
 ```
 
 Abilities without receipts stay typed `Unsupported` (ADR-019).

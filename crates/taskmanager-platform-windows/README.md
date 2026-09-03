@@ -101,7 +101,7 @@ src/provider/
 ├── service/ (+ log_runtime)  storage/  environment/ (+ sessions, boot_evidence)
 ├── power/  sensor/  integration/
 src/bindings.rs                taskmanager-windows-api consumption wrappers
-src/command.rs  config.rs  instance.rs  local_time.rs
+src/command.rs  config.rs  instance.rs  local_time.rs  window_capture.rs
 ```
 
 No PowerShell/CMD anywhere; native calls stay inside the ADR-031 boundary.

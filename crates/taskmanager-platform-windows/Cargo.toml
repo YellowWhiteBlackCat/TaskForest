@@ -59,6 +59,7 @@ notify-rust = "4.18"
 # menu behind a safe public API; ADR-0NN). Keep upstream default features off:
 # the Windows product does not need tray-icon's Linux GTK/libappindicator path.
 tray-icon = { version = "0.24", default-features = false }
+windows-capture = "1.5.0"
 
 [dev-dependencies]
 taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }
