@@ -1,4 +1,7 @@
 #![allow(
+    unknown_lints,
+    unused_unsafe,
+    mismatched_lifetime_syntaxes,
     // We don't use syntax sugar where it's not necessary.
     clippy::match_like_matches_macro,
     // Redundant matching is more explicit.
