@@ -6,6 +6,15 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.1.2] — 2026-09-03
+
+### 修复
+
+- **Windows 编译与跨平台窗口捕获修复**：修复在 Windows 目标下编译 GPUI 时因缺少 frame capture 导出符号导致的构建阻断（为 `patches/gpui/src/platform.rs` 补齐非 Linux/macOS 平台上的 fallback 桩实现，并在 `gpui.rs` 中无条件导出）；完善跨平台活动窗口捕获体系，在 `taskmanager-platform-windows` 中基于 `windows-capture` 提供原生窗口截图，在 `taskmanager-platform-native` 中建立统一的 In-Process → Native → Unsupported 三层回退流水线。
+- **发布流水线恢复**：修复 0.1.1 触发的 Windows MSI CI 构建阻断，恢复多平台完整自动化发布。
+
+> 注：0.1.1 tag 在发布流水线中遭遇 Windows x64 MSI 编译阻断未生成正式 GitHub Release 资产；0.1.1 所含全部变更并入 0.1.2 正式发布。
+
 ## [0.1.1] — 2026-09-03
 
 ### 修复

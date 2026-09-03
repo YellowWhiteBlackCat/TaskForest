@@ -9507,7 +9507,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-accessibility-linux"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "accesskit",
  "accesskit_consumer 0.38.0",
@@ -9517,14 +9517,14 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-afpacket"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "taskmanager-app-host"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "crossbeam-channel",
  "ctrlc",
@@ -9538,7 +9538,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-application"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "atomicwrites",
  "crossbeam-channel",
@@ -9550,14 +9550,14 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-assets"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "usvg 0.48.1",
 ]
 
 [[package]]
 name = "taskmanager-bevy-ui"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "accesskit",
  "bevy",
@@ -9575,7 +9575,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-cli"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde_json",
  "taskmanager-app-host",
@@ -9591,7 +9591,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-core"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -9600,21 +9600,21 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-escalation"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-fd-bridge",
 ]
 
 [[package]]
 name = "taskmanager-fd-bridge"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "taskmanager-gates"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "crossbeam-channel",
@@ -9641,7 +9641,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-gpui"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "chrono",
  "crossbeam-channel",
@@ -9671,7 +9671,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-history-store"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -9680,7 +9680,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-iced"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "fontdb 0.23.0",
  "futures-timer",
@@ -9706,7 +9706,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-icons"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-assets",
  "taskmanager-ui-contract",
@@ -9714,7 +9714,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-msr-helper"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -9722,7 +9722,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-net-launcher"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-afpacket",
  "taskmanager-fd-bridge",
@@ -9730,14 +9730,14 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-perf-ioctl"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "libc",
 ]
 
 [[package]]
 name = "taskmanager-platform-android"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-application",
  "taskmanager-platform-contract",
@@ -9746,7 +9746,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-platform-conformance"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-application",
  "taskmanager-core",
@@ -9755,14 +9755,14 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-platform-contract"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-core",
 ]
 
 [[package]]
 name = "taskmanager-platform-linux"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bitflags 2.13.1",
  "crossbeam-channel",
@@ -9796,7 +9796,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-platform-macos"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "open",
  "plist",
@@ -9815,7 +9815,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-platform-native"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-core",
  "taskmanager-platform-contract",
@@ -9826,7 +9826,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-platform-ohos"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-application",
  "taskmanager-platform-contract",
@@ -9835,7 +9835,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-platform-portable"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "nix 0.31.3",
  "starship-battery",
@@ -9847,7 +9847,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-platform-provider"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-core",
  "taskmanager-platform-contract",
@@ -9855,7 +9855,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-platform-runtime"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
@@ -9867,7 +9867,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-platform-windows"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "notify-rust",
  "nvml-wrapper",
@@ -9893,7 +9893,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-privilege-helper"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -9902,7 +9902,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-process-control-helper"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "nix 0.31.3",
  "rustix 1.1.4",
@@ -9914,7 +9914,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-rapl-helper"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -9922,11 +9922,11 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-setup-helper"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "taskmanager-shell"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-application",
  "taskmanager-core",
@@ -9938,7 +9938,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-smbios-helper"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "serde",
  "serde_json",
@@ -9947,11 +9947,11 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-smbios-tables"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "taskmanager-telemetry-store"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ringbuf",
  "taskmanager-core",
@@ -9960,7 +9960,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-test-support"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-application",
  "taskmanager-core",
@@ -9968,11 +9968,11 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-theme"
-version = "0.1.1"
+version = "0.1.2"
 
 [[package]]
 name = "taskmanager-tray-muda"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-core",
  "taskmanager-platform-contract",
@@ -9981,7 +9981,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-tui"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "ratatui",
  "taskmanager-app-host",
@@ -9999,7 +9999,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-ui"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "gpui",
  "taskmanager-icons",
@@ -10009,7 +10009,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-ui-contract"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "taskmanager-application",
  "taskmanager-platform-contract",
@@ -10017,7 +10017,7 @@ dependencies = [
 
 [[package]]
 name = "taskmanager-windows-api"
-version = "0.1.1"
+version = "0.1.2"
 dependencies = [
  "windows 0.62.2",
 ]
