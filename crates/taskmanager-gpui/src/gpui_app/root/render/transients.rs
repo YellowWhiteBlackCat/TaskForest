@@ -3,8 +3,8 @@
 use super::super::{RootView, TelemetryWarmupPhase, elements, i18n};
 use super::overlays;
 use gpui::{
-    AnimationExt, Context, Div, InteractiveElement, ParentElement, RenderOnce, Stateful, Styled,
-    Window, deferred, div, px,
+    AnimationExt, Context, Div, InteractiveElement, ParentElement, RenderOnce, Stateful,
+    StatefulInteractiveElement, Styled, Window, deferred, div, px,
 };
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
@@ -67,7 +67,7 @@ fn compose_feedback(
     cx: &mut Context<RootView>,
 ) -> Stateful<Div> {
     let Some(toast) = view.local_feedback_toast.clone() else {
-        return compose_shell_feedback(view, root, theme);
+        return compose_shell_feedback(view, root, theme, cx);
     };
     let weak = cx.entity().downgrade();
     let card = taskmanager_ui::overlays::toast::Toast::new(toast, theme.palette())
@@ -90,7 +90,12 @@ fn compose_feedback(
     ))
 }
 
-fn compose_shell_feedback(view: &RootView, root: Stateful<Div>, theme: &Theme) -> Stateful<Div> {
+fn compose_shell_feedback(
+    view: &RootView,
+    root: Stateful<Div>,
+    theme: &Theme,
+    cx: &mut Context<RootView>,
+) -> Stateful<Div> {
     let Some(notice) = view.shell.feedback_notice() else {
         return root;
     };
@@ -100,6 +105,7 @@ fn compose_shell_feedback(view: &RootView, root: Stateful<Div>, theme: &Theme) -
         taskmanager_shell::FeedbackSeverity::Warning => theme.warning,
         taskmanager_shell::FeedbackSeverity::Error => theme.danger,
     };
+    let weak = cx.entity().downgrade();
     let card = div()
         .max_w(px(640.0))
         .px(taskmanager_ui::theme_binding::definite_length(
@@ -114,7 +120,27 @@ fn compose_shell_feedback(view: &RootView, root: Stateful<Div>, theme: &Theme) -
         .border_color(taskmanager_ui::theme_binding::hsla(color.with_alpha(0.45)))
         .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
         .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
-        .child(notice.text().to_owned());
+        .flex()
+        .items_center()
+        .gap(taskmanager_ui::theme_binding::definite_length(
+            tokens::SPACE_8,
+        ))
+        .child(div().flex_1().child(notice.text().to_owned()))
+        .child(
+            div()
+                .id("dismiss-shell-feedback")
+                .debug_selector(|| "dismiss-shell-feedback".to_string())
+                .cursor_pointer()
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .hover(|s| s.text_color(taskmanager_ui::theme_binding::hsla(theme.fg)))
+                .on_click(move |_event, _window, cx| {
+                    let _ = weak.update(cx, |view, cx| {
+                        view.shell.clear_feedback_notice();
+                        cx.notify();
+                    });
+                })
+                .child("\u{00d7}"),
+        );
     root.child(deferred(
         div()
             .absolute()

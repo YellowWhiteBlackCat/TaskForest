@@ -85,6 +85,7 @@ pub(crate) fn run_drain_cycle(
     shell: &mut ShellApp,
     now_ms: u64,
 ) -> DrainCycle {
+    shell.advance_feedback_time(std::time::Duration::from_millis(16));
     let snapshot = client.capabilities().snapshot();
     let capabilities_changed = shell.apply_capability_snapshot(snapshot.clone());
     let mut folded_batches = 0;

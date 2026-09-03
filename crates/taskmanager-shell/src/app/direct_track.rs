@@ -840,6 +840,14 @@ impl DirectTrackState {
     pub const fn feedback_notice(&self) -> Option<&super::FeedbackNotice> {
         self.feedback.notice()
     }
+
+    pub fn clear_feedback_notice(&mut self) {
+        self.feedback.clear_notice();
+    }
+
+    pub fn advance_feedback_time(&mut self, elapsed: std::time::Duration) {
+        self.feedback.advance_time(elapsed);
+    }
 }
 
 #[cfg(test)]

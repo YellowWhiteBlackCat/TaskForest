@@ -126,7 +126,7 @@ impl RootView {
             self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
-                FeedbackLifecycle::UntilReplaced,
+                FeedbackLifecycle::TIMED_LONG,
                 taskmanager_application::i18n::t("window_capture.unavailable"),
             );
             return false;
@@ -141,7 +141,7 @@ impl RootView {
                 self.shell.report_notice(
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Info,
-                    FeedbackLifecycle::UntilReplaced,
+                    FeedbackLifecycle::TIMED_SHORT,
                     taskmanager_application::i18n::t("window_capture.queued"),
                 );
                 true
@@ -150,7 +150,7 @@ impl RootView {
                 self.shell.report_notice(
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Warning,
-                    FeedbackLifecycle::SHORT,
+                    FeedbackLifecycle::TIMED_SHORT,
                     taskmanager_application::i18n::t("window_capture.busy"),
                 );
                 false
@@ -174,7 +174,7 @@ impl RootView {
                 self.shell.report_notice(
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
-                    FeedbackLifecycle::UntilReplaced,
+                    FeedbackLifecycle::TIMED_LONG,
                     taskmanager_application::i18n::t("window_capture.failed")
                         .replace("{}", error.detail()),
                 );
@@ -216,7 +216,7 @@ impl RootView {
                 self.shell.report_notice(
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Success,
-                    FeedbackLifecycle::SHORT,
+                    FeedbackLifecycle::TIMED_SHORT,
                     message,
                 );
             }
@@ -232,7 +232,7 @@ impl RootView {
                 self.shell.report_notice(
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
-                    FeedbackLifecycle::UntilReplaced,
+                    FeedbackLifecycle::TIMED_LONG,
                     taskmanager_application::i18n::t("window_capture.failed")
                         .replace("{}", error.detail()),
                 );

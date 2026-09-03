@@ -45,7 +45,7 @@ impl RootView {
             self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
-                FeedbackLifecycle::UntilReplaced,
+                FeedbackLifecycle::TIMED_LONG,
                 taskmanager_application::i18n::t("system.export_unavailable"),
             );
             return;
@@ -65,20 +65,20 @@ impl RootView {
                 self.shell.report_notice(
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Info,
-                    FeedbackLifecycle::UntilReplaced,
+                    FeedbackLifecycle::TIMED_SHORT,
                     taskmanager_application::i18n::t("system.export_queued"),
                 );
             }
             Err(SnapshotExportSubmitError::Busy(_)) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
-                FeedbackLifecycle::SHORT,
+                FeedbackLifecycle::TIMED_SHORT,
                 taskmanager_application::i18n::t("system.export_busy"),
             ),
             Err(SnapshotExportSubmitError::RequestSpaceExhausted) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
-                FeedbackLifecycle::UntilReplaced,
+                FeedbackLifecycle::TIMED_LONG,
                 taskmanager_application::i18n::t("system.export_unavailable"),
             ),
             Err(SnapshotExportSubmitError::Rejected(error)) => {
@@ -91,7 +91,7 @@ impl RootView {
                 self.shell.report_notice(
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
-                    FeedbackLifecycle::UntilReplaced,
+                    FeedbackLifecycle::TIMED_LONG,
                     taskmanager_application::i18n::t("system.export_failed")
                         .replace("{}", error.detail()),
                 );
@@ -118,7 +118,7 @@ impl RootView {
                 self.shell.report_notice(
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Success,
-                    FeedbackLifecycle::SHORT,
+                    FeedbackLifecycle::TIMED_SHORT,
                     taskmanager_application::i18n::t("system.export_success").replace("{}", &base),
                 );
             }
@@ -133,7 +133,7 @@ impl RootView {
                 self.shell.report_notice(
                     FeedbackSource::Persistence,
                     FeedbackSeverity::Error,
-                    FeedbackLifecycle::UntilReplaced,
+                    FeedbackLifecycle::TIMED_LONG,
                     taskmanager_application::i18n::t("system.export_failed")
                         .replace("{}", error.detail()),
                 );

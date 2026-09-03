@@ -18,6 +18,8 @@ struct TickPlan {
 
 impl IcedApp {
     pub(super) fn handle_tick_message(&mut self) -> Option<PlatformEffect> {
+        self.shell
+            .advance_feedback_time(std::time::Duration::from_millis(100));
         self.runtime_event_system();
         // The tick doubles as the deferred-stepper-commit flush point (see
         // `update::columns`): a cheap gate check per 100 ms poll.
