@@ -12,7 +12,7 @@ use taskmanager_app_host::DiagnosticBundleClient;
 use taskmanager_application::{DiagnosticBundleSession, DiagnosticBundleTarget};
 
 use taskmanager_application::{
-    ServiceDependenciesLifecycle, ServiceLogStreamLifecycle, ServiceUpdate,
+    ServiceDependenciesLifecycle, ServiceLogStreamLifecycle, ServiceUpdate, i18n,
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::services::{
@@ -182,7 +182,7 @@ impl ServiceDetailsState {
     ) {
         let failure = ServiceLogFailure::with_detail(
             ServiceLogErrorKind::from_failure(failure),
-            format!("service log request was rejected: {failure:?}"),
+            i18n::t("service.log_request_rejected").replace("{reason}", &format!("{failure:?}")),
         );
         self.stream.reject_attempt(attempt_id, failure);
     }
@@ -264,7 +264,7 @@ impl ServiceDetailsState {
         self.snapshot_request_id = None;
         self.logs = ServiceLogState::Unavailable(ServiceLogFailure::with_detail(
             ServiceLogErrorKind::from_failure(failure),
-            format!("service log request was rejected: {failure:?}"),
+            i18n::t("service.log_request_rejected").replace("{reason}", &format!("{failure:?}")),
         ));
         self.copy_feedback = None;
     }

@@ -635,7 +635,7 @@
   "first_run.copy_command": "Copy command",
   "first_run.copy_revert_command": "Copy revert command",
   "first_run.copy_output": "Copy output",
-  "first_run.open_wiki": "Open Wiki",
+  "first_run.open_docs": "Open TaskForest documentation",
   "first_run.retry": "Retry",
   "first_run.view_script": "View script",
   "first_run.run_setup": "Run additional setup",
@@ -1355,5 +1355,14 @@
   "feedback.history_record_remains_failed": "History recording remains failed ({kind}): {detail}",
   "feedback.history_flush_remains_failed": "History flush remains failed ({kind}): {detail}",
   "feedback.history_status": "History persistence: {changes}",
-  "feedback.history_samples_dropped": "History persistence dropped or rejected samples (ingress {ingress}, store {store}, rejected {rejected})"
+  "feedback.history_samples_dropped": "History persistence dropped or rejected samples (ingress {ingress}, store {store}, rejected {rejected})",
+  "demo.no_host_actions": "Demo data · no host actions",
+  "settings.config_not_queued": "Configuration not queued: {error}",
+  "settings.config_resynchronised": "Configuration resynchronised after {count} missed updates",
+  "settings.config_not_saved": "Configuration not saved: {kind}",
+  "settings.config_refresh_failed": "Configuration refresh failed",
+  "settings.config_recovered": "Configuration recovered",
+  "settings.config_load_failed": "Configuration load failed",
+  "settings.config_fallback": "Configuration fallback: {source}",
+  "service.log_request_rejected": "Service log request was rejected: {reason}"
 }

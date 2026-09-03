@@ -12,6 +12,8 @@ pub const MAX_WINDOW_CAPTURE_FAILURE_CHARS: usize = 512;
 /// The native mechanism that produced one accepted PNG.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WindowCaptureBackend {
+    /// In-process GPU framebuffer readback (zero external dependencies).
+    InProcess,
     /// XDG Screenshot Portal with the active-window target.
     PortalScreenshot,
     /// KDE Spectacle's fixed-argument active-window capture path.
@@ -24,6 +26,7 @@ impl WindowCaptureBackend {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
+            Self::InProcess => "in-process",
             Self::PortalScreenshot => "portal-screenshot",
             Self::SpectacleActiveWindow => "spectacle-active-window",
             Self::PipeWireScreenCast => "pipewire-screencast",

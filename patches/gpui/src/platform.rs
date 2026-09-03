@@ -16,6 +16,17 @@ mod mac;
     all(target_os = "macos", feature = "macos-blade")
 ))]
 mod blade;
+#[cfg(any(
+    all(
+        any(target_os = "linux", target_os = "freebsd"),
+        any(feature = "x11", feature = "wayland")
+    ),
+    all(target_os = "macos", feature = "macos-blade")
+))]
+pub use blade::{
+    has_pending_window_frame_capture, request_window_frame_capture,
+    request_window_frame_capture_with_channel,
+};
 
 #[cfg(any(test, feature = "test-support"))]
 mod test;

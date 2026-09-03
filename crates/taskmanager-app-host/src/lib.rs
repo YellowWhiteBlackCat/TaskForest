@@ -65,6 +65,13 @@ pub use snapshot_export_runtime::{SnapshotExportClient, SnapshotExportRuntimeSta
 use window_capture_runtime::WindowCaptureCoordinator;
 pub use window_capture_runtime::{WindowCaptureClient, WindowCaptureRuntimeStartError};
 
+/// Register an in-process window frame capture hook from the active UI renderer.
+pub fn register_in_process_capture(
+    f: Box<dyn Fn(&std::path::Path) -> Result<(u32, u32), String> + Send + Sync>,
+) {
+    taskmanager_platform_native::register_in_process_capture(f);
+}
+
 pub fn spawn_tray(
     spec: taskmanager_core::core::tray::TraySpec,
     events: std::sync::mpsc::Sender<taskmanager_core::core::tray::TrayEvent>,

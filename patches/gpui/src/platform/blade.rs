@@ -9,3 +9,7 @@ pub(crate) use apple_compat::*;
 pub(crate) use blade_atlas::*;
 pub(crate) use blade_context::*;
 pub(crate) use blade_renderer::*;
+pub use blade_renderer::{
+    has_pending_window_frame_capture, request_window_frame_capture,
+    request_window_frame_capture_with_channel,
+};

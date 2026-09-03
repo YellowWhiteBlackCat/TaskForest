@@ -13,6 +13,7 @@ use crate::primitives::selectable_text::SelectableText;
 pub struct KeyValueRow {
     label: String,
     value: String,
+    extra_values: Vec<String>,
     palette: Palette,
     label_width: Option<Length>,
     value_color: Option<Color>,
@@ -27,6 +28,30 @@ impl KeyValueRow {
         Self {
             label: label.into(),
             value: value.into(),
+            extra_values: Vec::new(),
+            palette,
+            label_width: None,
+            value_color: None,
+            value_align_right: true,
+            selectable_value_id: None,
+            value_debug_selector: None,
+        }
+    }
+
+    /// Build a multi-line row where the left label sits on line 1 and multiple
+    /// right-hand values stack vertically, flush right.
+    pub fn new_multiline(
+        label: impl Into<String>,
+        values: impl IntoIterator<Item = impl Into<String>>,
+        palette: Palette,
+    ) -> Self {
+        let mut iter = values.into_iter();
+        let value = iter.next().map(Into::into).unwrap_or_default();
+        let extra_values = iter.map(Into::into).collect();
+        Self {
+            label: label.into(),
+            value,
+            extra_values,
             palette,
             label_width: None,
             value_color: None,
@@ -80,6 +105,48 @@ impl KeyValueRow {
     #[must_use]
     pub fn render(self) -> gpui::Div {
         let row_selector = format!("tm-key-value-row:{}", self.label);
+        if !self.extra_values.is_empty() {
+            let label = div()
+                .flex_none()
+                .text_size(crate::theme_binding::font_size(tokens::FONT_12))
+                .text_color(crate::theme_binding::hsla(self.palette.fg_muted))
+                .child(self.label);
+
+            let value_color = self.value_color.unwrap_or(self.palette.fg);
+            let mut values_col = div()
+                .flex()
+                .flex_col()
+                .items_end()
+                .flex_1()
+                .gap(crate::theme_binding::definite_length(tokens::SPACE_4));
+
+            let mut all_values = Vec::with_capacity(1 + self.extra_values.len());
+            all_values.push(self.value);
+            all_values.extend(self.extra_values);
+
+            for val in all_values {
+                let line_div = div()
+                    .text_size(crate::theme_binding::font_size(tokens::FONT_12))
+                    .text_color(crate::theme_binding::hsla(value_color))
+                    .text_right()
+                    .whitespace_nowrap()
+                    .child(val);
+                values_col = values_col.child(line_div);
+            }
+
+            return div()
+                .flex()
+                .flex_row()
+                .items_start()
+                .justify_between()
+                .gap(crate::theme_binding::definite_length(tokens::SPACE_12))
+                .w_full()
+                .min_w(px(0.0))
+                .debug_selector(move || row_selector.clone())
+                .child(label)
+                .child(values_col);
+        }
+
         let value_selector = format!("tm-key-value-value:{}", self.label);
         let selectable_selector = self.value_debug_selector.unwrap_or_else(|| {
             SharedString::from(format!("tm-key-value-selectable:{}", self.label))

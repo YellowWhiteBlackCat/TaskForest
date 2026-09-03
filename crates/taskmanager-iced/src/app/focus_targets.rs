@@ -233,7 +233,7 @@ pub enum FocusTarget {
     /// One first-run dialog descriptor copy stop (location / run command /
     /// revert command rows, indices 0..=2).
     FirstRunCopy(u8),
-    /// One first-run dialog action pill (wiki / view / run / revert /
+    /// One first-run dialog action pill (documentation / view / run / revert /
     /// restart / retry, indices 0..=5).
     FirstRunAction(u8),
 }

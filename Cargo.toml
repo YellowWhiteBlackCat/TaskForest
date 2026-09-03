@@ -15,7 +15,7 @@ resolver = "2"
 # unification live here because the workspace root lives here.
 [package]
 name = "taskmanager-gates"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "Cross-crate conformance gate host for the TaskForest workspace (no binary)"
@@ -87,3 +87,11 @@ gpui = { path = "./patches/gpui" }
 # Vendored cryoglyph 0.1.0 compatibility patch: its public API is unchanged,
 # but its glyph cache uses the fixed lru 0.18.2 panic-safety implementation.
 cryoglyph = { path = "./patches/cryoglyph" }
+# Vendored blade-graphics 0.7.1 patch (fixed-size descriptor sub-pools): the
+# upstream Vulkan descriptor allocator grew pools by `COUNT_BASE.pow(k)` up
+# to 4096 sets, which Intel's driver mapped at ~50 MiB each and which the reset
+# path never shrank. Following upstream's 0.8.x architecture, the vendored copy
+# replaces exponential growth with a linear sub-pool list: each sub-pool allocates
+# a fixed, bounded budget (COUNT_BASE sets), and reset clears each sub-pool in
+# place via vkResetDescriptorPool without reallocating. The public API is unchanged.
+blade-graphics = { path = "./patches/blade-graphics" }

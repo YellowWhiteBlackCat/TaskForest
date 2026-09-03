@@ -73,3 +73,11 @@ fn action_event_shape_is_not_confused_with_observation() {
         }
     ));
 }
+
+#[test]
+fn documentation_action_uses_the_taskforest_destination() {
+    assert_eq!(
+        DOCUMENTATION_URL,
+        "https://github.com/YellowWhiteBlackCat/TaskForest"
+    );
+}

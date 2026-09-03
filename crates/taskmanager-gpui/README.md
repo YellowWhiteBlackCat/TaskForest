@@ -32,6 +32,11 @@ First Run surface is opened only from the explicit Settings entry or after a
 user-initiated setup action; capability discovery never becomes a recurring
 startup modal.
 
+The product binary also supports `taskforest-g --demo`. Demo startup uses the
+shared deterministic shell fixture and an in-memory bounded telemetry history;
+it does not create a native platform client, read user configuration, persist
+history, spawn a tray, or execute host actions.
+
 ## Key modules
 
 - `src/gpui_app/root/projection_materialization.rs` owns the private, revision-keyed GPUI read

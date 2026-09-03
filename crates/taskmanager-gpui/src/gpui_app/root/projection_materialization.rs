@@ -22,6 +22,8 @@ use taskmanager_core::core::session::SessionItem;
 use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::core::startup::{StartupBootEvidenceSnapshot, StartupEntry};
 
+mod demo;
+
 #[derive(Clone, Debug, Default, PartialEq)]
 struct StartupEvidenceProjection {
     snapshot: Option<StartupBootEvidenceSnapshot>,

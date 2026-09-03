@@ -29,10 +29,10 @@ use taskmanager_theme::tokens;
 use super::components::IcedElement;
 use super::overlays::modal_overlay;
 
-/// The upstream first-run dialog's wiki destination. Opening it stays a typed
-/// intent ([`FirstRunMessage::OpenWiki`]) routed through the URL-open port at
+/// TaskForest's documentation destination. Opening it stays a typed intent
+/// ([`FirstRunMessage::OpenDocumentation`]) routed through the URL-open port at
 /// composition; this module never launches a browser command itself.
-pub const WIKI_URL: &str = "https://gitlab.com/mission-center-devs/mission-center/-/wikis/home";
+pub const DOCUMENTATION_URL: &str = "https://github.com/YellowWhiteBlackCat/TaskForest";
 
 /// Dialog phases, mirroring GPUI's `FirstRunPhase` one-to-one.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -171,8 +171,8 @@ pub enum FirstRunMessage {
     Close,
     /// Submit one typed setup-script action (View / Run / Revert / Restart).
     RequestAction(SetupScriptAction),
-    /// Open the upstream wiki through the typed URL-open port.
-    OpenWiki,
+    /// Open TaskForest documentation through the typed URL-open port.
+    OpenDocumentation,
 }
 
 /// Render the dialog from the current view state inside the shared modal
@@ -317,7 +317,7 @@ fn action_row<'a>(
         // In flight: the actions render as inert text (GPUI disables the
         // pills); no message can be submitted from this frame.
         for label in [
-            t("first_run.open_wiki"),
+            t("first_run.open_docs"),
             t("first_run.view_script"),
             t("first_run.run_setup"),
             t("first_run.revert_setup"),
@@ -333,8 +333,8 @@ fn action_row<'a>(
     actions = actions.push(action_button(
         theme_snapshot,
         FocusSlot::action(0),
-        t("first_run.open_wiki").to_owned(),
-        Message::FirstRun(FirstRunMessage::OpenWiki),
+        t("first_run.open_docs").to_owned(),
+        Message::FirstRun(FirstRunMessage::OpenDocumentation),
     ));
     actions = actions.push(action_button(
         theme_snapshot,

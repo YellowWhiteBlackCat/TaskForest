@@ -29,6 +29,14 @@ pub enum StatRow {
         label: String,
         value: Option<String>,
     },
+    /// Label + three-item trend summary (latest, average, peak) with a canonical full representation.
+    Trend {
+        label: String,
+        latest: String,
+        average: String,
+        peak: String,
+        raw_full: String,
+    },
 }
 
 impl StatRow {
@@ -50,11 +58,31 @@ impl StatRow {
         }
     }
 
+    /// Constructor sugar for trend rows (latest / avg / peak + raw string).
+    #[must_use]
+    pub fn trend(
+        label: impl Into<String>,
+        latest: impl Into<String>,
+        average: impl Into<String>,
+        peak: impl Into<String>,
+        raw_full: impl Into<String>,
+    ) -> Self {
+        Self::Trend {
+            label: label.into(),
+            latest: latest.into(),
+            average: average.into(),
+            peak: peak.into(),
+            raw_full: raw_full.into(),
+        }
+    }
+
     /// The row label (already locale-resolved by the producer).
     #[must_use]
     pub fn label(&self) -> &str {
         match self {
-            Self::Text { label, .. } | Self::Pair { label, .. } => label,
+            Self::Text { label, .. } | Self::Pair { label, .. } | Self::Trend { label, .. } => {
+                label
+            }
         }
     }
 
@@ -63,6 +91,21 @@ impl StatRow {
     pub fn value(&self) -> Option<&str> {
         match self {
             Self::Text { value, .. } | Self::Pair { value, .. } => value.as_deref(),
+            Self::Trend { raw_full, .. } => Some(raw_full.as_str()),
+        }
+    }
+
+    /// Split parts for multiline / wrap trend layout: (latest, avg, peak).
+    #[must_use]
+    pub fn trend_parts(&self) -> Option<(&str, &str, &str)> {
+        match self {
+            Self::Trend {
+                latest,
+                average,
+                peak,
+                ..
+            } => Some((latest.as_str(), average.as_str(), peak.as_str())),
+            Self::Text { .. } | Self::Pair { .. } => None,
         }
     }
 }

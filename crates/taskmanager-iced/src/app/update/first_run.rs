@@ -151,7 +151,7 @@ impl IcedApp {
     /// Reduce one dialog intent. `Close` is side-effect-free on the dialog
     /// state (the fold's `Dismissed` contract) and only closes the surface
     /// slot; `RequestAction` runs the GPUI request guards then submits;
-    /// `OpenWiki` rides the existing typed URL-open effect port.
+    /// `OpenDocumentation` rides the existing typed URL-open effect port.
     pub(super) fn reduce_first_run_message(&mut self, message: Message) -> UpdateDispatch {
         let Message::FirstRun(intent) = message else {
             return UpdateDispatch::none();
@@ -166,8 +166,8 @@ impl IcedApp {
                 self.apply_first_run_request(action);
                 None
             }
-            FirstRunMessage::OpenWiki => Some(PlatformEffect::OpenUrl(UrlOpenRequest {
-                url: crate::ui::first_run::WIKI_URL.to_owned(),
+            FirstRunMessage::OpenDocumentation => Some(PlatformEffect::OpenUrl(UrlOpenRequest {
+                url: crate::ui::first_run::DOCUMENTATION_URL.to_owned(),
             })),
         };
         UpdateDispatch::effect(effect)

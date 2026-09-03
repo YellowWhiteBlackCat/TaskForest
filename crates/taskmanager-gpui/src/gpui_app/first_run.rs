@@ -19,10 +19,10 @@ use taskmanager_platform_contract::{OperationFailure, SubmissionErrorKind};
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
-/// The upstream First Run dialog's explicit wiki destination. Opening it still
-/// goes through the ordinary typed URL-open port; this module never launches a
-/// browser command directly.
-pub const WIKI_URL: &str = "https://gitlab.com/mission-center-devs/mission-center/-/wikis/home";
+/// TaskForest's documentation destination for the First Run dialog. Opening
+/// it still goes through the ordinary typed URL-open port; this module never
+/// launches a browser command directly.
+pub const DOCUMENTATION_URL: &str = "https://github.com/YellowWhiteBlackCat/TaskForest";
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub enum FirstRunPhase {
@@ -188,7 +188,7 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
     let revert_entity = entity.clone();
     let view_entity = entity.clone();
     let restart_entity = entity.clone();
-    let wiki_entity = entity.clone();
+    let docs_entity = entity.clone();
     let close_entity = entity.clone();
     let path = info.path.display().to_string();
     let run_command = info.run_command.clone();
@@ -265,13 +265,13 @@ pub fn render_first_run(theme: &Theme, state: &FirstRunUiState, entity: Entity<R
         ))
         .child(elements::pill(
             theme,
-            "first-run-open-wiki",
-            i18n::t("first_run.open_wiki"),
+            "first-run-open-docs",
+            i18n::t("first_run.open_docs"),
             false,
             pending,
             move |_window: &mut Window, cx: &mut App| {
-                wiki_entity.update(cx, |view, cx| {
-                    let _ = view.request_open_url(WIKI_URL.to_owned(), cx);
+                docs_entity.update(cx, |view, cx| {
+                    let _ = view.request_open_url(DOCUMENTATION_URL.to_owned(), cx);
                 });
             },
             |_, _, _| {},

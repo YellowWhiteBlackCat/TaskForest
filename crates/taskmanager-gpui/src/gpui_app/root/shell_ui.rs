@@ -184,7 +184,10 @@ impl RootView {
                 );
             }
             ShellUiActionIntent::OpenUrl(_) => {
-                self.show_local_feedback(format!("Could not open browser: {error}"), cx);
+                self.show_local_feedback(
+                    format!("{}: {error}", i18n::t("hint.could_not_open_browser")),
+                    cx,
+                );
             }
         }
     }

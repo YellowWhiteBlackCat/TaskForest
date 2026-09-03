@@ -143,6 +143,20 @@ pub fn capture_current_window_png(
     }
 }
 
+/// Register an in-process window frame capture hook (from GPUI's renderer).
+pub fn register_in_process_capture(
+    f: Box<dyn Fn(&Path) -> Result<(u32, u32), String> + Send + Sync>,
+) {
+    #[cfg(target_os = "linux")]
+    {
+        taskmanager_platform_linux::window_capture::register_in_process_capture(f);
+    }
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = f;
+    }
+}
+
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]
 compile_error!(
     "this source tree does not yet contain a native adapter for the selected operating system"

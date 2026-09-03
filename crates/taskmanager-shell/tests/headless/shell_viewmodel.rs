@@ -2,18 +2,25 @@ use super::StatRow;
 
 /// Both variants expose the same label accessor.
 #[test]
-fn label_accessor_covers_both_variants() {
+fn label_accessor_covers_all_variants() {
     assert_eq!(StatRow::text("Read", None).label(), "Read");
     assert_eq!(StatRow::pair("Swap", None).label(), "Swap");
+    assert_eq!(
+        StatRow::trend("Trend", "1", "2", "3", "1 · 2 · 3").label(),
+        "Trend"
+    );
 }
 
-/// A present value reads back exactly once, for either variant.
+/// A present value reads back exactly once, for all variants.
 #[test]
 fn value_accessor_returns_present_values() {
     let row = StatRow::text("Read", Some("12.3 MiB/s".to_string()));
     assert_eq!(row.value(), Some("12.3 MiB/s"));
     let row = StatRow::pair("VRAM", Some("1.0 / 4.0 GiB".to_string()));
     assert_eq!(row.value(), Some("1.0 / 4.0 GiB"));
+    let row = StatRow::trend("Trend", "10", "15", "20", "10 · 15 · 20");
+    assert_eq!(row.value(), Some("10 · 15 · 20"));
+    assert_eq!(row.trend_parts(), Some(("10", "15", "20")));
 }
 
 /// `None` keeps the row: label still present, value absent — the

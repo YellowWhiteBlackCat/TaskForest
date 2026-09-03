@@ -219,7 +219,7 @@ pub fn apply_search_online(
         return;
     };
     if name.trim().is_empty() {
-        v.show_local_feedback("No process name to search", cx);
+        v.show_local_feedback(taskmanager_application::i18n::t("hint.no_process_name"), cx);
         return;
     }
     v.request_open_url(search_url_for(&name), cx);

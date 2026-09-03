@@ -23,6 +23,17 @@ const MAX_PNG_BYTES: u64 = 128 * 1024 * 1024;
 const MAX_DIMENSION: u32 = 32_768;
 const PNG_SIGNATURE: [u8; 8] = [137, 80, 78, 71, 13, 10, 26, 10];
 
+pub type InProcessCaptureFn = Box<dyn Fn(&Path) -> Result<(u32, u32), String> + Send + Sync>;
+static IN_PROCESS_CAPTURE_FN: std::sync::RwLock<Option<InProcessCaptureFn>> =
+    std::sync::RwLock::new(None);
+
+/// Register an in-process framebuffer capture hook (e.g. from GPUI's BladeRenderer).
+pub fn register_in_process_capture(f: InProcessCaptureFn) {
+    if let Ok(mut lock) = IN_PROCESS_CAPTURE_FN.write() {
+        *lock = Some(f);
+    }
+}
+
 trait OneShotWindowCaptureBackend {
     fn capture(&self, output: &Path) -> Result<WindowCaptureReceipt, WindowCaptureFailure>;
 }
@@ -73,6 +84,24 @@ impl OneShotWindowCaptureBackend for SpectacleActiveWindowBackend {
 pub fn capture_current_window_png(
     output: &Path,
 ) -> Result<WindowCaptureReceipt, WindowCaptureFailure> {
+    if let Ok(guard) = IN_PROCESS_CAPTURE_FN.read() {
+        if let Some(ref hook) = *guard {
+            match hook(output) {
+                Ok((width, height)) => {
+                    return Ok(WindowCaptureReceipt::new(
+                        width,
+                        height,
+                        WindowCaptureBackend::InProcess,
+                    ));
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        "in-process window capture failed: {err}; falling back to desktop capture"
+                    );
+                }
+            }
+        }
+    }
     SpectacleActiveWindowBackend.capture(output)
 }
 

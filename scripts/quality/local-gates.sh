@@ -662,6 +662,13 @@ elif scope_skip release "merge-owner release smoke" standard; then
     fi
 fi
 if [[ "$with_gui" == "1" ]]; then
+    if maybe gpui-demo; then
+        if [[ "$scope" == "all" || "$scope" == "gpui" ]]; then
+            run_stage gpui-demo standard timeout --kill-after=10s 1800 bash scripts/accept-gpui-demo.sh --headless
+        else
+            scope_skip gpui-demo "GPUI product composition" standard
+        fi
+    fi
     if maybe gpui-interactions; then
         run_stage gpui-interactions standard timeout --kill-after=10s 2400 bash scripts/accept-gpui-interactions.sh
     fi
@@ -676,6 +683,19 @@ elif [[ "$scope" == "bevy" ]]; then
     # standard pass, not only --with-gui.
     if maybe bevy-interactions; then
         run_stage bevy-interactions standard timeout --kill-after=10s 1200 bash scripts/accept-bevy-interactions.sh
+    fi
+fi
+
+# GPUI demo composition is headless and does not need --with-gui. A scoped GPUI
+# line therefore runs it on every standard pass; the merge-owner path gets the
+# same check in addition to the complete workspace gates above.
+if [[ "$with_gui" != "1" ]]; then
+    if maybe gpui-demo; then
+        if [[ "$scope" == "all" || "$scope" == "gpui" ]]; then
+            run_stage gpui-demo standard timeout --kill-after=10s 1800 bash scripts/accept-gpui-demo.sh --headless
+        else
+            scope_skip gpui-demo "GPUI product composition" standard
+        fi
     fi
 fi
 

@@ -351,7 +351,7 @@ impl BladeRenderer {
     ) -> anyhow::Result<Self> {
         let surface_config = gpu::SurfaceConfig {
             size: config.size,
-            usage: gpu::TextureUsage::TARGET,
+            usage: gpu::TextureUsage::TARGET | gpu::TextureUsage::COPY,
             display_sync: gpu::DisplaySync::Recent,
             color_space: gpu::ColorSpace::Srgb,
             allow_exclusive_full_screen: false,
@@ -906,6 +906,87 @@ impl BladeRenderer {
         }
         drop(pass);
 
+        let pending_capture = PENDING_FRAME_CAPTURE.lock().take();
+        if let Some((out_path, reply_tx)) = pending_capture {
+            let width = self.surface_config.size.width;
+            let height = self.surface_config.size.height;
+            let align = 256_u32;
+            let bytes_per_row = ((width * 4 + align - 1) / align) * align;
+            let buffer_size = (bytes_per_row * height) as u64;
+            let staging_buffer = self.gpu.create_buffer(gpu::BufferDesc {
+                name: "frame capture staging",
+                size: buffer_size,
+                memory: gpu::Memory::Shared,
+            });
+
+            let mut transfer = self.command_encoder.transfer("frame capture");
+            transfer.copy_texture_to_buffer(
+                frame.texture().into(),
+                staging_buffer.into(),
+                bytes_per_row,
+                gpu::Extent {
+                    width,
+                    height,
+                    depth: 1,
+                },
+            );
+            drop(transfer);
+
+            self.command_encoder.present(frame);
+            let sync_point = self.gpu.submit(&mut self.command_encoder);
+
+            profiling::scope!("finish");
+            self.instance_belt.flush(&sync_point);
+            self.atlas.after_frame(&sync_point);
+
+            self.wait_for_gpu();
+            self.last_sync_point = Some(sync_point);
+
+            let data_ptr = staging_buffer.data();
+            let mut rgba = vec![0u8; (width * height * 4) as usize];
+            for y in 0..height {
+                let src_row = unsafe {
+                    std::slice::from_raw_parts(
+                        data_ptr.add((y * bytes_per_row) as usize),
+                        (width * 4) as usize,
+                    )
+                };
+                let dst_row =
+                    &mut rgba[(y * width * 4) as usize..(y * width * 4 + width * 4) as usize];
+                for (src_chunk, dst_chunk) in
+                    src_row.chunks_exact(4).zip(dst_row.chunks_exact_mut(4))
+                {
+                    dst_chunk[0] = src_chunk[2]; // R from BGRA
+                    dst_chunk[1] = src_chunk[1]; // G
+                    dst_chunk[2] = src_chunk[0]; // B
+                    dst_chunk[3] = src_chunk[3]; // A
+                }
+            }
+            if let Some(parent) = out_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let save_result = image::save_buffer_with_format(
+                &out_path,
+                &rgba,
+                width,
+                height,
+                image::ExtendedColorType::Rgba8,
+                image::ImageFormat::Png,
+            );
+            self.gpu.destroy_buffer(staging_buffer);
+            match save_result {
+                Ok(()) => {
+                    log::info!("In-process window capture saved to {:?}", out_path);
+                    let _ = reply_tx.send(Ok((width, height)));
+                }
+                Err(err) => {
+                    log::error!("In-process window capture save error: {err}");
+                    let _ = reply_tx.send(Err(err.to_string()));
+                }
+            }
+            return;
+        }
+
         self.command_encoder.present(frame);
         let sync_point = self.gpu.submit(&mut self.command_encoder);
 
@@ -1069,4 +1150,26 @@ impl RenderingParameters {
             ratios[3] * NORM24,
         ]
     }
+}
+type FrameCaptureReply = std::sync::mpsc::SyncSender<Result<(u32, u32), String>>;
+static PENDING_FRAME_CAPTURE: parking_lot::Mutex<Option<(std::path::PathBuf, FrameCaptureReply)>> =
+    parking_lot::Mutex::new(None);
+
+/// Request an in-process frame capture with a standard sync reply channel.
+pub fn request_window_frame_capture_with_channel(
+    path: std::path::PathBuf,
+    reply_tx: std::sync::mpsc::SyncSender<Result<(u32, u32), String>>,
+) {
+    *PENDING_FRAME_CAPTURE.lock() = Some((path, reply_tx));
+}
+
+/// Request an in-process frame capture of the next rendered window frame.
+pub fn request_window_frame_capture(path: std::path::PathBuf) {
+    let (tx, _rx) = std::sync::mpsc::sync_channel(1);
+    *PENDING_FRAME_CAPTURE.lock() = Some((path, tx));
+}
+
+/// Check if an in-process capture is currently pending.
+pub fn has_pending_window_frame_capture() -> bool {
+    PENDING_FRAME_CAPTURE.lock().is_some()
 }

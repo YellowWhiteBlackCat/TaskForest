@@ -110,26 +110,8 @@ impl TopPage {
 impl super::RootView {
     /// Request only the inventory owned by a newly visible detail page.
     pub(crate) fn request_page_data(&mut self, page: TopPage) {
-        match page {
-            TopPage::System => {
-                self.request_refresh(taskmanager_application::RefreshRequest::HardwareInventory)
-            }
-            TopPage::Containers => {
-                self.request_refresh(taskmanager_application::RefreshRequest::Containers)
-            }
-            // The CPU page's pinned details (base clock, sockets, the P/E/LP
-            // core-class breakdown) consume the hardware inventory. Under the
-            // Dashboard automatic profile hardware is not background work, so
-            // the page requests its own copy when it becomes visible — one
-            // static fetch, never a schedule.
-            TopPage::Performance => {
-                self.request_refresh(taskmanager_application::RefreshRequest::HardwareInventory)
-            }
-            TopPage::Apps
-            | TopPage::Services
-            | TopPage::Startup
-            | TopPage::Users
-            | TopPage::AppHistory => {}
+        if let Some(request) = page_refresh_request(page) {
+            self.request_refresh(request);
         }
     }
 
@@ -144,6 +126,34 @@ impl super::RootView {
         self.dismiss_current_surface(super::WindowSurfaceDismissReason::PageChanged);
         self.page = page;
         self.request_page_data(page);
+    }
+}
+
+/// Map a visible top-level page to the inventory refresh it owns, if any.
+///
+/// Centralising the mapping (rather than scattering the dispatch inside
+/// [`RootView::request_page_data`]) makes the page→request contract a single
+/// typed source a unit test can pin. High-rate dashboard facts stay on the
+/// shared automatic schedule; Services/Startup/Users request their inventories
+/// only when the corresponding surface becomes visible, and Apps/AppHistory
+/// are driven by the always-on process/telemetry flow.
+pub(crate) fn page_refresh_request(
+    page: TopPage,
+) -> Option<taskmanager_application::RefreshRequest> {
+    match page {
+        // The CPU and System pages' pinned details (base clock, sockets, the
+        // P/E/LP core-class breakdown) consume the hardware inventory. Under
+        // the Dashboard automatic profile hardware is not background work, so
+        // the page requests its own copy when it becomes visible — one static
+        // fetch, never a schedule.
+        TopPage::Performance | TopPage::System => {
+            Some(taskmanager_application::RefreshRequest::HardwareInventory)
+        }
+        TopPage::Containers => Some(taskmanager_application::RefreshRequest::Containers),
+        TopPage::Services => Some(taskmanager_application::RefreshRequest::Services),
+        TopPage::Startup => Some(taskmanager_application::RefreshRequest::Startup),
+        TopPage::Users => Some(taskmanager_application::RefreshRequest::Sessions),
+        TopPage::Apps | TopPage::AppHistory => None,
     }
 }
 

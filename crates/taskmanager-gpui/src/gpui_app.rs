@@ -34,4 +34,5 @@ pub mod theme;
 pub mod timeline;
 pub mod users_view;
 
+pub(crate) use root::init_demo;
 pub use root::{RootView, StartupEnvironment, StartupRuntime, init};
