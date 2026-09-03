@@ -8,7 +8,6 @@
 /// observe it.
 pub const TELEMETRY_READY_BODY_SELECTOR: &str = "tm-telemetry-ready-body";
 
-#[cfg(target_os = "linux")]
 use std::time::Duration;
 
 use super::{
@@ -104,7 +103,6 @@ fn schedule_system_npu_capture(
     });
 }
 
-#[cfg(target_os = "linux")]
 fn schedule_window_capture(view: &mut RootView, window: &mut Window, cx: &mut Context<RootView>) {
     if !view.capture_evidence.schedule_window_capture_frame() {
         return;
@@ -163,7 +161,6 @@ impl Render for RootView {
         self.ensure_input_modality_key_interceptor(window, cx);
         self.poll_diagnostic_bundle_result();
         schedule_system_npu_capture(self, window, cx);
-        #[cfg(target_os = "linux")]
         schedule_window_capture(self, window, cx);
         if self.capture_evidence.keyboard_focus_requested() {
             // The capture token represents a keyboard-initiated focus state even

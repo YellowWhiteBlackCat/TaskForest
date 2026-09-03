@@ -42,6 +42,6 @@ pub use source::{
 };
 pub use tray::TrayController;
 pub use window_capture::{
-    MAX_WINDOW_CAPTURE_FAILURE_CHARS, WindowCaptureBackend, WindowCaptureFailure,
-    WindowCaptureFailureKind, WindowCaptureReceipt,
+    InProcessCaptureFn, MAX_WINDOW_CAPTURE_FAILURE_CHARS, NativeWindowCapture,
+    WindowCaptureBackend, WindowCaptureFailure, WindowCaptureFailureKind, WindowCaptureReceipt,
 };

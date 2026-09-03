@@ -212,6 +212,17 @@ pub struct DirectTrackState {
 }
 
 impl DirectTrackState {
+    /// Construct the direct-track projection used by the deterministic demo
+    /// surface. The fixture remains the single source for demo facts; this
+    /// method only installs its already-built projection into the direct
+    /// track and does not expose a mutable projection to renderers.
+    pub(crate) fn from_fixture_projection(projection: super::SystemProjectionStore) -> Self {
+        Self {
+            projection,
+            ..Self::default()
+        }
+    }
+
     pub(crate) fn seed_fixture_fact(&mut self, fact: crate::fixture::DirectTrackSeedFact) {
         match fact {
             crate::fixture::DirectTrackSeedFact::NpuInventory(snapshot) => {

@@ -636,7 +636,7 @@
   "first_run.copy_command": "复制命令",
   "first_run.copy_revert_command": "复制回滚命令",
   "first_run.copy_output": "复制输出",
-  "first_run.open_wiki": "打开 Wiki",
+  "first_run.open_docs": "打开任务森林文档",
   "first_run.retry": "重试",
   "first_run.view_script": "查看脚本",
   "first_run.run_setup": "执行附加设置",
@@ -1355,5 +1355,14 @@
   "feedback.history_record_remains_failed": "历史记录仍失败（{kind}）：{detail}",
   "feedback.history_flush_remains_failed": "历史刷新仍失败（{kind}）：{detail}",
   "feedback.history_status": "历史持久化：{changes}",
-  "feedback.history_samples_dropped": "历史持久化丢弃或拒绝了样本（入口 {ingress}，存储 {store}，拒绝 {rejected}）"
+  "feedback.history_samples_dropped": "历史持久化丢弃或拒绝了样本（入口 {ingress}，存储 {store}，拒绝 {rejected}）",
+  "demo.no_host_actions": "演示数据 · 不操作主机",
+  "settings.config_not_queued": "配置未加入队列：{error}",
+  "settings.config_resynchronised": "配置已重新同步，错过更新数：{count}",
+  "settings.config_not_saved": "配置未保存：{kind}",
+  "settings.config_refresh_failed": "配置刷新失败",
+  "settings.config_recovered": "配置已恢复",
+  "settings.config_load_failed": "配置加载失败",
+  "settings.config_fallback": "配置回退：{source}",
+  "service.log_request_rejected": "服务日志请求被拒绝：{reason}"
 }

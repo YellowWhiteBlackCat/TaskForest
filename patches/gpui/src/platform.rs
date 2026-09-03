@@ -16,6 +16,66 @@ mod mac;
     all(target_os = "macos", feature = "macos-blade")
 ))]
 mod blade;
+#[cfg(any(
+    all(
+        any(target_os = "linux", target_os = "freebsd"),
+        any(feature = "x11", feature = "wayland")
+    ),
+    all(target_os = "macos", feature = "macos-blade")
+))]
+pub use blade::{
+    has_pending_window_frame_capture, request_window_frame_capture,
+    request_window_frame_capture_with_channel,
+};
+
+/// Request an in-process frame capture with a standard sync reply channel.
+///
+/// Backends without in-process capture support reply synchronously with an
+/// error string so callers can fall back to another capture provider without
+/// waiting for a rendered frame.
+#[cfg(not(any(
+    all(
+        any(target_os = "linux", target_os = "freebsd"),
+        any(feature = "x11", feature = "wayland")
+    ),
+    all(target_os = "macos", feature = "macos-blade")
+)))]
+pub fn request_window_frame_capture_with_channel(
+    _path: std::path::PathBuf,
+    reply_tx: std::sync::mpsc::SyncSender<Result<(u32, u32), String>>,
+) {
+    let _ = reply_tx.send(Err(
+        "in-process frame capture is not supported for this renderer backend".to_string(),
+    ));
+}
+
+/// Request an in-process frame capture of the next rendered window frame.
+///
+/// On a backend without in-process capture support this is a no-op. Callers
+/// that need to observe unsupported backends should use
+/// [`request_window_frame_capture_with_channel`] instead.
+#[cfg(not(any(
+    all(
+        any(target_os = "linux", target_os = "freebsd"),
+        any(feature = "x11", feature = "wayland")
+    ),
+    all(target_os = "macos", feature = "macos-blade")
+)))]
+pub fn request_window_frame_capture(_path: std::path::PathBuf) {}
+
+/// Check if an in-process capture is currently pending.
+///
+/// This is always `false` on a backend without in-process capture support.
+#[cfg(not(any(
+    all(
+        any(target_os = "linux", target_os = "freebsd"),
+        any(feature = "x11", feature = "wayland")
+    ),
+    all(target_os = "macos", feature = "macos-blade")
+)))]
+pub fn has_pending_window_frame_capture() -> bool {
+    false
+}
 
 #[cfg(any(test, feature = "test-support"))]
 mod test;

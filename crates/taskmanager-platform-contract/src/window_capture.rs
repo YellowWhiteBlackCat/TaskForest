@@ -5,17 +5,34 @@
 //! D-Bus, PipeWire, or child-process type appears here.
 
 use std::fmt;
+use std::path::Path;
 use std::sync::Arc;
+
+/// Function hook signature for in-process window frame capture.
+pub type InProcessCaptureFn = Box<dyn Fn(&Path) -> Result<(u32, u32), String> + Send + Sync>;
+
+/// Native operating system window capture capability.
+pub trait NativeWindowCapture: Send + Sync {
+    /// Capture the currently active window to the specified PNG path.
+    fn capture_active_window(
+        &self,
+        output: &Path,
+    ) -> Result<WindowCaptureReceipt, WindowCaptureFailure>;
+}
 
 pub const MAX_WINDOW_CAPTURE_FAILURE_CHARS: usize = 512;
 
 /// The native mechanism that produced one accepted PNG.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum WindowCaptureBackend {
+    /// In-process GPU framebuffer readback (zero external dependencies).
+    InProcess,
     /// XDG Screenshot Portal with the active-window target.
     PortalScreenshot,
     /// KDE Spectacle's fixed-argument active-window capture path.
     SpectacleActiveWindow,
+    /// Windows.Graphics.Capture active-window capture path.
+    WindowsGraphicsCapture,
     /// Reserved for the future continuous ScreenCast/PipeWire backend.
     PipeWireScreenCast,
 }
@@ -24,8 +41,10 @@ impl WindowCaptureBackend {
     #[must_use]
     pub const fn code(self) -> &'static str {
         match self {
+            Self::InProcess => "in-process",
             Self::PortalScreenshot => "portal-screenshot",
             Self::SpectacleActiveWindow => "spectacle-active-window",
+            Self::WindowsGraphicsCapture => "windows-graphics-capture",
             Self::PipeWireScreenCast => "pipewire-screencast",
         }
     }

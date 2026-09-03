@@ -169,6 +169,10 @@ jobs:
       - run: cargo nextest run --locked --workspace --all-targets --features test-support --profile ci -j 4 -E 'not binary(throughput)'
       # nextest does not execute doctests on stable Rust.
       - run: cargo test --locked --doc --workspace -j 4
+      # The GPUI product advertises --demo; keep its actual composition path
+      # covered separately from the broad workspace suite. This default gate
+      # is headless and performs no host I/O or visible desktop action.
+      - run: timeout --kill-after=10s 1800s bash scripts/accept-gpui-demo.sh --headless
 
   docs:
     name: Linux (rustdoc)

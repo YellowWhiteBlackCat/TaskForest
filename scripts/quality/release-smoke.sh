@@ -49,6 +49,24 @@ timeout --kill-after=30s "$build_timeout" cargo build --locked --release -j "$jo
     -p taskmanager-rapl-helper \
     -p taskmanager-msr-helper
 
+# The release binary must expose the same demo entry point as the source
+# product. --help is a no-window smoke and therefore remains safe on runners
+# without a compositor; the real window path is covered by the explicit GPUI
+# demo acceptance script.
+release_binary="$repo/target/release/taskforest-g"
+[[ -x "$release_binary" ]] || {
+    echo "release-smoke: missing GPUI binary: $release_binary" >&2
+    exit 1
+}
+help_output="$repo/target/release/taskforest-g-help.txt"
+timeout --kill-after=10s 30s "$release_binary" --help >"$help_output"
+grep -F -- '--demo' "$help_output" >/dev/null \
+    || { echo "release-smoke: release help does not advertise --demo" >&2; exit 1; }
+if grep -F -- 'not yet supported by the GPUI frontend' "$help_output" >/dev/null; then
+    echo "release-smoke: release help contains the retired GPUI demo rejection" >&2
+    exit 1
+fi
+
 # The GPUI product binary is emitted as target/release/taskforest-g directly
 # (ADR-051); no artifact rename step is needed.
 timeout --kill-after=10s 30s scripts/test-system-install-manager.sh

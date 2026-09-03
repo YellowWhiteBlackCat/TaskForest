@@ -503,20 +503,26 @@ pub(crate) fn render_chart(
 /// their text widths to happen not to collide. The bottom inset is part of
 /// the card's safety band: the pill never rides the rounded border.
 fn summary_overlay(theme: &Theme, row: Div) -> Div {
-    div().absolute().bottom(px(6.0)).left(px(8.0)).child(
-        row.rounded(taskmanager_ui::theme_binding::absolute(
-            tokens::control_radius(theme),
-        ))
-        .bg(taskmanager_ui::theme_binding::fill(
-            theme.card_surface().with_alpha(0.85),
-        ))
-        .px(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_8,
-        ))
-        .py(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_2,
-        )),
-    )
+    div()
+        .absolute()
+        .bottom(px(6.0))
+        .left(px(8.0))
+        .max_w(px(320.0))
+        .min_w(px(0.0))
+        .child(
+            row.rounded(taskmanager_ui::theme_binding::absolute(
+                tokens::control_radius(theme),
+            ))
+            .bg(taskmanager_ui::theme_binding::fill(
+                theme.card_surface().with_alpha(0.85),
+            ))
+            .px(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .py(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_2,
+            )),
+        )
 }
 
 /// Chain the tier's growth/floor contract onto a rendered card.

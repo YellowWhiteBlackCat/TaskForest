@@ -17,7 +17,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_platform_contract::{
-    InstanceEvent, InstanceFailure, InstanceRole, TrayController, TrayFailure,
+    InProcessCaptureFn, InstanceEvent, InstanceFailure, InstanceRole, TrayController, TrayFailure,
 };
 use taskmanager_platform_native::{
     NativePlatformRuntime, history_lock_holder_is_gone, native_config_path, native_history_dir,
@@ -64,6 +64,11 @@ use snapshot_export_runtime::SnapshotExportCoordinator;
 pub use snapshot_export_runtime::{SnapshotExportClient, SnapshotExportRuntimeStartError};
 use window_capture_runtime::WindowCaptureCoordinator;
 pub use window_capture_runtime::{WindowCaptureClient, WindowCaptureRuntimeStartError};
+
+/// Register an in-process window frame capture hook from the active UI renderer.
+pub fn register_in_process_capture(f: InProcessCaptureFn) {
+    taskmanager_platform_native::register_in_process_capture(f);
+}
 
 pub fn spawn_tray(
     spec: taskmanager_core::core::tray::TraySpec,

@@ -504,8 +504,11 @@ def validate(args: argparse.Namespace) -> dict[str, object]:
             raise EvidenceError("native active-window PNG is unexpectedly small")
         if "current-window PNG capture completed" not in log_text:
             raise EvidenceError("native current-window completion is missing from the app log")
-        if 'backend="spectacle-active-window"' not in log_text:
-            raise EvidenceError("native Spectacle backend provenance is missing from the app log")
+        if (
+            'backend="in-process"' not in log_text
+            and 'backend="spectacle-active-window"' not in log_text
+        ):
+            raise EvidenceError("native backend provenance is missing from the app log")
         visual_receipt(native_image)
         native_ocr = ocr_text(native_image)
         reject_skeleton_text(native_ocr)

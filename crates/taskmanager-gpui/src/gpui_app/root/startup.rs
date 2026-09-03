@@ -21,6 +21,8 @@ mod appearance;
 use appearance::observe_startup_appearance;
 
 mod capture_systems;
+mod demo;
+pub(crate) use demo::init_demo;
 
 mod config_tokens;
 use crate::gpui_app::chrome::WindowDecorationsPreference;
@@ -187,7 +189,6 @@ fn spawn_update_loop(
                 if view.drain_snapshot_export_completions() {
                     cx.notify();
                 }
-                #[cfg(target_os = "linux")]
                 if view.drain_window_capture_completions() {
                     cx.notify();
                 }
@@ -366,7 +367,7 @@ pub fn init<E>(
         taskmanager_application::ConfigBootstrap::Fallback { snapshot, source } => (
             snapshot.as_ref().clone(),
             None,
-            Some(format!("Configuration fallback: {source:?}")),
+            Some(i18n::t("settings.config_fallback").replace("{source}", &format!("{source:?}"))),
         ),
     };
 

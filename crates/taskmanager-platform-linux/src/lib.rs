@@ -23,6 +23,7 @@ mod local_time;
 mod platform_handle;
 mod provider;
 pub mod window_capture;
+pub use window_capture::LinuxWindowCapture;
 
 pub use backend::{
     EnvironmentProviders, IntegrationProviders, LinuxProviderRegistry, PowerProviders,

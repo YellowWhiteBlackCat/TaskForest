@@ -84,17 +84,18 @@ pub(crate) fn stats_panel(
         col = col.debug_selector(|| "tm-perf-stats-panel".to_string());
     }
     for (i, (row, value)) in rows.into_iter().take(row_limit).enumerate() {
-        // Text and Pair draw identically here — the variant types the
-        // producer's folding semantics (plain vs used/total), not the ink.
-        // The label owns the elastic side and the value keeps its intrinsic
-        // width flush-right inside the bounded rail.
         let label = row.label().to_owned();
-        let row = KeyValueRow::new(label, value, theme.palette())
-            .value_color(theme.fg)
-            .value_debug_selector(format!("tm-perf-stat-value:{i}"))
-            .selectable_value(("perf-stat-value", i))
-            .render();
-        col = col.child(stat_row_with_selector(row, i));
+        let key_value = if let Some((latest, average, peak)) = row.trend_parts() {
+            KeyValueRow::new_multiline(label, [latest, average, peak], theme.palette())
+                .value_color(theme.fg)
+                .value_debug_selector(format!("tm-perf-stat-value:{i}"))
+        } else {
+            KeyValueRow::new(label, value, theme.palette())
+                .value_color(theme.fg)
+                .value_debug_selector(format!("tm-perf-stat-value:{i}"))
+                .selectable_value(("perf-stat-value", i))
+        };
+        col = col.child(stat_row_with_selector(key_value.render(), i));
     }
     if omitted > 0 {
         col = col.child(

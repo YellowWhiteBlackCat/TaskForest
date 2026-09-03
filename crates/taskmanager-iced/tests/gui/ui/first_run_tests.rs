@@ -152,3 +152,11 @@ fn render_covers_the_honest_dialog_states_without_panic() {
     let _ = restart.reduce(FirstRunEvent::ActionCompleted(SetupScriptAction::Run));
     let _ = render_first_run(theme_snapshot, &restart, 1.0);
 }
+
+#[test]
+fn documentation_action_uses_the_taskforest_destination() {
+    assert_eq!(
+        DOCUMENTATION_URL,
+        "https://github.com/YellowWhiteBlackCat/TaskForest"
+    );
+}

@@ -6,7 +6,24 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
-## [Unreleased]
+## [0.1.2] — 2026-09-03
+
+### 修复
+
+- **Windows 编译与跨平台窗口捕获修复**：修复在 Windows 目标下编译 GPUI 时因缺少 frame capture 导出符号导致的构建阻断（为 `patches/gpui/src/platform.rs` 补齐非 Linux/macOS 平台上的 fallback 桩实现，并在 `gpui.rs` 中无条件导出）；完善跨平台活动窗口捕获体系，在 `taskmanager-platform-windows` 中基于 `windows-capture` 提供原生窗口截图，在 `taskmanager-platform-native` 中建立统一的 In-Process → Native → Unsupported 三层回退流水线。
+- **发布流水线恢复**：修复 0.1.1 触发的 Windows MSI CI 构建阻断，恢复多平台完整自动化发布。
+
+> 注：0.1.1 tag 在发布流水线中遭遇 Windows x64 MSI 编译阻断未生成正式 GitHub Release 资产；0.1.1 所含全部变更并入 0.1.2 正式发布。
+
+## [0.1.1] — 2026-09-03
+
+### 修复
+
+- **内存暴涨与 Vulkan 描述符池防护**：通过本地 vendored patch 替换 `blade-graphics 0.7.1` 的描述符分配器，废除原本的 `16.pow(k)` 几何级数暴涨策略（曾扩容至 4096-set 导致 Intel 驱动单次映射 ~50 MiB、双 command buffer 内存飙升至近 200 MiB）；采用单池 256-set 封顶与单 buffer 64 池硬上限，并在每次帧重置时销毁附池、重建基准池以确保显存与匿名页映射在空闲期彻底回落；清理上游 7 处生命周期省略警告。
+- **服务、启动、用户页面空数据修复**：修复页面切换导航分发中遗漏的数据采样分支，进入 Services、Startup、Users 页面时分别按需发起专属刷新请求，并补齐完整的端到端自动化测试验证“切换页面 → 发出请求 → 接收快照 → 界面数据生成”。
+- **趋势文本与键值面板对齐重构**：在基础 UI 库的 `KeyValueRow` 中增加 `new_multiline` 构造支持，建立标准双栏多行排版：左侧标题锁定首行靠左，右侧多行数值垂直堆叠右对齐，行高根据内容自然撑开，彻底杜绝单行长文本挤压导致的文本覆盖重叠、截断或 `...` 缩写缺陷；性能页图表角标增加 `flex_wrap` 弹性约束，防止次级与紧凑图表越界。
+- **Wayland 纯进程内窗口自截屏**：打通 GPUI `BladeRenderer` 到 Vulkan 交换链帧回读管道，开启 `TextureUsage::TARGET | TextureUsage::COPY` 并在绘制完成后通过 Staging Buffer 直接将 GPU 显存像素读回 CPU，使用内置 `image` crate 原生编码 PNG，平台层建立优先级直连；彻底废除通过子进程调用外部 KDE `spectacle` 的做法，消除桌面环境依赖并根除失焦截错其他窗口的问题。
+- **演示模式与文案规范**：GPUI 现在真正支持 `taskforest-g --demo`，使用确定性演示数据启动完整桌面界面，不读取主机遥测、不写配置或历史，也不执行主机控制操作；配置、浏览器、服务日志和搜索反馈补齐中英文文案；首次运行入口改为 TaskForest 文档，不再指向上游 Mission Center Wiki。
 
 ## [0.1.0] — 2026-09-02
 

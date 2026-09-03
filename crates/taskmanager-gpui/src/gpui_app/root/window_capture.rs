@@ -1,53 +1,36 @@
 //! GPUI adapter for the application-correlated current-window PNG session.
 
-#[cfg(target_os = "linux")]
 use gpui::{
     AnyElement, Context, InteractiveElement, IntoElement, ParentElement,
     StatefulInteractiveElement, Styled, div, px,
 };
 use taskmanager_app_host::WindowCaptureClient;
-#[cfg(target_os = "linux")]
 use taskmanager_application::window_capture::WindowCaptureSession;
-#[cfg(target_os = "linux")]
 use taskmanager_application::window_capture::WindowCaptureState;
-#[cfg(target_os = "linux")]
 use taskmanager_application::window_capture::{WindowCaptureSubmitError, WindowCaptureTarget};
-#[cfg(target_os = "linux")]
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
-#[cfg(target_os = "linux")]
 use taskmanager_ui_contract::IconId;
-#[cfg(target_os = "linux")]
 use tracing::{info, warn};
 
-#[cfg(target_os = "linux")]
 use crate::gpui_app::elements;
 
-#[cfg(target_os = "linux")]
 use super::Hover;
-#[cfg(target_os = "linux")]
 use super::RootView;
 
 #[derive(Debug, Default)]
 pub(crate) enum WindowCaptureRuntime {
     #[default]
     Unavailable,
-    #[cfg(target_os = "linux")]
     Active(WindowCaptureSession<WindowCaptureClient>),
 }
 
 impl WindowCaptureRuntime {
     pub(crate) fn install(&mut self, client: WindowCaptureClient) {
-        #[cfg(target_os = "linux")]
         {
             *self = Self::Active(WindowCaptureSession::new(client));
         }
-        #[cfg(not(target_os = "linux"))]
-        {
-            let _ = client;
-        }
     }
 
-    #[cfg(target_os = "linux")]
     fn active_mut(&mut self) -> Option<&mut WindowCaptureSession<WindowCaptureClient>> {
         match self {
             Self::Unavailable => None,
@@ -56,9 +39,8 @@ impl WindowCaptureRuntime {
     }
 }
 
-/// Linux/Wayland one-shot capture affordance. The click only submits a typed
-/// application request; the app-host owns the native provider and PNG commit.
-#[cfg(target_os = "linux")]
+/// Cross-platform one-shot capture affordance. The click only submits a typed
+/// application request; the app-host owns native providers and PNG commit.
 pub(crate) fn current_window_capture_btn(
     t: &taskmanager_theme::Theme,
     hovered: Option<&Hover>,
@@ -133,9 +115,7 @@ pub(crate) fn current_window_capture_btn(
     .into_any_element()
 }
 
-#[cfg(target_os = "linux")]
 impl RootView {
-    #[cfg(target_os = "linux")]
     pub(crate) fn request_current_window_capture(&mut self) -> bool {
         let target = self
             .capture_evidence
@@ -203,7 +183,6 @@ impl RootView {
         }
     }
 
-    #[cfg(target_os = "linux")]
     pub(crate) fn drain_window_capture_completions(&mut self) -> bool {
         let Some(session) = self.window_capture.active_mut() else {
             return false;
@@ -242,6 +221,7 @@ impl RootView {
                 );
             }
             WindowCaptureState::Failed { request, error } => {
+                self.capture_evidence.mark_window_capture_failed();
                 warn!(
                     target: "taskmanager.window_capture",
                     request = request.get(),

@@ -32,9 +32,11 @@ use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::{
     CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus, RequestId,
 };
-use taskmanager_telemetry_store::CorrelatedTelemetryStamp;
+use taskmanager_telemetry_store::{
+    CorrelatedSystemTelemetryIngestor, CorrelatedTelemetryStamp, live_graph::LiveGraphHistory,
+};
 
-use crate::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
+use crate::{DirectTrackState, FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 mod cpu_topology;
 
@@ -208,6 +210,36 @@ pub fn demo_app() -> ShellApp {
     app
 }
 
+/// Build the GPUI direct-track projection from the same canonical demo facts
+/// used by the composed shell track. The conversion is intentionally kept in
+/// the fixture boundary so a renderer cannot invent a second demo model.
+#[must_use]
+pub fn demo_direct_track() -> DirectTrackState {
+    let demo = demo_app();
+    DirectTrackState::from_fixture_projection(demo.projection().clone())
+}
+
+/// Build a bounded live-graph store populated with deterministic samples for
+/// the standalone GPUI demo. The returned write capability belongs to the
+/// same store and is intentionally returned to the caller so the GPUI root
+/// can retain the normal read/write separation even though demo mode never
+/// schedules live collection.
+#[must_use]
+pub fn demo_telemetry() -> (
+    std::sync::Arc<taskmanager_telemetry_store::TelemetryStore>,
+    CorrelatedSystemTelemetryIngestor,
+) {
+    let (history, ingestor) =
+        LiveGraphHistory::shared(taskmanager_telemetry_store::live_graph::MAX_HISTORY_CAPACITY);
+    let base = snapshot();
+    for revision in 1..=4 {
+        let mut frame = base.clone();
+        frame.timestamp_ms = base.timestamp_ms.saturating_add(revision * 1_000);
+        record_demo_history_frame_into(&ingestor, revision, &frame, None, None);
+    }
+    (history.store().clone(), ingestor)
+}
+
 /// Feed deterministic demo/capture facts through the same typed bounded-store
 /// ingestor used by live correlation. This fixture seam does not exist on
 /// `LiveGraphHistory`, so production render code retains read-only authority.
@@ -224,12 +256,25 @@ pub fn record_demo_history_frame(
         .revision()
         .saturating_add(1)
         .max(1);
+    let ingestor = app.ensure_history_ingestor();
+    record_demo_history_frame_into(&ingestor, revision, snapshot, power, sensors);
+}
+
+/// Feed one deterministic frame into an explicitly supplied live-history
+/// writer. This is the shared fixture-side adapter used when a frontend must
+/// construct a demo store before it has a shell application instance.
+pub fn record_demo_history_frame_into(
+    ingestor: &CorrelatedSystemTelemetryIngestor,
+    revision: u64,
+    snapshot: &SystemSnapshot,
+    power: Option<&PowerSupplySnapshot>,
+    sensors: Option<&SensorCenterSnapshot>,
+) {
     let Some(stamp) =
-        CorrelatedTelemetryStamp::from_accepted_event(revision, snapshot.timestamp_ms)
+        CorrelatedTelemetryStamp::from_accepted_event(revision.max(1), snapshot.timestamp_ms)
     else {
         return;
     };
-    let ingestor = app.ensure_history_ingestor();
     let _ = ingestor.ingest_correlated_cpu(
         stamp,
         &CpuTelemetryObservation::current(snapshot.cpu.clone(), snapshot.timestamp_ms, Vec::new()),
@@ -625,3 +670,7 @@ fn sessions() -> Vec<SessionItem> {
         },
     ]
 }
+
+#[cfg(test)]
+#[path = "../tests/headless/fixture_demo.rs"]
+mod tests;

@@ -34,3 +34,12 @@ fn network_fixed_scale_uses_decimal_link_speed_and_fails_closed() {
     assert_eq!(network_link_speed_graph_max_mbps(Some(1_000)), Some(125.0));
     assert_eq!(network_link_speed_graph_max_mbps(Some(0)), Some(1.0));
 }
+
+#[test]
+fn graph_summary_row_builds_wrapping_readout_for_finite_samples() {
+    let theme = taskmanager_theme::Theme::dark();
+    let row = super::graph_summary_row(&theme, &[10.0, 20.0, 30.0], &|v| format!("{v:.0} MB/s"));
+    assert!(row.is_some());
+    let empty_row = super::graph_summary_row(&theme, &[f32::NAN], &|v| format!("{v:.0} MB/s"));
+    assert!(empty_row.is_none());
+}

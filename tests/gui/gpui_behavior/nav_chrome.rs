@@ -466,7 +466,7 @@ async fn mc06_first_run_case_first_run_dialog_keeps_setup_actions_typed_and_fail
 
     let mut vcx = VisualTestContext::from_window(win.into(), cx);
     for id in [
-        "first-run-open-wiki",
+        "first-run-open-docs",
         "first-run-view-script",
         "first-run-run-setup",
         "first-run-revert-setup",

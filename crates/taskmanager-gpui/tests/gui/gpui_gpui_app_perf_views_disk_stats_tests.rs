@@ -1,4 +1,4 @@
-use super::{disk_stats, temperature_trend_value};
+use super::{disk_stats, temperature_trend_stat_row, temperature_trend_value};
 use taskmanager_core::core::metrics::DiskMetrics;
 use taskmanager_core::core::units::UnitPreferences;
 
@@ -26,6 +26,22 @@ fn temperature_trend_summarizes_latest_average_and_peak() {
             taskmanager_application::i18n::t("common.peak"),
         )
     );
+}
+
+/// SMART temperature trend produces a typed StatRow::Trend with distinct
+/// latest, average, and peak components plus the full raw copy string.
+#[test]
+fn temperature_trend_stat_row_preserves_multiline_parts_and_raw_value() {
+    let row =
+        temperature_trend_stat_row(&[35.0, 37.0, 42.0]).expect("finite temperature samples exist");
+    assert_eq!(row.label(), taskmanager_application::i18n::t("proc.trend"));
+    let (latest, avg, peak) = row.trend_parts().expect("trend parts must be present");
+    assert!(latest.contains("42"));
+    assert!(avg.contains("38"));
+    assert!(peak.contains("42"));
+    let value = row.value().expect("full string must exist");
+    assert!(value.contains("42 °C"));
+    assert!(value.contains("38 °C"));
 }
 
 /// The removable-media row carries the locale label (never hardcoded

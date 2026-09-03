@@ -33,6 +33,37 @@ fn inherited_ui_font_declares_the_bundled_cjk_fallback() {
     );
 }
 
+#[gpui::test]
+async fn demo_root_materializes_shared_facts_without_a_platform_client(cx: &mut TestAppContext) {
+    let window =
+        cx.add_window(|_window, cx| crate::gpui_app::root::RootView::new_demo(Theme::dark(), cx));
+    let view = window.entity(cx).expect("demo RootView entity");
+    view.read_with(cx, |view, _| {
+        assert!(
+            view.platform.is_none(),
+            "demo must not create a platform client"
+        );
+        assert!(view.telemetry_frame_state.is_ready());
+        assert!(view.system_snapshot().cpu.brand.is_some());
+        assert!(view.processes().len() >= 2);
+        assert!(view.services().len() >= 2);
+        assert!(!view.startup_entries().is_empty());
+        assert!(!view.sessions().is_empty());
+    });
+
+    cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
+        .expect("demo window should render");
+    let mut visual = VisualTestContext::from_window(window.into(), cx);
+    let ready_body = visual
+        .debug_bounds(super::TELEMETRY_READY_BODY_SELECTOR)
+        .expect("demo should render the telemetry-ready body");
+    assert!(
+        ready_body.size.width > gpui::px(300.0) && ready_body.size.height > gpui::px(200.0),
+        "demo body must have a usable surface: {ready_body:?}"
+    );
+    drop(visual);
+}
+
 // ── Desktop-widget surface (render-path) ─────────────────────────────────────
 //
 // The widget replaces the whole desktop shell, so its proof is a render-path

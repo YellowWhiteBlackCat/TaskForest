@@ -55,8 +55,7 @@ pub struct CliCapabilities {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum CliMode {
     /// Launch the product's UI frontend (ADR-051). `demo` runs the fixture
-    /// data with no host I/O (supported by the TUI/iced/Bevy products; the
-    /// GPUI product reports that demo mode is not yet supported).
+    /// data with no host I/O; every graphical product provides this mode.
     Gui { app_id: Option<String>, demo: bool },
     /// Headless terminal text-frame evidence (TUI product only): render a
     /// fixed-size frame of the demo app to stdout and exit. Width/height

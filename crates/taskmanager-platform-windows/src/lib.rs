@@ -45,6 +45,8 @@ mod config;
 mod local_time;
 mod provider;
 pub mod tray;
+pub mod window_capture;
+pub use window_capture::WindowsWindowCapture;
 // Single-instance adapter (named mutex + named-event handoff, borrowed core
 // from tauri-plugin-single-instance; ADR-032 follow-up).
 pub mod instance;

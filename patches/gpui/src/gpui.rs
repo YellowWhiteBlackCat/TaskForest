@@ -29,6 +29,10 @@ mod key_dispatch;
 mod keymap;
 mod path_builder;
 mod platform;
+pub use platform::{
+    has_pending_window_frame_capture, request_window_frame_capture,
+    request_window_frame_capture_with_channel,
+};
 pub mod prelude;
 mod scene;
 mod shared_string;

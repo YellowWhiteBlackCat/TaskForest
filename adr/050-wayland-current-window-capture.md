@@ -19,20 +19,26 @@ version 2 with no active-window target advertised.
    `--activewindow --background --output` argument vector. The executable is
    optional; absence, denial, timeout, malformed PNG and provider failure remain
    distinct typed outcomes.
-2. `taskmanager-platform-contract` owns only `WindowCaptureReceipt`, backend
-   provenance and bounded failure vocabulary. `taskmanager-application` owns the
-   `Closed | Queued | Running | Ready | Failed` request lifecycle.
+2. `taskmanager-platform-contract` owns the in-process renderer hook, native
+   adapter trait, `WindowCaptureReceipt`, backend provenance and bounded failure
+   vocabulary. `taskmanager-application` owns the `Closed | Queued | Running |
+   Ready | Failed` request lifecycle.
 3. `taskmanager-app-host` owns one bounded worker per process. It allocates a
    private staging file, asks the native adapter to fill it, validates the PNG
    header/dimensions, and atomically renames it to the requested `.png` path.
-   Frontends never invoke a provider, inspect Wayland, or perform file I/O.
-4. GPUI exposes the current-window action on Linux and reports the committed
-   receipt through the shared shell feedback path. The default name is
-   `taskforest-window.png` in the process working directory.
+   Frontends never invoke a provider, inspect OS capture state, or perform file
+   I/O.
+4. GPUI exposes the current-window action on every product target and reports
+   the committed receipt through the shared shell feedback path. The host tries
+   the registered Blade readback hook first, then the selected native adapter:
+   Linux uses Spectacle, Windows uses Windows.Graphics.Capture, and macOS keeps
+   a typed `Unsupported` fallback when no renderer hook is available. The
+   default name is `taskforest-window.png` in the process working directory.
 
 ## Evolution path
 
-The backend enum already reserves `PortalScreenshot` and `PipeWireScreenCast`.
+The backend enum already reserves `PortalScreenshot` and `PipeWireScreenCast`;
+ScreenCaptureKit remains a future macOS backend value.
 When the Screenshot Portal advertises the version-3 active-window target, add a
 Portal adapter and prefer it before the Spectacle fallback; do not change the
 application lifecycle or publication transaction. The official portal contract

@@ -51,7 +51,6 @@ pub(super) use state::{
     CaptureScenarioProgress, HistoryReplayOpenState, SystemHealthCaptureOutcome,
     SystemNpuCaptureState,
 };
-#[cfg(target_os = "linux")]
 pub(super) use state::{WindowCaptureChain, WindowCaptureSchedule};
 
 impl CaptureEvidence {

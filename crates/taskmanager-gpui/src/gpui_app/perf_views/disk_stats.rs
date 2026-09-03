@@ -121,8 +121,8 @@ pub(super) fn disk_stats(
         // SMART temperature trend from this disk identity's generation-scoped
         // telemetry-store history. Only a window with at least one finite
         // sample renders a row; another disk can never influence it.
-        if let Some(trend) = temperature_trend_value(temperature_samples) {
-            stats.push(StatRow::text(i18n::t("proc.trend"), Some(trend)));
+        if let Some(trend_row) = temperature_trend_stat_row(temperature_samples) {
+            stats.push(trend_row);
         }
     }
     if let Some(pct) = d.smart_percent_used {
@@ -162,6 +162,31 @@ pub(super) fn disk_stats(
 /// mirroring the TUI's `device_summary_line` semantics. `None` when the window
 /// holds no finite sample — the honest absence the stats panel renders as no
 /// row, never a fabricated "0 °C" trend.
+fn temperature_trend_stat_row(samples: &[f32]) -> Option<StatRow> {
+    let raw_full = temperature_trend_value(samples)?;
+    let mut latest = f32::NAN;
+    let mut peak = f32::NAN;
+    let mut sum = 0.0_f32;
+    let mut count = 0_u32;
+    for &value in samples.iter().filter(|value| value.is_finite()) {
+        latest = value;
+        peak = peak.max(value);
+        sum += value;
+        count += 1;
+    }
+    let avg = sum / count as f32;
+    let latest_str = format!("{} {:.0} \u{b0}C", i18n::t("common.latest"), latest);
+    let avg_str = format!("{} {:.0} \u{b0}C", i18n::t("common.avg"), avg);
+    let peak_str = format!("{} {:.0} \u{b0}C", i18n::t("common.peak"), peak);
+    Some(StatRow::trend(
+        i18n::t("proc.trend"),
+        latest_str,
+        avg_str,
+        peak_str,
+        raw_full,
+    ))
+}
+
 fn temperature_trend_value(samples: &[f32]) -> Option<String> {
     let mut latest = f32::NAN;
     let mut peak = f32::NAN;
@@ -169,7 +194,6 @@ fn temperature_trend_value(samples: &[f32]) -> Option<String> {
     let mut count = 0_u32;
     for &value in samples.iter().filter(|value| value.is_finite()) {
         latest = value;
-        // `f32::max` ignores NaN operands, so the first sample seeds `peak`.
         peak = peak.max(value);
         sum += value;
         count += 1;

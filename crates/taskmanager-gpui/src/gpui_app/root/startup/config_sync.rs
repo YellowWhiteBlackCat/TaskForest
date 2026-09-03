@@ -125,7 +125,10 @@ pub(super) fn persist_config_if_due(
                 if let Some(canonical) = canonical {
                     apply_root_runtime_config(view, &canonical, cx);
                 }
-                view.show_local_feedback(format!("Configuration not queued: {error}"), cx);
+                view.show_local_feedback(
+                    i18n::t("settings.config_not_queued").replace("{error}", &error.to_string()),
+                    cx,
+                );
             });
         }
     }
@@ -167,9 +170,8 @@ pub(super) fn drain_config_publications(
         } => {
             let _ = weak.update(cx, |view, cx| {
                 view.show_local_feedback(
-                    format!(
-                        "Configuration resynchronised after {missed_publications} missed updates"
-                    ),
+                    i18n::t("settings.config_resynchronised")
+                        .replace("{count}", &missed_publications.to_string()),
                     cx,
                 );
             });
@@ -189,10 +191,10 @@ pub(super) fn drain_config_publications(
         }
         let feedback = match publication.outcome() {
             taskmanager_application::ConfigPublicationOutcome::SaveFailed { error, .. } => Some(
-                format!("Configuration not saved: {}", error.kind().stable_code()),
+                i18n::t("settings.config_not_saved").replace("{kind}", error.kind().stable_code()),
             ),
             taskmanager_application::ConfigPublicationOutcome::RefreshFailed(recovery) => Some(
-                config_recovery_message("Configuration refresh failed", *recovery),
+                config_recovery_message(i18n::t("settings.config_refresh_failed"), *recovery),
             ),
             taskmanager_application::ConfigPublicationOutcome::Refreshed(recovery) => {
                 initial_config_recovery_message(*recovery)
@@ -210,11 +212,12 @@ pub(super) fn initial_config_recovery_message(
 ) -> Option<String> {
     match recovery.initial_notice() {
         taskmanager_application::ConfigRecoveryNotice::None => None,
-        taskmanager_application::ConfigRecoveryNotice::Recovered => {
-            Some(config_recovery_message("Configuration recovered", recovery))
-        }
+        taskmanager_application::ConfigRecoveryNotice::Recovered => Some(config_recovery_message(
+            i18n::t("settings.config_recovered"),
+            recovery,
+        )),
         taskmanager_application::ConfigRecoveryNotice::Failed => Some(config_recovery_message(
-            "Configuration load failed",
+            i18n::t("settings.config_load_failed"),
             recovery,
         )),
     }

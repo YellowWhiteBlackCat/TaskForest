@@ -143,6 +143,7 @@ pub use presentation_preferences::{
 pub use process_feedback::ProcessControlAction;
 pub(crate) use process_feedback::process_control_feedback;
 pub use responsive::*;
+pub(crate) use startup::init_demo;
 use startup::page_token;
 pub use startup::{StartupEnvironment, StartupRuntime, init};
 use system_telemetry::SystemHistoryIngestionDiagnostic;
@@ -592,6 +593,42 @@ impl RootView {
             crate::window_presentation::GpuiSurfaceRole::Standalone,
             cx,
         )
+    }
+
+    /// Construct the no-host-I/O GPUI demo surface from the shared typed
+    /// fixture. Demo data enters through the same direct-track projection and
+    /// revision-keyed materialization used by production batches; no native
+    /// platform client, configuration worker, history writer, tray or helper
+    /// is created by this constructor.
+    pub(crate) fn new_demo(theme: Theme, cx: &mut Context<Self>) -> Self {
+        let (telemetry, telemetry_ingestor) = taskmanager_shell::fixture::demo_telemetry();
+        let mut view = Self::new_inner(
+            theme,
+            telemetry,
+            telemetry_ingestor,
+            TelemetryRefreshPolicy::default(),
+            None,
+            crate::window_presentation::GpuiSurfaceRole::Standalone,
+            cx,
+        );
+        view.shell = taskmanager_shell::fixture::demo_direct_track();
+        let projection = view.shell.projection().clone();
+        view.materialized.seed_from_projection(&projection);
+        view.telemetry_frame_state = TelemetryFrameState::Ready;
+        view.local_time_rules = taskmanager_core::core::time::LocalTimeRulesObservation::current(
+            taskmanager_core::core::time::LocalTimeRules::utc(),
+            0,
+        );
+        if let Some(snapshot) = projection.snapshot.as_ref() {
+            view.smart_history.record_snapshot(snapshot);
+        }
+        view.shell.report_notice(
+            taskmanager_shell::FeedbackSource::Demo,
+            taskmanager_shell::FeedbackSeverity::Info,
+            taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+            i18n::t("demo.no_host_actions"),
+        );
+        view
     }
 
     /// Construct the interactive shell with an application-owned platform

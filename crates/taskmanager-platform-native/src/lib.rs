@@ -9,9 +9,10 @@
 
 use std::path::{Path, PathBuf};
 
-#[cfg(not(target_os = "linux"))]
-use taskmanager_platform_contract::WindowCaptureFailureKind;
-use taskmanager_platform_contract::{WindowCaptureFailure, WindowCaptureReceipt};
+use taskmanager_platform_contract::{
+    InProcessCaptureFn, NativeWindowCapture, WindowCaptureBackend, WindowCaptureFailure,
+    WindowCaptureReceipt,
+};
 
 #[cfg(all(not(debug_assertions), not(feature = "hardware-all")))]
 compile_error!(
@@ -122,25 +123,50 @@ pub mod instance;
 
 pub use instance::acquire_single_instance;
 
-/// Capture the currently active window through the selected native adapter.
-/// Linux currently uses the fixed-argument KDE Spectacle Wayland path; other
-/// platforms return the contract's typed `Unsupported` failure until their
-/// native capture seam is implemented.
+static IN_PROCESS_CAPTURE_FN: std::sync::RwLock<Option<InProcessCaptureFn>> =
+    std::sync::RwLock::new(None);
+
+/// Register an in-process window frame capture hook from the active UI renderer.
+pub fn register_in_process_capture(f: InProcessCaptureFn) {
+    if let Ok(mut lock) = IN_PROCESS_CAPTURE_FN.write() {
+        *lock = Some(f);
+    }
+}
+
+#[cfg(target_os = "linux")]
+fn native_window_capture() -> impl NativeWindowCapture {
+    taskmanager_platform_linux::LinuxWindowCapture
+}
+
+#[cfg(target_os = "windows")]
+fn native_window_capture() -> impl NativeWindowCapture {
+    taskmanager_platform_windows::WindowsWindowCapture
+}
+
+#[cfg(target_os = "macos")]
+fn native_window_capture() -> impl NativeWindowCapture {
+    taskmanager_platform_macos::MacosWindowCapture
+}
+
+/// Capture the currently active window through the three-tier pipeline:
+/// 1. In-process GPU framebuffer readback (if registered by the active frontend)
+/// 2. Native operating system window capture adapter
+/// 3. Typed `Unsupported` failure fallback
 pub fn capture_current_window_png(
     output: &Path,
 ) -> Result<WindowCaptureReceipt, WindowCaptureFailure> {
-    #[cfg(target_os = "linux")]
+    if let Ok(guard) = IN_PROCESS_CAPTURE_FN.read()
+        && let Some(ref hook) = *guard
+        && let Ok((width, height)) = hook(output)
     {
-        taskmanager_platform_linux::window_capture::capture_current_window_png(output)
+        return Ok(WindowCaptureReceipt::new(
+            width,
+            height,
+            WindowCaptureBackend::InProcess,
+        ));
     }
-    #[cfg(not(target_os = "linux"))]
-    {
-        let _ = output;
-        Err(WindowCaptureFailure::new(
-            WindowCaptureFailureKind::Unsupported,
-            "current-window PNG capture is not implemented on this platform",
-        ))
-    }
+
+    native_window_capture().capture_active_window(output)
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", target_os = "windows")))]

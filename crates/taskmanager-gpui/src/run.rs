@@ -10,9 +10,25 @@ use crate::assets::TaskManagerAssets;
 /// Launch the GPUI desktop frontend.
 pub fn run(app_id: Option<String>, demo: bool) {
     if demo {
-        eprintln!("taskmanager: --demo is not yet supported by the GPUI frontend (ui-gpui)");
-        std::process::exit(2);
+        run_demo(app_id);
+        return;
     }
+    run_production(app_id);
+}
+
+fn run_demo(app_id: Option<String>) {
+    info!(
+        frontend = product::GPUI_NAME,
+        "Starting TaskForest demo frontend..."
+    );
+    Application::new()
+        .with_assets(TaskManagerAssets)
+        .run(move |cx: &mut App| {
+            crate::gpui_app::init_demo(cx, app_id);
+        });
+}
+
+fn run_production(app_id: Option<String>) {
     info!(
         frontend = product::GPUI_NAME,
         "Starting TaskForest frontend..."
@@ -57,6 +73,16 @@ pub fn run(app_id: Option<String>, demo: bool) {
     let local_time_rules = host.local_time_rules();
     let platform_factory = host.clone();
     let history_connector = host.history_frontend_connector();
+
+    taskmanager_app_host::register_in_process_capture(Box::new(|output| {
+        let (tx, rx) = std::sync::mpsc::sync_channel(1);
+        gpui::request_window_frame_capture_with_channel(output.to_path_buf(), tx);
+        match rx.recv_timeout(std::time::Duration::from_secs(5)) {
+            Ok(res) => res,
+            Err(e) => Err(format!("in-process capture timed out: {e}")),
+        }
+    }));
+
     Application::new()
         .with_assets(TaskManagerAssets)
         .run(move |cx: &mut App| {

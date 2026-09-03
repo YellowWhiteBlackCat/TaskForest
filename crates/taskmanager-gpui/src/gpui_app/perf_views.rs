@@ -4,7 +4,7 @@
 
 use gpui::{
     AnyElement, Context, Div, ElementId, InteractiveElement, IntoElement, ParentElement,
-    StatefulInteractiveElement, Styled, div,
+    StatefulInteractiveElement, Styled, div, px,
 };
 use taskmanager_telemetry_store::TelemetryStore;
 
@@ -757,30 +757,26 @@ pub(super) fn graph_summary_row(
     format_value: &dyn Fn(f32) -> String,
 ) -> Option<Div> {
     let summary = finite_graph_summary(samples)?;
+    let item = |label: &'static str, val: String| {
+        div()
+            .min_w(px(0.0))
+            .whitespace_nowrap()
+            .child(format!("{label} {val}"))
+    };
     Some(
         div()
             .flex()
             .flex_row()
+            .flex_wrap()
+            .min_w(px(0.0))
             .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_16,
+                tokens::SPACE_12,
             ))
             .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
             .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-            .child(format!(
-                "{} {}",
-                i18n::t("common.latest"),
-                format_value(summary.latest)
-            ))
-            .child(format!(
-                "{} {}",
-                i18n::t("common.avg"),
-                format_value(summary.average)
-            ))
-            .child(format!(
-                "{} {}",
-                i18n::t("common.peak"),
-                format_value(summary.maximum)
-            )),
+            .child(item(i18n::t("common.latest"), format_value(summary.latest)))
+            .child(item(i18n::t("common.avg"), format_value(summary.average)))
+            .child(item(i18n::t("common.peak"), format_value(summary.maximum))),
     )
 }
 
