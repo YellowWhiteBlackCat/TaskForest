@@ -680,5 +680,25 @@ fn properties_overlay_counts_as_a_modal_and_swallows_characters() {
     assert!(!app.process_properties_open());
 }
 
+#[test]
+fn escape_clears_active_feedback_notice_when_no_modal_open() {
+    let mut app = IcedApp::demo();
+    app.shell.report_notice(
+        taskmanager_shell::FeedbackSource::Persistence,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::TIMED_SHORT,
+        "Active notice",
+    );
+    assert!(app.shell.feedback_notice().is_some());
+
+    let _ = app.update(Message::Key(IcedKey::Fixed(
+        taskmanager_shell::ShellKeyEvent::new(
+            taskmanager_application::KeyCode::Escape,
+            taskmanager_application::Modifiers::NONE,
+        ),
+    )));
+    assert!(app.shell.feedback_notice().is_none());
+}
+
 #[path = "tests/settings_and_appearance.rs"]
 mod settings_and_appearance;

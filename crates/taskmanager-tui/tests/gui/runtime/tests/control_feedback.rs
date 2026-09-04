@@ -436,3 +436,139 @@ fn fully_applied_batch_renders_success_marker_without_failure_item() {
         "no failure marker for an all-applied batch"
     );
 }
+
+/// Calling `app.shell.advance_feedback_time(...)` expires a `FeedbackLifecycle::Timed`
+/// notice and clears the footer display.
+#[test]
+fn advance_feedback_time_expires_timed_notice_and_clears_footer() {
+    taskmanager_test_support::pin_english();
+    let mut app = app_on_processes();
+    app.set_feedback_activity("Live activity baseline");
+
+    let duration = std::time::Duration::from_secs(5);
+    app.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::Timed(duration),
+        "Temporary timed feedback notice",
+    );
+
+    assert!(app.shell.feedback_notice().is_some());
+    let text = frame_text(&app, 140, 36);
+    assert!(
+        text.contains("Temporary timed feedback notice"),
+        "the timed notice must render in the footer, got:\n{text}"
+    );
+
+    // Advance time partially: the notice must remain visible in state and footer.
+    app.shell
+        .advance_feedback_time(std::time::Duration::from_secs(2));
+    assert!(app.shell.feedback_notice().is_some());
+    let text = frame_text(&app, 140, 36);
+    assert!(
+        text.contains("Temporary timed feedback notice"),
+        "the notice must remain in the footer before expiration, got:\n{text}"
+    );
+
+    // Advance time past the remaining duration: notice expires.
+    app.shell
+        .advance_feedback_time(std::time::Duration::from_secs(3));
+    assert!(
+        app.shell.feedback_notice().is_none(),
+        "advancing elapsed duration must expire the notice"
+    );
+
+    // The footer display updates smoothly: notice is cleared and baseline activity shows.
+    let text = frame_text(&app, 140, 36);
+    assert!(
+        !text.contains("Temporary timed feedback notice"),
+        "the expired notice must no longer appear in the footer, got:\n{text}"
+    );
+    assert!(
+        text.contains("Live activity baseline"),
+        "footer must display background activity after notice expiry, got:\n{text}"
+    );
+}
+
+/// Pressing `Esc` clears an active notice via `clear_feedback_notice()` when no
+/// modal or menu is open.
+#[test]
+fn esc_key_clears_active_notice_via_clear_feedback_notice() {
+    taskmanager_test_support::pin_english();
+    let mut app = app_on_processes();
+    app.set_feedback_activity("Live activity baseline");
+
+    app.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Success,
+        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        "Active notice to dismiss with Esc",
+    );
+
+    assert!(app.shell.feedback_notice().is_some());
+    let text = frame_text(&app, 140, 36);
+    assert!(
+        text.contains("Active notice to dismiss with Esc"),
+        "active notice must render in footer, got:\n{text}"
+    );
+
+    // Press Esc when no modal/menu is open: notice is dismissed immediately.
+    let effect = press(&mut app, ratatui::crossterm::event::KeyCode::Esc);
+    assert!(effect.is_none());
+    assert!(
+        app.shell.feedback_notice().is_none(),
+        "Esc must clear the active notice"
+    );
+
+    // Footer updates immediately to clear the notice.
+    let text = frame_text(&app, 140, 36);
+    assert!(
+        !text.contains("Active notice to dismiss with Esc"),
+        "cleared notice must not appear in the footer, got:\n{text}"
+    );
+    assert!(
+        text.contains("Live activity baseline"),
+        "footer must return to background activity, got:\n{text}"
+    );
+}
+
+/// Modal/menu dismissal has precedence: pressing `Esc` while a menu is open
+/// dismisses the menu first, leaving the active feedback notice intact until
+/// a subsequent `Esc` press.
+#[test]
+fn esc_key_dismisses_open_modal_before_feedback_notice() {
+    taskmanager_test_support::pin_english();
+    let mut app = app_on_processes();
+
+    app.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        "Notice preserved across modal close",
+    );
+
+    // Open column menu ('C').
+    let effect = press(&mut app, ratatui::crossterm::event::KeyCode::Char('C'));
+    assert!(effect.is_none());
+    assert!(app.column_menu_selection().is_some());
+
+    // First Esc closes the column menu, notice is preserved.
+    let effect = press(&mut app, ratatui::crossterm::event::KeyCode::Esc);
+    assert!(effect.is_none());
+    assert!(
+        app.column_menu_selection().is_none(),
+        "Esc must close the column menu"
+    );
+    assert!(
+        app.shell.feedback_notice().is_some(),
+        "first Esc must not clear notice while a modal/menu was open"
+    );
+
+    // Second Esc (with no modal/menu open) clears the feedback notice.
+    let effect = press(&mut app, ratatui::crossterm::event::KeyCode::Esc);
+    assert!(effect.is_none());
+    assert!(
+        app.shell.feedback_notice().is_none(),
+        "second Esc must clear the feedback notice"
+    );
+}

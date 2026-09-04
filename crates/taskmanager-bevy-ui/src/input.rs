@@ -79,7 +79,8 @@ pub(crate) struct InputPlugin;
 impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PendingEffects>()
-            .init_resource::<QuitForwarded>();
+            .init_resource::<QuitForwarded>()
+            .init_resource::<crate::drain::FeedbackCache>();
     }
 }
 
@@ -150,6 +151,7 @@ pub(crate) fn keyboard_dispatch_system(
     mut route: ResMut<Route>,
     mut quit: ResMut<QuitForwarded>,
     mut exits: MessageWriter<AppExit>,
+    feedback_cache: Option<ResMut<crate::drain::FeedbackCache>>,
     mut commands: Commands,
 ) {
     let events: Vec<KeyboardInput> = presses
@@ -230,6 +232,17 @@ pub(crate) fn keyboard_dispatch_system(
             }
             applied = true;
             commands.trigger(crate::pages::services::log_panel::LogPanelRepaintRequired);
+            continue;
+        }
+        // 0c. Active feedback notice dismissal: when no confirmation or modal
+        //     is open, bare Escape clears the notice immediately.
+        if matches!(context, KeyboardOwner::Free)
+            && event.key_code == KeyCode::Escape
+            && modifiers == Modifiers::NONE
+            && shell.feedback_notice().is_some()
+        {
+            shell.clear_feedback_notice();
+            applied = true;
             continue;
         }
         // 1. Frontend navigation: route chords move the Bevy route AND the
@@ -363,6 +376,13 @@ pub(crate) fn keyboard_dispatch_system(
             .pending_confirmation()
             .and_then(PendingConfirmationView::from_pending);
         commands.trigger(ConfirmationChanged(view));
+    }
+    if let Some(mut cache) = feedback_cache {
+        let feedback = shell.feedback_text().to_owned();
+        if cache.0.as_deref() != Some(feedback.as_str()) {
+            cache.0 = Some(feedback.clone());
+            commands.trigger(crate::drain::FeedbackChanged(feedback));
+        }
     }
     // Quit forwarding is frame-level, not key-level: a quit requested
     // outside the keyboard (tray, platform lifecycle) still exits exactly

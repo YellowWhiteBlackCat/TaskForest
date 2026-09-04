@@ -34,7 +34,7 @@ type KeySystem = fn(&mut TuiApp, &KeyEvent) -> InputDispatch;
 
 /// Input precedence is data, not nesting. New input owners must be inserted in
 /// this registry and return an explicit dispatch state.
-const KEY_SYSTEMS: [KeySystem; 10] = [
+const KEY_SYSTEMS: [KeySystem; 11] = [
     open_modal_system,
     owned_input_system,
     character_system,
@@ -44,6 +44,7 @@ const KEY_SYSTEMS: [KeySystem; 10] = [
     performance_scroll_system,
     table_navigation_system,
     nonflat_navigation_system,
+    feedback_notice_dismiss_system,
     content_system,
 ];
 
@@ -604,6 +605,19 @@ fn collapse_nonflat_row(app: &mut TuiApp) -> InputDispatch {
         app.collapse_tree_identity(identity);
         InputDispatch::Consumed
     })
+}
+
+fn feedback_notice_dismiss_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
+    if key.code == KeyCode::Esc
+        && !key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        && app.shell.feedback_notice().is_some()
+    {
+        app.shell.clear_feedback_notice();
+        return InputDispatch::Consumed;
+    }
+    InputDispatch::Unhandled
 }
 
 fn content_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {

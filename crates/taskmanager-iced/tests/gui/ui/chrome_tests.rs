@@ -58,3 +58,109 @@ fn alert_badge_tone_keeps_the_severity_palette_mapping() {
         theme.palette().accent
     );
 }
+
+#[test]
+fn timed_notice_expires_when_time_advances_and_clears_footer() {
+    let mut app = crate::IcedApp::demo();
+    app.shell.set_feedback_activity("");
+    app.shell.report_notice(
+        taskmanager_shell::FeedbackSource::Persistence,
+        taskmanager_shell::FeedbackSeverity::Success,
+        taskmanager_shell::FeedbackLifecycle::Timed(std::time::Duration::from_millis(500)),
+        "Snapshot saved",
+    );
+    assert_eq!(footer_status(&app.shell), "Snapshot saved");
+    assert!(app.shell.feedback_notice().is_some());
+
+    app.shell
+        .advance_feedback_time(std::time::Duration::from_millis(200));
+    assert_eq!(footer_status(&app.shell), "Snapshot saved");
+    assert!(app.shell.feedback_notice().is_some());
+
+    app.shell
+        .advance_feedback_time(std::time::Duration::from_millis(300));
+    assert!(app.shell.feedback_notice().is_none());
+    assert_eq!(footer_status(&app.shell), "");
+}
+
+#[test]
+fn escape_key_clears_active_feedback_notice() {
+    let mut app = crate::IcedApp::demo();
+    app.shell.set_feedback_activity("");
+    app.shell.report_notice(
+        taskmanager_shell::FeedbackSource::Persistence,
+        taskmanager_shell::FeedbackSeverity::Success,
+        taskmanager_shell::FeedbackLifecycle::TIMED_SHORT,
+        "Snapshot saved",
+    );
+    assert_eq!(footer_status(&app.shell), "Snapshot saved");
+    assert!(app.shell.feedback_notice().is_some());
+
+    let _ = app.update(crate::app::Message::Key(crate::keys::IcedKey::Fixed(
+        taskmanager_shell::ShellKeyEvent::new(
+            taskmanager_application::KeyCode::Escape,
+            taskmanager_application::Modifiers::NONE,
+        ),
+    )));
+    assert!(app.shell.feedback_notice().is_none());
+    assert_eq!(footer_status(&app.shell), "");
+}
+
+#[test]
+fn escape_key_with_modal_open_dismisses_modal_first_preserving_notice() {
+    let mut app = crate::IcedApp::demo();
+    app.shell.set_feedback_activity("");
+    app.shell.report_notice(
+        taskmanager_shell::FeedbackSource::Persistence,
+        taskmanager_shell::FeedbackSeverity::Success,
+        taskmanager_shell::FeedbackLifecycle::TIMED_SHORT,
+        "Export queued",
+    );
+    let _ = app.update(crate::app::Message::OpenSettings);
+    assert!(app.settings_open());
+    assert!(app.shell.feedback_notice().is_some());
+
+    // Escape closes modal first, preserving notice
+    let _ = app.update(crate::app::Message::Key(crate::keys::IcedKey::Fixed(
+        taskmanager_shell::ShellKeyEvent::new(
+            taskmanager_application::KeyCode::Escape,
+            taskmanager_application::Modifiers::NONE,
+        ),
+    )));
+    assert!(!app.settings_open());
+    assert!(app.shell.feedback_notice().is_some());
+    assert_eq!(footer_status(&app.shell), "Export queued");
+
+    // Subsequent Escape dismisses the notice
+    let _ = app.update(crate::app::Message::Key(crate::keys::IcedKey::Fixed(
+        taskmanager_shell::ShellKeyEvent::new(
+            taskmanager_application::KeyCode::Escape,
+            taskmanager_application::Modifiers::NONE,
+        ),
+    )));
+    assert!(app.shell.feedback_notice().is_none());
+    assert_eq!(footer_status(&app.shell), "");
+}
+
+#[test]
+fn tick_message_advances_feedback_time_and_expires_notice() {
+    let mut app = crate::IcedApp::demo();
+    app.shell.set_feedback_activity("");
+    app.shell.report_notice(
+        taskmanager_shell::FeedbackSource::Persistence,
+        taskmanager_shell::FeedbackSeverity::Success,
+        taskmanager_shell::FeedbackLifecycle::Timed(std::time::Duration::from_millis(250)),
+        "Tick notice",
+    );
+    assert!(app.shell.feedback_notice().is_some());
+
+    let _ = app.update(crate::app::Message::Tick);
+    assert!(app.shell.feedback_notice().is_some());
+
+    let _ = app.update(crate::app::Message::Tick);
+    assert!(app.shell.feedback_notice().is_some());
+
+    let _ = app.update(crate::app::Message::Tick);
+    assert!(app.shell.feedback_notice().is_none());
+    assert_eq!(footer_status(&app.shell), "");
+}

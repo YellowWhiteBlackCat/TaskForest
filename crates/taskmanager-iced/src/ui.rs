@@ -235,6 +235,26 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
     };
 
     let status = footer_status(shell);
+    let status_color = if shell.should_quit() {
+        crate::theme_binding::color(theme_snapshot.palette().warning)
+    } else if let Some(notice) = shell.feedback_notice() {
+        match notice.severity() {
+            taskmanager_shell::FeedbackSeverity::Info => {
+                crate::theme_binding::color(theme_snapshot.palette().fg)
+            }
+            taskmanager_shell::FeedbackSeverity::Success => {
+                crate::theme_binding::color(theme_snapshot.palette().success)
+            }
+            taskmanager_shell::FeedbackSeverity::Warning => {
+                crate::theme_binding::color(theme_snapshot.palette().warning)
+            }
+            taskmanager_shell::FeedbackSeverity::Error => {
+                crate::theme_binding::color(theme_snapshot.palette().danger)
+            }
+        }
+    } else {
+        crate::theme_binding::color(theme_snapshot.palette().fg)
+    };
     // Active-alert indicator (BN-07): count + worst severity tone from the
     // shared alert center's last evaluation, rendered through the shared
     // badge grammar (see [`alert_badge_tone`] — the same palette semantics
@@ -279,7 +299,9 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
         )
     });
     let footer = row![
-        text(status).size(f32::from(tokens::FONT_12)),
+        text(status)
+            .size(f32::from(tokens::FONT_12))
+            .color(status_color),
         paused_pill,
         alert_pill,
         text(t("hint.footer_shortcuts"))
@@ -391,7 +413,7 @@ fn local_modal(app: &crate::IcedApp) -> Option<Element<'_, Message, iced::Theme,
 /// consumed a quit request, otherwise the live shell status verbatim. Pure seam
 /// so the quitting branch is table-testable headless.
 #[must_use]
-fn footer_status(shell: &ShellApp) -> String {
+pub(crate) fn footer_status(shell: &ShellApp) -> String {
     if shell.should_quit() {
         t("hint.quitting").to_string()
     } else {

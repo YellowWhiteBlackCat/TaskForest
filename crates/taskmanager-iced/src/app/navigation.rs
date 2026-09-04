@@ -64,6 +64,9 @@ impl IcedApp {
             // frontend-local alerts route owns it to return to the shared page.
             self.close_alerts_page();
             None
+        } else if self.shell.feedback_notice().is_some() && event.key == KeyCode::Escape {
+            self.shell.clear_feedback_notice();
+            None
         } else if event.key == KeyCode::Digit8
             && event.modifiers == Modifiers::ALT
             && !self.modal_open()

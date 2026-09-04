@@ -56,7 +56,7 @@ pub(crate) struct FeedbackChanged(pub(crate) String);
 
 /// Last feedback text seen by the drain, for change detection.
 #[derive(Resource, Default)]
-pub(crate) struct FeedbackCache(Option<String>);
+pub(crate) struct FeedbackCache(pub(crate) Option<String>);
 
 /// One frame's drain outcome, consumed by the UI adapter.
 #[derive(Debug, Default, PartialEq, Eq)]

@@ -45,7 +45,7 @@ impl IcedApp {
             self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
-                FeedbackLifecycle::SHORT,
+                FeedbackLifecycle::TIMED_SHORT,
                 taskmanager_application::i18n::t("system.export_no_data"),
             );
             return;
@@ -60,7 +60,7 @@ impl IcedApp {
             self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
-                FeedbackLifecycle::UntilReplaced,
+                FeedbackLifecycle::TIMED_LONG,
                 taskmanager_application::i18n::t("system.export_unavailable"),
             );
             return;
@@ -69,25 +69,25 @@ impl IcedApp {
             Ok(_) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Info,
-                FeedbackLifecycle::UntilReplaced,
+                FeedbackLifecycle::TIMED_SHORT,
                 taskmanager_application::i18n::t("system.export_queued"),
             ),
             Err(SnapshotExportSubmitError::Busy(_)) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Warning,
-                FeedbackLifecycle::SHORT,
+                FeedbackLifecycle::TIMED_SHORT,
                 taskmanager_application::i18n::t("system.export_busy"),
             ),
             Err(SnapshotExportSubmitError::RequestSpaceExhausted) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
-                FeedbackLifecycle::UntilReplaced,
+                FeedbackLifecycle::TIMED_LONG,
                 taskmanager_application::i18n::t("system.export_unavailable"),
             ),
             Err(SnapshotExportSubmitError::Rejected(error)) => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
-                FeedbackLifecycle::UntilReplaced,
+                FeedbackLifecycle::TIMED_LONG,
                 taskmanager_application::i18n::t("system.export_failed")
                     .replace("{}", error.detail()),
             ),
@@ -106,13 +106,13 @@ impl IcedApp {
             SnapshotExportState::Ready { base, .. } => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Success,
-                FeedbackLifecycle::SHORT,
+                FeedbackLifecycle::TIMED_SHORT,
                 taskmanager_application::i18n::t("system.export_success").replace("{}", &base),
             ),
             SnapshotExportState::Failed { error, .. } => self.shell.report_notice(
                 FeedbackSource::Persistence,
                 FeedbackSeverity::Error,
-                FeedbackLifecycle::UntilReplaced,
+                FeedbackLifecycle::TIMED_LONG,
                 taskmanager_application::i18n::t("system.export_failed")
                     .replace("{}", error.detail()),
             ),
