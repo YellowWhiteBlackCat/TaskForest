@@ -70,6 +70,7 @@ mod subscription;
 mod surface;
 mod update;
 mod viewport_state;
+mod window_capture;
 mod window_time;
 
 // Frontend-local view selectors live in the [`selectors`] module and are
@@ -411,6 +412,8 @@ pub enum Message {
     CopyAboutDetails,
     /// Export the current snapshot into the working directory.
     ExportSnapshot,
+    /// Request a current-window PNG screenshot capture.
+    RequestCurrentWindowCapture,
     /// Apply a saved process view preset.
     ApplySavedView(u64),
     /// Save current Applications view configuration as a custom preset.
@@ -504,6 +507,8 @@ pub struct IcedApp {
     /// Application-correlated export lifecycle with the app-host's named
     /// worker client; unavailable demo/test instances perform no file I/O.
     snapshot_export: snapshot_export::IcedSnapshotExportRuntime,
+    /// Application-correlated current-window PNG capture lifecycle.
+    window_capture: window_capture::IcedWindowCaptureRuntime,
     /// The sole Iced-owned primary surface. Shared confirmations and Process
     /// Properties remain in `application.interaction`; input ownership is
     /// derived across both machines by `InputScope`.
@@ -555,3 +560,7 @@ mod inventory_menus;
 #[cfg(test)]
 #[path = "../tests/gui/app/quit_tests.rs"]
 mod quit_tests;
+
+#[cfg(test)]
+#[path = "../tests/gui/app/window_capture_tests.rs"]
+mod window_capture_tests;

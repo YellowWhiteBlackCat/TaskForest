@@ -180,6 +180,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::OpenStartupLocation { .. }
         | Message::CopyAboutDetails
         | Message::ExportSnapshot
+        | Message::RequestCurrentWindowCapture
         | Message::ApplySavedView(_)
         | Message::SaveCurrentProcessView
         | Message::ExportSavedViews

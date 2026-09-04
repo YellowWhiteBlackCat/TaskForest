@@ -7,6 +7,7 @@ fn every_language_renders_every_key_non_empty_and_stable() {
             Key::Settings,
             Key::Containers,
             Key::Health,
+            Key::WindowCapture,
             Key::Export,
             Key::About,
             Key::Close,
@@ -72,6 +73,8 @@ fn zh_translations_differ_from_english_where_localized() {
     assert_eq!(t(Language::Zh, Key::Settings), "设置");
     assert_eq!(t(Language::En, Key::Containers), "Containers");
     assert_eq!(t(Language::Zh, Key::Containers), "容器");
+    assert_eq!(t(Language::En, Key::WindowCapture), "Capture window");
+    assert_eq!(t(Language::Zh, Key::WindowCapture), "截图当前窗口");
     // Language self-names stay in their own tongue.
     assert_eq!(Language::En.label(), "English");
     assert_eq!(Language::Zh.label(), "中文");
@@ -81,6 +84,7 @@ fn zh_translations_differ_from_english_where_localized() {
 fn key_codes_are_stable_locale_identifiers() {
     assert_eq!(Key::Settings.code(), "settings.title");
     assert_eq!(Key::Close.code(), "chrome.close");
+    assert_eq!(Key::WindowCapture.code(), "window_capture.capture");
     assert_eq!(
         Key::ContainersNoContainers.code(),
         "containers.no_containers"

@@ -95,6 +95,20 @@ pub(crate) use performance::{
 // update path builds the copy text through the same rows the modal renders.
 pub(crate) use about::about_copy_payload;
 
+/// The current-window capture trigger button in the top navigation strip.
+pub(crate) fn current_window_capture_btn<'a>(
+    theme_snapshot: &'a taskmanager_theme::Theme,
+    language: crate::i18n::Language,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    focus::ghost_button_with_icon(
+        theme_snapshot,
+        FocusTarget::WindowCapture,
+        IconId::Export,
+        i18n::t(language, Key::WindowCapture),
+        Message::RequestCurrentWindowCapture,
+    )
+}
+
 /// Build the root element for one render. The root input observer watches
 /// pointer presses for the focus-visible tracker
 /// (`crate::input_modality`) before the tree below handles the same event —
@@ -158,6 +172,7 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
             i18n::t(language, Key::Health),
             Message::OpenHealth,
         ),
+        current_window_capture_btn(theme_snapshot, language),
         focus::ghost_button_with_icon(
             theme_snapshot,
             FocusTarget::Export,

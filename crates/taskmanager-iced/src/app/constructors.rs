@@ -68,6 +68,7 @@ impl IcedApp {
             system_dashboard_window: taskmanager_core::core::history::HistoryWindow::OneHour,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(history_replay_client),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
+            window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
             local_surface: LocalSurfaceState::default(),
             process_presentation: super::process_presentation_state::ProcessPresentationState::new(
                 default_category_expansions(),
@@ -136,6 +137,7 @@ impl IcedApp {
             system_dashboard_window: taskmanager_core::core::history::HistoryWindow::OneHour,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(None),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
+            window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
             local_surface: LocalSurfaceState::default(),
             process_presentation: super::process_presentation_state::ProcessPresentationState::new(
                 default_category_expansions(),

@@ -66,3 +66,19 @@ fn supplied_gpu_and_feedback_mappings_are_accepted_differences() {
         }
     ));
 }
+
+#[test]
+fn current_window_screenshot_intent_is_mapped_to_local_header_route() {
+    let declaration = functional_declaration();
+    let screenshot = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.intent == ProductIntent::CurrentWindowScreenshot)
+        .expect("current window screenshot intent is registered");
+    assert_eq!(
+        screenshot.decision,
+        SurfaceDecision::Local {
+            route: "header.screenshot",
+        }
+    );
+}

@@ -97,6 +97,7 @@ pub enum PaletteLocalAction {
     ToggleBatchMenu,
     CopyClipboard,
     OpenServiceLog,
+    ExportServiceLog,
     ToggleDirectoryScan,
     /// `g` on the Performance·GPU page: cycles the headline chart metric.
     ToggleGpuChartMetric,
@@ -130,6 +131,7 @@ pub(crate) enum TuiDirectAction {
     CopyClipboard,
     OpenProcessMenu,
     OpenServiceLog,
+    ExportServiceLog,
     /// `e` on an escalation-ready Applications insight (G-04b).
     RequestNetworkEscalation,
     /// `e` on the Performance·GPU page.
@@ -163,6 +165,8 @@ pub(crate) enum TuiDirectScope {
     PerformanceResourceDigit,
     /// Services page with the log panel closed (the panel owns keys while up).
     ServicesPageLogClosed,
+    /// Services page with the log panel open.
+    ServicesPageLogOpen,
     /// Performance page viewing the GPU device; Ctrl/Alt refused.
     PerformanceGpuPage,
     /// Performance page viewing the Disk device; Ctrl/Alt refused.
@@ -379,6 +383,10 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 17] = [
             TuiDirectArm {
                 scope: TuiDirectScope::PerformanceGpuPage,
                 action: TuiDirectAction::ToggleGpuEngineRows,
+            },
+            TuiDirectArm {
+                scope: TuiDirectScope::ServicesPageLogOpen,
+                action: TuiDirectAction::ExportServiceLog,
             },
         ],
     },
@@ -685,6 +693,11 @@ impl TuiApp {
             Some(PaletteLocalAction::OpenServiceLog) if self.page() == AppPage::Services => {
                 let _ = self.shell.open_service_log();
             }
+            Some(PaletteLocalAction::ExportServiceLog)
+                if self.page() == AppPage::Services && self.shell.service_log.is_some() =>
+            {
+                self.export_service_log();
+            }
             // Device-scoped actions run only when the palette's active page is
             // the matching Performance device (the same guard the direct keys
             // use), so the palette never executes them against a wrong device.
@@ -711,6 +724,7 @@ impl TuiApp {
             }
             None
             | Some(PaletteLocalAction::OpenServiceLog)
+            | Some(PaletteLocalAction::ExportServiceLog)
             | Some(PaletteLocalAction::ToggleDirectoryScan)
             | Some(PaletteLocalAction::ToggleGpuChartMetric)
             | Some(PaletteLocalAction::RequestSmartSelfTest) => {}

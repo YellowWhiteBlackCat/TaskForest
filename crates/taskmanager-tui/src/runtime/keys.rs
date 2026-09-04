@@ -332,6 +332,12 @@ fn direct_scope_armed(app: &TuiApp, scope: TuiDirectScope, modifiers: Modifiers)
         TuiDirectScope::ServicesPageLogClosed => {
             app.page() == AppPage::Services && app.shell.service_log.is_none()
         }
+        TuiDirectScope::ServicesPageLogOpen => {
+            app.page() == AppPage::Services
+                && app.shell.service_log.is_some()
+                && !modifiers.control
+                && !modifiers.alt
+        }
         TuiDirectScope::PerformanceGpuPage => {
             app.page() == AppPage::Performance
                 && !modifiers.control
@@ -432,6 +438,10 @@ fn execute_tui_local_direct(
             InputDispatch::Consumed
         }
         TuiDirectAction::OpenServiceLog => InputDispatch::consumed(app.shell.open_service_log()),
+        TuiDirectAction::ExportServiceLog => {
+            app.export_service_log();
+            InputDispatch::Consumed
+        }
         TuiDirectAction::RequestNetworkEscalation => InputDispatch::Effect(Box::new(
             taskmanager_shell::ShellApp::request_process_network_escalation(),
         )),

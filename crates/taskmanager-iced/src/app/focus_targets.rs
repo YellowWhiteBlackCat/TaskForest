@@ -130,6 +130,8 @@ pub enum FocusTarget {
     AboutTrigger,
     /// The toolbar export trigger.
     Export,
+    /// The toolbar current window capture trigger.
+    WindowCapture,
     /// One service row lifecycle action (Start/Stop/Restart).
     ServiceAction {
         index: usize,
@@ -240,7 +242,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 142] = [
+    pub const ALL: [Self; 143] = [
         Self::ModalClose,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
@@ -302,6 +304,7 @@ impl FocusTarget {
         Self::HealthTrigger,
         Self::AboutTrigger,
         Self::Export,
+        Self::WindowCapture,
         Self::ServiceAction {
             index: 0,
             action: ServiceAction::Start,

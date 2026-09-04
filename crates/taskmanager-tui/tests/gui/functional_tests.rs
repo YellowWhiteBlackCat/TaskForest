@@ -47,3 +47,17 @@ fn supplied_gpu_and_feedback_mappings_are_accepted_differences() {
         ));
     }
 }
+
+#[test]
+fn service_log_export_decision_is_local_surface() {
+    let declaration = functional_declaration();
+    let entry = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.intent == ProductIntent::ServiceLogExport)
+        .expect("service log export intent is registered");
+    assert!(matches!(
+        entry.decision,
+        SurfaceDecision::Local { route } if route == "services.log-panel.export"
+    ));
+}

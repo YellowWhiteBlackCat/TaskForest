@@ -45,6 +45,9 @@ impl IcedApp {
                 task = Some(iced::clipboard::write(payload));
             }
             Message::ExportSnapshot => self.request_snapshot_export(),
+            Message::RequestCurrentWindowCapture => {
+                let _ = self.request_current_window_capture();
+            }
             Message::ApplySavedView(id) => {
                 if let Some(preset) = self.saved_views.iter().find(|p| p.id == id).cloned() {
                     self.shell.set_process_status_filter(preset.filter);

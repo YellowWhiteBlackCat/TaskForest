@@ -32,6 +32,7 @@ impl IcedApp {
         self.drain_config_publications();
         self.drain_history_replay_completions();
         self.drain_snapshot_export_completions();
+        self.drain_window_capture_completions();
         let instance_activate = self.runtime.drain_instance_events();
         let tray_activate = crate::tray::drain_tray_events(self);
         if instance_activate || tray_activate {

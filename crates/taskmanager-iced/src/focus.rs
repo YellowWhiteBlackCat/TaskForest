@@ -91,6 +91,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::HealthTrigger => "iced-health-trigger".to_owned(),
         FocusTarget::AboutTrigger => "iced-about-trigger".to_owned(),
         FocusTarget::Export => "iced-export".to_owned(),
+        FocusTarget::WindowCapture => "iced-window-capture".to_owned(),
         FocusTarget::ServiceAction { index, action } => {
             format!("iced-service-action-{index}-{action:?}")
         }

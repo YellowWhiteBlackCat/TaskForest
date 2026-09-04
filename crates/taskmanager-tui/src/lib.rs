@@ -36,6 +36,7 @@ mod process_view;
 mod runtime;
 mod selection;
 mod selectors;
+pub(crate) mod service_log;
 mod snapshot_export;
 mod startup_control;
 mod surface;
