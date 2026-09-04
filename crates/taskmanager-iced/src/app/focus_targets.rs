@@ -44,6 +44,10 @@ pub enum FocusTarget {
     ServicesSearch,
     /// A page-scoped retry action for a degraded inventory source.
     SourceRetry(RefreshRequest),
+    /// Authorize CPU package power readouts via the RAPL helper.
+    AuthorizeRaplPower,
+    /// Authorize CPU MSR readouts via the MSR helper.
+    AuthorizeMsrReadouts,
     /// The Applications end-task trigger.
     EndTask,
     /// The Applications open-file-location action (routed via platform port).
@@ -256,7 +260,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 148] = [
+    pub const ALL: [Self; 150] = [
         Self::ModalClose,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
@@ -275,6 +279,8 @@ impl FocusTarget {
         Self::SourceRetry(RefreshRequest::Services),
         Self::SourceRetry(RefreshRequest::Startup),
         Self::SourceRetry(RefreshRequest::Sessions),
+        Self::AuthorizeRaplPower,
+        Self::AuthorizeMsrReadouts,
         Self::EndTask,
         Self::OpenProcessLocation,
         Self::SearchProcessOnline,

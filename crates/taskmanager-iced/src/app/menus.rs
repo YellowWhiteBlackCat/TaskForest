@@ -54,7 +54,7 @@ impl IcedApp {
             .flatten()
     }
 
-    pub(super) fn focus_request_for(&self, message: &Message) -> Option<FocusTarget> {
+    pub fn focus_request_for(&self, message: &Message) -> Option<FocusTarget> {
         match message {
             Message::Focus(target) => Some(*target),
             Message::SelectPage(page) => Some(FocusTarget::PageTab(*page)),
@@ -77,6 +77,8 @@ impl IcedApp {
             }
             Message::OpenDiskSmart { index } => Some(FocusTarget::DiskSmartOpen { index: *index }),
             Message::CloseSearch if self.shell.search_active() => Some(FocusTarget::SearchTrigger),
+            Message::AuthorizeRaplPower => Some(FocusTarget::AuthorizeRaplPower),
+            Message::AuthorizeMsrReadouts => Some(FocusTarget::AuthorizeMsrReadouts),
             Message::OpenUserRowMenu(_) => Some(FocusTarget::UserRowMenuDisconnect),
             Message::OpenStartupRowMenu { visual_index } => Some(FocusTarget::StartupMenuAction {
                 index: self

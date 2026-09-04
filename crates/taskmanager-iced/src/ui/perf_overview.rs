@@ -18,7 +18,6 @@ use iced::widget::{canvas, column, row, text};
 use std::rc::Rc;
 use taskmanager_core::core::metrics::{CpuTemperatureSource, MemoryMetrics};
 
-use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
@@ -155,6 +154,12 @@ fn cpu_detail(
         }
         projection::CpuChartLayout::AggregateOnly => left.push(chart_panel),
     }
+    if let Some(card) = cpu::rapl_power_card(app, theme_snapshot) {
+        left.push(card);
+    }
+    if let Some(card) = cpu::msr_readouts_card(app, theme_snapshot) {
+        left.push(card);
+    }
     let (title, subtitle, stats) = cpu_memory_header_and_stats(app, PerfDevice::Cpu);
     perf_layout::main_with_stats(
         theme_snapshot,
@@ -273,7 +278,7 @@ fn memory_detail(
 /// pre-folded shell [`StatRow`]s: an applicable-but-uncollected fact keeps its
 /// row with `None` (the panel renders the shared dash dimmed); a fact that
 /// does not exist on this host omits its row entirely.
-fn cpu_memory_header_and_stats(
+pub(crate) fn cpu_memory_header_and_stats(
     app: &crate::IcedApp,
     device: PerfDevice,
 ) -> (String, String, Vec<StatRow>) {
@@ -311,8 +316,8 @@ fn cpu_memory_header_and_stats(
                 t("common.utilization"),
                 observed.usage_pct.map(|value| format!("{value:.0}%")),
             ),
-            cpu_speed_row(observed.frequency_mhz, cpu.frequency_source.is_bogomips()),
-            cpu_temperature_row(observed.temperature_c, cpu.temperature_source),
+            cpu::cpu_speed_row(observed.frequency_mhz, cpu.frequency_source.is_bogomips()),
+            cpu::cpu_temperature_row(observed.temperature_c, cpu.temperature_source),
             StatRow::text(t("common.processes"), Some(snapshot.processes.to_string())),
             StatRow::text(
                 t("common.threads"),
@@ -383,6 +388,7 @@ fn cpu_memory_header_and_stats(
                 Some(preference.to_string()),
             ));
         }
+        cpu::append_rapl_and_msr_stats(&app.shell, &mut stats);
         (t("common.cpu").to_string(), subtitle, stats)
     }
 }
@@ -424,78 +430,6 @@ pub(crate) fn format_cache_kb(kb: u64) -> String {
     } else {
         format!("{kb} KiB")
     }
-}
-
-/// The Speed stat row's label and typed value, honoring the provider's
-/// frequency source. BogoMIPS is a Linux boot-time calibration value, not a
-/// clock measurement: when the source is BogoMIPS (a VM or any host without
-/// cpufreq) the row relabels to BogoMIPS and keeps the raw calibration value
-/// instead of presenting it as a live MHz reading — the same relabel GPUI's
-/// `cpu_view.rs` Speed row applies. A missing value stays an honest `None`
-/// (the shared dash) under both sources. Pure so the source matrix is
-/// table-tested.
-fn cpu_speed_parts(frequency_mhz: Option<u64>, bogomips: bool) -> (&'static str, Option<String>) {
-    let label = if bogomips {
-        t("cpu.bogomips")
-    } else {
-        t("common.speed")
-    };
-    let value = match frequency_mhz {
-        Some(value) if bogomips => Some(format!("{value}.00 BogoMIPS")),
-        Some(value) => Some(format!("{value} MHz")),
-        None => None,
-    };
-    (label, value)
-}
-
-/// The Speed stat row as a pre-folded shell [`StatRow`].
-fn cpu_speed_row(frequency_mhz: Option<u64>, bogomips: bool) -> StatRow {
-    let (label, value) = cpu_speed_parts(frequency_mhz, bogomips);
-    StatRow::text(label, value)
-}
-
-/// One CPU frequency readout formatted for its source (GPUI
-/// `cpu_frequency_readout_for_source` parity): a BogoMIPS source prints the
-/// calibration value with `/proc/cpuinfo`'s implied two decimals; a native
-/// source keeps the MHz display; unavailable is the shared dash either way.
-pub(crate) fn cpu_frequency_readout_for_source(
-    frequency_mhz: Option<u64>,
-    bogomips: bool,
-) -> String {
-    cpu_speed_parts(frequency_mhz, bogomips)
-        .1
-        .unwrap_or_else(missing_value)
-}
-
-/// The Temperature stat row's label and typed value, honoring the provider's
-/// temperature source — the counterpart of [`cpu_speed_parts`]'s BogoMIPS
-/// relabel. A labeled-fallback tier (a CPU-package-labeled channel on
-/// another hwmon chip, or an ACPI thermal zone) appends the source
-/// qualifier to the value so the reading never masquerades as a dedicated
-/// CPU sensor chip; native chips keep the plain °C reading. A missing value
-/// stays an honest `None` under every source. Pure so the source matrix is
-/// table-tested.
-fn cpu_temperature_parts(
-    temperature_c: Option<f32>,
-    source: CpuTemperatureSource,
-) -> (&'static str, Option<String>) {
-    let note = match source {
-        CpuTemperatureSource::PackageHwmon => Some(t("cpu.temperature_source.package_hwmon")),
-        CpuTemperatureSource::ThermalZone => Some(t("cpu.temperature_source.thermal_zone")),
-        _ => None,
-    };
-    let value = temperature_c.map(|value| format!("{value:.0} °C"));
-    let value = match (note, value) {
-        (Some(note), Some(value)) => Some(format!("{value} · {note}")),
-        (_, value) => value,
-    };
-    (t("common.temperature"), value)
-}
-
-/// The Temperature stat row as a pre-folded shell [`StatRow`].
-fn cpu_temperature_row(temperature_c: Option<f32>, source: CpuTemperatureSource) -> StatRow {
-    let (label, value) = cpu_temperature_parts(temperature_c, source);
-    StatRow::text(label, value)
 }
 
 /// The Memory stats rows as pre-folded shell [`StatRow`]s for the right-hand

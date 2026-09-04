@@ -6,9 +6,9 @@ use taskmanager_application::PlatformEffect;
 use super::super::surface::InteractionSnapshot;
 use super::super::{IcedApp, Message};
 
-pub(super) struct UpdateDispatch {
-    pub(super) effect: Option<PlatformEffect>,
-    pub(super) tasks: Vec<Task<Message>>,
+pub(crate) struct UpdateDispatch {
+    pub(crate) effect: Option<PlatformEffect>,
+    pub(crate) tasks: Vec<Task<Message>>,
 }
 
 impl UpdateDispatch {
@@ -119,6 +119,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::ConfirmServiceControl) => MessageDomain::Service(message),
 
         message @ (Message::RefreshSource(_)
+        | Message::AuthorizeRaplPower
+        | Message::AuthorizeMsrReadouts
         | Message::RequestEndTask
         | Message::RequestProcessBatch(_)
         | Message::ConfirmEndTask

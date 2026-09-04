@@ -270,6 +270,10 @@ pub enum Message {
     ServicesSearchChanged(String),
     /// Refresh the inventory page whose source reported a retryable failure.
     RefreshSource(RefreshRequest),
+    /// Authorize or refresh CPU package power readouts via RAPL helper.
+    AuthorizeRaplPower,
+    /// Authorize or refresh CPU MSR readouts via MSR helper.
+    AuthorizeMsrReadouts,
     /// End-task was requested (shows the confirmation bar).
     RequestEndTask,
     /// Request a batch process-control action (Suspend / Resume / Kill /

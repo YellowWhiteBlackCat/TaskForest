@@ -49,6 +49,8 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::SourceRetry(request) => {
             format!("iced-source-retry-{}", refresh_request_key(request))
         }
+        FocusTarget::AuthorizeRaplPower => "iced-authorize-rapl-power".to_owned(),
+        FocusTarget::AuthorizeMsrReadouts => "iced-authorize-msr-readouts".to_owned(),
         FocusTarget::EndTask => "iced-end-task".to_owned(),
         FocusTarget::OpenProcessLocation => "iced-open-process-location".to_owned(),
         FocusTarget::SearchProcessOnline => "iced-search-process-online".to_owned(),
