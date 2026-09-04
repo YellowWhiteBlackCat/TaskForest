@@ -39,7 +39,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use bevy::input::ButtonInput;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{KeyCode, KeyboardInput};
-use taskmanager_application::{CommandContext, CommandScope, Modifiers, PlatformEffect};
+use taskmanager_application::{Modifiers, PlatformEffect};
 
 use taskmanager_shell::{InputDispatch, ShellApp, ShellKeyEvent};
 
@@ -47,7 +47,7 @@ use crate::app::{
     FrontendTrack, Page, Route, action_for_page, modifier_state, request_route, route_key_press,
 };
 use crate::confirmation::{ConfirmationChanged, PendingConfirmationView};
-use crate::input_contract::{InputModifiers, normalize_key, shared_key};
+use crate::input_contract::shared_key;
 use crate::menu_modal::{MenuModal, MenuModalChanged, ModalDriver};
 use crate::pages::processes::menu::ProcessMenuCtx;
 use crate::pages::services::menu::ServiceMenuCtx;
@@ -259,22 +259,17 @@ pub(crate) fn keyboard_dispatch_system(
             applied = true;
             continue;
         }
-        // 2. Dialog-scope Enter: the shared table's confirmation binding.
+        // 2. Dialog-scope Enter: confirm whatever gate is armed.
         if matches!(context, KeyboardOwner::Gate)
             && event.key_code == KeyCode::Enter
             && modifiers == Modifiers::NONE
-            && let Some(action) = normalize_key(
-                KeyCode::Enter,
-                InputModifiers::default(),
-                CommandContext {
-                    scope: CommandScope::Dialog,
-                    overlay_present: true,
-                    ..CommandContext::default()
-                },
-            )
-            && let Some(effect) = shell.apply_action(action)
+            && let Some(kind) = shell.confirmation_kind()
         {
-            pending.0.push(effect);
+            if let Some(effect) = crate::confirmation::confirm_armed(shell, kind) {
+                pending.0.push(effect);
+            }
+            applied = true;
+            continue;
         }
         // 2a. Applications action menu: the TUI-local `a` chord (TUI
         //     `OpenProcessMenu` parity) opens the process control menu —
@@ -295,19 +290,21 @@ pub(crate) fn keyboard_dispatch_system(
                 continue;
             }
         }
-        // 2b. Closed-menu Enter attempt: bare Enter over a selected row on
+        // 2b. Closed-menu Enter / 'a' attempt: bare Enter or 'a' over a selected row on
         //     an inventory page opens that page's action menu (TUI
         //     Enter-actions parity, one arm per inventory).
         if matches!(context, KeyboardOwner::Free)
-            && event.key_code == KeyCode::Enter
+            && (event.key_code == KeyCode::Enter
+                || (event.key_code == KeyCode::KeyA && route.page != Page::Processes))
             && modifiers == Modifiers::NONE
         {
             let opened = match route.page {
                 Page::Services => {
-                    match svc_selection
+                    let target = svc_selection
                         .as_ref()
                         .and_then(|state| state.target.as_ref())
-                    {
+                        .or_else(|| shell.sorted_services().first().map(|s| &s.id));
+                    match target {
                         Some(target) => {
                             crate::pages::services::menu::open_for(&mut svc_modal, shell, target)
                         }
@@ -315,10 +312,11 @@ pub(crate) fn keyboard_dispatch_system(
                     }
                 }
                 Page::Startup => {
-                    match stu_selection
+                    let target = stu_selection
                         .as_ref()
                         .and_then(|state| state.target.clone())
-                    {
+                        .or_else(|| shell.sorted_startup_entries().first().map(|e| e.id.clone()));
+                    match target {
                         Some(target) => {
                             crate::pages::startup::menu::open_for(&mut stu_modal, shell, &target)
                         }
@@ -326,10 +324,11 @@ pub(crate) fn keyboard_dispatch_system(
                     }
                 }
                 Page::Sessions => {
-                    match ses_selection
+                    let target = ses_selection
                         .as_ref()
                         .and_then(|state| state.target.clone())
-                    {
+                        .or_else(|| shell.sorted_sessions().first().map(|s| s.id.clone()));
+                    match target {
                         Some(target) => {
                             crate::pages::sessions::menu::open_for(&mut ses_modal, shell, &target)
                         }
@@ -362,6 +361,46 @@ pub(crate) fn keyboard_dispatch_system(
             applied = true;
             continue;
         }
+        // 3a. Table row selection motion for non-process inventory tables.
+        if matches!(context, KeyboardOwner::Free) && modifiers == Modifiers::NONE {
+            match route.page {
+                Page::Startup => match event.key_code {
+                    KeyCode::ArrowUp => {
+                        commands.trigger(crate::pages::startup::StartupSelectionMoved(-1));
+                        applied = true;
+                    }
+                    KeyCode::ArrowDown => {
+                        commands.trigger(crate::pages::startup::StartupSelectionMoved(1));
+                        applied = true;
+                    }
+                    _ => {}
+                },
+                Page::Sessions => match event.key_code {
+                    KeyCode::ArrowUp => {
+                        commands.trigger(crate::pages::sessions::SessionSelectionMoved(-1));
+                        applied = true;
+                    }
+                    KeyCode::ArrowDown => {
+                        commands.trigger(crate::pages::sessions::SessionSelectionMoved(1));
+                        applied = true;
+                    }
+                    _ => {}
+                },
+                Page::Services => match event.key_code {
+                    KeyCode::ArrowUp => {
+                        commands.trigger(crate::pages::services::ServiceSelectionMoved(-1));
+                        applied = true;
+                    }
+                    KeyCode::ArrowDown => {
+                        commands.trigger(crate::pages::services::ServiceSelectionMoved(1));
+                        applied = true;
+                    }
+                    _ => {}
+                },
+                _ => {}
+            }
+        }
+
         // 4. Fixed-key router (arrows, Delete, Escape, F5, chorded letters).
         if let Some(shared) = shared_key(event.key_code) {
             let outcome = shell.handle_local_key(ShellKeyEvent::new(shared, modifiers));

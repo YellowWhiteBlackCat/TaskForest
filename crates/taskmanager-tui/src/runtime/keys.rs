@@ -354,6 +354,9 @@ fn direct_scope_armed(app: &TuiApp, scope: TuiDirectScope, modifiers: Modifiers)
             direct_scope_armed(app, TuiDirectScope::PerformanceDiskPage, modifiers)
                 && crate::menus::smart_self_test_target(app).is_some()
         }
+        TuiDirectScope::ServicesPage => {
+            app.page() == AppPage::Services && !modifiers.control && !modifiers.alt
+        }
     }
 }
 
@@ -461,6 +464,10 @@ fn execute_tui_local_direct(
             // effect returns here — the platform request is emitted only by
             // the gate's `y`, like every shared confirmation.
             let _ = app.arm_smart_self_test();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::BrowseServiceDependencies => {
+            let _ = app.open_service_dependencies();
             InputDispatch::Consumed
         }
     }

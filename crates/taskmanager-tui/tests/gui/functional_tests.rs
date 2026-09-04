@@ -61,3 +61,19 @@ fn service_log_export_decision_is_local_surface() {
         SurfaceDecision::Local { route } if route == "services.log-panel.export"
     ));
 }
+
+#[test]
+fn service_dependencies_decision_is_local_surface() {
+    let declaration = functional_declaration();
+    let entry = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.intent == ProductIntent::ServiceDependencies)
+        .expect("service dependencies intent is registered");
+    assert_eq!(
+        entry.decision,
+        SurfaceDecision::Local {
+            route: "services.details.dependencies",
+        }
+    );
+}

@@ -270,11 +270,41 @@ pub(crate) fn disk_section(
 /// footer when the section is visible but fields are absent, and nothing
 /// when the section is hidden.
 fn smart_footer<'a>(
-    _app: &crate::IcedApp,
+    app: &crate::IcedApp,
     disk: &DiskMetrics,
     index: usize,
     theme_snapshot: &'a taskmanager_theme::Theme,
 ) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
+    if let Some(pending) = app.shell.pending_smart_self_test()
+        && pending.device_id.as_str() == disk.device_id
+    {
+        return Some(
+            iced::widget::row![
+                iced::widget::text(format!(
+                    "{} {:?}?",
+                    t("health.smart_self_test"),
+                    pending.kind
+                ))
+                .size(f32::from(tokens::FONT_12)),
+                crate::ui::focus::button(
+                    theme_snapshot,
+                    crate::app::FocusTarget::ConfirmSmartSelfTest,
+                    t("common.confirm"),
+                    Message::ConfirmSmartSelfTest,
+                    true,
+                ),
+                crate::ui::focus::button(
+                    theme_snapshot,
+                    crate::app::FocusTarget::CancelSmartSelfTest,
+                    t("common.cancel"),
+                    Message::DismissOverlay,
+                    false,
+                ),
+            ]
+            .spacing(8)
+            .into(),
+        );
+    }
     if !smart_section_visible(disk) {
         return None;
     }

@@ -104,6 +104,8 @@ pub enum PaletteLocalAction {
     /// `t` on the Performance·Disk page: arms the shared SMART self-test
     /// confirmation gate (the platform request stays gated behind `y`).
     RequestSmartSelfTest,
+    /// Browse dependencies for the selected service on the Services page.
+    BrowseServiceDependencies,
 }
 
 /// The typed direct-dispatch lane: what a TUI-local command DOES when its
@@ -143,6 +145,8 @@ pub(crate) enum TuiDirectAction {
     /// `t` on the Performance·Disk page: arms the shared SMART self-test
     /// confirmation gate (TUI-013). The confirm `y` emits the typed effect.
     RequestSmartSelfTest,
+    /// `d` on the Services page: open service dependencies browsing modal.
+    BrowseServiceDependencies,
 }
 
 /// Where (and under which modifier policy) a direct arm is armed. Declared as
@@ -175,6 +179,8 @@ pub(crate) enum TuiDirectScope {
     /// provider reports `SmartAvailability::Available` — the disk the gate
     /// freezes as its target (TUI-013).
     PerformanceDiskSmartReady,
+    /// Services page; Ctrl/Alt refused.
+    ServicesPage,
 }
 
 /// One executable arm of a registry command: scope guard + action. A command
@@ -396,10 +402,16 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 17] = [
             label: "Directory usage scan (Performance·Disk)",
         },
         palette_action: Some(PaletteLocalAction::ToggleDirectoryScan),
-        direct: &[TuiDirectArm {
-            scope: TuiDirectScope::PerformanceDiskPage,
-            action: TuiDirectAction::ToggleDirectoryScan,
-        }],
+        direct: &[
+            TuiDirectArm {
+                scope: TuiDirectScope::PerformanceDiskPage,
+                action: TuiDirectAction::ToggleDirectoryScan,
+            },
+            TuiDirectArm {
+                scope: TuiDirectScope::ServicesPage,
+                action: TuiDirectAction::BrowseServiceDependencies,
+            },
+        ],
     },
     TuiLocalCommand {
         binding: taskmanager_shell::LocalBinding {
@@ -722,12 +734,18 @@ impl TuiApp {
             {
                 let _ = self.arm_smart_self_test();
             }
+            Some(PaletteLocalAction::BrowseServiceDependencies)
+                if self.page() == AppPage::Services =>
+            {
+                let _ = self.open_service_dependencies();
+            }
             None
             | Some(PaletteLocalAction::OpenServiceLog)
             | Some(PaletteLocalAction::ExportServiceLog)
             | Some(PaletteLocalAction::ToggleDirectoryScan)
             | Some(PaletteLocalAction::ToggleGpuChartMetric)
-            | Some(PaletteLocalAction::RequestSmartSelfTest) => {}
+            | Some(PaletteLocalAction::RequestSmartSelfTest)
+            | Some(PaletteLocalAction::BrowseServiceDependencies) => {}
         }
     }
 }

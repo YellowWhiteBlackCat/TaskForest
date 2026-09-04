@@ -231,3 +231,134 @@ fn menus_close_without_arming_on_escape() {
     let _ = ServiceAction::Start;
     let _ = ServiceStatus::Active;
 }
+
+#[test]
+fn startup_bidirectional_control_channel_flow() {
+    let mut shell = shelved_startup(vec![startup_entry("ssh-agent", "SSH Agent", true)]);
+    let entry = shell
+        .sorted_startup_entries()
+        .first()
+        .map(|entry| (**entry).clone())
+        .expect("fixture entry");
+
+    // 1. Outbound: arm startup control gate (Disable)
+    let _ = shell.request_startup_control_for(entry.clone(), false);
+    let pending = shell.pending_startup().expect("startup gate armed");
+    assert!(!pending.enabled, "disable requested");
+
+    // Confirm the armed gate
+    let effect = crate::confirmation::confirm_armed(
+        &mut shell,
+        taskmanager_application::ConfirmationKind::StartupControl,
+    );
+    let Some(PlatformEffect::StartupControl(request)) = effect else {
+        panic!("expected StartupControl platform effect, got {effect:?}");
+    };
+    assert_eq!(request.entry.name, "SSH Agent");
+    assert!(!request.enabled);
+
+    // 2. Inbound: platform returns completed outcome
+    shell.apply_platform_batch(taskmanager_application::PlatformEventBatch {
+        startup_events: vec![taskmanager_application::CorrelatedStartupEvent {
+            request_id: taskmanager_platform_contract::RequestId::MIN,
+            capability: taskmanager_platform_contract::CapabilityId::STARTUP,
+            provider: None,
+            sequence: taskmanager_platform_contract::EventSequence::new(2),
+            observed_at_ms: 10,
+            event: taskmanager_application::StartupEvent::Control(
+                taskmanager_application::StartupControlOutcome {
+                    request_id: request.request_id,
+                    target_id: entry.id.clone(),
+                    target_name: entry.name.clone(),
+                    enabled: false,
+                    result: Ok(()),
+                },
+            ),
+        }],
+        ..taskmanager_application::PlatformEventBatch::default()
+    });
+
+    // Verify feedback notice
+    assert!(
+        shell
+            .feedback_text()
+            .contains("Startup SSH Agent disable completed"),
+        "feedback notice updated: {}",
+        shell.feedback_text()
+    );
+
+    // Verify shell queued a post-control refresh for startup inventory
+    let refresh = shell.take_startup_refresh_request();
+    assert_eq!(
+        refresh,
+        Some(PlatformEffect::Refresh(
+            taskmanager_application::RefreshRequest::Startup
+        )),
+        "startup refresh queued after control outcome"
+    );
+}
+
+#[test]
+fn session_bidirectional_control_channel_flow() {
+    let mut shell = shelved_sessions(vec![session_item("c2", "devuser")]);
+    let session = shell
+        .sorted_sessions()
+        .first()
+        .map(|session| (**session).clone())
+        .expect("fixture session");
+
+    // 1. Outbound: arm session control gate (Disconnect)
+    assert!(shell.select_session_control(&session, SessionControlAction::Disconnect));
+    let pending = shell.pending_session().expect("session gate armed");
+    assert_eq!(pending.action, SessionControlAction::Disconnect);
+
+    // Confirm the armed gate
+    let effect = crate::confirmation::confirm_armed(
+        &mut shell,
+        taskmanager_application::ConfirmationKind::SessionControl,
+    );
+    let Some(PlatformEffect::SessionControl(target)) = effect else {
+        panic!("expected SessionControl platform effect, got {effect:?}");
+    };
+    assert_eq!(target.session_id.as_str(), "c2");
+    assert_eq!(target.action, SessionControlAction::Disconnect);
+
+    // 2. Inbound: platform returns completed outcome
+    shell.apply_platform_batch(taskmanager_application::PlatformEventBatch {
+        session_events: vec![taskmanager_application::CorrelatedSessionEvent {
+            request_id: taskmanager_platform_contract::RequestId::MIN,
+            capability: taskmanager_platform_contract::CapabilityId::SESSIONS,
+            provider: None,
+            sequence: taskmanager_platform_contract::EventSequence::new(2),
+            observed_at_ms: 10,
+            event: taskmanager_application::SessionEvent::Control(
+                taskmanager_application::SessionControlOutcome {
+                    request_id: target.request_id,
+                    session_id: target.session_id.clone(),
+                    action: target.action,
+                    result: Ok(()),
+                },
+            ),
+        }],
+        ..taskmanager_application::PlatformEventBatch::default()
+    });
+
+    // Verify feedback notice
+    assert!(
+        shell
+            .feedback_text()
+            .contains("Session c2 Disconnect completed"),
+        "feedback notice updated: {}",
+        shell.feedback_text()
+    );
+
+    // Verify shell queued a post-control refresh for sessions inventory
+    let refresh = shell.take_session_refresh_request();
+    assert_eq!(
+        refresh,
+        Some(PlatformEffect::Refresh(
+            taskmanager_application::RefreshRequest::Sessions
+        )),
+        "session refresh queued after control outcome"
+    );
+}

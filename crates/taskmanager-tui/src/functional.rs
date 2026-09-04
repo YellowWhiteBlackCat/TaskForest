@@ -44,8 +44,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::ServiceDetails => SurfaceDecision::Unsupported {
             reason: "the terminal product shape does not offer the graphical service-details panel",
         },
-        ProductIntent::ServiceDependencies => SurfaceDecision::Unsupported {
-            reason: "the terminal service surface has no dependency-graph panel",
+        ProductIntent::ServiceDependencies => SurfaceDecision::Local {
+            route: "services.details.dependencies",
         },
         ProductIntent::ServiceLogs => SurfaceDecision::Local {
             route: "services.log-panel",

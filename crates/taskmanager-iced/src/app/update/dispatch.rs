@@ -132,6 +132,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::RequestStartupControl(_)
         | Message::RequestStartupControlFor { .. }
         | Message::ConfirmStartupControl
+        | Message::RequestSmartSelfTest { .. }
+        | Message::ConfirmSmartSelfTest
         | Message::OpenProcessLocation
         | Message::SearchProcessOnline) => MessageDomain::Control(message),
 
@@ -166,6 +168,7 @@ fn route(message: Message) -> MessageDomain {
         // `reduce_performance_message` (no shell effect).
         | Message::SystemDashboard(_)
         | Message::ToggleGpuEngines
+        | Message::ToggleGpuEnginesExpanded
         | Message::ToggleDirectoryUsageScan
         | Message::ToggleHistoryReplay
         | Message::SelectHistoryReplayWindow(_)

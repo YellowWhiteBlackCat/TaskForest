@@ -32,14 +32,16 @@ use bevy::ecs::lifecycle::{Add, HookContext};
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
+use bevy::ecs::system::Query;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
-use bevy::scene::{CommandsSceneExt, Scene, bsn, template_value};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
     UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SourceNotice, source_notice};
 use taskmanager_core::core::source::SourceStatus;
@@ -514,6 +516,8 @@ fn startup_row_scene(
         }
         BackgroundColor(fill)
         StartupRowMarker(index, target)
+        Button
+        on(on_startup_row_activated)
         Children [
             ( text_cell_scene(name, name_width, Role::Body) ),
             ( chip_cell_scene(state, state_width, chip, palette) ),
@@ -723,3 +727,13 @@ fn on_startup_selection_moved(
 #[cfg(test)]
 #[path = "../../tests/headless/pages/startup.rs"]
 mod tests;
+
+fn on_startup_row_activated(
+    activate: On<Activate>,
+    markers: Query<&StartupRowMarker>,
+    mut commands: Commands,
+) {
+    if let Ok(marker) = markers.get(activate.event().entity) {
+        commands.trigger(StartupRowClicked(marker.0));
+    }
+}

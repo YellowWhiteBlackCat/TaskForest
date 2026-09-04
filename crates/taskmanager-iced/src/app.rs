@@ -401,6 +401,15 @@ pub enum Message {
     ToggleDirectoryUsageScan,
     /// Open the SMART detail dialog for one observed disk.
     OpenDiskSmart { index: usize },
+    /// Request a SMART self-test on the observed disk at `index`.
+    RequestSmartSelfTest {
+        index: usize,
+        kind: taskmanager_core::core::SmartSelfTestKind,
+    },
+    /// Confirm the pending SMART self-test request.
+    ConfirmSmartSelfTest,
+    /// Toggle the expanded state of the GPU engines breakdown panel.
+    ToggleGpuEnginesExpanded,
     /// Toggle the per-engine GPU utilization session on the GPU device panel
     /// (the typed `telemetry.gpu.engines` lane): enable submits ONE bounded
     /// request for the first GPU (the user-initiated escalation entry), the

@@ -200,6 +200,25 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 }
                 None
             }
+            TuiSurfaceKind::ServiceDependencies => {
+                match key.code {
+                    ratatui::crossterm::event::KeyCode::Up
+                    | ratatui::crossterm::event::KeyCode::Char('k') => {
+                        app.service_dependencies_scroll(-1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Down
+                    | ratatui::crossterm::event::KeyCode::Char('j') => {
+                        app.service_dependencies_scroll(1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Esc
+                    | ratatui::crossterm::event::KeyCode::Char('q')
+                    | ratatui::crossterm::event::KeyCode::Char('d') => {
+                        app.close_local_overlays();
+                    }
+                    _ => {}
+                }
+                None
+            }
             TuiSurfaceKind::Settings => {
                 handle_settings_key(app, key);
                 None

@@ -263,6 +263,11 @@ impl TuiApp {
                     name: String::from("Containers"),
                     description: Some(String::from("Container inventory")),
                 }),
+                crate::TuiSurface::ServiceDependencies(target) => Some(ModalInput {
+                    id: String::from("service-dependencies-modal"),
+                    name: format!("Service dependencies: {}", target.service_name),
+                    description: Some(String::from("Service dependencies")),
+                }),
             },
             crate::TuiInputScope::SharedSurface(
                 taskmanager_application::SurfaceKind::ProcessProperties,

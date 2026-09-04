@@ -56,8 +56,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::ProcessAffinityEditor => SurfaceDecision::Local {
             route: "processes.affinity-modal",
         },
-        ProductIntent::SmartSelfTest => SurfaceDecision::Unsupported {
-            reason: "the Iced product shape exposes SMART observation only; SMART control remains a GPUI reference surface",
+        ProductIntent::SmartSelfTest => SurfaceDecision::Local {
+            route: "storage.smart-self-test",
         },
         ProductIntent::DiagnosticBundle => SurfaceDecision::AcceptedDifference {
             route: "about.diagnostic-report",

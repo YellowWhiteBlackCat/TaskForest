@@ -12,7 +12,9 @@ use taskmanager_core::core::alerts::{
     AlertMetric, InsufficientReason, SuggestedThreshold, SuggestionConfidence,
 };
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::presentation::{device_status_i18n_key, effective_smart_status};
+use taskmanager_shell::presentation::{
+    device_status_i18n_key, effective_smart_status, has_smart_fields,
+};
 use taskmanager_theme::{Theme, tokens};
 
 use crate::app::Message;
@@ -66,16 +68,115 @@ pub(super) fn smart_overlay<'a>(
     app: &'a crate::IcedApp,
     index: usize,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    use crate::app::FocusTarget;
     let body: Element<'a, Message, iced::Theme, iced::Renderer> =
         match app.shell.projection().snapshot.as_ref() {
             Some(snapshot) => match snapshot.disks.get(index) {
-                Some(disk) => column![
-                    text(crate::ui::perf_devices::disk_title(disk))
-                        .size(f32::from(tokens::FONT_14)),
-                    key_value_rows(smart_rows(disk)),
-                ]
-                .spacing(8)
-                .into(),
+                Some(disk) => {
+                    let mut col = column![
+                        text(crate::ui::perf_devices::disk_title(disk))
+                            .size(f32::from(tokens::FONT_14)),
+                        key_value_rows(smart_rows(disk)),
+                    ]
+                    .spacing(8);
+
+                    if let Some(pending) = app.shell.pending_smart_self_test()
+                        && pending.device_id.as_str() == disk.device_id
+                    {
+                        let confirm_bar = row![
+                            text(format!(
+                                "{} {:?} {} {}?",
+                                t("common.confirm"),
+                                pending.kind,
+                                t("health.smart_self_test"),
+                                pending.display_name
+                            ))
+                            .size(f32::from(tokens::FONT_12)),
+                            focus::button(
+                                app.theme(),
+                                FocusTarget::ConfirmSmartSelfTest,
+                                t("common.confirm"),
+                                Message::ConfirmSmartSelfTest,
+                                true,
+                            ),
+                            focus::button(
+                                app.theme(),
+                                FocusTarget::CancelSmartSelfTest,
+                                t("common.cancel"),
+                                Message::DismissOverlay,
+                                false,
+                            ),
+                        ]
+                        .spacing(8)
+                        .align_y(iced::Alignment::Center);
+                        col = col.push(confirm_bar);
+                    } else {
+                        let (smart_obs, _) = app.shell.projection().smart_projection();
+                        let report = smart_obs
+                            .observations()
+                            .iter()
+                            .find(|obs| obs.device_id.as_str() == disk.device_id)
+                            .map(|obs| &obs.report);
+
+                        let is_running = report.is_some_and(|r| {
+                            r.phase == taskmanager_core::core::SmartSelfTestPhase::Running
+                        });
+                        let can_test = !is_running
+                            && (disk.smart_availability
+                                == taskmanager_core::core::metrics::SmartAvailability::Available
+                                || has_smart_fields(disk));
+
+                        let mut test_row = row![
+                            text(t("health.smart_self_test")).size(f32::from(tokens::FONT_12)),
+                        ]
+                        .spacing(8)
+                        .align_y(iced::Alignment::Center);
+
+                        if can_test {
+                            test_row = test_row
+                                .push(focus::ghost_button(
+                                    app.theme(),
+                                    FocusTarget::SmartSelfTestShort { index },
+                                    t("health.short_test"),
+                                    Message::RequestSmartSelfTest {
+                                        index,
+                                        kind: taskmanager_core::core::SmartSelfTestKind::Short,
+                                    },
+                                ))
+                                .push(focus::ghost_button(
+                                    app.theme(),
+                                    FocusTarget::SmartSelfTestExtended { index },
+                                    t("health.extended_test"),
+                                    Message::RequestSmartSelfTest {
+                                        index,
+                                        kind: taskmanager_core::core::SmartSelfTestKind::Extended,
+                                    },
+                                ));
+                        } else if is_running {
+                            test_row = test_row.push(
+                                text(t("health.phase_running")).size(f32::from(tokens::FONT_12)),
+                            );
+                        }
+
+                        if let Some(r) = report {
+                            let mut report_info = format!("{:?}", r.phase);
+                            if let Some(pct) = r.progress_pct {
+                                report_info.push_str(&format!(" ({pct:.0}%)"));
+                            }
+                            test_row = test_row.push(
+                                text(report_info).size(f32::from(tokens::FONT_11)).style(
+                                    move |_| iced::widget::text::Style {
+                                        color: Some(theme::muted_text_color(app.theme())),
+                                    },
+                                ),
+                            );
+                        }
+
+                        col = col.push(test_row);
+                    }
+
+                    col.into()
+                }
                 None => text(t("disk.empty")).into(),
             },
             None => text(t("common.collecting_telemetry")).into(),

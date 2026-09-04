@@ -270,9 +270,9 @@ impl TuiApp {
             .copied()
             .unwrap_or(ui::batch_menu::BatchMenuAction::Suspend);
         match action {
-            ui::batch_menu::BatchMenuAction::End => self
-                .shell
-                .apply_action(taskmanager_application::AppAction::RequestEndTask),
+            ui::batch_menu::BatchMenuAction::End => {
+                self.shell.request_process_batch(ProcessBatchAction::End)
+            }
             ui::batch_menu::BatchMenuAction::Kill => {
                 self.shell.request_process_batch(ProcessBatchAction::Kill)
             }
@@ -489,6 +489,38 @@ impl TuiApp {
             SurfaceTransition::Unchanged
             | SurfaceTransition::Confirmed(_)
             | SurfaceTransition::Dismissed { .. } => false,
+        }
+    }
+
+    /// Open the interactive service dependencies browsing modal for the selected service.
+    #[must_use]
+    pub fn open_service_dependencies(&mut self) -> bool {
+        if self.page() != taskmanager_application::AppPage::Services {
+            return false;
+        }
+        let Some(service) = self.sorted_service_at(self.selected) else {
+            return false;
+        };
+        let target_id = service.id.clone();
+        let target_name = service.name.clone();
+        self.open_local_surface(crate::TuiSurface::ServiceDependencies(
+            crate::ServiceDependenciesTarget {
+                service_id: target_id,
+                service_name: target_name,
+                scroll: 0,
+            },
+        ));
+        true
+    }
+
+    /// Scroll the interactive service dependencies modal.
+    pub fn service_dependencies_scroll(&mut self, delta: isize) {
+        if let Some(target) = self.service_dependencies_mut() {
+            if delta < 0 {
+                target.scroll = target.scroll.saturating_sub(delta.unsigned_abs());
+            } else {
+                target.scroll = target.scroll.saturating_add(delta.unsigned_abs());
+            }
         }
     }
 }

@@ -67,3 +67,6 @@ mod perf_device_graphs;
 mod process_sparkline;
 #[path = "tests/views.rs"]
 mod views;
+
+#[path = "tests/gpu_engines_and_smart_test.rs"]
+mod gpu_engines_and_smart_test;

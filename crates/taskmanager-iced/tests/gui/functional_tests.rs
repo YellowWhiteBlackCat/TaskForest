@@ -82,3 +82,19 @@ fn current_window_screenshot_intent_is_mapped_to_local_header_route() {
         }
     );
 }
+
+#[test]
+fn smart_self_test_intent_is_mapped_to_local_storage_route() {
+    let declaration = functional_declaration();
+    let entry = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.intent == ProductIntent::SmartSelfTest)
+        .expect("SMART self-test intent is registered");
+    assert_eq!(
+        entry.decision,
+        SurfaceDecision::Local {
+            route: "storage.smart-self-test",
+        }
+    );
+}

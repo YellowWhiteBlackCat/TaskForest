@@ -116,6 +116,14 @@ pub(crate) fn run_drain_cycle(
         taskmanager_shell::queue_effect(shell, client, effect);
         refresh_submitted = true;
     }
+    if let Some(effect) = shell.take_startup_refresh_request() {
+        taskmanager_shell::queue_effect(shell, client, effect);
+        refresh_submitted = true;
+    }
+    if let Some(effect) = shell.take_session_refresh_request() {
+        taskmanager_shell::queue_effect(shell, client, effect);
+        refresh_submitted = true;
+    }
     // The open service-log stream's throttled follow: the shell owns the
     // 1 Hz cadence and the cursor dedup; the drain only carries the request
     // across the same queue_effect seam.

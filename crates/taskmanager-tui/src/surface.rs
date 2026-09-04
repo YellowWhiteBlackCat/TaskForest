@@ -13,6 +13,14 @@ use crate::{
     StartupMenuTarget, TuiApp,
 };
 
+/// Target for the interactive service-dependencies modal.
+#[derive(Clone, Debug)]
+pub struct ServiceDependenciesTarget {
+    pub service_id: taskmanager_core::core::target::ServiceId,
+    pub service_name: String,
+    pub scroll: usize,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum TuiSurfaceKind {
     Settings,
@@ -26,6 +34,7 @@ pub(crate) enum TuiSurfaceKind {
     StartupMenu,
     ColumnMenu,
     CommandPalette,
+    ServiceDependencies,
 }
 
 #[derive(Clone, Debug)]
@@ -41,6 +50,7 @@ pub(crate) enum TuiSurface {
     StartupMenu(StartupMenuTarget),
     ColumnMenu { selection: usize },
     CommandPalette(CommandPalette),
+    ServiceDependencies(ServiceDependenciesTarget),
 }
 
 impl TuiSurface {
@@ -57,6 +67,7 @@ impl TuiSurface {
             Self::StartupMenu(_) => TuiSurfaceKind::StartupMenu,
             Self::ColumnMenu { .. } => TuiSurfaceKind::ColumnMenu,
             Self::CommandPalette(_) => TuiSurfaceKind::CommandPalette,
+            Self::ServiceDependencies(_) => TuiSurfaceKind::ServiceDependencies,
         }
     }
 }
@@ -221,6 +232,13 @@ impl TuiApp {
     pub(crate) fn startup_menu_mut(&mut self) -> Option<&mut StartupMenuTarget> {
         match self.local_surface_mut() {
             Some(TuiSurface::StartupMenu(menu)) => Some(menu),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn service_dependencies_mut(&mut self) -> Option<&mut ServiceDependenciesTarget> {
+        match self.local_surface_mut() {
+            Some(TuiSurface::ServiceDependencies(target)) => Some(target),
             _ => None,
         }
     }

@@ -30,14 +30,16 @@ use bevy::ecs::lifecycle::{Add, HookContext};
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
+use bevy::ecs::system::Query;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
-use bevy::scene::{CommandsSceneExt, Scene, bsn, template_value};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
     UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SessionControlOutcome, SourceNotice, source_notice};
 use taskmanager_core::core::session::{SessionControlAction, SessionItem};
@@ -464,6 +466,8 @@ fn session_row_scene(
         }
         BackgroundColor(fill)
         SessionsRowMarker(index, target)
+        Button
+        on(on_sessions_row_activated)
         Children [
             ( text_cell_scene(session, session_width, Role::Body) ),
             ( text_cell_scene(user, user_width, Role::Body) ),
@@ -649,3 +653,13 @@ fn on_sessions_selection_moved(
 #[cfg(test)]
 #[path = "../../tests/headless/pages/sessions.rs"]
 mod tests;
+
+fn on_sessions_row_activated(
+    activate: On<Activate>,
+    markers: Query<&SessionsRowMarker>,
+    mut commands: Commands,
+) {
+    if let Ok(marker) = markers.get(activate.event().entity) {
+        commands.trigger(SessionRowClicked(marker.0));
+    }
+}

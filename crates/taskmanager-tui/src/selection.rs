@@ -767,6 +767,22 @@ impl TuiApp {
         Some(PlatformEffect::ProcessInsights(identity))
     }
 
+    /// Re-request service dependencies for the selected service on the Services page.
+    pub(crate) fn refresh_selected_service_dependencies(&mut self) -> Option<PlatformEffect> {
+        if self.page() != AppPage::Services {
+            self.last_service_dependencies_target = None;
+            return None;
+        }
+        let service_id = self.sorted_service_at(self.selected)?.id.clone();
+        if self.last_service_dependencies_target.as_ref() == Some(&service_id) {
+            return None;
+        }
+        self.last_service_dependencies_target = Some(service_id.clone());
+        Some(taskmanager_shell::ShellApp::request_service_dependencies(
+            service_id,
+        ))
+    }
+
     fn process_start_token_for_key(&self, key: ProcessRowId) -> Option<u64> {
         // The identity key already carries the provider start token
         // (CORE-01); structural rows have none.

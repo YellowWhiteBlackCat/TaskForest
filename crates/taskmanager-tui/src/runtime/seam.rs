@@ -375,7 +375,8 @@ fn apply_overlay_control_click(
         crate::TuiSurfaceKind::Settings
         | crate::TuiSurfaceKind::About
         | crate::TuiSurfaceKind::Health
-        | crate::TuiSurfaceKind::Containers => EventReaction::default(),
+        | crate::TuiSurfaceKind::Containers
+        | crate::TuiSurfaceKind::ServiceDependencies => EventReaction::default(),
     }
 }
 
@@ -514,6 +515,10 @@ where
             // throttles it to 1 Hz; the wall clock lives here, not in the
             // shell or the renderer).
             if let Some(effect) = app.refresh_selected_process_insights() {
+                taskmanager_shell::queue_effect(app, platform, effect);
+                cycle.ancillary_effect = true;
+            }
+            if let Some(effect) = app.refresh_selected_service_dependencies() {
                 taskmanager_shell::queue_effect(app, platform, effect);
                 cycle.ancillary_effect = true;
             }

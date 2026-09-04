@@ -58,6 +58,7 @@ pub use demo::demo_app;
 pub use menus::BatchMenuTarget;
 pub use runtime::{run_demo, run_live, snapshot_text};
 pub use selectors::{FocusPanel, PerfDevice};
+pub use surface::ServiceDependenciesTarget;
 pub(crate) use surface::{TuiInputScope, TuiSurface, TuiSurfaceKind, TuiSurfaceState};
 pub use terminal::{TuiColorMode, TuiGlyphMode, TuiTerminalProfile};
 pub use theme::{ThemeParams, TuiTheme};
@@ -200,6 +201,7 @@ pub struct TuiApp {
     /// after each refresh. Cleared on page change and when the cursor lands on
     /// a row without a trustworthy identity.
     last_insights_target: Option<FrozenProcessIdentity>,
+    pub(crate) last_service_dependencies_target: Option<taskmanager_core::core::target::ServiceId>,
     /// Monotonic wall-clock (micros) of the last runtime tick, computed once
     /// per loop iteration (never in the render path) and consumed by the
     /// service-log time filter. Defaults to 0 for deterministic headless
@@ -286,6 +288,7 @@ impl TuiApp {
             focus_panel: FocusPanel::Table,
             help_scroll: 0,
             last_insights_target: None,
+            last_service_dependencies_target: None,
             service_log_now_micros: 0,
             prefix_jump: String::new(),
             prefix_jump_at_micros: 0,

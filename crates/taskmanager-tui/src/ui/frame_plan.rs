@@ -436,7 +436,8 @@ fn local_surface_focus_control(app: &TuiApp, surface: crate::TuiSurfaceKind) -> 
         }),
         crate::TuiSurfaceKind::About
         | crate::TuiSurfaceKind::Health
-        | crate::TuiSurfaceKind::Containers => TuiFocusControl::Viewport,
+        | crate::TuiSurfaceKind::Containers
+        | crate::TuiSurfaceKind::ServiceDependencies => TuiFocusControl::Viewport,
     }
 }
 
@@ -690,7 +691,8 @@ fn overlay_controls(
         crate::TuiSurfaceKind::Settings
         | crate::TuiSurfaceKind::About
         | crate::TuiSurfaceKind::Health
-        | crate::TuiSurfaceKind::Containers => return None,
+        | crate::TuiSurfaceKind::Containers
+        | crate::TuiSurfaceKind::ServiceDependencies => return None,
     };
     let header_rows = u16::try_from(header_rows).unwrap_or(u16::MAX);
     let footer_rows = u16::try_from(footer_rows).unwrap_or(u16::MAX);
@@ -741,6 +743,7 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
                     .saturating_add(4),
             ),
             crate::TuiSurfaceKind::CommandPalette => (72, 26),
+            crate::TuiSurfaceKind::ServiceDependencies => (72, 20),
         },
         TuiInputScope::Help => (68, 24),
         TuiInputScope::Suggestions => (74, 22),
@@ -758,7 +761,7 @@ const fn confirmation_size(kind: taskmanager_application::ConfirmationKind) -> (
         taskmanager_application::ConfirmationKind::ServiceControl
         | taskmanager_application::ConfirmationKind::StartupControl
         | taskmanager_application::ConfirmationKind::SessionControl => (60, 9),
-        taskmanager_application::ConfirmationKind::ProcessBatch
-        | taskmanager_application::ConfirmationKind::SmartSelfTest => (62, 9),
+        taskmanager_application::ConfirmationKind::SmartSelfTest => (62, 9),
+        taskmanager_application::ConfirmationKind::ProcessBatch => (64, 15),
     }
 }

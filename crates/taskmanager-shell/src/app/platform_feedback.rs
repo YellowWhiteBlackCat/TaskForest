@@ -136,6 +136,16 @@ impl ShellApp {
         self.data.take_process_refresh_request()
     }
 
+    #[must_use]
+    pub fn take_startup_refresh_request(&mut self) -> Option<PlatformEffect> {
+        self.data.take_startup_refresh_request()
+    }
+
+    #[must_use]
+    pub fn take_session_refresh_request(&mut self) -> Option<PlatformEffect> {
+        self.data.take_session_refresh_request()
+    }
+
     fn sync_from_platform_fold(&mut self, output: BatchFoldOutput) {
         if let Some(activity) = output.activity.as_ref() {
             self.set_feedback_activity(activity);
@@ -180,6 +190,10 @@ impl ShellApp {
             );
         }
         for outcome in &output.session_control_outcomes {
+            if outcome.result.is_ok() {
+                self.data.session_refresh_request =
+                    Some(taskmanager_application::RefreshRequest::Sessions);
+            }
             let (severity, lifecycle, text) = match &outcome.result {
                 Ok(()) => (
                     FeedbackSeverity::Success,
@@ -201,6 +215,10 @@ impl ShellApp {
             self.report_notice(FeedbackSource::Control, severity, lifecycle, text);
         }
         for outcome in &output.startup_control_outcomes {
+            if outcome.result.is_ok() {
+                self.data.startup_refresh_request =
+                    Some(taskmanager_application::RefreshRequest::Startup);
+            }
             let intent = if outcome.enabled { "enable" } else { "disable" };
             let (severity, lifecycle, text) = match &outcome.result {
                 Ok(()) => (

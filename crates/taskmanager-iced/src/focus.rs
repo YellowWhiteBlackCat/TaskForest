@@ -133,6 +133,13 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::DirectoryUsageScan => "iced-directory-usage-scan".to_owned(),
         FocusTarget::DirectoryUsageCancel => "iced-directory-usage-cancel".to_owned(),
         FocusTarget::DiskSmartOpen { index } => format!("iced-disk-smart-open-{index}"),
+        FocusTarget::SmartSelfTestShort { index } => format!("iced-smart-self-test-short-{index}"),
+        FocusTarget::SmartSelfTestExtended { index } => {
+            format!("iced-smart-self-test-extended-{index}")
+        }
+        FocusTarget::ConfirmSmartSelfTest => "iced-confirm-smart-self-test".to_owned(),
+        FocusTarget::CancelSmartSelfTest => "iced-cancel-smart-self-test".to_owned(),
+        FocusTarget::GpuEnginesExpandToggle => "iced-gpu-engines-expand-toggle".to_owned(),
         FocusTarget::GpuEngineRowsToggle => "iced-gpu-engine-rows-toggle".to_owned(),
         FocusTarget::AboutCopyDetails => "iced-about-copy-details".to_owned(),
         FocusTarget::ServiceLogFollow => "iced-service-log-follow".to_owned(),

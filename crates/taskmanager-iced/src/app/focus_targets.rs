@@ -183,6 +183,20 @@ pub enum FocusTarget {
     DiskSmartOpen {
         index: usize,
     },
+    /// Run a short SMART self-test on the disk at index.
+    SmartSelfTestShort {
+        index: usize,
+    },
+    /// Run an extended SMART self-test on the disk at index.
+    SmartSelfTestExtended {
+        index: usize,
+    },
+    /// Confirm the pending SMART self-test.
+    ConfirmSmartSelfTest,
+    /// Cancel the pending SMART self-test.
+    CancelSmartSelfTest,
+    /// Toggle expansion of the GPU engines breakdown panel.
+    GpuEnginesExpandToggle,
     /// The conditional cancel action for a running directory-usage scan
     /// (rendered only while the selected disk's scan is Scanning).
     DirectoryUsageCancel,
@@ -242,7 +256,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 143] = [
+    pub const ALL: [Self; 148] = [
         Self::ModalClose,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
@@ -348,6 +362,11 @@ impl FocusTarget {
         Self::ProcessStatusFilterTab(ProcessStatusFilter::Other),
         Self::DirectoryUsageScan,
         Self::DiskSmartOpen { index: 0 },
+        Self::SmartSelfTestShort { index: 0 },
+        Self::SmartSelfTestExtended { index: 0 },
+        Self::ConfirmSmartSelfTest,
+        Self::CancelSmartSelfTest,
+        Self::GpuEnginesExpandToggle,
         Self::DirectoryUsageCancel,
         Self::AboutCopyDetails,
         Self::GpuEngineRowsToggle,
