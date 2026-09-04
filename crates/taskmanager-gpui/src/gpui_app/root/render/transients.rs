@@ -139,7 +139,7 @@ fn compose_shell_feedback(
                         cx.notify();
                     });
                 })
-                .child("\u{00d7}"),
+                .child("\u{2715}"),
         );
     root.child(deferred(
         div()
