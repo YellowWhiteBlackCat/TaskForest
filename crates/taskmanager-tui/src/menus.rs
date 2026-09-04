@@ -9,8 +9,10 @@ use crate::{
     ProcessDetailsSection, ProcessMenuTarget, ProcessPropertiesTarget, ServiceMenuTarget,
     SessionMenuTarget, TuiApp, TuiSurface, TuiSurfaceKind,
 };
+use taskmanager_application::i18n::t;
 use taskmanager_application::{
-    AppAction, AppPage, InteractionEvent, PendingConfirmation, PlatformEffect, SurfaceTransition,
+    AppAction, AppPage, InteractionEvent, PendingConfirmation, PlatformEffect,
+    ProcessAffinityReady, ProcessAffinityRequest, ProcessAffinityState, SurfaceTransition,
 };
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::SmartAvailability;
@@ -191,6 +193,15 @@ impl TuiApp {
                     .unwrap_or(taskmanager_core::core::process::PriorityTier::Normal);
                 self.shell
                     .request_process_batch(ProcessBatchAction::SetPriority(tier))
+            }
+            ui::process_menu::ProcessMenuAction::Affinity => {
+                if let Some(target) =
+                    taskmanager_core::core::process::FrozenProcessIdentity::from_process(&menu.item)
+                {
+                    self.open_process_affinity_for(target)
+                } else {
+                    self.open_process_affinity()
+                }
             }
             ui::process_menu::ProcessMenuAction::OpenLocation
             | ui::process_menu::ProcessMenuAction::SearchOnline => {
@@ -522,6 +533,138 @@ impl TuiApp {
                 target.scroll = target.scroll.saturating_add(delta.unsigned_abs());
             }
         }
+    }
+
+    /// Open the CPU affinity editor modal for the selected process on the Applications page.
+    #[must_use]
+    pub fn open_process_affinity(&mut self) -> Option<PlatformEffect> {
+        if self.page() != AppPage::Applications {
+            return None;
+        }
+        let item = self.selected_detail_process()?;
+        let target = taskmanager_core::core::process::FrozenProcessIdentity::from_process(&item)?;
+        self.open_process_affinity_for(target)
+    }
+
+    /// Open the CPU affinity editor modal for a specific frozen process
+    /// identity. A correlated snapshot the shell already holds for this exact
+    /// target seeds the controls immediately; a fresh read is queued so the
+    /// authoritative mask arrives while the editor is open. Before that read
+    /// lands, the grid shows every CPU unchecked and neither the toggles nor
+    /// Enter submit anything — an unobserved mask is never fabricated into an
+    /// editable default (Iced/GPUI fail closed the same way).
+    #[must_use]
+    pub fn open_process_affinity_for(
+        &mut self,
+        target: taskmanager_core::core::process::FrozenProcessIdentity,
+    ) -> Option<PlatformEffect> {
+        let logical_cpu_count = self.logical_cpu_count();
+        let current_mask = match self.shell.process_affinity_state() {
+            taskmanager_application::ProcessAffinityState::Ready(ready)
+                if ready.target == target =>
+            {
+                Some(ready.cpus.clone())
+            }
+            _ => None,
+        };
+        let state = crate::surface::AffinityModalState::new(
+            target.clone(),
+            current_mask,
+            logical_cpu_count,
+        );
+        self.open_local_surface(TuiSurface::ProcessAffinity(state));
+        Some(PlatformEffect::ProcessAffinity(ProcessAffinityRequest {
+            target,
+        }))
+    }
+
+    /// Copy an authoritative affinity read into the open editor, but only
+    /// when the snapshot's frozen target is the identity captured at open
+    /// time. A different process with the same PID is never allowed to
+    /// rewrite the visible mask (the Iced editor's same-wave sync rule).
+    pub fn sync_process_affinity_modal(&mut self) {
+        let Some(crate::TuiSurface::ProcessAffinity(state)) = self.local_surface() else {
+            return;
+        };
+        let target = state.target.clone();
+        let observed = affinity_last_good(self.shell.process_affinity_state(), &target)
+            .map(|ready| ready.cpus.clone());
+        let Some(cpus) = observed else {
+            return;
+        };
+        if let Some(crate::TuiSurface::ProcessAffinity(state)) = self.local_surface_mut() {
+            state.observe_mask(&cpus);
+        }
+    }
+
+    /// Apply the edited CPU affinity mask, emit the control request, and close
+    /// the modal. The decision fails closed: before an authoritative read is
+    /// observed, Enter reports the honest collecting notice and keeps the
+    /// editor open; an observed-but-empty mask reports the selection warning
+    /// and keeps the editor open. Only the displayed mask is ever submitted —
+    /// Apply never asks the shell to resolve the row again, so a recycled PID
+    /// cannot be silently retargeted, and the user's in-progress edits are
+    /// judged as displayed (authoritative reads rewrite the mask when the
+    /// batch folds in, never retroactively at decision time).
+    #[must_use]
+    pub fn apply_process_affinity(&mut self) -> Option<PlatformEffect> {
+        let Some(crate::TuiSurface::ProcessAffinity(state)) = self.local_surface() else {
+            return None;
+        };
+        let mask_observed = state.mask_observed;
+        let cpus = state.selected_mask.clone();
+        if !mask_observed {
+            self.report_notice(
+                FeedbackSource::Control,
+                FeedbackSeverity::Info,
+                FeedbackLifecycle::SHORT,
+                t("common.collecting_telemetry"),
+            );
+            return None;
+        }
+        if cpus.is_empty() {
+            self.report_notice(
+                FeedbackSource::Interaction,
+                FeedbackSeverity::Warning,
+                FeedbackLifecycle::SHORT,
+                t("proc.affinity_select_one"),
+            );
+            return None;
+        }
+        let TuiSurface::ProcessAffinity(state) =
+            self.take_local_surface(TuiSurfaceKind::ProcessAffinity)?
+        else {
+            return None;
+        };
+        self.shell
+            .request_process_affinity_control_for(state.target, state.selected_mask)
+    }
+}
+
+/// The last-good affinity snapshot for `target`, mirroring the Iced editor's
+/// read discipline: an exact `Ready` match, or a `Loading`/`Failed` session
+/// that still carries a previous good read for the same frozen identity.
+#[must_use]
+fn affinity_last_good<'a>(
+    state: &'a ProcessAffinityState,
+    target: &taskmanager_core::core::process::FrozenProcessIdentity,
+) -> Option<&'a ProcessAffinityReady> {
+    match state {
+        ProcessAffinityState::Ready(ready) if &ready.target == target => Some(ready),
+        ProcessAffinityState::Loading {
+            target: loading,
+            last_good: Some(ready),
+            ..
+        } if loading == target => Some(ready),
+        ProcessAffinityState::Failed {
+            target: failed,
+            last_good: Some(ready),
+            ..
+        } if failed == target => Some(ready),
+        ProcessAffinityState::Closed
+        | ProcessAffinityState::Loading { .. }
+        | ProcessAffinityState::Ready(_)
+        | ProcessAffinityState::Failed { .. } => None,
     }
 }
 

@@ -53,8 +53,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::ServiceLogExport => SurfaceDecision::Local {
             route: "services.log-panel.export",
         },
-        ProductIntent::ProcessAffinityEditor => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape has no CPU-affinity editor surface",
+        ProductIntent::ProcessAffinityEditor => SurfaceDecision::Local {
+            route: "processes.affinity-modal",
         },
         ProductIntent::SmartSelfTest => SurfaceDecision::Local {
             route: "performance.disk.smart-self-test",

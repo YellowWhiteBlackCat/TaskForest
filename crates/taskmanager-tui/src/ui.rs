@@ -2,6 +2,7 @@
 
 mod about;
 mod about_data;
+pub(crate) mod affinity_modal;
 mod alerts;
 mod app_history;
 pub(crate) mod batch_menu;
@@ -229,6 +230,9 @@ fn render_overlays(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan: &
                 service_dependencies_modal::render_service_dependencies_at(
                     frame, app, target, theme, popup,
                 );
+            }
+            Some(crate::TuiSurface::ProcessAffinity(state)) => {
+                affinity_modal::render_affinity_modal_at(frame, app, state, theme, popup);
             }
             None => {}
         },

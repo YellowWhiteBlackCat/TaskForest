@@ -437,7 +437,8 @@ fn local_surface_focus_control(app: &TuiApp, surface: crate::TuiSurfaceKind) -> 
         crate::TuiSurfaceKind::About
         | crate::TuiSurfaceKind::Health
         | crate::TuiSurfaceKind::Containers
-        | crate::TuiSurfaceKind::ServiceDependencies => TuiFocusControl::Viewport,
+        | crate::TuiSurfaceKind::ServiceDependencies
+        | crate::TuiSurfaceKind::ProcessAffinity => TuiFocusControl::Viewport,
     }
 }
 
@@ -692,7 +693,8 @@ fn overlay_controls(
         | crate::TuiSurfaceKind::About
         | crate::TuiSurfaceKind::Health
         | crate::TuiSurfaceKind::Containers
-        | crate::TuiSurfaceKind::ServiceDependencies => return None,
+        | crate::TuiSurfaceKind::ServiceDependencies
+        | crate::TuiSurfaceKind::ProcessAffinity => return None,
     };
     let header_rows = u16::try_from(header_rows).unwrap_or(u16::MAX);
     let footer_rows = u16::try_from(footer_rows).unwrap_or(u16::MAX);
@@ -733,7 +735,7 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
             crate::TuiSurfaceKind::Health => (84, 30),
             crate::TuiSurfaceKind::Containers => (84, 22),
             crate::TuiSurfaceKind::ServiceMenu => (52, 13),
-            crate::TuiSurfaceKind::ProcessMenu => (52, 17),
+            crate::TuiSurfaceKind::ProcessMenu => (52, 18),
             crate::TuiSurfaceKind::BatchMenu => (52, 15),
             crate::TuiSurfaceKind::SessionMenu | crate::TuiSurfaceKind::StartupMenu => (52, 11),
             crate::TuiSurfaceKind::ColumnMenu => (
@@ -744,6 +746,7 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
             ),
             crate::TuiSurfaceKind::CommandPalette => (72, 26),
             crate::TuiSurfaceKind::ServiceDependencies => (72, 20),
+            crate::TuiSurfaceKind::ProcessAffinity => (64, 16),
         },
         TuiInputScope::Help => (68, 24),
         TuiInputScope::Suggestions => (74, 22),

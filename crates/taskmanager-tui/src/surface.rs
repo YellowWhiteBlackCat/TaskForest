@@ -21,6 +21,118 @@ pub struct ServiceDependenciesTarget {
     pub scroll: usize,
 }
 
+/// Number of columns in the CPU affinity core grid.
+pub const AFFINITY_GRID_COLS: usize = 4;
+
+/// Target and interactive state for the CPU affinity editor modal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AffinityModalState {
+    pub target: taskmanager_core::core::process::FrozenProcessIdentity,
+    pub selected_cpu: usize,
+    pub selected_mask: Vec<u32>,
+    pub logical_cpu_count: usize,
+    pub scroll: usize,
+    /// Whether a correlated read has ever seeded `selected_mask`. Before the
+    /// first authoritative read, the grid shows every CPU unchecked and the
+    /// toggles and apply stay inert: an unobserved mask is never fabricated
+    /// into an editable default (the Iced editor fails closed the same way).
+    pub mask_observed: bool,
+}
+
+impl AffinityModalState {
+    #[must_use]
+    pub fn new(
+        target: taskmanager_core::core::process::FrozenProcessIdentity,
+        current_mask: Option<Vec<u32>>,
+        logical_cpu_count: usize,
+    ) -> Self {
+        let logical_cpu_count = logical_cpu_count.max(1);
+        let mask_observed = current_mask.is_some();
+        let selected_mask = current_mask.unwrap_or_default();
+        Self {
+            target,
+            selected_cpu: 0,
+            selected_mask,
+            logical_cpu_count,
+            scroll: 0,
+            mask_observed,
+        }
+    }
+
+    pub fn move_up(&mut self) {
+        if self.selected_cpu >= AFFINITY_GRID_COLS {
+            self.selected_cpu -= AFFINITY_GRID_COLS;
+        }
+        self.adjust_scroll();
+    }
+
+    pub fn move_down(&mut self) {
+        if self.selected_cpu + AFFINITY_GRID_COLS < self.logical_cpu_count {
+            self.selected_cpu += AFFINITY_GRID_COLS;
+        } else if self.logical_cpu_count > 0 {
+            self.selected_cpu = self.logical_cpu_count - 1;
+        }
+        self.adjust_scroll();
+    }
+
+    pub fn move_left(&mut self) {
+        self.selected_cpu = self.selected_cpu.saturating_sub(1);
+        self.adjust_scroll();
+    }
+
+    pub fn move_right(&mut self) {
+        if self.selected_cpu + 1 < self.logical_cpu_count {
+            self.selected_cpu += 1;
+        }
+        self.adjust_scroll();
+    }
+
+    pub fn toggle_selected(&mut self) {
+        if !self.mask_observed {
+            return;
+        }
+        if let Ok(cpu) = u32::try_from(self.selected_cpu) {
+            if let Some(pos) = self.selected_mask.iter().position(|&c| c == cpu) {
+                self.selected_mask.remove(pos);
+            } else {
+                self.selected_mask.push(cpu);
+                self.selected_mask.sort_unstable();
+            }
+        }
+    }
+
+    pub fn toggle_all(&mut self) {
+        if !self.mask_observed {
+            return;
+        }
+        if self.selected_mask.len() >= self.logical_cpu_count {
+            self.selected_mask.clear();
+        } else {
+            self.selected_mask = (0..self.logical_cpu_count as u32).collect();
+        }
+    }
+
+    /// Copy an authoritative read into the editor. Only a snapshot whose
+    /// frozen target matches the modal's captured identity may rewrite the
+    /// visible mask, so a recycled PID can never retarget the open editor.
+    pub fn observe_mask(&mut self, mask: &[u32]) {
+        let bounded = mask
+            .iter()
+            .copied()
+            .filter(|cpu| usize::try_from(*cpu).is_ok_and(|index| index < self.logical_cpu_count))
+            .collect::<Vec<_>>();
+        self.selected_mask = bounded;
+        self.mask_observed = true;
+    }
+
+    fn adjust_scroll(&mut self) {
+        let current_row = self.selected_cpu / AFFINITY_GRID_COLS;
+        if current_row < self.scroll {
+            self.scroll = current_row;
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum TuiSurfaceKind {
     Settings,
@@ -35,6 +147,7 @@ pub(crate) enum TuiSurfaceKind {
     ColumnMenu,
     CommandPalette,
     ServiceDependencies,
+    ProcessAffinity,
 }
 
 #[derive(Clone, Debug)]
@@ -51,6 +164,7 @@ pub(crate) enum TuiSurface {
     ColumnMenu { selection: usize },
     CommandPalette(CommandPalette),
     ServiceDependencies(ServiceDependenciesTarget),
+    ProcessAffinity(AffinityModalState),
 }
 
 impl TuiSurface {
@@ -68,6 +182,7 @@ impl TuiSurface {
             Self::ColumnMenu { .. } => TuiSurfaceKind::ColumnMenu,
             Self::CommandPalette(_) => TuiSurfaceKind::CommandPalette,
             Self::ServiceDependencies(_) => TuiSurfaceKind::ServiceDependencies,
+            Self::ProcessAffinity(_) => TuiSurfaceKind::ProcessAffinity,
         }
     }
 }
@@ -241,6 +356,26 @@ impl TuiApp {
             Some(TuiSurface::ServiceDependencies(target)) => Some(target),
             _ => None,
         }
+    }
+
+    #[must_use]
+    pub const fn process_affinity(&self) -> Option<&AffinityModalState> {
+        match self.local_surface() {
+            Some(TuiSurface::ProcessAffinity(state)) => Some(state),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn process_affinity_mut(&mut self) -> Option<&mut AffinityModalState> {
+        match self.local_surface_mut() {
+            Some(TuiSurface::ProcessAffinity(state)) => Some(state),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn affinity_open(&self) -> bool {
+        matches!(self.local_surface(), Some(TuiSurface::ProcessAffinity(_)))
     }
 
     pub(crate) const fn column_menu_selection(&self) -> Option<usize> {

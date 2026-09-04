@@ -77,3 +77,19 @@ fn service_dependencies_decision_is_local_surface() {
         }
     );
 }
+
+#[test]
+fn process_affinity_editor_decision_is_local_surface() {
+    let declaration = functional_declaration();
+    let entry = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.intent == ProductIntent::ProcessAffinityEditor)
+        .expect("process affinity editor intent is registered");
+    assert_eq!(
+        entry.decision,
+        SurfaceDecision::Local {
+            route: "processes.affinity-modal",
+        }
+    );
+}

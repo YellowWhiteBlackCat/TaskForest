@@ -343,6 +343,11 @@ pub(crate) fn battery_surfaces() -> Vec<BatterySurface> {
             open: open_startup_control_confirmation,
             popup: true,
         },
+        BatterySurface {
+            name: "process affinity",
+            open: open_process_affinity,
+            popup: true,
+        },
     ]
 }
 
@@ -371,6 +376,7 @@ pub(crate) fn surface_title_key(surface: &str) -> Option<&'static str> {
         "batch confirmation" => "confirm.batch_title",
         "session control confirmation" => "confirm.session_title",
         "startup control confirmation" => "confirm.startup_title",
+        "process affinity" => "dialog.cpu_affinity",
         _ => return None,
     })
 }
@@ -424,6 +430,11 @@ fn open_command_palette(app: &mut TuiApp) -> bool {
 fn open_suggestions(app: &mut TuiApp) -> bool {
     app.shell.toggle_suggestions();
     app.shell.suggestions_open()
+}
+
+fn open_process_affinity(app: &mut TuiApp) -> bool {
+    go_to(app, AppPage::Applications);
+    app.open_process_affinity().is_some()
 }
 
 fn open_process_menu(app: &mut TuiApp) -> bool {

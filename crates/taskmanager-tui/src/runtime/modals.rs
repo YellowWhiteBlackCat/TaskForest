@@ -158,6 +158,17 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                     None
                 }
                 ratatui::crossterm::event::KeyCode::Enter => app.process_menu_select(),
+                ratatui::crossterm::event::KeyCode::Char('a' | 'A') => {
+                    let target = app.process_menu_mut().and_then(|m| {
+                        taskmanager_core::core::process::FrozenProcessIdentity::from_process(
+                            &m.item,
+                        )
+                    });
+                    match target {
+                        Some(target) => app.open_process_affinity_for(target),
+                        None => app.open_process_affinity(),
+                    }
+                }
                 ratatui::crossterm::event::KeyCode::Esc => {
                     app.close_local_overlays();
                     None
@@ -219,6 +230,50 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 }
                 None
             }
+            TuiSurfaceKind::ProcessAffinity => match key.code {
+                ratatui::crossterm::event::KeyCode::Up => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.move_up();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Down => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.move_down();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Left => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.move_left();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Right => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.move_right();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Char(' ') => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.toggle_selected();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Char('a' | 'A') => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.toggle_all();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Enter => app.apply_process_affinity(),
+                ratatui::crossterm::event::KeyCode::Esc => {
+                    app.close_local_overlays();
+                    None
+                }
+                _ => None,
+            },
             TuiSurfaceKind::Settings => {
                 handle_settings_key(app, key);
                 None

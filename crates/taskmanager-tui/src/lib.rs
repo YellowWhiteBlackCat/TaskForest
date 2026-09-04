@@ -58,7 +58,7 @@ pub use demo::demo_app;
 pub use menus::BatchMenuTarget;
 pub use runtime::{run_demo, run_live, snapshot_text};
 pub use selectors::{FocusPanel, PerfDevice};
-pub use surface::ServiceDependenciesTarget;
+pub use surface::{AffinityModalState, ServiceDependenciesTarget};
 pub(crate) use surface::{TuiInputScope, TuiSurface, TuiSurfaceKind, TuiSurfaceState};
 pub use terminal::{TuiColorMode, TuiGlyphMode, TuiTerminalProfile};
 pub use theme::{ThemeParams, TuiTheme};
@@ -313,6 +313,7 @@ impl TuiApp {
         let services_revision_before = self.shell.projection().services_revision;
         let startup_revision_before = self.shell.projection().startup_revision;
         let sessions_revision_before = self.shell.projection().sessions_revision;
+        let affinity_state_before = self.shell.process_affinity_state().clone();
         self.shell.apply_platform_batch(batch);
         if self.shell.projection().process_revision != process_revision_before {
             self.prune_stale_tree_state();
@@ -350,6 +351,14 @@ impl TuiApp {
         // provider going dark) cannot stay selected into the next paint — the
         // anchor falls back fail-closed to the first still-backed resource.
         self.reconcile_perf_device_anchor();
+        // Same-wave fold for the open CPU affinity editor: only a batch that
+        // actually moved the shell's affinity session may rewrite the visible
+        // mask, so an unrelated telemetry wave never clobbers in-progress
+        // edits. The sync itself is target-guarded (see
+        // `sync_process_affinity_modal`).
+        if &affinity_state_before != self.shell.process_affinity_state() {
+            self.sync_process_affinity_modal();
+        }
     }
 
     pub(crate) fn install_history_frontend_connector(
@@ -874,6 +883,26 @@ impl TuiApp {
                 );
             }
         }
+    }
+}
+
+impl TuiApp {
+    /// Logical CPU count for affinity and per-core metrics.
+    #[must_use]
+    pub fn logical_cpu_count(&self) -> usize {
+        self.projection()
+            .snapshot
+            .as_ref()
+            .and_then(|snapshot| snapshot.cpu.logical_cores)
+            .or_else(|| {
+                self.projection()
+                    .hardware
+                    .as_ref()
+                    .and_then(|hw| hw.cpu_cores)
+            })
+            .filter(|count| *count > 0)
+            .unwrap_or_else(|| std::thread::available_parallelism().map_or(8, |count| count.get()))
+            .min(128)
     }
 }
 

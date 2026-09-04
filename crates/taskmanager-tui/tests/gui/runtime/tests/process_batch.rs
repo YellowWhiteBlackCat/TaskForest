@@ -29,7 +29,12 @@ fn process_menu_offers_the_batch_control_vocabulary() {
         .into_iter()
         .map(crate::ui::process_menu::action_label)
         .collect();
-    assert_eq!(labels.len(), 10);
+    assert_eq!(labels.len(), 11);
+    assert!(
+        labels
+            .iter()
+            .any(|l| l.contains("Affinity") || l.contains("affinity"))
+    );
     assert!(labels[0].contains("End task"));
     assert!(
         labels[1].contains("End process tree"),
