@@ -47,8 +47,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::ServiceDependencies => SurfaceDecision::Unsupported {
             reason: "the Bevy service-dependency panel is not wired",
         },
-        ProductIntent::ServiceLogs => SurfaceDecision::Unsupported {
-            reason: "the Bevy service-log stream panel is not wired",
+        ProductIntent::ServiceLogs => SurfaceDecision::Local {
+            route: "services.log-panel",
         },
         ProductIntent::ServiceLogExport => SurfaceDecision::Unsupported {
             reason: "the Bevy shape has no service-log export surface",
