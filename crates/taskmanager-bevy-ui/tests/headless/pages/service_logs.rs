@@ -16,6 +16,7 @@
 //!
 //! Mounted from `pages/services.rs` (the panel is a Services-page surface).
 
+use bevy::app::App;
 use bevy::input::keyboard::KeyCode;
 use taskmanager_application::PlatformEffect;
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
@@ -242,6 +243,10 @@ fn the_chord_mapping_is_total_and_exclusive() {
         Some(ServiceLogControlAction::CycleTime)
     );
     assert_eq!(
+        log_panel_key(KeyCode::KeyE),
+        Some(ServiceLogControlAction::Export)
+    );
+    assert_eq!(
         log_panel_key(KeyCode::Escape),
         Some(ServiceLogControlAction::Close)
     );
@@ -330,4 +335,186 @@ fn the_repaint_gate_fires_only_when_a_rendered_fact_moves() {
         "a new entry demands a repaint"
     );
     let _ = LogPanelRepaintRequired;
+}
+
+// ---- service log export -----------------------------------------------------
+
+#[test]
+fn service_log_export_writes_formatted_lines_and_reports_notice() {
+    let mut shell = ShellApp::new();
+    let service = taskmanager_core::core::target::ServiceId::new("demo.service");
+    let _ = shell.open_service_log_for(service.clone());
+    let query = ServiceLogQuery {
+        service_id: service.clone(),
+        level: ServiceLogLevelFilter::All,
+        time: ServiceLogTimeFilter::All,
+        after_cursor: None,
+    };
+
+    let now = 1_000;
+    if let Some(open) = shell.service_log.as_mut() {
+        open.feed
+            .apply_at(stream_snapshot(&query, (0..3).map(entry).collect()), now);
+    }
+
+    let scratch_dir = crate::app::app_support::repo_temp_dir().join("bevy-svc-log-export");
+    let _ = std::fs::create_dir_all(&scratch_dir);
+
+    super::log_panel::export_service_log(&mut shell, Some(&scratch_dir));
+
+    let exported_file = scratch_dir.join("taskmanager-service-demo.service.log");
+    assert!(exported_file.exists(), "the log file must be exported");
+
+    let content = std::fs::read_to_string(&exported_file).expect("read exported file");
+    assert!(content.contains("[Unknown] line 0"));
+    assert!(content.contains("[Unknown] line 1"));
+    assert!(content.contains("[Unknown] line 2"));
+
+    let notice = shell.feedback_notice().expect("feedback notice reported");
+    assert_eq!(
+        notice.severity(),
+        taskmanager_shell::FeedbackSeverity::Success
+    );
+    assert!(notice.text().contains(&exported_file.display().to_string()));
+
+    let _ = std::fs::remove_dir_all(&scratch_dir);
+}
+
+#[test]
+fn service_log_export_with_no_entries_reports_warning_notice() {
+    let mut shell = ShellApp::new();
+    let service = taskmanager_core::core::target::ServiceId::new("demo.service");
+    let _ = shell.open_service_log_for(service.clone());
+
+    let scratch_dir = crate::app::app_support::repo_temp_dir().join("bevy-svc-log-export-empty");
+    let _ = std::fs::create_dir_all(&scratch_dir);
+
+    super::log_panel::export_service_log(&mut shell, Some(&scratch_dir));
+
+    let exported_file = scratch_dir.join("taskmanager-service-demo.service.log");
+    assert!(
+        !exported_file.exists(),
+        "no file should be written when empty"
+    );
+
+    let notice = shell.feedback_notice().expect("warning notice reported");
+    assert_eq!(
+        notice.severity(),
+        taskmanager_shell::FeedbackSeverity::Warning
+    );
+    assert_eq!(
+        notice.text(),
+        taskmanager_application::i18n::t("svc.logs_nothing_to_export")
+    );
+
+    let _ = std::fs::remove_dir_all(&scratch_dir);
+}
+
+#[test]
+fn e_key_triggers_service_log_export_when_panel_is_open() {
+    let (mut app, events) = headless_services_app();
+    push_services(
+        &events,
+        vec![service_item(
+            "alpha.service",
+            "alpha",
+            ServiceStatus::Active,
+        )],
+    );
+    route_to_services(&mut app);
+    app.update();
+
+    app.world_mut()
+        .non_send_mut::<crate::app::FrontendTrack>()
+        .shell
+        .clear_feedback_notice();
+    let scratch_dir = crate::app::app_support::repo_temp_dir().join("bevy-svc-key-export");
+    let _ = std::fs::create_dir_all(&scratch_dir);
+    app.world_mut()
+        .insert_resource(super::log_panel::ServiceLogExportDir(Some(
+            scratch_dir.clone(),
+        )));
+
+    // Before log panel is opened, pressing E does not report notice
+    press_input(&mut app, KeyCode::KeyE);
+    app.update();
+    assert!(
+        app.world()
+            .non_send::<crate::app::FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_none(),
+        "E when log panel is closed does not trigger export notice"
+    );
+
+    // Open log panel
+    app.world_mut()
+        .resource_mut::<crate::pages::services::ServiceSelection>()
+        .target = Some(taskmanager_core::core::target::ServiceId::new(
+        "alpha.service",
+    ));
+    app.world_mut()
+        .commands()
+        .trigger(crate::pages::services::log_panel::ServiceLogsRequested);
+    app.update();
+
+    // Populate feed
+    let query = ServiceLogQuery {
+        service_id: taskmanager_core::core::target::ServiceId::new("alpha.service"),
+        level: ServiceLogLevelFilter::All,
+        time: ServiceLogTimeFilter::All,
+        after_cursor: None,
+    };
+    {
+        let mut track = app.world_mut().non_send_mut::<crate::app::FrontendTrack>();
+        if let Some(open) = track.shell.service_log.as_mut() {
+            open.feed
+                .apply_at(stream_snapshot(&query, vec![entry(0), entry(1)]), 100);
+        }
+    }
+
+    // Now press E while log panel is open
+    press_input(&mut app, KeyCode::KeyE);
+    app.update();
+
+    let track = app.world().non_send::<crate::app::FrontendTrack>();
+    let notice = track
+        .shell
+        .feedback_notice()
+        .expect("feedback notice reported on E key");
+    assert_eq!(
+        notice.severity(),
+        taskmanager_shell::FeedbackSeverity::Success
+    );
+
+    let exported_file = scratch_dir.join("taskmanager-service-alpha.service.log");
+    assert!(exported_file.exists(), "exported file must exist");
+    let content = std::fs::read_to_string(&exported_file).expect("read exported file");
+    assert!(content.contains("line 0"));
+    assert!(content.contains("line 1"));
+
+    let _ = std::fs::remove_dir_all(&scratch_dir);
+}
+
+fn press_input(app: &mut App, key: KeyCode) {
+    use bevy::ecs::system::RunSystemOnce;
+    use bevy::input::keyboard::{Key, KeyboardInput, NativeKey};
+    let event = KeyboardInput {
+        key_code: key,
+        logical_key: Key::Unidentified(NativeKey::Unidentified),
+        state: bevy::input::ButtonState::Pressed,
+        text: None,
+        repeat: false,
+        window: bevy::ecs::entity::Entity::PLACEHOLDER,
+    };
+    let mut event = Some(event);
+    app.world_mut()
+        .run_system_once(
+            move |mut writer: bevy::ecs::message::MessageWriter<KeyboardInput>| {
+                if let Some(event) = event.take() {
+                    writer.write(event);
+                }
+            },
+        )
+        .expect("injection runs");
 }

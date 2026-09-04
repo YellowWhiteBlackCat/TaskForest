@@ -35,7 +35,7 @@ use bevy::app::{App, AppExit, Plugin};
 use bevy::ecs::event::Event;
 use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
 use bevy::input::ButtonInput;
 use bevy::input::ButtonState;
 use bevy::input::keyboard::{KeyCode, KeyboardInput};
@@ -80,7 +80,8 @@ impl Plugin for InputPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<PendingEffects>()
             .init_resource::<QuitForwarded>()
-            .init_resource::<crate::drain::FeedbackCache>();
+            .init_resource::<crate::drain::FeedbackCache>()
+            .init_resource::<crate::pages::services::log_panel::ServiceLogExportDir>();
     }
 }
 
@@ -96,6 +97,23 @@ enum KeyboardOwner {
     SharedSurface,
     Search,
     Free,
+}
+
+/// Bundled action-menu modal resources to keep the dispatch system under the argument budget.
+#[derive(SystemParam)]
+pub(crate) struct InventoryActionModals<'w> {
+    pub(crate) svc: ResMut<'w, MenuModal<ServiceMenuCtx>>,
+    pub(crate) stu: ResMut<'w, MenuModal<StartupMenuCtx>>,
+    pub(crate) ses: ResMut<'w, MenuModal<SessionMenuCtx>>,
+    pub(crate) proc: ResMut<'w, MenuModal<ProcessMenuCtx>>,
+}
+
+/// Bundled table selections for the inventory pages.
+#[derive(SystemParam)]
+pub(crate) struct InventorySelections<'w> {
+    pub(crate) svc: Option<Res<'w, crate::pages::services::ServiceSelection>>,
+    pub(crate) stu: Option<Res<'w, crate::pages::startup::StartupSelection>>,
+    pub(crate) ses: Option<Res<'w, crate::pages::sessions::SessionSelection>>,
 }
 
 fn keyboard_owner(shell: &ShellApp, modal_open: bool, page: Page) -> KeyboardOwner {
@@ -140,17 +158,14 @@ pub(crate) fn keyboard_dispatch_system(
     mut presses: MessageReader<KeyboardInput>,
     keys: Res<ButtonInput<KeyCode>>,
     mut track: NonSendMut<FrontendTrack>,
-    mut svc_modal: ResMut<MenuModal<ServiceMenuCtx>>,
-    mut stu_modal: ResMut<MenuModal<StartupMenuCtx>>,
-    mut ses_modal: ResMut<MenuModal<SessionMenuCtx>>,
-    mut proc_modal: ResMut<MenuModal<ProcessMenuCtx>>,
-    svc_selection: Option<Res<crate::pages::services::ServiceSelection>>,
-    stu_selection: Option<Res<crate::pages::startup::StartupSelection>>,
-    ses_selection: Option<Res<crate::pages::sessions::SessionSelection>>,
+    mut modals: InventoryActionModals,
+    selections: InventorySelections,
     mut pending: ResMut<PendingEffects>,
     mut route: ResMut<Route>,
     mut quit: ResMut<QuitForwarded>,
     mut exits: MessageWriter<AppExit>,
+    perf_device_focus: Option<Res<crate::pages::performance::PerformanceDeviceFocus>>,
+    export_dir: Option<Res<crate::pages::services::log_panel::ServiceLogExportDir>>,
     feedback_cache: Option<ResMut<crate::drain::FeedbackCache>>,
     mut commands: Commands,
 ) {
@@ -164,50 +179,50 @@ pub(crate) fn keyboard_dispatch_system(
     let armed_before = shell.confirmation_kind();
     let mut applied = false;
     for event in &events {
-        let modal_open = svc_modal.is_open()
-            || stu_modal.is_open()
-            || ses_modal.is_open()
-            || proc_modal.is_open();
+        let modal_open = modals.svc.is_open()
+            || modals.stu.is_open()
+            || modals.ses.is_open()
+            || modals.proc.is_open();
         let context = keyboard_owner(shell, modal_open, route.page);
         // 0a. Open action menus (frontend-local modals): an open modal owns
         //     the keyboard ahead of navigation chords and the shell; its
         //     overlay mounts/despawns with the session transition.
         if modal_open {
-            let svc_before = svc_modal.is_open();
-            let stu_before = stu_modal.is_open();
-            let ses_before = ses_modal.is_open();
-            let proc_before = proc_modal.is_open();
+            let svc_before = modals.svc.is_open();
+            let stu_before = modals.stu.is_open();
+            let ses_before = modals.ses.is_open();
+            let proc_before = modals.proc.is_open();
             if svc_before {
-                applied |= svc_modal.drive(shell, event.key_code, &mut pending.0);
+                applied |= modals.svc.drive(shell, event.key_code, &mut pending.0);
             }
             if stu_before {
-                applied |= stu_modal.drive(shell, event.key_code, &mut pending.0);
+                applied |= modals.stu.drive(shell, event.key_code, &mut pending.0);
             }
             if ses_before {
-                applied |= ses_modal.drive(shell, event.key_code, &mut pending.0);
+                applied |= modals.ses.drive(shell, event.key_code, &mut pending.0);
             }
             if proc_before {
-                applied |= proc_modal.drive(shell, event.key_code, &mut pending.0);
+                applied |= modals.proc.drive(shell, event.key_code, &mut pending.0);
             }
-            if svc_before && !svc_modal.is_open() {
+            if svc_before && !modals.svc.is_open() {
                 commands.trigger(MenuModalChanged::<ServiceMenuCtx>(
                     false,
                     Default::default(),
                 ));
             }
-            if stu_before && !stu_modal.is_open() {
+            if stu_before && !modals.stu.is_open() {
                 commands.trigger(MenuModalChanged::<StartupMenuCtx>(
                     false,
                     Default::default(),
                 ));
             }
-            if ses_before && !ses_modal.is_open() {
+            if ses_before && !modals.ses.is_open() {
                 commands.trigger(MenuModalChanged::<SessionMenuCtx>(
                     false,
                     Default::default(),
                 ));
             }
-            if proc_before && !proc_modal.is_open() {
+            if proc_before && !modals.proc.is_open() {
                 commands.trigger(MenuModalChanged::<ProcessMenuCtx>(
                     false,
                     Default::default(),
@@ -216,7 +231,7 @@ pub(crate) fn keyboard_dispatch_system(
             continue;
         }
         // 0b. Service log panel (frontend-local surface, TUI panel parity):
-        //     F/P/L/T/Esc are consumed ahead of navigation chords and the
+        //     F/P/L/T/E/Esc are consumed ahead of navigation chords and the
         //     shell routers while the panel owns the Services page keyboard.
         if matches!(context, KeyboardOwner::ServiceLogPanel)
             && modifiers == Modifiers::NONE
@@ -228,6 +243,10 @@ pub(crate) fn keyboard_dispatch_system(
                 ServiceLogControlAction::TogglePaused => shell.toggle_service_log_paused(),
                 ServiceLogControlAction::CycleLevel => shell.cycle_service_log_level(),
                 ServiceLogControlAction::CycleTime => shell.cycle_service_log_time(),
+                ServiceLogControlAction::Export => {
+                    let dir = export_dir.as_deref().and_then(|d| d.0.as_deref());
+                    crate::pages::services::log_panel::export_service_log(shell, dir);
+                }
                 ServiceLogControlAction::Close => shell.close_service_log(),
             }
             applied = true;
@@ -283,7 +302,7 @@ pub(crate) fn keyboard_dispatch_system(
             && modifiers == Modifiers::NONE
         {
             let opened =
-                crate::pages::processes::menu::open_for_selected(proc_modal.as_mut(), shell);
+                crate::pages::processes::menu::open_for_selected(modals.proc.as_mut(), shell);
             if opened {
                 commands.trigger(MenuModalChanged::<ProcessMenuCtx>(true, Default::default()));
                 applied = true;
@@ -300,37 +319,40 @@ pub(crate) fn keyboard_dispatch_system(
         {
             let opened = match route.page {
                 Page::Services => {
-                    let target = svc_selection
+                    let target = selections
+                        .svc
                         .as_ref()
                         .and_then(|state| state.target.as_ref())
                         .or_else(|| shell.sorted_services().first().map(|s| &s.id));
                     match target {
                         Some(target) => {
-                            crate::pages::services::menu::open_for(&mut svc_modal, shell, target)
+                            crate::pages::services::menu::open_for(&mut modals.svc, shell, target)
                         }
                         None => false,
                     }
                 }
                 Page::Startup => {
-                    let target = stu_selection
+                    let target = selections
+                        .stu
                         .as_ref()
                         .and_then(|state| state.target.clone())
                         .or_else(|| shell.sorted_startup_entries().first().map(|e| e.id.clone()));
                     match target {
                         Some(target) => {
-                            crate::pages::startup::menu::open_for(&mut stu_modal, shell, &target)
+                            crate::pages::startup::menu::open_for(&mut modals.stu, shell, &target)
                         }
                         None => false,
                     }
                 }
                 Page::Sessions => {
-                    let target = ses_selection
+                    let target = selections
+                        .ses
                         .as_ref()
                         .and_then(|state| state.target.clone())
                         .or_else(|| shell.sorted_sessions().first().map(|s| s.id.clone()));
                     match target {
                         Some(target) => {
-                            crate::pages::sessions::menu::open_for(&mut ses_modal, shell, &target)
+                            crate::pages::sessions::menu::open_for(&mut modals.ses, shell, &target)
                         }
                         None => false,
                     }
@@ -347,6 +369,40 @@ pub(crate) fn keyboard_dispatch_system(
                         .trigger(MenuModalChanged::<SessionMenuCtx>(true, Default::default())),
                     _ => {}
                 }
+                applied = true;
+                continue;
+            }
+        }
+        // 2c. Performance page: 't' chord triggers SMART self-test for the selected disk.
+        if matches!(context, KeyboardOwner::Free)
+            && route.page == Page::Performance
+            && event.key_code == KeyCode::KeyT
+            && modifiers == Modifiers::NONE
+        {
+            let disk_target = match &perf_device_focus {
+                Some(focus) => match &focus.0 {
+                    crate::pages::performance::PerformanceDeviceTarget::Disk(id) => {
+                        Some(id.clone())
+                    }
+                    _ => None,
+                },
+                None => None,
+            };
+            let disk_id = disk_target.or_else(|| {
+                shell
+                    .projection()
+                    .snapshot
+                    .as_ref()
+                    .and_then(|snapshot| snapshot.disks.first())
+                    .map(|d| d.device_id.clone())
+            });
+            if let Some(disk_id) = disk_id
+                && crate::pages::performance::request_smart_self_test(
+                    shell,
+                    &disk_id,
+                    taskmanager_core::core::smart::SmartSelfTestKind::Short,
+                )
+            {
                 applied = true;
                 continue;
             }

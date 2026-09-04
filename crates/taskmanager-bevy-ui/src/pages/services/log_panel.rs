@@ -31,8 +31,8 @@ use taskmanager_core::core::services::{
     ServiceLogAvailability, ServiceLogEntry, ServiceLogErrorKind, ServiceLogLevelFilter,
     ServiceLogProviderState, ServiceLogTimeFilter,
 };
-use taskmanager_shell::ShellApp;
 use taskmanager_shell::app::OpenServiceLog;
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use crate::app::FrontendTrack;
 use crate::drain::{ShellProjectionFolded, unix_now_ms};
@@ -53,6 +53,7 @@ pub(crate) enum ServiceLogControlAction {
     TogglePaused,
     CycleLevel,
     CycleTime,
+    Export,
     Close,
 }
 
@@ -65,6 +66,7 @@ pub(crate) fn log_panel_key(key: KeyCode) -> Option<ServiceLogControlAction> {
         KeyCode::KeyP => Some(ServiceLogControlAction::TogglePaused),
         KeyCode::KeyL => Some(ServiceLogControlAction::CycleLevel),
         KeyCode::KeyT => Some(ServiceLogControlAction::CycleTime),
+        KeyCode::KeyE => Some(ServiceLogControlAction::Export),
         KeyCode::Escape => Some(ServiceLogControlAction::Close),
         _ => None,
     }
@@ -358,6 +360,7 @@ pub(crate) fn service_log_panel_scene(shell: &ShellApp, palette: &UiPalette) -> 
                     ( { chip_button(ServiceLogControlAction::TogglePaused, t("common.paused").to_owned(), feed.paused, palette) } ),
                     ( { chip_button(ServiceLogControlAction::CycleLevel, level_caption(feed.level), false, palette) } ),
                     ( { chip_button(ServiceLogControlAction::CycleTime, time_caption(feed.time), false, palette) } ),
+                    ( { chip_button(ServiceLogControlAction::Export, t("common.export").to_owned(), false, palette) } ),
                 ]
             ),
             (
@@ -470,12 +473,98 @@ pub(crate) struct ServiceLogsRequested;
 #[derive(Event)]
 pub(crate) struct LogPanelRepaintRequired;
 
+/// Optional directory for service log exports; `None` defaults to current working directory.
+#[derive(Resource, Clone, Debug, Default)]
+pub(crate) struct ServiceLogExportDir(pub(crate) Option<std::path::PathBuf>);
+
+/// Export the currently visible service-log entries to `taskmanager-service-{safe_id}.log`.
+pub(crate) fn export_service_log(shell: &mut ShellApp, export_dir: Option<&std::path::Path>) {
+    let Some(open) = shell.service_log.as_ref() else {
+        shell.report_notice(
+            FeedbackSource::Persistence,
+            FeedbackSeverity::Warning,
+            FeedbackLifecycle::SHORT,
+            t("svc.logs_nothing_to_export"),
+        );
+        return;
+    };
+    let Some(service_id) = open.service_id().map(ToString::to_string) else {
+        shell.report_notice(
+            FeedbackSource::Persistence,
+            FeedbackSeverity::Warning,
+            FeedbackLifecycle::SHORT,
+            t("svc.logs_nothing_to_export"),
+        );
+        return;
+    };
+    let entries = shell
+        .visible_service_log_entries(crate::drain::unix_now_ms() * 1_000)
+        .unwrap_or_default()
+        .into_iter()
+        .cloned()
+        .collect::<Vec<_>>();
+    if entries.is_empty() {
+        shell.report_notice(
+            FeedbackSource::Persistence,
+            FeedbackSeverity::Warning,
+            FeedbackLifecycle::SHORT,
+            t("svc.logs_nothing_to_export"),
+        );
+        return;
+    }
+
+    let safe_id: String = service_id
+        .chars()
+        .map(|character| {
+            if character.is_ascii_alphanumeric() || matches!(character, '-' | '_' | '.') {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let file_name = format!("taskmanager-service-{safe_id}.log");
+    let destination = match export_dir {
+        Some(dir) => dir.join(&file_name),
+        None => std::path::PathBuf::from(&file_name),
+    };
+
+    let mut payload = entries
+        .iter()
+        .map(|entry| format!("[{:?}] {}", entry.level, entry.message))
+        .collect::<Vec<_>>()
+        .join("\n");
+    if !payload.is_empty() {
+        payload.push('\n');
+    }
+
+    match std::fs::write(&destination, payload) {
+        Ok(()) => {
+            shell.report_notice(
+                FeedbackSource::Persistence,
+                FeedbackSeverity::Success,
+                FeedbackLifecycle::SHORT,
+                t("svc.logs_exported").replace("{path}", &destination.display().to_string()),
+            );
+        }
+        Err(_) => {
+            shell.report_notice(
+                FeedbackSource::Persistence,
+                FeedbackSeverity::Error,
+                FeedbackLifecycle::UntilReplaced,
+                t("svc.logs_export_failed"),
+            );
+        }
+    }
+}
+
 /// Bevy 0.19 widget activation for the panel buttons: shell mutation first,
 /// then the typed repaint trigger.
 pub(crate) fn log_panel_control_activated(
     activate: On<Activate>,
     buttons: Query<&ServiceLogControlButton>,
     mut track: NonSendMut<FrontendTrack>,
+    export_dir: Option<Res<ServiceLogExportDir>>,
     mut commands: Commands,
 ) {
     let Ok(button) = buttons.get(activate.event().entity) else {
@@ -487,6 +576,10 @@ pub(crate) fn log_panel_control_activated(
         ServiceLogControlAction::TogglePaused => shell.toggle_service_log_paused(),
         ServiceLogControlAction::CycleLevel => shell.cycle_service_log_level(),
         ServiceLogControlAction::CycleTime => shell.cycle_service_log_time(),
+        ServiceLogControlAction::Export => {
+            let dir = export_dir.as_deref().and_then(|d| d.0.as_deref());
+            export_service_log(shell, dir);
+        }
         ServiceLogControlAction::Close => shell.close_service_log(),
     }
     commands.trigger(LogPanelRepaintRequired);

@@ -50,10 +50,14 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, ScrollArea};
 use bevy::window::{PrimaryWindow, Window};
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::StorageDeviceKey;
+use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuTelemetryObservation, DiskMetrics, GpuMetrics, GpuTelemetryObservation,
     MemoryMetrics, MemoryTelemetryObservation, NetworkMetrics, NetworkTelemetryObservation,
 };
+use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments, swap_breakdown};
@@ -344,6 +348,38 @@ pub(crate) fn curve_selector_label(curve: SystemCurve) -> String {
         SystemCurve::Gpu => t("common.gpu"),
     }
     .to_owned()
+}
+
+/// Arm the SMART self-test confirmation gate for the specified disk.
+pub(crate) fn request_smart_self_test(
+    shell: &mut ShellApp,
+    disk_id: &str,
+    kind: SmartSelfTestKind,
+) -> bool {
+    let Some(disks) = shell
+        .projection()
+        .snapshot
+        .as_ref()
+        .map(|snapshot| &snapshot.disks)
+    else {
+        return false;
+    };
+    let Some(disk) = disks.iter().find(|d| d.device_id == disk_id) else {
+        return false;
+    };
+    let intent = SmartSelfTestIntent {
+        device_id: DeviceId::new(disk.device_id.clone()),
+        device_generation: disk.device_generation,
+        device_key: StorageDeviceKey::new(disk.name.clone()),
+        display_name: if disk.model.is_empty() {
+            disk.name.clone()
+        } else {
+            disk.model.clone()
+        },
+        kind,
+    };
+    shell.arm_smart_self_test(intent);
+    true
 }
 
 // ---- view model: pure resolvers over the read-only shell ----

@@ -168,10 +168,24 @@ impl PendingConfirmationView {
                     ),
                 })
             }
-            // No other gate can be armed from this frontend today (the SMART
-            // self-test and GPUI's termination dialog have no bevy surface),
-            // so rendering them would be unreachable copy.
-            _ => None,
+            PendingConfirmation::SmartSelfTest(intent) => {
+                let headline = format!(
+                    "{:?} SMART self-test · {}",
+                    intent.kind, intent.display_name
+                );
+                Some(Self {
+                    kind: ConfirmationKind::SmartSelfTest,
+                    title: "SMART self-test".to_owned(),
+                    body: format!("{headline}\n{}", t("confirm.provider_body")),
+                    confirm_label: t("common.confirm").to_owned(),
+                    cancel_label: t("common.cancel").to_owned(),
+                    target_key: format!(
+                        "smart-self-test:{}:{:?}",
+                        intent.device_id.as_str(),
+                        intent.kind
+                    ),
+                })
+            }
         }
     }
 }
@@ -244,7 +258,7 @@ pub(crate) fn confirm_armed(
         ConfirmationKind::ServiceControl => shell.apply_action(AppAction::ConfirmServiceControl),
         ConfirmationKind::StartupControl => shell.confirm_startup_control(),
         ConfirmationKind::SessionControl => shell.confirm_session_control(),
-        ConfirmationKind::SmartSelfTest => None,
+        ConfirmationKind::SmartSelfTest => shell.confirm_smart_self_test(),
     }
 }
 

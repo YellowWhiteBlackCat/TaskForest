@@ -50,14 +50,14 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::ServiceLogs => SurfaceDecision::Local {
             route: "services.log-panel",
         },
-        ProductIntent::ServiceLogExport => SurfaceDecision::Unsupported {
-            reason: "the Bevy shape has no service-log export surface",
+        ProductIntent::ServiceLogExport => SurfaceDecision::Local {
+            route: "services.log-panel.export",
         },
         ProductIntent::ProcessAffinityEditor => SurfaceDecision::Unsupported {
             reason: "the Bevy process-details surface has no affinity editor",
         },
-        ProductIntent::SmartSelfTest => SurfaceDecision::Unsupported {
-            reason: "the Bevy SMART self-test route is not wired",
+        ProductIntent::SmartSelfTest => SurfaceDecision::Local {
+            route: "performance.disk.smart-self-test",
         },
         ProductIntent::DiagnosticBundle => SurfaceDecision::Unsupported {
             reason: "the Bevy shape has no diagnostic-bundle surface",
