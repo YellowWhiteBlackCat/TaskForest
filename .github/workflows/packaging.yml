@@ -15,7 +15,8 @@
 # native Windows ARM runner; no emulation or mislabeled x64 payload is allowed.
 # Every Linux package format replays the PKGBUILD layout authority through
 # packaging/linux/stage-release-tree.sh, so Arch/deb/rpm installs identical
-# trees by construction. Only the GPUI frontend shape is packaged.
+# trees by construction. All four frontend products (TaskForest-G,
+# TaskForest-I, TaskForest-T, TaskForest-B) are packaged as DEB releases.
 #
 # Token policy is owned by the CALLER: this workflow declares no `permissions`
 # block, because a called workflow can only restrict the caller's GITHUB_TOKEN.
@@ -122,7 +123,7 @@ jobs:
       - name: Install build and packaging deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libxkbcommon-dev libxkbcommon-x11-dev rpm file mold
+          sudo apt-get install -y --no-install-recommends libxkbcommon-dev rpm file mold
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -133,6 +134,9 @@ jobs:
         run: |
           cargo build --locked --release -j 4 \
             -p taskmanager-gpui \
+            -p taskmanager-iced \
+            -p taskmanager-tui \
+            -p taskmanager-bevy-ui \
             -p taskmanager-setup-helper \
             -p taskmanager-privilege-helper \
             -p taskmanager-net-launcher \
@@ -156,6 +160,18 @@ jobs:
             "${{ steps.version.outputs.version }}" \
             "TaskForest-G-${{ steps.version.outputs.version }}-${{ matrix.arch }}.deb" \
             "$DEB_ARCH"
+          packaging/debian/build-deb-iced.sh \
+            "${{ steps.version.outputs.version }}" \
+            "TaskForest-I-${{ steps.version.outputs.version }}-${{ matrix.arch }}.deb" \
+            "$DEB_ARCH"
+          packaging/debian/build-deb-tui.sh \
+            "${{ steps.version.outputs.version }}" \
+            "TaskForest-T-${{ steps.version.outputs.version }}-${{ matrix.arch }}.deb" \
+            "$DEB_ARCH"
+          packaging/debian/build-deb-bevy.sh \
+            "${{ steps.version.outputs.version }}" \
+            "TaskForest-B-${{ steps.version.outputs.version }}-${{ matrix.arch }}.deb" \
+            "$DEB_ARCH"
       - name: Build RPM
         run: |
           packaging/rpm/build-rpm.sh staging \
@@ -164,12 +180,16 @@ jobs:
       - name: Validate DEB package
         run: |
           set -euo pipefail
-          deb=$(find . -maxdepth 1 -type f -name "TaskForest-G-*-${{ matrix.arch }}.deb" -print -quit)
-          test -n "$deb"
-          test "$(dpkg-deb --field "$deb" Architecture)" = "$DEB_ARCH"
-          dpkg-deb --info "$deb"
-          dpkg-deb --contents "$deb" > "deb-contents-${DEB_ARCH}.txt"
-          test -s "deb-contents-${DEB_ARCH}.txt"
+          for ui in G I T B; do
+            deb=$(find . -maxdepth 1 -type f -name "TaskForest-${ui}-*-${{ matrix.arch }}.deb" -print -quit)
+            test -n "$deb"
+            test -f "$deb"
+            test "$(dpkg-deb --field "$deb" Architecture)" = "$DEB_ARCH"
+            dpkg-deb --info "$deb"
+            dpkg-deb --contents "$deb" > "deb-contents-${ui}-${DEB_ARCH}.txt"
+            test -s "deb-contents-${ui}-${DEB_ARCH}.txt"
+          done
+          cp "deb-contents-G-${DEB_ARCH}.txt" "deb-contents-${DEB_ARCH}.txt"
       - name: Validate RPM package
         run: |
           set -euo pipefail
@@ -185,6 +205,9 @@ jobs:
           set -euo pipefail
           files=(
             "$(find . -maxdepth 1 -type f -name "TaskForest-G-*-${{ matrix.arch }}.deb" -print -quit)"
+            "$(find . -maxdepth 1 -type f -name "TaskForest-I-*-${{ matrix.arch }}.deb" -print -quit)"
+            "$(find . -maxdepth 1 -type f -name "TaskForest-T-*-${{ matrix.arch }}.deb" -print -quit)"
+            "$(find . -maxdepth 1 -type f -name "TaskForest-B-*-${{ matrix.arch }}.deb" -print -quit)"
             "$(find . -maxdepth 1 -type f -name "TaskForest-G-*-${{ matrix.arch }}.rpm" -print -quit)"
           )
           for file in "${files[@]}"; do test -n "$file" && test -f "$file"; done
@@ -197,6 +220,9 @@ jobs:
           retention-days: ${{ inputs.publish && 90 || 3 }}
           path: |
             TaskForest-G-*-${{ matrix.arch }}.deb
+            TaskForest-I-*-${{ matrix.arch }}.deb
+            TaskForest-T-*-${{ matrix.arch }}.deb
+            TaskForest-B-*-${{ matrix.arch }}.deb
             TaskForest-G-*-${{ matrix.arch }}.rpm
             checksums-sha256-linux-${{ matrix.arch }}.txt
 
@@ -350,13 +376,25 @@ jobs:
         working-directory: release-artifacts
         run: |
           set -euo pipefail
-          deb_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-x64.deb' -print -quit)
-          deb_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-arm64.deb' -print -quit)
+          deb_g_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-x64.deb' -print -quit)
+          deb_g_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-arm64.deb' -print -quit)
+          deb_i_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-I-*-x64.deb' -print -quit)
+          deb_i_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-I-*-arm64.deb' -print -quit)
+          deb_t_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-T-*-x64.deb' -print -quit)
+          deb_t_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-T-*-arm64.deb' -print -quit)
+          deb_b_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-B-*-x64.deb' -print -quit)
+          deb_b_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-B-*-arm64.deb' -print -quit)
           rpm_x86_64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-x64.rpm' -print -quit)
           rpm_aarch64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-arm64.rpm' -print -quit)
           msi_x64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-x64.msi' -print -quit)
           msi_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-arm64.msi' -print -quit)
-          for package in "$deb_amd64" "$deb_arm64" "$rpm_x86_64" "$rpm_aarch64" "$msi_x64" "$msi_arm64"; do
+          for package in \
+            "$deb_g_amd64" "$deb_g_arm64" \
+            "$deb_i_amd64" "$deb_i_arm64" \
+            "$deb_t_amd64" "$deb_t_arm64" \
+            "$deb_b_amd64" "$deb_b_arm64" \
+            "$rpm_x86_64" "$rpm_aarch64" \
+            "$msi_x64" "$msi_arm64"; do
             test -n "$package"
             test -s "$package"
           done
@@ -377,9 +415,17 @@ jobs:
           }
 
           check_checksum_manifest checksums-sha256-linux-x64.txt \
-            "$(basename "$deb_amd64")" "$(basename "$rpm_x86_64")"
+            "$(basename "$deb_g_amd64")" \
+            "$(basename "$deb_i_amd64")" \
+            "$(basename "$deb_t_amd64")" \
+            "$(basename "$deb_b_amd64")" \
+            "$(basename "$rpm_x86_64")"
           check_checksum_manifest checksums-sha256-linux-arm64.txt \
-            "$(basename "$deb_arm64")" "$(basename "$rpm_aarch64")"
+            "$(basename "$deb_g_arm64")" \
+            "$(basename "$deb_i_arm64")" \
+            "$(basename "$deb_t_arm64")" \
+            "$(basename "$deb_b_arm64")" \
+            "$(basename "$rpm_aarch64")"
           check_checksum_manifest checksums-sha256-windows-x64.txt \
             "$(basename "$msi_x64")"
           check_checksum_manifest checksums-sha256-windows-arm64.txt \
@@ -393,6 +439,12 @@ jobs:
           files: |
             release-artifacts/TaskForest-G-*-x64.deb
             release-artifacts/TaskForest-G-*-arm64.deb
+            release-artifacts/TaskForest-I-*-x64.deb
+            release-artifacts/TaskForest-I-*-arm64.deb
+            release-artifacts/TaskForest-T-*-x64.deb
+            release-artifacts/TaskForest-T-*-arm64.deb
+            release-artifacts/TaskForest-B-*-x64.deb
+            release-artifacts/TaskForest-B-*-arm64.deb
             release-artifacts/TaskForest-G-*-x64.rpm
             release-artifacts/TaskForest-G-*-arm64.rpm
             release-artifacts/TaskForest-G-*-x64.msi

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.YellowWhiteBlackCat.TaskForestB</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>Apache-2.0</project_license>
+  <developer id="io.github.yellowwhiteblackcat">
+    <name>TaskForest contributors</name>
+  </developer>
+  <name>TaskForestB</name>
+  <summary>Wayland-native Bevy UI system monitor</summary>
+  <summary xml:lang="zh-CN">基于 Bevy UI 的 Wayland 原生系统监视器</summary>
+  <description>
+    <p>TaskForestB presents live CPU, memory, disk, network and GPU telemetry and provides process, service, startup application and login-session controls in the Wayland-native Bevy UI frontend.</p>
+    <p xml:lang="zh-CN">TaskForestB 使用 Bevy UI 以前端展示 CPU、内存、磁盘、网络和 GPU 实时遥测，并提供进程、服务、启动应用及登录会话管理。</p>
+  </description>
+  <launchable type="desktop-id">io.github.YellowWhiteBlackCat.TaskForestB.desktop</launchable>
+  <provides>
+    <binary>taskforest-b</binary>
+  </provides>
+  <url type="homepage">https://github.com/YellowWhiteBlackCat/TaskForest</url>
+  <url type="bugtracker">https://github.com/YellowWhiteBlackCat/TaskForest/issues</url>
+  <content_rating type="oars-1.1"/>
+</component>

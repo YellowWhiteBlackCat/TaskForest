@@ -1,0 +1,18 @@
+[Desktop Entry]
+Type=Application
+Name=TaskForestB
+Name[zh_CN]=任务森林 B
+GenericName=System Monitor (Bevy)
+GenericName[zh_CN]=系统监视器（Bevy）
+Comment=Wayland-native Bevy UI system monitor
+Comment[zh_CN]=基于 Bevy UI 的 Wayland 原生系统监视器
+# Keep glibc's allocator arena count bounded for the multi-threaded provider
+# runtime. This is a process-memory policy shared by the Linux UI packages.
+Exec=env MALLOC_ARENA_MAX=1 taskforest-b
+Icon=taskforest-taskboard
+Terminal=false
+Categories=System;Monitor;
+Keywords=system;monitor;task;process;performance;bevy;
+Keywords[zh_CN]=系统;监视器;任务;进程;性能;Bevy;
+StartupNotify=true
+StartupWMClass=io.github.YellowWhiteBlackCat.TaskForestB

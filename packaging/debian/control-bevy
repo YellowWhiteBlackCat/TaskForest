@@ -1,0 +1,21 @@
+Package: taskforest-b
+Version: __VERSION__
+Section: admin
+Priority: optional
+Architecture: __ARCH__
+Depends: fontconfig, libfreetype6, libxkbcommon0, libwayland-client0, libvulkan1
+Recommends: polkitd
+Suggests: taskforest, smartmontools, nvme-cli, xfsprogs, iw, mesa-vulkan-drivers, nvidia-vulkan-icd
+Maintainer: TaskForest contributors <noreply@yellowwhiteblackcat.github.io>
+Installed-Size: __INSTALLED_SIZE__
+Homepage: https://github.com/YellowWhiteBlackCat/TaskForest
+Description: Wayland-native Bevy UI system monitor (taskforest-b)
+ TaskForest-B presents live CPU, memory, disk, network, and GPU telemetry
+ and provides process, service, startup application, and login-session
+ controls in the Wayland-native Bevy UI frontend.
+ .
+ Wayland session required (X11 is not supported). Vulkan loader and a Vulkan
+ ICD for your GPU are needed for wgpu rendering; the suggested packages cover
+ the common cases. Privileged telemetry helpers are provided by the taskforest
+ package or standalone helper installations.
+License: Apache-2.0

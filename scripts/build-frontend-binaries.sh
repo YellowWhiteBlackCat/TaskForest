@@ -55,6 +55,11 @@ cargo build --locked -p taskmanager-bevy-ui "${PROFILE_ARGS[@]}"
 install -Dm755 "target/$CARGO_PROFILE_DIR/taskforest-b$EXE_SUFFIX" \
   "$OUTPUT_DIR/taskforest-b$EXE_SUFFIX"
 
-printf 'product binaries ready:\n  %s\n  %s\n  %s\n' \
+# TUI frontend: its own product crate, own bin name (taskforest-t).
+cargo build --locked -p taskmanager-tui "${PROFILE_ARGS[@]}"
+install -Dm755 "target/$CARGO_PROFILE_DIR/taskforest-t$EXE_SUFFIX" \
+  "$OUTPUT_DIR/taskforest-t$EXE_SUFFIX"
+
+printf 'product binaries ready:\n  %s\n  %s\n  %s\n  %s\n' \
   "$OUTPUT_DIR/taskforest-g$EXE_SUFFIX" "$OUTPUT_DIR/taskforest-i$EXE_SUFFIX" \
-  "$OUTPUT_DIR/taskforest-b$EXE_SUFFIX"
+  "$OUTPUT_DIR/taskforest-b$EXE_SUFFIX" "$OUTPUT_DIR/taskforest-t$EXE_SUFFIX"
