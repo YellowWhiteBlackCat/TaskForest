@@ -278,13 +278,49 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 handle_settings_key(app, key);
                 None
             }
-            TuiSurfaceKind::About | TuiSurfaceKind::Health | TuiSurfaceKind::Containers => {
+            TuiSurfaceKind::About | TuiSurfaceKind::Containers => {
                 // Esc stays structural; the toggle chords resolve through the
                 // declared surface protocol. The full modal consumes every
                 // key, so an unmatched character is a silent no-op and can
                 // never double-route a command chord.
                 match key.code {
                     ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),
+                    ratatui::crossterm::event::KeyCode::Char(character) => {
+                        if let Some(action) =
+                            surface_protocol_action(TuiSurfaceScope::StatusOverlay, character)
+                        {
+                            app.run_surface_protocol_action(action);
+                        }
+                    }
+                    _ => {}
+                }
+                None
+            }
+            TuiSurfaceKind::Health => {
+                // Esc stays structural; the toggle chords resolve through the
+                // declared surface protocol. In the health overlay, arrows and
+                // Space / Enter navigate and toggle managed alert rules.
+                match key.code {
+                    ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),
+                    ratatui::crossterm::event::KeyCode::Up
+                    | ratatui::crossterm::event::KeyCode::Char('k') => {
+                        app.health_rule_move(-1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Down
+                    | ratatui::crossterm::event::KeyCode::Char('j') => {
+                        app.health_rule_move(1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Home => {
+                        app.health_rule_selection = 0;
+                    }
+                    ratatui::crossterm::event::KeyCode::End => {
+                        let count = app.projection().alert_center.managed_rules().len();
+                        app.health_rule_selection = count.saturating_sub(1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Enter
+                    | ratatui::crossterm::event::KeyCode::Char(' ') => {
+                        app.toggle_selected_alert_rule();
+                    }
                     ratatui::crossterm::event::KeyCode::Char(character) => {
                         if let Some(action) =
                             surface_protocol_action(TuiSurfaceScope::StatusOverlay, character)

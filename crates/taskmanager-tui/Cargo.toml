@@ -44,6 +44,10 @@ path = "src/lib.rs"
 name = "taskmanager-tui"
 path = "src/main.rs"
 
+[[bin]]
+name = "taskforest-t"
+path = "src/main.rs"
+
 # The standalone allocation-budget binary needs its own process-global
 # counting allocator, so it cannot be registered as a library module like
 # the other test trees; it links only this crate's public API.

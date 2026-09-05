@@ -158,7 +158,12 @@ impl TuiApp {
         startup: bool,
         update_form: bool,
     ) {
-        self.theme_params = ThemeParams::from_config_tokens(&config.skin, &config.mode, config.hc);
+        self.theme_params = ThemeParams::from_config_tokens_with_appearance(
+            &config.skin,
+            &config.mode,
+            config.hc,
+            self.observed_appearance,
+        );
         if update_form {
             self.settings_form = SettingsForm::from_config_tokens(
                 &config.skin,
@@ -512,6 +517,14 @@ impl TuiApp {
             &mut config,
             &mut self.theme_params,
         );
+        if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
+            self.theme_params = ThemeParams::from_config_tokens_with_appearance(
+                &config.skin,
+                &config.mode,
+                config.hc,
+                self.observed_appearance,
+            );
+        }
         if self.commit_config_draft(config) {
             self.settings_form.save_error = None;
             // The notification policy (opt-in + quiet hours) applies

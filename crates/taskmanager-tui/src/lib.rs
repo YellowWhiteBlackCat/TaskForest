@@ -75,15 +75,11 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 
 use taskmanager_application::{
-    AppAction, AppPage, ConfigClient, ConfigRevision, DirectoryUsageRequest, PlatformEffect,
-    PlatformEventBatch, RefreshRequest, i18n::t,
+    AppAction, AppPage, ConfigClient, ConfigRevision, PlatformEffect, PlatformEventBatch,
+    RefreshRequest, i18n::t,
 };
 use taskmanager_core::core::config::Config;
-use taskmanager_core::core::directory_usage::{
-    DirectoryScanBounds, DirectoryScanSpec, DirectoryScanStatus,
-};
-use taskmanager_core::core::identity::DeviceId;
-use taskmanager_core::core::metrics::{GpuMetrics, SystemSnapshot};
+use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
 use taskmanager_shell::{
     FeedbackLifecycle, FeedbackSeverity, FeedbackSource, InputDispatch, ShellKeyEvent, SortCol,
@@ -123,6 +119,8 @@ pub struct TuiApp {
     /// Runtime theme construction parameters; the runtime rebuilds the
     /// terminal palette from these on every frame.
     pub theme_params: ThemeParams,
+    /// Observed native desktop appearance from the platform runtime.
+    pub observed_appearance: Option<taskmanager_core::core::appearance::DesktopAppearance>,
     /// Non-blocking cursor into the app-host-owned configuration coordinator.
     config_client: Option<ConfigClient>,
     applied_config_revision: Option<ConfigRevision>,
@@ -161,6 +159,9 @@ pub struct TuiApp {
     /// Stored as navigation intent and clamped by the current projection and
     /// terminal height during paint.
     pub system_scroll: usize,
+    /// Alert-rule selection index in the health overlay. Clamped against the
+    /// projection's managed-rules count during access.
+    pub health_rule_selection: usize,
     /// The locale-neutral category/app/type expansion keys whose headers are
     /// currently expanded on the Applications page. Toggled by activating a
     /// header (Enter / Right). Re-seeded for the canonical category tree when
@@ -269,6 +270,7 @@ impl TuiApp {
             process_properties_view: None,
             settings_form: SettingsForm::default(),
             theme_params: ThemeParams::default(),
+            observed_appearance: None,
             config_client: None,
             applied_config_revision: None,
             config_draft: Config::default(),
@@ -281,6 +283,7 @@ impl TuiApp {
             cpu_core_scroll: 0,
             gpu_engine_scroll: 0,
             system_scroll: 0,
+            health_rule_selection: 0,
             expanded_groups: default_category_expansions(),
             collapsed_tree: std::collections::HashSet::new(),
             visual_row_count_cache: std::cell::RefCell::new(None),
@@ -314,6 +317,10 @@ impl TuiApp {
         let startup_revision_before = self.shell.projection().startup_revision;
         let sessions_revision_before = self.shell.projection().sessions_revision;
         let affinity_state_before = self.shell.process_affinity_state().clone();
+        for event in &batch.desktop_appearance_events {
+            let taskmanager_application::DesktopAppearanceEvent::Snapshot(snapshot) = &event.event;
+            self.apply_desktop_appearance(snapshot.value);
+        }
         self.shell.apply_platform_batch(batch);
         if self.shell.projection().process_revision != process_revision_before {
             self.prune_stale_tree_state();
@@ -361,54 +368,6 @@ impl TuiApp {
         }
     }
 
-    pub(crate) fn install_history_frontend_connector(
-        &mut self,
-        connector: Result<
-            taskmanager_app_host::HistoryFrontendConnector,
-            taskmanager_app_host::HistoryFrontendConnectorStartError,
-        >,
-    ) {
-        self.history_runtime.install_connector(connector);
-        self.sync_history_persistence_sink();
-    }
-
-    pub(crate) fn application_history_projection(
-        &self,
-    ) -> taskmanager_application::ApplicationHistoryProjection {
-        self.history_runtime.projection()
-    }
-
-    pub(crate) fn application_history_unavailable_reason(
-        &self,
-    ) -> Option<taskmanager_application::ApplicationHistoryUnavailableReason> {
-        self.history_runtime.unavailable_reason()
-    }
-
-    pub(crate) fn select_application_history_window(
-        &mut self,
-        window: taskmanager_core::core::history::HistoryWindow,
-    ) -> bool {
-        self.history_runtime.select_window(window)
-    }
-
-    pub(crate) fn drain_history_replay_completions(&mut self) -> bool {
-        let changed = self.history_runtime.drain();
-        if changed {
-            self.sync_history_persistence_sink();
-        }
-        changed
-    }
-
-    pub(crate) fn request_history_frontend(&mut self, enabled: bool) {
-        self.history_runtime.request(enabled);
-        self.sync_history_persistence_sink();
-    }
-
-    fn sync_history_persistence_sink(&mut self) {
-        self.shell
-            .set_history_persistence_sink(self.history_runtime.record_sink());
-    }
-
     /// Return the retry scope for the visible inventory page when its source
     /// policy says a refresh can help. The TUI renders this as `r` in the
     /// source banner; the request still crosses the shared platform seam.
@@ -440,6 +399,12 @@ impl TuiApp {
     /// Services page is visible) and forgets the insights dedupe target so a
     /// return to Applications re-requests for the current row.
     pub fn apply_action(&mut self, action: AppAction) -> Option<PlatformEffect> {
+        if matches!(action, AppAction::OpenAlerts) {
+            if !self.health_open() {
+                self.toggle_health();
+            }
+            return None;
+        }
         let page_before = self.page();
         let leaving_anchor = self.capture_page_row_anchor();
         let effect = self.shell.apply_action(action);
@@ -470,6 +435,15 @@ impl TuiApp {
 
     /// Proxy for the shell's key handler with the same page-change hygiene.
     pub fn handle_local_key(&mut self, event: ShellKeyEvent) -> InputDispatch {
+        if event.key == taskmanager_application::KeyCode::Digit8
+            && event.modifiers == taskmanager_application::Modifiers::ALT
+            && matches!(self.input_scope(), surface::TuiInputScope::Content)
+        {
+            if !self.health_open() {
+                self.toggle_health();
+            }
+            return InputDispatch::Consumed;
+        }
         let page_before = self.page();
         let query_before = self.query.clone();
         let leaving_anchor = self.capture_page_row_anchor();
@@ -555,8 +529,122 @@ impl TuiApp {
         if self.health_open() {
             self.dismiss_local_surface_kind(TuiSurfaceKind::Health);
         } else {
+            self.health_rule_selection = 0;
             self.open_local_surface(TuiSurface::Health);
         }
+    }
+
+    /// Apply one semantic edit to the canonical managed alert-rule set.
+    pub fn edit_alert_rules(
+        &mut self,
+        edit: taskmanager_application::ManagedAlertRuleEdit,
+    ) -> Result<
+        taskmanager_application::ManagedAlertRuleEditOutcome,
+        taskmanager_core::core::alerts::AlertRuleTransferError,
+    > {
+        self.shell.edit_alert_rules(edit)
+    }
+
+    pub fn add_alert_rule(
+        &mut self,
+        rule: taskmanager_core::core::alerts::AlertRule,
+    ) -> Result<
+        taskmanager_application::ManagedAlertRuleEditOutcome,
+        taskmanager_core::core::alerts::AlertRuleTransferError,
+    > {
+        self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Add(
+            taskmanager_application::ManagedAlertRule::new(rule, true),
+        ))
+    }
+
+    pub fn remove_alert_rule(
+        &mut self,
+        rule_id: String,
+    ) -> Result<
+        taskmanager_application::ManagedAlertRuleEditOutcome,
+        taskmanager_core::core::alerts::AlertRuleTransferError,
+    > {
+        self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Remove { rule_id })
+    }
+
+    pub fn export_alert_rules(
+        &self,
+    ) -> Result<String, taskmanager_core::core::alerts::AlertRuleTransferError> {
+        let entries: Vec<taskmanager_core::core::alerts::AlertRuleTransferEntry> = self
+            .projection()
+            .alert_center
+            .managed_rules()
+            .iter()
+            .map(taskmanager_core::core::alerts::AlertRuleTransferEntry::from)
+            .collect();
+        taskmanager_core::core::alerts::export_alert_rules_json(&entries)
+    }
+
+    pub fn import_alert_rules(
+        &mut self,
+        json: &str,
+        mode: taskmanager_application::AlertRuleImportMode,
+    ) -> Result<
+        taskmanager_application::ManagedAlertRuleEditOutcome,
+        taskmanager_core::core::alerts::AlertRuleTransferError,
+    > {
+        let entries = taskmanager_core::core::alerts::import_alert_rules_json(json)?;
+        let rules: Vec<taskmanager_application::ManagedAlertRule> = entries
+            .into_iter()
+            .map(taskmanager_application::ManagedAlertRule::from)
+            .collect();
+        self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Import { rules, mode })
+    }
+
+    /// The currently selected rule index in the health overlay. Clamped against
+    /// the current managed-rules count.
+    #[must_use]
+    pub fn health_rule_selection(&self) -> usize {
+        let count = self.projection().alert_center.managed_rules().len();
+        if count == 0 {
+            0
+        } else {
+            self.health_rule_selection.min(count - 1)
+        }
+    }
+
+    /// Move the health overlay's alert-rule selection cursor by `delta`.
+    pub fn health_rule_move(&mut self, delta: isize) {
+        let count = self.projection().alert_center.managed_rules().len();
+        if count == 0 {
+            self.health_rule_selection = 0;
+            return;
+        }
+        let current = self.health_rule_selection();
+        self.health_rule_selection = current.saturating_add_signed(delta).min(count - 1);
+    }
+
+    /// Toggle the currently selected managed alert rule in the health overlay.
+    pub fn toggle_selected_alert_rule(&mut self) -> bool {
+        let index = self.health_rule_selection();
+        let rules = self.projection().alert_center.managed_rules();
+        if let Some(managed) = rules.get(index) {
+            let rule_id = managed.rule.id.clone();
+            let _ = self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Toggle {
+                rule_id,
+            });
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Toggle a managed alert rule by ID.
+    pub fn toggle_alert_rule(&mut self, rule_id: impl Into<String>) -> bool {
+        self.edit_alert_rules(taskmanager_application::ManagedAlertRuleEdit::Toggle {
+            rule_id: rule_id.into(),
+        })
+        .is_ok_and(|outcome| outcome.changed())
+    }
+
+    /// Clear the recorded alert event history in the canonical alert center.
+    pub fn clear_alert_event_history(&mut self) {
+        self.shell.clear_alert_event_history();
     }
 
     /// Toggle the containers overlay, closing every other modal first.
@@ -685,160 +773,6 @@ impl TuiApp {
         let process = crate::process_view::process_at(&rows, index).cloned();
         let row_key = crate::process_view::row_key_at(&rows, index);
         self.apply_selection_resolution_with_row(index, process, row_key)
-    }
-
-    /// Toggle the directory-usage scan lifecycle on the
-    /// Performance page's Disk device. An idle or terminal slot starts a
-    /// bounded scan of the first mounted partition (or `/` when none is
-    /// reported); a `Scanning` slot cancels the active scan — mirroring
-    /// GPUI's one-pill-per-partition start plus the conditional cancel pill,
-    /// collapsed into a single keyboard toggle. The typed request crosses the
-    /// shared seam: [`ShellApp::request_directory_usage`] wraps it in the
-    /// `PlatformEffect::DirectoryUsage` variant the runtime routes through
-    /// `queue_effect` — the exact same application lane every on-demand
-    /// effect uses (G-03; no frontend-owned `PlatformClient` bypass).
-    /// Progress and results fold back into the shared
-    /// `SystemProjectionStore::directory_usage` slot the Disk panel renders.
-    pub(crate) fn toggle_directory_scan(&mut self) -> Option<PlatformEffect> {
-        if self.page() != AppPage::Performance || self.perf_device != PerfDevice::Disk {
-            return None;
-        }
-        // Cancel path: an active (Scanning) scan toggles to Cancel, mirroring
-        // GPUI's conditional cancel pill (only rendered while Scanning). The
-        // scan state is the shared `SystemProjectionStore` slot (latest-wins).
-        if let Some(snapshot) = self.shell.projection().directory_usage.as_ref()
-            && snapshot.status == DirectoryScanStatus::Scanning
-        {
-            let scan_id = snapshot.scan_id;
-            let root = snapshot.root.clone();
-            self.report_notice(
-                FeedbackSource::Control,
-                FeedbackSeverity::Info,
-                FeedbackLifecycle::SHORT,
-                t("tui.status.scan_cancelling").replacen("{}", &root, 1),
-            );
-            return Some(taskmanager_shell::ShellApp::request_directory_usage(
-                DirectoryUsageRequest::Cancel(scan_id),
-            ));
-        }
-        // Start path: scan the first mounted partition (or `/`), mirroring
-        // GPUI's default bounds (the UI never customizes depth/entry caps).
-        let root = self
-            .projection()
-            .snapshot
-            .as_ref()
-            .and_then(|snapshot| snapshot.disks.first())
-            .and_then(|disk| disk.partitions.iter().find(|p| !p.mount_point.is_empty()))
-            .map(|partition| partition.mount_point.clone())
-            .unwrap_or_else(|| "/".to_string());
-        let spec = DirectoryScanSpec {
-            root: root.clone(),
-            bounds: DirectoryScanBounds::default(),
-        };
-        self.report_notice(
-            FeedbackSource::Control,
-            FeedbackSeverity::Info,
-            FeedbackLifecycle::SHORT,
-            t("tui.status.scan_started").replacen("{}", &root, 1),
-        );
-        Some(taskmanager_shell::ShellApp::request_directory_usage(
-            DirectoryUsageRequest::StartScan(spec),
-        ))
-    }
-
-    /// Toggle the per-engine GPU utilization session (`e` on the
-    /// Performance·GPU page): enable submits ONE bounded engine-rows request
-    /// for the first GPU's device (the OS-native prompt fires at most on this
-    /// user-initiated request — the escalation discipline forbids
-    /// auto-triggering), disable stops the TUI's re-request cadence. The typed
-    /// answer lands in the shared request session, which is also the sole row
-    /// payload authority. A closed session never displays stale rows as live.
-    pub(crate) fn toggle_gpu_engine_rows(&mut self) -> Option<PlatformEffect> {
-        if self.page() != AppPage::Performance || self.perf_device != PerfDevice::Gpu {
-            return None;
-        }
-        let device_id = self.gpu_engine_rows_device_id()?;
-        let action = taskmanager_shell::presentation::gpu_engine_rows::present_gpu_engine_rows(
-            self.shell.gpu_engine_rows_state(),
-            &device_id,
-            self.projection().capability_status(
-                &taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES,
-            ),
-        )
-        .action();
-        match action {
-            taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::Disable => {
-                self.shell.close_gpu_engine_rows_request();
-                self.report_notice(
-                    FeedbackSource::Control,
-                    FeedbackSeverity::Info,
-                    FeedbackLifecycle::SHORT,
-                    t("tui.status.gpu_engines_stopped"),
-                );
-                None
-            }
-            taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::Enable
-            | taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::Reauthorize
-            | taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::Recheck => {
-                self.report_notice(
-                    FeedbackSource::Control,
-                    FeedbackSeverity::Info,
-                    FeedbackLifecycle::SHORT,
-                    t("tui.status.gpu_engines_requested"),
-                );
-                Some(taskmanager_shell::ShellApp::request_gpu_engine_rows(
-                    device_id,
-                ))
-            }
-            taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsAction::None => None,
-        }
-    }
-
-    /// The device identity for the engine-rows request: the first GPU's stable
-    /// native identity from the live snapshot (the PMU helper reads the
-    /// integrated engine block). `None` when no GPU exists — the toggle is an
-    /// honest no-op rather than a request about nothing.
-    pub(crate) fn gpu_engine_rows_device_id(&self) -> Option<DeviceId> {
-        let gpu = self.projection().snapshot.as_ref()?.gpu.first()?;
-        let id = gpu.device_id.trim();
-        (!id.is_empty()).then(|| DeviceId::new(id.to_owned()))
-    }
-
-    /// Cycle the GPU headline chart's metric family with `g` on the
-    /// Performance·GPU page (ADR-034 stage 2). The selection, its
-    /// availability gate, and the fixed vocabulary order live in the shared
-    /// shell contract — this only routes the key and reports the resulting
-    /// family in the status bar. No-op off the page, on another device, or
-    /// when the viewed GPU reports no available family.
-    pub(crate) fn cycle_gpu_chart_metric(&mut self) {
-        if self.page() != AppPage::Performance || self.perf_device != PerfDevice::Gpu {
-            return;
-        }
-        let gate = taskmanager_shell::gpu_chart_metric_gate(self.viewed_gpu());
-        if self.shell.cycle_gpu_chart_metric(&gate) {
-            let selected = self.shell.gpu_chart_metric_selected();
-            self.report_notice(
-                FeedbackSource::Control,
-                FeedbackSeverity::Info,
-                FeedbackLifecycle::SHORT,
-                t("tui.status.gpu_series").replacen("{}", t(selected.label_key()), 1),
-            );
-        }
-    }
-
-    /// The GPU row the shared chart-metric selection is bound to: the first
-    /// device of the Performance·GPU page's snapshot (the panel's headline
-    /// device — the same one the engine-rows session binds to). `None`
-    /// everywhere else; the shell fold then leaves the selection untouched.
-    pub(crate) fn viewed_gpu(&self) -> Option<&GpuMetrics> {
-        if self.page() == AppPage::Performance && self.perf_device == PerfDevice::Gpu {
-            self.projection()
-                .snapshot
-                .as_ref()
-                .and_then(|s| s.gpu.first())
-        } else {
-            None
-        }
     }
 
     /// The current snapshot, when one exists.

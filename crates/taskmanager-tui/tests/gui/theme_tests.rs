@@ -79,6 +79,45 @@ fn config_tokens_resolve_onto_typed_theme_params() {
             hc: true,
         }
     );
+
+    // Follow system setting when appearance is observed
+    let light_appearance = taskmanager_core::core::appearance::DesktopAppearance {
+        family: taskmanager_core::core::appearance::DesktopFamily::Gnome,
+        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Light,
+        high_contrast: Some(false),
+    };
+    assert_eq!(
+        ThemeParams::from_config_tokens_with_appearance(
+            "GNOME",
+            "System",
+            false,
+            Some(light_appearance)
+        ),
+        ThemeParams {
+            skin: Skin::Gnome,
+            mode: LightDark::Light,
+            hc: false,
+        }
+    );
+
+    let hc_appearance = taskmanager_core::core::appearance::DesktopAppearance {
+        family: taskmanager_core::core::appearance::DesktopFamily::Kde,
+        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Dark,
+        high_contrast: Some(true),
+    };
+    assert_eq!(
+        ThemeParams::from_config_tokens_with_appearance(
+            "KDE",
+            "System",
+            false,
+            Some(hc_appearance)
+        ),
+        ThemeParams {
+            skin: Skin::Kde,
+            mode: LightDark::Dark,
+            hc: true,
+        }
+    );
 }
 
 /// A settings change re-skins the terminal palette: different params

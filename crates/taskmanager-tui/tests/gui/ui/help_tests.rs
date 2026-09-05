@@ -27,7 +27,7 @@ fn help_rows_drop_unwired_dialog_confirm_and_sidebar_and_add_terminal_only_bindi
     let shortcuts: Vec<&str> = rows.iter().map(|row| row.shortcut).collect();
     // Shared commands explicitly absent from the TUI must not appear in the
     // honest overlay: confirmation is y/n/Esc, the sidebar has a terminal
-    // selector, and Alerts management is not implemented yet.
+    // selector; Alerts management routes through the shared ShowAlerts command.
     assert!(
         !rows
             .iter()
@@ -39,8 +39,8 @@ fn help_rows_drop_unwired_dialog_confirm_and_sidebar_and_add_terminal_only_bindi
         "the sidebar toggle is not wired into the TUI"
     );
     assert!(
-        !rows.iter().any(|row| row.shortcut == "Alt+8"),
-        "Alerts is not wired into the TUI yet"
+        rows.iter().any(|row| row.shortcut == "Alt+8"),
+        "the alerts toggle is wired into the TUI"
     );
     // Terminal-only bindings are present and attributed honestly.
     assert!(shortcuts.contains(&"?"));

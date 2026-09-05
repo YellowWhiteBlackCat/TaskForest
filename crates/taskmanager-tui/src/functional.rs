@@ -26,23 +26,23 @@ pub fn functional_declaration() -> FrontendFunctionalDeclaration {
 
 const fn decision(intent: ProductIntent) -> SurfaceDecision {
     match intent {
-        ProductIntent::AlertRuleToggle => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape exposes alert status but keeps rule mutation out of its health surface",
+        ProductIntent::AlertRuleToggle => SurfaceDecision::Local {
+            route: "health.alert-rules.toggle",
         },
-        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape does not offer an alert-rule authoring form",
+        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Local {
+            route: "health.alert-rules.authoring",
         },
-        ProductIntent::AlertRuleTransfer => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape does not offer alert-rule import/export",
+        ProductIntent::AlertRuleTransfer => SurfaceDecision::Local {
+            route: "health.alerts.transfer",
         },
         ProductIntent::ActiveAlerts => SurfaceDecision::Local {
             route: "health.active-alerts",
         },
-        ProductIntent::AlertEventHistory => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape keeps the compact health surface to active alert status; event-center history is graphical",
+        ProductIntent::AlertEventHistory => SurfaceDecision::Local {
+            route: "health.events",
         },
-        ProductIntent::ServiceDetails => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape does not offer the graphical service-details panel",
+        ProductIntent::ServiceDetails => SurfaceDecision::Local {
+            route: "services.details-column",
         },
         ProductIntent::ServiceDependencies => SurfaceDecision::Local {
             route: "services.details.dependencies",
