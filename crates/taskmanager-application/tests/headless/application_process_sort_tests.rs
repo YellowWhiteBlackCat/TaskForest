@@ -55,6 +55,11 @@ fn fixture_orders_match_the_documented_matrix_in_both_directions() {
             &[11, 12, 13, 14],
         ),
         (
+            ProcessSortAxis::Network,
+            &[11, 12, 13, 14],
+            &[11, 12, 13, 14],
+        ),
+        (
             ProcessSortAxis::StartTime,
             &[14, 11, 12, 13],
             &[13, 11, 12, 14],
