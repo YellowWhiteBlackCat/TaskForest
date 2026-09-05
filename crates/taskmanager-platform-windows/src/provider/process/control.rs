@@ -299,6 +299,13 @@ impl ProcessControlProvider for WinProcessControlProvider {
                         Err(failure) => ProcessBatchTargetResult::Failed(failure.kind()),
                     }
                 }
+                ProcessBatchAction::SetEfficiencyMode(enable) => {
+                    let tier = if enable { PriorityTier::Low } else { PriorityTier::Normal };
+                    match self.set_priority_from_snapshot(&target, tier) {
+                        Ok(()) => ProcessBatchTargetResult::Applied,
+                        Err(failure) => ProcessBatchTargetResult::Failed(failure.kind()),
+                    }
+                }
             };
             results.push((target, outcome));
         }

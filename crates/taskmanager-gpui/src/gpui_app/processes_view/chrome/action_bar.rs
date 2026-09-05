@@ -44,6 +44,7 @@ enum ProcessToolbarAction {
     Suspend,
     Resume,
     SetPriority(PriorityTier),
+    EfficiencyMode,
     Affinity,
     ExportBatchHistory,
 }
@@ -63,6 +64,7 @@ impl ProcessToolbarAction {
             Self::Suspend => i18n::t("proc.suspend"),
             Self::Resume => i18n::t("proc.resume"),
             Self::SetPriority(tier) => i18n::t(tier.i18n_key()),
+            Self::EfficiencyMode => i18n::t("proc.efficiency_mode"),
             Self::Affinity => i18n::t("proc.affinity"),
             Self::ExportBatchHistory => i18n::t("proc.batch_history_export"),
         }
@@ -78,6 +80,7 @@ impl ProcessToolbarAction {
             Self::SetPriority(PriorityTier::High) => "tooltip.proc_high",
             Self::SetPriority(PriorityTier::Normal) => "tooltip.proc_normal",
             Self::SetPriority(PriorityTier::Low) => "tooltip.proc_low",
+            Self::EfficiencyMode => "tooltip.proc_efficiency_mode",
             Self::Affinity => "tooltip.proc_affinity",
             Self::ExportBatchHistory => "tooltip.proc_batch_export",
         }
@@ -88,6 +91,7 @@ impl ProcessToolbarAction {
             Self::RunNewTask => Some(IconId::Process),
             Self::End => Some(IconId::Close),
             Self::ForceKill => Some(IconId::EndTask),
+            Self::EfficiencyMode => Some(IconId::Process),
             Self::Affinity => Some(IconId::Settings),
             Self::ExportBatchHistory => Some(IconId::Export),
             Self::Suspend | Self::Resume | Self::SetPriority(_) => None,
@@ -97,9 +101,12 @@ impl ProcessToolbarAction {
     const fn enabled(self, availability: ProcessActionAvailability) -> bool {
         match self {
             Self::RunNewTask => true,
-            Self::End | Self::ForceKill | Self::Suspend | Self::Resume | Self::SetPriority(_) => {
-                availability.control.is_ready()
-            }
+            Self::End
+            | Self::ForceKill
+            | Self::Suspend
+            | Self::Resume
+            | Self::SetPriority(_)
+            | Self::EfficiencyMode => availability.control.is_ready(),
             Self::Affinity => availability.control.is_single_process(),
             Self::ExportBatchHistory => availability.batch_history,
         }
@@ -125,6 +132,9 @@ impl ProcessToolbarAction {
             Self::Resume => submit_batch_or_single(view, ProcessBatchAction::Resume, cx),
             Self::SetPriority(tier) => {
                 submit_batch_or_single(view, ProcessBatchAction::SetPriority(tier), cx)
+            }
+            Self::EfficiencyMode => {
+                submit_batch_or_single(view, ProcessBatchAction::SetEfficiencyMode(true), cx)
             }
             Self::Affinity => {
                 if view.process_control_availability().is_single_process()
@@ -171,7 +181,8 @@ fn submit_batch_or_single(
                 }
                 ProcessBatchAction::Suspend
                 | ProcessBatchAction::Resume
-                | ProcessBatchAction::SetPriority(_) => {
+                | ProcessBatchAction::SetPriority(_)
+                | ProcessBatchAction::SetEfficiencyMode(_) => {
                     if !view.submit_process_batch_immediate(batch_action, identity, cx) {
                         return;
                     }
@@ -307,6 +318,11 @@ fn actions_dropdown(
                 ),
                 overflow_entry(
                     ProcessToolbarAction::SetPriority(PriorityTier::Low),
+                    availability,
+                    &entity,
+                ),
+                overflow_entry(
+                    ProcessToolbarAction::EfficiencyMode,
                     availability,
                     &entity,
                 ),

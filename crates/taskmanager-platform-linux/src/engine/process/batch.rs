@@ -26,6 +26,10 @@ pub(crate) fn execute_process_batch(intent: ProcessBatchIntent) -> ProcessBatchR
             ProcessBatchAction::SetPriority(tier) => {
                 ProcessManager::set_process_nice(target.pid, tier.canonical_nice())
             }
+            ProcessBatchAction::SetEfficiencyMode(enable) => {
+                let nice = if enable { 19 } else { 0 };
+                ProcessManager::set_process_nice(target.pid, nice)
+            }
         };
         super::finish_with_escalation(target, super::batch_operation(action), direct)
     })

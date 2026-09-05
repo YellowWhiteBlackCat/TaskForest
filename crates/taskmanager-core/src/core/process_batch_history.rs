@@ -198,6 +198,13 @@ fn action_parts(action: ProcessBatchAction) -> (&'static str, Option<i32>) {
         // The export column keeps the legacy numeric contract: the canonical
         // nice value of the tier, not the tier's name.
         ProcessBatchAction::SetPriority(tier) => ("set_priority", Some(tier.canonical_nice())),
+        ProcessBatchAction::SetEfficiencyMode(enable) => {
+            if enable {
+                ("enable_efficiency_mode", None)
+            } else {
+                ("disable_efficiency_mode", None)
+            }
+        }
     }
 }
 

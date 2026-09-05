@@ -22,6 +22,10 @@ pub(crate) fn batch_operation(action: ProcessBatchAction) -> ForeignProcessContr
         ProcessBatchAction::SetPriority(tier) => {
             ForeignProcessControlOperation::SetPriority(tier.canonical_nice())
         }
+        ProcessBatchAction::SetEfficiencyMode(enable) => {
+            let nice = if enable { 19 } else { 0 };
+            ForeignProcessControlOperation::SetPriority(nice)
+        }
     }
 }
 

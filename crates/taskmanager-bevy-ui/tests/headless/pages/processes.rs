@@ -315,13 +315,15 @@ fn sort_projection_maps_the_shell_sort_onto_contract_tokens() {
             descending: false,
         })
     );
-    // PSS has no contract column: no marker, no fabrication.
     assert_eq!(
         sort_projection((
             taskmanager_shell::SortCol::Pss,
             taskmanager_shell::SortDir::Asc
         )),
-        None
+        Some(crate::widgets::table::SortProjection {
+            column: "MemoryPss",
+            descending: false,
+        })
     );
 }
 

@@ -37,10 +37,11 @@ pub(crate) enum ProcessMenuAction {
     Resume,
     Kill,
     Priority(PriorityTier),
+    EfficiencyMode,
 }
 
 /// The actions in display order.
-const MENU_ACTIONS: [ProcessMenuAction; 8] = [
+const MENU_ACTIONS: [ProcessMenuAction; 9] = [
     ProcessMenuAction::EndTask,
     ProcessMenuAction::EndProcessTree,
     ProcessMenuAction::Suspend,
@@ -49,6 +50,7 @@ const MENU_ACTIONS: [ProcessMenuAction; 8] = [
     ProcessMenuAction::Priority(PriorityTier::High),
     ProcessMenuAction::Priority(PriorityTier::Normal),
     ProcessMenuAction::Priority(PriorityTier::Low),
+    ProcessMenuAction::EfficiencyMode,
 ];
 
 /// Localized label for one menu action. The three priority tiers route through
@@ -64,6 +66,7 @@ fn action_label(action: ProcessMenuAction) -> String {
         ProcessMenuAction::Priority(tier) => {
             taskmanager_shell::presentation::priority_tier_label(tier).to_owned()
         }
+        ProcessMenuAction::EfficiencyMode => t("proc.efficiency_mode").to_owned(),
     }
 }
 
@@ -135,6 +138,10 @@ impl ActionMenuContext for ProcessMenuCtx {
                 .collect(),
             ProcessMenuAction::Priority(tier) => shell
                 .request_process_batch(ProcessBatchAction::SetPriority(tier))
+                .into_iter()
+                .collect(),
+            ProcessMenuAction::EfficiencyMode => shell
+                .request_process_batch(ProcessBatchAction::SetEfficiencyMode(true))
                 .into_iter()
                 .collect(),
         }

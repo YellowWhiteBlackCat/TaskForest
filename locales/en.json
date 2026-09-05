@@ -838,6 +838,7 @@
   "proc.nice": "Nice",
   "proc.process_count": "processes",
   "proc.choose_priority": "Set priority…",
+  "proc.efficiency_mode": "Efficiency mode",
   "proc.delete_confirms": "Delete confirms",
   "proc.selected_delete_hint": "{count} selected · Delete confirms",
   "proc.mode_flat": "Flat",

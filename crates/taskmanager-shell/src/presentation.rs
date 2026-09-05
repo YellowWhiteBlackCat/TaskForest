@@ -193,6 +193,13 @@ pub fn process_batch_action_label(action: ProcessBatchAction) -> String {
             i18n::t("proc.priority"),
             priority_tier_label(tier)
         ),
+        ProcessBatchAction::SetEfficiencyMode(enable) => {
+            if enable {
+                format!("{} ({})", i18n::t("proc.efficiency_mode"), i18n::t("common.on"))
+            } else {
+                format!("{} ({})", i18n::t("proc.efficiency_mode"), i18n::t("common.off"))
+            }
+        }
     }
 }
 

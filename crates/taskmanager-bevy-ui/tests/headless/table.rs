@@ -77,11 +77,11 @@ fn viewport_capacity_floors_and_guards_degenerate_heights() {
 #[test]
 fn column_vocabulary_is_the_contract_single_source() {
     let columns = visible_columns(&[]);
-    assert_eq!(columns.len(), 14, "the contract's canonical column count");
+    assert_eq!(columns.len(), 15, "the contract's canonical column count");
     assert_eq!(columns[0].id, "Name", "the identity column leads");
     // Spot-prove the wiring is the live contract table, not a copy: the
     // numeric resource columns carry their contract widths.
-    for (id, width) in [("CPU", 70.0), ("Memory", 100.0), ("Swap", 100.0)] {
+    for (id, width) in [("CPU", 70.0), ("Memory", 100.0), ("Swap", 100.0), ("MemoryPss", 100.0)] {
         let spec = columns
             .iter()
             .find(|spec| spec.id == id)
@@ -94,7 +94,7 @@ fn column_vocabulary_is_the_contract_single_source() {
 #[test]
 fn hidden_columns_drop_but_the_identity_column_stays() {
     let visible = visible_columns(&["CPU", "Memory"]);
-    assert_eq!(visible.len(), 12);
+    assert_eq!(visible.len(), 13);
     assert!(
         visible
             .iter()

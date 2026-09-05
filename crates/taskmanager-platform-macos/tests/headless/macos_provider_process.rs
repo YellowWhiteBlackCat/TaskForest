@@ -189,6 +189,7 @@ fn batch_preserves_the_exact_unsupported_failure_for_every_action_and_target() {
         ProcessBatchAction::Suspend,
         ProcessBatchAction::Resume,
         ProcessBatchAction::SetPriority(taskmanager_core::PriorityTier::High),
+        ProcessBatchAction::SetEfficiencyMode(true),
     ] {
         let mut provider = MacProcessControlProvider::new();
         let intent = ProcessBatchIntent {

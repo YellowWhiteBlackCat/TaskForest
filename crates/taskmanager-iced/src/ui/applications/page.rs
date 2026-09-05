@@ -260,6 +260,14 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                     control.is_single_process(),
                 ));
             }
+            actions.push(focus::button_enabled(
+                theme_snapshot,
+                FocusTarget::ProcessActionMenu,
+                t("proc.efficiency_mode"),
+                Message::RequestProcessBatch(ProcessBatchAction::SetEfficiencyMode(true)),
+                false,
+                control.is_ready(),
+            ));
             let columns_trigger = focus::button(
                 theme_snapshot,
                 FocusTarget::ProcessColumnsTrigger,

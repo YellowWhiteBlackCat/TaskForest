@@ -153,6 +153,7 @@ impl TuiApp {
                 | ui::process_menu::ProcessMenuAction::PriorityHigh
                 | ui::process_menu::ProcessMenuAction::PriorityNormal
                 | ui::process_menu::ProcessMenuAction::PriorityLow
+                | ui::process_menu::ProcessMenuAction::EfficiencyMode
         );
         if is_control
             && !self
@@ -193,6 +194,10 @@ impl TuiApp {
                     .unwrap_or(taskmanager_core::core::process::PriorityTier::Normal);
                 self.shell
                     .request_process_batch(ProcessBatchAction::SetPriority(tier))
+            }
+            ui::process_menu::ProcessMenuAction::EfficiencyMode => {
+                self.shell
+                    .request_process_batch(ProcessBatchAction::SetEfficiencyMode(true))
             }
             ui::process_menu::ProcessMenuAction::Affinity => {
                 if let Some(target) =

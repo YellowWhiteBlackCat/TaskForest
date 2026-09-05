@@ -839,6 +839,7 @@
   "proc.nice": "Nice",
   "proc.process_count": "个进程",
   "proc.choose_priority": "设置优先级…",
+  "proc.efficiency_mode": "能效模式",
   "proc.delete_confirms": "Delete 确认",
   "proc.selected_delete_hint": "已选择 {count} 项 · Delete 确认",
   "proc.mode_flat": "平铺",
