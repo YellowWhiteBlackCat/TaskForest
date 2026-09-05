@@ -130,7 +130,7 @@ impl ShellApp {
     }
 
     /// Confirm the pending SMART self-test: emit it as a
-    /// [`PlatformEffect::SmartSelfTest`] and clear the gate.
+    /// [`PlatformEffect::SmartControl`] and clear the gate.
     #[must_use]
     pub fn confirm_smart_self_test(&mut self) -> Option<PlatformEffect> {
         self.confirm_confirmation(ConfirmationKind::SmartSelfTest)

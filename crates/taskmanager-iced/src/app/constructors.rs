@@ -82,7 +82,7 @@ impl IcedApp {
                 crate::run::initial_window_size(),
             ),
             projection_caches: IcedProjectionCaches::default(),
-            a11y_bridge: taskmanager_accessibility_linux::LinuxAccessKitBridge::new(),
+            a11y_bridge: crate::a11y::AppAccessibilityBridge::default(),
             a11y_revision: 0,
             a11y_snapshot: None,
         };
@@ -154,7 +154,7 @@ impl IcedApp {
                 crate::run::initial_window_size(),
             ),
             projection_caches: IcedProjectionCaches::default(),
-            a11y_bridge: taskmanager_accessibility_linux::LinuxAccessKitBridge::new(),
+            a11y_bridge: crate::a11y::AppAccessibilityBridge::default(),
             a11y_revision: 0,
             a11y_snapshot: None,
         }

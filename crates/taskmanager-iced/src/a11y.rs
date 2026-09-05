@@ -21,7 +21,10 @@ use taskmanager_ui_contract::{
     SemanticSnapshotBuilder,
 };
 
+#[cfg(target_os = "linux")]
 pub type AppAccessibilityBridge = taskmanager_accessibility_linux::LinuxAccessKitBridge;
+#[cfg(not(target_os = "linux"))]
+pub type AppAccessibilityBridge = taskmanager_ui_contract::DetachedAccessibilityBridge;
 
 const MAX_PUBLISHED_ROWS: usize = 64;
 
