@@ -9,6 +9,11 @@ layer-shell 并存合同见 [HOST_ARCHITECTURE.md](HOST_ARCHITECTURE.md)。这�
 TaskForest 是 Linux、Windows、macOS 三平台系统监视器。平台能力不同，但共享相同的
 领域语义：数据存在、真实零、缺失、暂时失败、权限不足和不支持必须可区分。
 
+显示服务器体系严格规范为：**Linux (Wayland) + Windows (Win32) + macOS (Cocoa/Metal)**。
+Linux 上三大图形前端（GPUI、Iced、Bevy-UI）一律仅支持 Wayland，不支持也不链接 X11，
+X11 crate 已被彻底排除在生产依赖闭包之外；纯文本终端产品 `taskforest-t`（Ratatui）
+作为跨全终端环境（含无头控制台、SSH、容器）的通用基石。
+
 四个前端是四个独立产品：GPUI、Iced、Ratatui 和 Bevy 各自是一个产品 crate 加一个
 二进制（ADR-051），消费同一应用投影。四端全部纳入官方发布流水线矩阵，享有同等的
 领域语义、配置持久化与安装包分发地位，不拥有独立业务事实。

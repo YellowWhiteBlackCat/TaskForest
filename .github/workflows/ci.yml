@@ -131,7 +131,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev libxkbcommon-x11-dev mold
+          libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -160,7 +160,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev libxkbcommon-x11-dev mold
+          libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
@@ -185,7 +185,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev libxkbcommon-x11-dev mold
+          libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -217,7 +217,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev libxkbcommon-x11-dev mold
+          libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2

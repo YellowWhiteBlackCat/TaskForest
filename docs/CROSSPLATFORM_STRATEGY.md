@@ -19,7 +19,7 @@ Windows 生产、测试和开发辅助代码均禁止 PowerShell、CMD 或其他
 
 | 平台 | 事实源与组合 | 当前原则 |
 |---|---|---|
-| Linux | `/proc`、`/sys`、systemd/OpenRC、SMART、hwmon、DRM、NVML、审计 boundary | 参考实机面；权限和硬件差异必须 typed、可恢复 |
+| Linux | `/proc`、`/sys`、systemd/OpenRC、SMART、hwmon、DRM、NVML、审计 boundary | 参考实机面；权限和硬件差异必须 typed、可恢复；图形前端仅支持 Wayland，不再提供 X11 原生表面 |
 | macOS | `sysinfo`、`starship-battery`、plist、安全系统命令和原生 composition | 能编译不等于实机完成；缺 receipt 保持 contract/Unsupported |
 | Windows | `sysinfo`、`raw-cpuid`、`starship-battery`、安全 registry/service crate、ADR-031 boundary | safe/native-first；缺合格 seam 不实现 PDH/WMI/命令解释器旁路 |
 

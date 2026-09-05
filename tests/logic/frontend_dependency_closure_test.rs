@@ -205,3 +205,36 @@ fn bevy_frontend_closures_keep_the_read_only_composition_boundary() {
         }
     }
 }
+
+#[test]
+fn all_gui_frontends_strictly_exclude_x11_in_production_closure() {
+    // Architectural charter: GUI frontends on Linux strictly support Wayland only.
+    // X11 is deprecated and excluded from production closures; terminal environments
+    // are served by taskforest-t.
+    let forbidden_x11 = [
+        "x11",
+        "x11rb",
+        "x11rb-protocol",
+        "x11-dl",
+        "x11-clipboard",
+        "libx11",
+        "xcb",
+    ];
+
+    for package in [
+        "taskmanager-gpui",
+        "taskmanager-iced",
+        "taskmanager-bevy-ui",
+    ] {
+        let Some(closure) = cargo_tree_packages(package, "no-dev", false) else {
+            return;
+        };
+        for forbidden in forbidden_x11 {
+            assert!(
+                !closure.contains(forbidden),
+                "{package} production closure reached forbidden X11 crate {forbidden}: {closure:?}"
+            );
+        }
+    }
+}
+

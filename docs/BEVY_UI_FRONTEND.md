@@ -34,7 +34,7 @@
   `scripts/quality/bevy_bsn_guard.py` 机械强制。
 - 两个 World 永不合并：平台 client 经 app-host `OnceLock` 缓存每进程一次；
   窗口重建复用句柄，绝不重开 runtime。
-- Linux 窗口仅 Wayland；X11 会话由现有三个前端承载。
+- Linux 窗口仅支持 Wayland；X11 已被全面废弃，非 Wayland 或纯终端环境由 TaskForest-T 承载。
 
 ## 数据接缝
 
