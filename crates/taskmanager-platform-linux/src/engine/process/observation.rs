@@ -290,6 +290,7 @@ fn unavailable_identity_observations(failure: FailureKind) -> ProcessScalarObser
         cpu_percentage: ScalarObservation::unavailable(failure),
         memory_bytes: ScalarObservation::unavailable(failure),
         memory_pss_bytes: ScalarObservation::unavailable(failure),
+        memory_uss_bytes: ScalarObservation::unavailable(failure),
         swap_bytes: ScalarObservation::unavailable(failure),
         disk_read_bytes_total: ScalarObservation::unavailable(failure),
         disk_write_bytes_total: ScalarObservation::unavailable(failure),

@@ -166,6 +166,7 @@ impl ProcessListProvider for MacProcessListProvider {
                 cpu_percentage: ScalarObservation::available(process.cpu_usage(), observed_at_ms),
                 memory_bytes: ScalarObservation::available(process.memory(), observed_at_ms),
                 memory_pss_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+                memory_uss_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
                 swap_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
                 disk_read_bytes_total: ScalarObservation::available(
                     disk.total_read_bytes,

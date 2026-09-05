@@ -124,6 +124,15 @@ fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> D
             &threads.to_string(),
         ));
     }
+    if let Some(pressure) = snap.pressure.as_ref() {
+        if let Some(cpu_pressure) = pressure.cpu.current_value() {
+            col = col.child(kv_row(
+                theme,
+                i18n::t("perf.stall"),
+                &format!("{:.1}%", cpu_pressure.some.avg10),
+            ));
+        }
+    }
     col.child(kv_row(
         theme,
         i18n::t("common.up_time"),

@@ -86,12 +86,12 @@ pub use metrics::{
     MemoryOptionalObservations, MemoryScalarObservations, MemoryTelemetryObservation,
     MsrPackageReadout, MsrReadoutFailure, MsrReadoutSnapshot, NetworkAdapterType, NetworkMetrics,
     NetworkScalarObservations, NetworkTelemetryObservation, NetworkWirelessObservations,
-    ObservationWireError, OptionalObservation, OptionalObservationState, ProviderRuntimeState,
-    RaplPackageRow, RaplPowerFailure, RaplPowerSnapshot, ScalarAvailability, ScalarObservation,
-    ScalarObservationGroup, ScalarObservationSlot, SmartAvailability, SmbiosMemoryFailure,
-    SmbiosMemorySnapshot, SmbiosModuleRow, StorageTelemetryObservation, SystemObservationState,
-    SystemSnapshot, SystemTelemetryDomains, VirtualMemoryCommitObservations,
-    cpu_usage_pct_observation,
+    ObservationWireError, OptionalObservation, OptionalObservationState, PressureWindow,
+    ProviderRuntimeState, RaplPackageRow, RaplPowerFailure, RaplPowerSnapshot, ResourcePressure,
+    ScalarAvailability, ScalarObservation, ScalarObservationGroup, ScalarObservationSlot,
+    SmartAvailability, SmbiosMemoryFailure, SmbiosMemorySnapshot, SmbiosModuleRow,
+    StorageTelemetryObservation, SystemObservationState, SystemPressureSnapshot, SystemSnapshot,
+    SystemTelemetryDomains, VirtualMemoryCommitObservations, cpu_usage_pct_observation,
 };
 pub use npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventoryFailure, NpuInventorySnapshot,

@@ -40,6 +40,7 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
         (t("cpu.frequency"), CpuField::Frequency),
         (t("common.temperature"), CpuField::Temperature),
         (t("common.power"), CpuField::Power),
+        (t("perf.stall"), CpuField::Pressure),
     ]
     .into_iter()
     .map(|(label, field)| {

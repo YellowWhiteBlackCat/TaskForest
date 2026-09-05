@@ -90,6 +90,8 @@ pub struct SystemSnapshot {
     /// missing thread count is therefore `None`, never a fabricated zero.
     pub processes: usize,
     pub threads: Option<usize>,
+    /// System-wide Pressure Stall Information (PSI / memory / IO pressure).
+    pub pressure: Option<super::SystemPressureSnapshot>,
 }
 
 impl SystemSnapshot {
@@ -205,6 +207,7 @@ impl SystemSnapshot {
             uptime_secs,
             processes,
             threads,
+            pressure: host.pressure.current_value().copied(),
         })
     }
 }

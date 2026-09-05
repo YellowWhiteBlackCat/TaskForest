@@ -148,6 +148,7 @@ impl HostTelemetryProvider for MacHostTelemetryProvider {
             uptime_secs: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
             processes: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
             threads: ScalarObservation::unavailable(FailureKind::Unsupported),
+            pressure: ScalarObservation::unavailable(FailureKind::Unsupported),
         };
         if uptime_secs > 0 {
             facts.uptime_secs = ScalarObservation::available(uptime_secs, observed_at_ms);

@@ -9,6 +9,7 @@ mod gpu_engine_rows;
 mod memory;
 mod msr_readout;
 mod network;
+mod psi;
 mod rapl_power;
 mod smbios_memory;
 mod system;
@@ -40,6 +41,7 @@ pub use msr_readout::{MsrPackageReadout, MsrReadoutFailure, MsrReadoutSnapshot};
 pub use network::{
     NetworkAdapterType, NetworkMetrics, NetworkScalarObservations, NetworkWirelessObservations,
 };
+pub use psi::{PressureWindow, ResourcePressure, SystemPressureSnapshot};
 pub use rapl_power::{RaplPackageRow, RaplPowerFailure, RaplPowerSnapshot};
 pub use smbios_memory::{
     DmiIdentityFacts, SmbiosMemoryFailure, SmbiosMemorySnapshot, SmbiosModuleRow,

@@ -16,6 +16,8 @@ pub struct HostRuntimeFacts {
     pub uptime_secs: ScalarObservation<u64>,
     pub processes: ScalarObservation<u64>,
     pub threads: ScalarObservation<u64>,
+    #[serde(default)]
+    pub pressure: ScalarObservation<crate::core::metrics::SystemPressureSnapshot>,
 }
 
 /// One independently scheduled host-runtime observation.

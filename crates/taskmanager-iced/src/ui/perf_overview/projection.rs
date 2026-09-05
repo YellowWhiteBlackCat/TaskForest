@@ -33,6 +33,7 @@ pub(super) struct CpuObservation {
     pub frequency_mhz: Option<u64>,
     pub temperature_c: Option<f32>,
     pub power_w: Option<f32>,
+    pub pressure_pct: Option<f32>,
 }
 
 impl From<&CpuMetrics> for CpuObservation {
@@ -42,6 +43,7 @@ impl From<&CpuMetrics> for CpuObservation {
             frequency_mhz: cpu.current_frequency_mhz(),
             temperature_c: cpu.current_temperature_c(),
             power_w: cpu.current_power_w().filter(|value| *value > 0.0),
+            pressure_pct: None,
         }
     }
 }
@@ -55,6 +57,7 @@ pub(super) enum CpuHeadlineValue {
     TemperatureC(f32),
     FrequencyMhz(u64),
     PowerW(f32),
+    PressurePercent(f32),
 }
 
 /// One CPU headline item in the canonical product order.
@@ -64,6 +67,7 @@ pub(super) enum CpuHeadlineKind {
     Frequency,
     Temperature,
     Power,
+    Pressure,
 }
 
 /// One CPU headline item in the Iced presentation order.
@@ -77,12 +81,13 @@ pub(super) struct CpuHeadlineMetric {
 /// order is a UI decision and deliberately does not come from the telemetry
 /// history vocabulary. Missing provider data stays explicit so the renderer
 /// shows a dash instead of a fabricated zero.
-pub(super) fn cpu_headline_metrics(observation: Option<CpuObservation>) -> [CpuHeadlineMetric; 4] {
+pub(super) fn cpu_headline_metrics(observation: Option<CpuObservation>) -> [CpuHeadlineMetric; 5] {
     let observed = observation.unwrap_or(CpuObservation {
         usage_pct: None,
         frequency_mhz: None,
         temperature_c: None,
         power_w: None,
+        pressure_pct: None,
     });
     [
         CpuHeadlineMetric {
@@ -100,6 +105,10 @@ pub(super) fn cpu_headline_metrics(observation: Option<CpuObservation>) -> [CpuH
         CpuHeadlineMetric {
             kind: CpuHeadlineKind::Power,
             value: observed.power_w.map(CpuHeadlineValue::PowerW),
+        },
+        CpuHeadlineMetric {
+            kind: CpuHeadlineKind::Pressure,
+            value: observed.pressure_pct.map(CpuHeadlineValue::PressurePercent),
         },
     ]
 }

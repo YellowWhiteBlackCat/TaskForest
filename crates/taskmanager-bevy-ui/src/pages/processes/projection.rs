@@ -61,6 +61,9 @@ fn cell_text(process: &ProcessItem, column: &str) -> String {
         "Swap" => process
             .current_swap_bytes()
             .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
+        "MemoryPss" => process
+            .current_memory_pss_bytes()
+            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
         "DiskRead" => process
             .current_disk_read_bytes_per_sec()
             .map_or_else(|| MISSING_VALUE.to_owned(), bytes),

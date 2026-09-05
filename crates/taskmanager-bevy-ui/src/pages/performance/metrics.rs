@@ -282,6 +282,13 @@ pub(super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
             .filter(|value| value.is_finite())
             .map(power_w)
             .unwrap_or_else(missing_value),
+        CpuField::Pressure => shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .and_then(|s| s.pressure.as_ref())
+            .and_then(|p| p.cpu.current_value())
+            .map_or_else(missing_value, |c| format!("{:.1}%", c.some.avg10)),
         CpuField::Core(index) => observed_percentage(core_usage_pct(shell, index)),
     }
 }

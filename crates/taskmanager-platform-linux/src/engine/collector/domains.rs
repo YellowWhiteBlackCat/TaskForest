@@ -18,6 +18,7 @@ mod gpu;
 mod host;
 mod memory;
 mod network;
+pub(crate) mod psi;
 mod storage;
 
 pub(crate) use cpu::LinuxCpuTelemetryCollector;

@@ -163,6 +163,7 @@ impl HostTelemetryProvider for WinHostTelemetryProvider {
             uptime_secs: uptime,
             processes,
             threads,
+            pressure: ScalarObservation::unavailable(FailureKind::Unsupported),
         };
         if sources.is_empty() {
             return Err(ProviderFailure::TemporarilyUnavailable);

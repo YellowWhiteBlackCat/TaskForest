@@ -21,6 +21,9 @@ pub struct ProcessScalarObservations {
     /// from `memory_bytes`, whose legacy meaning remains resident set size.
     #[serde(default)]
     pub memory_pss_bytes: ScalarObservation<u64>,
+    /// Unique set size (private memory not shared with any other process).
+    #[serde(default)]
+    pub memory_uss_bytes: ScalarObservation<u64>,
     /// Swap charged to this process. It is not part of either RSS or PSS.
     #[serde(default)]
     pub swap_bytes: ScalarObservation<u64>,
@@ -45,6 +48,7 @@ impl ProcessScalarObservations {
             cpu_percentage: self.cpu_percentage.transition_failure(failure),
             memory_bytes: self.memory_bytes.transition_failure(failure),
             memory_pss_bytes: self.memory_pss_bytes.transition_failure(failure),
+            memory_uss_bytes: self.memory_uss_bytes.transition_failure(failure),
             swap_bytes: self.swap_bytes.transition_failure(failure),
             disk_read_bytes_total: self.disk_read_bytes_total.transition_failure(failure),
             disk_write_bytes_total: self.disk_write_bytes_total.transition_failure(failure),
@@ -69,6 +73,9 @@ impl ProcessScalarObservations {
             memory_pss_bytes: self
                 .memory_pss_bytes
                 .retain_previous(previous.memory_pss_bytes),
+            memory_uss_bytes: self
+                .memory_uss_bytes
+                .retain_previous(previous.memory_uss_bytes),
             swap_bytes: self.swap_bytes.retain_previous(previous.swap_bytes),
             disk_read_bytes_total: self
                 .disk_read_bytes_total
@@ -143,6 +150,16 @@ impl ProcessItem {
     pub const fn current_memory_pss_bytes(&self) -> Option<u64> {
         self.scalar_observations
             .memory_pss_bytes
+            .current_value()
+            .copied()
+    }
+
+    /// Current unique set size (USS), representing private memory unshared with
+    /// any other process.
+    #[must_use]
+    pub const fn current_memory_uss_bytes(&self) -> Option<u64> {
+        self.scalar_observations
+            .memory_uss_bytes
             .current_value()
             .copied()
     }

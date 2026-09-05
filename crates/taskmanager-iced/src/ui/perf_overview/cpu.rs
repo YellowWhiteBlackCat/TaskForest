@@ -71,6 +71,13 @@ pub(super) fn cpu_headline_label_value(
                 _ => missing(),
             },
         ),
+        CpuHeadlineKind::Pressure => (
+            t("perf.stall").to_owned(),
+            match metric.value {
+                Some(CpuHeadlineValue::PressurePercent(value)) => format!("{value:.1}%"),
+                _ => missing(),
+            },
+        ),
     }
 }
 

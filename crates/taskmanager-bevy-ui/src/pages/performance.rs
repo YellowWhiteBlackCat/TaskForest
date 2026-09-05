@@ -299,6 +299,7 @@ pub(crate) enum CpuField {
     Frequency,
     Temperature,
     Power,
+    Pressure,
     Core(usize),
 }
 

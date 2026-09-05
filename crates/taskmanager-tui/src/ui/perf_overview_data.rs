@@ -74,7 +74,7 @@ pub(super) struct CpuRailRow {
 /// the System page's keys and the shared `duration` readout so one fact has
 /// one presentation in the whole frontend.
 pub(super) fn cpu_live_rail_rows(snapshot: &SystemSnapshot) -> Vec<CpuRailRow> {
-    vec![
+    let mut rows = vec![
         CpuRailRow {
             label: t("common.processes").to_owned(),
             value: snapshot.processes.to_string(),
@@ -89,7 +89,16 @@ pub(super) fn cpu_live_rail_rows(snapshot: &SystemSnapshot) -> Vec<CpuRailRow> {
             label: t("common.uptime").to_owned(),
             value: duration(snapshot.uptime_secs),
         },
-    ]
+    ];
+    if let Some(pressure) = snapshot.pressure.as_ref() {
+        if let Some(cpu_pressure) = pressure.cpu.current_value() {
+            rows.push(CpuRailRow {
+                label: "CPU Stall (some)".to_owned(),
+                value: format!("{:.1}%", cpu_pressure.some.avg10),
+            });
+        }
+    }
+    rows
 }
 
 /// The static spec rows, row-for-row the gpui `cpu_spec_rows` projection

@@ -48,6 +48,7 @@ impl LinuxHostTelemetryCollector {
     fn observe_facts(&mut self, now_ms: u64) -> (HostRuntimeFacts, Vec<SourceStatus>) {
         let uptime = observe_uptime(&self.proc_root.join("uptime"), now_ms);
         let process_scan = observe_processes(&self.proc_root, now_ms);
+        let psi = super::psi::observe_psi(&self.proc_root.join("pressure"), now_ms);
         let facts = HostRuntimeFacts {
             uptime_secs: uptime.scalar.retain_previous(self.last_facts.uptime_secs),
             processes: process_scan
@@ -58,6 +59,7 @@ impl LinuxHostTelemetryCollector {
                 .threads
                 .scalar
                 .retain_previous(self.last_facts.threads),
+            pressure: psi.snapshot.retain_previous(self.last_facts.pressure),
         };
         self.last_facts = facts.clone();
         (
@@ -66,6 +68,7 @@ impl LinuxHostTelemetryCollector {
                 uptime.source,
                 process_scan.processes.source,
                 process_scan.threads.source,
+                psi.source,
             ],
         )
     }

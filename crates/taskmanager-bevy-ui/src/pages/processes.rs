@@ -95,7 +95,7 @@ fn contract_token(column: SortCol) -> Option<&'static str> {
         SortCol::Name => Some("Name"),
         SortCol::Cpu => Some("CPU"),
         SortCol::Memory => Some("Memory"),
-        SortCol::Pss => None,
+        SortCol::Pss => Some("MemoryPss"),
         SortCol::Swap => Some("Swap"),
         SortCol::User => Some("User"),
         SortCol::State => Some("Status"),

@@ -505,6 +505,7 @@ fn snapshot() -> SystemSnapshot {
         uptime_secs: 6 * 3600 + 42 * 60,
         processes: 347,
         threads: Some(2_816),
+        pressure: None,
     }
 }
 

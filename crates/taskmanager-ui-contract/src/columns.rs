@@ -86,6 +86,12 @@ pub const PROCESS_COLUMNS: &[ProcessColumnSpec] = &[
         hideable: true,
     },
     ProcessColumnSpec {
+        id: "MemoryPss",
+        default_width: 100.0,
+        numeric: true,
+        hideable: true,
+    },
+    ProcessColumnSpec {
         id: "DiskRead",
         default_width: 100.0,
         numeric: true,

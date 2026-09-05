@@ -76,6 +76,24 @@ pub fn optional_count(value: Option<u32>) -> String {
     value.map_or_else(missing_value, |count| count.to_string())
 }
 
+/// Format a ResourcePressure (some/full) into a human-readable display string,
+/// e.g. "some 0.5% · full 0.1%" or "some 0.0%".
+#[must_use]
+pub fn format_resource_pressure(
+    pressure: Option<&taskmanager_core::core::metrics::ResourcePressure>,
+) -> String {
+    let Some(pressure) = pressure else {
+        return missing_value();
+    };
+    let some = format!("{:.1}%", pressure.some.avg10);
+    if let Some(full) = &pressure.full {
+        format!("some {some} · full {:.1}%", full.avg10)
+    } else {
+        format!("some {some}")
+    }
+}
+
+
 /// Format an optional second-duration (CPU time) through the shared
 /// [`duration`] helper, with `None` rendering an honest dash.
 #[must_use]
