@@ -29,11 +29,11 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::AlertRuleToggle => SurfaceDecision::Local {
             route: "alerts.page.rule-toggle",
         },
-        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Unsupported {
-            reason: "the Iced product shape exposes rule toggles only; rule add/update/remove authoring remains a GPUI reference surface",
+        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Local {
+            route: "alerts.page.authoring",
         },
-        ProductIntent::AlertRuleTransfer => SurfaceDecision::Unsupported {
-            reason: "the Iced product shape does not offer alert-rule import/export; the shared rule contract remains available to future surface work",
+        ProductIntent::AlertRuleTransfer => SurfaceDecision::Local {
+            route: "alerts.page.transfer",
         },
         ProductIntent::ActiveAlerts => SurfaceDecision::Shared {
             route: "shell.alert-active",

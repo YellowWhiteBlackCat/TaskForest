@@ -22,6 +22,10 @@ fn fixed_keys_map_onto_the_shared_vocabulary() {
         IcedKey::Fixed(ShellKeyEvent::new(KeyCode::F5, Modifiers::NONE))
     );
     assert_eq!(
+        map_key(&Key::Named(Named::F9), iced::keyboard::Modifiers::default()),
+        IcedKey::Fixed(ShellKeyEvent::new(KeyCode::F9, Modifiers::NONE))
+    );
+    assert_eq!(
         map_key(
             &Key::Named(Named::Home),
             iced::keyboard::Modifiers::default()

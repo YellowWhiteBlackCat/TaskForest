@@ -25,6 +25,7 @@ impl IcedApp {
         // `update::columns`): a cheap gate check per 100 ms poll.
         self.poll_process_column_persist();
         self.tick();
+        self.publish_accessibility_snapshot();
         None
     }
 

@@ -45,3 +45,39 @@ fn the_registered_divergences_are_exactly_the_known_drivers() {
         .collect();
     assert_eq!(divergent, ["toast", "text-selection"]);
 }
+
+#[test]
+fn every_capability_is_classified_correctly() {
+    let declaration = capability_declaration();
+    for capability in taskmanager_ui_contract::ComponentCapability::ALL {
+        let entry = declaration
+            .entries
+            .iter()
+            .find(|e| e.capability == *capability)
+            .unwrap_or_else(|| panic!("capability {capability:?} must be registered"));
+        match capability {
+            taskmanager_ui_contract::ComponentCapability::Scrollbar => {
+                assert!(
+                    matches!(entry.support, taskmanager_ui_contract::CapabilitySupport::Native { via } if via == "iced scrollable"),
+                    "Scrollbar must be Native via iced scrollable"
+                );
+            }
+            taskmanager_ui_contract::ComponentCapability::Toast
+            | taskmanager_ui_contract::ComponentCapability::TextSelection => {
+                assert!(
+                    matches!(entry.support, taskmanager_ui_contract::CapabilitySupport::Divergent { reason } if !reason.is_empty()),
+                    "{capability:?} must be Divergent with a non-empty reason"
+                );
+            }
+            _ => {
+                assert!(
+                    matches!(
+                        entry.support,
+                        taskmanager_ui_contract::CapabilitySupport::Ported
+                    ),
+                    "{capability:?} must be Ported"
+                );
+            }
+        }
+    }
+}

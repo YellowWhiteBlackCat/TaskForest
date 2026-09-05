@@ -58,6 +58,9 @@ taskmanager-telemetry-store = { path = "crates/taskmanager-telemetry-store" }
 taskmanager-ui-contract = { path = "crates/taskmanager-ui-contract" }
 taskmanager-shell = { path = "crates/taskmanager-shell" }
 taskmanager-theme = { path = "crates/taskmanager-theme" }
+taskmanager-accessibility-linux = { path = "crates/taskmanager-accessibility-linux" }
+accesskit = "0.24.1"
+accesskit_consumer = "0.38" 
 taskmanager-assets = { path = "crates/taskmanager-assets" }
 # Integration tests construct the platform runtime through the composition
 # edge (ADR-009 reverse dependency firewall) instead of naming an OS crate,

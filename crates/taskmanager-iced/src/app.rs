@@ -550,6 +550,16 @@ pub struct IcedApp {
     /// fingerprint boundary; viewport/scroll state remains outside because it
     /// has an independent interaction lifetime.
     projection_caches: IcedProjectionCaches,
+    /// Linked native accessibility bridge.
+    pub(crate) a11y_bridge: crate::a11y::AppAccessibilityBridge,
+    pub(crate) a11y_revision: u64,
+    pub(crate) a11y_snapshot: Option<taskmanager_ui_contract::SemanticSnapshot>,
+}
+
+impl IcedApp {
+    pub(crate) fn publish_accessibility_snapshot(&mut self) {
+        crate::a11y::publish_accessibility_snapshot(self);
+    }
 }
 
 impl Default for IcedApp {

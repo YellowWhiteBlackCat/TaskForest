@@ -48,6 +48,7 @@ pub fn map_key(key: &Key, iced_modifiers: iced::keyboard::Modifiers) -> IcedKey 
         Key::Named(Named::End) => KeyCode::End,
         Key::Named(Named::F1) => KeyCode::F1,
         Key::Named(Named::F5) => KeyCode::F5,
+        Key::Named(Named::F9) => KeyCode::F9,
         Key::Character(character) => {
             let mut chars = character.chars();
             let Some(character) = chars.next() else {

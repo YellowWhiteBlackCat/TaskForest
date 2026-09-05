@@ -313,3 +313,27 @@ fn scrim_elevated_and_card_styles_are_token_derived_and_layered() {
     assert!(card.shadow.blur_radius < elevated.shadow.blur_radius);
     assert_eq!(card.background, elevated.background);
 }
+
+#[test]
+fn high_contrast_mode_strengthens_iced_borders_and_text() {
+    let standard = Theme::build(
+        Skin::Gnome,
+        LightDark::Dark,
+        HighContrast::Off,
+        ResolvedFonts::system_for(Skin::Gnome),
+    );
+    let hc = Theme::build(
+        Skin::Gnome,
+        LightDark::Dark,
+        HighContrast::On,
+        ResolvedFonts::system_for(Skin::Gnome),
+    );
+    assert!(hc.hc);
+    let standard_border = panel_style(&standard).border.color;
+    let hc_border = panel_style(&hc).border.color;
+    assert_ne!(
+        standard_border, hc_border,
+        "high contrast must produce a distinct, stronger border in Iced"
+    );
+    assert_eq!(hc_border.a, 1.0, "high contrast border is fully opaque");
+}

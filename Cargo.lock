@@ -9560,7 +9560,9 @@ name = "taskmanager-bevy-ui"
 version = "0.1.2"
 dependencies = [
  "accesskit",
+ "accesskit_consumer 0.38.0",
  "bevy",
+ "taskmanager-accessibility-linux",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
@@ -9616,6 +9618,8 @@ dependencies = [
 name = "taskmanager-gates"
 version = "0.1.2"
 dependencies = [
+ "accesskit",
+ "accesskit_consumer 0.38.0",
  "chrono",
  "crossbeam-channel",
  "proc-macro2",
@@ -9623,6 +9627,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.119",
+ "taskmanager-accessibility-linux",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",
@@ -9682,12 +9687,15 @@ dependencies = [
 name = "taskmanager-iced"
 version = "0.1.2"
 dependencies = [
+ "accesskit",
+ "accesskit_consumer 0.38.0",
  "fontdb 0.23.0",
  "futures-timer",
  "iced",
  "naga 27.0.3",
  "serde",
  "serde_json",
+ "taskmanager-accessibility-linux",
  "taskmanager-app-host",
  "taskmanager-application",
  "taskmanager-assets",

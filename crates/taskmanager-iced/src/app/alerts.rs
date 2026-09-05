@@ -10,7 +10,15 @@
 //! evaluates alerts; it reads the shell's typed rule and `alert_active`
 //! projections.
 
-use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
+use taskmanager_application::{
+    AlertRuleImportMode, ManagedAlertRule, ManagedAlertRuleEdit, ManagedAlertRuleEditOutcome,
+    PlatformEffect,
+};
+use taskmanager_core::core::alerts::{
+    AlertRule, AlertRuleConflictPolicy, AlertRuleTransferEntry, AlertRuleTransferError,
+    export_alert_rules_json, import_alert_rules_json,
+};
+use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
 use super::IcedApp;
 
@@ -72,7 +80,7 @@ impl AlertsPageState {
 
 /// The Alerts-page message vocabulary, carried by
 /// [`super::Message::Alerts`].
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum AlertsMessage {
     /// Open the alerts page.
     OpenPage,
@@ -80,12 +88,28 @@ pub enum AlertsMessage {
     ClosePage,
     /// Toggle one managed rule by stable identity.
     ToggleRule { rule_id: String },
+    /// Export managed alert rules to the clipboard or report notice.
+    ExportRules,
+    /// Read alert rules JSON from the clipboard and import.
+    ImportRulesFromClipboard,
+    /// Import managed alert rules from JSON.
+    ImportRules {
+        json: String,
+        mode: AlertRuleImportMode,
+    },
+    /// Add one durable alert rule.
+    AddRule { rule: AlertRule },
+    /// Remove one durable alert rule by stable identity.
+    RemoveRule { rule_id: String },
 }
 
 impl IcedApp {
-    /// Dispatch one alerts-page message. No platform effects: enabling and
-    /// disabling rules is shared pure state, not a control submission.
-    pub(crate) fn update_alerts(&mut self, message: AlertsMessage) -> Option<PlatformEffect> {
+    /// Dispatch one alerts-page message with auxiliary clipboard task output.
+    pub(crate) fn update_alerts_with_clipboard(
+        &mut self,
+        message: AlertsMessage,
+        clipboard_task: &mut Option<iced::Task<super::Message>>,
+    ) -> Option<PlatformEffect> {
         match message {
             AlertsMessage::OpenPage => {
                 self.open_alerts_page();
@@ -97,6 +121,115 @@ impl IcedApp {
             }
             AlertsMessage::ToggleRule { rule_id } => {
                 self.toggle_alert_rule(rule_id);
+                None
+            }
+            AlertsMessage::ExportRules => {
+                match self.export_alert_rules() {
+                    Ok(json) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Clipboard,
+                            FeedbackSeverity::Success,
+                            FeedbackLifecycle::SHORT,
+                            format!("{} {}", t("alerts.manage"), t("common.copied")),
+                        );
+                        *clipboard_task = Some(iced::clipboard::write(json));
+                    }
+                    Err(error) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Clipboard,
+                            FeedbackSeverity::Error,
+                            FeedbackLifecycle::SHORT,
+                            format!("{}: {error}", t("alerts.manage")),
+                        );
+                    }
+                }
+                None
+            }
+            AlertsMessage::ImportRulesFromClipboard => {
+                *clipboard_task = Some(iced::clipboard::read().map(|content| {
+                    super::Message::Alerts(AlertsMessage::ImportRules {
+                        json: content.unwrap_or_default(),
+                        mode: AlertRuleImportMode::Merge(AlertRuleConflictPolicy::ReplaceExisting),
+                    })
+                }));
+                None
+            }
+            AlertsMessage::ImportRules { json, mode } => {
+                match self.import_alert_rules(&json, mode) {
+                    Ok(_) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Clipboard,
+                            FeedbackSeverity::Success,
+                            FeedbackLifecycle::SHORT,
+                            t("feedback.action_succeeded")
+                                .replace("{action}", t("common.import"))
+                                .replace("{target}", t("alerts.manage")),
+                        );
+                    }
+                    Err(error) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Clipboard,
+                            FeedbackSeverity::Error,
+                            FeedbackLifecycle::SHORT,
+                            format!("{}: {error}", t("alerts.manage")),
+                        );
+                    }
+                }
+                None
+            }
+            AlertsMessage::AddRule { rule } => {
+                match self.add_alert_rule(rule) {
+                    Ok(_) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Interaction,
+                            FeedbackSeverity::Success,
+                            FeedbackLifecycle::SHORT,
+                            t("feedback.action_succeeded")
+                                .replace("{action}", t("common.apply"))
+                                .replace("{target}", t("alerts.manage")),
+                        );
+                    }
+                    Err(error) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Interaction,
+                            FeedbackSeverity::Error,
+                            FeedbackLifecycle::SHORT,
+                            format!("{}: {error}", t("alerts.manage")),
+                        );
+                    }
+                }
+                None
+            }
+            AlertsMessage::RemoveRule { rule_id } => {
+                match self.remove_alert_rule(rule_id) {
+                    Ok(ManagedAlertRuleEditOutcome::Applied) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Interaction,
+                            FeedbackSeverity::Success,
+                            FeedbackLifecycle::SHORT,
+                            t("feedback.action_succeeded")
+                                .replace("{action}", t("common.remove"))
+                                .replace("{target}", t("alerts.manage")),
+                        );
+                    }
+                    Ok(ManagedAlertRuleEditOutcome::MissingTarget) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Interaction,
+                            FeedbackSeverity::Warning,
+                            FeedbackLifecycle::SHORT,
+                            t("feedback.target_changed").to_string(),
+                        );
+                    }
+                    Ok(ManagedAlertRuleEditOutcome::Unchanged) => {}
+                    Err(error) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Interaction,
+                            FeedbackSeverity::Error,
+                            FeedbackLifecycle::SHORT,
+                            format!("{}: {error}", t("alerts.manage")),
+                        );
+                    }
+                }
                 None
             }
         }
@@ -133,6 +266,63 @@ impl IcedApp {
         self.shell.projection().alert_center.managed_rules()
     }
 
+    /// Export the canonical managed alert rules as a JSON document.
+    pub fn export_alert_rules(&self) -> Result<String, AlertRuleTransferError> {
+        let entries: Vec<AlertRuleTransferEntry> = self
+            .alerts_rules()
+            .iter()
+            .map(AlertRuleTransferEntry::from)
+            .collect();
+        export_alert_rules_json(&entries)
+    }
+
+    /// Import alert rules from a JSON document using the specified merge mode.
+    pub fn import_alert_rules(
+        &mut self,
+        json: &str,
+        mode: AlertRuleImportMode,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        let entries = import_alert_rules_json(json)?;
+        let rules: Vec<ManagedAlertRule> =
+            entries.into_iter().map(ManagedAlertRule::from).collect();
+        self.shell
+            .edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
+    }
+
+    /// Add one durable alert rule into the managed authority.
+    pub fn add_alert_rule(
+        &mut self,
+        rule: AlertRule,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        self.shell
+            .edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
+    }
+
+    /// Update one durable alert rule in the managed authority.
+    pub fn update_alert_rule(
+        &mut self,
+        rule: AlertRule,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        let enabled = self
+            .alerts_rules()
+            .iter()
+            .find(|m| m.rule.id == rule.id)
+            .is_none_or(|m| m.enabled);
+        self.shell.edit_alert_rules(ManagedAlertRuleEdit::Update {
+            target_id: rule.id.clone(),
+            managed: ManagedAlertRule::new(rule, enabled),
+        })
+    }
+
+    /// Remove one durable alert rule by stable identity.
+    pub fn remove_alert_rule(
+        &mut self,
+        rule_id: String,
+    ) -> Result<ManagedAlertRuleEditOutcome, AlertRuleTransferError> {
+        self.shell
+            .edit_alert_rules(ManagedAlertRuleEdit::Remove { rule_id })
+    }
+
     /// Toggle one canonical managed rule through the semantic reducer. An
     /// missing stable target (a stale row widget after an import/removal) is
     /// an honest no-op and cannot mutate the rule that moved into its place.
@@ -149,7 +339,7 @@ impl IcedApp {
 // reads from the Iced widget tree in `ui/alerts.rs`.
 
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertRule, AlertSeverity};
+use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
 use taskmanager_core::core::metrics::SystemSnapshot;
 
 /// One rendered rule row (pure seam the headless tests assert on).

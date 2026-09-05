@@ -67,6 +67,7 @@ taskmanager-shell = { path = "../taskmanager-shell" }
 taskmanager-icons = { path = "../taskmanager-icons", default-features = false }
 taskmanager-theme = { path = "../taskmanager-theme" }
 taskmanager-ui-contract = { path = "../taskmanager-ui-contract" }
+taskmanager-accessibility-linux = { path = "../taskmanager-accessibility-linux" }
 # The bundled font bytes (ADR-026 fonts policy): the composition edge (run.rs)
 # registers Roboto Mono + MiSans VF into iced's font database, the same
 # single source GPUI embeds — zero toolkit, pure leaf crate.
@@ -98,6 +99,8 @@ windows = { version = "0.58.0", default-features = false, features = [
 ] }
 
 [dev-dependencies]
+accesskit = "0.24.1"
+accesskit_consumer = "0.38"
 taskmanager-test-support = { path = "../taskmanager-test-support" }
 # Test fixtures read the live-graph read model directly; production sources
 # consume the shell's trend projections instead (frontend firewall).

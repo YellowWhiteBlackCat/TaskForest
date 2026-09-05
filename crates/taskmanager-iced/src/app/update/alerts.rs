@@ -9,6 +9,7 @@ use super::dispatch::UpdateDispatch;
 
 impl IcedApp {
     pub(super) fn reduce_alerts_message(&mut self, message: Message) -> UpdateDispatch {
+        let mut clipboard_task = None;
         let effect = match message {
             Message::ClearAlertEvents => {
                 self.shell.clear_alert_event_history();
@@ -37,9 +38,15 @@ impl IcedApp {
                 }
                 None
             }
-            Message::Alerts(message) => self.update_alerts(message),
+            Message::Alerts(message) => {
+                self.update_alerts_with_clipboard(message, &mut clipboard_task)
+            }
             _ => None,
         };
-        UpdateDispatch::effect(effect)
+        let mut dispatch = UpdateDispatch::effect(effect);
+        if let Some(task) = clipboard_task {
+            dispatch = dispatch.with_task(task);
+        }
+        dispatch
     }
 }

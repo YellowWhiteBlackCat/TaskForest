@@ -174,3 +174,91 @@ mod connection_tests {
         );
     }
 }
+
+#[test]
+fn format_resource_pair_formats_honestly() {
+    assert_eq!(
+        format_resource_pair(
+            Some("10 MiB".into()),
+            Some(LimitValue::Unlimited),
+            |v| format!("{v} B")
+        ),
+        Some("10 MiB / ∞".into())
+    );
+    assert_eq!(
+        format_resource_pair(
+            Some("10 MiB".into()),
+            Some(LimitValue::Value(100)),
+            |v| format!("{v} B")
+        ),
+        Some("10 MiB / 100 B".into())
+    );
+    assert_eq!(
+        format_resource_pair(Some("10 MiB".into()), None, |v| format!("{v} B")),
+        Some("10 MiB".into())
+    );
+    assert_eq!(
+        format_resource_pair(None, Some(LimitValue::Unlimited), |v| format!("{v} B")),
+        Some("— / ∞".into())
+    );
+    assert_eq!(
+        format_resource_pair(None, Some(LimitValue::Value(100)), |v| format!("{v} B")),
+        Some("— / 100 B".into())
+    );
+    assert_eq!(format_resource_pair(None, None, |v| format!("{v} B")), None);
+}
+
+#[test]
+fn insights_sections_render_all_states_without_panic() {
+    use taskmanager_application::{ProcessInsightsProjection, ProcessInsightsRevision};
+    use taskmanager_core::core::process::FrozenProcessIdentity;
+
+    let theme = taskmanager_theme::Theme::default();
+
+    // None (initial)
+    let _ = environment_section(&theme, None);
+    let _ = resources_section(&theme, None);
+    let _ = isolation_section(&theme, None);
+    let _ = gpu_devices_section(&theme, None);
+
+    // Pending via tracker
+    let target =
+        FrozenProcessIdentity::from_authoritative_parts(1, String::from("init"), 10, 100).unwrap();
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target.clone(), ProcessInsightsRevision::new(1));
+    let pending = tracker.snapshot().unwrap();
+
+    let _ = environment_section(&theme, Some(&pending));
+    let _ = resources_section(&theme, Some(&pending));
+    let _ = isolation_section(&theme, Some(&pending));
+    let _ = gpu_devices_section(&theme, Some(&pending));
+
+    // Unavailable
+    let mut unavailable = pending.clone();
+    unavailable.threads = ProcessInsightFacetState::Unavailable(
+        ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied),
+    );
+    unavailable.open_files = ProcessInsightFacetState::Unavailable(
+        ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied),
+    );
+    unavailable.network = ProcessInsightFacetState::Unavailable(
+        ProcessInsightUnavailable::Provider(FailureKind::RequiresEscalation),
+    );
+    unavailable.gpu = ProcessInsightFacetState::Unavailable(ProcessInsightUnavailable::Provider(
+        FailureKind::Unsupported,
+    ));
+    unavailable.resources = ProcessInsightFacetState::Unavailable(
+        ProcessInsightUnavailable::Submission(SubmissionErrorKind::UnsupportedCapability),
+    );
+    unavailable.isolation = ProcessInsightFacetState::Unavailable(
+        ProcessInsightUnavailable::Provider(FailureKind::TemporarilyUnavailable),
+    );
+    unavailable.environment = ProcessInsightFacetState::Unavailable(
+        ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied),
+    );
+
+    let _ = environment_section(&theme, Some(&unavailable));
+    let _ = resources_section(&theme, Some(&unavailable));
+    let _ = isolation_section(&theme, Some(&unavailable));
+    let _ = gpu_devices_section(&theme, Some(&unavailable));
+}

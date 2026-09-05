@@ -1,46 +1,37 @@
 //! Toolkit-neutral semantic projection for the Iced frontend.
 //!
 //! This module consumes the same `taskmanager-ui-contract` snapshot builder as
-//! GPUI. It deliberately stops at a validated semantic tree: Iced has no
-//! linked native accessibility bridge in this slice, so a snapshot is not
-//! reported as an AT-SPI or screen-reader receipt.
+//! GPUI. On Linux the bridge is backed by a real `accesskit_unix::Adapter`
+//! (via `taskmanager-accessibility-linux`); on other targets it is the
+//! contract's detached bridge.
 //!
-//! **Contract-level detached projection, by owner decision (G-15, decision
-//! 10, 2026-08-14):** `semantic_snapshot` has NO live-loop call site and must
-//! not gain one — wiring an AT-SPI bridge (or even a slow-tick snapshot call)
-//! is frozen-domain new functionality. The projection stays reachable through
-//! [`crate::IcedApp::semantic_snapshot`] (shell-level facts) and
-//! [`crate::IcedApp::semantic_snapshot_with_local`] (shell facts plus the
-//! frontend-local alerts route) for tests and contract validation only, so
-//! the semantic vocabulary cannot drift from the GPUI surface while the
-//! native bridge remains unlinked.
+//! Publication is driven from the periodic refresh loop in `handle_tick_message`
+//! so the semantic tree advances on actual data changes rather than on every
+//! hover/focus repaint.
 
+use std::cmp::Ordering;
 use taskmanager_application::i18n::t;
+use taskmanager_application::process_sort::{ProcessSortAxis, compare_processes};
 use taskmanager_assets::product;
 use taskmanager_core::core::process::ProcessLiveKey;
 use taskmanager_shell::{ProcessRowId, ShellApp, process_semantic_key};
 use taskmanager_ui_contract::{
-    AlertRuleInput, GraphSummary, ModalInput, ProcessRowInput, SemanticSnapshot,
+    AccessibilityActionRejection, AccessibilityActionRequest, AccessibilityBridge, AlertRuleInput,
+    GraphSummary, ModalInput, ProcessRowInput, SemanticAction, SemanticSnapshot,
     SemanticSnapshotBuilder,
 };
+
+pub type AppAccessibilityBridge = taskmanager_accessibility_linux::LinuxAccessKitBridge;
 
 const MAX_PUBLISHED_ROWS: usize = 64;
 
 /// Build the current Iced semantic tree without performing native I/O.
-///
-/// The projection is bounded, uses the shell's active process ordering and
-/// cursor, and retains unavailable CPU/memory values as `Unavailable` in the
-/// contract rather than converting them to zero.
 #[must_use]
 pub fn semantic_snapshot(shell: &ShellApp) -> Option<SemanticSnapshot> {
     base_builder(shell).build().ok()
 }
 
-/// Build the semantic tree including the frontend-local routes: while the
-/// alerts page is open, the managed rule rows publish as a named group of
-/// toggleable switches (name, enabled choice, and the triggering flag folded
-/// into the localized detail line). Still a detached projection — no
-/// live-loop call site (see the module header).
+/// Build the semantic tree including the frontend-local routes.
 #[must_use]
 pub fn semantic_snapshot_with_local(app: &crate::IcedApp) -> Option<SemanticSnapshot> {
     let builder = base_builder(&app.shell);
@@ -50,6 +41,67 @@ pub fn semantic_snapshot_with_local(app: &crate::IcedApp) -> Option<SemanticSnap
         builder
     };
     builder.build().ok()
+}
+
+/// Build one semantic snapshot from the current view state and publish it
+/// to the linked accessibility bridge, then drain any inbound AT action
+/// requests.
+pub fn publish_accessibility_snapshot(app: &mut crate::IcedApp) {
+    app.a11y_revision = app.a11y_revision.wrapping_add(1);
+    if app.a11y_bridge.capability().is_ready()
+        && let Some(snapshot) = semantic_snapshot_with_local(app)
+    {
+        if app.a11y_bridge.try_publish(snapshot.clone()).is_ok() {
+            app.a11y_snapshot = Some(snapshot);
+        } else {
+            app.a11y_snapshot = None;
+        }
+    } else {
+        app.a11y_snapshot = None;
+    }
+
+    while let Ok(Some(request)) = app.a11y_bridge.try_recv_action() {
+        let Some(snapshot) = app.a11y_snapshot.clone() else {
+            continue;
+        };
+        let _ = apply_accessibility_action(app, &request, &snapshot);
+    }
+}
+
+/// Validate and execute one assistive-technology action against the frozen
+/// semantic snapshot.
+pub fn apply_accessibility_action(
+    app: &mut crate::IcedApp,
+    request: &AccessibilityActionRequest,
+    snapshot: &SemanticSnapshot,
+) -> Result<(), AccessibilityActionRejection> {
+    request.validate_against(snapshot)?;
+
+    if let Some(identity) = app.shell.visible_processes().iter().find_map(|process| {
+        (format!("row:{}", process_semantic_key(process)) == request.node.as_str())
+            .then(|| ProcessLiveKey::from_process(process))
+            .flatten()
+    }) {
+        match request.action {
+            SemanticAction::Focus | SemanticAction::Select => {
+                let _ = app
+                    .shell
+                    .apply_action(taskmanager_application::AppAction::SelectPage(
+                        taskmanager_application::AppPage::Applications,
+                    ));
+                let _ = app.shell.select_row_id(ProcessRowId::Process(identity));
+                app.sync_visual_cursor();
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
+    if request.action == SemanticAction::Dismiss && request.node.as_str().starts_with("modal:") {
+        app.close_local_modals();
+        app.close_shell_modals();
+    }
+    Ok(())
 }
 
 /// The shell-level semantic facts (table, graph, status, modal) as a
@@ -80,12 +132,17 @@ fn base_builder(shell: &ShellApp) -> SemanticSnapshotBuilder {
         .as_ref()
         .and_then(|snapshot| snapshot.memory.current_total_bytes());
     let processes = shell.projection().processes_slice();
-    for (index, &raw_index) in shell
-        .visible_process_indices()
-        .iter()
-        .take(MAX_PUBLISHED_ROWS)
-        .enumerate()
-    {
+    let mut visible_indices: Vec<usize> = shell.visible_process_indices().to_vec();
+    visible_indices.sort_by(|&left, &right| {
+        let left_p = processes.get(left);
+        let right_p = processes.get(right);
+        match (left_p, right_p) {
+            (Some(l), Some(r)) => compare_processes(l, r, ProcessSortAxis::Cpu, false),
+            _ => Ordering::Equal,
+        }
+    });
+
+    for (index, &raw_index) in visible_indices.iter().take(MAX_PUBLISHED_ROWS).enumerate() {
         let Some(process) = processes.get(raw_index) else {
             continue;
         };
@@ -118,10 +175,7 @@ fn base_builder(shell: &ShellApp) -> SemanticSnapshotBuilder {
     builder
 }
 
-/// One semantic rule row per managed rule. The managed mirror and the pure
-/// row projection share order by construction; the triggering flag comes
-/// from the shell's `alert_active` mirror (`rule_id` match), rendered through
-/// the shared `alert.triggered` catalog key.
+/// One semantic rule row per managed rule.
 fn alert_rule_inputs(app: &crate::IcedApp) -> Vec<AlertRuleInput> {
     let rows = crate::app::alerts::rule_rows(app);
     app.alerts_rules()
@@ -155,8 +209,6 @@ fn alert_rule_inputs(app: &crate::IcedApp) -> Vec<AlertRuleInput> {
 
 fn memory_percentage(value: Option<u64>, total: Option<u64>) -> Option<f64> {
     let (value, total) = (value?, total.filter(|total| *total > 0)?);
-    // This is a bounded display conversion at the semantic edge; source
-    // values remain u64 in the shared process and snapshot contracts.
     let percentage = (value as f64 / total as f64 * 100.0).clamp(0.0, 100.0);
     percentage.is_finite().then_some(percentage)
 }

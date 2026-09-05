@@ -82,6 +82,9 @@ impl IcedApp {
                 crate::run::initial_window_size(),
             ),
             projection_caches: IcedProjectionCaches::default(),
+            a11y_bridge: taskmanager_accessibility_linux::LinuxAccessKitBridge::new(),
+            a11y_revision: 0,
+            a11y_snapshot: None,
         };
         // The boot observation is the dialog's trigger (GPUI parity): it is
         // submitted through the platform channel before the first frame, and
@@ -151,6 +154,9 @@ impl IcedApp {
                 crate::run::initial_window_size(),
             ),
             projection_caches: IcedProjectionCaches::default(),
+            a11y_bridge: taskmanager_accessibility_linux::LinuxAccessKitBridge::new(),
+            a11y_revision: 0,
+            a11y_snapshot: None,
         }
         // The demo keeps the shared shell fixture's single recorded snapshot
         // (G-02): the Performance chart renders the honest "collecting"

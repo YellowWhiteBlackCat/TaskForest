@@ -250,6 +250,10 @@ pub enum FocusTarget {
     /// One managed alert-rule row toggle on the Alerts page (render-order
     /// focus position only; edits carry the canonical stable rule id).
     AlertsRuleToggle(usize),
+    /// Export alert rules action button on the Alerts page.
+    AlertsExport,
+    /// Import alert rules action button on the Alerts page.
+    AlertsImport,
     /// One first-run dialog descriptor copy stop (location / run command /
     /// revert command rows, indices 0..=2).
     FirstRunCopy(u8),
@@ -260,7 +264,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 150] = [
+    pub const ALL: [Self; 152] = [
         Self::ModalClose,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
@@ -405,6 +409,8 @@ impl FocusTarget {
         Self::RunTaskCancel,
         Self::AlertsPageTab,
         Self::AlertsRuleToggle(0),
+        Self::AlertsExport,
+        Self::AlertsImport,
         Self::FirstRunCopy(0),
         Self::FirstRunCopy(1),
         Self::FirstRunCopy(2),
