@@ -218,6 +218,7 @@ fn capture_page_name(page: crate::app::Page) -> &'static str {
         crate::app::Page::Alerts => "alerts",
         crate::app::Page::Settings => "settings",
         crate::app::Page::AppHistory => "app-history",
+        crate::app::Page::Containers => "containers",
     }
 }
 
@@ -326,6 +327,7 @@ fn capture_page() -> Option<crate::app::Page> {
         "alerts" => Some(crate::app::Page::Alerts),
         "settings" => Some(crate::app::Page::Settings),
         "app-history" | "history" => Some(crate::app::Page::AppHistory),
+        "containers" => Some(crate::app::Page::Containers),
         _ => None,
     }
 }
@@ -391,6 +393,8 @@ impl Plugin for FrontendWindowPlugin {
         app.add_plugins(AppShellPlugin);
         crate::icons::register(app);
         crate::confirmation::register(app);
+        crate::pages::processes::affinity::register(app);
+        crate::pages::services::details_modal::register(app);
         crate::menu_modal::register::<crate::pages::processes::menu::ProcessMenuCtx>(app);
         crate::menu_modal::register::<crate::pages::services::menu::ServiceMenuCtx>(app);
         crate::menu_modal::register::<crate::pages::startup::menu::StartupMenuCtx>(app);

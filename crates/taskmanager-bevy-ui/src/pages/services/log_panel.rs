@@ -397,6 +397,7 @@ pub(crate) fn services_logs_button_activated(
 /// The Services toolbar row: the open-logs affordance, right-aligned. A
 /// disabled-looking (unselected) button still renders; the request observer
 /// drops a selection-less request honestly.
+#[allow(dead_code)]
 pub(crate) fn logs_toolbar_scene(has_selection: bool, palette: &UiPalette) -> Box<dyn Scene> {
     Box::new(bsn! {
         Node {

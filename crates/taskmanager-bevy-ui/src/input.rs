@@ -457,10 +457,17 @@ pub(crate) fn keyboard_dispatch_system(
             }
         }
 
-        // 4. Fixed-key router (arrows, Delete, Escape, F5, chorded letters).
+        // 4. Fixed-key router (arrows, Delete, Escape, F5, F9, chorded letters).
         if let Some(shared) = shared_key(event.key_code) {
-            let outcome = shell.handle_local_key(ShellKeyEvent::new(shared, modifiers));
-            applied |= dispatch(outcome, &mut pending.0);
+            if shared == taskmanager_application::KeyCode::F9
+                && modifiers == taskmanager_application::Modifiers::NONE
+            {
+                commands.trigger(crate::pages::performance::TogglePerformanceSidebar);
+                applied = true;
+            } else {
+                let outcome = shell.handle_local_key(ShellKeyEvent::new(shared, modifiers));
+                applied |= dispatch(outcome, &mut pending.0);
+            }
         }
     }
     if applied {

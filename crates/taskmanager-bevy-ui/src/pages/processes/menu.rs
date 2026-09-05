@@ -91,11 +91,11 @@ impl ActionMenuContext for ProcessMenuCtx {
     }
 
     fn commit(&self, pick: usize, shell: &mut ShellApp) -> Vec<PlatformEffect> {
-        // Re-anchor the shell's semantic row onto the frozen identity first:
-        // the shared end-task and batch reducers act on the shell's selection,
-        // never on the menu's copy of it. An identity that left the projection
-        // fails closed with the TUI's notice instead of acting on a neighbor.
-        if !shell.select_row_id(ProcessRowId::Process(self.identity)) {
+        // When multiple rows are selected, preserve the multi-select set so batch
+        // actions apply to all marked targets. Otherwise re-anchor to the single
+        // frozen row.
+        let is_multi_select = shell.selected_rows.len() > 1;
+        if !is_multi_select && !shell.select_row_id(ProcessRowId::Process(self.identity)) {
             shell.report_notice(
                 FeedbackSource::Interaction,
                 FeedbackSeverity::Warning,
@@ -106,9 +106,16 @@ impl ActionMenuContext for ProcessMenuCtx {
         }
         match MENU_ACTIONS[pick] {
             ProcessMenuAction::EndTask => {
-                // Arms the shared EndTask gate; the confirm path submits.
-                let _ = shell.apply_action(AppAction::RequestEndTask);
-                Vec::new()
+                if is_multi_select {
+                    shell
+                        .request_process_batch(ProcessBatchAction::End)
+                        .into_iter()
+                        .collect()
+                } else {
+                    // Arms the shared EndTask gate; the confirm path submits.
+                    let _ = shell.apply_action(AppAction::RequestEndTask);
+                    Vec::new()
+                }
             }
             ProcessMenuAction::EndProcessTree => {
                 shell.request_process_tree_end(self.identity);

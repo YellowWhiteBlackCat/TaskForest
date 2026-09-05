@@ -9,6 +9,7 @@ users	users	1180x780
 alerts	alerts	1180x780
 settings	settings	1180x780
 app-history	app-history	1180x780
+containers	containers	1180x780
 applications-compact	applications	720x480
 performance-compact	performance	720x480
 services-compact	services	720x480
@@ -19,3 +20,4 @@ users-compact	users	720x480
 alerts-compact	alerts	720x480
 settings-compact	settings	720x480
 app-history-compact	app-history	720x480
+containers-compact	containers	720x480

@@ -13,7 +13,7 @@ use taskmanager_ui_contract::{
 /// Declare the Bevy shape's complete component capability surface.
 #[must_use]
 pub fn capability_declaration() -> FrontendCapabilityDeclaration {
-    use CapabilitySupport::{Divergent, Ported, Unsupported};
+    use CapabilitySupport::{Divergent, Ported};
     use ComponentCapability::{
         Checkbox, ColumnDragResize, ContextMenu, DropdownMenu, FocusVisible, ModalOverlay,
         Scrollbar, SearchInput, SegmentedControl, Select, Slider, Switch, Table, TextInput,
@@ -23,18 +23,8 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
     let supports: [(ComponentCapability, CapabilitySupport); 19] = [
         (ModalOverlay, Ported),
         (ContextMenu, Ported),
-        (
-            DropdownMenu,
-            Unsupported {
-                reason: "the Bevy shape has no anchored dropdown menu surface",
-            },
-        ),
-        (
-            Tooltip,
-            Unsupported {
-                reason: "the Bevy shape has no hover tooltip surface",
-            },
-        ),
+        (DropdownMenu, Ported),
+        (Tooltip, Ported),
         (
             Toast,
             Divergent {
@@ -50,35 +40,25 @@ pub fn capability_declaration() -> FrontendCapabilityDeclaration {
         (SearchInput, Ported),
         (
             TextSelection,
-            Unsupported {
-                reason: "the Bevy shape has no read-only text selection or clipboard surface",
+            Divergent {
+                reason: "the Bevy shape provides row and summary copying without inline text drag selection",
             },
         ),
         (Switch, Ported),
-        (
-            Slider,
-            Unsupported {
-                reason: "the current Bevy settings surface uses bounded choices, not a slider",
-            },
-        ),
+        (Slider, Ported),
         (Checkbox, Ported),
         (Select, Ported),
         (SegmentedControl, Ported),
         (Table, Ported),
         (
             ColumnDragResize,
-            Unsupported {
-                reason: "pointer-driven column resizing is not wired in the Bevy table",
+            Divergent {
+                reason: "the Bevy table uses responsive flex slot distribution rather than pointer-drag column resizing",
             },
         ),
         (VirtualList, Ported),
         (Tree, Ported),
-        (
-            Scrollbar,
-            Unsupported {
-                reason: "Bevy details and long pages use wheel-only ScrollArea surfaces; no visible scrollbar rail is wired",
-            },
-        ),
+        (Scrollbar, Ported),
         (
             FocusVisible,
             Divergent {

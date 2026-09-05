@@ -569,3 +569,40 @@ fn escape_clears_feedback_notice_and_fires_feedback_changed() {
         "FeedbackChanged with empty feedback must have fired: {events:?}"
     );
 }
+
+#[test]
+fn f9_toggles_performance_sidebar_visibility() {
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+
+    let before = app
+        .world()
+        .get_resource::<crate::pages::performance::PerformanceSidebarVisible>()
+        .map(|s| s.0)
+        .unwrap_or(true);
+    assert!(before, "sidebar starts visible");
+
+    press(&mut app, KeyCode::F9, None);
+    app.update();
+
+    let after = app
+        .world()
+        .get_resource::<crate::pages::performance::PerformanceSidebarVisible>()
+        .map(|s| s.0)
+        .unwrap_or(true);
+    assert!(!after, "F9 hides the performance sidebar in Bevy");
+
+    app.world_mut()
+        .resource_mut::<bevy::input::ButtonInput<KeyCode>>()
+        .clear();
+    press(&mut app, KeyCode::F9, None);
+    app.update();
+
+    let restored = app
+        .world()
+        .get_resource::<crate::pages::performance::PerformanceSidebarVisible>()
+        .map(|s| s.0)
+        .unwrap_or(false);
+    assert!(restored, "F9 restores the performance sidebar in Bevy");
+}

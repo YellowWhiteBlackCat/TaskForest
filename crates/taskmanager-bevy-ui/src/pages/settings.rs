@@ -40,7 +40,8 @@ use bevy::camera::ClearColor;
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
-use bevy::ecs::system::{Commands, NonSendMut, Query, ResMut};
+use bevy::ecs::resource::Resource;
+use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::scene::{EntityScene, Scene, bsn};
 use bevy::ui::Checked;
 use bevy::ui::prelude::{
@@ -50,10 +51,11 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Checkbox, RadioButton, RadioGroup, ValueChange};
 use taskmanager_application::i18n::{Language, current_language, set_language};
 use taskmanager_application::{AppAction, TelemetryInterval};
+use taskmanager_core::config::Config;
 
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
-use crate::app::{FrontendTrack, PageContext, RouteChanged};
+use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
 use crate::pages::alerts::{page_observer, request_projection_refresh};
 use crate::palette::{UiPalette, space_8, ui_palette};
 use crate::window::{Role, TextRole, WindowPalette};
@@ -89,12 +91,69 @@ pub(crate) fn capacity_choice_index(capacity: usize) -> Option<usize> {
 /// combination as the cold start (GNOME skin, no high contrast, system
 /// fonts) — a switch changes exactly one variable.
 pub(crate) fn theme_for_mode(mode: LightDark) -> Theme {
+    theme_for_mode_and_contrast(mode, HighContrast::Off)
+}
+
+pub(crate) fn theme_for_mode_and_contrast(mode: LightDark, hc: HighContrast) -> Theme {
     Theme::build(
         Skin::Gnome,
         mode,
-        HighContrast::Off,
+        hc,
         ResolvedFonts::system_for(Skin::Gnome),
     )
+}
+
+/// Dynamic presentation theme preferences for the Bevy desktop shell.
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ThemePreferences {
+    /// Explicit mode choice, or `None` to follow the system desktop preference.
+    pub(crate) mode: Option<LightDark>,
+    /// Explicit skin choice, or `None` to follow default GNOME skin.
+    pub(crate) skin: Option<Skin>,
+    pub(crate) hc: bool,
+    pub(crate) observed_appearance: Option<taskmanager_core::core::appearance::DesktopAppearance>,
+}
+
+impl ThemePreferences {
+    #[must_use]
+    pub(crate) fn effective_skin(&self) -> Skin {
+        self.skin.unwrap_or(Skin::Gnome)
+    }
+
+    #[must_use]
+    pub(crate) fn effective_mode(&self) -> LightDark {
+        self.mode
+            .unwrap_or_else(|| match self.observed_appearance.map(|a| a.color_scheme) {
+                Some(taskmanager_core::core::appearance::PreferredColorScheme::Light) => {
+                    LightDark::Light
+                }
+                _ => LightDark::Dark,
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn effective_contrast(&self) -> HighContrast {
+        let is_hc = self.hc
+            || self
+                .observed_appearance
+                .and_then(|a| a.high_contrast)
+                .unwrap_or(false);
+        if is_hc {
+            HighContrast::On
+        } else {
+            HighContrast::Off
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn resolve_theme(&self) -> Theme {
+        Theme::build(
+            self.effective_skin(),
+            self.effective_mode(),
+            self.effective_contrast(),
+            ResolvedFonts::system_for(self.effective_skin()),
+        )
+    }
 }
 
 /// Which of the two switchable modes the live palette currently reflects,
@@ -127,6 +186,10 @@ pub(crate) struct SettingsChoice(pub(crate) SettingsField);
 #[derive(Clone, Default, PartialEq, Debug)]
 pub(crate) enum SettingsField {
     Theme(LightDark),
+    SystemMode,
+    #[allow(dead_code)]
+    Skin(Skin),
+    HighContrast(bool),
     Language(Language),
     Refresh(TelemetryInterval),
     HistoryCapacity(usize),
@@ -137,22 +200,193 @@ pub(crate) enum SettingsField {
 /// The activation applier: resolve the widget's typed choice, write it
 /// through its authority, then request the remount that shows the fresh
 /// values ("changes take effect immediately; no local copy state").
+/// Submit a patch to the shared [`ConfigCoordinator`] via [`SharedRuntime::lock_config`].
+pub(crate) fn patch_persisted_config<F>(
+    runtime: Option<&SharedRuntimeHandle>,
+    patch: F,
+) -> Option<
+    Result<
+        taskmanager_application::ConfigSubmissionStatus,
+        taskmanager_application::ConfigSubmitError,
+    >,
+>
+where
+    F: FnOnce(&mut Config),
+{
+    let runtime = runtime?;
+    let mut config_guard = runtime.shared.lock_config();
+    let client = config_guard.as_mut()?;
+
+    if client.snapshot().is_none() {
+        let _ = client.wait_for_initial(taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT);
+    } else {
+        let _ = client.drain();
+    }
+
+    let current = client.snapshot().cloned()?;
+    let mut updated = (*current).clone();
+    patch(&mut updated);
+
+    Some(client.try_submit(updated))
+}
+
+/// Apply a persisted [`Config`] snapshot to the live theme preferences and shell.
+#[allow(dead_code)]
+pub(crate) fn apply_persisted_config(
+    config: &Config,
+    prefs: Option<&mut ThemePreferences>,
+    palette: &mut WindowPalette,
+    clear: Option<&mut ClearColor>,
+    track: &mut FrontendTrack,
+) {
+    if let Some(prefs) = prefs {
+        if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
+            prefs.mode = None;
+        } else if config.mode.eq_ignore_ascii_case("Light") {
+            prefs.mode = Some(LightDark::Light);
+        } else if config.mode.eq_ignore_ascii_case("Dark") {
+            prefs.mode = Some(LightDark::Dark);
+        } else if config.mode.eq_ignore_ascii_case("EyeForest") {
+            prefs.mode = Some(LightDark::EyeForest);
+        }
+
+        if !config.skin.is_empty() {
+            prefs.skin = match config.skin.to_ascii_lowercase().as_str() {
+                "kde" => Some(Skin::Kde),
+                "windows" => Some(Skin::Windows),
+                "macos" => Some(Skin::Macos),
+                _ => Some(Skin::Gnome),
+            };
+        }
+
+        prefs.hc = config.hc;
+        apply_preferences(prefs, palette, clear);
+    }
+
+    if let Some(lang) = config.language.as_deref().and_then(Language::from_code) {
+        set_language(lang);
+    }
+
+    if config.refresh_ms > 0 {
+        track
+            .shell
+            .set_telemetry_interval(TelemetryInterval::clamped(Duration::from_millis(
+                config.refresh_ms,
+            )));
+    }
+
+    if config.graph_data_points > 0 {
+        track
+            .shell
+            .set_history_capacity(usize::try_from(config.graph_data_points).unwrap_or(60));
+    }
+}
+
+/// Sync preferences from the coordinator via [`SharedRuntimeHandle`].
+#[allow(dead_code)]
+pub(crate) fn sync_preferences_from_config(
+    runtime: Option<&SharedRuntimeHandle>,
+    prefs: Option<&mut ThemePreferences>,
+    palette: &mut WindowPalette,
+    clear: Option<&mut ClearColor>,
+    track: &mut FrontendTrack,
+) {
+    let Some(runtime) = runtime else {
+        return;
+    };
+    let mut config_guard = runtime.shared.lock_config();
+    let Some(client) = config_guard.as_mut() else {
+        return;
+    };
+
+    if client.snapshot().is_none() {
+        let _ = client.wait_for_initial(taskmanager_application::DEFAULT_CONFIG_INITIAL_WAIT);
+    } else {
+        let _ = client.drain();
+    }
+
+    if let Some(snapshot) = client.snapshot().cloned() {
+        apply_persisted_config(&snapshot, prefs, palette, clear, track);
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn settings_choice_observer(
     change: On<ValueChange<bool>>,
     choices: Query<&SettingsChoice>,
     mut track: NonSendMut<FrontendTrack>,
+    mut prefs: Option<ResMut<ThemePreferences>>,
     mut palette: ResMut<WindowPalette>,
     mut clear: Option<ResMut<ClearColor>>,
+    runtime: Option<Res<SharedRuntimeHandle>>,
     mut commands: Commands,
 ) {
     let Ok(choice) = choices.get(change.event().source) else {
         return; // a foreign widget: none of this page's business
     };
     match choice.0.clone() {
-        SettingsField::Theme(mode) => apply_theme(mode, &mut palette, clear.as_deref_mut()),
-        SettingsField::Language(language) => set_language(language),
-        SettingsField::Refresh(interval) => track.shell.set_telemetry_interval(interval),
-        SettingsField::HistoryCapacity(capacity) => track.shell.set_history_capacity(capacity),
+        SettingsField::Theme(mode) => {
+            if let Some(prefs) = prefs.as_deref_mut() {
+                prefs.mode = Some(mode);
+                apply_preferences(prefs, &mut palette, clear.as_deref_mut());
+            } else {
+                apply_theme(mode, &mut palette, clear.as_deref_mut());
+            }
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.mode = match mode {
+                    LightDark::Light => "Light".to_string(),
+                    LightDark::Dark => "Dark".to_string(),
+                    LightDark::EyeForest => "EyeForest".to_string(),
+                };
+            });
+        }
+        SettingsField::SystemMode => {
+            if let Some(prefs) = prefs.as_deref_mut() {
+                prefs.mode = None;
+                apply_preferences(prefs, &mut palette, clear.as_deref_mut());
+            }
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.mode = "System".to_string();
+            });
+        }
+        SettingsField::Skin(skin) => {
+            if let Some(prefs) = prefs.as_deref_mut() {
+                prefs.skin = Some(skin);
+                apply_preferences(prefs, &mut palette, clear.as_deref_mut());
+            }
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.skin = skin.label().to_string();
+            });
+        }
+        SettingsField::HighContrast(on) => {
+            if let Some(prefs) = prefs.as_deref_mut() {
+                prefs.hc = on;
+                apply_preferences(prefs, &mut palette, clear.as_deref_mut());
+            } else {
+                palette.inner.high_contrast = on;
+            }
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.hc = on;
+            });
+        }
+        SettingsField::Language(language) => {
+            set_language(language);
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.language = Some(language.code().to_string());
+            });
+        }
+        SettingsField::Refresh(interval) => {
+            track.shell.set_telemetry_interval(interval);
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.refresh_ms = u64::try_from(interval.duration().as_millis()).unwrap_or(u64::MAX);
+            });
+        }
+        SettingsField::HistoryCapacity(capacity) => {
+            track.shell.set_history_capacity(capacity);
+            let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
+                cfg.graph_data_points = u32::try_from(capacity).unwrap_or(u32::MAX);
+            });
+        }
         SettingsField::PauseTelemetry => {
             // Guarded so a repeated activation is a no-op, not a double flip.
             if track.shell.paused() != change.event().value {
@@ -161,6 +395,19 @@ fn settings_choice_observer(
         }
     }
     commands.trigger(RouteChanged);
+}
+
+/// Apply resolved theme preferences to the palette resource and clear color.
+pub(crate) fn apply_preferences(
+    prefs: &ThemePreferences,
+    palette: &mut WindowPalette,
+    clear: Option<&mut ClearColor>,
+) {
+    let theme = prefs.resolve_theme();
+    palette.inner = ui_palette(&theme);
+    if let Some(clear) = clear {
+        clear.0 = palette.inner.window_clear;
+    }
 }
 
 /// Re-resolve the render authorities from the theme tokens for `mode`. The
@@ -176,14 +423,23 @@ fn apply_theme(mode: LightDark, palette: &mut WindowPalette, clear: Option<&mut 
 // ---- view model rows (pure projections of the authorities) ----
 
 fn theme_entries(mode: Option<LightDark>) -> Vec<ChoiceEntry> {
-    [(LightDark::Light, "Light"), (LightDark::Dark, "Dark")]
-        .into_iter()
-        .map(|(value, label)| ChoiceEntry {
-            label: label.to_owned(),
-            choice: SettingsChoice(SettingsField::Theme(value)),
-            selected: mode == Some(value),
-        })
-        .collect()
+    vec![
+        ChoiceEntry {
+            label: "System".to_owned(),
+            choice: SettingsChoice(SettingsField::SystemMode),
+            selected: mode.is_none(),
+        },
+        ChoiceEntry {
+            label: "Light".to_owned(),
+            choice: SettingsChoice(SettingsField::Theme(LightDark::Light)),
+            selected: mode == Some(LightDark::Light),
+        },
+        ChoiceEntry {
+            label: "Dark".to_owned(),
+            choice: SettingsChoice(SettingsField::Theme(LightDark::Dark)),
+            selected: mode == Some(LightDark::Dark),
+        },
+    ]
 }
 
 fn language_entries(language: Language) -> Vec<ChoiceEntry> {
@@ -246,15 +502,25 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let paused = context.shell.paused();
     let language = current_language();
     let mode = palette_mode(context.palette);
+    let hc = context.palette.high_contrast;
     let rows: Vec<Box<dyn Scene>> = vec![
         radio_row(
             "Theme",
             theme_entries(mode),
             match mode {
                 Some(LightDark::Light) => "Light",
-                Some(_) => "Dark",
-                None => "custom skin",
+                Some(LightDark::Dark) => "Dark",
+                _ => "System",
             },
+        ),
+        toggle_row(
+            "High contrast",
+            ChoiceEntry {
+                label: "enabled".to_owned(),
+                choice: SettingsChoice(SettingsField::HighContrast(!hc)),
+                selected: hc,
+            },
+            if hc { "enabled" } else { "disabled" },
         ),
         radio_row(
             "Language",
@@ -453,3 +719,7 @@ fn unchecked_checkbox_shape(label: String, field: SettingsField) -> impl Scene +
 #[cfg(test)]
 #[path = "../../tests/headless/pages/settings.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/config_sync.rs"]
+mod config_sync;

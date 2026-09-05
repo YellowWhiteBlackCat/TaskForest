@@ -70,6 +70,7 @@ use crate::widgets::table::{
 };
 use crate::window::{Role, TextRole, WindowPalette};
 
+pub(crate) mod affinity;
 pub(crate) mod details;
 pub(crate) mod input;
 pub(crate) mod menu;
@@ -158,12 +159,13 @@ pub(crate) fn rows_projection(
         .enumerate()
         .map(|(offset, process)| {
             let index = window.first + offset;
+            let is_selected = Some(index) == selected || shell.is_process_selected(process);
             ProcessRowView {
                 index,
                 semantic_id: process_semantic_key(process),
                 name: process.name.clone(),
-                cells: projection::row_cells(process, &columns, Some(index) == selected),
-                selected: Some(index) == selected,
+                cells: projection::row_cells(process, &columns, is_selected),
+                selected: is_selected,
             }
         })
         .collect();
@@ -246,6 +248,13 @@ pub(crate) struct ProcessSelectStep {
 /// `select_row`; an out-of-range row is rejected, never clamped).
 #[derive(Clone, Debug, EntityEvent)]
 pub(crate) struct ProcessSelectRow {
+    pub(crate) entity: Entity,
+    pub(crate) row: usize,
+}
+
+/// Multi-selection toggle on one visible row (Space / multi-select click).
+#[derive(Clone, Debug, EntityEvent)]
+pub(crate) struct ProcessToggleRowSelection {
     pub(crate) entity: Entity,
     pub(crate) row: usize,
 }
@@ -409,6 +418,30 @@ fn on_select_row(
     ensure_applications_row_context(shell);
     let before = selected_identity(shell);
     if !shell.select_row(trigger.event().row) {
+        return;
+    }
+    let after = selected_identity(shell);
+    let total = shell.visible_process_count();
+    surface.scroll.top = centered_scroll_top(total, surface.scroll.viewport_rows, shell.selected);
+    let Ok(root) = surface.roots.single() else {
+        return;
+    };
+    rebuild_table(&mut commands, root, shell, &mut surface);
+    if before != after {
+        commands.trigger(ProcessSelectionChanged);
+    }
+}
+
+fn on_toggle_row_selection(
+    trigger: On<ProcessToggleRowSelection>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut surface: TableSurface,
+    mut commands: Commands,
+) {
+    let shell = &mut track.shell;
+    ensure_applications_row_context(shell);
+    let before = selected_identity(shell);
+    if !shell.toggle_row_selection(trigger.event().row) {
         return;
     }
     let after = selected_identity(shell);
@@ -621,6 +654,7 @@ fn rows_root_scene(
         on(bootstrap_processes_page)
         on(on_select_step)
         on(on_select_row)
+        on(on_toggle_row_selection)
         on(on_scroll_intent)
         on(on_query_commit)
         ProcessRowsRoot
@@ -637,7 +671,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     // Honest capability note: the grouped tree strip is mounted; per-row
     // trend and multi-select batch verbs are not part of this frontend yet.
     let note = format!(
-        "{} — grouped tree is available; per-row trend and multi-select are unavailable; Delete arms the shared end-task gate; details follow the selected row",
+        "{} — grouped tree is available; multi-select batch verbs (suspend/resume/kill) are available; Delete arms the shared end-task gate; details follow the selected row",
         Page::Processes.nav_label()
     );
     let viewport_rows = rows_in_viewport(TABLE_VIEWPORT_HEIGHT_PX, palette.control_height_px);
@@ -703,3 +737,18 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
 #[cfg(test)]
 #[path = "../../tests/headless/pages/processes.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/process_affinity.rs"]
+mod process_affinity_tests;
+
+/// Request a batch process-control action (suspend/resume/kill) over current selection,
+/// arming the shared confirmation gate with `ProcessBatch` when multiple rows are targeted
+/// or when the verb is destructive.
+#[allow(dead_code)]
+pub(crate) fn request_process_batch(
+    shell: &mut ShellApp,
+    action: taskmanager_core::core::process::ProcessBatchAction,
+) -> Option<taskmanager_application::PlatformEffect> {
+    shell.request_process_batch(action)
+}

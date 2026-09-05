@@ -132,6 +132,8 @@ bevy = { version = "=0.19.1", default-features = false, features = [
 ] }
 
 [dev-dependencies]
+accesskit_consumer = "0.38"
+taskmanager-accessibility-linux = { path = "../taskmanager-accessibility-linux" }
 # Headless seam tests inject fake event ports through the application
 # re-exports; the app-host test-support feature marks the dev-only edge (the
 # same opt-in GPUI's test matrix uses).

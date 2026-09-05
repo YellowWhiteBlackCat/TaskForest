@@ -58,29 +58,90 @@ struct SnapshotKey {
 pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, SemanticSnapshotError> {
     let revision = shell.projection().process_revision;
     let mut builder = SemanticSnapshotBuilder::new(revision).application_name("TaskForestB");
-    let visible = shell.visible_processes();
-    if !visible.is_empty() {
-        let selected = shell.selected.min(visible.len() - 1);
-        let rows = visible
-            .iter()
-            .take(MAX_SNAPSHOT_ROWS)
-            .enumerate()
-            .map(|(index, process)| ProcessRowInput {
-                id: taskmanager_shell::process_semantic_key(process),
-                name: process.name.clone(),
-                cpu_percent: process.current_cpu_percentage().map(f64::from),
-                // A per-process share needs the denominator the shell does
-                // not project on rows; the semantic value stays honestly
-                // unavailable instead of a fabricated zero.
-                memory_percent: None,
-                selected: index == selected,
+
+    if let Some(cpu_current) = shell
+        .projection()
+        .snapshot
+        .as_ref()
+        .and_then(|snapshot| snapshot.cpu.current_global_usage_pct())
+        .filter(|value| value.is_finite())
+    {
+        let current = f64::from(cpu_current.clamp(0.0, 100.0));
+        builder = builder.cpu_graph(taskmanager_ui_contract::GraphSummary {
+            current,
+            peak: current,
+            maximum: 100.0,
+        });
+    }
+
+    let memory_total = shell
+        .projection()
+        .snapshot
+        .as_ref()
+        .and_then(|snapshot| snapshot.memory.current_total_bytes());
+    let mut rows_vec = shell.visible_processes();
+    rows_vec.sort_by(|left, right| {
+        taskmanager_application::process_sort::compare_processes(
+            left,
+            right,
+            taskmanager_application::process_sort::ProcessSortAxis::Cpu,
+            false,
+        )
+    });
+
+    let rows: Vec<ProcessRowInput> = rows_vec
+        .into_iter()
+        .take(MAX_SNAPSHOT_ROWS)
+        .enumerate()
+        .map(|(index, process)| {
+            let name = if process.name.trim().is_empty() {
+                String::from("Unnamed process")
+            } else {
+                process.name.clone()
+            };
+            let memory_percent = memory_total.and_then(|total| {
+                if total == 0 {
+                    return None;
+                }
+                process
+                    .current_memory_bytes()
+                    .map(|bytes| (bytes as f64 / total as f64 * 100.0).clamp(0.0, 100.0))
             });
+            let selected = match shell.selected_row {
+                Some(taskmanager_shell::ProcessRowId::Process(identity)) => {
+                    taskmanager_core::core::process::ProcessLiveKey::from_process(process)
+                        .is_some_and(|row_identity| row_identity == identity)
+                }
+                Some(
+                    taskmanager_shell::ProcessRowId::Application(_)
+                    | taskmanager_shell::ProcessRowId::Category(_),
+                ) => false,
+                None => index == shell.selected,
+            } || shell.is_process_selected(process);
+            ProcessRowInput {
+                id: taskmanager_shell::process_semantic_key(process),
+                name,
+                cpu_percent: process
+                    .current_cpu_percentage()
+                    .filter(|value| value.is_finite())
+                    .map(|v| f64::from(v.clamp(0.0, 100.0))),
+                memory_percent,
+                selected,
+            }
+        })
+        .collect();
+    if !rows.is_empty() {
         builder = builder.process_rows(rows);
     }
+
     let feedback = shell.feedback_text();
-    if !feedback.is_empty() {
-        builder = builder.status_announcement(feedback);
-    }
+    let status = if feedback.trim().is_empty() {
+        format!("{} processes", shell.visible_process_count())
+    } else {
+        feedback.to_owned()
+    };
+    builder = builder.status_announcement(status);
+
     if let Some(view) = shell
         .pending_confirmation()
         .and_then(PendingConfirmationView::from_pending)
@@ -91,9 +152,48 @@ pub(crate) fn build_snapshot(shell: &ShellApp) -> Result<SemanticSnapshot, Seman
             description: Some(view.body),
         });
     }
-    // The builder validates connectivity/roles; a broken tree must never be
-    // published.
     builder.build()
+}
+
+/// Validate and execute one assistive-technology action against the frozen
+/// semantic snapshot for Bevy.
+#[allow(dead_code)]
+pub(crate) fn apply_accessibility_action(
+    track: &mut FrontendTrack,
+    request: &taskmanager_ui_contract::AccessibilityActionRequest,
+    snapshot: &SemanticSnapshot,
+) -> Result<(), taskmanager_ui_contract::AccessibilityActionRejection> {
+    request.validate_against(snapshot)?;
+
+    if let Some(identity) = track.shell.visible_processes().iter().find_map(|process| {
+        (format!("row:{}", taskmanager_shell::process_semantic_key(process))
+            == request.node.as_str())
+        .then(|| taskmanager_core::core::process::ProcessLiveKey::from_process(process))
+        .flatten()
+    }) {
+        match request.action {
+            taskmanager_ui_contract::SemanticAction::Focus
+            | taskmanager_ui_contract::SemanticAction::Select => {
+                let _ = track
+                    .shell
+                    .apply_action(taskmanager_application::AppAction::SelectPage(
+                        taskmanager_application::AppPage::Applications,
+                    ));
+                let _ = track
+                    .shell
+                    .select_row_id(taskmanager_shell::ProcessRowId::Process(identity));
+            }
+            _ => {}
+        }
+        return Ok(());
+    }
+
+    if request.action == taskmanager_ui_contract::SemanticAction::Dismiss
+        && request.node.as_str().starts_with("modal:")
+    {
+        track.shell.dismiss_overlay();
+    }
+    Ok(())
 }
 
 /// The `PostUpdate` projection: rebuild only when the revision key moved.

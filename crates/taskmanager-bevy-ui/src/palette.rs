@@ -95,6 +95,11 @@ pub(crate) struct UiPalette {
     pub(crate) caption: TextFont,
     /// Monospace metrics for aligned telemetry values and diagnostics.
     pub(crate) mono: TextFont,
+    /// High-contrast theme active flag.
+    pub(crate) high_contrast: bool,
+    /// Panel and card border color.
+    #[allow(dead_code)]
+    pub(crate) border_color: Color,
 }
 
 /// Resolve the window palette from a theme snapshot.
@@ -121,6 +126,8 @@ pub(crate) fn ui_palette(theme: &Theme) -> UiPalette {
         heading_color: theme_color(theme.fg),
         body_color: theme_color(theme.fg),
         dim_color: theme_color(theme.fg_dim),
+        high_contrast: theme.hc,
+        border_color: theme_color(theme.border),
         heading: TextFont {
             font_size: FontSize::Px(standard.page_title_font_size().0),
             weight: theme_weight(tokens::FONT_WEIGHT_HEADER),

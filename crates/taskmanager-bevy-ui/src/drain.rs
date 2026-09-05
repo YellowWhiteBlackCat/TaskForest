@@ -21,6 +21,7 @@ use taskmanager_platform_contract::CapabilitySnapshot;
 use taskmanager_shell::ShellApp;
 
 use crate::app::{FrontendTrack, SharedRuntimeHandle};
+use crate::window::WindowPalette;
 
 /// Upper bound on how many non-empty event batches one frame drains.
 ///
@@ -69,6 +70,8 @@ pub(crate) struct DrainCycle {
     pub(crate) capability_summary: Option<String>,
     /// Whether a scheduled or post-control refresh intent left this frame.
     pub(crate) refresh_submitted: bool,
+    /// Latest observed desktop appearance from the platform runtime.
+    pub(crate) appearance: Option<taskmanager_core::core::appearance::DesktopAppearance>,
 }
 
 /// One frame's drain: capability fold, bounded batch drain, refresh intents.
@@ -89,11 +92,17 @@ pub(crate) fn run_drain_cycle(
     let snapshot = client.capabilities().snapshot();
     let capabilities_changed = shell.apply_capability_snapshot(snapshot.clone());
     let mut folded_batches = 0;
+    let mut last_appearance = None;
     for _ in 0..EVENT_DRAIN_BATCH {
         match client.try_drain() {
             Ok(batch) => {
                 if batch.is_empty() {
                     break;
+                }
+                for event in &batch.desktop_appearance_events {
+                    let taskmanager_application::DesktopAppearanceEvent::Snapshot(snapshot) =
+                        &event.event;
+                    last_appearance = Some(snapshot.value);
                 }
                 shell.apply_platform_batch(batch);
                 folded_batches += 1;
@@ -134,6 +143,7 @@ pub(crate) fn run_drain_cycle(
         folded_batches,
         capability_summary: capabilities_changed.then(|| capability_summary_line(&snapshot)),
         refresh_submitted,
+        appearance: last_appearance,
     }
 }
 
@@ -187,11 +197,19 @@ pub(crate) fn unix_now_ms() -> u64 {
 /// so the summary line reflects live platform state instead of staying on its
 /// cold-start text. Batches folded this frame trigger
 /// [`ShellProjectionFolded`] for the page observers.
+#[allow(
+    clippy::too_many_arguments,
+    clippy::collapsible_if,
+    clippy::explicit_auto_deref
+)]
 pub(crate) fn drain_system(
     runtime: Res<SharedRuntimeHandle>,
     mut track: NonSendMut<FrontendTrack>,
     mut pending: ResMut<crate::input::PendingEffects>,
     mut feedback_cache: ResMut<FeedbackCache>,
+    prefs: Option<ResMut<crate::pages::settings::ThemePreferences>>,
+    palette: Option<ResMut<WindowPalette>>,
+    mut clear: Option<ResMut<bevy::camera::ClearColor>>,
     mut commands: Commands,
 ) {
     let mut client = runtime.shared.lock_client();
@@ -215,6 +233,22 @@ pub(crate) fn drain_system(
     }
     if let Some(summary) = cycle.capability_summary {
         commands.trigger(CapabilitySummaryChanged(summary));
+    }
+    if let Some(appearance) = cycle.appearance {
+        if let Some(mut prefs) = prefs {
+            if prefs.observed_appearance != Some(appearance) {
+                prefs.observed_appearance = Some(appearance);
+                if prefs.mode.is_none() {
+                    if let Some(mut pal) = palette {
+                        crate::pages::settings::apply_preferences(
+                            &*prefs,
+                            &mut pal,
+                            clear.as_deref_mut(),
+                        );
+                    }
+                }
+            }
+        }
     }
     let feedback = track.shell.feedback_text().to_owned();
     if feedback_cache.0.as_deref() != Some(feedback.as_str()) {

@@ -84,6 +84,19 @@ cp "$MATRIX" "$OUT/matrix.tsv"
     printf 'command=cargo nextest run %s -p taskmanager-bevy-ui --lib -j 4 --no-fail-fast\n' "$LOCK_FLAG"
     printf 'status=%s\n' "$status"
 } >"$OUT/receipt.txt"
+{
+    printf '{\n'
+    printf '  "run_id": "%s",\n' "$RUN_ID"
+    printf '  "git_head": "%s",\n' "$(cat "$OUT/git-head.txt")"
+    printf '  "worktree_sha256": "%s",\n' "$(sha256sum "$OUT/git-status.txt" | cut -d' ' -f1)"
+    printf '  "rust": "%s",\n' "$(cat "$OUT/rust.txt")"
+    printf '  "matrix": "scripts/bevy_interaction_matrix.tsv",\n'
+    printf '  "matrix_count": %s,\n' "$MATRIX_COUNT"
+    printf '  "command": "cargo nextest run %s -p taskmanager-bevy-ui --lib -j 4 --no-fail-fast",\n' "$LOCK_FLAG"
+    printf '  "status": "%s",\n' "$([ "$status" -eq 0 ] && printf 'pass' || printf 'fail')"
+    printf '  "exit_code": %s\n' "$status"
+    printf '}\n'
+} >"$OUT/receipt.json"
 [ "$status" -eq 0 ] || die "Bevy lib target failed (receipt: $OUT/receipt.txt)"
 printf 'Bevy interaction gate: PASS (%s matrix cases; full lib target green) -> %s\n' \
     "$MATRIX_COUNT" "$OUT"

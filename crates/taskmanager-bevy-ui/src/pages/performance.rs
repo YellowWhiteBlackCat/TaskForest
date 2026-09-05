@@ -171,6 +171,36 @@ pub(crate) struct PerformanceLayoutState(pub(crate) PerformanceLayoutMode);
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerformanceDeviceSidebar;
 
+/// The presentation visibility of the performance device navigator.
+#[derive(Resource, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PerformanceSidebarVisible(pub(crate) bool);
+
+impl Default for PerformanceSidebarVisible {
+    fn default() -> Self {
+        Self(true)
+    }
+}
+
+/// Triggered by F9 to toggle the device sidebar.
+#[derive(Event, Clone, Copy, Debug)]
+pub(crate) struct TogglePerformanceSidebar;
+
+pub(crate) fn toggle_sidebar_observer(
+    _event: On<TogglePerformanceSidebar>,
+    mut sidebar: ResMut<PerformanceSidebarVisible>,
+    mut device_rails: Query<&mut Node, With<PerformanceDeviceSidebar>>,
+) {
+    sidebar.0 = !sidebar.0;
+    let display = if sidebar.0 {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    for mut node in &mut device_rails {
+        node.display = display;
+    }
+}
+
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerformanceStatsRail;
 
@@ -494,6 +524,7 @@ fn sync_device_focus_changed(
 /// subtree is rebuilt when a window crosses the breakpoint.
 pub(crate) fn sync_performance_layout(
     windows: Query<&Window, bevy::ecs::query::With<PrimaryWindow>>,
+    sidebar: Option<Res<PerformanceSidebarVisible>>,
     mut state: ResMut<PerformanceLayoutState>,
     mut rails: ParamSet<(
         DeviceRailQuery<'_, '_>,
@@ -506,9 +537,10 @@ pub(crate) fn sync_performance_layout(
     let width = windows.iter().next().map_or(1180.0, Window::width);
     let mode = crate::widgets::layout::performance_layout_mode(width);
     state.0 = mode;
+    let sidebar_on = sidebar.is_none_or(|s| s.0);
     let display = match mode {
-        PerformanceLayoutMode::Wide => Display::Flex,
-        PerformanceLayoutMode::Compact => Display::None,
+        PerformanceLayoutMode::Wide if sidebar_on => Display::Flex,
+        _ => Display::None,
     };
     for mut node in &mut rails.p0() {
         node.display = display;

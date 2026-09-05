@@ -19,7 +19,8 @@ use std::sync::{Mutex, MutexGuard, OnceLock};
 
 use taskmanager_app_host::NativeAppHost;
 use taskmanager_application::{
-    HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets, PlatformHandle,
+    ConfigClient, HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets,
+    PlatformHandle,
 };
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilitySnapshot, EventEnvelope, EventPort, EventPortError,
@@ -64,16 +65,28 @@ impl fmt::Display for RuntimeStartFailure {
 }
 
 /// The started process-wide runtime: the shared client behind a short-lock
-/// mutex. Cloning is impossible by design — every consumer borrows the one
+/// mutex and an optional configuration client for cross-session persistence.
+/// Cloning is impossible by design — every consumer borrows the one
 /// `'static` handle.
 pub struct SharedRuntime {
     client: Mutex<PlatformClient>,
+    config: Mutex<Option<ConfigClient>>,
 }
 
 impl SharedRuntime {
-    fn new(client: PlatformClient) -> Self {
+    #[must_use]
+    pub fn new(client: PlatformClient) -> Self {
         Self {
             client: Mutex::new(client),
+            config: Mutex::new(None),
+        }
+    }
+
+    #[must_use]
+    pub fn with_config(client: PlatformClient, config: Option<ConfigClient>) -> Self {
+        Self {
+            client: Mutex::new(client),
+            config: Mutex::new(config),
         }
     }
 
@@ -84,6 +97,16 @@ impl SharedRuntime {
     /// and the typed event port keeps its own failure reporting.
     pub fn lock_client(&self) -> MutexGuard<'_, PlatformClient> {
         self.client
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+    }
+
+    /// Lock the shared configuration client for settings persistence.
+    ///
+    /// Poison is recovered via `into_inner` matching the workspace lock-poisoning
+    /// contract.
+    pub fn lock_config(&self) -> MutexGuard<'_, Option<ConfigClient>> {
+        self.config
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner())
     }
@@ -119,6 +142,19 @@ impl RuntimeCache {
         spawn: impl FnOnce() -> Result<PlatformClient, RuntimeStartFailure>,
     ) -> Result<&SharedRuntime, &RuntimeStartFailure> {
         match self.cell.get_or_init(|| spawn().map(SharedRuntime::new)) {
+            Ok(runtime) => Ok(runtime),
+            Err(failure) => Err(failure),
+        }
+    }
+
+    /// Return the cached runtime with optional configuration client.
+    pub fn get_or_init_with_config(
+        &self,
+        spawn: impl FnOnce() -> Result<(PlatformClient, Option<ConfigClient>), RuntimeStartFailure>,
+    ) -> Result<&SharedRuntime, &RuntimeStartFailure> {
+        match self.cell.get_or_init(|| {
+            spawn().map(|(client, config)| SharedRuntime::with_config(client, config))
+        }) {
             Ok(runtime) => Ok(runtime),
             Err(failure) => Err(failure),
         }
@@ -184,10 +220,13 @@ pub fn demo_platform_runtime() -> &'static SharedRuntime {
 /// Production-only seam (tests inject their own [`RuntimeCache`]); building
 /// the host reads the native composition paths exactly once per process.
 pub fn shared_platform_runtime() -> Result<&'static SharedRuntime, &'static RuntimeStartFailure> {
-    PROCESS_RUNTIME.get_or_init(|| {
-        NativeAppHost::production()
+    PROCESS_RUNTIME.get_or_init_with_config(|| {
+        let host = NativeAppHost::production();
+        let client = host
             .spawn_client()
-            .map_err(RuntimeStartFailure::composition)
+            .map_err(RuntimeStartFailure::composition)?;
+        let config = host.config_client().ok();
+        Ok((client, config))
     })
 }
 
