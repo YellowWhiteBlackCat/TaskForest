@@ -58,6 +58,7 @@ pub fn sort_id(col: SortCol) -> &'static str {
         SortCol::Swap => "sort-swap",
         SortCol::DiskRead => "sort-disk-r",
         SortCol::DiskWrite => "sort-disk-w",
+        SortCol::Network => "sort-network",
         SortCol::CpuTime => "sort-cputime",
         SortCol::Fds => "sort-fds",
         SortCol::Nice => "sort-nice",

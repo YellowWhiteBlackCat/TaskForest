@@ -103,6 +103,7 @@ fn contract_token(column: SortCol) -> Option<&'static str> {
         SortCol::CpuTime => Some("CPUTime"),
         SortCol::DiskRead => Some("DiskRead"),
         SortCol::DiskWrite => Some("DiskWrite"),
+        SortCol::Network => Some("Network"),
         SortCol::StartTime => Some("StartTime"),
         SortCol::Fds => Some("FDs"),
         SortCol::Nice => Some("Nice"),

@@ -54,6 +54,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::EndTask => "iced-end-task".to_owned(),
         FocusTarget::OpenProcessLocation => "iced-open-process-location".to_owned(),
         FocusTarget::SearchProcessOnline => "iced-search-process-online".to_owned(),
+        FocusTarget::ProcessEfficiencyMode => "iced-process-efficiency-mode".to_owned(),
         FocusTarget::ProcessAffinityOpen => "iced-process-affinity-open".to_owned(),
         FocusTarget::ProcessAffinityCpu(cpu) => format!("iced-process-affinity-cpu-{cpu}"),
         FocusTarget::ProcessAffinityApply => "iced-process-affinity-apply".to_owned(),

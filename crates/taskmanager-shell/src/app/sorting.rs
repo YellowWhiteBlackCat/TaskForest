@@ -41,6 +41,8 @@ pub enum SortCol {
     CpuTime,
     DiskRead,
     DiskWrite,
+    /// Network aggregate throughput.
+    Network,
     /// Process start time (wall-clock seconds since boot). Mirrors the gpui
     /// `SortCol::StartTime` advanced column.
     StartTime,
@@ -53,7 +55,7 @@ pub enum SortCol {
 impl SortCol {
     /// Every sortable process-table column, in declaration order. The
     /// iteration source for consumers and tests — never duplicate the list.
-    pub const ALL: [SortCol; 15] = [
+    pub const ALL: [SortCol; 16] = [
         SortCol::Pid,
         SortCol::Name,
         SortCol::Cpu,
@@ -66,6 +68,7 @@ impl SortCol {
         SortCol::CpuTime,
         SortCol::DiskRead,
         SortCol::DiskWrite,
+        SortCol::Network,
         SortCol::StartTime,
         SortCol::Fds,
         SortCol::Nice,
@@ -87,6 +90,7 @@ impl SortCol {
             Self::CpuTime => "CPU time",
             Self::DiskRead => "Disk R/s",
             Self::DiskWrite => "Disk W/s",
+            Self::Network => "Network",
             Self::StartTime => "Start",
             Self::Fds => "Fds",
             Self::Nice => "Nice",
@@ -95,7 +99,7 @@ impl SortCol {
 
     /// Cycle to the next column in display (left-to-right) order.
     ///
-    /// The advanced columns (Threads/CpuTime/DiskRead/DiskWrite) are intentionally
+    /// The advanced columns (Threads/CpuTime/DiskRead/DiskWrite/Network) are intentionally
     /// not in the cycle — they restart it at Pid — because the TUI `s` key drives
     /// this cycle and a terminal cannot display those columns. Wide frontends
     /// reach them directly via [`ShellApp::set_sort_column`] (per-header click).
@@ -114,6 +118,7 @@ impl SortCol {
             | Self::CpuTime
             | Self::DiskRead
             | Self::DiskWrite
+            | Self::Network
             | Self::StartTime
             | Self::Fds
             | Self::Nice => Self::Pid,

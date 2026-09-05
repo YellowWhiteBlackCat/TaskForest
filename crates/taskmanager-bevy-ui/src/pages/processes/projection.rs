@@ -70,6 +70,9 @@ fn cell_text(process: &ProcessItem, column: &str) -> String {
         "DiskWrite" => process
             .current_disk_write_bytes_per_sec()
             .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
+        "Network" => process
+            .current_network_bytes_per_sec()
+            .map_or_else(|| MISSING_VALUE.to_owned(), |v| format!("{}/s", bytes(v))),
         "CPUTime" => optional_cpu_time_seconds(process.current_cpu_time_secs()),
         "FDs" => process
             .current_fds()

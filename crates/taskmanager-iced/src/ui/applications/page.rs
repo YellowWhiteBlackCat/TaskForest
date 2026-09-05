@@ -262,7 +262,7 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
             }
             actions.push(focus::button_enabled(
                 theme_snapshot,
-                FocusTarget::ProcessActionMenu,
+                FocusTarget::ProcessEfficiencyMode,
                 t("proc.efficiency_mode"),
                 Message::RequestProcessBatch(ProcessBatchAction::SetEfficiencyMode(true)),
                 false,

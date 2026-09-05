@@ -296,6 +296,8 @@ fn unavailable_identity_observations(failure: FailureKind) -> ProcessScalarObser
         disk_write_bytes_total: ScalarObservation::unavailable(failure),
         disk_read_bytes_per_sec: ScalarObservation::unavailable(failure),
         disk_write_bytes_per_sec: ScalarObservation::unavailable(failure),
+        network_rx_bytes_per_sec: ScalarObservation::unavailable(failure),
+        network_tx_bytes_per_sec: ScalarObservation::unavailable(failure),
         threads: ScalarObservation::unavailable(failure),
         start_time_secs: ScalarObservation::unavailable(failure),
         cpu_time_secs: ScalarObservation::unavailable(failure),

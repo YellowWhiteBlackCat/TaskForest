@@ -54,6 +54,8 @@ pub enum FocusTarget {
     OpenProcessLocation,
     /// The Applications search-online action (routed via platform port).
     SearchProcessOnline,
+    /// Apply/lift process efficiency mode.
+    ProcessEfficiencyMode,
     /// Open the selected process's CPU-affinity editor.
     ProcessAffinityOpen,
     /// Select all logical CPUs in the affinity editor.
@@ -264,7 +266,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 152] = [
+    pub const ALL: [Self; 153] = [
         Self::ModalClose,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
@@ -288,6 +290,7 @@ impl FocusTarget {
         Self::EndTask,
         Self::OpenProcessLocation,
         Self::SearchProcessOnline,
+        Self::ProcessEfficiencyMode,
         Self::ProcessAffinityOpen,
         Self::ProcessAffinityCpu(0),
         Self::ProcessAffinityApply,

@@ -279,6 +279,7 @@ fn host_scalar_unknowns_are_gaps_inside_a_current_partial_domain() {
             uptime_secs: ScalarObservation::available(0, 10),
             processes: ScalarObservation::unavailable(FailureKind::PermissionDenied),
             threads: ScalarObservation::available(0, 10),
+            pressure: ScalarObservation::default(),
         },
         10,
         FailureKind::PermissionDenied,

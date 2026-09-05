@@ -175,6 +175,7 @@ pub(super) fn render_processes(
                 (SortCol::CpuTime, 9),
                 (SortCol::DiskRead, 9),
                 (SortCol::DiskWrite, 9),
+                (SortCol::Network, 9),
             ]
             .into_iter()
             .filter(|(candidate, _)| column_visible(*candidate))
@@ -400,6 +401,7 @@ fn process_header(
             SortCol::CpuTime,
             SortCol::DiskRead,
             SortCol::DiskWrite,
+            SortCol::Network,
         ]
         .into_iter()
         .filter(|candidate| visible(*candidate)),

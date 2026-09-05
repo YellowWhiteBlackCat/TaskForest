@@ -31,6 +31,10 @@ pub struct ProcessScalarObservations {
     pub disk_write_bytes_total: ScalarObservation<u64>,
     pub disk_read_bytes_per_sec: ScalarObservation<u64>,
     pub disk_write_bytes_per_sec: ScalarObservation<u64>,
+    #[serde(default)]
+    pub network_rx_bytes_per_sec: ScalarObservation<u64>,
+    #[serde(default)]
+    pub network_tx_bytes_per_sec: ScalarObservation<u64>,
     pub threads: ScalarObservation<u32>,
     pub start_time_secs: ScalarObservation<u64>,
     pub cpu_time_secs: ScalarObservation<u64>,
@@ -54,6 +58,8 @@ impl ProcessScalarObservations {
             disk_write_bytes_total: self.disk_write_bytes_total.transition_failure(failure),
             disk_read_bytes_per_sec: self.disk_read_bytes_per_sec.transition_failure(failure),
             disk_write_bytes_per_sec: self.disk_write_bytes_per_sec.transition_failure(failure),
+            network_rx_bytes_per_sec: self.network_rx_bytes_per_sec.transition_failure(failure),
+            network_tx_bytes_per_sec: self.network_tx_bytes_per_sec.transition_failure(failure),
             threads: self.threads.transition_failure(failure),
             start_time_secs: self.start_time_secs.transition_failure(failure),
             cpu_time_secs: self.cpu_time_secs.transition_failure(failure),
@@ -89,6 +95,12 @@ impl ProcessScalarObservations {
             disk_write_bytes_per_sec: self
                 .disk_write_bytes_per_sec
                 .retain_previous(previous.disk_write_bytes_per_sec),
+            network_rx_bytes_per_sec: self
+                .network_rx_bytes_per_sec
+                .retain_previous(previous.network_rx_bytes_per_sec),
+            network_tx_bytes_per_sec: self
+                .network_tx_bytes_per_sec
+                .retain_previous(previous.network_tx_bytes_per_sec),
             threads: self.threads.retain_previous(previous.threads),
             start_time_secs: self
                 .start_time_secs
@@ -201,6 +213,35 @@ impl ProcessItem {
             .disk_write_bytes_per_sec
             .current_value()
             .copied()
+    }
+
+    #[must_use]
+    pub const fn current_network_rx_bytes_per_sec(&self) -> Option<u64> {
+        self.scalar_observations
+            .network_rx_bytes_per_sec
+            .current_value()
+            .copied()
+    }
+
+    #[must_use]
+    pub const fn current_network_tx_bytes_per_sec(&self) -> Option<u64> {
+        self.scalar_observations
+            .network_tx_bytes_per_sec
+            .current_value()
+            .copied()
+    }
+
+    #[must_use]
+    pub fn current_network_bytes_per_sec(&self) -> Option<u64> {
+        match (
+            self.current_network_rx_bytes_per_sec(),
+            self.current_network_tx_bytes_per_sec(),
+        ) {
+            (Some(rx), Some(tx)) => Some(rx.saturating_add(tx)),
+            (Some(rx), None) => Some(rx),
+            (None, Some(tx)) => Some(tx),
+            (None, None) => None,
+        }
     }
 
     #[must_use]

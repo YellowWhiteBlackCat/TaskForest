@@ -186,6 +186,8 @@ impl ProcessListProvider for WinProcessListProvider {
                 ),
                 disk_read_bytes_per_sec: read_rate,
                 disk_write_bytes_per_sec: write_rate,
+                network_rx_bytes_per_sec: ScalarObservation::unavailable(FailureKind::RequiresEscalation),
+                network_tx_bytes_per_sec: ScalarObservation::unavailable(FailureKind::RequiresEscalation),
                 threads: thread_count,
                 start_time_secs: ScalarObservation::available(start_time_secs, observed_at_ms),
                 cpu_time_secs: ScalarObservation::available(

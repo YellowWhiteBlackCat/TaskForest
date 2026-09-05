@@ -216,6 +216,7 @@ mod cpu_frequency_source_tests {
             frequency_mhz: Some(3_500),
             temperature_c: Some(54.0),
             power_w: Some(18.2),
+            pressure_pct: Some(0.5),
         }));
         assert_eq!(
             metrics
@@ -231,6 +232,7 @@ mod cpu_frequency_source_tests {
                 ("Speed".to_string(), "3500 MHz".to_string()),
                 ("Temperature".to_string(), "54 °C".to_string()),
                 ("Power".to_string(), "18.2 W".to_string()),
+                ("Stall".to_string(), "0.5%".to_string()),
             ]
         );
         assert_eq!(
@@ -262,6 +264,7 @@ mod cpu_frequency_source_tests {
             frequency_mhz: Some(2_400),
             temperature_c: None,
             power_w: None,
+            pressure_pct: None,
         }));
         assert_eq!(
             projected.map(|metric| metric.kind),
@@ -270,6 +273,7 @@ mod cpu_frequency_source_tests {
                 projection::CpuHeadlineKind::Frequency,
                 projection::CpuHeadlineKind::Temperature,
                 projection::CpuHeadlineKind::Power,
+                projection::CpuHeadlineKind::Pressure,
             ],
             "headline readouts must keep the fixed Iced presentation order"
         );

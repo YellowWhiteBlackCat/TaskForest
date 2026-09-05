@@ -103,6 +103,12 @@ pub const PROCESS_COLUMNS: &[ProcessColumnSpec] = &[
         numeric: true,
         hideable: true,
     },
+    ProcessColumnSpec {
+        id: "Network",
+        default_width: 90.0,
+        numeric: true,
+        hideable: true,
+    },
     // 100px fits "30d 23h" (days>0 drops minutes) with margin; 80 overflowed
     // leftward into DiskWrite for any process running >= 1 day.
     ProcessColumnSpec {

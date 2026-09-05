@@ -51,7 +51,8 @@ impl From<TrendSeries> for DeviceMetricScale {
             TrendSeries::CpuUsagePercent
             | TrendSeries::MemoryUsagePercent
             | TrendSeries::GpuUsagePercent
-            | TrendSeries::DiskActiveTimePct => Self::Percent,
+            | TrendSeries::DiskActiveTimePct
+            | TrendSeries::NpuUsagePercent => Self::Percent,
             TrendSeries::DiskBytesPerSec | TrendSeries::NetworkBytesPerSec => {
                 Self::BytesPerSecond {
                     use_bytes: true,

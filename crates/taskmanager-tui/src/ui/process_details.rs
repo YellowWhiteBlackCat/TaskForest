@@ -285,6 +285,9 @@ pub(super) fn process_cells_with_local_time<'a>(input: ProcessCellInput<'a>) -> 
     if visible(SortCol::DiskWrite) {
         cells.push(zero_tinted_cell(data.disk_write, gray_zero, theme));
     }
+    if visible(SortCol::Network) {
+        cells.push(zero_tinted_cell(data.network, gray_zero, theme));
+    }
     cells
 }
 
@@ -394,6 +397,7 @@ pub(super) fn group_header_cells(
         SortCol::CpuTime,
         SortCol::DiskRead,
         SortCol::DiskWrite,
+        SortCol::Network,
     ] {
         if visible(column) {
             cells.push(Cell::from(MISSING_VALUE));
