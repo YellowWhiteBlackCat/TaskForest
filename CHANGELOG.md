@@ -6,6 +6,18 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.1.3] — 2026-09-04
+
+### 新增
+
+- **四端全量功能与视觉平价基线（Milestone 3）**：
+  - **Bevy UI**：补齐容器管理页（Containers）、CPU 亲和性设置（Affinity）、服务详情弹窗与依赖拓扑面板（Dependencies Panel）、系统托盘集成（System Tray），完善选中进程详情与全套无头行为断言。
+  - **Iced UI**：集成 Linux AccessKit 原生无障碍桥接，支持完整的屏幕阅读器语义树投影与动作分发；补齐 F5/F9/Alt+1..8/Esc/Ctrl+F/Ctrl+Space 全局快捷键与 Alerts 路由；性能页 CPU 视图接入 RAPL 功耗与 MSR 实时读数。
+  - **TUI**：补齐 CPU 亲和性编辑、服务日志导出、健康与告警浮层路由、以及与 AccessKit 契约对齐的终端语义快照。
+  - **GPUI**：进程详情面板新增环境变量键值预览卡片（Environment Card）；完善高对比度与跟随系统主题切换；强化 AccessKit 动作响应。
+- **Linux 多端原生 DEB 打包**：
+  - 扩展 Linux 打包流水线，在既有 GPUI 发布物基础上，原生支持构建与验证 Iced (`TaskForest-I`)、TUI (`TaskForest-T`)、Bevy (`TaskForest-B`) 三个独立前端形态的完整 DEB 安装包，严格遵循统一安装目录与 Wayland-only 规范。
+
 ## [0.1.2] — 2026-09-03
 
 ### 修复
