@@ -533,3 +533,22 @@ fn packaging_matrix_enforces_complete_parity_across_all_frontends() {
     assert!(!tui_spec.contains("fontconfig"), "taskforest-t.spec must not depend on fontconfig");
 }
 
+#[test]
+fn release_documentation_matches_24_package_full_parity_matrix() {
+    let release_doc = include_str!("../../docs/RELEASE.md");
+
+    // 4 frontends (G, I, T, B) × 2 architectures (x64, arm64) × 3 package formats (deb, rpm, msi) = 24
+    for ui in ["G", "I", "T", "B"] {
+        for arch in ["x64", "arm64"] {
+            for ext in ["deb", "rpm", "msi"] {
+                let pattern = format!("TaskForest-{ui}-<ver>-{arch}.{ext}");
+                assert!(
+                    release_doc.contains(&pattern),
+                    "docs/RELEASE.md table must contain release artifact entry {pattern}"
+                );
+            }
+        }
+    }
+}
+
+

@@ -10,8 +10,7 @@
 - 与 GPUI/Iced/TUI 同级的产品表面：只消费中立层投影，不读 OS 数据源，不拥有
   独立业务事实。成熟度低于 GPUI；页面功能覆盖、性能页深度、系统页和托盘仍
   是公开的已知边界，不在文档中虚构。
-- 以 `TaskForestB` 登记于 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)，是受支持的
-  源码构建形态（独立二进制 `taskforest-b`），不进入发行包矩阵。
+- 以 `TaskForestB` 登记于 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)，现已完全纳入官方发布流水线矩阵，享有同等的领域语义、配置持久化与安装包分发地位（提供 DEB、RPM、MSI 官方安装包）。
 - 产品组件（进程表、图表、确认面）由自有 theme tokens + `ui-contract` 定义
   语义；Bevy 官方 Feathers 皮肤体系不采用——theme tokens 是唯一皮肤权威。
 

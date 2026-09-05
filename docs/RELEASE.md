@@ -6,22 +6,23 @@
 
 ## 发布面
 
-当前官方发布矩阵已涵盖四个独立前端产品（TaskForest-G、TaskForest-I、TaskForest-T、
-TaskForest-B）：Linux 同时提供四端的 amd64/arm64 DEB 发布物以及 GPUI 的 RPM；
-Windows 提供 GPUI 的 x64/arm64 MSI。macOS 打包、签名和公证暂缓。
+当前官方发布矩阵已实现四个独立前端产品（TaskForest-G、TaskForest-I、TaskForest-T、
+TaskForest-B）全量一碗水端平：Linux 同时提供四端的 amd64/arm64 DEB 与 x86_64/aarch64 RPM 发布物；
+Windows 同时提供四端的 x64/arm64 MSI 安装包。macOS 打包、签名和公证暂缓。
 
 ### 0.1.3 发行面与平价矩阵
 
-正式发行面已扩展至全前端产品体系：Linux 发布流水线原生构建与发布四端（GPUI、
-Iced、TUI、Bevy）全量 DEB 安装包。四端严格保持 Wayland-only，彻底不含 X11 依赖。
+正式发行面已扩展至全前端全格式产品体系：Linux 发布流水线原生构建与发布四端（GPUI、
+Iced、TUI、Bevy）全量 DEB 与 RPM 安装包；Windows 原生流水线构建与发布四端全量 MSI。
+四端严格保持 Wayland-only，彻底不含 X11 依赖；TUI 具备零图形栈依赖独立运行能力。
 所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 为 `G`/`I`/`T`/`B`）。
 
 该边界只约束发行物，不扩大平台能力。发行面内没有合格数据源、授权或原生实现的能力，
 必须继续以 typed `Unsupported`、`Unavailable` 或权限结果呈现，不得用空值、静态占位或
 未接线按钮把它写成正式版功能。
 
-只有推送与根 `Cargo.toml` 版本一致的 `vX.Y.Z` tag，才会创建正式 Release 并生成以下产物。
-所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 当前恒为 `G`，
+只有推送与根 `Cargo.toml` 版本一致的 `vX.Y.Z` tag，才会创建正式 Release 并生成以下 24 项产物。
+所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 对应为 `G`、`I`、`T`、`B`，
 平台为 `x64`/`arm64`）；权威定义见 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)。
 包内元数据仍遵守发行版惯例：DEB `Architecture` 为 `amd64`/`arm64`，RPM arch 为
 `x86_64`/`aarch64`，与文件名中的 `x64`/`arm64` 是固定映射。
@@ -36,10 +37,22 @@ Iced、TUI、Bevy）全量 DEB 安装包。四端严格保持 Wayland-only，彻
 | Linux | arm64 | `TaskForest-T-<ver>-arm64.deb` | `arm64` | `packaging/debian/build-deb-tui.sh` |
 | Linux | x64 | `TaskForest-B-<ver>-x64.deb` | `amd64` | `packaging/debian/build-deb-bevy.sh` |
 | Linux | arm64 | `TaskForest-B-<ver>-arm64.deb` | `arm64` | `packaging/debian/build-deb-bevy.sh` |
-| Linux | x64 | `TaskForest-G-<ver>-x64.rpm` | `x86_64` | `packaging/rpm/build-rpm.sh` |
-| Linux | arm64 | `TaskForest-G-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh` |
-| Windows | x64 | `TaskForest-G-<ver>-x64.msi` | `x64` | `packaging/windows/build-msi.sh`（WiX） |
-| Windows | arm64 | `TaskForest-G-<ver>-arm64.msi` | `arm64` | `packaging/windows/build-msi.sh`（WiX） |
+| Linux | x64 | `TaskForest-G-<ver>-x64.rpm` | `x86_64` | `packaging/rpm/build-rpm.sh ... G` |
+| Linux | arm64 | `TaskForest-G-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh ... G` |
+| Linux | x64 | `TaskForest-I-<ver>-x64.rpm` | `x86_64` | `packaging/rpm/build-rpm.sh ... I` |
+| Linux | arm64 | `TaskForest-I-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh ... I` |
+| Linux | x64 | `TaskForest-T-<ver>-x64.rpm` | `x86_64` | `packaging/rpm/build-rpm.sh ... T` |
+| Linux | arm64 | `TaskForest-T-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh ... T` |
+| Linux | x64 | `TaskForest-B-<ver>-x64.rpm` | `x86_64` | `packaging/rpm/build-rpm.sh ... B` |
+| Linux | arm64 | `TaskForest-B-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh ... B` |
+| Windows | x64 | `TaskForest-G-<ver>-x64.msi` | `x64` | `packaging/windows/build-msi.sh ... G` |
+| Windows | arm64 | `TaskForest-G-<ver>-arm64.msi` | `arm64` | `packaging/windows/build-msi.sh ... G` |
+| Windows | x64 | `TaskForest-I-<ver>-x64.msi` | `x64` | `packaging/windows/build-msi.sh ... I` |
+| Windows | arm64 | `TaskForest-I-<ver>-arm64.msi` | `arm64` | `packaging/windows/build-msi.sh ... I` |
+| Windows | x64 | `TaskForest-T-<ver>-x64.msi` | `x64` | `packaging/windows/build-msi.sh ... T` |
+| Windows | arm64 | `TaskForest-T-<ver>-arm64.msi` | `arm64` | `packaging/windows/build-msi.sh ... T` |
+| Windows | x64 | `TaskForest-B-<ver>-x64.msi` | `x64` | `packaging/windows/build-msi.sh ... B` |
+| Windows | arm64 | `TaskForest-B-<ver>-arm64.msi` | `arm64` | `packaging/windows/build-msi.sh ... B` |
 
 任一 DEB、RPM 或 MSI 架构缺失或验证失败，发布必须失败。Windows 不再是可选或
 `continue-on-error` 平台。
