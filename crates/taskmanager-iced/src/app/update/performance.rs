@@ -60,6 +60,10 @@ impl IcedApp {
                     GpuEngineRowsAction::None => None,
                 }
             }
+            Message::ToggleGpuEnginesExpanded => {
+                self.performance.gpu_engines_expanded = !self.performance.gpu_engines_expanded;
+                None
+            }
             Message::ToggleDirectoryUsageScan => {
                 let selected = self.perf_device();
                 self.shell

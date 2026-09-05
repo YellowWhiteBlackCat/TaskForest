@@ -6,9 +6,9 @@ use taskmanager_application::PlatformEffect;
 use super::super::surface::InteractionSnapshot;
 use super::super::{IcedApp, Message};
 
-pub(super) struct UpdateDispatch {
-    pub(super) effect: Option<PlatformEffect>,
-    pub(super) tasks: Vec<Task<Message>>,
+pub(crate) struct UpdateDispatch {
+    pub(crate) effect: Option<PlatformEffect>,
+    pub(crate) tasks: Vec<Task<Message>>,
 }
 
 impl UpdateDispatch {
@@ -119,6 +119,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::ConfirmServiceControl) => MessageDomain::Service(message),
 
         message @ (Message::RefreshSource(_)
+        | Message::AuthorizeRaplPower
+        | Message::AuthorizeMsrReadouts
         | Message::RequestEndTask
         | Message::RequestProcessBatch(_)
         | Message::ConfirmEndTask
@@ -132,6 +134,8 @@ fn route(message: Message) -> MessageDomain {
         | Message::RequestStartupControl(_)
         | Message::RequestStartupControlFor { .. }
         | Message::ConfirmStartupControl
+        | Message::RequestSmartSelfTest { .. }
+        | Message::ConfirmSmartSelfTest
         | Message::OpenProcessLocation
         | Message::SearchProcessOnline) => MessageDomain::Control(message),
 
@@ -166,6 +170,7 @@ fn route(message: Message) -> MessageDomain {
         // `reduce_performance_message` (no shell effect).
         | Message::SystemDashboard(_)
         | Message::ToggleGpuEngines
+        | Message::ToggleGpuEnginesExpanded
         | Message::ToggleDirectoryUsageScan
         | Message::ToggleHistoryReplay
         | Message::SelectHistoryReplayWindow(_)
@@ -180,6 +185,7 @@ fn route(message: Message) -> MessageDomain {
         | Message::OpenStartupLocation { .. }
         | Message::CopyAboutDetails
         | Message::ExportSnapshot
+        | Message::RequestCurrentWindowCapture
         | Message::ApplySavedView(_)
         | Message::SaveCurrentProcessView
         | Message::ExportSavedViews

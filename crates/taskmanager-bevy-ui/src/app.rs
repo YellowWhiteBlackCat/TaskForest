@@ -36,6 +36,9 @@ use bevy::app::{App, Plugin, Update};
 #[cfg(test)]
 #[path = "../tests/headless/app_support.rs"]
 pub(crate) mod app_support;
+
+#[path = "pages/containers.rs"]
+pub(crate) mod containers;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::event::Event;
@@ -152,6 +155,8 @@ pub(crate) enum Page {
     Startup,
     /// Login sessions (shared page: `Users`).
     Sessions,
+    /// Containers rollup table (frontend-owned route).
+    Containers,
     /// Alert center (frontend-owned route behind shared `OpenAlerts`).
     Alerts,
     /// Settings surface (frontend-owned; no shared chord, local `P` binding).
@@ -180,6 +185,7 @@ impl Page {
             Page::System => "tab.system",
             Page::Startup => "tab.startup",
             Page::Sessions => "tab.users",
+            Page::Containers => "tab.containers",
             Page::Alerts => "tab.alerts",
             Page::Settings => "tab.settings",
             Page::AppHistory => "tab.apphistory",
@@ -292,6 +298,7 @@ pub(crate) fn action_for_page(page: Page) -> Option<AppAction> {
         Page::Sessions => Some(AppAction::SelectPage(AppPage::Users)),
         Page::Alerts => Some(AppAction::OpenAlerts),
         Page::AppHistory => Some(AppAction::SelectPage(AppPage::AppHistory)),
+        Page::Containers => None,
         Page::Settings => None,
     }
 }
@@ -481,6 +488,7 @@ pub(crate) fn page_scene(page: Page, context: &PageContext<'_>) -> Box<dyn Scene
         Page::System => Box::new(crate::pages::system::content(context)),
         Page::Startup => Box::new(crate::pages::startup::content(context)),
         Page::Sessions => Box::new(crate::pages::sessions::content(context)),
+        Page::Containers => Box::new(crate::app::containers::scene(context)),
         Page::Alerts => Box::new(crate::pages::alerts::content(context)),
         Page::Settings => Box::new(crate::pages::settings::content(context)),
         Page::AppHistory => Box::new(crate::pages::history::scene::content(
@@ -533,6 +541,9 @@ impl Plugin for AppShellPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<Route>()
             .init_resource::<PageMount>()
+            .init_resource::<crate::pages::settings::ThemePreferences>()
+            .init_resource::<crate::pages::performance::PerformanceSidebarVisible>()
+            .add_observer(crate::pages::performance::toggle_sidebar_observer)
             // The input adapter drives every inventory modal on every key;
             // all four exist whether or not their pages ever mounted.
             .init_resource::<crate::menu_modal::MenuModal<
@@ -595,6 +606,7 @@ pub(crate) fn tab_icon(page: Page) -> taskmanager_ui_contract::IconId {
         Page::Startup => IconId::Startup,
         Page::Sessions => IconId::Users,
         Page::AppHistory => IconId::History,
+        Page::Containers => IconId::Process,
         Page::Alerts => IconId::Alert,
         Page::Settings => IconId::Settings,
     }

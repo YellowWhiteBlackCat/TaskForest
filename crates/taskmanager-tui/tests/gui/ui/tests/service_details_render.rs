@@ -15,6 +15,7 @@ use taskmanager_core::core::services::{
 };
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::RequestId;
+use taskmanager_ui_contract::{ProductIntent, SurfaceDecision};
 
 /// The reference frame the details column is designed for: wide and tall
 /// enough to afford the panel beside the table.
@@ -261,5 +262,139 @@ fn the_details_column_labels_translate_across_both_locales() {
     assert!(
         zh_frame.contains(zh_pair.1),
         "the relation label translates"
+    );
+}
+
+#[test]
+fn service_dependencies_modal_opens_and_renders_relations() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
+        taskmanager_application::AppPage::Services,
+    ));
+    assert!(
+        app.open_service_dependencies(),
+        "opens dependencies modal on services page"
+    );
+    assert_eq!(
+        app.local_surface_kind(),
+        Some(crate::TuiSurfaceKind::ServiceDependencies)
+    );
+
+    let service_id = app
+        .sorted_service_at(app.selected)
+        .expect("selected service")
+        .id
+        .clone();
+    let deps = ServiceDeps::from_relations(
+        taskmanager_core::core::services::ServiceRelationGraph::from_edges(vec![
+            taskmanager_core::core::services::ServiceRelationEdge::new(
+                taskmanager_core::core::services::ServiceRelationKind::Requires,
+                "systemd-journald.service",
+            ),
+        ]),
+    );
+    resolve_relations(&mut app, service_id, deps);
+
+    let frame = frame_text(&app, WIDE_WIDTH, WIDE_HEIGHT);
+    assert!(
+        frame.contains("systemd-journald.service"),
+        "dependencies modal renders relation targets, got:
+{frame}"
+    );
+
+    app.service_dependencies_scroll(2);
+    let target = app
+        .service_dependencies_mut()
+        .expect("target still present");
+    assert_eq!(target.scroll, 2, "modal scroll moves");
+
+    app.close_local_overlays();
+    assert_eq!(app.local_surface_kind(), None, "closes on dismiss");
+}
+
+#[test]
+fn batch_menu_end_on_multi_select_arms_batch_confirmation_with_targets() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(taskmanager_application::AppAction::SelectPage(
+        taskmanager_application::AppPage::Applications,
+    ));
+
+    let processes = app.shell.projection().processes_slice().to_vec();
+    assert!(processes.len() >= 2);
+    let p0 = taskmanager_core::core::process::ProcessLiveKey::from_process(&processes[0]).unwrap();
+    let p1 = taskmanager_core::core::process::ProcessLiveKey::from_process(&processes[1]).unwrap();
+    app.shell.toggle_selected_identity(p0);
+    app.shell.toggle_selected_identity(p1);
+    assert_eq!(
+        app.shell.selected_identities().len(),
+        2,
+        "two processes marked"
+    );
+
+    // Open batch menu
+    assert!(app.open_batch_menu(), "open batch menu");
+
+    // Select End action (index 0)
+    let _ = app.batch_menu_select();
+
+    let pending = app.shell.pending_batch().expect("batch confirmation armed");
+    assert_eq!(
+        pending.targets.len(),
+        2,
+        "both targets frozen in batch intent"
+    );
+    assert_eq!(
+        pending.action,
+        taskmanager_core::core::process::ProcessBatchAction::End
+    );
+
+    // Render frame while confirmation is open
+    let frame = frame_text(&app, WIDE_WIDTH, WIDE_HEIGHT);
+    for target in &pending.targets {
+        assert!(
+            frame.contains(&target.pid.to_string()) && frame.contains(&target.name),
+            "batch confirmation popup must display target PID and name: {} ({}), got:
+{frame}",
+            target.name,
+            target.pid
+        );
+    }
+
+    // Confirm batch
+    let effect = app.shell.confirm_process_batch();
+    assert!(
+        matches!(effect, Some(taskmanager_application::PlatformEffect::ExecuteBatch(intent)) if intent.targets.len() == 2),
+        "confirming emits ExecuteBatch with 2 targets"
+    );
+}
+
+#[test]
+fn service_details_functional_declaration_is_local_details_column() {
+    let declaration = crate::functional_declaration();
+    let entry = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.intent == ProductIntent::ServiceDetails)
+        .expect("service details intent is registered");
+    assert_eq!(
+        entry.decision,
+        SurfaceDecision::Local {
+            route: "services.details-column",
+        }
+    );
+
+    let mut app = crate::TuiApp::demo();
+    app.application.active_page = AppPage::Services;
+    seed_two_services(&mut app);
+    app.selected = 0;
+
+    let frame = frame_text(&app, WIDE_WIDTH, WIDE_HEIGHT);
+    assert!(
+        frame.contains("alpha.service"),
+        "the details column renders the selected service header"
+    );
+    assert!(
+        frame.contains("Load state"),
+        "the details column renders state triplet rows"
     );
 }

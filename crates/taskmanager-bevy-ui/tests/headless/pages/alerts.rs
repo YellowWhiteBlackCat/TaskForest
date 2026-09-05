@@ -295,10 +295,8 @@ fn alerts_page_renders_the_empty_state_and_canonical_rules() {
         "the summary counts render: {texts:?}"
     );
     assert!(
-        texts
-            .iter()
-            .any(|text| text.contains("in incubation") && text.contains("Alerts")),
-        "the notification-history placeholder is honest about its state"
+        texts.iter().any(|text| text == "No recent alert events"),
+        "the notification-history empty state is honest about its state"
     );
     let mut toggles = world.query_filtered::<(Entity, &AlertRuleToggleTarget), ()>();
     let rows = toggles.iter(world).collect::<Vec<_>>();
@@ -465,4 +463,138 @@ fn pages_assemble_and_despawn_in_a_bare_scene_world() {
             page.nav_label()
         );
     }
+}
+
+#[test]
+fn event_history_renders_recent_events() {
+    use taskmanager_core::core::alerts::{
+        Alert, AlertEvent, AlertEventKind, AlertMetric, AlertSeverity,
+    };
+
+    let alert = Alert {
+        instance_id: "inst-1".into(),
+        rule_id: "cpu-rule".into(),
+        metric: AlertMetric::CpuUsagePercent,
+        severity: AlertSeverity::Warning,
+        target: "Global".into(),
+        value: 85.0,
+        threshold: 80.0,
+        active_since_ms: 1000,
+    };
+    let event = AlertEvent {
+        id: 1,
+        kind: AlertEventKind::Activated,
+        alert,
+        observed_at_ms: 1050,
+    };
+
+    let line = super::event_history_line(&event);
+    assert!(line.contains("[Activated]"));
+    assert!(line.contains("Warning"));
+    assert!(line.contains("85.0%"));
+}
+
+#[test]
+fn alert_rule_export_and_import_round_trip() {
+    use taskmanager_application::AlertRuleImportMode;
+    use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
+
+    let mut shell = ShellApp::new();
+    let json = super::export_alert_rules(&shell).expect("export rules");
+    assert!(json.contains("cpu"));
+
+    let custom = AlertRule::new(
+        "bevy-custom",
+        AlertMetric::CpuUsagePercent,
+        AlertSeverity::Warning,
+        90.0,
+        std::time::Duration::from_secs(5),
+        2.0,
+    );
+    let entries = [taskmanager_core::core::alerts::AlertRuleTransferEntry::new(
+        custom, true,
+    )];
+    let custom_json = taskmanager_core::core::alerts::export_alert_rules_json(&entries).unwrap();
+
+    let outcome = super::import_alert_rules(&mut shell, &custom_json, AlertRuleImportMode::Replace)
+        .expect("import");
+    assert_eq!(
+        outcome,
+        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
+    );
+    assert_eq!(shell.projection().alert_center.managed_rules().len(), 1);
+}
+
+#[test]
+fn alert_rule_authoring_creates_and_edits_rules() {
+    let mut shell = ShellApp::new();
+    let initial_count = shell.projection().alert_center.managed_rules().len();
+
+    // 1. Create rule
+    let outcome = super::create_alert_rule(
+        &mut shell,
+        "custom-cpu-rule",
+        AlertMetric::CpuUsagePercent,
+        AlertSeverity::Critical,
+        88.0,
+        4.0,
+    )
+    .expect("create rule");
+    assert_eq!(
+        outcome,
+        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
+    );
+    let rules = shell.projection().alert_center.managed_rules();
+    assert_eq!(rules.len(), initial_count + 1);
+    let created = rules
+        .iter()
+        .find(|r| r.rule.id == "custom-cpu-rule")
+        .unwrap();
+    assert_eq!(created.rule.threshold, 88.0);
+    assert_eq!(created.rule.severity, AlertSeverity::Critical);
+
+    // 2. Edit rule
+    let edit_outcome = super::edit_alert_rule(
+        &mut shell,
+        "custom-cpu-rule".to_string(),
+        AlertMetric::CpuUsagePercent,
+        AlertSeverity::Warning,
+        95.0,
+        5.0,
+    )
+    .expect("edit rule");
+    assert_eq!(
+        edit_outcome,
+        taskmanager_application::ManagedAlertRuleEditOutcome::Applied
+    );
+    let updated_rules = shell.projection().alert_center.managed_rules();
+    let updated = updated_rules
+        .iter()
+        .find(|r| r.rule.id == "custom-cpu-rule")
+        .unwrap();
+    assert_eq!(updated.rule.threshold, 95.0);
+    assert_eq!(updated.rule.severity, AlertSeverity::Warning);
+
+    // 3. Line formatting
+    let line =
+        super::rule_authoring_line(AlertMetric::CpuUsagePercent, 85.0, AlertSeverity::Warning);
+    assert!(line.contains("CPU Usage"));
+    assert!(line.contains("≥ 85.0%"));
+    assert!(line.contains("Warning"));
+}
+
+#[test]
+fn alert_rule_authoring_intent_declared() {
+    let declaration = crate::functional::functional_declaration();
+    let entry = declaration
+        .entries
+        .iter()
+        .find(|e| e.intent == taskmanager_ui_contract::ProductIntent::AlertRuleAuthoring)
+        .expect("AlertRuleAuthoring declared");
+    assert_eq!(
+        entry.decision,
+        taskmanager_ui_contract::SurfaceDecision::Local {
+            route: "alerts.page.authoring",
+        }
+    );
 }

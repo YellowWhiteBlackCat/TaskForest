@@ -29,11 +29,11 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::AlertRuleToggle => SurfaceDecision::Local {
             route: "alerts.page.rule-toggle",
         },
-        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Unsupported {
-            reason: "the Iced product shape exposes rule toggles only; rule add/update/remove authoring remains a GPUI reference surface",
+        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Local {
+            route: "alerts.page.authoring",
         },
-        ProductIntent::AlertRuleTransfer => SurfaceDecision::Unsupported {
-            reason: "the Iced product shape does not offer alert-rule import/export; the shared rule contract remains available to future surface work",
+        ProductIntent::AlertRuleTransfer => SurfaceDecision::Local {
+            route: "alerts.page.transfer",
         },
         ProductIntent::ActiveAlerts => SurfaceDecision::Shared {
             route: "shell.alert-active",
@@ -56,15 +56,15 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::ProcessAffinityEditor => SurfaceDecision::Local {
             route: "processes.affinity-modal",
         },
-        ProductIntent::SmartSelfTest => SurfaceDecision::Unsupported {
-            reason: "the Iced product shape exposes SMART observation only; SMART control remains a GPUI reference surface",
+        ProductIntent::SmartSelfTest => SurfaceDecision::Local {
+            route: "storage.smart-self-test",
         },
         ProductIntent::DiagnosticBundle => SurfaceDecision::AcceptedDifference {
             route: "about.diagnostic-report",
             reason: "Iced provides a redacted clipboard report while GPUI provides the preview/write bundle workflow",
         },
-        ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Unsupported {
-            reason: "the Iced product shape does not expose the graphical current-window PNG capture control",
+        ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Local {
+            route: "header.screenshot",
         },
         ProductIntent::FirstRunSetup => SurfaceDecision::Local {
             route: "first-run.dialog",

@@ -291,3 +291,52 @@ fn service_log_modal_is_a_dismissible_dialog_in_semantics() {
     assert!(modal.state().modal);
     assert!(modal.supports_action(SemanticAction::Dismiss));
 }
+
+#[test]
+fn mapped_tree_is_well_formed_under_accesskit_consumer_oracle() {
+    let app = crate::IcedApp::demo();
+    let snapshot = semantic_snapshot_with_local(&app).expect("snapshot must build");
+    let update = taskmanager_accessibility_linux::snapshot_to_tree_update(&snapshot);
+    let tree = accesskit_consumer::Tree::new(update, false);
+
+    let root = tree.state().root();
+    assert_eq!(root.role(), accesskit::Role::Application);
+    assert_eq!(root.label().as_deref(), Some(product::ICED_NAME));
+}
+
+#[test]
+fn assistive_technology_actions_drive_iced_selection_and_modal() {
+    let mut app = crate::IcedApp::demo();
+    let snapshot = semantic_snapshot_with_local(&app).expect("snapshot must build");
+
+    let process = app.shell.visible_processes()[1].clone();
+    let row_node_id = format!("row:{}", process_semantic_key(&process));
+    let request = taskmanager_ui_contract::AccessibilityActionRequest {
+        snapshot_revision: snapshot.revision(),
+        node: SemanticNodeId::owned(row_node_id),
+        action: SemanticAction::Select,
+        value: None,
+    };
+    apply_accessibility_action(&mut app, &request, &snapshot).expect("matching AT action");
+    assert_eq!(
+        app.shell.selected_row,
+        process
+            .current_start_token()
+            .and_then(|t| ProcessLiveKey::from_parts(process.pid, t))
+            .map(ProcessRowId::Process)
+    );
+
+    // Modal dismiss
+    app.shell.toggle_suggestions();
+    let modal_snapshot = semantic_snapshot_with_local(&app).expect("modal snapshot");
+    assert!(app.shell.suggestions_open());
+    let dismiss_request = taskmanager_ui_contract::AccessibilityActionRequest {
+        snapshot_revision: modal_snapshot.revision(),
+        node: SemanticNodeId::borrowed("modal:threshold-suggestions"),
+        action: SemanticAction::Dismiss,
+        value: None,
+    };
+    apply_accessibility_action(&mut app, &dismiss_request, &modal_snapshot)
+        .expect("dismiss action");
+    assert!(!app.shell.suggestions_open());
+}

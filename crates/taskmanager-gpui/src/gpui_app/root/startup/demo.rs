@@ -54,6 +54,24 @@ pub(crate) fn init_demo(cx: &mut App, custom_app_id: Option<String>) {
     let window_result = cx.open_window(options, move |window, cx| {
         window.set_window_title(product::GPUI_NAME);
         let entity: Entity<RootView> = cx.new(|cx| RootView::new_demo(theme, cx));
+        let weak = entity.downgrade();
+        cx.spawn(async move |cx: &mut gpui::AsyncApp| {
+            loop {
+                gpui::Timer::after(std::time::Duration::from_millis(200)).await;
+                if weak.upgrade().is_none() {
+                    break;
+                }
+                let _ = weak.update(cx, |view, cx| {
+                    let notice_before = view.shell.feedback_notice().is_some();
+                    view.shell
+                        .advance_feedback_time(std::time::Duration::from_millis(200));
+                    if notice_before && view.shell.feedback_notice().is_none() {
+                        cx.notify();
+                    }
+                });
+            }
+        })
+        .detach();
         entity
     });
     if let Err(error) = window_result {

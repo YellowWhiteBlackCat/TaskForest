@@ -1,6 +1,6 @@
 //! Platform refresh and typed control-intent message reducer.
 
-use taskmanager_application::{AppAction, PlatformEffect};
+use taskmanager_application::{AppAction, MsrReadoutRequest, PlatformEffect, RaplPowerRequest};
 
 use taskmanager_shell::ShellApp;
 
@@ -8,9 +8,16 @@ use super::super::{ContextMenuKind, IcedApp, Message};
 use super::dispatch::UpdateDispatch;
 
 impl IcedApp {
-    pub(super) fn reduce_control_message(&mut self, message: Message) -> UpdateDispatch {
-        let effect = match message {
+    /// Handle a typed control message, returning any emitted platform effect.
+    pub fn handle_control_message(&mut self, message: Message) -> Option<PlatformEffect> {
+        match message {
             Message::RefreshSource(request) => Some(PlatformEffect::Refresh(request)),
+            Message::AuthorizeRaplPower => {
+                Some(PlatformEffect::RaplPower(RaplPowerRequest::Refresh))
+            }
+            Message::AuthorizeMsrReadouts => {
+                Some(PlatformEffect::MsrReadout(MsrReadoutRequest::Refresh))
+            }
             Message::RequestEndTask => self.shell.apply_action(AppAction::RequestEndTask),
             Message::RequestProcessBatch(action) => self.shell.request_process_batch(action),
             Message::ConfirmEndTask => self.shell.confirm_end_task(),
@@ -51,10 +58,42 @@ impl IcedApp {
                 self.apply_startup_menu_action(enabled)
             }
             Message::ConfirmStartupControl => self.shell.confirm_startup_control(),
+            Message::RequestSmartSelfTest { index, kind } => {
+                if let Some(disk) = self
+                    .shell
+                    .projection()
+                    .snapshot
+                    .as_ref()
+                    .and_then(|snapshot| snapshot.disks.get(index))
+                {
+                    let intent = taskmanager_core::core::system_health::SmartSelfTestIntent {
+                        device_id: taskmanager_core::core::identity::DeviceId::new(
+                            disk.device_id.clone(),
+                        ),
+                        device_generation: disk.device_generation,
+                        device_key: taskmanager_core::core::StorageDeviceKey::new(
+                            disk.name.clone(),
+                        ),
+                        display_name: if disk.model.is_empty() {
+                            disk.name.clone()
+                        } else {
+                            disk.model.clone()
+                        },
+                        kind,
+                    };
+                    self.shell.arm_smart_self_test(intent);
+                }
+                None
+            }
+            Message::ConfirmSmartSelfTest => self.shell.confirm_smart_self_test(),
             Message::OpenProcessLocation => self.process_location_effect(),
             Message::SearchProcessOnline => self.process_search_effect(),
             _ => None,
-        };
+        }
+    }
+
+    pub(crate) fn reduce_control_message(&mut self, message: Message) -> UpdateDispatch {
+        let effect = self.handle_control_message(message);
         UpdateDispatch::effect(effect)
     }
 }

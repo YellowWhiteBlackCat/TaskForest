@@ -20,13 +20,16 @@
 
 use bevy::color::Color;
 use bevy::ecs::hierarchy::Children;
-use bevy::scene::{Scene, bsn};
+use bevy::scene::{Scene, bsn, template_value};
 use bevy::ui::prelude::{
-    AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, UiRect, Val, percent, px,
+    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, UiRect, Val,
+    percent, px,
 };
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::Button;
+use taskmanager_ui_contract::IconId;
 
-use crate::palette::{UiPalette, space_8};
+use crate::palette::{UiPalette, no_wrap_text, space_8};
 use crate::window::{Role, TextRole};
 
 /// One menu entry. `enabled == false` renders a dimmed, non-activatable row
@@ -173,6 +176,150 @@ fn menu_row_scene(item: &MenuItem, highlighted: bool, palette: &UiPalette) -> im
     }
 }
 
+/// Typed presence state for an anchored dropdown menu surface.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) enum DropdownPresence {
+    /// Dropdown popup is closed; only the trigger is interactive.
+    #[default]
+    Closed,
+    /// Dropdown popup is open and anchored below the trigger.
+    Open,
+}
+
+/// State of an anchored dropdown menu: whether the popup is open, plus the
+/// cursor state over the item list when open.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) struct DropdownMenuState {
+    pub(crate) presence: DropdownPresence,
+    pub(crate) menu_state: MenuState,
+}
+
+#[allow(dead_code)]
+impl DropdownMenuState {
+    pub(crate) fn new(presence: DropdownPresence, selection: usize) -> Self {
+        Self {
+            presence,
+            menu_state: MenuState { selection },
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn is_open(&self) -> bool {
+        matches!(self.presence, DropdownPresence::Open)
+    }
+
+    pub(crate) fn toggle(&mut self) {
+        self.presence = match self.presence {
+            DropdownPresence::Open => DropdownPresence::Closed,
+            DropdownPresence::Closed => DropdownPresence::Open,
+        };
+    }
+
+    pub(crate) fn open(&mut self) {
+        self.presence = DropdownPresence::Open;
+    }
+
+    pub(crate) fn close(&mut self) {
+        self.presence = DropdownPresence::Closed;
+    }
+
+    /// Advance dropdown navigation or selection:
+    /// - If closed: Confirm opens it, other keys are ignored.
+    /// - If open: Cancel closes and yields `MenuOutcome::Canceled`;
+    ///   Confirm delegates to `menu_state.advance`, closing on success;
+    ///   Up / Down delegates navigation without closing.
+    pub(crate) fn advance(&mut self, items: &[MenuItem], input: MenuInput) -> Option<MenuOutcome> {
+        if !self.is_open() {
+            if input == MenuInput::Confirm {
+                self.open();
+            }
+            return None;
+        }
+
+        match input {
+            MenuInput::Cancel => {
+                self.close();
+                Some(MenuOutcome::Canceled)
+            }
+            MenuInput::Confirm => {
+                let outcome = self.menu_state.advance(items, input);
+                if outcome.is_some() {
+                    self.close();
+                }
+                outcome
+            }
+            MenuInput::Up | MenuInput::Down => {
+                self.menu_state.advance(items, input);
+                None
+            }
+        }
+    }
+}
+
+/// An anchored dropdown menu attached to a trigger control.
+/// Renders a trigger button with chevron affordance and, when open, mounts
+/// the anchored popup menu scene directly beneath it.
+#[allow(dead_code)]
+pub(crate) fn dropdown_menu_scene(
+    trigger_label: String,
+    spec: &MenuSpec,
+    state: &DropdownMenuState,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    let open = state.is_open();
+    let trigger_bg = if open {
+        palette.nav_active_bg
+    } else {
+        palette.content_bg
+    };
+    let height = palette.control_height_px;
+    let radius = palette.control_radius_px;
+    let chevron_icon = if open {
+        IconId::NavigateUp
+    } else {
+        IconId::NavigateDown
+    };
+    let chevron_scene = crate::icons::icon_scene(chevron_icon, 12.0, palette.dim_color);
+    let popup_scenes: Vec<Box<dyn Scene>> = if open {
+        vec![Box::new(menu_scene_at(spec, &state.menu_state, palette))]
+    } else {
+        Vec::new()
+    };
+
+    bsn! {
+        Node {
+            flex_direction: FlexDirection::Column,
+            align_items: AlignItems::FlexStart,
+        }
+        Children [
+            (
+                Node {
+                    width: px(220.0),
+                    height: px(height),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceBetween,
+                    padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_8() / 4.0)),
+                    border_radius: BorderRadius::all(Val::Px(radius)),
+                }
+                BackgroundColor(trigger_bg)
+                Button
+                Children [
+                    ( Text(trigger_label) TextRole(Role::Body) template_value(no_wrap_text()) ),
+                    ( { chevron_scene } ),
+                ]
+            ),
+            { popup_scenes }
+        ]
+    }
+}
+
 #[cfg(test)]
 #[path = "../../tests/headless/widgets_interaction.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/widgets/dropdown.rs"]
+mod dropdown_tests;

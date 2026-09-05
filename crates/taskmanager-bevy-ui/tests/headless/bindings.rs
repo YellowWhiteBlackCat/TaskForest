@@ -14,6 +14,6 @@ fn binding_declaration_is_complete_for_bevy() {
             .iter()
             .find(|(command, _)| *command == CommandId::ToggleSidebar)
             .map(|(_, status)| *status),
-        Some(CoverageStatus::DeliberatelyUnbound)
+        Some(CoverageStatus::Bound("F9"))
     );
 }

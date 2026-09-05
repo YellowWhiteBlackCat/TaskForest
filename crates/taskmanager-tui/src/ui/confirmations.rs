@@ -201,22 +201,52 @@ pub(super) fn render_batch_confirmation_at(
     } else {
         format!("{} {}", targets.len(), t("proc.process_count"))
     };
+    let mut lines = vec![
+        Line::from(Span::styled(
+            t("confirm.action_headline")
+                .replace("{action}", &action)
+                .replace("{target}", &scope),
+            Style::new()
+                .fg(theme.color(Color::White))
+                .add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+    ];
+    if targets.len() > 1 {
+        const MAX_SHOWN_TARGETS: usize = 5;
+        for target in targets.iter().take(MAX_SHOWN_TARGETS) {
+            lines.push(Line::from(vec![
+                Span::styled(
+                    format!("  {:>6}  ", target.pid),
+                    Style::new().fg(theme.accent),
+                ),
+                Span::styled(
+                    target.name.clone(),
+                    Style::new().fg(theme.color(Color::White)),
+                ),
+            ]));
+        }
+        if targets.len() > MAX_SHOWN_TARGETS {
+            let remaining = targets.len() - MAX_SHOWN_TARGETS;
+            lines.push(Line::from(Span::styled(
+                format!("  +{remaining} more..."),
+                Style::new().fg(theme.dim),
+            )));
+        }
+        lines.push(Line::from(""));
+    }
+    lines.push(Line::from(t("confirm.frozen_body")));
+    lines.push(Line::from(""));
+    lines.push(confirm_hint_line(theme));
+
     frame.render_widget(
-        Paragraph::new(vec![
-            Line::from(Span::styled(
-                t("confirm.action_headline")
-                    .replace("{action}", &action)
-                    .replace("{target}", &scope),
-                Style::new()
-                    .fg(theme.color(Color::White))
-                    .add_modifier(Modifier::BOLD),
-            )),
-            Line::from(t("confirm.frozen_body")),
-            Line::from(""),
-            confirm_hint_line(theme),
-        ])
-        .alignment(Alignment::Center)
-        .wrap(Wrap { trim: true }),
+        Paragraph::new(lines)
+            .alignment(if targets.len() > 1 {
+                Alignment::Left
+            } else {
+                Alignment::Center
+            })
+            .wrap(Wrap { trim: true }),
         inner,
     );
 }

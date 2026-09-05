@@ -138,3 +138,19 @@ fn light_and_dark_themes_resolve_to_different_surfaces() {
         "nav surfaces follow the mode too"
     );
 }
+
+#[test]
+fn high_contrast_theme_strengthens_bevy_palette_and_flags_hc() {
+    let standard = ui_palette(&Theme::dark());
+    let hc_theme = Theme::build(
+        Skin::Gnome,
+        LightDark::Dark,
+        HighContrast::On,
+        ResolvedFonts::system_for(Skin::Gnome),
+    );
+    let hc = ui_palette(&hc_theme);
+    assert!(!standard.high_contrast);
+    assert!(hc.high_contrast);
+    assert_ne!(standard.border_color.to_srgba(), hc.border_color.to_srgba());
+    assert_eq!(hc.border_color.to_srgba().alpha, 1.0);
+}

@@ -6,9 +6,10 @@ use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::process_telemetry::{
     ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
     IsolationKind, LimitValue, OpenFileEntry, OpenFileKind, ProcessConnection, ProcessEnvironment,
-    ProcessGpuDevice, ProcessGpuSnapshot, ProcessIdentity, ProcessIsolation,
-    ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot, ProcessTelemetrySnapshot,
-    ProcessThreadInfo, ProcessThreads, ResourceGroupMembership, ThreadState,
+    ProcessEnvironmentEntry, ProcessGpuDevice, ProcessGpuSnapshot, ProcessIdentity,
+    ProcessIsolation, ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceSnapshot,
+    ProcessTelemetrySnapshot, ProcessThreadInfo, ProcessThreads, ResourceGroupMembership,
+    ThreadState,
 };
 
 use taskmanager_core::core::device_state::DeviceState;
@@ -147,7 +148,25 @@ pub fn process_insights_capture_fixture() -> ProcessInsightsState {
                 },
             ],
         },
-        environment: ProcessEnvironment::default(),
+        environment: ProcessEnvironment {
+            state: DeviceState::healthy(now_ms),
+            working_directory: Some("/opt/app".into()),
+            entries: vec![
+                ProcessEnvironmentEntry {
+                    key: "PATH".into(),
+                    value: "/usr/local/bin:/usr/bin:/bin".into(),
+                },
+                ProcessEnvironmentEntry {
+                    key: "SHELL".into(),
+                    value: "/bin/bash".into(),
+                },
+                ProcessEnvironmentEntry {
+                    key: "USER".into(),
+                    value: "app".into(),
+                },
+            ],
+            truncated_count: 0,
+        },
         threads: ProcessThreads {
             state: DeviceState::healthy(now_ms),
             threads: vec![

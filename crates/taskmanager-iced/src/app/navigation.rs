@@ -64,6 +64,9 @@ impl IcedApp {
             // frontend-local alerts route owns it to return to the shared page.
             self.close_alerts_page();
             None
+        } else if self.shell.feedback_notice().is_some() && event.key == KeyCode::Escape {
+            self.shell.clear_feedback_notice();
+            None
         } else if event.key == KeyCode::Digit8
             && event.modifiers == Modifiers::ALT
             && !self.modal_open()
@@ -196,7 +199,7 @@ impl IcedApp {
     /// rendered row with the selected flat index — for a group whose main
     /// process is selected this is its header, which is exactly the row the
     /// click painted.
-    pub(super) fn sync_visual_cursor(&mut self) {
+    pub(crate) fn sync_visual_cursor(&mut self) {
         let visual_cursor = {
             let projection = self.projected_rows();
             self.shell
@@ -293,13 +296,13 @@ impl IcedApp {
             _ => {}
         }
     }
-    pub(super) fn close_local_modals(&mut self) {
+    pub(crate) fn close_local_modals(&mut self) {
         self.dismiss_local_surface();
     }
 
     /// Close the shell-owned informational overlays before opening a local
     /// modal, so only one modal is visible and focused at a time.
-    pub(super) fn close_shell_modals(&mut self) {
+    pub(crate) fn close_shell_modals(&mut self) {
         self.shell.dismiss_informational_overlay();
         self.shell.close_service_log();
         self.shell.dismiss_overlay();

@@ -1,6 +1,7 @@
 //! Typed shell lifecycle for quit intent and user-visible feedback.
 
 use super::ShellApp;
+use std::time::Duration;
 use taskmanager_application::{
     ServiceControlOutcome, SessionControlOutcome, StartupControlOutcome,
 };
@@ -82,11 +83,16 @@ impl FeedbackBatchLifetime {
 pub enum FeedbackLifecycle {
     UntilReplaced,
     PlatformBatches(FeedbackBatchLifetime),
+    Timed(Duration),
 }
 
 impl FeedbackLifecycle {
     pub const NEXT_PLATFORM_BATCH: Self = Self::PlatformBatches(FeedbackBatchLifetime::ONE);
     pub const SHORT: Self = Self::PlatformBatches(FeedbackBatchLifetime::TWO);
+    pub const SHORT_DURATION: Duration = Duration::from_secs(5);
+    pub const LONG_DURATION: Duration = Duration::from_secs(8);
+    pub const TIMED_SHORT: Self = Self::Timed(Self::SHORT_DURATION);
+    pub const TIMED_LONG: Self = Self::Timed(Self::LONG_DURATION);
 
     #[must_use]
     pub const fn for_platform_batches(batches: u8) -> Option<Self> {
@@ -94,6 +100,11 @@ impl FeedbackLifecycle {
             Some(lifetime) => Some(Self::PlatformBatches(lifetime)),
             None => None,
         }
+    }
+
+    #[must_use]
+    pub const fn timed(duration: Duration) -> Self {
+        Self::Timed(duration)
     }
 }
 
@@ -144,6 +155,7 @@ enum FeedbackEvent {
     Report(FeedbackNotice),
     ClearNotice,
     AdvancePlatformBatch,
+    AdvanceTime(Duration),
     RecordService(ServiceControlOutcome),
     RecordStartup(StartupControlOutcome),
     RecordSession(SessionControlOutcome),
@@ -212,6 +224,10 @@ impl FeedbackState {
         self.reduce(FeedbackEvent::ClearNotice);
     }
 
+    pub fn advance_time(&mut self, elapsed: Duration) {
+        self.reduce(FeedbackEvent::AdvanceTime(elapsed));
+    }
+
     pub fn record_service(&mut self, outcome: ServiceControlOutcome) {
         self.reduce(FeedbackEvent::RecordService(outcome));
     }
@@ -242,6 +258,19 @@ impl FeedbackState {
                         notice.lifecycle = FeedbackLifecycle::PlatformBatches(
                             FeedbackBatchLifetime(lifetime.remaining() - 1),
                         );
+                    }
+                    FeedbackLifecycle::Timed(_) => {}
+                }
+            }
+            FeedbackEvent::AdvanceTime(elapsed) => {
+                let Some(notice) = self.notice.as_mut() else {
+                    return;
+                };
+                if let FeedbackLifecycle::Timed(remaining) = notice.lifecycle {
+                    if remaining <= elapsed {
+                        self.notice = None;
+                    } else {
+                        notice.lifecycle = FeedbackLifecycle::Timed(remaining - elapsed);
                     }
                 }
             }
@@ -370,6 +399,14 @@ impl ShellApp {
         let _ = self
             .lifecycle
             .reduce(ShellLifecycleEvent::Feedback(FeedbackEvent::ClearNotice));
+    }
+
+    pub fn advance_feedback_time(&mut self, elapsed: Duration) {
+        let _ = self
+            .lifecycle
+            .reduce(ShellLifecycleEvent::Feedback(FeedbackEvent::AdvanceTime(
+                elapsed,
+            )));
     }
 
     pub(super) fn advance_feedback_platform_batch(&mut self) {

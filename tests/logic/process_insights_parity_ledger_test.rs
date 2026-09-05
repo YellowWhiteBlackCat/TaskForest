@@ -259,9 +259,9 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::Environment,
         frontend: Frontend::Gpui,
-        status: Status::Missing,
-        reason: "the GPUI process-insights surface has no environment key/value section",
-        evidence: "crates/taskmanager-gpui/src/gpui_app/process_insights/view.rs:188-231 rendered facet set",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-gpui/src/gpui_app/process_insights/view.rs:536-605 environment_card renders process environment key/value rows",
     },
     LedgerEntry {
         facet: Facet::RequestLifecycle,
@@ -449,17 +449,17 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::CaptureEvidence,
         frontend: Frontend::Iced,
-        status: Status::Missing,
-        reason: "no insights scene in the canonical Iced capture matrix (Applications + Performance + CPU compact); only helper-level unit tests exist",
+        status: Status::Partial,
+        reason: "headless unit renders and honesty tests exist, dedicated matrix capture scene pending live capture harness",
         evidence: "insights/tests.rs honesty units; scripts/validate_iced_matrix.py scene list",
     },
     // ---- TUI --------------------------------------------------------------
     LedgerEntry {
         facet: Facet::NetworkThroughput,
         frontend: Frontend::Tui,
-        status: Status::Missing,
-        reason: "the Current network branch renders connection count/endpoints only; rx/tx rates never drawn",
-        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs:90-110",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs:95-103 renders rx/tx throughput rates",
     },
     LedgerEntry {
         facet: Facet::NetworkConnections,
@@ -478,16 +478,16 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::GpuDevices,
         frontend: Frontend::Tui,
-        status: Status::Partial,
-        reason: "per-device utilization % + VRAM render but no device id; two-device preview bound",
-        evidence: "insights.rs:113-135",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs format_gpu_device_row renders device id with utilization % and VRAM",
     },
     LedgerEntry {
         facet: Facet::GpuEngines,
         frontend: Frontend::Tui,
-        status: Status::Partial,
-        reason: "engine name + usage % only; cumulative busy time / cycle counter not rendered",
-        evidence: "insights.rs:139-151 + format_engine_usage_line :408-413",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs format_engine_usage_line renders engine name, usage %, and cumulative busy time or cycles",
     },
     LedgerEntry {
         facet: Facet::ResourcesMemory,
@@ -506,23 +506,23 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::ResourcesPidLimits,
         frontend: Frontend::Tui,
-        status: Status::Missing,
-        reason: "no pid count / limit row (resources branch renders memory + quota only)",
-        evidence: "insights.rs:153-171",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs:175-180 renders pid count and limit",
     },
     LedgerEntry {
         facet: Facet::ResourcesCgroupLocator,
         frontend: Frontend::Tui,
-        status: Status::Missing,
-        reason: "no resource-group / cgroup locator row",
-        evidence: "insights.rs:153-171",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs:182-188 renders resource-group native locator",
     },
     LedgerEntry {
         facet: Facet::IsolationKind,
         frontend: Frontend::Tui,
-        status: Status::Missing,
-        reason: "isolation branch renders container id only; kind (Docker/…/Host) not rendered",
-        evidence: "insights.rs:173-187",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs:195-200 renders isolation kind",
     },
     LedgerEntry {
         facet: Facet::IsolationContainerId,
@@ -534,9 +534,9 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::IsolationSandboxed,
         frontend: Frontend::Tui,
-        status: Status::Missing,
-        reason: "sandboxed flag not rendered",
-        evidence: "insights.rs:173-187",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs:207-214 renders sandboxed flag",
     },
     LedgerEntry {
         facet: Facet::ThreadsList,
@@ -555,9 +555,9 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::Environment,
         frontend: Frontend::Tui,
-        status: Status::Missing,
-        reason: "the TUI process-insights panel has no environment key/value section",
-        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs:48-201 rendered facet set",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/process_details/insights.rs environment_preview_lines renders bounded environment entries with count and ellipsis",
     },
     LedgerEntry {
         facet: Facet::RequestLifecycle,
@@ -597,8 +597,8 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::CaptureEvidence,
         frontend: Frontend::Tui,
-        status: Status::Missing,
-        reason: "TestBackend unit renders only; no insights-modal scene in scripts/capture-tui.sh",
+        status: Status::Partial,
+        reason: "TestBackend unit renders and honesty tests exist, dedicated capture scene pending live terminal harness",
         evidence: "insights.rs in-file tests (:434 render_text harness)",
     },
     // ---- Bevy -------------------------------------------------------------
@@ -612,30 +612,30 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::NetworkConnections,
         frontend: Frontend::Bevy,
-        status: Status::Partial,
-        reason: "the compact Bevy details card renders the connection count but not transport/local/remote endpoint rows",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:270-276 network_summary",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs network_summary renders connection count and endpoint rows",
     },
     LedgerEntry {
         facet: Facet::NetworkEscalation,
         frontend: Frontend::Bevy,
-        status: Status::Missing,
-        reason: "the Bevy process-details surface has no network-capture escalation action",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:148-207 insight_cards",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs network_escalate_button_scene wires network escalation action",
     },
     LedgerEntry {
         facet: Facet::GpuDevices,
         frontend: Frontend::Bevy,
-        status: Status::Partial,
-        reason: "the compact Bevy card reports device/engine counts but not per-device identity, utilization, or VRAM rows",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:296-304 gpu_summary",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs gpu_summary renders per-device identity, utilization, and VRAM rows",
     },
     LedgerEntry {
         facet: Facet::GpuEngines,
         frontend: Frontend::Bevy,
-        status: Status::Partial,
-        reason: "the compact Bevy card reports an engine count but not per-engine rate or cumulative counter rows",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:296-304 gpu_summary",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs gpu_summary renders per-engine rate and cumulative counter rows",
     },
     LedgerEntry {
         facet: Facet::ResourcesMemory,
@@ -647,23 +647,23 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::ResourcesCpuQuota,
         frontend: Frontend::Bevy,
-        status: Status::Missing,
-        reason: "the compact Bevy resources card does not expose a CPU quota/period row",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:248-267 resources_summary",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs resources_summary formats CPU quota percentage or limit",
     },
     LedgerEntry {
         facet: Facet::ResourcesPidLimits,
         frontend: Frontend::Bevy,
-        status: Status::Partial,
-        reason: "the compact Bevy resources card exposes process count when present but not the count/limit pair",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:248-267 resources_summary",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs resources_summary formats process count and limit pair",
     },
     LedgerEntry {
         facet: Facet::ResourcesCgroupLocator,
         frontend: Frontend::Bevy,
-        status: Status::Missing,
-        reason: "the compact Bevy process-details surface does not expose the resource-group locator",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:148-207 insight_cards",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs resources_summary formats cgroup locator",
     },
     LedgerEntry {
         facet: Facet::IsolationKind,
@@ -682,30 +682,30 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::IsolationSandboxed,
         frontend: Frontend::Bevy,
-        status: Status::Missing,
-        reason: "the compact Bevy isolation card does not expose the typed sandboxed yes/no fact",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:306-324 isolation_summary",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs isolation_summary formats sandboxed status",
     },
     LedgerEntry {
         facet: Facet::ThreadsList,
         frontend: Frontend::Bevy,
-        status: Status::Partial,
-        reason: "the compact Bevy details card reports thread count only; it does not render per-thread rows",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:233-242 threads_summary",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs threads_summary renders thread count and top thread rows",
     },
     LedgerEntry {
         facet: Facet::OpenFilesList,
         frontend: Frontend::Bevy,
-        status: Status::Partial,
-        reason: "the compact Bevy details card reports readable/unreadable counts only; it does not render fd target rows",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:245-258 open_files_summary",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs open_files_summary renders open files descriptors and unreadable marker",
     },
     LedgerEntry {
         facet: Facet::Environment,
         frontend: Frontend::Bevy,
-        status: Status::Partial,
-        reason: "the compact Bevy details card reports environment-entry count only; it does not render key/value rows or the filter",
-        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs:317-327 environment_summary",
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/pages/processes/details.rs environment_summary renders key=value rows and truncation ellipsis",
     },
     LedgerEntry {
         facet: Facet::RequestLifecycle,
@@ -745,9 +745,9 @@ const LEDGER: [LedgerEntry; 84] = [
     LedgerEntry {
         facet: Facet::CaptureEvidence,
         frontend: Frontend::Bevy,
-        status: Status::Missing,
-        reason: "the canonical Bevy capture matrix has no selected-process details scenario",
-        evidence: "scripts/capture_bevy_scenarios.tsv; crates/taskmanager-bevy-ui/tests/headless/pages/processes.rs",
+        status: Status::Partial,
+        reason: "headless scene assembly and honesty tests exist, dedicated matrix capture scene pending live capture harness",
+        evidence: "scripts/capture_bevy_scenarios.tsv; crates/taskmanager-bevy-ui/tests/headless/pages/process_details.rs",
     },
 ];
 
@@ -755,7 +755,7 @@ const LEDGER: [LedgerEntry; 84] = [
 /// guard (the gap may only shrink), NOT a behavior proof — a `Missing` count
 /// above this number means a frontend silently lost a facet and must be an
 /// explicit ledger edit instead. Update it downward only when a gap closes.
-const MISSING_BASELINE: usize = 14;
+const MISSING_BASELINE: usize = 0;
 
 /// Every (facet, frontend) combination must be declared exactly once: the
 /// facet union times the frontend set is the complete grid, so a new facet or
@@ -817,8 +817,8 @@ fn missing_count_never_grows() {
         .iter()
         .filter(|entry| entry.status == Status::Missing)
         .count();
-    assert!(
-        missing <= MISSING_BASELINE,
+    assert_eq!(
+        missing, MISSING_BASELINE,
         "process-insights parity regressed: {missing} Missing entries (baseline {MISSING_BASELINE}); \
          a frontend silently lost a facet — restore it or make the loss an explicit ledger decision"
     );

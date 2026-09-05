@@ -234,3 +234,83 @@ fn the_frozen_identity_travels_with_the_session() {
         "the menu freezes the row it was opened on, got {frozen:?}"
     );
 }
+
+// ---- multi-select batch tests ----
+use taskmanager_core::core::process::ProcessLiveKey;
+
+fn multi_shelved_shell() -> ShellApp {
+    let mut shell = ShellApp::new();
+    let p1 = token_process(100, "proc1");
+    let p2 = token_process(200, "proc2");
+    fixture::edit_processes(&mut shell, |shelved| {
+        *shelved = Some(vec![p1, p2]);
+    });
+    let _ = shell.apply_action(AppAction::SelectPage(
+        taskmanager_application::AppPage::Applications,
+    ));
+    // Mark both processes for multi-select
+    assert!(shell.select_row(0));
+    assert!(shell.toggle_row_selection(1));
+    assert_eq!(shell.selected_rows.len(), 2);
+    shell
+}
+
+#[test]
+fn multi_select_suspend_arms_batch_gate_with_multiple_targets() {
+    let mut shell = multi_shelved_shell();
+    let id = ProcessLiveKey::from_process(shell.visible_process_at(0).unwrap()).unwrap();
+    let ctx = ProcessMenuCtx {
+        identity: id,
+        control_available: true,
+    };
+
+    // Pick 2 = Suspend
+    let effects = ctx.commit(2, &mut shell);
+    assert!(
+        effects.is_empty(),
+        "gated batch action returns no direct platform effects"
+    );
+    let Some(PendingConfirmation::ProcessBatch(intent)) = shell.pending_confirmation() else {
+        panic!("multi-select suspend must arm ProcessBatch confirmation gate");
+    };
+    assert_eq!(intent.action, ProcessBatchAction::Suspend);
+    assert_eq!(intent.targets.len(), 2);
+}
+
+#[test]
+fn multi_select_resume_arms_batch_gate_with_multiple_targets() {
+    let mut shell = multi_shelved_shell();
+    let id = ProcessLiveKey::from_process(shell.visible_process_at(0).unwrap()).unwrap();
+    let ctx = ProcessMenuCtx {
+        identity: id,
+        control_available: true,
+    };
+
+    // Pick 3 = Resume
+    let effects = ctx.commit(3, &mut shell);
+    assert!(effects.is_empty());
+    let Some(PendingConfirmation::ProcessBatch(intent)) = shell.pending_confirmation() else {
+        panic!("multi-select resume must arm ProcessBatch confirmation gate");
+    };
+    assert_eq!(intent.action, ProcessBatchAction::Resume);
+    assert_eq!(intent.targets.len(), 2);
+}
+
+#[test]
+fn multi_select_kill_arms_batch_gate_with_multiple_targets() {
+    let mut shell = multi_shelved_shell();
+    let id = ProcessLiveKey::from_process(shell.visible_process_at(0).unwrap()).unwrap();
+    let ctx = ProcessMenuCtx {
+        identity: id,
+        control_available: true,
+    };
+
+    // Pick 4 = Kill
+    let effects = ctx.commit(4, &mut shell);
+    assert!(effects.is_empty());
+    let Some(PendingConfirmation::ProcessBatch(intent)) = shell.pending_confirmation() else {
+        panic!("multi-select kill must arm ProcessBatch confirmation gate");
+    };
+    assert_eq!(intent.action, ProcessBatchAction::Kill);
+    assert_eq!(intent.targets.len(), 2);
+}

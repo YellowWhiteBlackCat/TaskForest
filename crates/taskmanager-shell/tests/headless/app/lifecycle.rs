@@ -148,3 +148,21 @@ fn restart_quit_is_recorded_without_failure_feedback() {
     assert_eq!(app.feedback_notice(), None);
     assert_eq!(app.feedback_text(), app.feedback_activity());
 }
+
+#[test]
+fn timed_notice_expires_when_time_advances_past_duration() {
+    let mut app = ShellApp::new();
+    app.report_notice(
+        FeedbackSource::Persistence,
+        FeedbackSeverity::Success,
+        FeedbackLifecycle::Timed(std::time::Duration::from_millis(500)),
+        "saved",
+    );
+    assert_eq!(app.feedback_text(), "saved");
+
+    app.advance_feedback_time(std::time::Duration::from_millis(200));
+    assert_eq!(app.feedback_text(), "saved");
+
+    app.advance_feedback_time(std::time::Duration::from_millis(300));
+    assert!(app.feedback_notice().is_none());
+}

@@ -8,6 +8,7 @@ pub(crate) struct PerformanceState {
     pub(crate) selected_device: PerfDevice,
     pub(crate) sidebar_visible: bool,
     pub(crate) process_history: Option<ProcessPerfHistory>,
+    pub(crate) gpu_engines_expanded: bool,
 }
 
 impl Default for PerformanceState {
@@ -17,6 +18,7 @@ impl Default for PerformanceState {
             selected_device: PerfDevice::default(),
             sidebar_visible: true,
             process_history: None,
+            gpu_engines_expanded: true,
         }
     }
 }

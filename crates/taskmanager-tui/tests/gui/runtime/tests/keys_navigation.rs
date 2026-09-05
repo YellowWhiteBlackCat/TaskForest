@@ -151,9 +151,9 @@ fn crossterm_keys_normalize_into_shared_command_vocabulary() {
 }
 
 #[test]
-fn alt_8_is_not_advertised_as_a_live_tui_route_before_alerts_exists() {
+fn alt_8_opens_health_and_alerts_overlay() {
     let mut app = crate::demo_app();
-    let before = app.page();
+    assert!(!app.health_open());
     let _ = handle_key(
         &mut app,
         KeyEvent::new(
@@ -161,10 +161,9 @@ fn alt_8_is_not_advertised_as_a_live_tui_route_before_alerts_exists() {
             KeyModifiers::ALT,
         ),
     );
-    assert_eq!(app.page(), before);
     assert!(
-        crate::bindings::is_deliberately_unbound(taskmanager_application::CommandId::ShowAlerts),
-        "the TUI must keep the unimplemented Alerts route explicit"
+        app.health_open(),
+        "Alt+8 opens the health and alerts overlay in the TUI"
     );
 }
 

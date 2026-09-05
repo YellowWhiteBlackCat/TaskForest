@@ -49,6 +49,8 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::SourceRetry(request) => {
             format!("iced-source-retry-{}", refresh_request_key(request))
         }
+        FocusTarget::AuthorizeRaplPower => "iced-authorize-rapl-power".to_owned(),
+        FocusTarget::AuthorizeMsrReadouts => "iced-authorize-msr-readouts".to_owned(),
         FocusTarget::EndTask => "iced-end-task".to_owned(),
         FocusTarget::OpenProcessLocation => "iced-open-process-location".to_owned(),
         FocusTarget::SearchProcessOnline => "iced-search-process-online".to_owned(),
@@ -91,6 +93,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::HealthTrigger => "iced-health-trigger".to_owned(),
         FocusTarget::AboutTrigger => "iced-about-trigger".to_owned(),
         FocusTarget::Export => "iced-export".to_owned(),
+        FocusTarget::WindowCapture => "iced-window-capture".to_owned(),
         FocusTarget::ServiceAction { index, action } => {
             format!("iced-service-action-{index}-{action:?}")
         }
@@ -132,6 +135,13 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::DirectoryUsageScan => "iced-directory-usage-scan".to_owned(),
         FocusTarget::DirectoryUsageCancel => "iced-directory-usage-cancel".to_owned(),
         FocusTarget::DiskSmartOpen { index } => format!("iced-disk-smart-open-{index}"),
+        FocusTarget::SmartSelfTestShort { index } => format!("iced-smart-self-test-short-{index}"),
+        FocusTarget::SmartSelfTestExtended { index } => {
+            format!("iced-smart-self-test-extended-{index}")
+        }
+        FocusTarget::ConfirmSmartSelfTest => "iced-confirm-smart-self-test".to_owned(),
+        FocusTarget::CancelSmartSelfTest => "iced-cancel-smart-self-test".to_owned(),
+        FocusTarget::GpuEnginesExpandToggle => "iced-gpu-engines-expand-toggle".to_owned(),
         FocusTarget::GpuEngineRowsToggle => "iced-gpu-engine-rows-toggle".to_owned(),
         FocusTarget::AboutCopyDetails => "iced-about-copy-details".to_owned(),
         FocusTarget::ServiceLogFollow => "iced-service-log-follow".to_owned(),
@@ -158,6 +168,8 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::RunTaskCancel => "iced-run-task-cancel".to_owned(),
         FocusTarget::AlertsPageTab => "iced-alerts-page-tab".to_owned(),
         FocusTarget::AlertsRuleToggle(index) => format!("iced-alerts-rule-toggle-{index}"),
+        FocusTarget::AlertsExport => "iced-alerts-export".to_owned(),
+        FocusTarget::AlertsImport => "iced-alerts-import".to_owned(),
         FocusTarget::FirstRunCopy(row) => format!("iced-first-run-copy-{row}"),
         FocusTarget::FirstRunAction(index) => format!("iced-first-run-action-{index}"),
         FocusTarget::ProcessAffinitySelectAll => "iced-process-affinity-select-all".to_owned(),

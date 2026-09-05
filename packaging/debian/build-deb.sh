@@ -37,7 +37,7 @@ case "$deb_arch" in
 esac
 
 [[ -d "$staged/usr" ]] || { echo "build-deb: $staged does not contain a staged usr/ tree" >&2; exit 1; }
-command -v dpkg-deb >/dev/null || { echo "build-deb: dpkg-deb not installed" >&2; exit 1; }
+# dpkg-deb or ar+tar fallback checked below
 
 work=$(mktemp -d "$repo/.tmp/build-deb.XXXXXX")
 trap 'rm -rf "$work"' EXIT
@@ -56,7 +56,18 @@ sed -e "s/__VERSION__/$deb_version/" \
     -e "s/__INSTALLED_SIZE__/$installed_size/" \
     "$script_dir/control" >"$work/DEBIAN/control"
 
-# --root-owner-group keeps a non-root build honest: every archive entry is
-# recorded as root:root exactly as a real package transaction would install it.
-dpkg-deb --root-owner-group --build "$work" "$output" >/dev/null
+if command -v dpkg-deb >/dev/null 2>&1; then
+    # --root-owner-group keeps a non-root build honest: every archive entry is
+    # recorded as root:root exactly as a real package transaction would install it.
+    dpkg-deb --root-owner-group --build "$work" "$output" >/dev/null
+elif command -v ar >/dev/null 2>&1 && command -v tar >/dev/null 2>&1; then
+    echo "2.0" > "$work/debian-binary"
+    tar --numeric-owner --owner=0 --group=0 -czf "$work/control.tar.gz" -C "$work/DEBIAN" .
+    tar --numeric-owner --owner=0 --group=0 -czf "$work/data.tar.gz" -C "$work" usr
+    unlink "$output" 2>/dev/null || true
+    ar -qc "$output" "$work/debian-binary" "$work/control.tar.gz" "$work/data.tar.gz"
+else
+    echo "build-deb: neither dpkg-deb nor ar/tar is available to create .deb package" >&2
+    exit 1
+fi
 echo "build-deb: $(basename "$output") ready ($(du -h "$output" | cut -f1))"

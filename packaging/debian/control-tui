@@ -1,0 +1,20 @@
+Package: taskforest-t
+Version: __VERSION__
+Section: admin
+Priority: optional
+Architecture: __ARCH__
+Depends: libc6
+Suggests: smartmontools, nvme-cli, xfsprogs, iw
+Maintainer: TaskForest contributors <noreply@yellowwhiteblackcat.github.io>
+Installed-Size: __INSTALLED_SIZE__
+Homepage: https://github.com/YellowWhiteBlackCat/TaskForest
+Description: Fast, terminal-native system monitor
+ TaskForest-T is the fast, terminal-native Ratatui frontend for the TaskForest
+ system monitor. It renders live CPU, memory, GPU, network, storage,
+ and per-process telemetry directly in any standard terminal without
+ requiring a Wayland session or GPU driver libraries (X11 is not supported).
+ .
+ Designed for headless servers, containers, remote SSH sessions, and minimal
+ environments. Supports interactive monitoring, headless text snapshots,
+ and structured JSON exports. Zero graphical or X11 dependencies.
+License: Apache-2.0

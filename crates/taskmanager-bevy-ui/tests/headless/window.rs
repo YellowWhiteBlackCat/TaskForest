@@ -33,7 +33,7 @@ use taskmanager_platform_contract::{
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
 
-use super::{FrontendWindowPlugin, Role, SummaryLine, TextRole};
+use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 
@@ -264,5 +264,82 @@ fn the_accessibility_bridge_resources_are_installed_once() {
             .get_resource::<bevy::a11y::ManageAccessibilityUpdates>()
             .is_some(),
         "the update-management resource must exist after composition"
+    );
+}
+
+#[test]
+fn timed_feedback_notice_expires_and_fires_feedback_changed_to_update_feedback_line() {
+    let (client, _host_requests) = scripted_client();
+    let cache: &'static RuntimeCache = Box::leak(Box::new(RuntimeCache::new()));
+    let runtime = cache
+        .get_or_init(move || Ok(client))
+        .expect("scripted runtime starts");
+    let mut app = headless_window_app(runtime);
+
+    // Initial update to run Startup systems and spawn the app shell.
+    app.update();
+
+    let world = app.world_mut();
+    let line = world
+        .query_filtered::<&Text, With<FeedbackLine>>()
+        .iter(world)
+        .map(|text| text.0.clone())
+        .collect::<Vec<String>>();
+    assert_eq!(line.len(), 1, "app shell spawns exactly one feedback line");
+    assert_eq!(
+        line[0], "Refresh queued",
+        "initial feedback line reports queued refresh"
+    );
+
+    // Report a timed feedback notice with 30ms lifetime.
+    app.world_mut()
+        .non_send_mut::<crate::app::FrontendTrack>()
+        .shell
+        .report_notice(
+            taskmanager_shell::FeedbackSource::Interaction,
+            taskmanager_shell::FeedbackSeverity::Info,
+            taskmanager_shell::FeedbackLifecycle::timed(std::time::Duration::from_millis(30)),
+            "Screenshot captured",
+        );
+
+    // Frame 1: drain_system advances 16ms (leaving 14ms), detects changed feedback,
+    // fires FeedbackChanged, and the observer rewrites FeedbackLine.
+    app.update();
+
+    let world = app.world_mut();
+    let line = world
+        .query_filtered::<&Text, With<FeedbackLine>>()
+        .single(world)
+        .expect("feedback line text")
+        .0
+        .clone();
+    assert_eq!(
+        line, "Screenshot captured",
+        "feedback line must display the active notice text"
+    );
+
+    // Frame 2: drain_system advances another 16ms (32ms total >= 30ms).
+    // The timed notice expires and becomes None; drain_system fires FeedbackChanged(""),
+    // and the observer clears FeedbackLine.
+    app.update();
+
+    let world = app.world_mut();
+    assert!(
+        world
+            .non_send::<crate::app::FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_none(),
+        "timed notice must be cleared from shell after expiring"
+    );
+    let line = world
+        .query_filtered::<&Text, With<FeedbackLine>>()
+        .single(world)
+        .expect("feedback line text")
+        .0
+        .clone();
+    assert_eq!(
+        line, "Waiting for telemetry…",
+        "feedback line must return to background activity after timed notice expires"
     );
 }

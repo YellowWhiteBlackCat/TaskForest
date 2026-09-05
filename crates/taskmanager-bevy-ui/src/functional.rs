@@ -29,47 +29,49 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::AlertRuleToggle => SurfaceDecision::Local {
             route: "alerts.page.rule-toggle",
         },
-        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Unsupported {
-            reason: "the Bevy shape exposes rule toggles only; rule authoring is not wired",
+        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Local {
+            route: "alerts.page.authoring",
         },
-        ProductIntent::AlertRuleTransfer => SurfaceDecision::Unsupported {
-            reason: "the Bevy shape has no alert-rule import/export surface",
+        ProductIntent::AlertRuleTransfer => SurfaceDecision::Local {
+            route: "alerts.page.transfer",
         },
         ProductIntent::ActiveAlerts => SurfaceDecision::Local {
             route: "alerts.page.active",
         },
-        ProductIntent::AlertEventHistory => SurfaceDecision::Unsupported {
-            reason: "the Bevy notification-history surface is not wired",
+        ProductIntent::AlertEventHistory => SurfaceDecision::Local {
+            route: "alerts.page.events",
         },
-        ProductIntent::ServiceDetails => SurfaceDecision::Unsupported {
-            reason: "the Bevy shape currently exposes service inventory only",
+        ProductIntent::ServiceDetails => SurfaceDecision::Local {
+            route: "services.details-modal",
         },
-        ProductIntent::ServiceDependencies => SurfaceDecision::Unsupported {
-            reason: "the Bevy service-dependency panel is not wired",
+        ProductIntent::ServiceDependencies => SurfaceDecision::Local {
+            route: "services.dependencies-panel",
         },
-        ProductIntent::ServiceLogs => SurfaceDecision::Unsupported {
-            reason: "the Bevy service-log stream panel is not wired",
+        ProductIntent::ServiceLogs => SurfaceDecision::Local {
+            route: "services.log-panel",
         },
-        ProductIntent::ServiceLogExport => SurfaceDecision::Unsupported {
-            reason: "the Bevy shape has no service-log export surface",
+        ProductIntent::ServiceLogExport => SurfaceDecision::Local {
+            route: "services.log-panel.export",
         },
-        ProductIntent::ProcessAffinityEditor => SurfaceDecision::Unsupported {
-            reason: "the Bevy process-details surface has no affinity editor",
+        ProductIntent::ProcessAffinityEditor => SurfaceDecision::Local {
+            route: "processes.affinity-modal",
         },
-        ProductIntent::SmartSelfTest => SurfaceDecision::Unsupported {
-            reason: "the Bevy SMART self-test route is not wired",
+        ProductIntent::SmartSelfTest => SurfaceDecision::Local {
+            route: "performance.disk.smart-self-test",
         },
-        ProductIntent::DiagnosticBundle => SurfaceDecision::Unsupported {
-            reason: "the Bevy shape has no diagnostic-bundle surface",
+        ProductIntent::DiagnosticBundle => SurfaceDecision::AcceptedDifference {
+            route: "about.diagnostic-report",
+            reason: "Bevy provides a redacted clipboard report while GPUI provides the preview/write bundle workflow",
         },
-        ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Unsupported {
-            reason: "the Bevy shape has no current-window PNG capture surface",
+        ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Local {
+            route: "header.screenshot",
         },
-        ProductIntent::FirstRunSetup => SurfaceDecision::Unsupported {
-            reason: "the Bevy first-run setup route is not wired",
+        ProductIntent::FirstRunSetup => SurfaceDecision::Local {
+            route: "first-run.dialog",
         },
-        ProductIntent::GpuMetricInspection => SurfaceDecision::Unsupported {
-            reason: "the Bevy GPU metric-inspection detail surface is not wired",
+        ProductIntent::GpuMetricInspection => SurfaceDecision::AcceptedDifference {
+            route: "performance.gpu.metric-summary",
+            reason: "Bevy renders the available GPU metric families together in its device cards instead of exposing a multi-level engine selector",
         },
         ProductIntent::TransientFeedback => SurfaceDecision::AcceptedDifference {
             route: "root.feedback-line",

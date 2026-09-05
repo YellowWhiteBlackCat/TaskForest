@@ -188,3 +188,7 @@ impl RootView {
         });
     }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_gpui_app_root_appearance_tests.rs"]
+mod tests;

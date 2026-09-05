@@ -321,7 +321,8 @@ pub(crate) fn gpu_section(
 }
 
 mod engine_graph;
-use engine_graph::{GpuBlockProps, engine_rows_presentation, gpu_block};
+pub(crate) use engine_graph::engine_rows_presentation;
+use engine_graph::{GpuBlockProps, gpu_block};
 
 /// Dedicated visual progress bars and percentage meters for Dedicated VRAM and Shared VRAM.
 ///
@@ -387,4 +388,138 @@ pub(crate) fn gpu_vram_meters_panel<'a>(
                 .into(),
         )
     }
+}
+
+/// The GPU engines breakdown and expansion panel.
+///
+/// Surfaces the per-engine utilization breakdown with an interactive
+/// expand/collapse toggle and direct access to on-demand telemetry authorization.
+pub(crate) fn gpu_engines_panel<'a>(
+    app: &'a crate::IcedApp,
+    gpu: &'a GpuMetrics,
+    engine_rows: &taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation<'a>,
+    theme_snapshot: &'a taskmanager_theme::Theme,
+) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
+    use taskmanager_shell::presentation::gpu_engine_rows::GpuEngineRowsPresentation;
+
+    let mut engine_items: Vec<(String, f32)> = Vec::new();
+    for engine in &gpu.engines {
+        if !engine.name.trim().is_empty() && engine.usage_pct.is_finite() {
+            engine_items.push((engine.name.clone(), engine.usage_pct));
+        }
+    }
+    if let GpuEngineRowsPresentation::Active(active) = engine_rows {
+        for engine in *active {
+            if !engine_items.iter().any(|(name, _)| name == &engine.name) {
+                engine_items.push((engine.name.clone(), engine.utilization_pct));
+            }
+        }
+    }
+
+    let count = engine_items.len();
+    let expanded = app.performance.gpu_engines_expanded;
+    let expand_glyph = if expanded { "▼" } else { "▶" };
+
+    let header_title = iced::widget::row![
+        crate::focus::ghost_button(
+            theme_snapshot,
+            crate::app::FocusTarget::GpuEnginesExpandToggle,
+            expand_glyph,
+            Message::ToggleGpuEnginesExpanded,
+        ),
+        iced::widget::text(t("gpu.per_engine_title")).size(f32::from(tokens::FONT_13)),
+        iced::widget::text(if count > 0 {
+            format!("{count}")
+        } else {
+            String::new()
+        })
+        .size(f32::from(tokens::FONT_11))
+        .style(move |_| iced::widget::text::Style {
+            color: Some(theme::muted_text_color(theme_snapshot)),
+        }),
+    ]
+    .spacing(6)
+    .align_y(iced::Alignment::Center);
+
+    let mut header_items = vec![header_title.into()];
+    if let Some(toggle) =
+        engine_graph::engine_rows_toggle_section(theme_snapshot, engine_rows.action())
+    {
+        header_items.push(iced::widget::Space::new().width(iced::Length::Fill).into());
+        header_items.push(toggle);
+    }
+    let header = iced::widget::row(header_items)
+        .width(iced::Length::Fill)
+        .align_y(iced::Alignment::Center);
+
+    let mut panel_col: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = vec![header.into()];
+
+    if expanded {
+        if engine_items.is_empty() {
+            let msg = if let Some(key) = engine_rows.message_key() {
+                t(key).to_string()
+            } else {
+                t("gpu.engines_none_reported").to_string()
+            };
+            panel_col.push(
+                iced::widget::text(msg)
+                    .size(f32::from(tokens::FONT_11))
+                    .style(move |_| iced::widget::text::Style {
+                        color: Some(theme::muted_text_color(theme_snapshot)),
+                    })
+                    .into(),
+            );
+        } else {
+            let mut engine_bars: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> =
+                Vec::new();
+            for (name, pct_val) in &engine_items {
+                let clamped = (pct_val / 100.0).clamp(0.0, 1.0);
+                let row_header = iced::widget::row![
+                    iced::widget::text(name.clone()).size(f32::from(tokens::FONT_12)),
+                    iced::widget::text(format!("{:.0}%", pct_val.round()))
+                        .size(f32::from(tokens::FONT_11))
+                        .style(move |_| iced::widget::text::Style {
+                            color: Some(theme::muted_text_color(theme_snapshot)),
+                        }),
+                ]
+                .spacing(8)
+                .align_y(iced::Alignment::Center);
+
+                let progress = components::progress(
+                    theme_snapshot,
+                    Some(clamped),
+                    components::BadgeTone::Accent,
+                );
+                engine_bars.push(
+                    iced::widget::column![row_header, progress]
+                        .spacing(3)
+                        .into(),
+                );
+            }
+            panel_col.push(iced::widget::column(engine_bars).spacing(6).into());
+        }
+    } else if !engine_items.is_empty() {
+        let summary = engine_items
+            .iter()
+            .take(3)
+            .map(|(n, p)| format!("{n}: {:.0}%", p.round()))
+            .collect::<Vec<_>>()
+            .join(" · ");
+        panel_col.push(
+            iced::widget::text(summary)
+                .size(f32::from(tokens::FONT_11))
+                .style(move |_| iced::widget::text::Style {
+                    color: Some(theme::muted_text_color(theme_snapshot)),
+                })
+                .into(),
+        );
+    }
+
+    Some(
+        iced::widget::container(iced::widget::column(panel_col).spacing(6))
+            .padding(8)
+            .width(iced::Length::Fill)
+            .style(move |_| theme::panel_style(theme_snapshot))
+            .into(),
+    )
 }

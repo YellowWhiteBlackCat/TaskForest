@@ -23,4 +23,22 @@ fn functional_declaration_is_complete_and_explicit() {
             .map(|(_, status)| status),
         Some(FunctionalStatus::Declared(SurfaceDecision::Local { .. }))
     ));
+    assert_eq!(
+        report
+            .iter()
+            .find(|(intent, _)| *intent == ProductIntent::SmartSelfTest)
+            .map(|(_, status)| status),
+        Some(&FunctionalStatus::Declared(SurfaceDecision::Local {
+            route: "performance.disk.smart-self-test",
+        }))
+    );
+    assert_eq!(
+        report
+            .iter()
+            .find(|(intent, _)| *intent == ProductIntent::ServiceLogExport)
+            .map(|(_, status)| status),
+        Some(&FunctionalStatus::Declared(SurfaceDecision::Local {
+            route: "services.log-panel.export",
+        }))
+    );
 }

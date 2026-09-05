@@ -50,12 +50,13 @@ pub enum ProcessMenuAction {
     PriorityHigh,
     PriorityNormal,
     PriorityLow,
+    Affinity,
     OpenLocation,
     SearchOnline,
 }
 
 /// The actions in display order.
-pub const MENU_ACTIONS: [ProcessMenuAction; 10] = [
+pub const MENU_ACTIONS: [ProcessMenuAction; 11] = [
     ProcessMenuAction::EndTask,
     ProcessMenuAction::EndProcessTree,
     ProcessMenuAction::Suspend,
@@ -64,6 +65,7 @@ pub const MENU_ACTIONS: [ProcessMenuAction; 10] = [
     ProcessMenuAction::PriorityHigh,
     ProcessMenuAction::PriorityNormal,
     ProcessMenuAction::PriorityLow,
+    ProcessMenuAction::Affinity,
     ProcessMenuAction::OpenLocation,
     ProcessMenuAction::SearchOnline,
 ];
@@ -100,6 +102,7 @@ pub fn action_label(action: ProcessMenuAction) -> &'static str {
             let tier = priority_tier(action).unwrap_or(PriorityTier::Normal);
             taskmanager_shell::presentation::priority_tier_label(tier)
         }
+        ProcessMenuAction::Affinity => t("proc.affinity"),
         ProcessMenuAction::OpenLocation => t("proc.open_location"),
         ProcessMenuAction::SearchOnline => t("proc.search_online"),
     }
@@ -139,7 +142,8 @@ pub fn resolve_action(target: &ProcessMenuTarget) -> Option<PlatformEffect> {
             | ProcessMenuAction::Kill
             | ProcessMenuAction::PriorityHigh
             | ProcessMenuAction::PriorityNormal
-            | ProcessMenuAction::PriorityLow,
+            | ProcessMenuAction::PriorityLow
+            | ProcessMenuAction::Affinity,
         )
         | None => None,
     }

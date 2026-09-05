@@ -31,19 +31,13 @@ use bevy::ui_widgets::{Activate, Button, ScrollArea};
 use taskmanager_application::process_details_vm::{
     ProcessDetailsField, detail_value, process_details_rows,
 };
-use taskmanager_application::{
-    ProcessInsightFacetState, ProcessInsightUnavailable, i18n::t, project_process_resources,
-};
+use taskmanager_application::{ProcessInsightFacetState, ProcessInsightUnavailable, i18n::t};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process::{FrozenProcessIdentity, ProcessLiveKey};
-use taskmanager_core::core::process_telemetry::{
-    IsolationKind, LimitValue, ProcessEnvironment, ProcessGpuSnapshot, ProcessNetworkSnapshot,
-    ProcessOpenFiles, ProcessResourceSnapshot, ProcessThreads,
-};
 use taskmanager_platform_contract::SubmissionErrorKind;
 
 use taskmanager_shell::ShellApp;
-use taskmanager_shell::presentation::{MISSING_VALUE, bytes};
+use taskmanager_shell::presentation::MISSING_VALUE;
 
 use super::super::processes;
 use crate::app::{FrontendTrack, PageContext, SharedRuntimeHandle, ShellTrack};
@@ -68,6 +62,11 @@ pub(crate) struct DetailRow {
     pub(crate) value: String,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum InsightCardAction {
+    NetworkEscalation,
+}
+
 /// A compact card summary. The full bounded facet lists remain a later
 /// expansion of this component; this first slice makes every facet visible
 /// without growing the page beyond the real window's first viewport.
@@ -75,6 +74,7 @@ pub(crate) struct DetailRow {
 pub(crate) struct InsightCard {
     pub(crate) title: String,
     pub(crate) value: String,
+    pub(crate) action: Option<InsightCardAction>,
 }
 
 /// Renderer-neutral input for the mounted panel, kept pure for headless tests.
@@ -151,6 +151,41 @@ fn insight_cards(
     projection: Option<&taskmanager_application::ProjectedProcessInsights>,
 ) -> Vec<InsightCard> {
     let collecting = t("proc_insights.collecting").to_owned();
+    let network_card = match projection.map(|value| &value.network) {
+        None | Some(ProcessInsightFacetState::Pending) => InsightCard {
+            title: t("proc_insights.network_throughput").to_owned(),
+            value: collecting.clone(),
+            action: None,
+        },
+        Some(ProcessInsightFacetState::Unavailable(ProcessInsightUnavailable::Provider(
+            FailureKind::RequiresEscalation,
+        ))) => InsightCard {
+            title: t("proc_insights.network_throughput").to_owned(),
+            value: format!(
+                "{} ({})",
+                t("proc_insights.network_requires_escalation"),
+                t("proc_insights.enable_network_capture")
+            ),
+            action: Some(InsightCardAction::NetworkEscalation),
+        },
+        Some(ProcessInsightFacetState::Unavailable(reason)) => InsightCard {
+            title: t("proc_insights.network_throughput").to_owned(),
+            value: unavailable_text(reason),
+            action: None,
+        },
+        Some(ProcessInsightFacetState::Current(snapshot)) => {
+            let has_escalation = snapshot.traffic_failure == Some(FailureKind::RequiresEscalation);
+            InsightCard {
+                title: t("proc_insights.network_throughput").to_owned(),
+                value: network_summary(snapshot),
+                action: if has_escalation {
+                    Some(InsightCardAction::NetworkEscalation)
+                } else {
+                    None
+                },
+            }
+        }
+    };
     vec![
         InsightCard {
             title: t("proc_insights.threads").to_owned(),
@@ -159,6 +194,7 @@ fn insight_cards(
                 threads_summary,
                 &collecting,
             ),
+            action: None,
         },
         InsightCard {
             title: t("proc_insights.open_files").to_owned(),
@@ -167,18 +203,13 @@ fn insight_cards(
                 open_files_summary,
                 &collecting,
             ),
+            action: None,
         },
-        InsightCard {
-            title: t("proc_insights.network_throughput").to_owned(),
-            value: facet_value(
-                projection.map(|value| &value.network),
-                network_summary,
-                &collecting,
-            ),
-        },
+        network_card,
         InsightCard {
             title: t("common.gpu").to_owned(),
             value: facet_value(projection.map(|value| &value.gpu), gpu_summary, &collecting),
+            action: None,
         },
         InsightCard {
             title: t("proc_insights.resource_limits").to_owned(),
@@ -187,6 +218,7 @@ fn insight_cards(
                 resources_summary,
                 &collecting,
             ),
+            action: None,
         },
         InsightCard {
             title: t("proc_insights.isolation").to_owned(),
@@ -195,6 +227,7 @@ fn insight_cards(
                 isolation_summary,
                 &collecting,
             ),
+            action: None,
         },
         InsightCard {
             title: t("prop.environment").to_owned(),
@@ -203,6 +236,7 @@ fn insight_cards(
                 environment_summary,
                 &collecting,
             ),
+            action: None,
         },
     ]
 }
@@ -232,102 +266,8 @@ fn unavailable_text(reason: &ProcessInsightUnavailable) -> String {
     }
 }
 
-fn threads_summary(threads: &ProcessThreads) -> String {
-    if threads.threads.is_empty() {
-        t("proc_insights.no_threads").to_owned()
-    } else {
-        threads.threads.len().to_string()
-    }
-}
-
-fn open_files_summary(files: &ProcessOpenFiles) -> String {
-    if files.entries.is_empty() && files.unreadable_count == 0 {
-        return t("proc_insights.no_open_files").to_owned();
-    }
-    if files.unreadable_count == 0 {
-        files.entries.len().to_string()
-    } else {
-        format!(
-            "{} · {} {}",
-            files.entries.len(),
-            files.unreadable_count,
-            t("proc_insights.unreadable")
-        )
-    }
-}
-
-fn network_summary(network: &ProcessNetworkSnapshot) -> String {
-    let rx = network.rx_bytes_per_sec.map_or_else(
-        || MISSING_VALUE.to_owned(),
-        |value| format!("{}/s", bytes(value)),
-    );
-    let tx = network.tx_bytes_per_sec.map_or_else(
-        || MISSING_VALUE.to_owned(),
-        |value| format!("{}/s", bytes(value)),
-    );
-    format!("{} · RX {rx} · TX {tx}", network.connections.len())
-}
-
-fn gpu_summary(gpu: &ProcessGpuSnapshot) -> String {
-    let devices = gpu.devices.len();
-    let engines = gpu.engines.engines.len();
-    if devices == 0 && engines == 0 {
-        t("proc_insights.no_gpu").to_owned()
-    } else {
-        format!("{devices} · {engines} {}", t("proc_insights.gpu_engines"))
-    }
-}
-
-fn resources_summary(resources: &ProcessResourceSnapshot) -> String {
-    let projection = project_process_resources(resources);
-    let memory = match (projection.memory_usage_bytes, projection.memory_limit) {
-        (Some(used), Some(LimitValue::Value(limit))) => {
-            format!("{} / {}", bytes(used), bytes(limit))
-        }
-        (Some(used), Some(LimitValue::Unlimited)) => format!("{} / ∞", bytes(used)),
-        (Some(used), None) => bytes(used),
-        _ => MISSING_VALUE.to_owned(),
-    };
-    match projection.process_count {
-        Some(count) => format!("{memory} · {count} {}", t("proc_insights.pids")),
-        None => memory,
-    }
-}
-
-fn isolation_summary(
-    isolation: &taskmanager_core::core::process_telemetry::ProcessIsolation,
-) -> String {
-    let kind = match isolation.kind {
-        Some(IsolationKind::Docker) => "Docker",
-        Some(IsolationKind::Podman) => "Podman",
-        Some(IsolationKind::Kubernetes) => "Kubernetes",
-        Some(IsolationKind::Lxc) => "LXC",
-        Some(IsolationKind::SystemdNspawn) => "systemd-nspawn",
-        Some(IsolationKind::Flatpak) => "Flatpak",
-        Some(IsolationKind::Snap) => "Snap",
-        Some(IsolationKind::Wsl) => "WSL",
-        Some(IsolationKind::OtherContainer) => "Container",
-        None => return t("proc_insights.host_process").to_owned(),
-    };
-    isolation
-        .container_id
-        .as_deref()
-        .map_or_else(|| kind.to_owned(), |id| format!("{kind} · {id}"))
-}
-
-fn environment_summary(environment: &ProcessEnvironment) -> String {
-    if environment.entries.is_empty() {
-        t("prop.environment_empty").to_owned()
-    } else if environment.truncated_count == 0 {
-        environment.entries.len().to_string()
-    } else {
-        format!(
-            "{} · +{}",
-            environment.entries.len(),
-            environment.truncated_count
-        )
-    }
-}
+mod formatting;
+pub(crate) use formatting::*;
 
 // ---- observer bridge ----------------------------------------------------
 
@@ -568,22 +508,65 @@ fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
 fn insight_card_scene(card: &InsightCard, palette: &UiPalette) -> impl Scene + use<> {
     let title = card.title.clone();
     let value = card.value.clone();
+    let action_scene = card
+        .action
+        .map(|_| Box::new(network_escalate_button_scene(palette)) as Box<dyn Scene>);
     bsn! {
         Node {
             width: percent(100),
             min_height: px(palette.control_height_px),
             flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
+            align_items: AlignItems::FlexStart,
             column_gap: Val::Px(space_2()),
-            padding: UiRect::horizontal(Val::Px(space_2())),
+            padding: UiRect::all(Val::Px(space_2())),
             border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
         }
         BackgroundColor({ palette.content_bg })
         Children [
-            ( Node { width: px(104.0) } Children [ ( Text(title) TextRole(Role::Caption) ) ] ),
-            ( Text(value) TextRole(Role::Body) ),
+            ( Node { width: px(104.0), flex_shrink: 0.0 } Children [ ( Text(title) TextRole(Role::Caption) ) ] ),
+            (
+                Node {
+                    flex_grow: 1.0,
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(space_2()),
+                }
+                Children [
+                    ( Text(value) TextRole(Role::Body) ),
+                    ( { action_scene } ),
+                ]
+            ),
         ]
     }
+}
+
+fn network_escalate_button_scene(palette: &UiPalette) -> impl Scene + use<> {
+    bsn! {
+        Node {
+            height: px(palette.control_height_px),
+            padding: UiRect::horizontal(Val::Px(space_8())),
+            align_items: AlignItems::Center,
+            border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+        }
+        BackgroundColor({ palette.nav_active_bg })
+        Button
+        on(on_network_escalate_activated)
+        Children [
+            ( Text(t("proc_insights.enable_network_capture")) TextRole(Role::Body) ),
+        ]
+    }
+}
+
+fn on_network_escalate_activated(
+    _activate: On<Activate>,
+    mut track: NonSendMut<FrontendTrack>,
+    runtime: Option<Res<SharedRuntimeHandle>>,
+) {
+    let effect = ShellApp::request_process_network_escalation();
+    let Some(runtime) = runtime else {
+        return;
+    };
+    let mut client = runtime.shared.lock_client();
+    taskmanager_shell::queue_effect(&mut track.shell, &mut client, effect);
 }
 
 fn refresh_button_scene(palette: &UiPalette) -> impl Scene + use<> {

@@ -534,6 +534,7 @@ fn workspace_dependency_dag_matches_the_inward_firewall() {
         (
             "taskmanager-iced",
             &[
+                "taskmanager-accessibility-linux",
                 // ADR-051: the product bin hands its capabilities to the
                 // shared CLI harness.
                 "taskmanager-cli",

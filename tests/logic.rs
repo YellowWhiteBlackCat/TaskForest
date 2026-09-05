@@ -15,6 +15,9 @@ mod iced_dependency_coherence_test;
 #[path = "logic/process_insights_parity_ledger_test.rs"]
 mod process_insights_parity_ledger_test;
 
+#[path = "logic/four_frontend_parity_ledger_test.rs"]
+mod four_frontend_parity_ledger_test;
+
 #[path = "logic/gpui_interaction_matrix_test.rs"]
 mod gpui_interaction_matrix_test;
 

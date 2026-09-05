@@ -29,6 +29,8 @@ mod keys_navigation;
 mod overlays;
 #[path = "tests/page_navigation.rs"]
 mod page_navigation;
+#[path = "tests/process_affinity.rs"]
+mod process_affinity;
 #[path = "tests/process_batch.rs"]
 mod process_batch;
 #[path = "tests/process_properties.rs"]

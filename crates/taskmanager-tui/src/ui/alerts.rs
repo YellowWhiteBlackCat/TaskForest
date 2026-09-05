@@ -21,8 +21,8 @@ use ratatui::widgets::{Block, Borders, Clear, Paragraph, Wrap};
 use taskmanager_application::ManagedAlertRule;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::alerts::{
-    AlertMetric, AlertSeverity, InsufficientReason, SUGGESTION_MIN_SAMPLES, SuggestedThreshold,
-    SuggestionBasis, SuggestionConfidence,
+    AlertEvent, AlertEventKind, AlertMetric, AlertSeverity, InsufficientReason,
+    SUGGESTION_MIN_SAMPLES, SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
 };
 use taskmanager_ui_contract::IconId;
 
@@ -179,10 +179,14 @@ pub(crate) fn metric_unit(metric: AlertMetric) -> &'static str {
     }
 }
 
-/// Compact read-only projection of one canonical managed rule for the Health
-/// surface. Disabled rules remain present and are labelled instead of being
-/// mistaken for deletion.
-pub(crate) fn managed_rule_line(managed: &ManagedAlertRule, theme: TuiTheme) -> Line<'static> {
+/// Compact projection of one canonical managed rule for the Health surface,
+/// highlighting the active selection cursor. Disabled rules remain present
+/// and are labelled instead of being mistaken for deletion.
+pub(crate) fn managed_rule_line(
+    managed: &ManagedAlertRule,
+    active: bool,
+    theme: TuiTheme,
+) -> Line<'static> {
     let severity = match managed.rule.severity {
         AlertSeverity::Info => theme.accent,
         AlertSeverity::Warning => theme.warn,
@@ -198,10 +202,34 @@ pub(crate) fn managed_rule_line(managed: &ManagedAlertRule, theme: TuiTheme) -> 
     } else {
         theme.dim
     };
+    let prefix = if active { "› " } else { "  " };
+    let prefix_style = if active {
+        Style::new().fg(theme.accent).add_modifier(Modifier::BOLD)
+    } else {
+        Style::new().fg(theme.dim)
+    };
+    let (metric_style, state_style) = if active {
+        (
+            Style::new()
+                .fg(severity)
+                .bg(theme.highlight_bg)
+                .add_modifier(Modifier::BOLD),
+            Style::new()
+                .fg(state_color)
+                .bg(theme.highlight_bg)
+                .add_modifier(Modifier::BOLD),
+        )
+    } else {
+        (
+            Style::new().fg(severity).add_modifier(Modifier::BOLD),
+            Style::new().fg(state_color),
+        )
+    };
     Line::from(vec![
+        Span::styled(prefix, prefix_style),
         Span::styled(
             super::text::pad_cells(metric_label(managed.rule.metric), 18),
-            Style::new().fg(severity).add_modifier(Modifier::BOLD),
+            metric_style,
         ),
         Span::styled(
             format!(
@@ -210,14 +238,57 @@ pub(crate) fn managed_rule_line(managed: &ManagedAlertRule, theme: TuiTheme) -> 
                 metric_unit(managed.rule.metric),
                 state
             ),
-            Style::new().fg(state_color),
+            state_style,
         ),
     ])
 }
 
-/// Format a finite metric value with one decimal place. Every threshold the
-/// engine returns is finite (it clamps to a sane range), so this never renders
-/// `NaN`/`inf`.
+/// Compact projection of one alert event transition for the Health surface.
+pub(crate) fn alert_event_line(event: &AlertEvent, theme: TuiTheme) -> Line<'static> {
+    let (kind_str, kind_color) = match event.kind {
+        AlertEventKind::Activated => {
+            let color = match event.alert.severity {
+                AlertSeverity::Critical => theme.danger,
+                AlertSeverity::Warning => theme.warn,
+                AlertSeverity::Info => theme.accent,
+            };
+            (t("events.active"), color)
+        }
+        AlertEventKind::Cleared => (t("events.cleared"), theme.good),
+    };
+    let unit = metric_unit(event.alert.metric);
+    let target = if event.alert.target.is_empty() {
+        metric_label(event.alert.metric)
+    } else {
+        event.alert.target.as_str()
+    };
+    Line::from(vec![
+        Span::styled(
+            format!("  {}ms ", event.observed_at_ms),
+            Style::new().fg(theme.dim),
+        ),
+        Span::styled(
+            format!("[{kind_str}] "),
+            Style::new().fg(kind_color).add_modifier(Modifier::BOLD),
+        ),
+        Span::styled(
+            format!("{target} "),
+            Style::new().fg(theme.color(Color::White)),
+        ),
+        Span::styled(
+            format!(
+                "· {} {:.1}{} (thresh: {:.1}{})",
+                metric_label(event.alert.metric),
+                event.alert.value,
+                unit,
+                event.alert.threshold,
+                unit,
+            ),
+            Style::new().fg(theme.dim),
+        ),
+    ])
+}
+
 fn format_threshold(value: f32) -> String {
     format!("{value:.1}")
 }

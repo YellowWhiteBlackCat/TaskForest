@@ -433,3 +433,70 @@ fn language_activation_switches_the_shared_i18n_bundle() {
     // though nextest isolates each test in its own process.
     set_language(Language::En);
 }
+
+#[test]
+fn high_contrast_activation_toggles_high_contrast_on_palette() {
+    let mut app = headless_shell_app();
+    mount_settings(&mut app);
+
+    assert!(!app.world().resource::<WindowPalette>().inner.high_contrast);
+
+    let hc_choice = choice_entity(app.world_mut(), &SettingsField::HighContrast(true));
+    activate(&mut app, hc_choice);
+    assert!(
+        app.world().resource::<WindowPalette>().inner.high_contrast,
+        "high-contrast activation enables high contrast on the palette"
+    );
+
+    let hc_off_choice = choice_entity(app.world_mut(), &SettingsField::HighContrast(false));
+    activate(&mut app, hc_off_choice);
+    assert!(
+        !app.world().resource::<WindowPalette>().inner.high_contrast,
+        "high-contrast activation disables high contrast on the palette"
+    );
+}
+
+#[test]
+fn system_mode_and_theme_preferences_follow_observed_appearance() {
+    use super::ThemePreferences;
+    let mut prefs = ThemePreferences::default();
+    assert_eq!(prefs.mode, None, "default mode is System (None)");
+    assert_eq!(
+        prefs.effective_mode(),
+        LightDark::Dark,
+        "defaults to Dark before observation"
+    );
+
+    let light_app = taskmanager_core::core::appearance::DesktopAppearance {
+        family: taskmanager_core::core::appearance::DesktopFamily::Gnome,
+        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Light,
+        high_contrast: Some(false),
+    };
+    prefs.observed_appearance = Some(light_app);
+    assert_eq!(
+        prefs.effective_mode(),
+        LightDark::Light,
+        "follows light appearance in System mode"
+    );
+
+    let hc_app = taskmanager_core::core::appearance::DesktopAppearance {
+        family: taskmanager_core::core::appearance::DesktopFamily::Gnome,
+        color_scheme: taskmanager_core::core::appearance::PreferredColorScheme::Dark,
+        high_contrast: Some(true),
+    };
+    prefs.observed_appearance = Some(hc_app);
+    assert_eq!(
+        prefs.effective_contrast(),
+        HighContrast::On,
+        "follows high contrast appearance"
+    );
+
+    // Explicit choice overrides system observation
+    prefs.mode = Some(LightDark::Dark);
+    prefs.observed_appearance = Some(light_app);
+    assert_eq!(
+        prefs.effective_mode(),
+        LightDark::Dark,
+        "explicit choice is not overridden"
+    );
+}

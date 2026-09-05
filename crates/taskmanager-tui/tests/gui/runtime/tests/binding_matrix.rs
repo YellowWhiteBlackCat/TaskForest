@@ -391,6 +391,7 @@ fn y_copies_the_selected_row_through_the_declared_chord() {
 #[test]
 fn o_opens_the_service_log_only_on_services_and_only_once() {
     let mut app = crate::demo_app();
+    app.shell.clear_feedback_notice();
     select_page(&mut app, AppPage::Services);
     let _ = press_char(&mut app, 'o');
     assert!(
@@ -431,6 +432,38 @@ fn e_requests_the_gpu_engine_rows_on_the_gpu_device() {
         cpu.feedback_notice().is_none(),
         "the engine-rows arm is GPU-scoped and must stay silent on the CPU device"
     );
+}
+
+#[test]
+fn e_exports_service_log_on_services_page_when_log_open() {
+    let mut app = crate::demo_app();
+    app.shell.clear_feedback_notice();
+    select_page(&mut app, AppPage::Services);
+    let scratch = crate::ui::test_support::repo_temp_dir().join(format!(
+        "svc-log-matrix-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&scratch).expect("create scratch dir");
+    app.export_dir = Some(scratch.clone());
+
+    // When closed, e does not export
+    let effect = press_char(&mut app, 'e');
+    assert!(effect.is_none());
+    assert!(app.feedback_notice().is_none());
+
+    // Open service log
+    let _ = press_char(&mut app, 'o');
+    assert!(app.shell.service_log.is_some());
+
+    // When open, e triggers export
+    let effect = press_char(&mut app, 'e');
+    assert!(effect.is_none());
+    assert!(app.feedback_notice().is_some());
+
+    let _ = std::fs::remove_dir_all(&scratch);
 }
 
 #[test]
@@ -530,6 +563,11 @@ fn palette_local_actions_respect_the_declared_scopes() {
     assert!(
         services.shell.service_log.is_some(),
         "on Services the palette runs the same log action the o key does"
+    );
+    services.run_palette_local_action(Some(PaletteLocalAction::ExportServiceLog));
+    assert!(
+        services.feedback_notice().is_some(),
+        "with service log open, palette export action triggers export"
     );
 
     let mut gpu = app_on_device(AppPage::Performance, crate::PerfDevice::Gpu);

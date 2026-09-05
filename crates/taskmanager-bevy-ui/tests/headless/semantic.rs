@@ -157,3 +157,88 @@ fn arming_the_gate_surfaces_a_modal_an_at_user_can_dismiss() {
         "the AT path can dismiss the confirmation"
     );
 }
+
+#[test]
+fn mapped_tree_is_well_formed_under_accesskit_consumer_oracle() {
+    let shell = shell_with(vec![
+        fixture_process(100, "alpha", 12.5),
+        fixture_process(200, "beta", 3.0),
+    ]);
+    let snapshot = build_snapshot(&shell).expect("valid snapshot");
+    let update = taskmanager_accessibility_linux::snapshot_to_tree_update(&snapshot);
+    let tree = accesskit_consumer::Tree::new(update, false);
+
+    let root = tree.state().root();
+    assert_eq!(root.role(), accesskit::Role::Application);
+    assert_eq!(root.label().as_deref(), Some("TaskForestB"));
+}
+
+#[test]
+fn rows_are_published_highest_cpu_first_with_deterministic_tie_break() {
+    let shell = shell_with(vec![
+        fixture_process(100, "slow", 5.0),
+        fixture_process(200, "fast", 75.0),
+        fixture_process(300, "medium", 25.0),
+    ]);
+    let snapshot = build_snapshot(&shell).expect("valid snapshot");
+    let table = snapshot
+        .get(&SemanticNodeId::borrowed("process-table"))
+        .expect("process table present");
+    let pids: Vec<u32> = table
+        .children()
+        .filter_map(|child| snapshot.get(child))
+        .filter(|node| node.role() == SemanticRole::Row)
+        .filter_map(|node| node.id().as_str().strip_prefix("row:process:pid:"))
+        .filter_map(|rest| rest.split(':').next()?.parse::<u32>().ok())
+        .collect();
+    assert_eq!(
+        pids,
+        vec![200, 300, 100],
+        "highest CPU rows must be published first"
+    );
+}
+
+#[test]
+fn assistive_technology_actions_drive_bevy_selection_and_modal() {
+    let shell = shell_with(vec![
+        fixture_process(100, "alpha", 12.5),
+        fixture_process(200, "beta", 3.0),
+    ]);
+    let mut track = crate::app::FrontendTrack {
+        shell,
+        initial_refresh_submitted: true,
+        process_tree_expansion: Default::default(),
+    };
+    let snapshot = build_snapshot(&track.shell).expect("valid snapshot");
+
+    let request = taskmanager_ui_contract::AccessibilityActionRequest {
+        snapshot_revision: snapshot.revision(),
+        node: row_id(200),
+        action: SemanticAction::Select,
+        value: None,
+    };
+    super::apply_accessibility_action(&mut track, &request, &snapshot).expect("matching AT action");
+    assert_eq!(
+        track.shell.selected_row,
+        Some(taskmanager_shell::ProcessRowId::Process(
+            taskmanager_core::core::process::ProcessLiveKey::from_parts(200, 2_000_000).unwrap()
+        ))
+    );
+
+    // Modal dismiss
+    let _ = track
+        .shell
+        .apply_action(taskmanager_application::AppAction::RequestEndTask);
+    let modal_snapshot = build_snapshot(&track.shell).expect("modal snapshot");
+    let pending = track.shell.pending_confirmation().unwrap();
+    let view = PendingConfirmationView::from_pending(pending).unwrap();
+    let dismiss_request = taskmanager_ui_contract::AccessibilityActionRequest {
+        snapshot_revision: modal_snapshot.revision(),
+        node: SemanticNodeId::owned(format!("modal:{}", view.target_key)),
+        action: SemanticAction::Dismiss,
+        value: None,
+    };
+    super::apply_accessibility_action(&mut track, &dismiss_request, &modal_snapshot)
+        .expect("dismiss action");
+    assert!(track.shell.pending_confirmation().is_none());
+}

@@ -26,35 +26,35 @@ pub fn functional_declaration() -> FrontendFunctionalDeclaration {
 
 const fn decision(intent: ProductIntent) -> SurfaceDecision {
     match intent {
-        ProductIntent::AlertRuleToggle => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape exposes alert status but keeps rule mutation out of its health surface",
+        ProductIntent::AlertRuleToggle => SurfaceDecision::Local {
+            route: "health.alert-rules.toggle",
         },
-        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape does not offer an alert-rule authoring form",
+        ProductIntent::AlertRuleAuthoring => SurfaceDecision::Local {
+            route: "health.alert-rules.authoring",
         },
-        ProductIntent::AlertRuleTransfer => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape does not offer alert-rule import/export",
+        ProductIntent::AlertRuleTransfer => SurfaceDecision::Local {
+            route: "health.alerts.transfer",
         },
         ProductIntent::ActiveAlerts => SurfaceDecision::Local {
             route: "health.active-alerts",
         },
-        ProductIntent::AlertEventHistory => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape keeps the compact health surface to active alert status; event-center history is graphical",
+        ProductIntent::AlertEventHistory => SurfaceDecision::Local {
+            route: "health.events",
         },
-        ProductIntent::ServiceDetails => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape does not offer the graphical service-details panel",
+        ProductIntent::ServiceDetails => SurfaceDecision::Local {
+            route: "services.details-column",
         },
-        ProductIntent::ServiceDependencies => SurfaceDecision::Unsupported {
-            reason: "the terminal service surface has no dependency-graph panel",
+        ProductIntent::ServiceDependencies => SurfaceDecision::Local {
+            route: "services.details.dependencies",
         },
         ProductIntent::ServiceLogs => SurfaceDecision::Local {
             route: "services.log-panel",
         },
-        ProductIntent::ServiceLogExport => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape has no service-log export surface",
+        ProductIntent::ServiceLogExport => SurfaceDecision::Local {
+            route: "services.log-panel.export",
         },
-        ProductIntent::ProcessAffinityEditor => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape has no CPU-affinity editor surface",
+        ProductIntent::ProcessAffinityEditor => SurfaceDecision::Local {
+            route: "processes.affinity-modal",
         },
         ProductIntent::SmartSelfTest => SurfaceDecision::Local {
             route: "performance.disk.smart-self-test",

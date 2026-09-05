@@ -683,3 +683,48 @@ fn event_bursts_drain_in_bounded_batches_per_cycle() {
         "21 events under a 16-per-cycle cap must span exactly two cycles"
     );
 }
+
+#[test]
+fn seam_event_loop_expires_timed_feedback_notice() {
+    let mut app = crate::demo_app();
+    app.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::Timed(Duration::from_millis(40)),
+        "Expiring in loop",
+    );
+    assert!(app.shell.feedback_notice().is_some());
+    let outcome = drive(
+        &mut app,
+        vec![key(
+            ratatui::crossterm::event::KeyCode::Char('q'),
+            KeyEventKind::Press,
+        )],
+    );
+    assert!(outcome.is_ok());
+    assert!(app.shell.feedback_notice().is_none());
+}
+
+#[test]
+fn seam_event_loop_esc_dismisses_feedback_notice() {
+    let mut app = crate::demo_app();
+    app.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        "Notice to dismiss in loop",
+    );
+    assert!(app.shell.feedback_notice().is_some());
+    let outcome = drive(
+        &mut app,
+        vec![
+            key(ratatui::crossterm::event::KeyCode::Esc, KeyEventKind::Press),
+            key(
+                ratatui::crossterm::event::KeyCode::Char('q'),
+                KeyEventKind::Press,
+            ),
+        ],
+    );
+    assert!(outcome.is_ok());
+    assert!(app.shell.feedback_notice().is_none());
+}

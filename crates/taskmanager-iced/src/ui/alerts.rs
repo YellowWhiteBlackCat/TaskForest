@@ -9,7 +9,7 @@
 //! `alert.*` catalog keys the TUI suggestions overlay and the GPUI rule
 //! manager already consume.
 
-use iced::widget::{checkbox, column, container, row, scrollable, text};
+use iced::widget::{Space, checkbox, column, container, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::alerts::AlertSeverity;
@@ -62,14 +62,40 @@ pub(crate) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     let theme_snapshot = app.theme();
     let muted = theme::muted_text_color(theme_snapshot);
 
+    let export_button = focus::button(
+        theme_snapshot,
+        FocusTarget::AlertsExport,
+        t("common.export"),
+        Message::Alerts(AlertsMessage::ExportRules),
+        false,
+    );
+    let import_button = focus::button(
+        theme_snapshot,
+        FocusTarget::AlertsImport,
+        t("common.import"),
+        Message::Alerts(AlertsMessage::ImportRulesFromClipboard),
+        false,
+    );
+
+    let actions = row![export_button, import_button]
+        .spacing(f32::from(tokens::SPACE_8))
+        .align_y(iced::Alignment::Center);
+
     let heading = row![
-        text(t("alerts.manage")).size(f32::from(tokens::FONT_14)),
-        text(t("alerts.observed_hint"))
-            .size(f32::from(tokens::FONT_11))
-            .color(muted),
+        row![
+            text(t("alerts.manage")).size(f32::from(tokens::FONT_14)),
+            text(t("alerts.observed_hint"))
+                .size(f32::from(tokens::FONT_11))
+                .color(muted),
+        ]
+        .spacing(f32::from(tokens::SPACE_8))
+        .align_y(iced::Alignment::Center),
+        Space::new().width(Length::Fill),
+        actions,
     ]
     .spacing(f32::from(tokens::SPACE_8))
-    .align_y(iced::Alignment::Center);
+    .align_y(iced::Alignment::Center)
+    .width(Length::Fill);
 
     let active_section = active_section(app, theme_snapshot);
     let rules_section = rules_section(app, theme_snapshot);

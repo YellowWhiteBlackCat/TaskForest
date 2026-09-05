@@ -70,6 +70,7 @@ pub mod pages;
 pub mod palette;
 pub mod runtime;
 pub mod semantic;
+pub(crate) mod tray;
 pub mod widgets;
 mod window;
 

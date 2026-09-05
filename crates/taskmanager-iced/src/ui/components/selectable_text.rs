@@ -7,7 +7,7 @@
 //! bounds — iced delivers every runtime event to the tree, the widget simply
 //! stops filtering by its bounds while the session is open), double-click
 //! selects a word, triple-click selects everything. Finishing a drag
-//! publishes the selection to the primary clipboard on Wayland/X11
+//! publishes the selection to the primary clipboard on Wayland
 //! (middle-click paste, the Linux reference behavior); Ctrl/Cmd-C copies
 //! through the standard clipboard.
 //!

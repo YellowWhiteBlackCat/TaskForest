@@ -50,10 +50,14 @@ use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, ScrollArea};
 use bevy::window::{PrimaryWindow, Window};
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::StorageDeviceKey;
+use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::{
     CpuMetrics, CpuTelemetryObservation, DiskMetrics, GpuMetrics, GpuTelemetryObservation,
     MemoryMetrics, MemoryTelemetryObservation, NetworkMetrics, NetworkTelemetryObservation,
 };
+use taskmanager_core::core::smart::SmartSelfTestKind;
+use taskmanager_core::core::system_health::SmartSelfTestIntent;
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::memory::{MemSegment, MemSegmentKind, memory_segments, swap_breakdown};
@@ -166,6 +170,36 @@ pub(crate) struct PerformanceLayoutState(pub(crate) PerformanceLayoutMode);
 
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerformanceDeviceSidebar;
+
+/// The presentation visibility of the performance device navigator.
+#[derive(Resource, Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct PerformanceSidebarVisible(pub(crate) bool);
+
+impl Default for PerformanceSidebarVisible {
+    fn default() -> Self {
+        Self(true)
+    }
+}
+
+/// Triggered by F9 to toggle the device sidebar.
+#[derive(Event, Clone, Copy, Debug)]
+pub(crate) struct TogglePerformanceSidebar;
+
+pub(crate) fn toggle_sidebar_observer(
+    _event: On<TogglePerformanceSidebar>,
+    mut sidebar: ResMut<PerformanceSidebarVisible>,
+    mut device_rails: Query<&mut Node, With<PerformanceDeviceSidebar>>,
+) {
+    sidebar.0 = !sidebar.0;
+    let display = if sidebar.0 {
+        Display::Flex
+    } else {
+        Display::None
+    };
+    for mut node in &mut device_rails {
+        node.display = display;
+    }
+}
 
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerformanceStatsRail;
@@ -346,6 +380,38 @@ pub(crate) fn curve_selector_label(curve: SystemCurve) -> String {
     .to_owned()
 }
 
+/// Arm the SMART self-test confirmation gate for the specified disk.
+pub(crate) fn request_smart_self_test(
+    shell: &mut ShellApp,
+    disk_id: &str,
+    kind: SmartSelfTestKind,
+) -> bool {
+    let Some(disks) = shell
+        .projection()
+        .snapshot
+        .as_ref()
+        .map(|snapshot| &snapshot.disks)
+    else {
+        return false;
+    };
+    let Some(disk) = disks.iter().find(|d| d.device_id == disk_id) else {
+        return false;
+    };
+    let intent = SmartSelfTestIntent {
+        device_id: DeviceId::new(disk.device_id.clone()),
+        device_generation: disk.device_generation,
+        device_key: StorageDeviceKey::new(disk.name.clone()),
+        display_name: if disk.model.is_empty() {
+            disk.name.clone()
+        } else {
+            disk.model.clone()
+        },
+        kind,
+    };
+    shell.arm_smart_self_test(intent);
+    true
+}
+
 // ---- view model: pure resolvers over the read-only shell ----
 
 // ---- scene composition ----
@@ -458,6 +524,7 @@ fn sync_device_focus_changed(
 /// subtree is rebuilt when a window crosses the breakpoint.
 pub(crate) fn sync_performance_layout(
     windows: Query<&Window, bevy::ecs::query::With<PrimaryWindow>>,
+    sidebar: Option<Res<PerformanceSidebarVisible>>,
     mut state: ResMut<PerformanceLayoutState>,
     mut rails: ParamSet<(
         DeviceRailQuery<'_, '_>,
@@ -470,9 +537,10 @@ pub(crate) fn sync_performance_layout(
     let width = windows.iter().next().map_or(1180.0, Window::width);
     let mode = crate::widgets::layout::performance_layout_mode(width);
     state.0 = mode;
+    let sidebar_on = sidebar.is_none_or(|s| s.0);
     let display = match mode {
-        PerformanceLayoutMode::Wide => Display::Flex,
-        PerformanceLayoutMode::Compact => Display::None,
+        PerformanceLayoutMode::Wide if sidebar_on => Display::Flex,
+        _ => Display::None,
     };
     for mut node in &mut rails.p0() {
         node.display = display;

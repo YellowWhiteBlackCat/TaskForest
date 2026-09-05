@@ -34,7 +34,7 @@ type KeySystem = fn(&mut TuiApp, &KeyEvent) -> InputDispatch;
 
 /// Input precedence is data, not nesting. New input owners must be inserted in
 /// this registry and return an explicit dispatch state.
-const KEY_SYSTEMS: [KeySystem; 10] = [
+const KEY_SYSTEMS: [KeySystem; 11] = [
     open_modal_system,
     owned_input_system,
     character_system,
@@ -44,6 +44,7 @@ const KEY_SYSTEMS: [KeySystem; 10] = [
     performance_scroll_system,
     table_navigation_system,
     nonflat_navigation_system,
+    feedback_notice_dismiss_system,
     content_system,
 ];
 
@@ -331,6 +332,12 @@ fn direct_scope_armed(app: &TuiApp, scope: TuiDirectScope, modifiers: Modifiers)
         TuiDirectScope::ServicesPageLogClosed => {
             app.page() == AppPage::Services && app.shell.service_log.is_none()
         }
+        TuiDirectScope::ServicesPageLogOpen => {
+            app.page() == AppPage::Services
+                && app.shell.service_log.is_some()
+                && !modifiers.control
+                && !modifiers.alt
+        }
         TuiDirectScope::PerformanceGpuPage => {
             app.page() == AppPage::Performance
                 && !modifiers.control
@@ -346,6 +353,9 @@ fn direct_scope_armed(app: &TuiApp, scope: TuiDirectScope, modifiers: Modifiers)
         TuiDirectScope::PerformanceDiskSmartReady => {
             direct_scope_armed(app, TuiDirectScope::PerformanceDiskPage, modifiers)
                 && crate::menus::smart_self_test_target(app).is_some()
+        }
+        TuiDirectScope::ServicesPage => {
+            app.page() == AppPage::Services && !modifiers.control && !modifiers.alt
         }
     }
 }
@@ -431,6 +441,10 @@ fn execute_tui_local_direct(
             InputDispatch::Consumed
         }
         TuiDirectAction::OpenServiceLog => InputDispatch::consumed(app.shell.open_service_log()),
+        TuiDirectAction::ExportServiceLog => {
+            app.export_service_log();
+            InputDispatch::Consumed
+        }
         TuiDirectAction::RequestNetworkEscalation => InputDispatch::Effect(Box::new(
             taskmanager_shell::ShellApp::request_process_network_escalation(),
         )),
@@ -450,6 +464,10 @@ fn execute_tui_local_direct(
             // effect returns here — the platform request is emitted only by
             // the gate's `y`, like every shared confirmation.
             let _ = app.arm_smart_self_test();
+            InputDispatch::Consumed
+        }
+        TuiDirectAction::BrowseServiceDependencies => {
+            let _ = app.open_service_dependencies();
             InputDispatch::Consumed
         }
     }
@@ -604,6 +622,19 @@ fn collapse_nonflat_row(app: &mut TuiApp) -> InputDispatch {
         app.collapse_tree_identity(identity);
         InputDispatch::Consumed
     })
+}
+
+fn feedback_notice_dismiss_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
+    if key.code == KeyCode::Esc
+        && !key
+            .modifiers
+            .intersects(KeyModifiers::CONTROL | KeyModifiers::ALT)
+        && app.shell.feedback_notice().is_some()
+    {
+        app.shell.clear_feedback_notice();
+        return InputDispatch::Consumed;
+    }
+    InputDispatch::Unhandled
 }
 
 fn content_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {

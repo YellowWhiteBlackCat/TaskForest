@@ -317,6 +317,7 @@ fn key_to_terminal(event: KeyEvent) -> Option<taskmanager_shell::ShellKeyEvent> 
         ratatui::crossterm::event::KeyCode::Char('5') => KeyCode::Digit5,
         ratatui::crossterm::event::KeyCode::Char('6') => KeyCode::Digit6,
         ratatui::crossterm::event::KeyCode::Char('7') => KeyCode::Digit7,
+        ratatui::crossterm::event::KeyCode::Char('8') => KeyCode::Digit8,
         ratatui::crossterm::event::KeyCode::Char(' ') => KeyCode::Space,
         ratatui::crossterm::event::KeyCode::PageUp => KeyCode::PageUp,
         ratatui::crossterm::event::KeyCode::PageDown => KeyCode::PageDown,
@@ -327,6 +328,7 @@ fn key_to_terminal(event: KeyEvent) -> Option<taskmanager_shell::ShellKeyEvent> 
         }
         ratatui::crossterm::event::KeyCode::F(1) => KeyCode::F1,
         ratatui::crossterm::event::KeyCode::F(5) => KeyCode::F5,
+        ratatui::crossterm::event::KeyCode::F(9) => KeyCode::F9,
         ratatui::crossterm::event::KeyCode::Delete => KeyCode::Delete,
         ratatui::crossterm::event::KeyCode::Enter => KeyCode::Enter,
         ratatui::crossterm::event::KeyCode::Esc => KeyCode::Escape,

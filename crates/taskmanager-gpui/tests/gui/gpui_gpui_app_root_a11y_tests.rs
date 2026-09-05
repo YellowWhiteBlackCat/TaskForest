@@ -382,3 +382,54 @@ async fn assistive_technology_modal_dismissal_uses_the_shared_surface_owner(
         assert!(view.pending_confirmation().is_none());
     });
 }
+
+#[gpui::test]
+async fn publish_accessibility_snapshot_advances_revision_and_updates_published_tree(
+    cx: &mut TestAppContext,
+) {
+    let root = make_root(cx);
+    root.update(cx, |view, _| {
+        view.mark_telemetry_frame_ready();
+        view.page = TopPage::Apps;
+        view.replace_processes_for_test(vec![process(1001, "alpha"), process(2002, "bravo")]);
+        assert_eq!(view.a11y_revision, 0);
+        assert!(view.a11y_snapshot.is_none());
+
+        view.publish_accessibility_snapshot();
+        assert_eq!(view.a11y_revision, 1);
+        #[cfg(target_os = "linux")]
+        {
+            assert!(view.a11y_snapshot.is_some());
+            assert_eq!(view.a11y_snapshot.as_ref().unwrap().revision(), 1);
+        }
+
+        view.publish_accessibility_snapshot();
+        assert_eq!(view.a11y_revision, 2);
+        #[cfg(target_os = "linux")]
+        {
+            assert!(view.a11y_snapshot.is_some());
+            assert_eq!(view.a11y_snapshot.as_ref().unwrap().revision(), 2);
+        }
+    });
+}
+
+#[cfg(target_os = "linux")]
+#[gpui::test]
+async fn mapped_tree_is_well_formed_under_accesskit_bridge_contract(cx: &mut TestAppContext) {
+    let root = make_root(cx);
+    root.update(cx, |view, _| {
+        view.mark_telemetry_frame_ready();
+        view.page = TopPage::Apps;
+        view.replace_processes_for_test(vec![process(1001, "alpha"), process(2002, "bravo")]);
+    });
+    let snapshot = snapshot_of(cx, &root, 42);
+    let update = taskmanager_accessibility_linux::snapshot_to_tree_update(&snapshot);
+    let tree_update = update.tree.expect("tree metadata present");
+    assert_eq!(
+        tree_update.root,
+        taskmanager_accessibility_linux::stable_node_id(
+            &taskmanager_ui_contract::SemanticNodeId::borrowed("app")
+        )
+    );
+    assert!(!update.nodes.is_empty());
+}

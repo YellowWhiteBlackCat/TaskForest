@@ -70,6 +70,7 @@ mod subscription;
 mod surface;
 mod update;
 mod viewport_state;
+mod window_capture;
 mod window_time;
 
 // Frontend-local view selectors live in the [`selectors`] module and are
@@ -269,6 +270,10 @@ pub enum Message {
     ServicesSearchChanged(String),
     /// Refresh the inventory page whose source reported a retryable failure.
     RefreshSource(RefreshRequest),
+    /// Authorize or refresh CPU package power readouts via RAPL helper.
+    AuthorizeRaplPower,
+    /// Authorize or refresh CPU MSR readouts via MSR helper.
+    AuthorizeMsrReadouts,
     /// End-task was requested (shows the confirmation bar).
     RequestEndTask,
     /// Request a batch process-control action (Suspend / Resume / Kill /
@@ -400,6 +405,15 @@ pub enum Message {
     ToggleDirectoryUsageScan,
     /// Open the SMART detail dialog for one observed disk.
     OpenDiskSmart { index: usize },
+    /// Request a SMART self-test on the observed disk at `index`.
+    RequestSmartSelfTest {
+        index: usize,
+        kind: taskmanager_core::core::SmartSelfTestKind,
+    },
+    /// Confirm the pending SMART self-test request.
+    ConfirmSmartSelfTest,
+    /// Toggle the expanded state of the GPU engines breakdown panel.
+    ToggleGpuEnginesExpanded,
     /// Toggle the per-engine GPU utilization session on the GPU device panel
     /// (the typed `telemetry.gpu.engines` lane): enable submits ONE bounded
     /// request for the first GPU (the user-initiated escalation entry), the
@@ -411,6 +425,8 @@ pub enum Message {
     CopyAboutDetails,
     /// Export the current snapshot into the working directory.
     ExportSnapshot,
+    /// Request a current-window PNG screenshot capture.
+    RequestCurrentWindowCapture,
     /// Apply a saved process view preset.
     ApplySavedView(u64),
     /// Save current Applications view configuration as a custom preset.
@@ -504,6 +520,8 @@ pub struct IcedApp {
     /// Application-correlated export lifecycle with the app-host's named
     /// worker client; unavailable demo/test instances perform no file I/O.
     snapshot_export: snapshot_export::IcedSnapshotExportRuntime,
+    /// Application-correlated current-window PNG capture lifecycle.
+    window_capture: window_capture::IcedWindowCaptureRuntime,
     /// The sole Iced-owned primary surface. Shared confirmations and Process
     /// Properties remain in `application.interaction`; input ownership is
     /// derived across both machines by `InputScope`.
@@ -532,6 +550,16 @@ pub struct IcedApp {
     /// fingerprint boundary; viewport/scroll state remains outside because it
     /// has an independent interaction lifetime.
     projection_caches: IcedProjectionCaches,
+    /// Linked native accessibility bridge.
+    pub(crate) a11y_bridge: crate::a11y::AppAccessibilityBridge,
+    pub(crate) a11y_revision: u64,
+    pub(crate) a11y_snapshot: Option<taskmanager_ui_contract::SemanticSnapshot>,
+}
+
+impl IcedApp {
+    pub(crate) fn publish_accessibility_snapshot(&mut self) {
+        crate::a11y::publish_accessibility_snapshot(self);
+    }
 }
 
 impl Default for IcedApp {
@@ -555,3 +583,7 @@ mod inventory_menus;
 #[cfg(test)]
 #[path = "../tests/gui/app/quit_tests.rs"]
 mod quit_tests;
+
+#[cfg(test)]
+#[path = "../tests/gui/app/window_capture_tests.rs"]
+mod window_capture_tests;

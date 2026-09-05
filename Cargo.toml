@@ -15,7 +15,7 @@ resolver = "2"
 # unification live here because the workspace root lives here.
 [package]
 name = "taskmanager-gates"
-version = "0.1.2"
+version = "0.1.3"
 edition = "2024"
 authors = ["TaskForest contributors"]
 description = "Cross-crate conformance gate host for the TaskForest workspace (no binary)"
@@ -58,6 +58,9 @@ taskmanager-telemetry-store = { path = "crates/taskmanager-telemetry-store" }
 taskmanager-ui-contract = { path = "crates/taskmanager-ui-contract" }
 taskmanager-shell = { path = "crates/taskmanager-shell" }
 taskmanager-theme = { path = "crates/taskmanager-theme" }
+taskmanager-accessibility-linux = { path = "crates/taskmanager-accessibility-linux" }
+accesskit = "0.24.1"
+accesskit_consumer = "0.38" 
 taskmanager-assets = { path = "crates/taskmanager-assets" }
 # Integration tests construct the platform runtime through the composition
 # edge (ADR-009 reverse dependency firewall) instead of naming an OS crate,

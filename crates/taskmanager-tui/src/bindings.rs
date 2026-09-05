@@ -18,15 +18,11 @@ use taskmanager_application::i18n::t;
 use taskmanager_ui_contract::{Binding, BindingEntry, FrontendBindingDeclaration, FrontendShape};
 
 /// Shared-router commands the terminal shape deliberately does not wire.
-/// Confirmation uses `y` / `n` / `Esc`, the terminal has a resource selector
-/// instead of a desktop sidebar, and the Alerts management surface has not yet
-/// been implemented here. Keeping all three explicit prevents help/coverage
-/// from claiming a dead shortcut.
-pub(crate) const DELIBERATELY_UNBOUND: [CommandId; 3] = [
-    CommandId::ShowAlerts,
-    CommandId::Confirm,
-    CommandId::ToggleSidebar,
-];
+/// Confirmation uses `y` / `n` / `Esc`, and the terminal has a resource
+/// selector instead of a desktop sidebar. Keeping both explicit prevents
+/// help/coverage from claiming a dead shortcut.
+pub(crate) const DELIBERATELY_UNBOUND: [CommandId; 2] =
+    [CommandId::Confirm, CommandId::ToggleSidebar];
 
 /// Whether a shared command is intentionally absent from the TUI binding
 /// surface. Help and binding declaration both call this named authority.

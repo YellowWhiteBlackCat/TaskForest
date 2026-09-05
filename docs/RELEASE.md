@@ -6,15 +6,15 @@
 
 ## 发布面
 
-当前发行包只包含 GPUI / TaskForestG。Iced、TUI 和 Bevy 不进入二进制发行包；macOS
-打包、签名和公证暂缓。
+当前官方发布矩阵已涵盖四个独立前端产品（TaskForest-G、TaskForest-I、TaskForest-T、
+TaskForest-B）：Linux 同时提供四端的 amd64/arm64 DEB 发布物以及 GPUI 的 RPM；
+Windows 提供 GPUI 的 x64/arm64 MSI。macOS 打包、签名和公证暂缓。
 
-### 0.1.0 首发边界
+### 0.1.3 发行面与平价矩阵
 
-`0.1.0` 的正式发行面固定为 GPUI 桌面产品：Linux 提供 amd64/arm64 的 DEB 与 RPM，
-Windows 提供 x64/arm64 的 MSI。Iced 与 TUI 是支持源码构建的产品形态，Bevy 是支持
-源码构建的实验形态；它们都不属于 `0.1.0` 安装包。macOS 在本版本只接受目标编译与
-契约验证，不宣称有安装包、签名或公证支持。
+正式发行面已扩展至全前端产品体系：Linux 发布流水线原生构建与发布四端（GPUI、
+Iced、TUI、Bevy）全量 DEB 安装包。四端严格保持 Wayland-only，彻底不含 X11 依赖。
+所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 为 `G`/`I`/`T`/`B`）。
 
 该边界只约束发行物，不扩大平台能力。发行面内没有合格数据源、授权或原生实现的能力，
 必须继续以 typed `Unsupported`、`Unavailable` 或权限结果呈现，不得用空值、静态占位或
@@ -30,6 +30,12 @@ Windows 提供 x64/arm64 的 MSI。Iced 与 TUI 是支持源码构建的产品�
 |---|---|---|---|---|
 | Linux | x64 | `TaskForest-G-<ver>-x64.deb` | `amd64` | `packaging/debian/build-deb.sh` |
 | Linux | arm64 | `TaskForest-G-<ver>-arm64.deb` | `arm64` | `packaging/debian/build-deb.sh` |
+| Linux | x64 | `TaskForest-I-<ver>-x64.deb` | `amd64` | `packaging/debian/build-deb-iced.sh` |
+| Linux | arm64 | `TaskForest-I-<ver>-arm64.deb` | `arm64` | `packaging/debian/build-deb-iced.sh` |
+| Linux | x64 | `TaskForest-T-<ver>-x64.deb` | `amd64` | `packaging/debian/build-deb-tui.sh` |
+| Linux | arm64 | `TaskForest-T-<ver>-arm64.deb` | `arm64` | `packaging/debian/build-deb-tui.sh` |
+| Linux | x64 | `TaskForest-B-<ver>-x64.deb` | `amd64` | `packaging/debian/build-deb-bevy.sh` |
+| Linux | arm64 | `TaskForest-B-<ver>-arm64.deb` | `arm64` | `packaging/debian/build-deb-bevy.sh` |
 | Linux | x64 | `TaskForest-G-<ver>-x64.rpm` | `x86_64` | `packaging/rpm/build-rpm.sh` |
 | Linux | arm64 | `TaskForest-G-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh` |
 | Windows | x64 | `TaskForest-G-<ver>-x64.msi` | `x64` | `packaging/windows/build-msi.sh`（WiX） |

@@ -40,7 +40,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::metrics::MemoryTelemetryObservation;
 use taskmanager_core::core::metrics::{
-    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, MemoryMetrics,
+    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, DiskMetrics, MemoryMetrics,
     MemoryScalarObservations, NetworkAdapterType, NetworkMetrics, NetworkScalarObservations,
     NetworkTelemetryObservation, NetworkWirelessObservations, ScalarObservation,
     ScalarObservationGroup,
@@ -957,4 +957,118 @@ fn composition_bar_fractions_sum_to_one_and_zero_total_is_empty() {
     // Nothing measured yet: an empty layout, never NaN widths.
     let zero = taskmanager_core::core::metrics::MemoryMetrics::default();
     assert!(segment_bar_layout(&memory_segments(&zero)).is_empty());
+}
+
+// ---- SMART self-test request ----------------------------------------------
+
+#[test]
+fn smart_self_test_request_arms_confirmation_and_confirm_emits_effect() {
+    let mut shell = ShellApp::new();
+    let mut disk = DiskMetrics::default();
+    disk.device_id = "disk-samsung-980".to_owned();
+    disk.name = "nvme0n1".to_owned();
+    disk.model = "Samsung SSD 980 Pro".to_owned();
+    disk.device_generation = taskmanager_core::core::DeviceGeneration::new(2);
+
+    let snapshot = taskmanager_core::core::SystemSnapshot {
+        disks: vec![disk],
+        ..Default::default()
+    };
+    taskmanager_shell::fixture::edit_snapshot(&mut shell, |s| *s = Some(snapshot));
+
+    // Requesting a non-existent disk fails
+    assert!(!super::request_smart_self_test(
+        &mut shell,
+        "non-existent-disk",
+        taskmanager_core::core::smart::SmartSelfTestKind::Short,
+    ));
+    assert_eq!(shell.confirmation_kind(), None);
+
+    // Requesting an existing disk arms the confirmation gate
+    assert!(super::request_smart_self_test(
+        &mut shell,
+        "disk-samsung-980",
+        taskmanager_core::core::smart::SmartSelfTestKind::Short,
+    ));
+    assert_eq!(
+        shell.confirmation_kind(),
+        Some(taskmanager_application::ConfirmationKind::SmartSelfTest)
+    );
+
+    // Confirming emits PlatformEffect::SmartControl
+    let effect = crate::confirmation::confirm_armed(
+        &mut shell,
+        taskmanager_application::ConfirmationKind::SmartSelfTest,
+    );
+    assert!(matches!(
+        effect,
+        Some(taskmanager_application::PlatformEffect::SmartControl(
+            taskmanager_application::SmartControlRequest::StartSelfTest(ref intent)
+        )) if intent.display_name == "Samsung SSD 980 Pro"
+            && intent.device_id.as_str() == "disk-samsung-980"
+            && intent.kind == taskmanager_core::core::smart::SmartSelfTestKind::Short
+    ));
+    assert_eq!(shell.confirmation_kind(), None);
+}
+
+#[test]
+fn key_t_on_performance_page_arms_smart_self_test_for_disk() {
+    use bevy::ecs::system::RunSystemOnce;
+    use bevy::input::keyboard::{Key, KeyboardInput, NativeKey};
+
+    let mut app = headless_perf_app();
+    let mut disk = DiskMetrics::default();
+    disk.device_id = "disk-nvme-0".to_owned();
+    disk.name = "nvme0n1".to_owned();
+    disk.model = "Fast NVMe".to_owned();
+    disk.device_generation = taskmanager_core::core::DeviceGeneration::new(1);
+
+    let snapshot = taskmanager_core::core::SystemSnapshot {
+        disks: vec![disk],
+        ..Default::default()
+    };
+    taskmanager_shell::fixture::edit_snapshot(
+        &mut app.world_mut().non_send_mut::<FrontendTrack>().shell,
+        |s| *s = Some(snapshot),
+    );
+
+    route_to_performance(&mut app);
+    app.update();
+
+    // Inject 't' key press
+    let event = KeyboardInput {
+        key_code: bevy::input::keyboard::KeyCode::KeyT,
+        logical_key: Key::Unidentified(NativeKey::Unidentified),
+        state: bevy::input::ButtonState::Pressed,
+        text: None,
+        repeat: false,
+        window: Entity::PLACEHOLDER,
+    };
+    let mut event = Some(event);
+    app.world_mut()
+        .run_system_once(
+            move |mut writer: bevy::ecs::message::MessageWriter<KeyboardInput>| {
+                if let Some(event) = event.take() {
+                    writer.write(event);
+                }
+            },
+        )
+        .expect("injection runs");
+    app.update();
+
+    let track = app.world().non_send::<FrontendTrack>();
+    assert_eq!(
+        track.shell.confirmation_kind(),
+        Some(taskmanager_application::ConfirmationKind::SmartSelfTest)
+    );
+    let pending = track
+        .shell
+        .pending_smart_self_test()
+        .expect("pending intent");
+    assert_eq!(pending.device_id.as_str(), "disk-nvme-0");
+    assert_eq!(pending.display_name, "Fast NVMe");
+    assert_eq!(
+        pending.kind,
+        taskmanager_core::core::smart::SmartSelfTestKind::Short
+    );
 }

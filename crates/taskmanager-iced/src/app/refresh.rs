@@ -18,11 +18,14 @@ struct TickPlan {
 
 impl IcedApp {
     pub(super) fn handle_tick_message(&mut self) -> Option<PlatformEffect> {
+        self.shell
+            .advance_feedback_time(std::time::Duration::from_millis(100));
         self.runtime_event_system();
         // The tick doubles as the deferred-stepper-commit flush point (see
         // `update::columns`): a cheap gate check per 100 ms poll.
         self.poll_process_column_persist();
         self.tick();
+        self.publish_accessibility_snapshot();
         None
     }
 
@@ -30,6 +33,7 @@ impl IcedApp {
         self.drain_config_publications();
         self.drain_history_replay_completions();
         self.drain_snapshot_export_completions();
+        self.drain_window_capture_completions();
         let instance_activate = self.runtime.drain_instance_events();
         let tray_activate = crate::tray::drain_tray_events(self);
         if instance_activate || tray_activate {

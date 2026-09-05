@@ -192,6 +192,11 @@ fn spawn_update_loop(
                 if view.drain_window_capture_completions() {
                     cx.notify();
                 }
+                let notice_before = view.shell.feedback_notice().is_some();
+                view.shell.advance_feedback_time(Duration::from_millis(200));
+                if notice_before && view.shell.feedback_notice().is_none() {
+                    cx.notify();
+                }
             });
             let refresh_paused = weak
                 .update(cx, |view, _cx| view.telemetry_refresh_policy.is_paused())

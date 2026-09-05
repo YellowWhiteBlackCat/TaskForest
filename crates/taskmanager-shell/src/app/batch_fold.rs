@@ -416,6 +416,20 @@ impl SystemProjectionStore {
             .map(PlatformEffect::Refresh)
     }
 
+    #[must_use]
+    pub fn take_startup_refresh_request(&mut self) -> Option<PlatformEffect> {
+        self.startup_refresh_request
+            .take()
+            .map(PlatformEffect::Refresh)
+    }
+
+    #[must_use]
+    pub fn take_session_refresh_request(&mut self) -> Option<PlatformEffect> {
+        self.session_refresh_request
+            .take()
+            .map(PlatformEffect::Refresh)
+    }
+
     /// Drain queued desktop notifications. Evaluation lives in the shared
     /// alert center; frontends only route these requests.
     #[must_use]

@@ -341,3 +341,268 @@ fn the_process_action_chord_opens_the_applications_menu_and_commits_through_the_
         taskmanager_core::core::process::ProcessBatchAction::Suspend
     );
 }
+
+#[test]
+fn escape_clears_active_feedback_notice_when_no_modal_is_open() {
+    let mut shell = shell_with_selection();
+    shell.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        "Screenshot saved to /tmp/screenshot.png",
+    );
+    assert!(shell.feedback_notice().is_some());
+
+    let mut app = input_app(shell);
+    app.update();
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_some()
+    );
+
+    // Press Escape to dismiss the notice.
+    press(&mut app, KeyCode::Escape, None);
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_none(),
+        "pressing Esc must clear active feedback notice when no modal is open"
+    );
+    assert_ne!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_text(),
+        "Screenshot saved to /tmp/screenshot.png"
+    );
+}
+
+#[test]
+fn escape_dismisses_armed_gate_first_before_clearing_feedback_notice() {
+    let mut shell = shell_with_selection();
+    shell.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        "Active notice across modal",
+    );
+
+    let mut app = input_app(shell);
+    app.update();
+    app.update();
+
+    // Arm confirmation gate via Delete.
+    press(&mut app, KeyCode::Delete, None);
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .confirmation_kind()
+            .is_some(),
+        "gate must be armed"
+    );
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_some(),
+        "feedback notice must be present"
+    );
+
+    // First Esc dismisses the confirmation gate.
+    press(&mut app, KeyCode::Escape, None);
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .confirmation_kind()
+            .is_none(),
+        "gate must be dismissed by first Esc"
+    );
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_some(),
+        "notice must NOT be cleared when Esc was consumed to dismiss the gate"
+    );
+
+    // Second Esc clears the feedback notice.
+    press(&mut app, KeyCode::Escape, None);
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_none(),
+        "second Esc must clear the feedback notice"
+    );
+}
+
+#[test]
+fn escape_cancels_action_menu_first_before_clearing_feedback_notice() {
+    use crate::menu_modal::MenuModal;
+    use crate::pages::processes::menu::ProcessMenuCtx;
+
+    let mut shell = shell_with_selection();
+    shell.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        "Active notice across menu modal",
+    );
+
+    let mut app = input_app(shell);
+    app.update();
+    app.update();
+
+    // Open process menu via 'a'.
+    press(&mut app, KeyCode::KeyA, Some("a"));
+    app.update();
+
+    assert!(
+        app.world()
+            .resource::<MenuModal<ProcessMenuCtx>>()
+            .session
+            .is_some(),
+        "process menu modal must be open"
+    );
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_some()
+    );
+
+    // First Esc cancels the menu modal.
+    press(&mut app, KeyCode::Escape, None);
+    app.update();
+
+    assert!(
+        !app.world()
+            .resource::<MenuModal<ProcessMenuCtx>>()
+            .session
+            .is_some(),
+        "menu modal must be closed by first Esc"
+    );
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_some(),
+        "notice must NOT be cleared when Esc was consumed to cancel the menu"
+    );
+
+    // Second Esc clears the feedback notice.
+    press(&mut app, KeyCode::Escape, None);
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_none(),
+        "second Esc must clear the feedback notice"
+    );
+}
+
+#[test]
+fn escape_clears_feedback_notice_and_fires_feedback_changed() {
+    use std::sync::{Arc, Mutex};
+    let received = Arc::new(Mutex::new(Vec::new()));
+    let received_clone = received.clone();
+
+    let mut shell = shell_with_selection();
+    shell.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+        "Active notice to clear",
+    );
+
+    let mut app = input_app(shell);
+    app.add_observer(
+        move |event: bevy::ecs::observer::On<crate::drain::FeedbackChanged>| {
+            received_clone.lock().unwrap().push(event.event().0.clone());
+        },
+    );
+
+    app.update();
+    app.update();
+
+    // Press Escape.
+    press(&mut app, KeyCode::Escape, None);
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .feedback_notice()
+            .is_none(),
+        "notice must be cleared"
+    );
+
+    let events = received.lock().unwrap().clone();
+    assert!(
+        events.iter().any(|text| text != "Active notice to clear"),
+        "FeedbackChanged with empty feedback must have fired: {events:?}"
+    );
+}
+
+#[test]
+fn f9_toggles_performance_sidebar_visibility() {
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+
+    let before = app
+        .world()
+        .get_resource::<crate::pages::performance::PerformanceSidebarVisible>()
+        .map(|s| s.0)
+        .unwrap_or(true);
+    assert!(before, "sidebar starts visible");
+
+    press(&mut app, KeyCode::F9, None);
+    app.update();
+
+    let after = app
+        .world()
+        .get_resource::<crate::pages::performance::PerformanceSidebarVisible>()
+        .map(|s| s.0)
+        .unwrap_or(true);
+    assert!(!after, "F9 hides the performance sidebar in Bevy");
+
+    app.world_mut()
+        .resource_mut::<bevy::input::ButtonInput<KeyCode>>()
+        .clear();
+    press(&mut app, KeyCode::F9, None);
+    app.update();
+
+    let restored = app
+        .world()
+        .get_resource::<crate::pages::performance::PerformanceSidebarVisible>()
+        .map(|s| s.0)
+        .unwrap_or(false);
+    assert!(restored, "F9 restores the performance sidebar in Bevy");
+}

@@ -151,6 +151,15 @@ pub fn run(demo: bool) -> iced::Result {
                         format!("Diagnostic bundle runtime unavailable: {error}"),
                     ),
                 }
+                match host.window_capture_client() {
+                    Ok(client) => app.install_window_capture_client(client),
+                    Err(error) => app.shell.report_notice(
+                        taskmanager_shell::FeedbackSource::Persistence,
+                        taskmanager_shell::FeedbackSeverity::Error,
+                        taskmanager_shell::FeedbackLifecycle::UntilReplaced,
+                        format!("Window capture runtime unavailable: {error}"),
+                    ),
+                }
                 // Restore the persisted appearance preferences (skin, mode,
                 // contrast, fonts, density) before the first frame renders.
                 app.load_config();

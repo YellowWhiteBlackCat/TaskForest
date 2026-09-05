@@ -322,3 +322,37 @@ fn dismiss_never_submits_and_confirm_reports_through_the_feedback_line() {
         "the drain publishes the submission outcome to the feedback line"
     );
 }
+
+#[test]
+fn smart_self_test_confirmation_view_and_confirm_armed() {
+    let intent = taskmanager_core::core::system_health::SmartSelfTestIntent {
+        device_id: taskmanager_core::core::identity::DeviceId::new("disk-0"),
+        device_generation: taskmanager_core::core::DeviceGeneration::new(1),
+        device_key: taskmanager_core::core::StorageDeviceKey::new("nvme0n1"),
+        display_name: "Samsung SSD 980".to_owned(),
+        kind: taskmanager_core::core::smart::SmartSelfTestKind::Short,
+    };
+    let pending = taskmanager_application::PendingConfirmation::SmartSelfTest(intent.clone());
+    let view = PendingConfirmationView::from_pending(&pending).expect("SmartSelfTest renders view");
+    assert_eq!(view.kind, ConfirmationKind::SmartSelfTest);
+    assert_eq!(view.title, "SMART self-test");
+    assert!(view.body.contains("Short"));
+    assert!(view.body.contains("Samsung SSD 980"));
+    assert_eq!(view.target_key, "smart-self-test:disk-0:Short");
+
+    let mut shell = ShellApp::new();
+    shell.arm_smart_self_test(intent.clone());
+    assert_eq!(
+        shell.confirmation_kind(),
+        Some(ConfirmationKind::SmartSelfTest)
+    );
+
+    let effect = super::confirm_armed(&mut shell, ConfirmationKind::SmartSelfTest);
+    assert!(matches!(
+        effect,
+        Some(taskmanager_application::PlatformEffect::SmartControl(
+            taskmanager_application::SmartControlRequest::StartSelfTest(ref i)
+        )) if i.display_name == "Samsung SSD 980"
+    ));
+    assert_eq!(shell.confirmation_kind(), None);
+}

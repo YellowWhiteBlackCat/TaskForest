@@ -41,13 +41,15 @@ use bevy::ui::prelude::{
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Checkbox, ValueChange};
 use taskmanager_application::{ManagedAlertRule, ManagedAlertRuleEdit, PlatformEffect};
-use taskmanager_core::core::alerts::{Alert, AlertMetric, AlertSeverity};
+use taskmanager_core::core::alerts::{
+    Alert, AlertEvent, AlertEventKind, AlertMetric, AlertRule, AlertSeverity,
+};
 
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 use crate::app::{FrontendTrack, PageContext, RouteChanged, SharedRuntimeHandle};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, space_8};
+use crate::palette::{UiPalette, space_4, space_8};
 use crate::window::{Role, TextRole};
 
 /// A page-scoped [`Observer`] carrier: resolves to one entity carrying the
@@ -236,7 +238,146 @@ pub(crate) fn managed_rule_line(managed: &ManagedAlertRule) -> String {
     )
 }
 
-/// The header summary line: honest counts, zero included.
+/// Marker on the alert rule authoring section.
+#[derive(Component, Clone, Default)]
+pub(crate) struct AlertRuleAuthoringRoot;
+
+/// Marker for rule authoring intent targets.
+#[derive(Component, Clone, Default)]
+pub(crate) struct AlertRuleAuthoringMarker;
+
+/// One authoring line showing metric, threshold comparison, and severity.
+pub(crate) fn rule_authoring_line(
+    metric: AlertMetric,
+    threshold: f32,
+    severity: AlertSeverity,
+) -> String {
+    format!(
+        "{} · Condition: value ≥ {:.1}{} · Severity: {}",
+        metric_label(metric),
+        threshold,
+        metric_unit(metric),
+        severity_label(severity),
+    )
+}
+
+pub(crate) fn metric_label(metric: AlertMetric) -> &'static str {
+    match metric {
+        AlertMetric::CpuUsagePercent => "CPU Usage",
+        AlertMetric::MemoryUsagePercent => "Memory Usage",
+        AlertMetric::DiskTemperatureC => "Disk Temperature",
+        AlertMetric::SmartPercentUsed => "SMART Percent Used",
+        AlertMetric::SmartCriticalWarning => "SMART Critical Warning",
+    }
+}
+
+/// Create a new managed alert rule.
+#[allow(dead_code)]
+pub(crate) fn create_alert_rule(
+    shell: &mut ShellApp,
+    id: impl Into<String>,
+    metric: AlertMetric,
+    severity: AlertSeverity,
+    threshold: f32,
+    hysteresis: f32,
+) -> Result<
+    taskmanager_application::ManagedAlertRuleEditOutcome,
+    taskmanager_core::core::alerts::AlertRuleTransferError,
+> {
+    let rule = AlertRule::new(
+        id,
+        metric,
+        severity,
+        threshold,
+        std::time::Duration::from_secs(5),
+        hysteresis,
+    );
+    shell.edit_alert_rules(ManagedAlertRuleEdit::Add(ManagedAlertRule::new(rule, true)))
+}
+
+/// Edit an existing managed alert rule.
+#[allow(dead_code)]
+pub(crate) fn edit_alert_rule(
+    shell: &mut ShellApp,
+    target_id: String,
+    metric: AlertMetric,
+    severity: AlertSeverity,
+    threshold: f32,
+    hysteresis: f32,
+) -> Result<
+    taskmanager_application::ManagedAlertRuleEditOutcome,
+    taskmanager_core::core::alerts::AlertRuleTransferError,
+> {
+    let enabled = shell
+        .projection()
+        .alert_center
+        .managed_rules()
+        .iter()
+        .find(|m| m.rule.id == target_id)
+        .is_none_or(|m| m.enabled);
+    let rule = AlertRule::new(
+        target_id.clone(),
+        metric,
+        severity,
+        threshold,
+        std::time::Duration::from_secs(5),
+        hysteresis,
+    );
+    shell.edit_alert_rules(ManagedAlertRuleEdit::Update {
+        target_id,
+        managed: ManagedAlertRule::new(rule, enabled),
+    })
+}
+
+/// Delete a managed alert rule.
+#[allow(dead_code)]
+pub(crate) fn delete_alert_rule(
+    shell: &mut ShellApp,
+    rule_id: String,
+) -> Result<
+    taskmanager_application::ManagedAlertRuleEditOutcome,
+    taskmanager_core::core::alerts::AlertRuleTransferError,
+> {
+    shell.edit_alert_rules(ManagedAlertRuleEdit::Remove { rule_id })
+}
+
+fn rule_authoring_scene(palette: &UiPalette) -> impl Scene + use<> {
+    let radius = palette.control_radius_px;
+    let line = rule_authoring_line(AlertMetric::CpuUsagePercent, 85.0, AlertSeverity::Warning);
+    bsn! {
+        Node {
+            width: percent(100),
+            height: Val::Auto,
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px({ space_4() }),
+            padding: UiRect::all(Val::Px(space_8())),
+            border_radius: BorderRadius::all(Val::Px(radius)),
+        }
+        AlertRuleAuthoringRoot
+        AlertRuleAuthoringMarker
+        Children [
+            ( Text(line) TextRole(Role::Body) ),
+        ]
+    }
+}
+
+pub(crate) fn event_history_line(event: &AlertEvent) -> String {
+    let unit = metric_unit(event.alert.metric);
+    let kind_str = match event.kind {
+        AlertEventKind::Activated => "Activated",
+        AlertEventKind::Cleared => "Cleared",
+    };
+    format!(
+        "[{kind_str}] {} · {} — {:.1}{} (thresh: {:.1}{})",
+        severity_label(event.alert.severity),
+        event.alert.target,
+        event.alert.value,
+        unit,
+        event.alert.threshold,
+        unit
+    )
+}
+
 pub(crate) fn alerts_summary(shell: &ShellApp) -> String {
     let projection = shell.projection();
     let rules = projection.alert_center.managed_rules();
@@ -268,6 +409,19 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             .collect()
     };
     let rule_rows = rule_rows(rules, context.palette);
+    let authoring_rows: Vec<Box<dyn Scene>> =
+        vec![Box::new(rule_authoring_scene(context.palette)) as Box<dyn Scene>];
+    let events = projection.alert_center.event_history();
+    let event_rows: Vec<Box<dyn Scene>> = if events.is_empty() {
+        vec![Box::new(empty_events_scene()) as Box<dyn Scene>]
+    } else {
+        events
+            .iter()
+            .rev()
+            .take(10)
+            .map(|event| Box::new(event_row_scene(event_history_line(event))) as Box<dyn Scene>)
+            .collect()
+    };
     bsn! {
         Node {
             width: percent(100),
@@ -284,12 +438,30 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             { active_rows },
             ( Text("Rules") TextRole(Role::Caption) ),
             { rule_rows },
-            (
-                Text("Notification history — the Alerts delivery log is in incubation until the notification history seam lands")
-                TextRole(Role::Caption)
-            ),
+            ( Text("Rule authoring") TextRole(Role::Caption) ),
+            { authoring_rows },
+            ( Text("Event history") TextRole(Role::Caption) ),
+            { event_rows },
             { EntityScene(page_observer(alerts_fold_observer)) },
             { EntityScene(page_observer(rule_toggle_observer)) },
+        ]
+    }
+}
+
+fn empty_events_scene() -> impl Scene + use<> {
+    bsn! {
+        Node { width: percent(100), height: Val::Auto }
+        Children [
+            ( Text("No recent alert events") TextRole(Role::Body) ),
+        ]
+    }
+}
+
+fn event_row_scene(line: String) -> impl Scene + use<> {
+    bsn! {
+        Node { width: percent(100), height: Val::Auto }
+        Children [
+            ( Text(line) TextRole(Role::Mono) ),
         ]
     }
 }
@@ -385,3 +557,31 @@ fn unchecked_rule_row(line: String, rule_id: String, palette: &UiPalette) -> imp
 #[cfg(test)]
 #[path = "../../tests/headless/pages/alerts.rs"]
 mod tests;
+
+#[allow(dead_code)]
+pub(crate) fn export_alert_rules(
+    shell: &ShellApp,
+) -> Result<String, taskmanager_core::core::alerts::AlertRuleTransferError> {
+    let entries: Vec<taskmanager_core::core::alerts::AlertRuleTransferEntry> = shell
+        .projection()
+        .alert_center
+        .managed_rules()
+        .iter()
+        .map(taskmanager_core::core::alerts::AlertRuleTransferEntry::from)
+        .collect();
+    taskmanager_core::core::alerts::export_alert_rules_json(&entries)
+}
+
+#[allow(dead_code)]
+pub(crate) fn import_alert_rules(
+    shell: &mut ShellApp,
+    json: &str,
+    mode: taskmanager_application::AlertRuleImportMode,
+) -> Result<
+    taskmanager_application::ManagedAlertRuleEditOutcome,
+    taskmanager_core::core::alerts::AlertRuleTransferError,
+> {
+    let entries = taskmanager_core::core::alerts::import_alert_rules_json(json)?;
+    let rules: Vec<ManagedAlertRule> = entries.into_iter().map(ManagedAlertRule::from).collect();
+    shell.edit_alert_rules(ManagedAlertRuleEdit::Import { rules, mode })
+}

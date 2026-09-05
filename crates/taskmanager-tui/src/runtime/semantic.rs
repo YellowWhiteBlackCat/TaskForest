@@ -263,6 +263,19 @@ impl TuiApp {
                     name: String::from("Containers"),
                     description: Some(String::from("Container inventory")),
                 }),
+                crate::TuiSurface::ServiceDependencies(target) => Some(ModalInput {
+                    id: String::from("service-dependencies-modal"),
+                    name: format!("Service dependencies: {}", target.service_name),
+                    description: Some(String::from("Service dependencies")),
+                }),
+                crate::TuiSurface::ProcessAffinity(state) => Some(ModalInput {
+                    id: String::from("process-affinity-modal"),
+                    name: format!(
+                        "Process affinity: {} ({})",
+                        state.target.name, state.target.pid
+                    ),
+                    description: Some(String::from("Process CPU affinity editor")),
+                }),
             },
             crate::TuiInputScope::SharedSurface(
                 taskmanager_application::SurfaceKind::ProcessProperties,

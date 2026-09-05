@@ -375,7 +375,9 @@ fn apply_overlay_control_click(
         crate::TuiSurfaceKind::Settings
         | crate::TuiSurfaceKind::About
         | crate::TuiSurfaceKind::Health
-        | crate::TuiSurfaceKind::Containers => EventReaction::default(),
+        | crate::TuiSurfaceKind::Containers
+        | crate::TuiSurfaceKind::ServiceDependencies
+        | crate::TuiSurfaceKind::ProcessAffinity => EventReaction::default(),
     }
 }
 
@@ -455,6 +457,12 @@ where
         // whether this cycle paints. The cross-cycle keypress/resize signal
         // lives in `pending_draw` (declared above the loop) because the
         // poll runs after the draw decision.
+        let notice_before = app.shell.feedback_notice().is_some();
+        app.shell
+            .advance_feedback_time(std::time::Duration::from_millis(50));
+        if notice_before && app.shell.feedback_notice().is_none() {
+            pending_draw = true;
+        }
         let mut cycle = DrawCycleInputs::default();
         cycle.ancillary_effect |= app.drain_config_publications();
         cycle.ancillary_effect |= app.drain_history_replay_completions();
@@ -508,6 +516,10 @@ where
             // throttles it to 1 Hz; the wall clock lives here, not in the
             // shell or the renderer).
             if let Some(effect) = app.refresh_selected_process_insights() {
+                taskmanager_shell::queue_effect(app, platform, effect);
+                cycle.ancillary_effect = true;
+            }
+            if let Some(effect) = app.refresh_selected_service_dependencies() {
                 taskmanager_shell::queue_effect(app, platform, effect);
                 cycle.ancillary_effect = true;
             }

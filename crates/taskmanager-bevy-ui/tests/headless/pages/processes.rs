@@ -781,3 +781,65 @@ fn wheel_scrolls_map_to_signed_rows_by_unit() {
     assert_eq!(wheel_rows(70.0, MouseScrollUnit::Pixel, 34.0), 2);
     assert_eq!(wheel_rows(10.0, MouseScrollUnit::Pixel, 0.0), 0);
 }
+
+// ---- multi-select batch tests ----
+use crate::pages::processes::request_process_batch;
+use taskmanager_application::PendingConfirmation;
+use taskmanager_core::core::process::ProcessBatchAction;
+
+fn test_proc(pid: u32, name: &str) -> ProcessItem {
+    let mut p = ProcessItem::new(pid, name);
+    p.apply_scalar_observations(ProcessScalarObservations {
+        start_token: ScalarObservation::available(u64::from(pid) * 10_000, 1),
+        ..Default::default()
+    });
+    p
+}
+
+#[test]
+fn multi_select_processes_arms_batch_confirmation_gate() {
+    let mut shell = ShellApp::new();
+    let p1 = test_proc(10, "alpha");
+    let p2 = test_proc(20, "beta");
+    let p3 = test_proc(30, "gamma");
+    fixture::edit_processes(&mut shell, |shelved| {
+        *shelved = Some(vec![p1, p2, p3]);
+    });
+    let _ = shell.apply_action(taskmanager_application::AppAction::SelectPage(
+        taskmanager_application::AppPage::Applications,
+    ));
+
+    // Mark row 0 and toggle row 1
+    assert!(shell.select_row(0));
+    assert!(shell.toggle_row_selection(1));
+    assert_eq!(shell.selected_rows.len(), 2);
+
+    // 1. Multi-select Suspend -> arms ProcessBatch gate
+    let effect = request_process_batch(&mut shell, ProcessBatchAction::Suspend);
+    assert!(effect.is_none(), "gated batch action returns None");
+    let Some(PendingConfirmation::ProcessBatch(intent)) = shell.pending_confirmation() else {
+        panic!("multi-select suspend must arm ProcessBatch confirmation gate");
+    };
+    assert_eq!(intent.action, ProcessBatchAction::Suspend);
+    assert_eq!(intent.targets.len(), 2);
+    shell.dismiss_overlay();
+
+    // 2. Multi-select Resume -> arms ProcessBatch gate
+    let effect = request_process_batch(&mut shell, ProcessBatchAction::Resume);
+    assert!(effect.is_none());
+    let Some(PendingConfirmation::ProcessBatch(intent)) = shell.pending_confirmation() else {
+        panic!("multi-select resume must arm ProcessBatch confirmation gate");
+    };
+    assert_eq!(intent.action, ProcessBatchAction::Resume);
+    assert_eq!(intent.targets.len(), 2);
+    shell.dismiss_overlay();
+
+    // 3. Multi-select Kill -> arms ProcessBatch gate
+    let effect = request_process_batch(&mut shell, ProcessBatchAction::Kill);
+    assert!(effect.is_none());
+    let Some(PendingConfirmation::ProcessBatch(intent)) = shell.pending_confirmation() else {
+        panic!("multi-select kill must arm ProcessBatch confirmation gate");
+    };
+    assert_eq!(intent.action, ProcessBatchAction::Kill);
+    assert_eq!(intent.targets.len(), 2);
+}

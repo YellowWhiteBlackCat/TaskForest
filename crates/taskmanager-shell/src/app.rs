@@ -243,6 +243,8 @@ pub struct SystemProjectionStore {
     /// Keeping the request payload here avoids a separate bool whose meaning
     /// would have to be reconstructed by every draining frontend.
     pub(crate) process_refresh_request: Option<RefreshRequest>,
+    pub(crate) startup_refresh_request: Option<RefreshRequest>,
+    pub(crate) session_refresh_request: Option<RefreshRequest>,
 }
 
 impl SystemProjectionStore {
@@ -645,6 +647,16 @@ impl ShellApp {
     pub const fn pending_session(&self) -> Option<&SessionControlConfirmation> {
         match self.pending_confirmation() {
             Some(PendingConfirmation::SessionControl(pending)) => Some(pending),
+            _ => None,
+        }
+    }
+
+    #[must_use]
+    pub const fn pending_smart_self_test(
+        &self,
+    ) -> Option<&taskmanager_core::core::system_health::SmartSelfTestIntent> {
+        match self.pending_confirmation() {
+            Some(PendingConfirmation::SmartSelfTest(intent)) => Some(intent),
             _ => None,
         }
     }

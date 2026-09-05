@@ -158,6 +158,17 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                     None
                 }
                 ratatui::crossterm::event::KeyCode::Enter => app.process_menu_select(),
+                ratatui::crossterm::event::KeyCode::Char('a' | 'A') => {
+                    let target = app.process_menu_mut().and_then(|m| {
+                        taskmanager_core::core::process::FrozenProcessIdentity::from_process(
+                            &m.item,
+                        )
+                    });
+                    match target {
+                        Some(target) => app.open_process_affinity_for(target),
+                        None => app.open_process_affinity(),
+                    }
+                }
                 ratatui::crossterm::event::KeyCode::Esc => {
                     app.close_local_overlays();
                     None
@@ -200,17 +211,116 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                 }
                 None
             }
+            TuiSurfaceKind::ServiceDependencies => {
+                match key.code {
+                    ratatui::crossterm::event::KeyCode::Up
+                    | ratatui::crossterm::event::KeyCode::Char('k') => {
+                        app.service_dependencies_scroll(-1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Down
+                    | ratatui::crossterm::event::KeyCode::Char('j') => {
+                        app.service_dependencies_scroll(1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Esc
+                    | ratatui::crossterm::event::KeyCode::Char('q')
+                    | ratatui::crossterm::event::KeyCode::Char('d') => {
+                        app.close_local_overlays();
+                    }
+                    _ => {}
+                }
+                None
+            }
+            TuiSurfaceKind::ProcessAffinity => match key.code {
+                ratatui::crossterm::event::KeyCode::Up => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.move_up();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Down => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.move_down();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Left => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.move_left();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Right => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.move_right();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Char(' ') => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.toggle_selected();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Char('a' | 'A') => {
+                    if let Some(state) = app.process_affinity_mut() {
+                        state.toggle_all();
+                    }
+                    None
+                }
+                ratatui::crossterm::event::KeyCode::Enter => app.apply_process_affinity(),
+                ratatui::crossterm::event::KeyCode::Esc => {
+                    app.close_local_overlays();
+                    None
+                }
+                _ => None,
+            },
             TuiSurfaceKind::Settings => {
                 handle_settings_key(app, key);
                 None
             }
-            TuiSurfaceKind::About | TuiSurfaceKind::Health | TuiSurfaceKind::Containers => {
+            TuiSurfaceKind::About | TuiSurfaceKind::Containers => {
                 // Esc stays structural; the toggle chords resolve through the
                 // declared surface protocol. The full modal consumes every
                 // key, so an unmatched character is a silent no-op and can
                 // never double-route a command chord.
                 match key.code {
                     ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),
+                    ratatui::crossterm::event::KeyCode::Char(character) => {
+                        if let Some(action) =
+                            surface_protocol_action(TuiSurfaceScope::StatusOverlay, character)
+                        {
+                            app.run_surface_protocol_action(action);
+                        }
+                    }
+                    _ => {}
+                }
+                None
+            }
+            TuiSurfaceKind::Health => {
+                // Esc stays structural; the toggle chords resolve through the
+                // declared surface protocol. In the health overlay, arrows and
+                // Space / Enter navigate and toggle managed alert rules.
+                match key.code {
+                    ratatui::crossterm::event::KeyCode::Esc => app.close_local_overlays(),
+                    ratatui::crossterm::event::KeyCode::Up
+                    | ratatui::crossterm::event::KeyCode::Char('k') => {
+                        app.health_rule_move(-1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Down
+                    | ratatui::crossterm::event::KeyCode::Char('j') => {
+                        app.health_rule_move(1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Home => {
+                        app.health_rule_selection = 0;
+                    }
+                    ratatui::crossterm::event::KeyCode::End => {
+                        let count = app.projection().alert_center.managed_rules().len();
+                        app.health_rule_selection = count.saturating_sub(1);
+                    }
+                    ratatui::crossterm::event::KeyCode::Enter
+                    | ratatui::crossterm::event::KeyCode::Char(' ') => {
+                        app.toggle_selected_alert_rule();
+                    }
                     ratatui::crossterm::event::KeyCode::Char(character) => {
                         if let Some(action) =
                             surface_protocol_action(TuiSurfaceScope::StatusOverlay, character)

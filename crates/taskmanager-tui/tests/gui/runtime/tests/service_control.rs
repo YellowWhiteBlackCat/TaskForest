@@ -660,3 +660,264 @@ fn menu_and_log_open_target_the_sorted_services_row() {
         "the log stream must follow the highlighted (sorted) row"
     );
 }
+
+#[test]
+fn service_log_export_via_e_key_writes_file_and_reports_notice() {
+    let mut app = crate::demo_app();
+    app.shell.clear_feedback_notice();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
+    let dir = crate::ui::test_support::repo_temp_dir().join(format!(
+        "svc-export-test-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create scratch dir");
+    app.export_dir = Some(dir.clone());
+
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('o'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(app.shell.service_log.is_some());
+    let service_id = app
+        .shell
+        .service_log
+        .as_ref()
+        .unwrap()
+        .service_id()
+        .unwrap()
+        .clone();
+
+    let entry1 = taskmanager_core::core::services::ServiceLogEntry {
+        cursor: "c1".into(),
+        realtime_timestamp_micros: Some(1_000_000),
+        priority: Some(6),
+        level: taskmanager_core::core::services::ServiceLogLevel::Info,
+        message: "daemon started successfully".into(),
+    };
+    let entry2 = taskmanager_core::core::services::ServiceLogEntry {
+        cursor: "c2".into(),
+        realtime_timestamp_micros: Some(1_001_000),
+        priority: Some(4),
+        level: taskmanager_core::core::services::ServiceLogLevel::Warning,
+        message: "connection pool retry".into(),
+    };
+    let entries =
+        taskmanager_core::core::services::ServiceLogEntries::new(vec![entry1, entry2]).unwrap();
+    let query = taskmanager_core::core::services::ServiceLogQuery {
+        service_id: service_id.clone(),
+        level: taskmanager_core::core::services::ServiceLogLevelFilter::All,
+        time: taskmanager_core::core::services::ServiceLogTimeFilter::All,
+        after_cursor: None,
+    };
+    let snapshot = taskmanager_core::core::services::ServiceLogStreamSnapshot {
+        query,
+        state: taskmanager_core::core::services::ServiceLogStreamState::Ready(entries),
+    };
+    app.shell
+        .service_log
+        .as_mut()
+        .unwrap()
+        .feed
+        .apply_at(snapshot, 100);
+
+    let effect = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('e'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(effect.is_none());
+
+    let service_id_str = service_id.to_string();
+    let safe_id: String = service_id_str
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let expected_file = dir.join(format!("taskmanager-service-{safe_id}.log"));
+    assert!(
+        expected_file.exists(),
+        "expected file {:?} to exist",
+        expected_file
+    );
+
+    let content = std::fs::read_to_string(&expected_file).expect("read exported file");
+    assert!(content.contains("[Info] daemon started successfully"));
+    assert!(content.contains("[Warning] connection pool retry"));
+
+    let notice = app.feedback_notice().expect("feedback notice reported");
+    assert_eq!(
+        notice.severity(),
+        taskmanager_shell::FeedbackSeverity::Success
+    );
+    assert!(notice.text().contains(&expected_file.display().to_string()));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn service_log_export_palette_action_triggers_export() {
+    let mut app = crate::demo_app();
+    app.shell.clear_feedback_notice();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
+    let dir = crate::ui::test_support::repo_temp_dir().join(format!(
+        "svc-palette-export-test-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create scratch dir");
+    app.export_dir = Some(dir.clone());
+
+    app.run_palette_local_action(Some(crate::PaletteLocalAction::ExportServiceLog));
+    assert!(app.feedback_notice().is_none());
+
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('o'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(app.shell.service_log.is_some());
+    let service_id = app
+        .shell
+        .service_log
+        .as_ref()
+        .unwrap()
+        .service_id()
+        .unwrap()
+        .clone();
+
+    let entry = taskmanager_core::core::services::ServiceLogEntry {
+        cursor: "c1".into(),
+        realtime_timestamp_micros: Some(1_000_000),
+        priority: Some(6),
+        level: taskmanager_core::core::services::ServiceLogLevel::Info,
+        message: "palette triggered log export".into(),
+    };
+    let entries = taskmanager_core::core::services::ServiceLogEntries::new(vec![entry]).unwrap();
+    let query = taskmanager_core::core::services::ServiceLogQuery {
+        service_id: service_id.clone(),
+        level: taskmanager_core::core::services::ServiceLogLevelFilter::All,
+        time: taskmanager_core::core::services::ServiceLogTimeFilter::All,
+        after_cursor: None,
+    };
+    let snapshot = taskmanager_core::core::services::ServiceLogStreamSnapshot {
+        query,
+        state: taskmanager_core::core::services::ServiceLogStreamState::Ready(entries),
+    };
+    app.shell
+        .service_log
+        .as_mut()
+        .unwrap()
+        .feed
+        .apply_at(snapshot, 100);
+
+    app.run_palette_local_action(Some(crate::PaletteLocalAction::ExportServiceLog));
+    let notice = app.feedback_notice().expect("feedback notice reported");
+    assert_eq!(
+        notice.severity(),
+        taskmanager_shell::FeedbackSeverity::Success
+    );
+
+    let service_id_str = service_id.to_string();
+    let safe_id: String = service_id_str
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.') {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
+    let expected_file = dir.join(format!("taskmanager-service-{safe_id}.log"));
+    assert!(expected_file.exists());
+    let content = std::fs::read_to_string(&expected_file).expect("read exported log");
+    assert!(content.contains("palette triggered log export"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn service_log_export_with_no_entries_reports_warning_notice() {
+    let mut app = crate::demo_app();
+    app.shell.clear_feedback_notice();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
+    let dir = crate::ui::test_support::repo_temp_dir().join(format!(
+        "svc-export-empty-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&dir).expect("create scratch dir");
+    app.export_dir = Some(dir.clone());
+
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('o'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(app.shell.service_log.is_some());
+
+    let effect = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('e'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(effect.is_none());
+    let notice = app.feedback_notice().expect("feedback notice reported");
+    assert_eq!(
+        notice.severity(),
+        taskmanager_shell::FeedbackSeverity::Warning
+    );
+    assert_eq!(
+        notice.text(),
+        taskmanager_application::i18n::t("svc.logs_nothing_to_export")
+    );
+
+    let file_count = std::fs::read_dir(&dir).unwrap().count();
+    assert_eq!(file_count, 0, "no files should be written on empty export");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn e_key_does_not_export_service_log_when_log_panel_is_closed() {
+    let mut app = crate::demo_app();
+    app.shell.clear_feedback_notice();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
+    assert!(app.shell.service_log.is_none());
+
+    let effect = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('e'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(effect.is_none());
+    assert!(
+        app.feedback_notice().is_none(),
+        "e when closed must not trigger export notice"
+    );
+}

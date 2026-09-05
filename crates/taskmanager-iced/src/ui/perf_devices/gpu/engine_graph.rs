@@ -113,6 +113,9 @@ pub(super) fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, Ic
     if let Some(vram_panel) = gpu_vram_meters_panel(gpu, theme_snapshot) {
         graphs.push(vram_panel);
     }
+    if let Some(engines_panel) = gpu_engines_panel(app, gpu, &engine_rows, theme_snapshot) {
+        graphs.push(engines_panel);
+    }
     let mut stats = gpu_summary_lines(gpu);
     match &engine_rows {
         GpuEngineRowsPresentation::Active(engines) => {
@@ -326,7 +329,7 @@ fn gpu_chart_metric_graph<'a>(
     }
 }
 
-pub(super) fn engine_rows_presentation<'a>(
+pub(crate) fn engine_rows_presentation<'a>(
     app: &'a IcedApp,
     gpu: &'a GpuMetrics,
 ) -> GpuEngineRowsPresentation<'a> {
@@ -339,7 +342,7 @@ pub(super) fn engine_rows_presentation<'a>(
     )
 }
 
-fn engine_rows_toggle_section<'a>(
+pub(super) fn engine_rows_toggle_section<'a>(
     theme_snapshot: &'a Theme,
     action: GpuEngineRowsAction,
 ) -> Option<Element<'a, Message, IcedTheme, Renderer>> {

@@ -120,4 +120,19 @@ impl ShellApp {
     pub fn confirm_startup_control(&mut self) -> Option<PlatformEffect> {
         self.confirm_confirmation(ConfirmationKind::StartupControl)
     }
+
+    /// Arm the shared SMART self-test confirmation gate with an explicit intent.
+    pub fn arm_smart_self_test(
+        &mut self,
+        intent: taskmanager_core::core::system_health::SmartSelfTestIntent,
+    ) {
+        self.arm_confirmation(PendingConfirmation::SmartSelfTest(intent));
+    }
+
+    /// Confirm the pending SMART self-test: emit it as a
+    /// [`PlatformEffect::SmartControl`] and clear the gate.
+    #[must_use]
+    pub fn confirm_smart_self_test(&mut self) -> Option<PlatformEffect> {
+        self.confirm_confirmation(ConfirmationKind::SmartSelfTest)
+    }
 }

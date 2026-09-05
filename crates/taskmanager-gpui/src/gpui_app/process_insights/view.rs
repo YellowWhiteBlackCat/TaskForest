@@ -73,6 +73,8 @@ pub struct ProcessInsightsLabels {
     pub thread_state: &'static str,
     pub thread_cpu_time: &'static str,
     pub thread_cpu_percent: &'static str,
+    pub environment: &'static str,
+    pub no_environment: &'static str,
     pub yes: &'static str,
     pub no: &'static str,
     pub unknown: &'static str,
@@ -118,6 +120,8 @@ impl ProcessInsightsLabels {
             thread_state: "State",
             thread_cpu_time: "CPU time",
             thread_cpu_percent: "CPU %",
+            environment: "Environment variables",
+            no_environment: "No environment variables observed",
             yes: "Yes",
             no: "No",
             unknown: "Unknown",
@@ -226,7 +230,8 @@ pub(crate) fn render_process_insights(
                     snapshot,
                     labels,
                     layout.card_width,
-                )),
+                ))
+                .child(environment_card(theme, snapshot, labels, layout.card_width)),
         ),
     }
 }
@@ -523,6 +528,77 @@ fn isolation_card(
     content
 }
 
+pub(crate) fn environment_card(
+    theme: &Theme,
+    snapshot: &ProcessTelemetrySnapshot,
+    labels: &ProcessInsightsLabels,
+    width: f32,
+) -> Div {
+    let environment = &snapshot.environment;
+    if environment.state.status != DeviceStatus::Healthy {
+        return card(theme, labels.environment, width).child(
+            div()
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .child(status_label(environment.state.status, labels).to_string()),
+        );
+    }
+    let mut content = card(theme, labels.environment, width);
+    if environment.entries.is_empty() {
+        return content.child(
+            div()
+                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+                .child(labels.no_environment.to_string()),
+        );
+    }
+    let header = if environment.truncated_count > 0 {
+        format!(
+            "{} · {} · +{}",
+            labels.environment,
+            environment.entries.len(),
+            environment.truncated_count,
+        )
+    } else {
+        format!("{} · {}", labels.environment, environment.entries.len())
+    };
+    content = content.child(
+        div()
+            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
+            .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
+            .child(header),
+    );
+    let (shown, hidden) = capped_card_rows(environment.entries.len());
+    content = content.child(
+        div()
+            .flex()
+            .flex_col()
+            .gap(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_3,
+            ))
+            .children(
+                environment
+                    .entries
+                    .iter()
+                    .take(shown)
+                    .enumerate()
+                    .map(|(i, entry)| {
+                        KeyValueRow::new(&entry.key, &entry.value, theme.palette())
+                            .label_width(taskmanager_theme::Length(110.0))
+                            .value_align_right(false)
+                            .selectable_value(gpui::ElementId::Name(
+                                format!("process-insight-env:{i}:{}", entry.key).into(),
+                            ))
+                            .render()
+                    }),
+            ),
+    );
+    if hidden > 0 {
+        content = content.child(crate::gpui_app::elements::more_rows_hint(theme, hidden));
+    }
+    content
+}
+
 fn status_label(status: DeviceStatus, labels: &ProcessInsightsLabels) -> &'static str {
     match status {
         DeviceStatus::Healthy => labels.healthy,
@@ -600,3 +676,7 @@ fn isolation_label(kind: &IsolationKind) -> &'static str {
 #[cfg(test)]
 #[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_cap_tests.rs"]
 mod cap_tests;
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_gpui_app_process_insights_view_environment_tests.rs"]
+mod environment_tests;

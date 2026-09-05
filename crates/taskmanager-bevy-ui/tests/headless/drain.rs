@@ -300,3 +300,36 @@ fn summary_line_counts_typed_statuses_without_fabricating_zero() {
         "an empty inventory must say so explicitly, not report zero available"
     );
 }
+
+#[test]
+fn advance_feedback_time_clears_timed_notices_in_drain_cycle() {
+    let events = ScriptedEvents::quiet();
+    let mut client = client_with(snapshot_with_mixed_statuses(), events);
+    let mut shell = ShellApp::new();
+    shell.report_notice(
+        taskmanager_shell::FeedbackSource::Interaction,
+        taskmanager_shell::FeedbackSeverity::Info,
+        taskmanager_shell::FeedbackLifecycle::timed(std::time::Duration::from_millis(30)),
+        "Screenshot saved to /tmp/screenshot.png",
+    );
+    assert!(shell.feedback_notice().is_some());
+    assert_eq!(
+        shell.feedback_text(),
+        "Screenshot saved to /tmp/screenshot.png"
+    );
+
+    // Drain cycle 1: advances 16ms, leaving 14ms remaining.
+    let _ = run_drain_cycle(&mut client, &mut shell, 0);
+    assert!(shell.feedback_notice().is_some());
+
+    // Drain cycle 2: advances another 16ms (32ms total >= 30ms). Timed notice expires.
+    let _ = run_drain_cycle(&mut client, &mut shell, 16);
+    assert!(
+        shell.feedback_notice().is_none(),
+        "timed notice must expire after elapsed drain cycles exceed its duration"
+    );
+    assert_ne!(
+        shell.feedback_text(),
+        "Screenshot saved to /tmp/screenshot.png"
+    );
+}

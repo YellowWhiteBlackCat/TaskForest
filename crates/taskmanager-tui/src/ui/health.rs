@@ -35,7 +35,7 @@ use crate::TuiApp;
 #[path = "../../tests/headless/ui/health_support.rs"]
 pub(crate) mod health_support;
 use crate::TuiTheme;
-use crate::ui::alerts::managed_rule_line;
+use crate::ui::alerts::{alert_event_line, managed_rule_line};
 use crate::ui::{DeviceHealth, classify_device_state};
 
 /// Render the health overlay centred over `area`.
@@ -48,15 +48,29 @@ pub(super) fn render_health_overlay_at(
     let inner =
         Modal::new(theme, IconId::Health, t("health.system_health_alerts")).render(frame, popup);
 
-    let [summary, rules, footer] = Layout::vertical([
-        Constraint::Length(12),
-        Constraint::Min(6),
-        Constraint::Length(3),
-    ])
-    .areas(inner);
+    let [summary, rules, events, footer] = if inner.height >= 24 {
+        Layout::vertical([
+            Constraint::Length(11),
+            Constraint::Length(7),
+            Constraint::Min(4),
+            Constraint::Length(3),
+        ])
+        .areas(inner)
+    } else {
+        let [s, r, f] = Layout::vertical([
+            Constraint::Length(10),
+            Constraint::Min(5),
+            Constraint::Length(3),
+        ])
+        .areas(inner);
+        [s, r, Rect::default(), f]
+    };
 
     render_device_summary(frame, app, theme, summary);
     render_alert_rules(frame, app, theme, rules);
+    if events.height > 0 {
+        render_alert_events(frame, app, theme, events);
+    }
 
     let mut hint = KeyHint::spans(
         theme,
@@ -296,14 +310,54 @@ fn render_alert_rules(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area
         heading,
     );
 
+    let selected_index = app.health_rule_selection();
+    let is_health_open = app.health_open();
     let lines: Vec<Line<'static>> = app
         .projection()
         .alert_center
         .managed_rules()
         .iter()
-        .map(|managed| managed_rule_line(managed, theme))
+        .enumerate()
+        .map(|(index, managed)| {
+            let active = is_health_open && selected_index == index;
+            managed_rule_line(managed, active, theme)
+        })
         .collect();
     frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }), rows);
+}
+
+fn render_alert_events(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+    if area.height < 2 {
+        return;
+    }
+    let [heading, rows] = Layout::vertical([Constraint::Length(1), Constraint::Min(1)]).areas(area);
+    frame.render_widget(
+        Paragraph::new(Line::from(Span::styled(
+            t("events.title"),
+            Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
+        ))),
+        heading,
+    );
+
+    let events = app.projection().alert_center.event_history();
+    if events.is_empty() {
+        frame.render_widget(
+            Paragraph::new(Line::from(Span::styled(
+                format!("  {}", t("events.empty")),
+                Style::new().fg(theme.dim),
+            ))),
+            rows,
+        );
+    } else {
+        let max_events = (rows.height as usize).max(1);
+        let lines: Vec<Line<'static>> = events
+            .iter()
+            .rev()
+            .take(max_events)
+            .map(|event| alert_event_line(event, theme))
+            .collect();
+        frame.render_widget(Paragraph::new(lines).wrap(Wrap { trim: true }), rows);
+    }
 }
 
 #[cfg(test)]

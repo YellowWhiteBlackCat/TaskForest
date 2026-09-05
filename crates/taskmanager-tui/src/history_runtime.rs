@@ -4,10 +4,12 @@ use taskmanager_app_host::{
     HistoryFrontendConnectRequestId, HistoryFrontendConnector, HistoryFrontendConnectorStartError,
 };
 use taskmanager_application::{
-    ApplicationHistoryCapability, ApplicationHistoryProjection, HistoryReplayController,
-    HistoryReplayRequest,
+    ApplicationHistoryCapability, ApplicationHistoryProjection,
+    ApplicationHistoryUnavailableReason, HistoryReplayController, HistoryReplayRequest,
 };
 use taskmanager_core::core::history::HistoryWindow;
+
+use crate::TuiApp;
 
 enum HistoryResources {
     Disabled,
@@ -161,5 +163,47 @@ impl TuiHistoryRuntime {
             | HistoryResources::Connecting(_)
             | HistoryResources::Unavailable(_) => None,
         }
+    }
+}
+
+impl TuiApp {
+    pub(crate) fn install_history_frontend_connector(
+        &mut self,
+        connector: Result<HistoryFrontendConnector, HistoryFrontendConnectorStartError>,
+    ) {
+        self.history_runtime.install_connector(connector);
+        self.sync_history_persistence_sink();
+    }
+
+    pub(crate) fn application_history_projection(&self) -> ApplicationHistoryProjection {
+        self.history_runtime.projection()
+    }
+
+    pub(crate) fn application_history_unavailable_reason(
+        &self,
+    ) -> Option<ApplicationHistoryUnavailableReason> {
+        self.history_runtime.unavailable_reason()
+    }
+
+    pub(crate) fn select_application_history_window(&mut self, window: HistoryWindow) -> bool {
+        self.history_runtime.select_window(window)
+    }
+
+    pub(crate) fn drain_history_replay_completions(&mut self) -> bool {
+        let changed = self.history_runtime.drain();
+        if changed {
+            self.sync_history_persistence_sink();
+        }
+        changed
+    }
+
+    pub(crate) fn request_history_frontend(&mut self, enabled: bool) {
+        self.history_runtime.request(enabled);
+        self.sync_history_persistence_sink();
+    }
+
+    fn sync_history_persistence_sink(&mut self) {
+        self.shell
+            .set_history_persistence_sink(self.history_runtime.record_sink());
     }
 }

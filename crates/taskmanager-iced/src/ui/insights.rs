@@ -11,8 +11,10 @@
 //!
 //! Extracted from [`super::overlays`] so the overlays module stays under the
 //! repository's source-size budget.
+mod helpers;
+pub(crate) use helpers::*;
 
-use iced::widget::{column, row, text};
+use iced::widget::{column, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
@@ -20,11 +22,7 @@ use taskmanager_application::{
     project_process_resources,
 };
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
-use taskmanager_core::core::process_telemetry::{
-    IsolationKind, LimitValue, OpenFileEntry, ProcessThreadInfo,
-};
-use taskmanager_platform_contract::SubmissionErrorKind;
+use taskmanager_core::core::process_telemetry::{IsolationKind, LimitValue};
 
 use taskmanager_shell::ShellApp;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes, missing_value};
@@ -32,7 +30,6 @@ use taskmanager_theme::{Theme, tokens};
 
 use crate::app::Message;
 use crate::focus;
-use crate::theme;
 
 /// The explicit dash for any value the source could not prove (a missing CPU
 /// counter, a cold-start rate gap, an unreadable readlink). Never a fabricated
@@ -42,7 +39,7 @@ const DASH: &str = MISSING_VALUE;
 /// this only keeps one busy process from dominating the panel.
 const MAX_FACET_ROWS: usize = 8;
 
-/// Build the per-process insights block (heading + seven facet sub-sections)
+/// Build the per-process insights block (heading + eight facet sub-sections)
 /// for the open details overlay. The block always renders: when no projection
 /// for this frozen target has arrived yet every facet shows the honest
 /// "collecting…" hint, because the per-tick request is already in flight.
@@ -65,6 +62,7 @@ pub(super) fn insights_block<'a>(
         gpu_engines_section(theme_snapshot, projection),
         resources_section(theme_snapshot, projection),
         isolation_section(theme_snapshot, projection),
+        environment_section(theme_snapshot, projection),
     ]
     .spacing(8)
     .width(Length::Fill)
@@ -224,6 +222,12 @@ fn gpu_devices_section<'a>(
                         ));
                     }
                 }
+                if gpu.devices.len() > MAX_FACET_ROWS {
+                    rows.push(muted_text(
+                        theme_snapshot,
+                        format!("… +{} more", gpu.devices.len() - MAX_FACET_ROWS),
+                    ));
+                }
                 (t("common.gpu").to_string(), rows)
             }
         }
@@ -231,10 +235,31 @@ fn gpu_devices_section<'a>(
     section_column(theme_snapshot, &heading, body)
 }
 
+/// Format an optional (current, limit) pair into an honest display string.
+/// A missing value renders with an explicit dash or omitted when both are
+/// unobserved; an unlimited limit renders "∞", never a fabricated zero.
+pub(crate) fn format_resource_pair(
+    current: Option<String>,
+    limit: Option<LimitValue>,
+    format_val: impl Fn(u64) -> String,
+) -> Option<String> {
+    let limit_str = limit.map(|l| match l {
+        LimitValue::Unlimited => "∞".to_string(),
+        LimitValue::Value(v) => format_val(v),
+    });
+    match (current, limit_str) {
+        (Some(c), Some(m)) => Some(format!("{c} / {m}")),
+        (Some(c), None) => Some(c),
+        (None, Some(m)) => Some(format!("{DASH} / {m}")),
+        (None, None) => None,
+    }
+}
+
 /// The resource-limits facet: memory usage / limit, CPU quota as a percentage
-/// of one period, and pid count when the provider exposes them. Mirrors GPUI's
-/// resource_card. An unlimited quota renders "∞", never a fabricated zero.
-fn resources_section<'a>(
+/// of one period, pid count when the provider exposes them, and CGroup locator.
+/// Mirrors GPUI's resource_card. An unlimited quota renders "∞", never a
+/// fabricated zero.
+pub(crate) fn resources_section<'a>(
     theme_snapshot: &'a Theme,
     projection: Option<&ProjectedProcessInsights>,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -251,27 +276,29 @@ fn resources_section<'a>(
         Some(ProcessInsightFacetState::Current(resources)) => {
             let resources = project_process_resources(resources);
             let mut rows = Vec::new();
-            if let Some(used) = resources.memory_usage_bytes {
-                let limit = match resources.memory_limit {
-                    Some(LimitValue::Unlimited) | None => "∞".to_string(),
-                    Some(LimitValue::Value(v)) => bytes(v),
-                };
+            if let Some(mem_str) = format_resource_pair(
+                resources.memory_usage_bytes.map(bytes),
+                resources.memory_limit,
+                bytes,
+            ) {
                 rows.push(kv_row(
                     theme_snapshot,
                     t("common.memory").to_string(),
-                    format!("{} / {}", bytes(used), limit),
+                    mem_str,
                 ));
             }
-            if let (Some(quota), Some(period)) = (
-                resources.cpu_time_quota_micros,
-                resources.cpu_time_period_micros,
-            ) {
+            if let Some(quota) = resources.cpu_time_quota_micros {
                 let pct = match quota {
                     LimitValue::Unlimited => "∞".to_string(),
-                    LimitValue::Value(q) if period > 0 => {
-                        format!("{:.0}%", (q as f64 / period as f64) * 100.0)
+                    LimitValue::Value(q) => {
+                        if let Some(period) = resources.cpu_time_period_micros
+                            && period > 0
+                        {
+                            format!("{:.0}%", (q as f64 / period as f64) * 100.0)
+                        } else {
+                            missing_value()
+                        }
                     }
-                    LimitValue::Value(_) => missing_value(),
                 };
                 rows.push(kv_row(
                     theme_snapshot,
@@ -282,15 +309,15 @@ fn resources_section<'a>(
             // Pid count and resource-group locator (GPUI resource_card
             // parity): an unlimited pids limit renders "∞", never a
             // fabricated number.
-            if let Some(count) = resources.process_count {
-                let limit = match resources.process_limit {
-                    Some(LimitValue::Unlimited) | None => "∞".to_string(),
-                    Some(LimitValue::Value(v)) => v.to_string(),
-                };
+            if let Some(pids_str) = format_resource_pair(
+                resources.process_count.map(|count| count.to_string()),
+                resources.process_limit,
+                |v| v.to_string(),
+            ) {
                 rows.push(kv_row(
                     theme_snapshot,
                     t("proc_insights.pids").to_string(),
-                    format!("{count} / {limit}"),
+                    pids_str,
                 ));
             }
             if let Some(group) = resources.resource_group {
@@ -301,7 +328,7 @@ fn resources_section<'a>(
                 ));
             }
             if rows.is_empty() {
-                rows.push(muted_text(theme_snapshot, t("proc_insights.no_gpu")));
+                rows.push(muted_text(theme_snapshot, t("proc_insights.unknown")));
             }
             (t("proc_insights.resource_limits").to_string(), rows)
         }
@@ -312,7 +339,7 @@ fn resources_section<'a>(
 /// The isolation facet: the container/sandbox kind (Docker / Podman / …), the
 /// container id, and the sandboxed flag. A host process renders "Host process".
 /// Mirrors GPUI's isolation_card.
-fn isolation_section<'a>(
+pub(crate) fn isolation_section<'a>(
     theme_snapshot: &'a Theme,
     projection: Option<&ProjectedProcessInsights>,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
@@ -353,14 +380,73 @@ fn isolation_section<'a>(
                     id.to_string(),
                 ));
             }
-            if let Some(sandboxed) = isolation.sandboxed {
-                rows.push(kv_row(
-                    theme_snapshot,
-                    t("proc_insights.sandboxed").to_string(),
-                    if sandboxed { "Yes" } else { "No" },
-                ));
-            }
+            let sandboxed_str = match isolation.sandboxed {
+                Some(true) => "Yes",
+                Some(false) => "No",
+                None => t("proc_insights.unknown"),
+            };
+            rows.push(kv_row(
+                theme_snapshot,
+                t("proc_insights.sandboxed").to_string(),
+                sandboxed_str,
+            ));
             (t("proc_insights.isolation").to_string(), rows)
+        }
+    };
+    section_column(theme_snapshot, &heading, body)
+}
+
+/// The environment facet: bounded environment key/value rows with honest
+/// Pending / Unavailable / Current empty states. Mirrors GPUI's environment_card.
+pub(crate) fn environment_section<'a>(
+    theme_snapshot: &'a Theme,
+    projection: Option<&ProjectedProcessInsights>,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let state = projection.map(|projection| &projection.environment);
+    let (heading, body) = match state {
+        None | Some(ProcessInsightFacetState::Pending) => (
+            t("prop.environment").to_string(),
+            vec![muted_text(theme_snapshot, t("proc_insights.collecting"))],
+        ),
+        Some(ProcessInsightFacetState::Unavailable(reason)) => (
+            t("prop.environment").to_string(),
+            vec![muted_text(theme_snapshot, facet_unavailable_text(reason))],
+        ),
+        Some(ProcessInsightFacetState::Current(environment)) => {
+            let heading = if environment.truncated_count > 0 {
+                format!(
+                    "{} · {} · +{}",
+                    t("prop.environment"),
+                    environment.entries.len(),
+                    environment.truncated_count,
+                )
+            } else if environment.entries.is_empty() {
+                t("prop.environment").to_string()
+            } else {
+                format!("{} · {}", t("prop.environment"), environment.entries.len())
+            };
+            if environment.entries.is_empty() {
+                (
+                    heading,
+                    vec![muted_text(theme_snapshot, t("prop.environment_empty"))],
+                )
+            } else {
+                let mut rows = Vec::new();
+                for entry in environment.entries.iter().take(MAX_FACET_ROWS) {
+                    rows.push(kv_row(
+                        theme_snapshot,
+                        entry.key.clone(),
+                        entry.value.clone(),
+                    ));
+                }
+                if environment.entries.len() > MAX_FACET_ROWS {
+                    rows.push(muted_text(
+                        theme_snapshot,
+                        format!("… +{} more", environment.entries.len() - MAX_FACET_ROWS),
+                    ));
+                }
+                (heading, rows)
+            }
         }
     };
     section_column(theme_snapshot, &heading, body)
@@ -531,168 +617,6 @@ fn gpu_engines_section<'a>(
         }
     };
     section_column(theme_snapshot, &heading, body)
-}
-
-/// Assemble one facet sub-section: an accent-colored heading followed by its
-/// content rows.
-fn section_column<'a>(
-    theme_snapshot: &'a Theme,
-    heading: &str,
-    body: Vec<Element<'a, Message, iced::Theme, iced::Renderer>>,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let mut col = column![section_title(theme_snapshot, heading)];
-    for child in body {
-        col = col.push(child);
-    }
-    col.spacing(4).width(Length::Fill).into()
-}
-
-fn section_title<'a>(
-    theme_snapshot: &'a Theme,
-    heading: &str,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    text(heading.to_string())
-        .size(f32::from(tokens::FONT_13))
-        .color(crate::theme_binding::color(theme_snapshot.palette().accent))
-        .into()
-}
-
-fn muted_text<'a, S: iced::advanced::text::IntoFragment<'a>>(
-    theme_snapshot: &'a Theme,
-    body: S,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    text(body)
-        .size(f32::from(tokens::FONT_12))
-        .color(theme::muted_text_color(theme_snapshot))
-        .into()
-}
-
-/// A small label / value row for an insight facet (memory, quota, container
-/// id, …). The label is muted and Fixed-width so the values align; the value
-/// is the body color. The label is OWNED so the returned element borrows only
-/// the theme (not the facet projection), keeping the section lifetime-simple.
-fn kv_row<'a, V: iced::advanced::text::IntoFragment<'a>>(
-    theme_snapshot: &'a Theme,
-    label: String,
-    value: V,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let muted = theme::muted_text_color(theme_snapshot);
-    row![
-        text(label).width(Length::Fixed(150.0)).color(muted),
-        text(value).width(Length::Fill),
-    ]
-    .spacing(8)
-    .width(Length::Fill)
-    .into()
-}
-
-/// The Fixed-width column-header row shared by every thread data row.
-fn thread_header<'a>(
-    theme_snapshot: &'a Theme,
-) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let muted = theme::muted_text_color(theme_snapshot);
-    row![
-        text("TID").width(Length::Fixed(56.0)).color(muted),
-        text("Name").width(Length::Fixed(196.0)).color(muted),
-        text("State").width(Length::Fixed(48.0)).color(muted),
-        text("CPU-time").width(Length::Fixed(72.0)).color(muted),
-        text("CPU%").width(Length::Fill).color(muted),
-    ]
-    .spacing(8)
-    .padding(2)
-    .width(Length::Fill)
-    .into()
-}
-
-/// One thread as a Fixed-width row, matching [`thread_header`]'s columns. An
-/// empty `comm` is the contract's unknown identity (e.g. Windows ToolHelp32
-/// exposes no thread names) and renders the explicit dash like every other
-/// typed gap.
-fn thread_row<'a>(thread: &ProcessThreadInfo) -> Element<'a, Message, iced::Theme, iced::Renderer> {
-    let comm = if thread.comm.is_empty() {
-        missing_value()
-    } else {
-        thread.comm.clone()
-    };
-    row![
-        text(thread.tid.to_string()).width(Length::Fixed(56.0)),
-        text(comm).width(Length::Fixed(196.0)),
-        text(thread.state.as_short_label()).width(Length::Fixed(48.0)),
-        text(cpu_time_text(thread.cpu_time_secs)).width(Length::Fixed(72.0)),
-        text(cpu_percent_text(thread.cpu_percent)).width(Length::Fill),
-    ]
-    .spacing(8)
-    .padding(2)
-    .width(Length::Fill)
-    .into()
-}
-
-/// Honest cumulative CPU time for one thread: the parsed seconds, or the
-/// explicit dash when the source lacked CPU counters.
-fn cpu_time_text(cpu: Option<f64>) -> String {
-    cpu.map_or_else(|| DASH.to_string(), |value| format!("{value:.1}s"))
-}
-
-/// Honest instantaneous CPU% for one thread: the identity-bound rate, or the
-/// explicit dash for the first sample / a counter gap.
-fn cpu_percent_text(cpu: Option<f32>) -> String {
-    cpu.map_or_else(|| DASH.to_string(), |value| format!("{value:.1}%"))
-}
-
-/// One open file descriptor as `fd → target`. An unreadable target (a failed
-/// readlink) keeps the row with the typed "unreadable" marker.
-fn format_open_file_row(entry: &OpenFileEntry) -> String {
-    let target = entry
-        .target
-        .clone()
-        .unwrap_or_else(|| t("proc_insights.unreadable").to_string());
-    format!("fd {} → {}", entry.fd, target)
-}
-
-/// One GPU engine as `name  usage%`. The cold-start rate gap renders the
-/// explicit dash rather than a fabricated `0.0%`.
-/// One engine line: `name  rate` plus the cumulative busy time or cycle count
-/// when the driver reports it (GPUI `gpu_engines` parity): i915 exposes busy
-/// nanoseconds, xe exposes cycles — the cumulative readout shows whichever
-/// the source typed, never both.
-fn format_engine_usage(
-    name: &str,
-    usage_pct: &ScalarObservation<f32>,
-    time_ns: &ScalarObservation<u64>,
-    cycles: &ScalarObservation<u64>,
-) -> String {
-    let usage = usage_pct
-        .current_value()
-        .map_or_else(|| DASH.to_string(), |value| format!("{value:.1}%"));
-    let cumulative = time_ns
-        .current_value()
-        .map(|nanos| taskmanager_shell::presentation::duration(*nanos / 1_000_000_000))
-        .or_else(|| {
-            cycles
-                .current_value()
-                .map(|value| format!("{value} cycles"))
-        })
-        .unwrap_or_else(|| DASH.to_string());
-    format!("{name}  {usage}  {cumulative}")
-}
-
-/// Typed one-line message for a facet that cannot contribute. Mirrors the
-/// gpui status labels: a permission denial (or a capability the per-feature
-/// escalation seam could reach) is "permission denied"; an unsupported facet
-/// is "unsupported"; everything else is the honest generic "unavailable".
-pub(crate) fn facet_unavailable_text(reason: &ProcessInsightUnavailable) -> String {
-    match reason {
-        ProcessInsightUnavailable::Provider(FailureKind::PermissionDenied)
-        | ProcessInsightUnavailable::Provider(FailureKind::RequiresEscalation) => {
-            "permission denied"
-        }
-        ProcessInsightUnavailable::Provider(FailureKind::Unsupported)
-        | ProcessInsightUnavailable::Submission(SubmissionErrorKind::UnsupportedCapability) => {
-            "unsupported"
-        }
-        _ => "unavailable",
-    }
-    .to_string()
 }
 
 #[cfg(test)]

@@ -26,6 +26,7 @@
 //! grows semantic status tokens, [`chip_fill`] is the one function to
 //! re-target.
 
+use crate::widgets::controls::{ControlTone, ControlVisual};
 use bevy::color::Color;
 use bevy::ecs::component::Component;
 use bevy::ecs::entity::Entity;
@@ -37,12 +38,13 @@ use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
-use bevy::scene::{CommandsSceneExt, Scene, bsn, template_value};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
     UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::Button;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SourceNotice, source_notice};
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
@@ -54,10 +56,12 @@ use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_24};
+use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12, space_24};
 use crate::widgets::controls::sort_indicator_scene;
 use crate::window::{Role, TextRole, WindowPalette};
 
+pub(crate) mod dependencies_panel;
+pub(crate) mod details_modal;
 pub(crate) mod log_panel;
 pub(crate) mod menu;
 
@@ -329,6 +333,14 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
                 ServicesBody
             ),
             (
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Column,
+                    row_gap: Val::Px(space_2()),
+                }
+                dependencies_panel::ServicesDependenciesPanelSlot
+            ),
+            (
                 // The service-log panel's mount point. The panel is a
                 // page-local surface fed by the shell's log lifecycle; its
                 // painter is fingerprint-gated so idle folds never respawn.
@@ -356,7 +368,7 @@ fn services_body_scene(
     let empty = empty_state_text(shell.projection().services_source.as_deref());
     let children = body_children(&rows, selected, notice, empty, palette);
     let header = header_scene(shell.services_sort, palette);
-    let toolbar = log_panel::logs_toolbar_scene(selection.target.is_some(), palette);
+    let toolbar = services_toolbar_scene(selection.target.is_some(), palette);
     bsn! {
         Node {
             width: percent(100),
@@ -401,6 +413,89 @@ fn body_children(
 /// Header row: one caption cell per column; every cell carries the
 /// [`ServicesSortHeader`] identity (`Some` on sortable columns) for the
 /// pointer adapter.
+fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -> Box<dyn Scene> {
+    Box::new(bsn! {
+        Node {
+            width: percent(100.0),
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_8()),
+        }
+        Children [
+            ( Node { flex_grow: 1.0 } ),
+            (
+                Node {
+                    height: px(palette.control_height_px),
+                    padding: UiRect::horizontal(Val::Px(space_12())),
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+                }
+                BackgroundColor({
+                    if has_selection { palette.nav_active_bg } else { palette.content_bg }
+                })
+                ControlVisual(ControlTone::Surface, has_selection)
+                Button
+                on(details_modal::on_details_button_activated)
+                details_modal::ServiceDetailsOpenButton
+                Children [
+                    (
+                        Text({ t("common.details").to_owned() })
+                        TextRole(Role::Caption)
+                        template_value(no_wrap_text())
+                    )
+                ]
+            ),
+            (
+                Node {
+                    height: px(palette.control_height_px),
+                    padding: UiRect::horizontal(Val::Px(space_12())),
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+                }
+                BackgroundColor({
+                    if has_selection { palette.nav_active_bg } else { palette.content_bg }
+                })
+                ControlVisual(ControlTone::Surface, has_selection)
+                Button
+                on(dependencies_panel::services_dependencies_button_activated)
+                dependencies_panel::ServicesDependenciesOpenButton
+                Children [
+                    (
+                        Text({ t("svc.dependencies").to_owned() })
+                        TextRole(Role::Caption)
+                        template_value(no_wrap_text())
+                    )
+                ]
+            ),
+            (
+                Node {
+                    height: px(palette.control_height_px),
+                    padding: UiRect::horizontal(Val::Px(space_12())),
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::Center,
+                    border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
+                }
+                BackgroundColor({
+                    if has_selection { palette.nav_active_bg } else { palette.content_bg }
+                })
+                ControlVisual(ControlTone::Surface, has_selection)
+                Button
+                on(log_panel::services_logs_button_activated)
+                log_panel::ServicesLogsOpenButton
+                Children [
+                    (
+                        Text({ t("svc.logs").to_owned() })
+                        TextRole(Role::Caption)
+                        template_value(no_wrap_text())
+                    )
+                ]
+            ),
+        ]
+    })
+}
+
 fn header_scene(sort: Option<(InfoSortCol, SortDir)>, palette: &UiPalette) -> impl Scene + use<> {
     let cells: Vec<Box<dyn Scene>> = columns()
         .into_iter()
@@ -612,6 +707,12 @@ fn bind_services_page(mut world: DeferredWorld<'_>, _context: HookContext) {
     commands.insert_resource(ServicesRenderState {
         rendered_revision: None,
     });
+    commands.init_resource::<dependencies_panel::ServicesDependenciesRenderState>();
+    commands.add_observer(dependencies_panel::on_services_dependencies_requested);
+    commands.add_observer(dependencies_panel::on_dependencies_panel_repaint_required);
+    commands.add_observer(dependencies_panel::on_dependencies_panel_slot_added);
+    commands.add_observer(dependencies_panel::on_services_fold_dependencies_gate);
+    commands.add_observer(dependencies_panel::services_dependencies_button_activated);
     commands.init_resource::<log_panel::ServicesLogRenderState>();
     commands.add_observer(on_services_projection_folded);
     commands.add_observer(on_services_sort_clicked);
@@ -707,3 +808,11 @@ mod services_menu_tests;
 #[cfg(test)]
 #[path = "../../tests/headless/pages/service_logs.rs"]
 mod service_logs_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/service_dependencies.rs"]
+mod service_dependencies_tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/service_details_modal.rs"]
+mod service_details_modal_tests;

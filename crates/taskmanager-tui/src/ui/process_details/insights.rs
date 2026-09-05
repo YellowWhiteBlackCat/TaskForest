@@ -9,9 +9,9 @@ use ratatui::style::{Modifier, Style};
 use ratatui::text::Span;
 use taskmanager_application::{ProcessInsightUnavailable, i18n::t};
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process_telemetry::{
-    ConnectionEndpoint, ConnectionTransport, LimitValue, OpenFileEntry, ProcessOpenFiles,
+    ConnectionEndpoint, ConnectionTransport, LimitValue, OpenFileEntry, ProcessEnvironment,
+    ProcessEnvironmentEntry, ProcessGpuDevice, ProcessGpuEngineUsage, ProcessOpenFiles,
     ProcessThreadInfo, ProcessThreads,
 };
 use taskmanager_shell::presentation::{bytes, missing_value};
@@ -92,6 +92,18 @@ pub(crate) fn insights_lines(
             lines.push(insight_unavailable(theme, reason))
         }
         ProcessInsightFacetState::Current(snapshot) => {
+            let rx = snapshot
+                .rx_bytes_per_sec
+                .map_or_else(missing_value, |v| format!("{}/s", bytes(v)));
+            let tx = snapshot
+                .tx_bytes_per_sec
+                .map_or_else(missing_value, |v| format!("{}/s", bytes(v)));
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} RX {} · TX {}",
+                t("common.throughput"),
+                rx,
+                tx
+            )));
             lines.push(ratatui::text::Line::from(format!(
                 "  {} {}",
                 t("proc_insights.connections"),
@@ -121,16 +133,9 @@ pub(crate) fn insights_lines(
         }
         ProcessInsightFacetState::Current(snapshot) => {
             for device in snapshot.devices.iter().take(2) {
-                let vram = device.memory_bytes.map_or_else(missing_value, bytes);
-                let util = device
-                    .utilization_pct
-                    .map_or_else(missing_value, |value| format!("{value:.1}%"));
                 lines.push(ratatui::text::Line::from(format!(
-                    "  {} {} · {} {}",
-                    t("common.gpu"),
-                    util,
-                    t("gpu.vram_in_use"),
-                    vram,
+                    "  {}",
+                    format_gpu_device_row(device)
                 )));
             }
             if snapshot.devices.len() > 2 {
@@ -140,12 +145,12 @@ pub(crate) fn insights_lines(
                 )));
             }
             // Per-engine breakdown (drm-engine fdinfo, deeper-indented under
-            // the device rollup): name + current usage_pct. An empty engine
-            // list renders nothing fabricated — a live, non-GPU process.
+            // the device rollup): name + current usage_pct + cumulative time/cycles.
+            // An empty engine list renders nothing fabricated — a live, non-GPU process.
             for engine in snapshot.engines.engines.iter().take(GPU_ENGINES_PREVIEW) {
                 lines.push(ratatui::text::Line::from(format!(
                     "    {}",
-                    format_engine_usage_line(&engine.name, &engine.usage_pct)
+                    format_engine_usage_line(engine)
                 )));
             }
             if snapshot.engines.engines.len() > GPU_ENGINES_PREVIEW {
@@ -178,6 +183,22 @@ pub(crate) fn insights_lines(
                     limit_value(Some(quota), None),
                 )));
             }
+            if let Some(pids) = snapshot.current_process_count() {
+                lines.push(ratatui::text::Line::from(format!(
+                    "  {} {}",
+                    t("proc_insights.pids"),
+                    limit_value(snapshot.current_process_limit(), Some(pids)),
+                )));
+            }
+            if let Some(groups) = snapshot.current_resource_groups()
+                && let Some(first) = groups.first()
+            {
+                lines.push(ratatui::text::Line::from(format!(
+                    "  {} {}",
+                    t("proc_insights.resource_group"),
+                    first.native_locator,
+                )));
+            }
         }
     }
     // Isolation: one honest line.
@@ -187,6 +208,15 @@ pub(crate) fn insights_lines(
             lines.push(insight_unavailable(theme, reason))
         }
         ProcessInsightFacetState::Current(isolation) => {
+            let kind_str = isolation
+                .kind
+                .as_ref()
+                .map_or_else(missing_value, |k| format!("{k:?}"));
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc_insights.isolation"),
+                kind_str,
+            )));
             let detail = isolation
                 .container_id
                 .as_deref()
@@ -195,6 +225,18 @@ pub(crate) fn insights_lines(
                 "  {} {}",
                 t("proc_insights.container_id"),
                 detail,
+            )));
+            let sandboxed_str = isolation.sandboxed.map_or_else(missing_value, |s| {
+                if s {
+                    t("common.yes").to_string()
+                } else {
+                    t("common.no").to_string()
+                }
+            });
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc_insights.sandboxed"),
+                sandboxed_str,
             )));
         }
     }
@@ -216,6 +258,16 @@ pub(crate) fn insights_lines(
         }
         ProcessInsightFacetState::Current(open_files) => {
             lines.extend(open_files_preview_lines(open_files, theme))
+        }
+    }
+    // Environment: entry count plus the first N bounded key=value entries.
+    match &projection.environment {
+        ProcessInsightFacetState::Pending => lines.push(collecting()),
+        ProcessInsightFacetState::Unavailable(reason) => {
+            lines.push(insight_unavailable(theme, reason))
+        }
+        ProcessInsightFacetState::Current(env) => {
+            lines.extend(environment_preview_lines(env, theme))
         }
     }
     lines
@@ -298,6 +350,7 @@ fn limit_value(limit: Option<LimitValue>, current: Option<u64>) -> String {
 const THREADS_PREVIEW: usize = 3;
 const OPEN_FILES_PREVIEW: usize = 3;
 const GPU_ENGINES_PREVIEW: usize = 3;
+const ENVIRONMENT_PREVIEW: usize = 3;
 
 /// Compact thread row: `tid  comm  state  cpu-time  cpu%`. Missing CPU time or
 /// percent render an explicit dash, never a fabricated `0.0` — the first
@@ -429,15 +482,104 @@ fn open_files_preview_lines(
     out
 }
 
-/// Compact per-engine line: `name usage%`. The current usage is a typed
-/// [`ScalarObservation`] — the cold-start first sample and any counter rollback
-/// are a typed gap, rendered as an explicit dash rather than a fabricated
-/// `0.0%`.
-fn format_engine_usage_line(name: &str, usage_pct: &ScalarObservation<f32>) -> String {
-    let usage = usage_pct
+/// Format one environment entry as `key=escaped_value`. Newlines and carriage returns
+/// are escaped to keep each entry on a single terminal row.
+fn format_env_entry(entry: &ProcessEnvironmentEntry) -> String {
+    let escaped = entry.value.replace('\r', "\\r").replace('\n', "\\n");
+    format!("{}={}", entry.key, escaped)
+}
+
+/// Bounded Environment-facet preview: the entry count, then the first
+/// [`ENVIRONMENT_PREVIEW`] `key=value` rows and an honest "…" when more
+/// remain or entries were dropped by the capture budget. An empty environment
+/// renders the explicit empty state.
+fn environment_preview_lines(
+    env: &ProcessEnvironment,
+    theme: TuiTheme,
+) -> Vec<ratatui::text::Line<'static>> {
+    let mut out = Vec::new();
+    if env.entries.is_empty() {
+        out.push(ratatui::text::Line::from(Span::styled(
+            format!("  {}", t("prop.environment_empty")),
+            Style::new().fg(theme.dim),
+        )));
+        return out;
+    }
+    out.push(ratatui::text::Line::from(format!(
+        "  {} {}",
+        t("prop.environment"),
+        env.entries.len()
+    )));
+    for entry in env.entries.iter().take(ENVIRONMENT_PREVIEW) {
+        out.push(ratatui::text::Line::from(format!(
+            "    {}",
+            format_env_entry(entry)
+        )));
+    }
+    if env.entries.len() > ENVIRONMENT_PREVIEW || env.truncated_count > 0 {
+        out.push(ratatui::text::Line::from(Span::styled(
+            "    …",
+            Style::new().fg(theme.dim),
+        )));
+    }
+    out
+}
+
+/// Compact GPU device line: `GPU #<id> <util> · VRAM in use <bytes>`.
+fn format_gpu_device_row(device: &ProcessGpuDevice) -> String {
+    let vram = device.memory_bytes.map_or_else(missing_value, bytes);
+    let util = device
+        .utilization_pct
+        .map_or_else(missing_value, |value| format!("{value:.1}%"));
+    format!(
+        "{} #{} {} · {} {}",
+        t("common.gpu"),
+        device.device_id,
+        util,
+        t("gpu.vram_in_use"),
+        vram,
+    )
+}
+
+/// Format one engine's cumulative busy time as seconds.
+fn format_engine_time(nanoseconds: u64) -> String {
+    let seconds = nanoseconds as f64 / 1_000_000_000.0;
+    format!("{seconds:.1}s")
+}
+
+/// Format a cumulative cycle counter (xe fdinfo) as a compact count.
+fn format_engine_cycles(cycles: u64) -> String {
+    if cycles >= 1_000_000_000 {
+        format!("{:.2}G cycles", cycles as f64 / 1_000_000_000.0)
+    } else if cycles >= 1_000_000 {
+        format!("{:.1}M cycles", cycles as f64 / 1_000_000.0)
+    } else {
+        format!("{cycles} cycles")
+    }
+}
+
+/// Compact per-engine line: `name  usage%  cumulative`. The current usage is a
+/// typed [`ScalarObservation`] — the cold-start first sample and any counter
+/// rollback are a typed gap, rendered as an explicit dash rather than a
+/// fabricated `0.0%`. Cumulative DRM busy time or cycles are shown when observed;
+/// if neither is present, it renders an explicit dash.
+fn format_engine_usage_line(engine: &ProcessGpuEngineUsage) -> String {
+    let usage = engine
+        .usage_pct
         .current_value()
         .map_or_else(missing_value, |value| format!("{value:.1}%"));
-    format!("{name} {usage}")
+    let cumulative = engine
+        .engine_time_ns
+        .current_value()
+        .map(|value| format_engine_time(*value))
+        .or_else(|| {
+            engine
+                .engine_cycles
+                .current_value()
+                .map(|value| format_engine_cycles(*value))
+        })
+        .unwrap_or_else(missing_value);
+    format!("{}  {usage}  {cumulative}", engine.name)
 }
 
 #[cfg(test)]

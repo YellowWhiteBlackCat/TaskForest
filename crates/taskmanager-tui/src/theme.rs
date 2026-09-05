@@ -11,9 +11,11 @@
 //! `Theme::detect(NativeAppearance)` and pass it to
 //! [`TuiTheme::from_theme`] — nothing else in the renderer changes.
 
+use taskmanager_core::core::appearance::DesktopAppearance;
 use taskmanager_theme::color::mix;
 use taskmanager_theme::{Color, HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 
+use crate::TuiApp;
 use crate::TuiTerminalProfile;
 
 /// Runtime-resolved theme construction parameters (ADR-026): the neutral
@@ -45,17 +47,38 @@ impl ThemeParams {
     /// long-standing default.
     #[must_use]
     pub fn from_config_tokens(skin: &str, mode: &str, hc: bool) -> Self {
+        Self::from_config_tokens_with_appearance(skin, mode, hc, None)
+    }
+
+    /// Parse the opaque config tokens with optional observed desktop
+    /// appearance facts from the platform runtime.
+    #[must_use]
+    pub fn from_config_tokens_with_appearance(
+        skin: &str,
+        mode: &str,
+        hc: bool,
+        appearance: Option<taskmanager_core::core::appearance::DesktopAppearance>,
+    ) -> Self {
         let skin = Skin::ALL
             .into_iter()
             .find(|candidate| candidate.label().eq_ignore_ascii_case(skin))
             .unwrap_or(Skin::Gnome);
         let mode = match mode {
+            "System" | "" => match appearance.map(|app| app.color_scheme) {
+                Some(taskmanager_core::core::appearance::PreferredColorScheme::Light) => {
+                    LightDark::Light
+                }
+                _ => LightDark::Dark,
+            },
             "Light" => LightDark::Light,
             "Dark" => LightDark::Dark,
             "EyeForest" => LightDark::EyeForest,
-            "System" | "" => LightDark::Dark,
             _ => LightDark::Dark,
         };
+        let hc = hc
+            || appearance
+                .and_then(|app| app.high_contrast)
+                .unwrap_or(false);
         Self { skin, mode, hc }
     }
 
@@ -196,6 +219,22 @@ impl TuiTheme {
 pub fn rgb(c: Color) -> ratatui::style::Color {
     let [r, g, b] = c.to_srgb8();
     ratatui::style::Color::Rgb(r, g, b)
+}
+
+impl TuiApp {
+    /// Apply one correlated native appearance snapshot to theme parameters.
+    pub fn apply_desktop_appearance(&mut self, appearance: DesktopAppearance) {
+        self.observed_appearance = Some(appearance);
+        let config = self.config_draft.clone();
+        if config.mode.eq_ignore_ascii_case("System") || config.mode.is_empty() {
+            self.theme_params = ThemeParams::from_config_tokens_with_appearance(
+                &config.skin,
+                &config.mode,
+                config.hc,
+                Some(appearance),
+            );
+        }
+    }
 }
 
 #[cfg(test)]

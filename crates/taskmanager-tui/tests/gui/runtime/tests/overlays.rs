@@ -177,3 +177,103 @@ fn local_overlay_toggles_are_mutually_exclusive_and_modal() {
     );
     assert!(!app.about_open());
 }
+
+#[test]
+fn health_overlay_navigates_and_toggles_alert_rules() {
+    let mut app = crate::demo_app();
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('h'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(app.health_open());
+    assert_eq!(app.health_rule_selection(), 0);
+
+    // Initial state: rule 0 ("cpu-high") is enabled.
+    assert!(app.projection().alert_center.managed_rules()[0].enabled);
+
+    // Space toggles the selected rule to disabled.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char(' '),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(!app.projection().alert_center.managed_rules()[0].enabled);
+
+    // Enter toggles it back to enabled.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Enter,
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(app.projection().alert_center.managed_rules()[0].enabled);
+
+    // Down arrow moves selection down.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(ratatui::crossterm::event::KeyCode::Down, KeyModifiers::NONE),
+    );
+    assert_eq!(app.health_rule_selection(), 1);
+
+    // 'j' also moves selection down.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('j'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert_eq!(app.health_rule_selection(), 2);
+
+    // 'k' moves selection up.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('k'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert_eq!(app.health_rule_selection(), 1);
+
+    // Up arrow moves selection up.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(ratatui::crossterm::event::KeyCode::Up, KeyModifiers::NONE),
+    );
+    assert_eq!(app.health_rule_selection(), 0);
+
+    // Clamping at top.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(ratatui::crossterm::event::KeyCode::Up, KeyModifiers::NONE),
+    );
+    assert_eq!(app.health_rule_selection(), 0);
+
+    // End moves to the last rule.
+    let count = app.projection().alert_center.managed_rules().len();
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(ratatui::crossterm::event::KeyCode::End, KeyModifiers::NONE),
+    );
+    assert_eq!(app.health_rule_selection(), count - 1);
+
+    // Home moves to the first rule.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(ratatui::crossterm::event::KeyCode::Home, KeyModifiers::NONE),
+    );
+    assert_eq!(app.health_rule_selection(), 0);
+
+    // Esc closes the health overlay.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(ratatui::crossterm::event::KeyCode::Esc, KeyModifiers::NONE),
+    );
+    assert!(!app.health_open());
+}

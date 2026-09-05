@@ -68,6 +68,7 @@ impl IcedApp {
             system_dashboard_window: taskmanager_core::core::history::HistoryWindow::OneHour,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(history_replay_client),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
+            window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
             local_surface: LocalSurfaceState::default(),
             process_presentation: super::process_presentation_state::ProcessPresentationState::new(
                 default_category_expansions(),
@@ -81,6 +82,9 @@ impl IcedApp {
                 crate::run::initial_window_size(),
             ),
             projection_caches: IcedProjectionCaches::default(),
+            a11y_bridge: crate::a11y::AppAccessibilityBridge::default(),
+            a11y_revision: 0,
+            a11y_snapshot: None,
         };
         // The boot observation is the dialog's trigger (GPUI parity): it is
         // submitted through the platform channel before the first frame, and
@@ -136,6 +140,7 @@ impl IcedApp {
             system_dashboard_window: taskmanager_core::core::history::HistoryWindow::OneHour,
             history_runtime: super::history_replay::IcedHistoryRuntime::new(None),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
+            window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
             local_surface: LocalSurfaceState::default(),
             process_presentation: super::process_presentation_state::ProcessPresentationState::new(
                 default_category_expansions(),
@@ -149,6 +154,9 @@ impl IcedApp {
                 crate::run::initial_window_size(),
             ),
             projection_caches: IcedProjectionCaches::default(),
+            a11y_bridge: crate::a11y::AppAccessibilityBridge::default(),
+            a11y_revision: 0,
+            a11y_snapshot: None,
         }
         // The demo keeps the shared shell fixture's single recorded snapshot
         // (G-02): the Performance chart renders the honest "collecting"

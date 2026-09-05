@@ -44,6 +44,10 @@ pub enum FocusTarget {
     ServicesSearch,
     /// A page-scoped retry action for a degraded inventory source.
     SourceRetry(RefreshRequest),
+    /// Authorize CPU package power readouts via the RAPL helper.
+    AuthorizeRaplPower,
+    /// Authorize CPU MSR readouts via the MSR helper.
+    AuthorizeMsrReadouts,
     /// The Applications end-task trigger.
     EndTask,
     /// The Applications open-file-location action (routed via platform port).
@@ -130,6 +134,8 @@ pub enum FocusTarget {
     AboutTrigger,
     /// The toolbar export trigger.
     Export,
+    /// The toolbar current window capture trigger.
+    WindowCapture,
     /// One service row lifecycle action (Start/Stop/Restart).
     ServiceAction {
         index: usize,
@@ -181,6 +187,20 @@ pub enum FocusTarget {
     DiskSmartOpen {
         index: usize,
     },
+    /// Run a short SMART self-test on the disk at index.
+    SmartSelfTestShort {
+        index: usize,
+    },
+    /// Run an extended SMART self-test on the disk at index.
+    SmartSelfTestExtended {
+        index: usize,
+    },
+    /// Confirm the pending SMART self-test.
+    ConfirmSmartSelfTest,
+    /// Cancel the pending SMART self-test.
+    CancelSmartSelfTest,
+    /// Toggle expansion of the GPU engines breakdown panel.
+    GpuEnginesExpandToggle,
     /// The conditional cancel action for a running directory-usage scan
     /// (rendered only while the selected disk's scan is Scanning).
     DirectoryUsageCancel,
@@ -230,6 +250,10 @@ pub enum FocusTarget {
     /// One managed alert-rule row toggle on the Alerts page (render-order
     /// focus position only; edits carry the canonical stable rule id).
     AlertsRuleToggle(usize),
+    /// Export alert rules action button on the Alerts page.
+    AlertsExport,
+    /// Import alert rules action button on the Alerts page.
+    AlertsImport,
     /// One first-run dialog descriptor copy stop (location / run command /
     /// revert command rows, indices 0..=2).
     FirstRunCopy(u8),
@@ -240,7 +264,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 142] = [
+    pub const ALL: [Self; 152] = [
         Self::ModalClose,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
@@ -259,6 +283,8 @@ impl FocusTarget {
         Self::SourceRetry(RefreshRequest::Services),
         Self::SourceRetry(RefreshRequest::Startup),
         Self::SourceRetry(RefreshRequest::Sessions),
+        Self::AuthorizeRaplPower,
+        Self::AuthorizeMsrReadouts,
         Self::EndTask,
         Self::OpenProcessLocation,
         Self::SearchProcessOnline,
@@ -302,6 +328,7 @@ impl FocusTarget {
         Self::HealthTrigger,
         Self::AboutTrigger,
         Self::Export,
+        Self::WindowCapture,
         Self::ServiceAction {
             index: 0,
             action: ServiceAction::Start,
@@ -345,6 +372,11 @@ impl FocusTarget {
         Self::ProcessStatusFilterTab(ProcessStatusFilter::Other),
         Self::DirectoryUsageScan,
         Self::DiskSmartOpen { index: 0 },
+        Self::SmartSelfTestShort { index: 0 },
+        Self::SmartSelfTestExtended { index: 0 },
+        Self::ConfirmSmartSelfTest,
+        Self::CancelSmartSelfTest,
+        Self::GpuEnginesExpandToggle,
         Self::DirectoryUsageCancel,
         Self::AboutCopyDetails,
         Self::GpuEngineRowsToggle,
@@ -377,6 +409,8 @@ impl FocusTarget {
         Self::RunTaskCancel,
         Self::AlertsPageTab,
         Self::AlertsRuleToggle(0),
+        Self::AlertsExport,
+        Self::AlertsImport,
         Self::FirstRunCopy(0),
         Self::FirstRunCopy(1),
         Self::FirstRunCopy(2),
