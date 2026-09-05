@@ -154,7 +154,7 @@ pub(super) fn render_process_properties_at(
         }
         ProcessDetailsSection::Command => command_lines(&target.item, &app.local_time_rules, theme),
         ProcessDetailsSection::Insights => {
-            super::process_details::insights_lines(app, theme, target.item.pid)
+            super::process_details::modal_insights_lines(app, theme, target.item.pid)
         }
     };
     // Short-terminal scroll: a tab body can exceed the modal's bounded body

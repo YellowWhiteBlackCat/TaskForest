@@ -12,8 +12,10 @@
 #![allow(dead_code)]
 
 use std::fmt;
+use std::sync::Mutex;
 use std::sync::mpsc::{Receiver, channel};
 
+use bevy::ecs::resource::Resource;
 use taskmanager_assets::{PRODUCT_TRAY_ICON_SIZE, product, product_tray_icon_rgba};
 use taskmanager_core::core::tray::{
     TrayActionId, TrayEvent, TrayIconData, TrayIconError, TrayMenuItem, TrayMenuSpec, TraySpec,
@@ -143,10 +145,10 @@ pub fn sync_tray_pause_checkmark<T: TrayControllerTarget + ?Sized>(target: &T, p
 ///
 /// Owns the active native tray controller handle and the receiver for
 /// incoming user interactions (menu clicks, icon activations).
-#[derive(Default)]
+#[derive(Default, Resource)]
 pub struct TrayResource {
     pub controller: Option<Box<dyn TrayController>>,
-    pub events_rx: Option<Receiver<TrayEvent>>,
+    pub events_rx: Option<Mutex<Receiver<TrayEvent>>>,
 }
 
 impl fmt::Debug for TrayResource {
@@ -165,7 +167,7 @@ impl TrayResource {
     ) -> Self {
         Self {
             controller,
-            events_rx,
+            events_rx: events_rx.map(Mutex::new),
         }
     }
 
@@ -212,8 +214,10 @@ pub fn spawn_tray_host(
 pub fn drain_tray_events(tray: &mut TrayResource) -> Vec<TrayEvent> {
     let mut events = Vec::new();
     if let Some(rx) = tray.events_rx.as_ref() {
-        while let Ok(event) = rx.try_recv() {
-            events.push(event);
+        if let Ok(rx) = rx.lock() {
+            while let Ok(event) = rx.try_recv() {
+                events.push(event);
+            }
         }
     }
     events

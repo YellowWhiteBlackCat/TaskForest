@@ -132,6 +132,23 @@ pub(crate) fn run_demo(shared: &'static SharedRuntime) -> ExitCode {
 }
 
 fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
+    let _instance_guard = if !demo {
+        let (tx, _rx) = std::sync::mpsc::channel();
+        match taskmanager_app_host::acquire_single_instance(product::BEVY_NAME, tx) {
+            Ok(taskmanager_platform_contract::InstanceRole::Primary(guard)) => Some(guard),
+            Ok(taskmanager_platform_contract::InstanceRole::Secondary) => {
+                eprintln!("taskforest-b: already running, waking existing instance");
+                return ExitCode::SUCCESS;
+            }
+            Err(failure) => {
+                eprintln!("taskforest-b: cannot acquire single-instance lock: {failure:?}");
+                None
+            }
+        }
+    } else {
+        None
+    };
+
     // Production keeps the cold-start dark theme until the native appearance
     // seam arrives. Capture uses the light reference skin so the visual gate
     // compares the actual product structure and typography, not a fixture-only
@@ -156,11 +173,11 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
             title: product::BEVY_NAME.to_owned(),
             name: Some(product::BEVY_APP_ID.to_owned()),
             resolution: capture_window_resolution(),
-            // Borderless content, GPUI's chrome grammar: the navigation strip
-            // is the window's top product surface and the compositor owns the
-            // frame. A server title bar would paint a second identity layer
-            // the other frontends do not carry.
-            decorations: false,
+            // Under visual capture, keep borderless content so pixel receipts match
+            // reference frames without compositor window borders; under normal
+            // desktop launches, follow the repo-wide SSD direction (decorations: true)
+            // so the window has native titlebar, dragging, and minimize/close controls.
+            decorations: std::env::var_os("TASKFOREST_CAPTURE_SCENARIO").is_none(),
             ..Window::default()
         }),
         ..WindowPlugin::default()
@@ -176,6 +193,10 @@ fn run_with_mode(shared: &'static SharedRuntime, demo: bool) -> ExitCode {
             PreUpdate,
             crate::pages::history::drain_history_system.before(crate::drain::drain_system),
         );
+        let (tray_controller, tray_rx) = crate::tray::spawn_tray_host(false);
+        app.insert_resource(crate::tray::TrayResource::new(tray_controller, tray_rx));
+    } else {
+        app.insert_resource(crate::tray::TrayResource::empty());
     }
     if let Some(page) = capture_page() {
         app.insert_resource(Route { page });

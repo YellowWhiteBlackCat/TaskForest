@@ -24,7 +24,7 @@ use taskmanager_shell::SortCol;
 use taskmanager_shell::presentation::{MISSING_VALUE, bytes, missing_value};
 
 mod insights;
-pub(crate) use insights::{insights_lines, network_requires_escalation};
+pub(crate) use insights::{insights_lines, modal_insights_lines, network_requires_escalation};
 
 /// Clamp a stored vertical-scroll intent to the valid viewport range so the
 /// rendered content never scrolls past the last line. `content_lines` is the

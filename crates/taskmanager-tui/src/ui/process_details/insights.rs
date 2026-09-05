@@ -52,6 +52,26 @@ pub(crate) fn insights_lines(
     theme: TuiTheme,
     pid: u32,
 ) -> Vec<ratatui::text::Line<'static>> {
+    insights_lines_with_limit(app, theme, pid, THREADS_PREVIEW)
+}
+
+/// Rich process-insights representation for the dedicated Process Properties
+/// modal: renders up to 64 rows per facet with scroll navigation rather than
+/// the compact 3-row limit of the fixed inline bottom panel.
+pub(crate) fn modal_insights_lines(
+    app: &crate::TuiApp,
+    theme: TuiTheme,
+    pid: u32,
+) -> Vec<ratatui::text::Line<'static>> {
+    insights_lines_with_limit(app, theme, pid, 64)
+}
+
+pub(crate) fn insights_lines_with_limit(
+    app: &crate::TuiApp,
+    theme: TuiTheme,
+    pid: u32,
+    limit: usize,
+) -> Vec<ratatui::text::Line<'static>> {
     use taskmanager_application::ProcessInsightFacetState;
     let collecting = || {
         ratatui::text::Line::from(Span::styled(
@@ -70,7 +90,7 @@ pub(crate) fn insights_lines(
         t("prop.insights"),
         Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
     )));
-    // Network connections: count plus the first three endpoints. An
+    // Network connections: count plus bounded endpoint list. An
     // escalation-requiring capture renders the typed reason line plus the
     // `e` trigger hint (G-04b) — never the Debug formatting of the reason.
     match &projection.network {
@@ -109,7 +129,7 @@ pub(crate) fn insights_lines(
                 t("proc_insights.connections"),
                 snapshot.connections.len()
             )));
-            for connection in snapshot.connections.iter().take(3) {
+            for connection in snapshot.connections.iter().take(limit) {
                 lines.push(ratatui::text::Line::from(format!(
                     "    {} {} -> {}",
                     transport_text(&connection.transport),
@@ -117,7 +137,7 @@ pub(crate) fn insights_lines(
                     endpoint_text(&connection.remote),
                 )));
             }
-            if snapshot.connections.len() > 3 {
+            if snapshot.connections.len() > limit {
                 lines.push(ratatui::text::Line::from(Span::styled(
                     "    …",
                     Style::new().fg(theme.dim),
@@ -132,13 +152,13 @@ pub(crate) fn insights_lines(
             lines.push(insight_unavailable(theme, reason))
         }
         ProcessInsightFacetState::Current(snapshot) => {
-            for device in snapshot.devices.iter().take(2) {
+            for device in snapshot.devices.iter().take(limit.max(2)) {
                 lines.push(ratatui::text::Line::from(format!(
                     "  {}",
                     format_gpu_device_row(device)
                 )));
             }
-            if snapshot.devices.len() > 2 {
+            if snapshot.devices.len() > limit.max(2) {
                 lines.push(ratatui::text::Line::from(Span::styled(
                     "  …",
                     Style::new().fg(theme.dim),
@@ -147,13 +167,13 @@ pub(crate) fn insights_lines(
             // Per-engine breakdown (drm-engine fdinfo, deeper-indented under
             // the device rollup): name + current usage_pct + cumulative time/cycles.
             // An empty engine list renders nothing fabricated — a live, non-GPU process.
-            for engine in snapshot.engines.engines.iter().take(GPU_ENGINES_PREVIEW) {
+            for engine in snapshot.engines.engines.iter().take(limit) {
                 lines.push(ratatui::text::Line::from(format!(
                     "    {}",
                     format_engine_usage_line(engine)
                 )));
             }
-            if snapshot.engines.engines.len() > GPU_ENGINES_PREVIEW {
+            if snapshot.engines.engines.len() > limit {
                 lines.push(ratatui::text::Line::from(Span::styled(
                     "    …",
                     Style::new().fg(theme.dim),
@@ -247,7 +267,7 @@ pub(crate) fn insights_lines(
             lines.push(insight_unavailable(theme, reason))
         }
         ProcessInsightFacetState::Current(threads) => {
-            lines.extend(thread_preview_lines(threads, theme))
+            lines.extend(thread_preview_lines_with_limit(threads, theme, limit))
         }
     }
     // Open files: entry count (+ unreadable marker) plus the first N descriptors.
@@ -257,7 +277,7 @@ pub(crate) fn insights_lines(
             lines.push(insight_unavailable(theme, reason))
         }
         ProcessInsightFacetState::Current(open_files) => {
-            lines.extend(open_files_preview_lines(open_files, theme))
+            lines.extend(open_files_preview_lines_with_limit(open_files, theme, limit))
         }
     }
     // Environment: entry count plus the first N bounded key=value entries.
@@ -267,7 +287,7 @@ pub(crate) fn insights_lines(
             lines.push(insight_unavailable(theme, reason))
         }
         ProcessInsightFacetState::Current(env) => {
-            lines.extend(environment_preview_lines(env, theme))
+            lines.extend(environment_preview_lines_with_limit(env, theme, limit))
         }
     }
     lines
@@ -348,8 +368,11 @@ fn limit_value(limit: Option<LimitValue>, current: Option<u64>) -> String {
 /// an honest "…" when more remain — the same shape the connections and device
 /// previews already use.
 const THREADS_PREVIEW: usize = 3;
+#[allow(dead_code)]
 const OPEN_FILES_PREVIEW: usize = 3;
+#[allow(dead_code)]
 const GPU_ENGINES_PREVIEW: usize = 3;
+#[allow(dead_code)]
 const ENVIRONMENT_PREVIEW: usize = 3;
 
 /// Compact thread row: `tid  comm  state  cpu-time  cpu%`. Missing CPU time or
@@ -382,9 +405,18 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
 /// Bounded Threads-facet preview: a count title, a compact column header, the
 /// first [`THREADS_PREVIEW`] rows, and an honest "…" when more remain. An empty
 /// thread list renders the explicit empty state, never a fabricated row.
+#[cfg_attr(not(test), allow(dead_code))]
 fn thread_preview_lines(
     threads: &ProcessThreads,
     theme: TuiTheme,
+) -> Vec<ratatui::text::Line<'static>> {
+    thread_preview_lines_with_limit(threads, theme, THREADS_PREVIEW)
+}
+
+fn thread_preview_lines_with_limit(
+    threads: &ProcessThreads,
+    theme: TuiTheme,
+    limit: usize,
 ) -> Vec<ratatui::text::Line<'static>> {
     let mut out = Vec::new();
     if threads.threads.is_empty() {
@@ -407,13 +439,13 @@ fn thread_preview_lines(
         ),
         Style::new().fg(theme.dim),
     )));
-    for thread in threads.threads.iter().take(THREADS_PREVIEW) {
+    for thread in threads.threads.iter().take(limit) {
         out.push(ratatui::text::Line::from(format!(
             "    {}",
             format_thread_row(thread)
         )));
     }
-    if threads.threads.len() > THREADS_PREVIEW {
+    if threads.threads.len() > limit {
         out.push(ratatui::text::Line::from(Span::styled(
             "    …",
             Style::new().fg(theme.dim),
@@ -433,14 +465,21 @@ fn format_open_file_row(entry: &OpenFileEntry, unreadable: &str) -> String {
     format!("{} → {}", entry.fd, target)
 }
 
-/// Bounded Open-files-facet preview: the entry count (plus an "N unreadable"
-/// marker when readlink failed for any descriptor), then the first
-/// [`OPEN_FILES_PREVIEW`] `fd → target` rows and an honest "…" when more
-/// remain. A healthy process with no readable descriptors renders the explicit
-/// empty state.
+#[cfg_attr(not(test), allow(dead_code))]
 fn open_files_preview_lines(
     open_files: &ProcessOpenFiles,
     theme: TuiTheme,
+) -> Vec<ratatui::text::Line<'static>> {
+    open_files_preview_lines_with_limit(open_files, theme, OPEN_FILES_PREVIEW)
+}
+
+/// Bounded Open-files-facet preview: the entry count (plus an "N unreadable"
+/// marker when readlink failed for any descriptor), then the first
+/// `limit` `fd → target` rows and an honest "…" when more remain.
+fn open_files_preview_lines_with_limit(
+    open_files: &ProcessOpenFiles,
+    theme: TuiTheme,
+    limit: usize,
 ) -> Vec<ratatui::text::Line<'static>> {
     let unreadable_label = t("proc_insights.unreadable");
     let mut out = Vec::new();
@@ -467,13 +506,13 @@ fn open_files_preview_lines(
         )
     };
     out.push(ratatui::text::Line::from(header));
-    for entry in open_files.entries.iter().take(OPEN_FILES_PREVIEW) {
+    for entry in open_files.entries.iter().take(limit) {
         out.push(ratatui::text::Line::from(format!(
             "    {}",
             format_open_file_row(entry, unreadable_label)
         )));
     }
-    if open_files.entries.len() > OPEN_FILES_PREVIEW {
+    if open_files.entries.len() > limit {
         out.push(ratatui::text::Line::from(Span::styled(
             "    …",
             Style::new().fg(theme.dim),
@@ -489,13 +528,20 @@ fn format_env_entry(entry: &ProcessEnvironmentEntry) -> String {
     format!("{}={}", entry.key, escaped)
 }
 
-/// Bounded Environment-facet preview: the entry count, then the first
-/// [`ENVIRONMENT_PREVIEW`] `key=value` rows and an honest "…" when more
-/// remain or entries were dropped by the capture budget. An empty environment
-/// renders the explicit empty state.
+#[cfg_attr(not(test), allow(dead_code))]
 fn environment_preview_lines(
     env: &ProcessEnvironment,
     theme: TuiTheme,
+) -> Vec<ratatui::text::Line<'static>> {
+    environment_preview_lines_with_limit(env, theme, ENVIRONMENT_PREVIEW)
+}
+
+/// Bounded Environment-facet preview: the entry count, then the first
+/// `limit` `key=value` rows and an honest "…" when more remain.
+fn environment_preview_lines_with_limit(
+    env: &ProcessEnvironment,
+    theme: TuiTheme,
+    limit: usize,
 ) -> Vec<ratatui::text::Line<'static>> {
     let mut out = Vec::new();
     if env.entries.is_empty() {
@@ -510,13 +556,13 @@ fn environment_preview_lines(
         t("prop.environment"),
         env.entries.len()
     )));
-    for entry in env.entries.iter().take(ENVIRONMENT_PREVIEW) {
+    for entry in env.entries.iter().take(limit) {
         out.push(ratatui::text::Line::from(format!(
             "    {}",
             format_env_entry(entry)
         )));
     }
-    if env.entries.len() > ENVIRONMENT_PREVIEW || env.truncated_count > 0 {
+    if env.entries.len() > limit || env.truncated_count > 0 {
         out.push(ratatui::text::Line::from(Span::styled(
             "    …",
             Style::new().fg(theme.dim),

@@ -16,10 +16,10 @@
 -->
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
-  <Package Name="TaskForest"
+  <Package Name="$(var.ProductName)"
            Manufacturer="TaskForest contributors"
            Version="$(var.ProductVersion)"
-           UpgradeCode="2C676326-A218-46D4-A591-39FB02798F3A"
+           UpgradeCode="$(var.UpgradeCode)"
            Scope="perMachine"
            Compressed="yes"
            Language="1033"
@@ -28,8 +28,8 @@
          the full Cargo version (prerelease rcN included) is carried in the
          summary metadata, the ARP comments, and the Software\TaskForest
          Version registry value below. -->
-    <SummaryInformation Description="TaskForest $(var.FullVersion) — eye-friendly native system monitor built with GPUI" />
-    <Property Id="ARPCOMMENTS" Value="TaskForest $(var.FullVersion) — eye-friendly native system monitor (GPUI)" />
+    <SummaryInformation Description="$(var.ProductName) $(var.FullVersion) — eye-friendly native system monitor" />
+    <Property Id="ARPCOMMENTS" Value="$(var.ProductName) $(var.FullVersion) — eye-friendly native system monitor" />
     <MajorUpgrade AllowSameVersionUpgrades="yes"
                   DowngradeErrorMessage="A newer version of TaskForest is already installed." />
     <MediaTemplate EmbedCab="yes" />
@@ -38,8 +38,8 @@
 
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="TaskForest">
-        <Component Id="TaskForestGExecutable" Guid="64F61D3A-68C5-46CB-B8E0-3BAB0639CAFE">
-          <File Id="TaskForestGExe" Source="$(var.StageDir)/taskforest-g.exe" KeyPath="yes" />
+        <Component Id="TaskForestExecutable" Guid="$(var.ComponentGuid)">
+          <File Id="TaskForestExe" Source="$(var.StageDir)/$(var.ExeName)" KeyPath="yes" />
         </Component>
         <Component Id="TaskForestProcessControlHelper" Guid="8D2D0F43-CB9A-4B2E-8A45-5DF8F6C56E1B">
           <File Id="TaskForestProcessControlHelperExe"
@@ -58,10 +58,10 @@
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ShortcutFolder" Name="TaskForest">
         <Component Id="StartMenuShortcut" Guid="67C87331-4F2F-4846-8681-7D86C731BA54">
-          <Shortcut Id="TaskForestGShortcut"
-                    Name="TaskForestG"
-                    Description="Eye-friendly native system monitor (GPUI)"
-                    Target="[INSTALLFOLDER]taskforest-g.exe"
+          <Shortcut Id="TaskForestShortcut"
+                    Name="$(var.ShortcutName)"
+                    Description="Eye-friendly native system monitor"
+                    Target="[INSTALLFOLDER]$(var.ExeName)"
                     Icon="TaskForest.ico"
                     WorkingDirectory="INSTALLFOLDER" />
           <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />

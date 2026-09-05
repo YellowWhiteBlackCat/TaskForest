@@ -1,5 +1,6 @@
 //! Behavior tests for the Bevy selected-process details projection.
 
+use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::ProcessDetailsField;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
@@ -114,10 +115,11 @@ fn resources_summary_exposes_memory_cpu_pids_and_cgroup_locator() {
     );
 
     let summary = super::resources_summary(&snapshot);
-    assert_eq!(
-        summary,
-        "256.0 MiB / 1.0 GiB · CPU 150% · 7 / 64 Processes · /system.slice/worker.scope"
+    let expected = format!(
+        "256.0 MiB / 1.0 GiB · CPU 150% · 7 / 64 {} · /system.slice/worker.scope",
+        t("proc_insights.pids")
     );
+    assert_eq!(summary, expected);
 }
 
 #[test]
@@ -143,7 +145,8 @@ fn resources_summary_handles_unlimited_quotas_and_limits() {
     );
 
     let summary = super::resources_summary(&snapshot);
-    assert_eq!(summary, "512.0 MiB / ∞ · CPU ∞ · 3 / ∞ Processes");
+    let expected = format!("512.0 MiB / ∞ · CPU ∞ · 3 / ∞ {}", t("proc_insights.pids"));
+    assert_eq!(summary, expected);
 }
 
 #[test]
@@ -166,13 +169,18 @@ fn resources_summary_partial_observations_never_fabricate_missing_values() {
     );
 
     let summary = super::resources_summary(&snapshot);
-    assert_eq!(summary, "12 Processes");
+    let expected = format!("12 {}", t("proc_insights.pids"));
+    assert_eq!(summary, expected);
 }
 
 #[test]
 fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
+
+    let host_process = t("proc_insights.host_process");
+    let not_sandboxed = "not sandboxed";
+    let sandboxed = t("proc_insights.sandboxed");
 
     // Host process without sandboxed fact
     let host = ProcessIsolation {
@@ -181,7 +189,7 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         container_id: None,
         sandboxed: None,
     };
-    assert_eq!(super::isolation_summary(&host), "Host process");
+    assert_eq!(super::isolation_summary(&host), host_process);
 
     // Host process explicitly not sandboxed
     let host_not_sandboxed = ProcessIsolation {
@@ -192,7 +200,7 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
     };
     assert_eq!(
         super::isolation_summary(&host_not_sandboxed),
-        "Host process · not sandboxed"
+        format!("{host_process} · {not_sandboxed}")
     );
 
     // Host process sandboxed
@@ -204,7 +212,7 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
     };
     assert_eq!(
         super::isolation_summary(&host_sandboxed),
-        "Host process · Sandboxed"
+        format!("{host_process} · {sandboxed}")
     );
 
     // Container with container ID and sandboxed true
@@ -216,7 +224,7 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
     };
     assert_eq!(
         super::isolation_summary(&docker_sandboxed),
-        "Docker · c-abcdef123 · Sandboxed"
+        format!("Docker · c-abcdef123 · {sandboxed}")
     );
 
     // Container with container ID and sandboxed false
