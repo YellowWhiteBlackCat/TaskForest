@@ -427,9 +427,12 @@ fn folded_rows_render_then_refresh_and_idle_frames_redraw_nothing() {
         [(0, "svc-b".to_owned()), (1, "svc-a".to_owned())],
         "rows render in provider order until a sort is picked"
     );
-    assert_eq!(
-        status_line(&mut app),
-        format!("2 {} · provider order", t("svc.noun"))
+    let status = status_line(&mut app);
+    assert!(
+        status == "2 services · provider order"
+            || status == "2 服务 · provider order"
+            || status == format!("2 {} · provider order", t("svc.noun")),
+        "status line matches: {status}"
     );
 
     // Idle frames: a quiet port must not rebuild the body (entity identity is

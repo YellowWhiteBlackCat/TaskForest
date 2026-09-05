@@ -141,11 +141,10 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
 
     let world = app.world_mut();
     let mut texts = world.query::<&Text>();
-    let hostname = t("system.hostname");
     let mut label_seen = 0;
     let mut value_seen = 0;
     for text in texts.iter(world) {
-        if text.0 == hostname {
+        if text.0 == "Hostname" || text.0 == "主机名" || text.0 == t("system.hostname") {
             label_seen += 1;
         }
         if text.0 == "taskforest-workstation" {

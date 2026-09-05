@@ -221,6 +221,7 @@ fn minimal_snapshot() -> SystemSnapshot {
         uptime_secs: 0,
         processes: 0,
         threads: None,
+        pressure: None,
     }
 }
 

@@ -296,6 +296,11 @@ pub(super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
 pub(super) fn curve_wanted(shell: &ShellApp, curve: SystemCurve) -> bool {
     match curve {
         SystemCurve::Gpu => gpu_devices(shell).is_some_and(|devices| !devices.is_empty()),
+        SystemCurve::Npu => shell
+            .projection()
+            .npu_inventory
+            .as_ref()
+            .is_some_and(|inv| !inv.devices.is_empty()),
         _ => true,
     }
 }

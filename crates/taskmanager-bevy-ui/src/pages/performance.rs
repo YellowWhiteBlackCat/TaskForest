@@ -325,11 +325,18 @@ pub(crate) enum SystemCurve {
     Memory,
     Network,
     Gpu,
+    Npu,
 }
 
 impl SystemCurve {
-    /// The strip order; the GPU card is always spawned but display-gated.
-    pub(crate) const STRIP: [Self; 4] = [Self::Cpu, Self::Memory, Self::Network, Self::Gpu];
+    /// The strip order; the GPU and NPU cards are always spawned but display-gated.
+    pub(crate) const STRIP: [Self; 5] = [
+        Self::Cpu,
+        Self::Memory,
+        Self::Network,
+        Self::Gpu,
+        Self::Npu,
+    ];
 
     fn series(self) -> TrendSeries {
         match self {
@@ -337,6 +344,7 @@ impl SystemCurve {
             Self::Memory => TrendSeries::MemoryUsagePercent,
             Self::Network => TrendSeries::NetworkBytesPerSec,
             Self::Gpu => TrendSeries::GpuUsagePercent,
+            Self::Npu => TrendSeries::NpuUsagePercent,
         }
     }
 
@@ -346,6 +354,7 @@ impl SystemCurve {
             Self::Memory => t("common.memory"),
             Self::Network => t("perf.system_network_throughput"),
             Self::Gpu => t("perf.system_gpu_utilization"),
+            Self::Npu => "NPU",
         }
         .to_owned()
     }
@@ -362,7 +371,7 @@ impl SystemCurve {
     /// Bar ink per curve, from the palette only (never a literal).
     fn color(self, palette: &UiPalette) -> bevy::color::Color {
         match self {
-            Self::Cpu | Self::Gpu => palette.accent,
+            Self::Cpu | Self::Gpu | Self::Npu => palette.accent,
             Self::Memory => palette.body_color,
             Self::Network => palette.dim_color,
         }
@@ -377,6 +386,7 @@ pub(crate) fn curve_selector_label(curve: SystemCurve) -> String {
         SystemCurve::Memory => t("common.memory"),
         SystemCurve::Network => t("sidebar.network"),
         SystemCurve::Gpu => t("common.gpu"),
+        SystemCurve::Npu => "NPU",
     }
     .to_owned()
 }

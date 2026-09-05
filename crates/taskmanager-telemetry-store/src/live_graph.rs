@@ -47,6 +47,7 @@ pub enum DeviceDomain {
     Storage,
     Network,
     Gpu,
+    Npu,
 }
 
 /// The resolution domain every [`MetricSeries`] declares for itself. The
@@ -83,13 +84,15 @@ pub enum MetricSeries {
     /// series is device-only by scope: the store observes per-device facts
     /// and fabricates no host aggregate for them.
     DiskActiveTimePct,
+    /// Aggregate or per-device NPU compute utilization percentage.
+    NpuUsagePercent,
 }
 
 impl MetricSeries {
     /// Every series exactly once, in the canonical order that backs
     /// [`Self::slot`]. A new variant must extend this array; the slot
     /// round-trip test keeps enum and array in lockstep.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::CpuUsagePercent,
         Self::MemoryUsagePercent,
         Self::DiskBytesPerSec,
@@ -99,6 +102,7 @@ impl MetricSeries {
         Self::CpuFrequencyMhz,
         Self::CpuPowerW,
         Self::DiskActiveTimePct,
+        Self::NpuUsagePercent,
     ];
 
     /// The resolution domain this series can be read from; see
@@ -115,6 +119,7 @@ impl MetricSeries {
             Self::DiskBytesPerSec => SeriesScope::HostAndDevice(DeviceDomain::Storage),
             Self::NetworkBytesPerSec => SeriesScope::HostAndDevice(DeviceDomain::Network),
             Self::GpuUsagePercent => SeriesScope::HostAndDevice(DeviceDomain::Gpu),
+            Self::NpuUsagePercent => SeriesScope::HostAndDevice(DeviceDomain::Npu),
         }
     }
 
@@ -327,7 +332,8 @@ impl LiveGraphHistory {
                 | MetricSeries::CpuPowerW,
                 Some(_),
             )
-            | (MetricSeries::DiskActiveTimePct, None) => Vec::new(),
+            | (MetricSeries::DiskActiveTimePct, None)
+            | (MetricSeries::NpuUsagePercent, _) => Vec::new(),
         }
     }
 
