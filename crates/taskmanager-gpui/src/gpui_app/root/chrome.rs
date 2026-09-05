@@ -623,6 +623,8 @@ fn process_insights_labels() -> ProcessInsightsLabels {
         thread_state: i18n::t("common.status"),
         thread_cpu_time: i18n::t("proc_insights.thread_cpu_time"),
         thread_cpu_percent: i18n::t("proc_insights.thread_cpu_percent"),
+        environment: i18n::t("prop.environment"),
+        no_environment: i18n::t("prop.environment_empty"),
         yes: i18n::t("common.yes"),
         no: i18n::t("common.no"),
         unknown: i18n::t("proc_insights.unknown"),

@@ -240,3 +240,118 @@ async fn page_navigation_closes_help_and_pending_confirmations(cx: &mut TestAppC
         "a page chord must dismiss the pending confirmation and navigate"
     );
 }
+
+#[gpui::test]
+async fn f9_toggles_sidebar_visibility(cx: &mut TestAppContext) {
+    let win = root(cx);
+    assert!(
+        win.read_with(cx, |view, _cx| view.sidebar_visible).unwrap(),
+        "sidebar starts visible"
+    );
+
+    cx.dispatch_keystroke(win.into(), Keystroke::parse("f9").unwrap());
+    assert!(
+        !win.read_with(cx, |view, _cx| view.sidebar_visible).unwrap(),
+        "F9 must toggle sidebar visibility off"
+    );
+
+    cx.dispatch_keystroke(win.into(), Keystroke::parse("f9").unwrap());
+    assert!(
+        win.read_with(cx, |view, _cx| view.sidebar_visible).unwrap(),
+        "a second F9 must toggle sidebar visibility back on"
+    );
+}
+
+#[gpui::test]
+async fn ctrl_space_toggles_telemetry_pause(cx: &mut TestAppContext) {
+    let win = root(cx);
+    assert!(
+        !win.read_with(cx, |view, _cx| view
+            .telemetry_refresh_policy
+            .is_manually_paused())
+            .unwrap(),
+        "telemetry starts unpaused"
+    );
+
+    cx.dispatch_keystroke(win.into(), Keystroke::parse("ctrl-space").unwrap());
+    assert!(
+        win.read_with(cx, |view, _cx| view
+            .telemetry_refresh_policy
+            .is_manually_paused())
+            .unwrap(),
+        "Ctrl+Space must pause telemetry collection"
+    );
+
+    cx.dispatch_keystroke(win.into(), Keystroke::parse("ctrl-space").unwrap());
+    assert!(
+        !win.read_with(cx, |view, _cx| view
+            .telemetry_refresh_policy
+            .is_manually_paused())
+            .unwrap(),
+        "a second Ctrl+Space must unpause telemetry collection"
+    );
+}
+
+#[gpui::test]
+async fn alt_digits_navigate_pages(cx: &mut TestAppContext) {
+    let win = root(cx);
+    let cases = [
+        ("alt-1", TopPage::Performance),
+        ("alt-4", TopPage::System),
+        ("alt-6", TopPage::Users),
+        ("alt-7", TopPage::AppHistory),
+        ("alt-2", TopPage::Apps),
+    ];
+    for (shortcut, expected) in cases {
+        cx.dispatch_keystroke(win.into(), Keystroke::parse(shortcut).unwrap());
+        assert_eq!(
+            win.read_with(cx, |view, _cx| view.page).unwrap(),
+            expected,
+            "{shortcut} must navigate to {expected:?}"
+        );
+    }
+}
+
+#[gpui::test]
+async fn escape_dismisses_confirmation_modal(cx: &mut TestAppContext) {
+    let win = root(cx);
+    win.update(cx, |view, _window, cx| {
+        view.replace_processes_for_test(vec![
+            taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
+                taskmanager_core::core::process::ProcessItem::default(),
+            )
+            .pid(42)
+            .name("target".into())
+            .scalar_observations(taskmanager_core::core::process::ProcessScalarObservations {
+                start_token: taskmanager_core::core::ScalarObservation::available(4_200, 1),
+                ..Default::default()
+            })
+            .build(),
+        ]);
+        view.request_end_task_confirmation(
+            ProcessLiveKey::from_parts(42, 4_200).expect("fixture identity"),
+        );
+        assert!(view.pending_confirmation().is_some());
+        cx.notify();
+    })
+    .unwrap();
+
+    cx.dispatch_keystroke(win.into(), Keystroke::parse("escape").unwrap());
+    assert!(
+        win.read_with(cx, |view, _cx| view.pending_confirmation().is_none())
+            .unwrap(),
+        "Escape must dismiss the pending confirmation"
+    );
+}
+
+#[gpui::test]
+async fn f5_refreshes_processes_without_panic(cx: &mut TestAppContext) {
+    let win = root(cx);
+    cx.dispatch_keystroke(win.into(), Keystroke::parse("f5").unwrap());
+    cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+        .unwrap();
+    assert!(
+        win.read_with(cx, |view, _cx| !view.telemetry_frame_state.is_collecting())
+            .unwrap()
+    );
+}
