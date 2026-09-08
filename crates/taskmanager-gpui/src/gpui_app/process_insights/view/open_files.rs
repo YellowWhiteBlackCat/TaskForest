@@ -25,14 +25,23 @@ use taskmanager_theme::tokens;
 use super::ProcessInsightsLabels;
 use crate::gpui_app::theme::mono_font_with_fallback;
 
-/// Render one descriptor as `fd  target`, with the target falling back to the
-/// typed "unreadable" marker when procfs could not resolve the symlink.
+/// Render one descriptor as `fd [kind]  target`, with the target falling back
+/// to the typed "unreadable" marker when procfs could not resolve the symlink.
 fn format_open_file(entry: &OpenFileEntry, unreadable: &str) -> String {
     let target = entry
         .target
         .clone()
         .unwrap_or_else(|| unreadable.to_string());
-    format!("{}  {}", entry.fd, target)
+    if entry.deleted {
+        format!(
+            "{} [{}]  {} [deleted]",
+            entry.fd,
+            entry.resolved_kind(),
+            target
+        )
+    } else {
+        format!("{} [{}]  {}", entry.fd, entry.resolved_kind(), target)
+    }
 }
 
 /// The open-files card. Surfaces the per-process descriptor list or an explicit

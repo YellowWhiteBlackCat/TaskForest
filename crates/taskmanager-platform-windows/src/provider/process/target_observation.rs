@@ -287,6 +287,7 @@ impl ProcessNetworkProvider for WinProcessNetworkProvider {
                     remote,
                     state,
                     provider_key: None,
+                    rtt_ms: None,
                 });
             }
 
@@ -301,6 +302,7 @@ impl ProcessNetworkProvider for WinProcessNetworkProvider {
                 },
                 traffic_failure: Some(FailureKind::Unsupported),
                 traffic_provider: None,
+                connection_counters: None,
             };
 
             validate_process_target_after(target, expected)?;
@@ -368,6 +370,17 @@ impl ProcessIsolationProvider for WinProcessIsolationProvider {
                 kind,
                 container_id: None,
                 sandboxed,
+                seccomp_mode: None,
+                no_new_privs: None,
+                child_subreaper: None,
+                security_profile: None,
+                yama_ptrace_scope: None,
+                capabilities: None,
+                namespaces: None,
+                root_uid_host: None,
+                rootfs_read_only: None,
+                sandbox_confinement: None,
+                sandbox_permissions: Vec::new(),
             };
 
             Ok(ProcessInsightSnapshot {

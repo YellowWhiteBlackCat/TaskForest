@@ -10,15 +10,21 @@
 //! (which rows exist, their cell text) stays owned by the page + shell —
 //! this layer only renders what it is handed, bounded by the window math.
 
+use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
-use bevy::scene::{Scene, bsn, template_value};
+use bevy::ecs::observer::On;
+use bevy::ecs::system::{Commands, NonSendMut, Query};
+use bevy::picking::Pickable;
+use bevy::scene::{Scene, bsn, on, template_value};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
     AlignItems, FlexDirection, JustifyContent, Node, Overflow, Val, percent, px,
 };
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::{Activate, Button};
 use taskmanager_ui_contract::{PROCESS_COLUMNS, ProcessColumnSpec};
 
+use crate::app::FrontendTrack;
 use crate::palette::{UiPalette, no_wrap_text, space_4, space_8};
 use crate::window::{Role, TextRole};
 
@@ -102,6 +108,54 @@ pub(crate) fn sorted_direction(
     }
 }
 
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct ProcessSortHeader(pub(crate) &'static str);
+
+pub(crate) fn sort_col_from_id(id: &str) -> Option<taskmanager_shell::SortCol> {
+    use taskmanager_shell::SortCol;
+    match id {
+        "Name" => Some(SortCol::Name),
+        "User" => Some(SortCol::User),
+        "PID" => Some(SortCol::Pid),
+        "Threads" => Some(SortCol::Threads),
+        "StartTime" => Some(SortCol::StartTime),
+        "Status" => Some(SortCol::State),
+        "CPU" => Some(SortCol::Cpu),
+        "Memory" => Some(SortCol::Memory),
+        "Swap" => Some(SortCol::Swap),
+        "MemoryPss" => Some(SortCol::Pss),
+        "DiskRead" => Some(SortCol::DiskRead),
+        "DiskWrite" => Some(SortCol::DiskWrite),
+        "Network" => Some(SortCol::Network),
+        "CPUTime" => Some(SortCol::CpuTime),
+        "FDs" => Some(SortCol::Fds),
+        "Nice" => Some(SortCol::Nice),
+        _ => None,
+    }
+}
+
+pub(crate) fn on_process_sort_header_activated(
+    activate: On<Activate>,
+    headers: Query<&ProcessSortHeader>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut commands: Commands,
+) {
+    let header = headers
+        .get(activate.entity)
+        .or_else(|_| headers.get(activate.event().entity));
+    let Ok(header) = header else {
+        return;
+    };
+    if let Some(col) = sort_col_from_id(header.0) {
+        if track.shell.process_sort.0 == col {
+            track.shell.toggle_sort_direction();
+        } else {
+            track.shell.set_sort_column(col);
+        }
+        commands.trigger(crate::input::ShellInteractionApplied);
+    }
+}
+
 /// Render adapter: the header row. One text cell per column, widths from the
 /// contract's default-width tokens; numeric columns right-align; the sorted
 /// column carries the semantic direction icon.
@@ -110,14 +164,11 @@ pub(crate) fn header_scene(
     sort: Option<SortProjection>,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
-    let labels: Vec<String> = columns.iter().map(|column| header_label(column)).collect();
-    let widths: Vec<f32> = columns.iter().map(|column| column.default_width).collect();
-    let numeric: Vec<bool> = columns.iter().map(|column| column.numeric).collect();
     let directions: Vec<Option<bool>> = columns
         .iter()
         .map(|column| sorted_direction(column, sort))
         .collect();
-    let cells = header_cells(&labels, &widths, &numeric, &directions, palette);
+    let cells = header_cells(columns, &directions, palette);
     bsn! {
         Node {
             width: percent(100),
@@ -165,19 +216,23 @@ fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> im
 }
 
 fn header_cells(
-    labels: &[String],
-    widths: &[f32],
-    numeric: &[bool],
+    columns: &[&ProcessColumnSpec],
     directions: &[Option<bool>],
     palette: &UiPalette,
 ) -> Vec<impl Scene + use<>> {
-    labels
+    columns
         .iter()
-        .zip(widths.iter().copied())
-        .zip(numeric.iter().copied())
         .zip(directions.iter().copied())
-        .map(|(((label, width), numeric_column), direction)| {
-            header_cell_scene(label.clone(), width, numeric_column, direction, palette)
+        .map(|(column, direction)| {
+            let label = header_label(column);
+            header_cell_scene(
+                label,
+                column.id,
+                column.default_width,
+                column.numeric,
+                direction,
+                palette,
+            )
         })
         .collect()
 }
@@ -187,6 +242,7 @@ fn header_cells(
 /// clip — and the same main-axis alignment contract.
 fn header_cell_scene(
     label: String,
+    column_id: &'static str,
     width: f32,
     numeric_column: bool,
     direction: Option<bool>,
@@ -208,8 +264,11 @@ fn header_cell_scene(
             column_gap: Val::Px(space_4()),
             overflow: Overflow::clip_x(),
         }
+        Button
+        ProcessSortHeader(column_id)
+        on(on_process_sort_header_activated)
         Children [
-            ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ),
+            ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) Pickable::IGNORE ),
             { indicator },
         ]
     }

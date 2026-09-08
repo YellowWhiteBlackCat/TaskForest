@@ -58,10 +58,10 @@ impl TuiApp {
             );
             return false;
         }
-        self.open_local_surface(TuiSurface::ServiceMenu(ServiceMenuTarget {
+        self.open_local_surface(TuiSurface::ServiceMenu(Box::new(ServiceMenuTarget {
             service: service.clone(),
             selection: 0,
-        }));
+        })));
         true
     }
 
@@ -195,10 +195,9 @@ impl TuiApp {
                 self.shell
                     .request_process_batch(ProcessBatchAction::SetPriority(tier))
             }
-            ui::process_menu::ProcessMenuAction::EfficiencyMode => {
-                self.shell
-                    .request_process_batch(ProcessBatchAction::SetEfficiencyMode(true))
-            }
+            ui::process_menu::ProcessMenuAction::EfficiencyMode => self
+                .shell
+                .request_process_batch(ProcessBatchAction::SetEfficiencyMode(true)),
             ui::process_menu::ProcessMenuAction::Affinity => {
                 if let Some(target) =
                     taskmanager_core::core::process::FrozenProcessIdentity::from_process(&menu.item)

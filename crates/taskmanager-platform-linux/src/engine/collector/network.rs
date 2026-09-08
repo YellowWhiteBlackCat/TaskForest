@@ -355,6 +355,14 @@ fn assemble_snapshot(
                 utilization_pct,
                 link_speed_mbps,
                 link_up: interface.link_up,
+                mtu_bytes: interface.mtu_bytes,
+                tx_queue_len: interface.tx_queue_len,
+                rx_drops: interface.rx_drops,
+                tx_drops: interface.tx_drops,
+                rx_errors: interface.rx_errors,
+                tx_errors: interface.tx_errors,
+                rx_overruns: interface.rx_overruns,
+                tx_overruns: interface.tx_overruns,
             };
             let wireless_observations = assemble_wireless_observations(
                 is_wireless,
@@ -375,6 +383,8 @@ fn assemble_snapshot(
             metric.mac_addr = interface.mac_addr.clone();
             metric.driver = interface.driver.clone();
             metric.adapter = interface.adapter.clone();
+            metric.master_interface = interface.master_interface.clone();
+            metric.peer_interface = interface.peer_interface.clone();
             metric.apply_observations(adapter_type, scalar_observations, wireless_observations);
             metric
         })
@@ -553,6 +563,7 @@ fn assemble_wireless_observations(
         bssid,
         frequency_mhz,
         channel,
+        channel_width_mhz,
         rx_bitrate_mbps,
         tx_bitrate_mbps,
         protocol,
@@ -563,6 +574,7 @@ fn assemble_wireless_observations(
             signal_dbm,
             frequency_mhz,
             channel,
+            channel_width_mhz,
             rx_bitrate_mbps,
             tx_bitrate_mbps,
             protocol,
@@ -573,6 +585,7 @@ fn assemble_wireless_observations(
             present_or_unavailable(bssid.map(Arc::from), now_ms),
             present_or_unavailable(frequency_mhz, now_ms),
             present_or_unavailable(channel, now_ms),
+            present_or_unavailable(channel_width_mhz, now_ms),
             present_or_unavailable(rx_bitrate_mbps, now_ms),
             present_or_unavailable(tx_bitrate_mbps, now_ms),
             present_or_unavailable(protocol.map(Arc::from), now_ms),
@@ -581,6 +594,7 @@ fn assemble_wireless_observations(
             OptionalObservation::absent(now_ms),
             OptionalObservation::absent(now_ms),
             None,
+            OptionalObservation::absent(now_ms),
             OptionalObservation::absent(now_ms),
             OptionalObservation::absent(now_ms),
             OptionalObservation::absent(now_ms),
@@ -598,6 +612,7 @@ fn assemble_wireless_observations(
             OptionalObservation::unavailable(failure),
             OptionalObservation::unavailable(failure),
             OptionalObservation::unavailable(failure),
+            OptionalObservation::unavailable(failure),
         ),
         None => {
             let failure = source_failure(iw.outcome).unwrap_or(FailureKind::TemporarilyUnavailable);
@@ -605,6 +620,7 @@ fn assemble_wireless_observations(
                 OptionalObservation::unavailable(failure),
                 OptionalObservation::unavailable(failure),
                 None,
+                OptionalObservation::unavailable(failure),
                 OptionalObservation::unavailable(failure),
                 OptionalObservation::unavailable(failure),
                 OptionalObservation::unavailable(failure),
@@ -635,6 +651,7 @@ fn assemble_wireless_observations(
         bssid,
         frequency_mhz,
         channel,
+        channel_width_mhz,
         rx_bitrate_mbps,
         tx_bitrate_mbps,
         protocol,

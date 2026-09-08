@@ -532,6 +532,7 @@ fn simulate_collect_tick(
                         observed_at_ms,
                     ),
                     pressure: ScalarObservation::default(),
+                    load_average: ScalarObservation::default(),
                 },
                 observed_at_ms,
                 Vec::new(),

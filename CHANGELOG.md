@@ -6,6 +6,15 @@
 格式遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)；0.x 阶段的
 次版本号可以承载破坏性变更。发布与 tag 规则见 [docs/RELEASE.md](docs/RELEASE.md)。
 
+## [0.1.4] — 2026-09-05
+
+### 新增
+
+- **四端同构（Four-UI Parity）阶段性补强**：统一 `PROCESS_COLUMNS`，补齐多项进程、
+  硬件、电源和诊断投影，并把 GPUI、Iced、TUI、Bevy UI 的 headless 测试执行器统一到
+  `nextest`。本版本不把尚未完成的真实平台采集、像素级截图矩阵或交互闭环标记为已验收；
+  各项能力仍以当前门禁和私有逐项验收记录为准。
+
 ## [0.1.3] — 2026-09-04
 
 ### 新增

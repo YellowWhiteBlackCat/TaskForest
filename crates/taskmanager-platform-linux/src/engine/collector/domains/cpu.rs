@@ -20,6 +20,7 @@ pub(crate) struct LinuxCpuTelemetryCollector {
     rapl_max_energy_uj: u64,
     static_facts_initialized: bool,
     last_value: Option<(CpuMetrics, u64)>,
+    last_idle_states: Option<(Vec<taskmanager_core::CpuIdleState>, u64)>,
 }
 
 impl LinuxCpuTelemetryCollector {
@@ -32,6 +33,7 @@ impl LinuxCpuTelemetryCollector {
             rapl_max_energy_uj: 1u64 << 32,
             static_facts_initialized: false,
             last_value: None,
+            last_idle_states: None,
         }
     }
 
@@ -66,6 +68,18 @@ impl LinuxSystemDomainCollector for LinuxCpuTelemetryCollector {
             now,
             now_ms,
         );
+        if !snapshot.value.idle_states.is_empty() {
+            if let Some((previous, previous_at_ms)) = &self.last_idle_states {
+                let elapsed_ms = now_ms.saturating_sub(*previous_at_ms);
+                for state in &mut snapshot.value.idle_states {
+                    state.residency_pct = previous
+                        .iter()
+                        .find(|before| before.name == state.name)
+                        .and_then(|before| state.residency_percentage_since(before, elapsed_ms));
+                }
+            }
+            self.last_idle_states = Some((snapshot.value.idle_states.clone(), now_ms));
+        }
         if let Some((previous, _)) = &self.last_value {
             snapshot.value.retain_previous_observations(previous);
         }

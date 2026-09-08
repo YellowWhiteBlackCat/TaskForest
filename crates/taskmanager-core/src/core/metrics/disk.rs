@@ -44,6 +44,21 @@ pub struct DiskScalarObservations {
     pub iops: ScalarObservation<u64>,
     pub active_time_pct: ScalarObservation<f32>,
     pub response_time_ms: ScalarObservation<f32>,
+    /// Mean number of in-flight I/O operations over the sampling interval.
+    /// Linux derives this from `/proc/diskstats` weighted I/O time; other
+    /// platforms keep the observation explicitly unavailable until they have
+    /// an equivalent native counter.
+    pub average_queue_depth: ScalarObservation<f32>,
+    /// Busy-time per completed I/O, a lower-bound service-time estimate. The
+    /// diskstats contract does not expose per-request completion latency, so
+    /// this is intentionally separate from queue-inclusive response time.
+    pub service_time_ms: ScalarObservation<f32>,
+    /// Read requests merged per second by the block layer (`rrqm/s`).
+    #[serde(default)]
+    pub read_merges_per_sec: ScalarObservation<u64>,
+    /// Write requests merged per second by the block layer (`wrqm/s`).
+    #[serde(default)]
+    pub write_merges_per_sec: ScalarObservation<u64>,
 }
 
 impl DiskScalarObservations {
@@ -69,6 +84,18 @@ impl DiskScalarObservations {
             response_time_ms: self
                 .response_time_ms
                 .retain_previous(previous.response_time_ms),
+            average_queue_depth: self
+                .average_queue_depth
+                .retain_previous(previous.average_queue_depth),
+            service_time_ms: self
+                .service_time_ms
+                .retain_previous(previous.service_time_ms),
+            read_merges_per_sec: self
+                .read_merges_per_sec
+                .retain_previous(previous.read_merges_per_sec),
+            write_merges_per_sec: self
+                .write_merges_per_sec
+                .retain_previous(previous.write_merges_per_sec),
         }
     }
 
@@ -82,6 +109,10 @@ impl DiskScalarObservations {
             iops: ScalarObservation::unavailable(failure),
             active_time_pct: ScalarObservation::unavailable(failure),
             response_time_ms: ScalarObservation::unavailable(failure),
+            average_queue_depth: ScalarObservation::unavailable(failure),
+            service_time_ms: ScalarObservation::unavailable(failure),
+            read_merges_per_sec: ScalarObservation::unavailable(failure),
+            write_merges_per_sec: ScalarObservation::unavailable(failure),
         }
     }
 }
@@ -239,6 +270,9 @@ pub struct DiskMetrics {
     /// Device-health temperature in °C. `None` means no trustworthy
     /// observation was available from the selected native provider.
     pub smart_temperature_c: Option<f32>,
+    /// Additional controller/NAND temperature sensors, in Celsius. The
+    /// primary `smart_temperature_c` remains the composite value.
+    pub smart_temperature_sensors_c: Vec<f32>,
     /// Provider-normalized device-health warning flag. `None` remains distinct
     /// from a confirmed `false`.
     pub smart_critical_warning: Option<bool>,
@@ -246,8 +280,14 @@ pub struct DiskMetrics {
     pub smart_temp_critical_c: Option<f32>,
     /// Provider-normalized estimated endurance used, in percent (0–100+).
     pub smart_percent_used: Option<f32>,
+    /// NVMe controller-reported available spare capacity, in percent.
+    pub smart_available_spare_pct: Option<f32>,
+    /// NVMe controller-reported available-spare warning threshold, in percent.
+    pub smart_available_spare_threshold_pct: Option<f32>,
     /// Provider-reported power-on hours.
     pub smart_power_on_hours: Option<u64>,
+    /// NVMe lifetime unsafe-shutdown event counter.
+    pub smart_unsafe_shutdowns: Option<u64>,
 }
 
 impl DiskMetrics {
@@ -329,6 +369,40 @@ impl DiskMetrics {
             .current_value()
             .copied()
             .filter(|value| value.is_finite())
+    }
+
+    #[must_use]
+    pub fn current_average_queue_depth(&self) -> Option<f32> {
+        self.scalar_observations
+            .average_queue_depth
+            .current_value()
+            .copied()
+            .filter(|value| value.is_finite() && *value >= 0.0)
+    }
+
+    #[must_use]
+    pub fn current_service_time_ms(&self) -> Option<f32> {
+        self.scalar_observations
+            .service_time_ms
+            .current_value()
+            .copied()
+            .filter(|value| value.is_finite() && *value >= 0.0)
+    }
+
+    #[must_use]
+    pub const fn current_read_merges_per_sec(&self) -> Option<u64> {
+        self.scalar_observations
+            .read_merges_per_sec
+            .current_value()
+            .copied()
+    }
+
+    #[must_use]
+    pub const fn current_write_merges_per_sec(&self) -> Option<u64> {
+        self.scalar_observations
+            .write_merges_per_sec
+            .current_value()
+            .copied()
     }
 
     #[must_use]

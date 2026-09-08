@@ -79,6 +79,16 @@ pub(super) fn disk_stats(
                 .map(|value| format!("{value:.2} ms")),
         ),
         StatRow::text(
+            i18n::t("disk.queue_depth"),
+            d.current_average_queue_depth()
+                .map(|value| format!("{value:.2}")),
+        ),
+        StatRow::text(
+            i18n::t("disk.service_time"),
+            d.current_service_time_ms()
+                .map(|value| format!("{value:.2} ms")),
+        ),
+        StatRow::text(
             i18n::t("disk.capacity"),
             d.current_capacity_bytes()
                 .map(|value| units.format_quantity(value, QuantityFamily::Drive, false)),
@@ -88,9 +98,31 @@ pub(super) fn disk_stats(
             d.current_available_bytes()
                 .map(|value| units.format_quantity(value, QuantityFamily::Drive, false)),
         ),
-        StatRow::text(i18n::t("common.type"), Some(d.disk_type.clone())),
-        StatRow::text(i18n::t("disk.filesystem"), Some(d.fs_type.clone())),
+        StatRow::text(
+            i18n::t("common.type"),
+            (!d.disk_type.trim().is_empty()).then(|| d.disk_type.trim().to_string()),
+        ),
+        StatRow::text(
+            i18n::t("disk.filesystem"),
+            (!d.fs_type.trim().is_empty()).then(|| d.fs_type.trim().to_string()),
+        ),
     ];
+    if d.current_read_merges_per_sec().is_some() || d.current_write_merges_per_sec().is_some() {
+        stats.push(StatRow::text(
+            i18n::t("disk.merged_requests"),
+            Some(format!(
+                "{} / {}",
+                d.current_read_merges_per_sec()
+                    .map_or_else(crate::gpui_app::formatting::missing_value, |value| {
+                        value.to_string()
+                    }),
+                d.current_write_merges_per_sec()
+                    .map_or_else(crate::gpui_app::formatting::missing_value, |value| {
+                        value.to_string()
+                    })
+            )),
+        ));
+    }
     if let Some(serial) = d.serial.as_deref().filter(|value| !value.is_empty()) {
         stats.push(StatRow::text(
             i18n::t("disk.serial"),
@@ -125,11 +157,28 @@ pub(super) fn disk_stats(
             stats.push(trend_row);
         }
     }
+    for (index, temperature) in d.smart_temperature_sensors_c.iter().enumerate() {
+        if temperature.is_finite() {
+            stats.push(StatRow::text(
+                format!("{} {}", i18n::t("disk.temperature_sensor"), index + 1),
+                Some(format!("{temperature:.0} \u{b0}C")),
+            ));
+        }
+    }
     if let Some(pct) = d.smart_percent_used {
         stats.push(StatRow::text(
             i18n::t("disk.endurance_used"),
             Some(format!("{:.0}%", pct)),
         ));
+    }
+    if let Some(spare) = d.smart_available_spare_pct {
+        let warning_threshold = d.smart_available_spare_threshold_pct.unwrap_or(10.0);
+        let value = if spare <= warning_threshold {
+            format!("{spare:.0}% ⚠ (≤{warning_threshold:.0}%)")
+        } else {
+            format!("{spare:.0}%")
+        };
+        stats.push(StatRow::text(i18n::t("disk.available_spare"), Some(value)));
     }
     if let Some(hours) = d.smart_power_on_hours {
         // Power-on hours → years/days for a glanceable wear figure.
@@ -141,6 +190,12 @@ pub(super) fn disk_stats(
                     .replace("{hours}", &hours.to_string())
                     .replace("{days}", &days.to_string()),
             ),
+        ));
+    }
+    if let Some(count) = d.smart_unsafe_shutdowns {
+        stats.push(StatRow::text(
+            i18n::t("disk.unsafe_shutdowns"),
+            Some(count.to_string()),
         ));
     }
     if smart_section_visible(d) && !has_smart_fields(d) {

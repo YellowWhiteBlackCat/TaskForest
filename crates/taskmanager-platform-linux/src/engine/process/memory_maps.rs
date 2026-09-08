@@ -45,8 +45,12 @@ struct CachedProcessMaps {
 pub(super) struct ProcessMemoryObservation {
     pub(super) pss: Result<u64, FailureKind>,
     pub(super) swap: Result<u64, FailureKind>,
+    pub(super) uss: Result<u64, FailureKind>,
+    pub(super) anon_huge_pages: Result<u64, FailureKind>,
     pub(super) pss_outcome: SourceOutcome,
     pub(super) swap_outcome: SourceOutcome,
+    pub(super) uss_outcome: SourceOutcome,
+    pub(super) anon_huge_pages_outcome: SourceOutcome,
 }
 
 impl ProcessMemoryObservation {
@@ -54,8 +58,12 @@ impl ProcessMemoryObservation {
         Self {
             pss: Err(failure),
             swap: Err(failure),
+            uss: Err(failure),
+            anon_huge_pages: Err(failure),
             pss_outcome: SourceOutcome::Unavailable(failure),
             swap_outcome: SourceOutcome::Unavailable(failure),
+            uss_outcome: SourceOutcome::Unavailable(failure),
+            anon_huge_pages_outcome: SourceOutcome::Unavailable(failure),
         }
     }
 }
@@ -124,22 +132,39 @@ impl MemoryMaps {
     /// stat are read again here to narrow the PID-reuse window around the
     /// enrichment; a race is reported as `IdentityChanged`, never as zero.
     pub(super) fn observe(&self, pid: u32, expected_start_token: u64) -> ProcessMemoryObservation {
-        let (pss, swap) = match read_proc_memory_observations(pid) {
+        let (pss, swap, uss, anon_huge_pages) = match read_proc_memory_observations(pid) {
             Ok(ProcMemoryObservations {
                 pss_fields,
                 swap_bytes,
+                uss_bytes,
+                anon_huge_pages_bytes,
             }) => {
                 let pss =
                     pss_fields.and_then(|status| self.pss_for(pid, expected_start_token, status));
-                (pss, swap_bytes)
+                let identity = self.validate_identity(pid, expected_start_token);
+                let uss = identity.and(uss_bytes);
+                let anon_huge_pages = identity.and(anon_huge_pages_bytes);
+                (pss, swap_bytes, uss, anon_huge_pages)
             }
-            Err(failure) => (Err(failure), Err(failure)),
+            Err(failure) => (Err(failure), Err(failure), Err(failure), Err(failure)),
         };
         ProcessMemoryObservation {
             pss_outcome: result_outcome(&pss),
             swap_outcome: result_outcome(&swap),
+            uss_outcome: result_outcome(&uss),
+            anon_huge_pages_outcome: result_outcome(&anon_huge_pages),
             pss,
             swap,
+            uss,
+            anon_huge_pages,
+        }
+    }
+
+    fn validate_identity(&self, pid: u32, expected_start_token: u64) -> Result<(), FailureKind> {
+        if read_proc_stat(pid)?.start_ticks == expected_start_token {
+            Ok(())
+        } else {
+            Err(FailureKind::IdentityChanged)
         }
     }
 

@@ -395,13 +395,24 @@ fn vm_display(rows: &[ProcessDetailsRowVm], field: ProcessDetailsField) -> Strin
 
 /// The Overview section's field order (label keys + VM fields) — the single
 /// list `details_overview` renders.
-const OVERVIEW_FIELDS: [(ProcessDetailsField, &str); 7] = [
+const OVERVIEW_FIELDS: [(ProcessDetailsField, &str); 15] = [
     (ProcessDetailsField::Name, "common.name"),
     (ProcessDetailsField::Pid, "proc.pid"),
     (ProcessDetailsField::ParentPid, "prop.parent_pid"),
     (ProcessDetailsField::User, "common.user"),
     (ProcessDetailsField::Status, "common.status"),
     (ProcessDetailsField::Threads, "common.threads"),
+    (ProcessDetailsField::Pss, "proc.pss"),
+    (ProcessDetailsField::Uss, "proc.uss"),
+    (ProcessDetailsField::AnonHugePages, "proc.anon_huge_pages"),
+    (ProcessDetailsField::SchedPolicy, "proc.sched_policy"),
+    (ProcessDetailsField::OomScore, "proc.oom_score"),
+    (ProcessDetailsField::PageFaults, "proc.page_faults"),
+    (ProcessDetailsField::NetworkRate, "common.network"),
+    (
+        ProcessDetailsField::CancelledWriteBytes,
+        "proc.cancelled_write",
+    ),
     (ProcessDetailsField::StartTime, "prop.start_time"),
 ];
 
@@ -528,6 +539,13 @@ fn details_command(
     for (label, value) in vm_rows(item, &COMMAND_FIELDS, local_time_rules) {
         section = section.child(prop_row(t, label, value));
     }
+    if let Some(summary) = taskmanager_shell::presentation::command_identity_summary(item) {
+        section = section.child(prop_row(
+            t,
+            i18n::t("proc_insights.command_identity"),
+            summary,
+        ));
+    }
     section
 }
 
@@ -612,6 +630,13 @@ fn process_insights_labels() -> ProcessInsightsLabels {
         isolation: i18n::t("proc_insights.isolation"),
         container_id: i18n::t("proc_insights.container_id"),
         sandboxed: i18n::t("proc_insights.sandboxed"),
+        security_profile: i18n::t("proc_insights.security_profile"),
+        seccomp: i18n::t("proc_insights.seccomp"),
+        no_new_privs: i18n::t("proc_insights.no_new_privs"),
+        ptrace_scope: i18n::t("proc_insights.ptrace_scope"),
+        capabilities: i18n::t("proc_insights.capabilities"),
+        namespaces: i18n::t("proc_insights.namespaces"),
+        sandbox_details: i18n::t("proc_insights.sandbox_details"),
         host_process: i18n::t("proc_insights.host_process"),
         open_files: i18n::t("proc_insights.open_files"),
         no_open_files: i18n::t("proc_insights.no_open_files"),
@@ -622,6 +647,7 @@ fn process_insights_labels() -> ProcessInsightsLabels {
         thread_name: i18n::t("common.name"),
         thread_state: i18n::t("common.status"),
         thread_cpu_time: i18n::t("proc_insights.thread_cpu_time"),
+        thread_wait: i18n::t("proc_insights.thread_wait"),
         thread_cpu_percent: i18n::t("proc_insights.thread_cpu_percent"),
         environment: i18n::t("prop.environment"),
         no_environment: i18n::t("prop.environment_empty"),

@@ -172,17 +172,17 @@ pub fn run(binary_name: &'static str, handlers: FrontendHandlers) {
         }
         CliMode::Gui { app_id, demo } => {
             #[cfg(target_os = "linux")]
-            if binary_name != "taskforest-t" && binary_name != "taskmanager-tui" {
-                if std::env::var_os("WAYLAND_DISPLAY").is_none()
-                    && std::env::var_os("TASKFOREST_HEADLESS").is_none()
-                    && !demo
-                {
-                    eprintln!(
-                        "error: {binary_name} requires a Wayland compositor session (WAYLAND_DISPLAY is not set).\n\
-                         hint: for non-Wayland or console environments, use the terminal product `taskforest-t`."
-                    );
-                    std::process::exit(1);
-                }
+            if binary_name != "taskforest-t"
+                && binary_name != "taskmanager-tui"
+                && std::env::var_os("WAYLAND_DISPLAY").is_none()
+                && std::env::var_os("TASKFOREST_HEADLESS").is_none()
+                && !demo
+            {
+                eprintln!(
+                    "error: {binary_name} requires a Wayland compositor session (WAYLAND_DISPLAY is not set).\n\
+                     hint: for non-Wayland or console environments, use the terminal product `taskforest-t`."
+                );
+                std::process::exit(1);
             }
 
             // Tracing initializes only on the GUI path: the JSON snapshot mode

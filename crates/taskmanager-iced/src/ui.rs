@@ -87,9 +87,7 @@ use applications::page::applications_page;
 pub(crate) use device_chart::GraphPrefs;
 use perf_devices::*;
 use perf_overview::*;
-pub(crate) use performance::{
-    UnitPrefs, chunked_rows, compact_toolbar_columns, perf_device_label, performance_page,
-};
+pub(crate) use performance::{UnitPrefs, chunked_rows, perf_device_label, performance_page};
 
 // The About modal's clipboard payload seam (G-16) — named re-export so the
 // update path builds the copy text through the same rows the modal renders.
@@ -196,14 +194,32 @@ fn view_root(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Re
     // chrome presentation (responsive.rs), not a local literal.
     let chrome = ChromePresentation::for_width(app.viewport_width());
     let wrapped_chrome = app.compact_layout() || chrome.is_wrapped();
-    let toolbar: Element<'_, Message, iced::Theme, iced::Renderer> = if wrapped_chrome {
-        chunked_rows(toolbar_items, compact_toolbar_columns(app.viewport_width()))
+    let toolbar: Element<'_, Message, iced::Theme, iced::Renderer> = if app.compact_layout() {
+        scrollable(row(toolbar_items).spacing(4))
+            .direction(iced::widget::scrollable::Direction::Horizontal(
+                iced::widget::scrollable::Scrollbar::default(),
+            ))
+            .height(iced::Length::Fixed(36.0))
+            .width(iced::Length::Fill)
+            .into()
+    } else if wrapped_chrome {
+        // Keep the action band to one bounded row. A wrapped action grid made
+        // the 1180px capture spend a third row on About, pushing the actual
+        // page body below the fold. Horizontal scrolling preserves every
+        // action without changing the page's vertical budget.
+        scrollable(row(toolbar_items).spacing(4))
+            .direction(iced::widget::scrollable::Direction::Horizontal(
+                iced::widget::scrollable::Scrollbar::default(),
+            ))
+            .height(iced::Length::Fixed(36.0))
+            .width(iced::Length::Fill)
+            .into()
     } else {
         row(toolbar_items).spacing(4).into()
     };
     // The wide layout keeps the action toolbar pinned to the trailing edge.
     // Compact windows get intentional rows: routes remain in one bounded
-    // strip and actions get their own wrapped full-width rows. Mixing both in
+    // strip and actions get their own bounded horizontal row. Mixing both in
     // one horizontal scroller made the first screenshot look like controls
     // had disappeared behind the right edge even though they were reachable.
     let nav: Element<'_, Message, iced::Theme, iced::Renderer> = if wrapped_chrome {

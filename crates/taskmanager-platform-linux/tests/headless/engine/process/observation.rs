@@ -9,6 +9,9 @@ fn stat(start_ticks: u64, user_ticks: u64, system_ticks: u64) -> ProcStatFields 
         user_ticks,
         system_ticks,
         nice: 0,
+        policy: None,
+        minflt: 0,
+        majflt: 0,
     }
 }
 
@@ -49,7 +52,9 @@ fn observe_with_fd_opt(
             io: Ok(ProcIoFields {
                 read_bytes: Ok(0),
                 write_bytes: Ok(0),
+                cancelled_write_bytes: Ok(0),
             }),
+            oom_score: None,
         },
         ProcessObservationContext::<ProcessItem> {
             boot_time: &Ok(1_720_000_000),
@@ -182,6 +187,7 @@ fn exact_start_token_change_blocks_all_stale_inheritance() {
             fds: Some(Err(FailureKind::PermissionDenied)),
             memory: Err(FailureKind::PermissionDenied),
             io: Err(FailureKind::PermissionDenied),
+            oom_score: None,
         },
         ProcessObservationContext {
             boot_time: &Ok(1_720_000_000),
@@ -215,7 +221,9 @@ fn identity_race_invalidates_other_successful_proc_fields() {
             io: Ok(ProcIoFields {
                 read_bytes: Ok(10),
                 write_bytes: Ok(20),
+                cancelled_write_bytes: Ok(0),
             }),
+            oom_score: None,
         },
         ProcessObservationContext::<ProcessItem> {
             boot_time: &Ok(1_720_000_000),

@@ -188,25 +188,24 @@ fn grouped_rows_hide_cells_by_their_own_column() {
             .map(|index| iced::widget::text(index.to_string()).into())
             .collect()
     }
-    // Grouped rows with swap carry 15 cells (the fused identity cell replaces
-    // the separate Pid + Name cells).
+    // Rows with swap carry 17 cells (16 contract columns + 1 Trend sparkline).
     let hidden = std::collections::HashSet::from([SortCol::StartTime]);
-    let survivors = visible_column_elements(dummy_cells(15), true, &hidden, true).len();
+    let survivors = visible_column_elements(dummy_cells(17), true, &hidden, true).len();
     assert_eq!(
-        survivors, 14,
+        survivors, 16,
         "hiding StartTime must drop exactly the start-clock cell"
     );
 
-    // Flat rows keep one cell per column (16 with swap): hiding Cpu drops only
+    // Flat rows keep 17 cells with swap: hiding Cpu drops only
     // its own cell and never the Trend sparkline.
     let flat_survivors = visible_column_elements(
-        dummy_cells(16),
+        dummy_cells(17),
         true,
         &std::collections::HashSet::from([SortCol::Cpu]),
         false,
     )
     .len();
-    assert_eq!(flat_survivors, 15);
+    assert_eq!(flat_survivors, 16);
 }
 
 /// The local inventory specs (Services/Users/Startup) share the column

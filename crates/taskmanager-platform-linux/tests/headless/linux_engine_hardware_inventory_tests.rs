@@ -38,7 +38,7 @@ fn context<'a>(probe: &'a SystemProbe, paths: &'a InventoryPaths) -> InventoryCo
 
 #[test]
 fn cpuinfo_x86_flags_line_maps_all_neutral_features_in_canonical_order() {
-    let cpuinfo = "processor\t: 0\nflags\t\t: fpu vme sse4_1 sse4_2 avx avx2 avx512f fma aes sha_ni avx_vnni avx512_vnni amx_int8 amx_bf16 hypervisor la57\n";
+    let cpuinfo = "processor\t: 0\nflags\t\t: fpu vme sse4_1 sse4_2 avx avx2 avx512f fma aes sha_ni avx_vnni avx512_vnni amx_int8 amx_bf16 avx10 hypervisor la57\n";
     let features = compute::parse_cpuinfo_instruction_features(cpuinfo);
     assert_eq!(
         features,
@@ -55,6 +55,7 @@ fn cpuinfo_x86_flags_line_maps_all_neutral_features_in_canonical_order() {
             CpuInstructionFeature::Avx512Vnni,
             CpuInstructionFeature::AmxInt8,
             CpuInstructionFeature::AmxBf16,
+            CpuInstructionFeature::Avx10,
         ]
     );
 }
@@ -464,6 +465,24 @@ fn malformed_linux_kernel_record_is_a_typed_partial_without_raw_build_text() {
     );
     assert_eq!(fragment.status.item_count, 3);
     assert_eq!(fragment.value.build, None);
+}
+
+#[test]
+fn kernel_error_parser_keeps_only_severe_priorities_and_bounds_messages() {
+    let entries =
+        parse_kernel_errors("<3>[T=12] nvme reset\n<4>[T=13] warning\n[14] plain error\n");
+    assert_eq!(entries.len(), 2);
+    assert_eq!(
+        entries[0].priority,
+        taskmanager_core::KernelLogPriority::Error
+    );
+    assert_eq!(entries[0].timestamp_seconds, Some(12));
+    assert_eq!(entries[0].message, "nvme reset");
+    assert_eq!(
+        entries[1].priority,
+        taskmanager_core::KernelLogPriority::Error
+    );
+    assert_eq!(entries[1].timestamp_seconds, None);
 }
 
 #[test]

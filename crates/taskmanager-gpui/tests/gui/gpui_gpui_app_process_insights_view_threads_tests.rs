@@ -24,6 +24,9 @@ fn populated_threads() -> ProcessThreads {
                 state: ThreadState::Sleep,
                 cpu_time_secs: Some(12.5),
                 cpu_percent: Some(18.5),
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             // A thread whose `stat` lacked parseable CPU counters: the row
             // is kept with cpu_time_secs = None and must render an explicit
@@ -34,6 +37,9 @@ fn populated_threads() -> ProcessThreads {
                 state: ThreadState::Running,
                 cpu_time_secs: None,
                 cpu_percent: None,
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
         ],
     }
@@ -101,6 +107,9 @@ fn oversized_thread_list_renders_through_the_capped_path(cx: &mut TestAppContext
                 state: ThreadState::Sleep,
                 cpu_time_secs: Some(i as f64),
                 cpu_percent: Some(0.25),
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             })
             .collect(),
     };

@@ -132,6 +132,22 @@ async fn cpu_page_renders_dominant_graph_readouts_and_per_core_content(cx: &mut 
     let panel = vcx
         .debug_bounds("tm-cpu-details-panel")
         .expect("pinned CPU details");
+    let details_viewport = vcx
+        .debug_bounds("tm-cpu-details-scroll")
+        .expect("CPU details must expose a bounded scroll viewport");
+    let details_scrollbar = vcx
+        .debug_bounds("tm-cpu-details-scrollbar")
+        .expect("CPU details must expose its pinned scrollbar hit rail");
+    assert!(
+        details_viewport.left() >= stats_surface.left() - px(0.5)
+            && details_viewport.right() <= stats_surface.right() + px(0.5),
+        "CPU details viewport must stay inside the statistics rail: viewport={details_viewport:?}, stats={stats_surface:?}"
+    );
+    assert!(
+        details_scrollbar.right() <= stats_surface.right() + px(0.5)
+            && details_scrollbar.bottom() <= stats_surface.bottom() + px(0.5),
+        "CPU details scrollbar must stay pinned inside the statistics rail: scrollbar={details_scrollbar:?}, stats={stats_surface:?}"
+    );
     assert!(
         panel.right() <= stats_surface.right() - px(8.0),
         "CPU details must keep the shared trailing inset before the rail edge: panel={panel:?}, stats={stats_surface:?}"

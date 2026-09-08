@@ -3,20 +3,28 @@
 //! The renderer consumes ordered sections and a bounded viewport; observation
 //! availability and NPU engine/memory folds live here instead of paint code.
 
+use std::path::PathBuf;
+
 use taskmanager_application::i18n::t;
+use taskmanager_core::core::diagnostics::{
+    DiagnosticBundleError, DiagnosticBundleErrorKind, RedactionSummary,
+};
 use taskmanager_core::core::hardware::{DisplayInfo, HardwareInfo};
 use taskmanager_core::core::metrics::SystemSnapshot;
 use taskmanager_core::core::npu::{NpuEngineKind, NpuInventorySnapshot};
-use taskmanager_shell::presentation::{MISSING_VALUE, duration, missing_value, optional_bytes};
+use taskmanager_shell::presentation::{
+    MISSING_VALUE, duration, health_score_for_snapshot, health_score_summary, missing_value,
+    optional_bytes,
+};
 
-pub(super) struct SystemFact {
-    pub(super) label: String,
-    pub(super) value: String,
+pub(crate) struct SystemFact {
+    pub(crate) label: String,
+    pub(crate) value: String,
 }
 
-pub(super) struct SystemFactSection {
-    pub(super) title: String,
-    pub(super) facts: Vec<SystemFact>,
+pub(crate) struct SystemFactSection {
+    pub(crate) title: String,
+    pub(crate) facts: Vec<SystemFact>,
 }
 
 impl SystemFactSection {
@@ -47,10 +55,11 @@ impl SystemFactSection {
 /// Ordered System facts. NPU inventory stays a fixed section: every device,
 /// aggregate observation, reported engine and memory fact is materialized
 /// once, with unavailable values rendered honestly as dashes.
-pub(super) fn system_sections(
+pub(crate) fn system_sections(
     hardware: Option<&HardwareInfo>,
     snapshot: Option<&SystemSnapshot>,
     npu_inventory: Option<&NpuInventorySnapshot>,
+    smbios_memory: Option<&taskmanager_core::core::metrics::SmbiosMemorySnapshot>,
 ) -> Vec<SystemFactSection> {
     let window_manager = hardware.and_then(|item| {
         item.window_manager.as_deref().map(|name| {
@@ -154,6 +163,11 @@ pub(super) fn system_sections(
         ),
     ] {
         device.push_optional_text(key, value);
+    }
+    if let Some(hardware) = hardware
+        && let Some(errors) = taskmanager_shell::presentation::kernel_error_summary(hardware)
+    {
+        device.push(t("system.kernel_errors"), errors);
     }
     // Platform/chipset model belongs with the board/firmware identity; a host
     // whose adapter proved no chipset omits the row instead of dashing it.
@@ -335,6 +349,23 @@ pub(super) fn system_sections(
     }
 
     let mut sections = vec![device, cpu, memory];
+    if let Some(snapshot) = snapshot
+        && let Some(score) = health_score_for_snapshot(snapshot)
+    {
+        let mut health = SystemFactSection::new("system.health_score");
+        health.push(t("system.health_score"), health_score_summary(&score));
+        sections.push(health);
+    }
+    if let Some(smbios) = smbios_memory {
+        let mut smbios_section = SystemFactSection::new("system.memory_slots");
+        for (label, value) in taskmanager_shell::presentation::smbios_memory_inventory_rows(smbios)
+        {
+            smbios_section.push(label, value);
+        }
+        if !smbios_section.facts.is_empty() {
+            sections.push(smbios_section);
+        }
+    }
     if !graphics.facts.is_empty() {
         sections.push(graphics);
     }
@@ -400,4 +431,167 @@ fn display_hdr_capability(display: &DisplayInfo) -> Option<String> {
         None => return None,
     };
     Some(format!("{} {state}", t("system.hdr")))
+}
+
+/// Diagnostic bundle export status and feedback lifecycle for TUI.
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) enum DiagnosticBundleExportStatus {
+    /// Writing/exporting the bundle to disk.
+    Writing,
+    /// Export completed successfully to the specified destination path.
+    Complete(PathBuf),
+    /// Export failed with a typed diagnostic bundle error.
+    Failed(DiagnosticBundleError),
+}
+
+#[allow(dead_code)]
+impl DiagnosticBundleExportStatus {
+    #[must_use]
+    pub(crate) const fn writing() -> Self {
+        Self::Writing
+    }
+
+    #[must_use]
+    pub(crate) fn complete(path: impl Into<PathBuf>) -> Self {
+        Self::Complete(path.into())
+    }
+
+    #[must_use]
+    pub(crate) fn failed(error: DiagnosticBundleError) -> Self {
+        Self::Failed(error)
+    }
+
+    /// Whether this status represents an in-progress export.
+    #[must_use]
+    pub(crate) const fn is_writing(&self) -> bool {
+        matches!(self, Self::Writing)
+    }
+
+    /// Whether this status represents a completed export.
+    #[must_use]
+    pub(crate) const fn is_complete(&self) -> bool {
+        matches!(self, Self::Complete(_))
+    }
+
+    /// Whether this status represents a failed export.
+    #[must_use]
+    pub(crate) const fn is_failed(&self) -> bool {
+        matches!(self, Self::Failed(_))
+    }
+}
+
+/// Localized feedback key for a diagnostic failure reason.
+#[must_use]
+#[allow(dead_code)]
+pub(crate) const fn diagnostic_failure_feedback_key(
+    kind: DiagnosticBundleErrorKind,
+) -> &'static str {
+    match kind {
+        DiagnosticBundleErrorKind::InvalidSource => "diagnostics.failure_invalid_source",
+        DiagnosticBundleErrorKind::InvalidTarget => "diagnostics.failure_invalid_target",
+        DiagnosticBundleErrorKind::Encode => "diagnostics.failure_encode",
+        DiagnosticBundleErrorKind::Io => "diagnostics.failure_io",
+        DiagnosticBundleErrorKind::Busy => "diagnostics.failure_busy",
+        DiagnosticBundleErrorKind::Unavailable => "diagnostics.failure_unavailable",
+    }
+}
+
+/// Format a failure message using the localized template and error kind.
+/// Private filesystem paths and sensitive host details are never interpolated into user feedback.
+#[must_use]
+#[allow(dead_code)]
+pub(crate) fn diagnostic_failure_message(error: &DiagnosticBundleError) -> String {
+    t("diagnostics.failed_detail")
+        .replace("{reason}", t(diagnostic_failure_feedback_key(error.kind())))
+}
+
+/// Format user-facing feedback for a diagnostic bundle export status.
+#[must_use]
+#[allow(dead_code)]
+pub(crate) fn diagnostic_bundle_export_feedback(status: &DiagnosticBundleExportStatus) -> String {
+    match status {
+        DiagnosticBundleExportStatus::Writing => t("diagnostics.writing").to_owned(),
+        DiagnosticBundleExportStatus::Complete(path) => {
+            t("diagnostics.complete").replace("{path}", &path.display().to_string())
+        }
+        DiagnosticBundleExportStatus::Failed(error) => diagnostic_failure_message(error),
+    }
+}
+
+/// Format the summary of redactions applied to a diagnostic bundle.
+#[must_use]
+#[allow(dead_code)]
+pub(crate) fn format_redaction_summary(summary: &RedactionSummary) -> String {
+    t("diagnostics.redaction_summary")
+        .replace("{total}", &summary.total().to_string())
+        .replace("{users}", &summary.usernames.to_string())
+        .replace("{paths}", &summary.paths.to_string())
+        .replace(
+            "{ips}",
+            &(summary.ipv4_addresses + summary.ipv6_addresses).to_string(),
+        )
+}
+
+/// Materialize a dedicated diagnostic bundle export status section for the System page.
+#[must_use]
+#[allow(dead_code)]
+pub(crate) fn diagnostic_bundle_section(
+    status: &DiagnosticBundleExportStatus,
+) -> SystemFactSection {
+    let mut section = SystemFactSection::new("diagnostics.title");
+    let (status_text, detail) = match status {
+        DiagnosticBundleExportStatus::Writing => (t("diagnostics.writing").to_owned(), None),
+        DiagnosticBundleExportStatus::Complete(path) => (
+            t("diagnostics.complete").replace("{path}", &path.display().to_string()),
+            Some(path.display().to_string()),
+        ),
+        DiagnosticBundleExportStatus::Failed(error) => (
+            t("diagnostics.failed").to_owned(),
+            Some(t(diagnostic_failure_feedback_key(error.kind())).to_owned()),
+        ),
+    };
+    section.push(t("common.status"), status_text);
+    if let Some(detail_val) = detail {
+        section.push(t("common.details"), detail_val);
+    }
+    section
+}
+
+/// Materialize ordered system facts with optional diagnostic bundle export status feedback.
+#[must_use]
+#[allow(dead_code)]
+pub(crate) fn system_sections_with_diagnostics(
+    hardware: Option<&HardwareInfo>,
+    snapshot: Option<&SystemSnapshot>,
+    npu_inventory: Option<&NpuInventorySnapshot>,
+    smbios_memory: Option<&taskmanager_core::core::metrics::SmbiosMemorySnapshot>,
+    diagnostic_status: Option<&DiagnosticBundleExportStatus>,
+) -> Vec<SystemFactSection> {
+    let mut sections = system_sections(hardware, snapshot, npu_inventory, smbios_memory);
+    if let Some(status) = diagnostic_status {
+        sections.push(diagnostic_bundle_section(status));
+    }
+    sections
+}
+
+/// Format system specifications and diagnostic facts for export or clipboard copy.
+#[must_use]
+#[allow(dead_code)]
+pub(crate) fn format_system_spec_export(
+    hardware: Option<&HardwareInfo>,
+    snapshot: Option<&SystemSnapshot>,
+    npu_inventory: Option<&NpuInventorySnapshot>,
+    smbios_memory: Option<&taskmanager_core::core::metrics::SmbiosMemorySnapshot>,
+) -> String {
+    let sections = system_sections(hardware, snapshot, npu_inventory, smbios_memory);
+    let mut lines = Vec::new();
+    lines.push("# System Specifications".to_string());
+    for section in sections {
+        lines.push(format!("## {}", section.title));
+        for fact in section.facts {
+            lines.push(format!("- {}: {}", fact.label, fact.value));
+        }
+    }
+    lines.join("\n")
 }

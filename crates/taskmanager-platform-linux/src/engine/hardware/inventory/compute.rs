@@ -260,6 +260,7 @@ fn cpuinfo_native_flag(feature: CpuInstructionFeature) -> &'static str {
         CpuInstructionFeature::Avx512Vnni => "avx512_vnni",
         CpuInstructionFeature::AmxInt8 => "amx_int8",
         CpuInstructionFeature::AmxBf16 => "amx_bf16",
+        CpuInstructionFeature::Avx10 => "avx10",
         CpuInstructionFeature::Neon => "asimd",
         CpuInstructionFeature::Sve => "sve",
     }

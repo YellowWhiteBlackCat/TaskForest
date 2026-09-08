@@ -66,9 +66,7 @@ fn vm_value(field: ProcessDetailsField) -> String {
 #[test]
 fn property_pairs_mirror_the_neutral_vm() {
     let pairs = property_pairs(&fixture(), &local_time_rules());
-    // 14 rows: the 16-field surface minus the two drop-on-missing rows
-    // (none missing on this fixture) plus... every field present.
-    assert_eq!(pairs.len(), 16);
+    assert_eq!(pairs.len(), 24);
     let value = |field: ProcessDetailsField| {
         pairs
             .iter()
@@ -80,9 +78,17 @@ fn property_pairs_mirror_the_neutral_vm() {
         ProcessDetailsField::User,
         ProcessDetailsField::Status,
         ProcessDetailsField::Memory,
+        ProcessDetailsField::Pss,
+        ProcessDetailsField::Uss,
+        ProcessDetailsField::AnonHugePages,
         ProcessDetailsField::Threads,
+        ProcessDetailsField::NetworkRate,
+        ProcessDetailsField::CancelledWriteBytes,
         ProcessDetailsField::Fds,
         ProcessDetailsField::Nice,
+        ProcessDetailsField::SchedPolicy,
+        ProcessDetailsField::OomScore,
+        ProcessDetailsField::PageFaults,
         ProcessDetailsField::ParentPid,
         ProcessDetailsField::StartTime,
         ProcessDetailsField::CpuTime,
@@ -143,6 +149,6 @@ fn overview_exactly_the_property_rows_minus_command_and_exe() {
         .map(|(f, _, _)| *f)
         .filter(|f| !matches!(f, ProcessDetailsField::Cmdline | ProcessDetailsField::Exe))
         .collect();
-    assert_eq!(overview.len(), 14);
+    assert_eq!(overview.len(), 22);
     assert_eq!(overview.first(), Some(&ProcessDetailsField::Name));
 }

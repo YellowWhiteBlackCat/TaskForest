@@ -73,7 +73,10 @@ pub(super) struct CpuRailRow {
 /// graph exactly as the gpui pinned details panel places them. Labels reuse
 /// the System page's keys and the shared `duration` readout so one fact has
 /// one presentation in the whole frontend.
-pub(super) fn cpu_live_rail_rows(snapshot: &SystemSnapshot) -> Vec<CpuRailRow> {
+pub(super) fn cpu_live_rail_rows(
+    snapshot: &SystemSnapshot,
+    rapl_state: Option<&taskmanager_application::RaplPowerState>,
+) -> Vec<CpuRailRow> {
     let mut rows = vec![
         CpuRailRow {
             label: t("common.processes").to_owned(),
@@ -90,11 +93,43 @@ pub(super) fn cpu_live_rail_rows(snapshot: &SystemSnapshot) -> Vec<CpuRailRow> {
             value: duration(snapshot.uptime_secs),
         },
     ];
-    if let Some(pressure) = snapshot.pressure.as_ref() {
-        if let Some(cpu_pressure) = pressure.cpu.current_value() {
+    if let Some(pressure) = snapshot.pressure.as_ref()
+        && let Some(cpu_pressure) = pressure.cpu.current_value()
+    {
+        rows.push(CpuRailRow {
+            label: format!("{} (some)", t("perf.stall")),
+            value: taskmanager_shell::presentation::pressure_summary(cpu_pressure),
+        });
+    }
+    if let Some(load) = snapshot.load_average.as_ref() {
+        // The terminal details rail has a deliberately narrow value column.
+        // Keep all three windows as separate label/value rows so the load
+        // evidence stays readable instead of wrapping a long composite value
+        // onto a second visual line.
+        rows.extend([
+            CpuRailRow {
+                label: format!("{} 1m", t("system.load_normalized")),
+                value: format!("{:.2}×", load.normalized_one_minute),
+            },
+            CpuRailRow {
+                label: format!("{} 5m", t("system.load_normalized")),
+                value: format!("{:.2}×", load.normalized_five_minutes),
+            },
+            CpuRailRow {
+                label: format!("{} 15m", t("system.load_normalized")),
+                value: format!("{:.2}×", load.normalized_fifteen_minutes),
+            },
+            CpuRailRow {
+                label: t("system.load_basis").to_owned(),
+                value: taskmanager_shell::presentation::load_average_basis_summary(load),
+            },
+        ]);
+    }
+    if let Some(taskmanager_application::RaplPowerState::Ready(rapl)) = rapl_state {
+        for row in &rapl.snapshot.packages {
             rows.push(CpuRailRow {
-                label: "CPU Stall (some)".to_owned(),
-                value: format!("{:.1}%", cpu_pressure.some.avg10),
+                label: format!("{} {}", row.name, t("common.power")),
+                value: format!("{:.1} W", row.power_w),
             });
         }
     }
@@ -185,6 +220,33 @@ pub(super) fn cpu_spec_rail_rows(
         rows.push(CpuRailRow {
             label: t("cpu.power_preference").to_owned(),
             value: preference.clone(),
+        });
+    }
+    if let Some(power_limits) = taskmanager_shell::presentation::cpu_power_limits_summary(cpu) {
+        rows.push(CpuRailRow {
+            label: t("cpu.power_limits").to_owned(),
+            value: power_limits,
+        });
+    }
+    // Diagnostic topology counters are lower priority than policy facts. The
+    // renderer's measured-cell budget can then leave a visible more-rows hint
+    // instead of cutting the governor/limit rows below a wrapped value.
+    if let Some(topology) = taskmanager_shell::presentation::cpu_topology_summary(cpu) {
+        rows.push(CpuRailRow {
+            label: t("cpu.topology").to_owned(),
+            value: topology,
+        });
+    }
+    if let Some(idle_states) = taskmanager_shell::presentation::cpu_idle_state_summary(cpu) {
+        rows.push(CpuRailRow {
+            label: t("cpu.idle_states").to_owned(),
+            value: idle_states,
+        });
+    }
+    if let Some(interrupts) = taskmanager_shell::presentation::cpu_interrupt_summary(cpu) {
+        rows.push(CpuRailRow {
+            label: t("cpu.interrupts").to_owned(),
+            value: interrupts,
         });
     }
     rows

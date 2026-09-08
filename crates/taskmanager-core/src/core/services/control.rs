@@ -11,4 +11,8 @@ pub enum ServiceAction {
     Restart,
     Enable,
     Disable,
+    /// Ask the selected systemd manager to rescan unit files. The provider
+    /// ignores the selected unit for the native command because this is a
+    /// manager-wide `daemon-reload`, not a per-service lifecycle transition.
+    ReloadDaemon,
 }

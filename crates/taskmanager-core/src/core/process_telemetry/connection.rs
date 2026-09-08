@@ -187,6 +187,16 @@ impl ConnectionEndpoint {
         }
     }
 
+    /// Return whether this endpoint is a loopback IP or a local-domain path.
+    #[must_use]
+    pub fn is_loopback(&self) -> bool {
+        match self {
+            Self::Ip(address) => address.ip().is_loopback(),
+            Self::Local { .. } => true,
+            Self::Opaque { .. } | Self::Unspecified => false,
+        }
+    }
+
     fn family_hint(&self) -> Option<ConnectionAddressFamily> {
         match self {
             Self::Ip(SocketAddr::V4(_)) => Some(ConnectionAddressFamily::Ipv4),
@@ -354,25 +364,128 @@ impl<'de> Deserialize<'de> for ConnectionProviderKey {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// Provider-neutral connection lifecycle state, accurately modeling standard
+/// TCP states (RFC 793 / RFC 9293) alongside non-TCP socket semantics.
+///
+/// Standard TCP states include connection-establishment phases ([`Self::Established`],
+/// [`Self::SynSent`], [`Self::SynReceived`], [`Self::Listen`]), termination phases
+/// ([`Self::FinWait1`], [`Self::FinWait2`], [`Self::TimeWait`], [`Self::CloseWait`],
+/// [`Self::LastAck`], [`Self::Closing`]), and the quiescent closed state ([`Self::Closed`]).
+///
+/// For connectionless transports (such as UDP datagram sockets or unbound local
+/// sockets), [`Self::Unconnected`] is reported. [`Self::Unknown`] captures unrecognized
+/// or unsupported platform-specific states.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ConnectionState {
+    /// Active, fully established bidirectional connection in data transfer phase (RFC 793 `ESTABLISHED`).
+    ///
+    /// Both endpoints have completed the handshake and can exchange payload data.
     Established,
+    /// Active connection opening initiated; waiting for a matching connection request (RFC 793 `SYN-SENT`).
+    ///
+    /// The local endpoint has transmitted a SYN segment to the remote peer and is awaiting SYN-ACK.
     SynSent,
+    /// Connection request received and acknowledged; waiting for final confirmation (RFC 793 `SYN-RECEIVED`).
+    ///
+    /// The local endpoint received a SYN, sent a SYN-ACK, and is awaiting an incoming ACK.
     SynReceived,
+    /// Connection termination initiated locally; waiting for termination request or ACK (RFC 793 `FIN-WAIT-1`).
+    ///
+    /// The local endpoint has sent a FIN segment and awaits either a FIN from the remote peer or an ACK.
     FinWait1,
+    /// Local termination acknowledged; waiting for remote termination request (RFC 793 `FIN-WAIT-2`).
+    ///
+    /// The local endpoint received an ACK for its FIN, and is waiting for the remote peer to close its half.
     FinWait2,
+    /// Waiting for sufficient time (2MSL) to ensure remote peer received termination ACK (RFC 793 `TIME-WAIT`).
+    ///
+    /// Prevents delayed segments from an expired connection from interfering with subsequent connections.
     TimeWait,
+    /// Connection is closed and inactive (RFC 793 `CLOSED`).
+    ///
+    /// Represents the absence of an active connection or a terminated socket control block.
     Closed,
+    /// Remote peer initiated termination; waiting for local application closure (RFC 793 `CLOSE-WAIT`).
+    ///
+    /// The local endpoint received a FIN from the remote peer and sent an ACK; waiting for local socket close.
     CloseWait,
+    /// Local termination initiated after remote close; waiting for final ACK (RFC 793 `LAST-ACK`).
+    ///
+    /// The local endpoint was in `CloseWait`, closed its end by sending a FIN, and awaits final ACK.
     LastAck,
+    /// Endpoint is passively listening for incoming connection requests (RFC 793 `LISTEN`).
+    ///
+    /// The local socket is bound and waiting for incoming client SYN segments.
     Listen,
+    /// Simultaneous connection termination; waiting for remote termination ACK (RFC 793 `CLOSING`).
+    ///
+    /// Both endpoints sent FIN segments concurrently and the local endpoint awaits an ACK of its FIN.
     Closing,
+    /// Connectionless or unbound transport state (e.g. UDP sockets or unbound local endpoints).
+    ///
+    /// Used for datagram sockets that are open but not connected to a specific remote peer.
     Unconnected,
+    /// Connection state could not be determined or is not recognized by the native platform provider.
+    #[default]
     Unknown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl ConnectionState {
+    /// Returns the canonical RFC/standard name for the connection state.
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Established => "ESTABLISHED",
+            Self::SynSent => "SYN_SENT",
+            Self::SynReceived => "SYN_RECEIVED",
+            Self::FinWait1 => "FIN_WAIT_1",
+            Self::FinWait2 => "FIN_WAIT_2",
+            Self::TimeWait => "TIME_WAIT",
+            Self::Closed => "CLOSED",
+            Self::CloseWait => "CLOSE_WAIT",
+            Self::LastAck => "LAST_ACK",
+            Self::Listen => "LISTEN",
+            Self::Closing => "CLOSING",
+            Self::Unconnected => "UNCONNECTED",
+            Self::Unknown => "UNKNOWN",
+        }
+    }
+
+    /// Whether this connection state represents an established data-transfer session.
+    #[must_use]
+    pub const fn is_established(&self) -> bool {
+        matches!(self, Self::Established)
+    }
+
+    /// Whether this state indicates an endpoint listening for incoming connections.
+    #[must_use]
+    pub const fn is_listening(&self) -> bool {
+        matches!(self, Self::Listen)
+    }
+
+    /// Whether this state indicates a connection in the process of closing or terminating.
+    #[must_use]
+    pub const fn is_closing(&self) -> bool {
+        matches!(
+            self,
+            Self::FinWait1
+                | Self::FinWait2
+                | Self::CloseWait
+                | Self::Closing
+                | Self::LastAck
+                | Self::TimeWait
+        )
+    }
+}
+
+impl fmt::Display for ConnectionState {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProcessConnection {
     pub transport: ConnectionTransport,
     pub family: ConnectionAddressFamily,
@@ -380,6 +493,10 @@ pub struct ProcessConnection {
     pub remote: ConnectionEndpoint,
     pub state: ConnectionState,
     pub provider_key: Option<ConnectionProviderKey>,
+    /// Observed TCP round-trip time in milliseconds, when the native provider
+    /// can correlate `TCP_INFO`/`ss` data with this socket inode. UDP, UNIX,
+    /// unsupported providers, and permission failures remain `None`.
+    pub rtt_ms: Option<f32>,
 }
 
 #[derive(Deserialize)]
@@ -393,9 +510,27 @@ struct ProcessConnectionWire {
     state: ConnectionState,
     #[serde(default)]
     provider_key: Option<ConnectionProviderKey>,
+    #[serde(default)]
+    rtt_ms: Option<f32>,
 }
 
 impl ProcessConnection {
+    /// Return whether the connection is confined to the local host.
+    ///
+    /// UNIX-domain paths are inherently local; an IP connection is loopback
+    /// only when both known endpoints are loopback addresses. A loopback bind
+    /// to a non-loopback peer remains external traffic. Unknown or unspecified
+    /// endpoints are not silently counted as local traffic.
+    #[must_use]
+    pub fn is_loopback(&self) -> bool {
+        matches!(self.transport, ConnectionTransport::Local)
+            || matches!(
+                (self.local.as_socket_addr(), self.remote.as_socket_addr()),
+                (Some(local), Some(remote))
+                    if local.ip().is_loopback() && remote.ip().is_loopback()
+            )
+    }
+
     fn legacy_protocol_name(&self) -> Cow<'_, str> {
         match (&self.transport, &self.family) {
             (ConnectionTransport::Tcp, ConnectionAddressFamily::Ipv6) => Cow::Borrowed("tcp6"),
@@ -425,8 +560,10 @@ impl Serialize for ProcessConnection {
             self.family,
             ConnectionAddressFamily::Ipv4 | ConnectionAddressFamily::Ipv6
         );
-        let field_count =
-            4 + usize::from(include_family) + usize::from(self.provider_key.is_some());
+        let field_count = 4
+            + usize::from(include_family)
+            + usize::from(self.provider_key.is_some())
+            + usize::from(self.rtt_ms.is_some());
         let mut connection = serializer.serialize_struct("ProcessConnection", field_count)?;
         connection.serialize_field("protocol", &self.legacy_protocol_name())?;
         if include_family {
@@ -437,6 +574,12 @@ impl Serialize for ProcessConnection {
         connection.serialize_field("state", &self.state)?;
         if let Some(provider_key) = &self.provider_key {
             connection.serialize_field("provider_key", provider_key)?;
+        }
+        if let Some(rtt_ms) = self
+            .rtt_ms
+            .filter(|value| value.is_finite() && *value >= 0.0)
+        {
+            connection.serialize_field("rtt_ms", &rtt_ms)?;
         }
         connection.end()
     }
@@ -466,8 +609,23 @@ impl<'de> Deserialize<'de> for ProcessConnection {
             remote: wire.remote,
             state: wire.state,
             provider_key: wire.provider_key,
+            rtt_ms: wire
+                .rtt_ms
+                .filter(|value| value.is_finite() && *value >= 0.0),
         })
     }
+}
+
+/// Host TCP open/retransmit counters sampled alongside a process's socket
+/// table. They are intentionally labeled as host counters: procfs can prove
+/// socket ownership and endpoints, but it cannot attribute these aggregate
+/// counters to one PID. They compensate for short-lived connections that a
+/// one-second socket-table sample can miss.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub struct NetworkConnectionCounters {
+    pub active_opens: Option<u64>,
+    pub passive_opens: Option<u64>,
+    pub retransmitted_segments: Option<u64>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
@@ -481,6 +639,8 @@ pub struct ProcessNetworkSnapshot {
     pub traffic_failure: Option<FailureKind>,
     #[serde(default)]
     pub traffic_provider: Option<ProviderId>,
+    #[serde(default)]
+    pub connection_counters: Option<NetworkConnectionCounters>,
 }
 
 #[cfg(test)]

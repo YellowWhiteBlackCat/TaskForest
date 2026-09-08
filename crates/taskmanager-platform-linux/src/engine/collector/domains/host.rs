@@ -11,7 +11,7 @@ use std::time::Instant;
 
 use taskmanager_core::{
     FailureKind, HostRuntimeFacts, HostRuntimeObservation, ProviderId, ScalarObservation,
-    SourceOutcome, SourceStatus,
+    SourceOutcome, SourceStatus, SystemLoadAverage,
 };
 
 use super::{LinuxSystemDomainCollector, SourceQuality, source_quality, stronger_failure};
@@ -19,10 +19,13 @@ use super::{LinuxSystemDomainCollector, SourceQuality, source_quality, stronger_
 const UPTIME_PROVIDER: ProviderId = ProviderId::borrowed("linux.host.proc-uptime");
 const PROCESS_PROVIDER: ProviderId = ProviderId::borrowed("linux.host.proc-processes");
 const THREAD_PROVIDER: ProviderId = ProviderId::borrowed("linux.host.proc-threads");
+const LOAD_PROVIDER: ProviderId = ProviderId::borrowed("linux.host.proc-loadavg");
 
 /// Host runtime facts collected independently from CPU and process-list lanes.
 pub(crate) struct LinuxHostTelemetryCollector {
     proc_root: PathBuf,
+    logical_processors: usize,
+    physical_processors: Option<usize>,
     last_facts: HostRuntimeFacts,
     last_value: Option<(HostRuntimeFacts, u64)>,
 }
@@ -34,8 +37,22 @@ impl LinuxHostTelemetryCollector {
     }
 
     fn with_proc_root(proc_root: PathBuf) -> Self {
+        Self::with_proc_root_and_processor_counts(
+            proc_root,
+            logical_processor_count(),
+            physical_processor_count(),
+        )
+    }
+
+    fn with_proc_root_and_processor_counts(
+        proc_root: PathBuf,
+        logical_processors: usize,
+        physical_processors: Option<usize>,
+    ) -> Self {
         Self {
             proc_root,
+            logical_processors,
+            physical_processors,
             last_facts: HostRuntimeFacts::default(),
             last_value: None,
         }
@@ -49,6 +66,12 @@ impl LinuxHostTelemetryCollector {
         let uptime = observe_uptime(&self.proc_root.join("uptime"), now_ms);
         let process_scan = observe_processes(&self.proc_root, now_ms);
         let psi = super::psi::observe_psi(&self.proc_root.join("pressure"), now_ms);
+        let load_average = observe_load_average(
+            &self.proc_root.join("loadavg"),
+            self.logical_processors,
+            self.physical_processors,
+            now_ms,
+        );
         let facts = HostRuntimeFacts {
             uptime_secs: uptime.scalar.retain_previous(self.last_facts.uptime_secs),
             processes: process_scan
@@ -60,6 +83,9 @@ impl LinuxHostTelemetryCollector {
                 .scalar
                 .retain_previous(self.last_facts.threads),
             pressure: psi.snapshot.retain_previous(self.last_facts.pressure),
+            load_average: load_average
+                .scalar
+                .retain_previous(self.last_facts.load_average),
         };
         self.last_facts = facts.clone();
         (
@@ -69,6 +95,7 @@ impl LinuxHostTelemetryCollector {
                 process_scan.processes.source,
                 process_scan.threads.source,
                 psi.source,
+                load_average.source,
             ],
         )
     }
@@ -109,17 +136,53 @@ impl LinuxSystemDomainCollector for LinuxHostTelemetryCollector {
     }
 }
 
-struct ScalarSource {
-    scalar: ScalarObservation<u64>,
+struct ScalarSource<T> {
+    scalar: ScalarObservation<T>,
     source: SourceStatus,
 }
 
 struct ProcessScan {
-    processes: ScalarSource,
-    threads: ScalarSource,
+    processes: ScalarSource<u64>,
+    threads: ScalarSource<u64>,
 }
 
-fn observe_uptime(path: &Path, now_ms: u64) -> ScalarSource {
+fn logical_processor_count() -> usize {
+    std::thread::available_parallelism()
+        .map(std::num::NonZeroUsize::get)
+        .unwrap_or(1)
+}
+
+fn physical_processor_count() -> Option<usize> {
+    let root = Path::new("/sys/devices/system/cpu");
+    let mut identities = std::collections::BTreeSet::new();
+    let entries = fs::read_dir(root).ok()?;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let Some(cpu) = name
+            .strip_prefix("cpu")
+            .and_then(|value| value.parse::<usize>().ok())
+        else {
+            continue;
+        };
+        let topology = root.join(format!("cpu{cpu}/topology"));
+        let Some(package) = fs::read_to_string(topology.join("physical_package_id"))
+            .ok()
+            .and_then(|value| value.trim().parse::<u32>().ok())
+        else {
+            continue;
+        };
+        let Some(core) = fs::read_to_string(topology.join("core_id"))
+            .ok()
+            .and_then(|value| value.trim().parse::<u32>().ok())
+        else {
+            continue;
+        };
+        identities.insert((package, core));
+    }
+    (!identities.is_empty()).then_some(identities.len())
+}
+
+fn observe_uptime(path: &Path, now_ms: u64) -> ScalarSource<u64> {
     let observation = fs::read_to_string(path)
         .map_err(|error| io_failure(&error))
         .and_then(|content| parse_uptime_secs(&content));
@@ -152,6 +215,66 @@ fn parse_uptime_secs(content: &str) -> Result<u64, FailureKind> {
     whole_seconds
         .parse::<u64>()
         .map_err(|_| FailureKind::ProviderFault)
+}
+
+fn observe_load_average(
+    path: &Path,
+    logical_processors: usize,
+    physical_processors: Option<usize>,
+    now_ms: u64,
+) -> ScalarSource<SystemLoadAverage> {
+    let observation = fs::read_to_string(path)
+        .map_err(|error| io_failure(&error))
+        .and_then(|content| parse_load_average(&content, logical_processors, physical_processors));
+    match observation {
+        Ok(value) => ScalarSource {
+            scalar: ScalarObservation::available(value, now_ms),
+            source: SourceStatus {
+                provider: LOAD_PROVIDER,
+                outcome: SourceOutcome::Available,
+                item_count: 1,
+            },
+        },
+        Err(failure) => ScalarSource {
+            scalar: ScalarObservation::unavailable(failure),
+            source: SourceStatus {
+                provider: LOAD_PROVIDER,
+                outcome: SourceOutcome::Unavailable(failure),
+                item_count: 0,
+            },
+        },
+    }
+}
+
+fn parse_load_average(
+    content: &str,
+    logical_processors: usize,
+    physical_processors: Option<usize>,
+) -> Result<SystemLoadAverage, FailureKind> {
+    let mut fields = content.split_whitespace();
+    let one_minute = fields
+        .next()
+        .ok_or(FailureKind::ProviderFault)?
+        .parse::<f32>()
+        .map_err(|_| FailureKind::ProviderFault)?;
+    let five_minutes = fields
+        .next()
+        .ok_or(FailureKind::ProviderFault)?
+        .parse::<f32>()
+        .map_err(|_| FailureKind::ProviderFault)?;
+    let fifteen_minutes = fields
+        .next()
+        .ok_or(FailureKind::ProviderFault)?
+        .parse::<f32>()
+        .map_err(|_| FailureKind::ProviderFault)?;
+    SystemLoadAverage::from_raw_with_physical(
+        one_minute,
+        five_minutes,
+        fifteen_minutes,
+        logical_processors,
+        physical_processors,
+    )
+    .ok_or(FailureKind::ProviderFault)
 }
 
 fn observe_processes(proc_root: &Path, now_ms: u64) -> ProcessScan {
@@ -239,7 +362,7 @@ fn observed_count(
     successful_samples: u64,
     failure: Option<FailureKind>,
     now_ms: u64,
-) -> ScalarSource {
+) -> ScalarSource<u64> {
     let item_count = usize::try_from(successful_samples).unwrap_or(usize::MAX);
     match (successful_samples, failure) {
         (_, None) => ScalarSource {
@@ -266,7 +389,7 @@ fn observed_count(
     }
 }
 
-fn unavailable_scalar(provider: ProviderId, failure: FailureKind) -> ScalarSource {
+fn unavailable_scalar<T>(provider: ProviderId, failure: FailureKind) -> ScalarSource<T> {
     ScalarSource {
         scalar: ScalarObservation::unavailable(failure),
         source: SourceStatus {

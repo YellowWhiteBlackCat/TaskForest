@@ -5,6 +5,7 @@
 use serde::{Deserialize, Serialize};
 
 use super::domain::{SystemDomainValue, SystemObservationState};
+use crate::core::metrics::SystemLoadAverage;
 use crate::core::{FailureKind, ScalarObservation, SourceStatus};
 
 /// Independently fallible host-runtime counters.
@@ -18,6 +19,8 @@ pub struct HostRuntimeFacts {
     pub threads: ScalarObservation<u64>,
     #[serde(default)]
     pub pressure: ScalarObservation<crate::core::metrics::SystemPressureSnapshot>,
+    #[serde(default)]
+    pub load_average: ScalarObservation<SystemLoadAverage>,
 }
 
 /// One independently scheduled host-runtime observation.

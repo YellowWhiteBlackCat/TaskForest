@@ -367,13 +367,6 @@ jobs:
           path: |
             TaskForest-*-*-${{ matrix.arch }}.msi
             checksums-sha256-windows-${{ matrix.arch }}.txt
-          name: windows-${{ matrix.arch }}-artifacts
-          compression-level: 0
-          if-no-files-found: error
-          retention-days: ${{ inputs.publish && 90 || 3 }}
-          path: |
-            TaskForest-G-*-${{ matrix.arch }}.msi
-            checksums-sha256-windows-${{ matrix.arch }}.txt
 
   publish:
     name: Publish release artifacts
@@ -488,5 +481,4 @@ jobs:
             release-artifacts/TaskForest-*-*.deb
             release-artifacts/TaskForest-*-*.rpm
             release-artifacts/TaskForest-*-*.msi
-            release-artifacts/checksums-sha256-*.txt
             release-artifacts/checksums-sha256-*.txt

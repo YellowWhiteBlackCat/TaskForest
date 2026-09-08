@@ -91,15 +91,15 @@ fn connection_readout_preserves_ip_labels_and_displays_local_endpoint_truth() {
 
     assert_eq!(
         format_connection(&fixture.network.connections[0]),
-        "TCP  127.0.0.1:51842 → 10.20.0.8:443"
+        "TCP [ESTABLISHED · EXTERNAL]  127.0.0.1:51842 → 10.20.0.8:443 · RTT 12.4 ms"
     );
     assert_eq!(
         format_connection(&fixture.network.connections[1]),
-        "UDP6  [::1]:53535 → [::1]:53"
+        "UDP6 [UNCONNECTED · LOOPBACK]  [::1]:53535 → [::1]:53"
     );
     assert_eq!(
         format_connection(&fixture.network.connections[2]),
-        "LOCAL  /run/taskmanager.sock → —"
+        "LOCAL [LISTEN · LOOPBACK]  /run/taskmanager.sock → —"
     );
     assert!(
         fixture.network.connections[2]

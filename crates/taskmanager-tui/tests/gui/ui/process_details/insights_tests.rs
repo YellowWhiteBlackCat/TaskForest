@@ -1,3 +1,7 @@
+use super::formatting::{
+    format_capability_line, format_capability_row, format_engine_cycles, format_engine_time,
+    is_dangerous_capability,
+};
 use super::*;
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
@@ -12,8 +16,8 @@ use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::FrozenProcessIdentity;
 use taskmanager_core::core::process_telemetry::{
-    OpenFileKind, ProcessEnvironmentEntry, ProcessGpuEngineUsage, ProcessGpuEngines,
-    ProcessGpuSnapshot, ThreadState,
+    OpenFileKind, ProcessEnvironmentEntry, ProcessGpuDevice, ProcessGpuEngineUsage,
+    ProcessGpuEngines, ProcessGpuSnapshot, ThreadState,
 };
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 
@@ -49,6 +53,9 @@ fn format_thread_row_keeps_missing_cpu_honest() {
         state: ThreadState::Sleep,
         cpu_time_secs: Some(12.5),
         cpu_percent: Some(18.5),
+        wchan: None,
+        run_queue_wait_ns: None,
+        wait_kind: None,
     };
     let gap = ProcessThreadInfo {
         tid: 4243,
@@ -56,6 +63,9 @@ fn format_thread_row_keeps_missing_cpu_honest() {
         state: ThreadState::Running,
         cpu_time_secs: None,
         cpu_percent: None,
+        wchan: None,
+        run_queue_wait_ns: None,
+        wait_kind: None,
     };
     let warm_line = format_thread_row(&warm);
     let gap_line = format_thread_row(&gap);
@@ -79,11 +89,13 @@ fn format_open_file_row_keeps_unreadable_target_honest() {
         fd: 0,
         kind: OpenFileKind::File,
         target: Some("/dev/null".into()),
+        deleted: false,
     };
     let unreadable = OpenFileEntry {
         fd: 9,
         kind: OpenFileKind::Other,
         target: None,
+        deleted: false,
     };
     assert!(format_open_file_row(&readable, "unreadable").contains("/dev/null"),);
     let denied = format_open_file_row(&unreadable, "unreadable");
@@ -188,6 +200,9 @@ fn thread_preview_renders_header_rows_and_ellipsis() {
                 state: ThreadState::Running,
                 cpu_time_secs: Some(2.0),
                 cpu_percent: Some(5.0),
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             ProcessThreadInfo {
                 tid: 101,
@@ -195,6 +210,9 @@ fn thread_preview_renders_header_rows_and_ellipsis() {
                 state: ThreadState::Sleep,
                 cpu_time_secs: None,
                 cpu_percent: None,
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             ProcessThreadInfo {
                 tid: 102,
@@ -202,6 +220,9 @@ fn thread_preview_renders_header_rows_and_ellipsis() {
                 state: ThreadState::Sleep,
                 cpu_time_secs: None,
                 cpu_percent: None,
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             ProcessThreadInfo {
                 tid: 103,
@@ -209,6 +230,9 @@ fn thread_preview_renders_header_rows_and_ellipsis() {
                 state: ThreadState::Sleep,
                 cpu_time_secs: None,
                 cpu_percent: None,
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
         ],
     };
@@ -262,21 +286,25 @@ fn open_files_preview_renders_count_unreadable_and_rows() {
                 fd: 0,
                 kind: OpenFileKind::File,
                 target: Some("/dev/null".into()),
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 3,
                 kind: OpenFileKind::Socket,
                 target: Some("socket:[4242]".into()),
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 9,
                 kind: OpenFileKind::Other,
                 target: None,
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 10,
                 kind: OpenFileKind::Pipe,
                 target: Some("pipe:[5]".into()),
+                deleted: false,
             },
         ],
     };
@@ -288,8 +316,8 @@ fn open_files_preview_renders_count_unreadable_and_rows() {
     );
     // Readable descriptors render as `fd → target`; the None target keeps
     // the typed unreadable marker.
-    assert!(text.contains("0 → /dev/null"));
-    assert!(text.contains("9 → unreadable"));
+    assert!(text.contains("0 [file] → /dev/null"));
+    assert!(text.contains("9 [other] → unreadable"));
     // The fourth descriptor is beyond the preview bound.
     assert!(text.contains('…'));
     assert!(
@@ -629,4 +657,184 @@ fn format_engine_usage_line_precedence_and_missing_counters() {
     };
     let line3 = format_engine_usage_line(&cycles_m);
     assert!(line3.contains("blit  —  42.5M cycles"), "{line3}");
+}
+
+/// Dangerous capabilities (CAP_SYS_ADMIN, CAP_SYS_PTRACE, etc.) are correctly identified
+/// regardless of case and CAP_ prefix.
+#[test]
+fn is_dangerous_capability_identifies_high_privilege_caps() {
+    // CAP_SYS_ADMIN variants
+    assert!(is_dangerous_capability("CAP_SYS_ADMIN"));
+    assert!(is_dangerous_capability("cap_sys_admin"));
+    assert!(is_dangerous_capability("SYS_ADMIN"));
+    assert!(is_dangerous_capability("sys_admin"));
+
+    // CAP_SYS_PTRACE variants
+    assert!(is_dangerous_capability("CAP_SYS_PTRACE"));
+    assert!(is_dangerous_capability("cap_sys_ptrace"));
+    assert!(is_dangerous_capability("SYS_PTRACE"));
+    assert!(is_dangerous_capability("sys_ptrace"));
+
+    // Other dangerous capabilities
+    assert!(is_dangerous_capability("CAP_SYS_RAWIO"));
+    assert!(is_dangerous_capability("CAP_SYS_MODULE"));
+    assert!(is_dangerous_capability("CAP_NET_ADMIN"));
+    assert!(is_dangerous_capability("CAP_DAC_OVERRIDE"));
+
+    // Safe cgroup controllers / capabilities
+    assert!(!is_dangerous_capability("cpu"));
+    assert!(!is_dangerous_capability("memory"));
+    assert!(!is_dangerous_capability("pids"));
+    assert!(!is_dangerous_capability("io"));
+    assert!(!is_dangerous_capability("CAP_AUDIT_WRITE"));
+}
+
+/// format_capability_row adds visible warning markers for dangerous capabilities.
+#[test]
+fn format_capability_row_highlights_dangerous_capabilities() {
+    let dangerous_admin = format_capability_row("CAP_SYS_ADMIN");
+    assert!(
+        dangerous_admin.contains("[!]") && dangerous_admin.contains('\u{26a0}'),
+        "dangerous capability must contain visible warning marker: {dangerous_admin}"
+    );
+    assert!(dangerous_admin.contains("CAP_SYS_ADMIN"));
+
+    let dangerous_ptrace = format_capability_row("CAP_SYS_PTRACE");
+    assert!(
+        dangerous_ptrace.contains("[!]") && dangerous_ptrace.contains('\u{26a0}'),
+        "dangerous capability must contain visible warning marker: {dangerous_ptrace}"
+    );
+    assert!(dangerous_ptrace.contains("CAP_SYS_PTRACE"));
+
+    let safe = format_capability_row("cpu");
+    assert!(
+        !safe.contains("[!]") && !safe.contains('\u{26a0}'),
+        "safe capability must not contain warning marker: {safe}"
+    );
+    assert_eq!(safe, "cpu");
+}
+
+/// format_capability_line styles dangerous capabilities with theme.warn and Modifier::BOLD.
+#[test]
+fn format_capability_line_styles_dangerous_with_warning() {
+    let theme = TuiTheme::default();
+    let line = format_capability_line("CAP_SYS_ADMIN", theme);
+    let rendered = render_text(vec![line]);
+    assert!(
+        rendered.contains("[!]")
+            && rendered.contains('\u{26a0}')
+            && rendered.contains("CAP_SYS_ADMIN"),
+        "rendered line must contain marker and cap: {rendered}"
+    );
+
+    let safe_line = format_capability_line("memory", theme);
+    let safe_rendered = render_text(vec![safe_line]);
+    assert!(
+        !safe_rendered.contains("[!]") && !safe_rendered.contains('\u{26a0}'),
+        "safe line must not have marker: {safe_rendered}"
+    );
+    assert!(safe_rendered.contains("memory"));
+}
+
+/// Capabilities preview renders the count title, highlights dangerous capabilities,
+/// and truncates with ellipsis beyond preview limit.
+#[test]
+fn capabilities_preview_renders_header_rows_and_ellipsis() {
+    let _guard = en();
+    let caps = vec![
+        "cpu".to_string(),
+        "CAP_SYS_ADMIN".to_string(),
+        "CAP_SYS_PTRACE".to_string(),
+        "extra_cap".to_string(),
+    ];
+    let text = render_text(capabilities_preview_lines_with_limit(
+        &caps,
+        TuiTheme::default(),
+        3,
+    ));
+    assert!(
+        text.contains("Capabilities 4"),
+        "count title must render, got:\n{text}"
+    );
+    assert!(text.contains("cpu"), "safe capability must render: {text}");
+    assert!(
+        text.contains("[!]") && text.contains("CAP_SYS_ADMIN"),
+        "CAP_SYS_ADMIN must render with warning marker: {text}"
+    );
+    assert!(
+        text.contains("[!]") && text.contains("CAP_SYS_PTRACE"),
+        "CAP_SYS_PTRACE must render with warning marker: {text}"
+    );
+    assert!(
+        text.contains('…'),
+        "ellipsis must render when truncated: {text}"
+    );
+    assert!(
+        !text.contains("extra_cap"),
+        "truncated item beyond bound must not render: {text}"
+    );
+}
+
+/// Full `insights_lines` pipeline verifies that dangerous capabilities in resource groups
+/// are highlighted with visible warning markers.
+#[test]
+fn insights_lines_renders_capabilities_with_warning_markers() {
+    use taskmanager_core::core::identity::ProviderId;
+    use taskmanager_core::core::process_telemetry::{
+        ProcessResourceObservations, ProcessResourceSnapshot, ResourceGroupMembership,
+        ResourceObservation,
+    };
+
+    let _guard = en();
+    let target = FrozenProcessIdentity::from_authoritative_parts(200, "priv-proc", 1000, 1000)
+        .expect("valid target");
+    let revision = ProcessInsightsRevision::new(1);
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target, revision);
+    let mut projection = tracker.snapshot().expect("snapshot exists");
+
+    let groups = vec![ResourceGroupMembership {
+        provider: ProviderId::borrowed("fixture"),
+        native_hierarchy_id: Some(1),
+        capabilities: vec![
+            "cpu".into(),
+            "CAP_SYS_ADMIN".into(),
+            "CAP_SYS_PTRACE".into(),
+        ],
+        native_locator: "cgroup:/system.slice/test.service".into(),
+    }];
+    let resource_snapshot = ProcessResourceSnapshot::from_observations(
+        DeviceState::healthy(1),
+        ProcessResourceObservations {
+            resource_groups: ResourceObservation::current(groups, 1),
+            ..ProcessResourceObservations::default()
+        },
+        Vec::new(),
+    );
+    projection.resources = ProcessInsightFacetState::Current(resource_snapshot);
+
+    let mut app = crate::demo_app();
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+    );
+    let text = render_text(insights_lines(&app, TuiTheme::default(), 200));
+
+    assert!(
+        text.contains("Resource group"),
+        "resource group locator must render: {text}"
+    );
+    assert!(
+        text.contains("Capabilities 3"),
+        "capabilities count must render: {text}"
+    );
+    assert!(
+        text.contains("[!]") && text.contains("CAP_SYS_ADMIN"),
+        "CAP_SYS_ADMIN must render with warning marker: {text}"
+    );
+    assert!(
+        text.contains("[!]") && text.contains("CAP_SYS_PTRACE"),
+        "CAP_SYS_PTRACE must render with warning marker: {text}"
+    );
+    assert!(text.contains("cpu"), "safe controller must render: {text}");
 }

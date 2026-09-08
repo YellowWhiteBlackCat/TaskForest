@@ -1,12 +1,14 @@
 //! Performance sidebar, CPU header, and responsive rail scenes.
 
 use super::*;
+use crate::pages::performance::metrics::{battery_caption, battery_sidebar_title};
 use crate::widgets::chart::{MAX_CHART_POINTS, line_segments, polyline_scene};
 
 pub(super) mod cpu;
 
 use super::blocks::gpu_block_title;
 use super::chart::chart_grid_scene;
+use bevy::ui_widgets::ScrollArea;
 use cpu::device_button_scene;
 
 /// One label→value line; the value is the rewritable fact. Both columns are
@@ -16,28 +18,26 @@ fn fact_row(label: String, value: String, field: DynField) -> impl Scene + use<>
     bsn! {
         Node {
             width: percent(100),
-            min_width: px(180.0),
+            min_width: px(220.0),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             justify_content: JustifyContent::SpaceBetween,
-            column_gap: Val::Px(space_2()),
+            column_gap: Val::Px(space_8()),
             padding: UiRect::vertical(Val::Px(space_2())),
         }
         Children [
             (
                 Node {
-                    min_width: px(100.0),
+                    flex_shrink: 1.0,
                     overflow: Overflow::clip_x(),
                 }
                 Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
             ),
             (
                 Node {
-                    min_width: px(0.0),
-                    flex_shrink: 1.0,
+                    flex_shrink: 0.0,
                     flex_direction: FlexDirection::Row,
                     justify_content: JustifyContent::FlexEnd,
-                    overflow: Overflow::clip_x(),
                 }
                 Children [ ( Text(value) TextRole(Role::Mono) DynText(field) template_value(no_wrap_text()) ) ]
             ),
@@ -63,18 +63,78 @@ fn cpu_metric_cell_scene(
     bsn! {
         Node {
             flex_grow: 1.0,
+            flex_shrink: 1.0,
             min_width: px(palette.control_height_px * 3.5),
             flex_direction: FlexDirection::Row,
             align_items: AlignItems::Center,
             column_gap: Val::Px(space_2()),
+            overflow: Overflow::clip_x(),
         }
         Children [
-            ( Text(label) TextRole(Role::Caption) ),
             (
-                Text(value)
-                TextRole(Role::Mono)
-                DynText(DynField::Cpu(field))
-                template_value(no_wrap_text())
+                Node {
+                    flex_shrink: 0.0,
+                    overflow: Overflow::clip_x(),
+                }
+                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+            ),
+            (
+                Node {
+                    flex_grow: 1.0,
+                    flex_shrink: 1.0,
+                    min_width: px(0.0),
+                    overflow: Overflow::clip_x(),
+                }
+                Children [
+                    (
+                        Text(value)
+                        TextRole(Role::Mono)
+                        DynText(DynField::Cpu(field))
+                        template_value(no_wrap_text())
+                    )
+                ]
+            ),
+        ]
+    }
+}
+
+/// One bounded full-width diagnostic line used for composite CPU facts. The
+/// value owns the shrinkable slot and wraps within it. Its measured height
+/// contributes to the row, preserving long provider values without letting
+/// them overlap the neighboring fact.
+fn cpu_metric_full_row_scene(label: String, value: String, field: CpuField) -> impl Scene + use<> {
+    bsn! {
+        Node {
+            width: percent(100),
+            flex_shrink: 0.0,
+            flex_direction: FlexDirection::Row,
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_8()),
+            overflow: Overflow::clip_x(),
+        }
+        Children [
+            (
+                Node {
+                    width: px(96.0),
+                    flex_shrink: 0.0,
+                    overflow: Overflow::clip_x(),
+                }
+                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+            ),
+            (
+                Node {
+                    flex_grow: 1.0,
+                    flex_shrink: 1.0,
+                    min_width: px(0.0),
+                    overflow: Overflow::clip_x(),
+                }
+                Children [
+                    (
+                        Text(value)
+                        TextRole(Role::Mono)
+                        DynText(DynField::Cpu(field))
+                    )
+                ]
             ),
         ]
     }
@@ -265,11 +325,7 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                         palette.accent,
                         palette,
                     ),
-                    Box::new(bsn! {
-                        Text(disk_caption(disk))
-                        TextRole(Role::Mono)
-                        template_value(no_wrap_text())
-                    }),
+                    super::disk_caption_scene(disk, palette),
                     false,
                     palette,
                 )),
@@ -331,6 +387,35 @@ pub(super) fn device_sidebar_scene(shell: &ShellApp, palette: &UiPalette) -> imp
                         Role::Mono,
                         DynField::Device {
                             section: Section::Gpu,
+                            device: key,
+                        },
+                    ),
+                    false,
+                    palette,
+                )),
+            )));
+        }
+    }
+    if let Some(power) = shell.projection().power_supplies.as_ref() {
+        for (index, battery) in power.batteries.iter().enumerate() {
+            let key = battery.id.clone();
+            let title = battery_sidebar_title(battery, index);
+            let caption = battery_caption(battery);
+            rows.push(Box::new(device_button_scene(
+                PerformanceDeviceTarget::Battery(key.clone()),
+                Box::new(device_row_with_accessory_scene(
+                    title,
+                    sidebar_activity_scene(
+                        taskmanager_ui_contract::IconId::Performance,
+                        &[],
+                        palette.accent,
+                        palette,
+                    ),
+                    marked_text_scene(
+                        caption,
+                        Role::Mono,
+                        DynField::Device {
+                            section: Section::Battery,
                             device: key,
                         },
                     ),
@@ -411,10 +496,8 @@ pub(super) fn stats_rail_scene(shell: &ShellApp, palette: &UiPalette) -> impl Sc
             min_width: px(WIDE_STATS_WIDTH_PX),
             height: percent(100),
             flex_shrink: 0.0,
-            overflow: Overflow::scroll_y(),
         }
         PerformanceStatsRail
-        ScrollArea
         Children [
             ( { panel } ),
         ]

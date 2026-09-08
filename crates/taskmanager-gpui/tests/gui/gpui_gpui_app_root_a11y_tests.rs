@@ -209,6 +209,7 @@ async fn snapshot_stays_well_formed_with_edge_values_and_modal_open(cx: &mut Tes
 /// well-formed with the process table still published.
 #[gpui::test]
 async fn pending_termination_confirmation_is_published_to_the_live_region(cx: &mut TestAppContext) {
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     let root = make_root(cx);
     root.update(cx, |view, _| {
         view.mark_telemetry_frame_ready();

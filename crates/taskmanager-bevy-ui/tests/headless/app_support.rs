@@ -14,6 +14,7 @@ impl Page {
         Page::System,
         Page::Startup,
         Page::Sessions,
+        Page::Containers,
         Page::Alerts,
         Page::Settings,
         Page::AppHistory,

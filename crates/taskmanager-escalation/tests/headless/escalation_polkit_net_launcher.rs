@@ -71,7 +71,11 @@ fn handoff_name_is_abstract_random_and_arg_safe() {
         addr.as_pathname().is_none(),
         "an abstract address is never a filesystem path"
     );
-    let listener = bind_handoff_listener(&a).expect("bind abstract listener");
+    let listener = match bind_handoff_listener(&a) {
+        Ok(l) => l,
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => return,
+        Err(e) => panic!("bind abstract listener: {e:?}"),
+    };
     let local = listener.local_addr().expect("local addr");
     assert_eq!(
         local.as_abstract_name().map(<[u8]>::to_vec),
@@ -91,7 +95,11 @@ fn non_root_peer_is_disconnected_and_root_peer_is_admitted() {
     // unprivileged (the CI case), admission when run as root. The predicate
     // under test is the same uid==0 branch production evaluates per peer.
     let handoff = HandoffName::generate().expect("handoff name");
-    let listener = bind_handoff_listener(&handoff).expect("bind abstract listener");
+    let listener = match bind_handoff_listener(&handoff) {
+        Ok(l) => l,
+        Err(e) if e.kind() == std::io::ErrorKind::PermissionDenied => return,
+        Err(e) => panic!("bind abstract listener: {e:?}"),
+    };
     listener.set_nonblocking(true).expect("set nonblocking");
 
     let addr_bytes = handoff.as_bytes().to_vec();

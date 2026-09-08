@@ -156,7 +156,7 @@ pub(crate) enum TuiSurface {
     About,
     Health,
     Containers,
-    ServiceMenu(ServiceMenuTarget),
+    ServiceMenu(Box<ServiceMenuTarget>),
     ProcessMenu(Box<ProcessMenuTarget>),
     BatchMenu(BatchMenuTarget),
     SessionMenu(SessionMenuTarget),

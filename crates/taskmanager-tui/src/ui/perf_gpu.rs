@@ -301,6 +301,17 @@ fn gpu_fact_lines_with_theme(
                             version,
                         )));
                     }
+                    if let Some(version) = api
+                        .mesa_version
+                        .as_deref()
+                        .filter(|value| !value.is_empty())
+                    {
+                        lines.push(Line::from(format!(
+                            "  {} {}",
+                            t("gpu.mesa_version"),
+                            version,
+                        )));
+                    }
                 }
                 let power = data
                     .power
@@ -317,6 +328,44 @@ fn gpu_fact_lines_with_theme(
                     t("gpu.idle_residency"),
                     data.idle_residency,
                 )));
+                if data.fan_rpm.is_some() || data.fan_pwm.is_some() {
+                    lines.push(Line::from(format!(
+                        "  {} {} · {} {}",
+                        t("fan.rpm"),
+                        data.fan_rpm
+                            .as_deref()
+                            .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+                        t("fan.pwm"),
+                        data.fan_pwm
+                            .as_deref()
+                            .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+                    )));
+                }
+                if data.memory_bus_width.is_some() || data.power_limit.is_some() {
+                    lines.push(Line::from(format!(
+                        "  {} {} · {} {}",
+                        t("gpu.memory_bus_width"),
+                        data.memory_bus_width
+                            .as_deref()
+                            .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+                        t("gpu.power_limit"),
+                        data.power_limit
+                            .as_deref()
+                            .unwrap_or(taskmanager_shell::presentation::MISSING_VALUE),
+                    )));
+                }
+                if let Some(bandwidth) = gpu
+                    .memory_bandwidth_gbps
+                    .filter(|value| value.is_finite() && *value > 0.0)
+                {
+                    lines.push(Line::from(format!(
+                        "  {} {bandwidth:.1} GB/s",
+                        t("gpu.memory_bandwidth")
+                    )));
+                }
+                if let Some(depth) = gpu.queue_depth {
+                    lines.push(Line::from(format!("  {} {depth}", t("gpu.queue_depth"))));
+                }
                 for vram in &data.vram {
                     lines.push(Line::from(format!(
                         "  {}  {} / {}",
@@ -344,6 +393,17 @@ fn gpu_fact_lines_with_theme(
                         version,
                     )));
                 }
+                if let Some(version) = gpu
+                    .vbios_version
+                    .as_deref()
+                    .filter(|value| !value.is_empty())
+                {
+                    lines.push(Line::from(format!(
+                        "  {} {}",
+                        t("gpu.vbios_version"),
+                        version,
+                    )));
+                }
                 // Raw PCI function identity (GPUI gpu_stats tail row). An
                 // unattached/unprobed GPU omits the row instead of a dash.
                 if let Some(slot) = gpu
@@ -352,6 +412,13 @@ fn gpu_fact_lines_with_theme(
                     .filter(|slot| !slot.trim().is_empty())
                 {
                     lines.push(Line::from(format!("  {} {}", t("gpu.pci_slot"), slot,)));
+                }
+                if let Some(connected) = gpu.display_connected {
+                    lines.push(Line::from(format!(
+                        "  {} {}",
+                        t("gpu.display_output"),
+                        t(if connected { "common.yes" } else { "common.no" })
+                    )));
                 }
             }
         }

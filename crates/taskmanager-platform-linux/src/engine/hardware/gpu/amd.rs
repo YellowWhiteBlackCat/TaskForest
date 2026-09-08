@@ -57,6 +57,32 @@ pub(super) fn probe_amdgpu_device(_card_name: &str, device_path: &Path) -> AmdDe
         utilization.failure,
     );
 
+    let mut queue_read = GpuFieldRead::unavailable(FailureKind::Unsupported);
+    for name in ["gpu_queue_depth", "ring_queue_depth", "queue_depth"] {
+        let candidate = read_u64_field(&device_path.join(name), false);
+        if candidate.value.is_some() || candidate.failure != Some(FailureKind::Unsupported) {
+            queue_read = candidate;
+            break;
+        }
+    }
+    match queue_read.value.and_then(|value| u32::try_from(value).ok()) {
+        Some(depth) => {
+            metric.queue_depth = Some(depth);
+            fields.push(GpuMetricField::QueueDepth);
+        }
+        None if queue_read
+            .failure
+            .is_some_and(|failure| failure != FailureKind::Unsupported) =>
+        {
+            record_optional_failure(
+                &mut failures,
+                GpuMetricField::QueueDepth,
+                queue_read.failure,
+            );
+        }
+        None => {}
+    }
+
     let engines = read_amdgpu_engines_detailed(device_path);
     metric.engines = engines.value.unwrap_or_default();
     if !metric.engines.is_empty() {

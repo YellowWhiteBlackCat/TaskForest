@@ -14,6 +14,11 @@ fn canonical_targets_round_trip_without_display_name_inference() {
         assert_eq!(resolved.init(), expected_init);
         assert_eq!(resolved.native(), expected_native);
     }
+    let user = resolve_service_target(&systemd_user_service_id("demo.service"))
+        .expect("canonical user-service target");
+    assert_eq!(user.init(), InitSystem::Systemd);
+    assert_eq!(user.native(), "demo.service");
+    assert!(user.user_scope());
 }
 
 #[test]

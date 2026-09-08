@@ -54,6 +54,7 @@ fn npu_view_model_keeps_all_current_facts_and_marks_missing_values() {
         memory: NpuMemoryReport {
             dedicated_total_bytes: ScalarObservation::available(0, 1),
             shared_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+            sram_total_bytes: ScalarObservation::available(32 * 1024 * 1024, 1),
         },
         ..NpuDevice::default()
     };
@@ -71,7 +72,15 @@ fn npu_view_model_keeps_all_current_facts_and_marks_missing_values() {
             .iter()
             .map(|row| row.value.as_str())
             .collect::<Vec<_>>(),
-        ["Intel AI Boost", "intel_vpu", "42%", "17%", "0 B", "—"]
+        [
+            "Intel AI Boost",
+            "intel_vpu",
+            "42%",
+            "17%",
+            "0 B",
+            "—",
+            "32.0 MiB",
+        ]
     );
 
     let failed = NpuInventorySnapshot::failed(FailureKind::ProviderFault, "fixture", 2);
@@ -229,26 +238,26 @@ fn apps_columns_keep_swap_conditional_and_project_the_gpui_parity_set() {
     assert_eq!(
         with_swap.iter().map(|(col, _)| *col).collect::<Vec<_>>(),
         vec![
-            SortCol::Pid,
             SortCol::Name,
+            SortCol::User,
+            SortCol::Pid,
+            SortCol::Threads,
+            SortCol::StartTime,
+            SortCol::State,
             SortCol::Cpu,
             SortCol::Memory,
-            SortCol::Pss,
             SortCol::Swap,
+            SortCol::Pss,
             SortCol::DiskRead,
             SortCol::DiskWrite,
+            SortCol::Network,
             SortCol::CpuTime,
-            SortCol::Threads,
-            SortCol::User,
-            // GPUI-parity advanced columns (each individually sortable).
-            SortCol::State,
             SortCol::Fds,
             SortCol::Nice,
-            SortCol::StartTime,
         ]
     );
     // Labels come from the shell's SortCol::label, not a duplicated literal.
-    assert_eq!(with_swap[0].0.label(), "PID");
+    assert_eq!(with_swap[0].0.label(), "Name");
 
     let without_swap = apps_columns(false);
     assert!(
@@ -280,7 +289,7 @@ fn applications_column_menu_hides_scalars_but_keeps_name_and_trend_anchored() {
     assert!(visible.iter().any(|(column, _)| *column == SortCol::Name));
     assert!(!visible.iter().any(|(column, _)| *column == SortCol::Cpu));
     assert!(!visible.iter().any(|(column, _)| *column == SortCol::Memory));
-    assert_eq!(trend_header_index_for(&visible), 2);
+    assert_eq!(trend_header_index_for(&visible), 6);
 }
 
 #[test]

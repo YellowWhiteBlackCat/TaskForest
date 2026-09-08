@@ -21,6 +21,7 @@ fn host_facts(observed_at_ms: u64) -> HostRuntimeFacts {
         processes: ScalarObservation::available(4, observed_at_ms),
         threads: ScalarObservation::available(12, observed_at_ms),
         pressure: ScalarObservation::default(),
+        load_average: ScalarObservation::default(),
     }
 }
 
@@ -131,6 +132,7 @@ fn compatibility_projection_never_turns_unknown_host_counts_into_zero() {
         processes: ScalarObservation::available(0, 10),
         threads: ScalarObservation::available(0, 10),
         pressure: ScalarObservation::default(),
+        load_average: ScalarObservation::default(),
     };
     domains.host = HostRuntimeObservation::current(zero_facts, 10, Vec::new());
     let snapshot =

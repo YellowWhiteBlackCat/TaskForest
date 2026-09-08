@@ -72,7 +72,7 @@ the lower document layers.
 
 ## Working protocol
 
-- Preserve unrelated work. Cargo uses `.tmp/`, shared `target/`, and at most four jobs; tests use `cargo nextest ... -j 4` (doctests use `cargo test --doc ... -j 4`), enforced by the quick gate.
+- Preserve unrelated work. Cargo uses `.tmp/`, shared `target/`, and at most four jobs. Every non-doctest test must use `cargo nextest run ... -j 4`; only an explicit `cargo test --doc ... -j 4` is allowed for doctests. The quick gate mechanically rejects every other non-doctest form.
 - Routine work may proceed on `main` until the owner rescinds mainline mode.
 - Before completion, run the quick gate and report pass/fail/skip with relevant evidence.
 - Every visible layout change must complete the elastic-layout playbook: derive slot budgets, admit

@@ -27,6 +27,15 @@ macOS 打包和真实设备视觉验证仍然 deferred，跨平台编译不能�
 
 ## 2. 本地层级
 
+### 强制测试执行器规则
+
+这是不可豁免的仓库规则：除 doctest 外，任何测试、集成测试、GUI/headless 测试和
+覆盖率测试都必须通过 `cargo nextest run ... -j 4`（覆盖率使用
+`cargo llvm-cov nextest ... -j 4`）。测试命令只允许在明确带有 `--doc` 的
+doctest，并且必须带 `-j 4`；裸测试命令、带 `--tests` 的变体或其它非 doctest
+形式都会被 `scripts/quality/test_runner_guard.py` 拒绝。`cargo nextest list` 仅用于发现，
+不能替代实际的 `nextest run`。
+
 统一入口为：
 
 ```bash

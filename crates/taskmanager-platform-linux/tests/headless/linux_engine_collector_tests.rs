@@ -13,10 +13,14 @@ fn apply_smart_copies_availability_with_optional_fields() {
         provider: Some(ProviderId::borrowed("fixture.smart")),
         failure: Some(taskmanager_core::SmartProviderFailureKind::MissingTool),
         temperature_c: None,
+        temperature_sensors_c: Vec::new(),
         critical_warning: None,
         temp_critical_c: None,
         percent_used: None,
+        available_spare_pct: None,
+        available_spare_threshold_pct: None,
         power_on_hours: None,
+        unsafe_shutdowns: None,
         ata_attributes: None,
     };
     let mut disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()

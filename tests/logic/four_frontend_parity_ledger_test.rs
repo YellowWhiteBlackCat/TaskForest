@@ -6,6 +6,8 @@
 //! 1. Global shortcuts (F5, F9, Alt+1..8, Esc, Ctrl+F, Ctrl+Space).
 //! 2. AccessKit semantic tree mounting, consumer oracle validation, and actions.
 //! 3. Theme system high-contrast and follow-system strictness.
+//! 4. Performance chart fidelity (smooth Catmull-Rom / Bezier curves, fixed ceiling scaling, shared-scale sparklines, honest gap preservation).
+//! 5. Responsive layout properties (typed viewport budgets, compact breakpoints, rail collapsing, minimum usable chart floors).
 
 use taskmanager_application::CommandId;
 use taskmanager_core::core::appearance::{DesktopAppearance, DesktopFamily, PreferredColorScheme};
@@ -47,10 +49,12 @@ enum Facet {
     AccessKitActions,
     ThemeHighContrast,
     ThemeFollowSystem,
+    ChartFidelity,
+    ResponsiveProperties,
 }
 
 impl Facet {
-    const ALL: [Facet; 11] = [
+    const ALL: [Facet; 13] = [
         Facet::GlobalShortcutF5,
         Facet::GlobalShortcutF9,
         Facet::GlobalShortcutAltDigits,
@@ -62,6 +66,8 @@ impl Facet {
         Facet::AccessKitActions,
         Facet::ThemeHighContrast,
         Facet::ThemeFollowSystem,
+        Facet::ChartFidelity,
+        Facet::ResponsiveProperties,
     ];
 }
 
@@ -83,7 +89,7 @@ struct LedgerEntry {
     evidence: &'static str,
 }
 
-const LEDGER: [LedgerEntry; 44] = [
+const LEDGER: [LedgerEntry; 52] = [
     // ---- GPUI -------------------------------------------------------------
     LedgerEntry {
         facet: Facet::GlobalShortcutF5,
@@ -161,6 +167,20 @@ const LEDGER: [LedgerEntry; 44] = [
         status: Status::Ready,
         reason: "",
         evidence: "crates/taskmanager-gpui/src/gpui_app/root/appearance.rs:145 apply_system_color_scheme follows desktop_appearance.color_scheme",
+    },
+    LedgerEntry {
+        facet: Facet::ChartFidelity,
+        frontend: Frontend::Gpui,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-gpui/src/gpui_app/graph.rs:130-155 Catmull-Rom spline curve smoothing (smooth: true), fill_alpha 0.39, bounded 60-sample window, and honest NaN gap handling",
+    },
+    LedgerEntry {
+        facet: Facet::ResponsiveProperties,
+        frontend: Frontend::Gpui,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-gpui/src/gpui_app/root/responsive.rs:21-65 MIN_WIDTH 720, MIN_HEIGHT 480, NAV_RAIL_COMPACT_WIDTH 54, NAV_RAIL_WIDTH 144, COMPACT_CONTENT_WIDTH 1080, and performance slot floors",
     },
     // ---- Iced -------------------------------------------------------------
     LedgerEntry {
@@ -240,6 +260,20 @@ const LEDGER: [LedgerEntry; 44] = [
         reason: "",
         evidence: "crates/taskmanager-iced/src/app/appearance.rs:108 reduce_system_theme_change follows OS theme when mode is System",
     },
+    LedgerEntry {
+        facet: Facet::ChartFidelity,
+        frontend: Frontend::Iced,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-iced/src/perf_chart.rs:688-720 smooth_line_path & smooth_area_path corrected bezier_curve_to control point order (ctrl_a, ctrl_b, end); ui/perf_overview.rs:646-700 cpu/memory split charts",
+    },
+    LedgerEntry {
+        facet: Facet::ResponsiveProperties,
+        frontend: Frontend::Iced,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-iced/src/ui/responsive.rs:20-65 PageLayoutBudget, LayoutProfile, PERFORMANCE_MAIN_MIN_WIDTH 360, and ui/performance.rs:118-138 interactive column resize handle",
+    },
     // ---- TUI --------------------------------------------------------------
     LedgerEntry {
         facet: Facet::GlobalShortcutF5,
@@ -317,6 +351,20 @@ const LEDGER: [LedgerEntry; 44] = [
         status: Status::Ready,
         reason: "",
         evidence: "crates/taskmanager-tui/src/theme.rs:52 from_config_tokens_with_appearance follows desktop_appearance in System mode",
+    },
+    LedgerEntry {
+        facet: Facet::ChartFidelity,
+        frontend: Frontend::Tui,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/sparkline.rs:187-250 device_dual_trend_in shared-scale normalization across paired directions with explicit DEVICE_TREND_GAP mid-dots and 2-sample warm floor",
+    },
+    LedgerEntry {
+        facet: Facet::ResponsiveProperties,
+        frontend: Frontend::Tui,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-tui/src/ui/perf_overview.rs:243-265 cpu_chart_layout (GraphOnly vs GraphWithCores with 10-row min height) and perf_gpu.rs:40-75 GpuPanelLayout (Compact vs Standard)",
     },
     // ---- Bevy -------------------------------------------------------------
     LedgerEntry {
@@ -396,6 +444,20 @@ const LEDGER: [LedgerEntry; 44] = [
         reason: "",
         evidence: "crates/taskmanager-bevy-ui/src/drain.rs:232 drain_system updates ThemePreferences from desktop_appearance_events in System mode",
     },
+    LedgerEntry {
+        facet: Facet::ChartFidelity,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/widgets/chart.rs:89-140 line_segments_scaled anchored to fixed ceiling (0.0..ceiling) with gap-aware segment breaks; scene/chart.rs:24-35 curve_card_scene",
+    },
+    LedgerEntry {
+        facet: Facet::ResponsiveProperties,
+        frontend: Frontend::Bevy,
+        status: Status::Ready,
+        reason: "",
+        evidence: "crates/taskmanager-bevy-ui/src/widgets/layout.rs:8-35 COMPACT_BREAKPOINT_PX 860, MAIN_GRAPH_MIN_WIDTH_PX 360, PerformanceLayoutMode; pages/performance.rs:564-600 sync_performance_layout",
+    },
 ];
 
 #[test]
@@ -403,7 +465,7 @@ fn every_facet_frontend_combination_has_exactly_one_entry() {
     assert_eq!(
         LEDGER.len(),
         Facet::ALL.len() * Frontend::ALL.len(),
-        "ledger size must equal the facet × frontend grid (11 × 4 = 44)"
+        "ledger size must equal the facet × frontend grid (13 × 4 = 52)"
     );
     for facet in Facet::ALL {
         for frontend in Frontend::ALL {
@@ -605,4 +667,38 @@ fn accesskit_consumer_oracle_validates_semantic_trees() {
     let root = tree.state().root();
     assert_eq!(root.role(), accesskit::Role::Application);
     assert_eq!(root.label().as_deref(), Some("TaskForest"));
+}
+
+#[test]
+fn chart_fidelity_and_responsive_contract_invariants() {
+    // 1. Chart fidelity: peak_of correctly respects sample windows and optional live readings
+    assert_eq!(
+        taskmanager_shell::presentation::peak_of(&[f32::NAN], None),
+        None
+    );
+    assert_eq!(
+        taskmanager_shell::presentation::peak_of(&[10.0, 50.0, 20.0], None),
+        Some(50.0)
+    );
+    assert_eq!(
+        taskmanager_shell::presentation::peak_of(&[10.0, 50.0, 20.0], Some(80.0)),
+        Some(80.0)
+    );
+    assert_eq!(
+        taskmanager_shell::presentation::peak_of(&[], Some(40.0)),
+        Some(40.0)
+    );
+
+    // 2. Chart summary computes honest metrics over finite values without fabricating zero for gaps
+    let summary = taskmanager_shell::presentation::graph_summary(&[10.0, f32::NAN, 30.0])
+        .expect("finite samples produce summary");
+    assert_eq!(summary.latest, 30.0);
+    assert_eq!(summary.minimum, 10.0);
+    assert_eq!(summary.maximum, 30.0);
+    assert_eq!(summary.average, 20.0);
+    assert_eq!(summary.sample_count, 2);
+
+    // 3. Peak of an empty series without live value is None (honest absence)
+    let empty_samples: [f32; 0] = [];
+    assert!(taskmanager_shell::presentation::graph_summary(&empty_samples).is_none());
 }

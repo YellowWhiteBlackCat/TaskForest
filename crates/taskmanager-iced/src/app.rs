@@ -513,7 +513,7 @@ pub struct IcedApp {
     /// Frontend-local System-page dashboard window selection. The dashboard
     /// segment renderer lives in `ui::system_dashboard`; the pills publish
     /// `Message::SystemDashboard(SelectWindow)` which stores here.
-    pub(crate) system_dashboard_window: taskmanager_core::core::history::HistoryWindow,
+    pub(crate) system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow,
     /// Boot-resolved replay capability plus its application-correlated panel
     /// lifecycle. Runtime config publications cannot change the capability.
     history_runtime: history_replay::IcedHistoryRuntime,

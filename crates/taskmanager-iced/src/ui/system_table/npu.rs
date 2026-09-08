@@ -52,6 +52,10 @@ impl NpuDeviceViewModel {
                 t("npu.shared_memory"),
                 byte_count(device.memory.shared_total_bytes.current_value().copied()),
             ),
+            fact_row(
+                t("npu.sram"),
+                byte_count(device.memory.sram_total_bytes.current_value().copied()),
+            ),
         ]);
         Self { title, rows }
     }

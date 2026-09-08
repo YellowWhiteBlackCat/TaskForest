@@ -553,10 +553,23 @@ fn rewrite_summary_line(
 /// Empty feedback keeps the line blank — never a fabricated status.
 fn rewrite_feedback_line(
     feedback: On<crate::drain::FeedbackChanged>,
-    mut lines: Query<&mut Text, With<FeedbackLine>>,
+    mut lines: Query<(&mut Text, Option<&FeedbackLine>, Option<&SummaryLine>)>,
 ) {
-    if let Ok(mut line) = lines.single_mut() {
-        line.0 = feedback.event().0.clone();
+    let summary = lines
+        .iter()
+        .find_map(|(line, _, marker)| marker.map(|_| line.0.clone()));
+    for (mut line, feedback_marker, _) in &mut lines {
+        if feedback_marker.is_some() {
+            // The demo shell seeds its informational feedback with the same
+            // text used by the summary line. Keep one visual owner instead of
+            // painting the sentence twice in the standard (non-Performance)
+            // shell.
+            line.0 = if summary.as_deref() == Some(feedback.event().0.as_str()) {
+                String::new()
+            } else {
+                feedback.event().0.clone()
+            };
+        }
     }
 }
 
@@ -656,9 +669,9 @@ fn spawn_app_shell(
 ) {
     commands.spawn(Camera2d);
     let summary = if demo.is_some() {
-        "Demo snapshot · no host actions".to_owned()
+        taskmanager_application::i18n::t("status.demo_snapshot").to_owned()
     } else {
-        "waiting for the first capability snapshot…".to_owned()
+        taskmanager_application::i18n::t("status.waiting_for_snapshot").to_owned()
     };
     commands.spawn_scene(app_shell_scene(&palette.inner, route.page, summary));
 }

@@ -45,7 +45,7 @@ macOS 适配器**只用发布在 crates.io 的 Safe 封装库 + 有界 `std::pro
 | SMART 自检 | smartctl -t 启动 + smartctl --json 轮询（简化单次镜像 Linux 策略机） | — |
 | **目录占用扫描** | 共享 `DirectoryUsageScanner`（pure safe-`std::fs`、有界可取消分块；APFS firmlink/克隆/符号链接树按构造不跟随） | 实机 APFS 大目录 receipt 未取 |
 | network | sysinfo 收发字节/速率/MAC + **`networksetup`/`airport`/`ifconfig` 解析**（WiFi SSID/链路速率） | 解析失败 → None（不猜测） |
-| process list | sysinfo 全字段 + **fd 计数（sysinfo `open_files`）+ 有界 `ps -Ao pid,nice,thcount` 快照（线程数/nice，~5s 缓存）** | 快照 miss/列为空 → 该标量 typed Unsupported（绝不伪造 0） |
+| process list | sysinfo 全字段 + **fd 计数（sysinfo `open_files`）+ 有界 `ps -Ao pid,nice,thcount` 快照（线程数/nice，~5s 缓存）+ 有界 `nettop -P -L 1 -d` per-process 收发速率快照（~5s 缓存）** | 任一命令 miss/列为空/行无法归属 → 对应标量 typed Unsupported（绝不伪造 0） |
 | **process control** | **sysinfo kill_with（Term/Kill/Stop/Continue/Hangup/Interrupt/User1/User2）** + renice 优先级 | — |
 | process insights | 资源（内存用量）、线程清单（pending） | 逐进程网络/GPU/隔离/open-files 明细 → Unsupported |
 | services | **launchctl list 清单 + kickstart/kill/enable/disable 控制 + log show 日志快照** | 系统域守护进程需特权 → 诚实省略（用户域清单）；依赖图/流式日志 → Unsupported |
@@ -64,8 +64,8 @@ macOS 适配器**只用发布在 crates.io 的 Safe 封装库 + 有界 `std::pro
 
 | 能力 | 需要的 macOS API | 现状 | 未来 Safe 路径 |
 |---|---|---|---|
-| GPU 整域 | Metal/IOKit（unsafe） | **Unsupported**（2019 后无 NVIDIA 驱动，无 NVML） | 无 |
-| 每进程 GPU/网络 | Metal HUD / nettop（需特权） | Unsupported | 无 |
+| GPU 整域 | Metal/IOKit（无合格 safe 封装） | identity/VRAM 由 `system_profiler` 提供；整体利用率在单适配器且 `ioreg` 属性可匹配时由 bounded snapshot 提供；其余动态标量仍缺席 | 无 |
+| 每进程 GPU | Metal HUD / IOKit（无合格 safe 封装） | Unsupported | 无 |
 | 风扇转速 | SMC（IOHID 无 Safe 封装） | 缺失 | sysinfo 未来版本若提供 |
 | 磁盘 IOPS/吞吐 | 无 Safe 计数器源 | Unavailable 标量 | 无 |
 | 进程隔离/沙箱（entitlement 域） | Sandbox/entitlements（unsafe） | Unsupported | 无 |
@@ -74,7 +74,7 @@ macOS 适配器**只用发布在 crates.io 的 Safe 封装库 + 有界 `std::pro
 | 会话控制 | 无 Safe API | Unsupported | — |
 | 电池循环次数 | SMC（无 Safe 封装） | Unavailable 标量 | — |
 | 固件版本/BIOS | 无 Safe SMBIOS 等价物 | typed Unavailable 片段 | system_profiler 部分覆盖 |
-| 逐进程网络提权链 | AF_PACKET/SCM_RIGHTS 是 Linux 面 | Unsupported（off-Linux 无等价链） | — |
+| 逐进程网络提权链 | AF_PACKET/SCM_RIGHTS 是 Linux 面 | Unsupported（off-Linux 无等价链）；普通 per-process 速率已由 `nettop` 快照提供 | — |
 
 注册-pending（描述符在目录中，提交完成于 typed `Unsupported`）：
 

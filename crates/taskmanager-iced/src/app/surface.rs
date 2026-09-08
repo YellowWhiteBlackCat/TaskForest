@@ -159,7 +159,7 @@ pub(crate) enum ContextMenu {
     },
     Service {
         source_index: usize,
-        service: ServiceItem,
+        service: Box<ServiceItem>,
     },
     Startup {
         source_index: usize,

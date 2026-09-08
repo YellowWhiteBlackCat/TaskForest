@@ -168,6 +168,9 @@ fn service_rows(item: &ServiceItem, matching_pid: Option<u32>) -> Vec<(String, S
             value_or_dash(&item.sub_state),
         ),
     ];
+    rows.extend(taskmanager_shell::presentation::service_diagnostics_rows(
+        item.diagnostics(),
+    ));
     if let Some(pid) = matching_pid {
         rows.push((t("proc.pid").to_owned(), pid.to_string()));
     }

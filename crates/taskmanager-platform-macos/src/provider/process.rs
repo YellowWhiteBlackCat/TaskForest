@@ -2,14 +2,16 @@
 //!
 //! List/resources use `sysinfo`; process control uses `sysinfo::Process::kill_with`
 //! (signals: terminate/kill/stop/continue) plus `renice` through the bounded
-//! command runner for priority. Per-process network/GPU/isolation and CPU
-//! affinity have NO safe source on macOS — those providers complete with
-//! typed unsupported outcomes and the gaps are recorded in
-//! `adr/019-macos-telemetry-safety.md`. The registry-facing group structs
+//! command runner for priority. Per-process network *rates* in the list use
+//! the bounded system `nettop` CSV snapshot; GPU/isolation/open-connection
+//! enrichments and CPU affinity still have no safe source on macOS, so those
+//! providers complete with typed unsupported outcomes and the gaps are
+//! recorded in `adr/019-macos-telemetry-safety.md`. The registry-facing group structs
 //! live in `process/composition.rs`.
 
 mod bundle_identity;
 mod composition;
+mod network_facts;
 mod pending;
 
 pub use composition::{
@@ -41,6 +43,7 @@ use taskmanager_platform_provider::{
 };
 
 use crate::provider::process_facts::ProcessFactsCache;
+use network_facts::ProcessNetworkFactsCache;
 
 const PROCESS_LIST_PROVIDER: ProviderId = ProviderId::borrowed("macos.process.list.sysinfo");
 
@@ -77,6 +80,10 @@ pub struct MacProcessListProvider {
     /// once per ~5 s. A PID absent from the cache keeps both scalars honestly
     /// `Unsupported` rather than fabricating 0.
     process_facts: ProcessFactsCache,
+    /// Per-process receive/send rates from the bounded macOS `nettop` sample.
+    /// A missing command or row leaves only that process's network scalars
+    /// unavailable; it never invalidates the process list itself.
+    process_network_facts: ProcessNetworkFactsCache,
 }
 
 impl MacProcessListProvider {
@@ -85,6 +92,7 @@ impl MacProcessListProvider {
             system: sysinfo::System::new(),
             disk_rates: HashMap::new(),
             process_facts: ProcessFactsCache::new(),
+            process_network_facts: ProcessNetworkFactsCache::new(),
         }
     }
 }
@@ -105,6 +113,7 @@ impl ProcessListProvider for MacProcessListProvider {
         // map — `fresh` borrows self mutably on a cache miss and the loop body
         // also borrows self.disk_rates / self.system.
         let facts = self.process_facts.fresh(Instant::now()).clone();
+        let network_facts = self.process_network_facts.fresh(Instant::now()).clone();
 
         let mut items = Vec::new();
         let mut current_pids = std::collections::HashSet::new();
@@ -167,6 +176,9 @@ impl ProcessListProvider for MacProcessListProvider {
                 memory_bytes: ScalarObservation::available(process.memory(), observed_at_ms),
                 memory_pss_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
                 memory_uss_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+                memory_anon_huge_pages_bytes: ScalarObservation::unavailable(
+                    FailureKind::Unsupported,
+                ),
                 swap_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
                 disk_read_bytes_total: ScalarObservation::available(
                     disk.total_read_bytes,
@@ -178,8 +190,20 @@ impl ProcessListProvider for MacProcessListProvider {
                 ),
                 disk_read_bytes_per_sec: read_rate,
                 disk_write_bytes_per_sec: write_rate,
-                network_rx_bytes_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
-                network_tx_bytes_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
+                network_rx_bytes_per_sec: network_facts
+                    .get(&pid_value)
+                    .and_then(|(receive, _)| *receive)
+                    .map_or_else(
+                        || ScalarObservation::unavailable(FailureKind::Unsupported),
+                        |value| ScalarObservation::available(value, observed_at_ms),
+                    ),
+                network_tx_bytes_per_sec: network_facts
+                    .get(&pid_value)
+                    .and_then(|(_, send)| *send)
+                    .map_or_else(
+                        || ScalarObservation::unavailable(FailureKind::Unsupported),
+                        |value| ScalarObservation::available(value, observed_at_ms),
+                    ),
                 threads: threads_obs,
                 start_time_secs: ScalarObservation::available(start_time_secs, observed_at_ms),
                 cpu_time_secs: ScalarObservation::available(

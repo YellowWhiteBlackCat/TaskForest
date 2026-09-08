@@ -212,8 +212,11 @@ power_on_hours                          : 5432
         "39 °C parsed"
     );
     assert_eq!(out.critical_warning, Some(false));
+    assert_eq!(out.available_spare_pct, Some(100.0));
+    assert_eq!(out.available_spare_threshold_pct, Some(10.0));
     assert!((out.percent_used.unwrap() - 2.0).abs() < 1e-6);
     assert_eq!(out.power_on_hours, Some(5432));
+    assert_eq!(out.unsafe_shutdowns, None);
 }
 
 /// `critical_warning` is emitted by nvme-cli in hex (`0x4`) when the

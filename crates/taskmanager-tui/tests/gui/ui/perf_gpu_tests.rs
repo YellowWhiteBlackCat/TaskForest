@@ -20,6 +20,8 @@ fn observed_gpu() -> GpuMetrics {
         frequency_mhz: ScalarObservation::available(1_800, 1),
         max_frequency_mhz: ScalarObservation::available(2_100, 1),
         power_w: ScalarObservation::available(120.0, 1),
+        fan_speed_rpm: ScalarObservation::available(1_240, 1),
+        fan_speed_pct: ScalarObservation::available(42.0, 1),
         idle_residency_pct: ScalarObservation::available(74.0, 1),
         dedicated_vram_used_bytes: ScalarObservation::available(1 << 30, 1),
         dedicated_vram_total_bytes: ScalarObservation::available(8 << 30, 1),
@@ -33,6 +35,10 @@ fn observed_gpu() -> GpuMetrics {
     ));
     gpu.driver = Some("xe".into());
     gpu.marketing_name = Some("Arc B390".into());
+    gpu.memory_bus_width_bits = Some(256);
+    gpu.memory_bandwidth_gbps = Some(160.0);
+    gpu.queue_depth = Some(3);
+    gpu.power_limit_w = Some(165.0);
     gpu.engines = vec![GpuEngine {
         name: "Render/3D".into(),
         usage_pct: 42.0,
@@ -68,6 +74,12 @@ fn full_fact_strip_keeps_every_current_gpu_scalar_together() {
         "1800 MHz",
         "2100 MHz",
         "120.0 W",
+        "1240 RPM",
+        "42%",
+        "256 bit",
+        "160.0 GB/s",
+        "Queue depth 3",
+        "165.0 W",
         "74.0%",
         "1.0 GiB",
         "8.0 GiB",
@@ -107,6 +119,7 @@ fn full_fact_strip_names_proven_graphics_apis_and_pci_slot() {
     proven.graphics_api = Some(taskmanager_core::core::metrics::GpuGraphicsApi {
         opengl_version: Some("4.6".into()),
         vulkan_version: Some("1.3.290".into()),
+        mesa_version: Some("25.1.4".into()),
     });
     proven.pci_slot = Some("0000:03:00.0".into());
     let text = joined(&gpu_fact_lines(&[proven], GpuFactDensity::Full));
@@ -127,6 +140,7 @@ fn full_fact_strip_names_proven_graphics_apis_and_pci_slot() {
     partial.graphics_api = Some(taskmanager_core::core::metrics::GpuGraphicsApi {
         opengl_version: Some("4.6".into()),
         vulkan_version: None,
+        mesa_version: None,
     });
     let partial_text = joined(&gpu_fact_lines(&[partial], GpuFactDensity::Full));
     assert!(
@@ -154,6 +168,7 @@ fn full_fact_strip_names_a_proven_driver_version() {
     taskmanager_test_support::pin_english();
     let mut proven = observed_gpu();
     proven.driver_version = Some("566.36".into());
+    proven.vbios_version = Some("95.0.1".into());
     let text = joined(&gpu_fact_lines(
         std::slice::from_ref(&proven),
         GpuFactDensity::Full,
@@ -161,6 +176,10 @@ fn full_fact_strip_names_a_proven_driver_version() {
     assert!(
         text.contains(&format!("{} 566.36", t("gpu.driver_version"))),
         "GPU fact strip lost the proven driver version:\n{text}"
+    );
+    assert!(
+        text.contains(&format!("{} 95.0.1", t("gpu.vbios_version"))),
+        "GPU fact strip lost the proven VBIOS version:\n{text}"
     );
 
     let unproven_text = joined(&gpu_fact_lines(&[observed_gpu()], GpuFactDensity::Full));
@@ -184,6 +203,7 @@ fn gpu_capability_rows_render_the_active_locale_copy() {
     gpu.graphics_api = Some(taskmanager_core::core::metrics::GpuGraphicsApi {
         opengl_version: Some("4.6".into()),
         vulkan_version: Some("1.3.290".into()),
+        mesa_version: Some("25.1.4".into()),
     });
     gpu.pci_slot = Some("0000:03:00.0".into());
     let keys = ["gpu.opengl_version", "gpu.vulkan_version", "gpu.pci_slot"];

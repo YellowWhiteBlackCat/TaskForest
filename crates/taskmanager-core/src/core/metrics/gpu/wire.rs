@@ -38,6 +38,14 @@ struct GpuMetricsWire {
     #[serde(default)]
     pci_modalias: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    memory_bus_width_bits: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    memory_bandwidth_gbps: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    queue_depth: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    display_connected: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     gpu_usage_pct: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     utilization_pct: Option<f32>,
@@ -90,6 +98,10 @@ struct GpuMetricsWire {
     #[serde(default)]
     driver_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    power_limit_w: Option<f32>,
+    #[serde(default)]
+    vbios_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     graphics_api: Option<GpuGraphicsApi>,
 }
 
@@ -122,6 +134,10 @@ impl Serialize for GpuMetrics {
             pci_subsystem_device_id: self.pci_subsystem_device_id,
             pci_slot: self.pci_slot.clone(),
             pci_modalias: self.pci_modalias.clone(),
+            memory_bus_width_bits: self.memory_bus_width_bits,
+            memory_bandwidth_gbps: self.memory_bandwidth_gbps,
+            queue_depth: self.queue_depth,
+            display_connected: self.display_connected,
             gpu_usage_pct: utilization,
             utilization_pct: utilization,
             vram_used_bytes: dedicated_used,
@@ -158,6 +174,8 @@ impl Serialize for GpuMetrics {
             throttle_reasons,
             driver: self.driver.clone(),
             driver_version: self.driver_version.clone(),
+            power_limit_w: self.power_limit_w,
+            vbios_version: self.vbios_version.clone(),
             graphics_api: self.graphics_api.clone(),
         }
         .serialize(serializer)
@@ -350,11 +368,17 @@ impl<'de> Deserialize<'de> for GpuMetrics {
             pci_subsystem_device_id: wire.pci_subsystem_device_id,
             pci_slot: wire.pci_slot,
             pci_modalias: wire.pci_modalias,
+            memory_bus_width_bits: wire.memory_bus_width_bits,
+            memory_bandwidth_gbps: wire.memory_bandwidth_gbps,
+            queue_depth: wire.queue_depth,
+            display_connected: wire.display_connected,
             engines: wire.engines,
             engine_failure: wire.engine_failure,
             engine_provider: wire.engine_provider,
             driver: wire.driver,
             driver_version: wire.driver_version,
+            power_limit_w: wire.power_limit_w,
+            vbios_version: wire.vbios_version,
             graphics_api: wire.graphics_api,
         })
     }

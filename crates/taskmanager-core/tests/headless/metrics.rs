@@ -207,6 +207,7 @@ fn legacy_top_level_cpu_policy_json_deserializes_into_neutral_model() {
             frequency_implementation: Some("intel_pstate".into()),
             active_policy: Some("powersave".into()),
             energy_preference: Some("balance_performance".into()),
+            ..Default::default()
         }
     );
 }
@@ -218,6 +219,7 @@ fn neutral_cpu_policy_serializes_with_legacy_top_level_json_keys() {
         frequency_implementation: Some("native-frequency-control".into()),
         active_policy: Some("balanced".into()),
         energy_preference: Some("efficiency".into()),
+        ..Default::default()
     };
 
     let value = serde_json::to_value(metrics).expect("CPU metrics should serialize");
@@ -260,6 +262,7 @@ fn neutral_cpu_policy_json_aliases_are_accepted() {
             frequency_implementation: Some("native-policy-api".into()),
             active_policy: Some("automatic".into()),
             energy_preference: Some("battery_saver".into()),
+            ..Default::default()
         }
     );
 }
@@ -270,6 +273,7 @@ fn second_platform_can_construct_cpu_policy_without_linux_vocabulary() {
         frequency_implementation: Some("processor-power-management".into()),
         active_policy: Some("balanced".into()),
         energy_preference: Some("best-power-efficiency".into()),
+        ..Default::default()
     };
     let mut metrics = CpuMetrics::default();
     metrics.performance_policy = policy.clone();
@@ -530,6 +534,14 @@ fn network_zero_is_current_only_when_typed_observation_proves_it() {
             utilization_pct: ScalarObservation::available(0.0, 100),
             link_speed_mbps: ScalarObservation::available(1_000, 100),
             link_up: ScalarObservation::available(true, 100),
+            mtu_bytes: ScalarObservation::available(1500, 100),
+            tx_queue_len: ScalarObservation::available(0, 100),
+            rx_drops: ScalarObservation::available(0, 100),
+            tx_drops: ScalarObservation::available(0, 100),
+            rx_errors: ScalarObservation::available(0, 100),
+            tx_errors: ScalarObservation::available(0, 100),
+            rx_overruns: ScalarObservation::available(0, 100),
+            tx_overruns: ScalarObservation::available(0, 100),
         },
         NetworkWirelessObservations::default(),
     );
@@ -541,6 +553,14 @@ fn network_zero_is_current_only_when_typed_observation_proves_it() {
     assert_eq!(metrics.current_utilization_pct(), Some(0.0));
     assert_eq!(metrics.current_link_speed_mbps(), Some(1_000));
     assert_eq!(metrics.current_link_up(), Some(true));
+    assert_eq!(metrics.current_mtu_bytes(), Some(1500));
+    assert_eq!(metrics.current_tx_queue_len(), Some(0));
+    assert_eq!(metrics.current_rx_drops(), Some(0));
+    assert_eq!(metrics.current_tx_drops(), Some(0));
+    assert_eq!(metrics.current_rx_errors(), Some(0));
+    assert_eq!(metrics.current_tx_errors(), Some(0));
+    assert_eq!(metrics.current_rx_overruns(), Some(0));
+    assert_eq!(metrics.current_tx_overruns(), Some(0));
 }
 
 #[test]
@@ -667,6 +687,14 @@ fn applying_network_observations_projects_legacy_wire_from_typed_truth() {
             utilization_pct: ScalarObservation::available(3.0, 100),
             link_speed_mbps: ScalarObservation::available(866, 100),
             link_up: ScalarObservation::available(true, 100),
+            mtu_bytes: ScalarObservation::available(1500, 100),
+            tx_queue_len: ScalarObservation::available(0, 100),
+            rx_drops: ScalarObservation::available(0, 100),
+            tx_drops: ScalarObservation::available(0, 100),
+            rx_errors: ScalarObservation::available(0, 100),
+            tx_errors: ScalarObservation::available(0, 100),
+            rx_overruns: ScalarObservation::available(0, 100),
+            tx_overruns: ScalarObservation::available(0, 100),
         },
         NetworkWirelessObservations {
             association: OptionalObservation::present(true, 100),
@@ -675,6 +703,7 @@ fn applying_network_observations_projects_legacy_wire_from_typed_truth() {
             bssid: OptionalObservation::present("02:11:22:33:44:55".into(), 100),
             frequency_mhz: OptionalObservation::present(5220, 100),
             channel: OptionalObservation::present(44, 100),
+            channel_width_mhz: OptionalObservation::present(80, 100),
             rx_bitrate_mbps: OptionalObservation::present(2402, 100),
             tx_bitrate_mbps: OptionalObservation::present(4800, 100),
             protocol: OptionalObservation::present("802.11be (Wi-Fi 7)".into(), 100),
@@ -692,6 +721,7 @@ fn applying_network_observations_projects_legacy_wire_from_typed_truth() {
     assert_eq!(metrics.current_bssid(), Some("02:11:22:33:44:55"));
     assert_eq!(metrics.current_frequency_mhz(), Some(5220));
     assert_eq!(metrics.current_channel(), Some(44));
+    assert_eq!(metrics.current_channel_width_mhz(), Some(80));
     assert_eq!(metrics.current_rx_bitrate_mbps(), Some(2402));
     assert_eq!(metrics.current_tx_bitrate_mbps(), Some(4800));
     assert_eq!(metrics.current_protocol(), Some("802.11be (Wi-Fi 7)"));
@@ -752,6 +782,8 @@ fn legacy_wifi_hydrates_only_with_identity_and_positive_classification_evidence(
 fn typed_only_network_payload_roundtrips_without_legacy_success_keys() {
     let mut network = NetworkMetrics::new("eth0");
     network.device_id = "network:typed:eth0".into();
+    network.master_interface = Some("br0".into());
+    network.peer_interface = Some("veth0".into());
     network.apply_observations(
         NetworkAdapterType::Ethernet,
         NetworkScalarObservations {
@@ -762,6 +794,14 @@ fn typed_only_network_payload_roundtrips_without_legacy_success_keys() {
             utilization_pct: ScalarObservation::available(0.0, 40),
             link_speed_mbps: ScalarObservation::available(0, 40),
             link_up: ScalarObservation::available(false, 40),
+            mtu_bytes: ScalarObservation::available(1500, 40),
+            tx_queue_len: ScalarObservation::available(0, 40),
+            rx_drops: ScalarObservation::available(0, 40),
+            tx_drops: ScalarObservation::available(0, 40),
+            rx_errors: ScalarObservation::available(0, 40),
+            tx_errors: ScalarObservation::available(0, 40),
+            rx_overruns: ScalarObservation::available(0, 40),
+            tx_overruns: ScalarObservation::available(0, 40),
         },
         NetworkWirelessObservations::not_applicable(40),
     );
@@ -786,6 +826,8 @@ fn typed_only_network_payload_roundtrips_without_legacy_success_keys() {
     assert_eq!(decoded.current_rx_bytes_per_sec(), Some(0));
     assert_eq!(decoded.current_link_up(), Some(false));
     assert_eq!(decoded.current_ssid(), None);
+    assert_eq!(decoded.master_interface.as_deref(), Some("br0"));
+    assert_eq!(decoded.peer_interface.as_deref(), Some("veth0"));
 }
 
 #[test]

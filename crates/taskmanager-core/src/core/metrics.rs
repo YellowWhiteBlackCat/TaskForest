@@ -6,6 +6,7 @@ mod cpu;
 mod disk;
 mod gpu;
 mod gpu_engine_rows;
+mod load;
 mod memory;
 mod msr_readout;
 mod network;
@@ -20,8 +21,9 @@ pub use availability::{
 };
 pub use counter::{CounterDelta, CumulativeCounter};
 pub use cpu::{
-    CpuFrequencySource, CpuMetrics, CpuPerformancePolicy, CpuScalarObservations,
-    CpuTemperatureSource, MAX_TRACKED_LOGICAL_CPUS, cpu_usage_pct_observation,
+    CpuFrequencySource, CpuIdleState, CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics,
+    CpuPerformancePolicy, CpuScalarObservations, CpuTemperatureSource, MAX_TRACKED_LOGICAL_CPUS,
+    cpu_usage_pct_observation,
 };
 pub use disk::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, DiskScalarObservations,
@@ -32,6 +34,7 @@ pub use gpu::{
     GpuMetricField, GpuMetricProvenance, GpuMetrics, GpuScalarObservations, GpuThrottleReason,
 };
 pub use gpu_engine_rows::{GpuEngineRowsFailure, GpuEngineRowsSnapshot};
+pub use load::SystemLoadAverage;
 pub use memory::{
     MemoryCompositionObservations, MemoryCompressionObservations, MemoryMetrics,
     MemoryModuleObservations, MemoryOptionalObservations, MemoryScalarObservations,

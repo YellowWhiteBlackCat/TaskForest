@@ -151,9 +151,11 @@ fn detail_panel_scroll_reaches_clipped_insights_line() {
         "the clipped insights line must NOT be visible at scroll 0\ntext:\n{top}"
     );
 
-    // Scroll to the max offset (16 content − 8 visible = 8). The collecting
-    // line is now in view and the first row is scrolled off the top.
-    app.detail_scroll = 8;
+    // Ask for the end rather than baking the current row count into the test.
+    // The detail VM is intentionally extensible (new truthful fields must not
+    // make the last insight line unreachable), so the renderer computes and
+    // clamps this intent to the current max offset.
+    app.detail_scroll = usize::MAX;
     let bottom = detail_panel_text(&app, 80, 10);
     assert!(
         bottom.contains(COLLECTING),
@@ -257,8 +259,8 @@ fn modal_tab_body_scroll_reaches_clipped_overview_rows() {
     let app = app_on_applications();
     let mut target = properties_target(4201);
     target.section = ProcessDetailsSection::Overview;
-    // The Overview tab carries 7 kv rows; a 10-row modal clamps the body to a
-    // ~4-row viewport, so the bottom rows are clipped at scroll 0.
+    // The Overview tab carries more rows than the short modal body, so the
+    // bottom rows are clipped at scroll 0.
     target.scroll = 0;
     let top = modal_text(&target, &app, 96, 10);
     assert!(
@@ -270,9 +272,10 @@ fn modal_tab_body_scroll_reaches_clipped_overview_rows() {
         "the clipped last overview row must NOT be visible at scroll 0\ntext:\n{top}"
     );
 
-    // Scroll to the max offset — the last row is now in view and the early
-    // "Parent PID" row has scrolled off the top.
-    target.scroll = 3;
+    // Ask for the end; the renderer clamps to the actual wrap-aware maximum.
+    // The last row is now in view and the early "Parent PID" row has scrolled
+    // off the top even as new truthful VM rows are added in the future.
+    target.scroll = usize::MAX;
     let bottom = modal_text(&target, &app, 96, 10);
     assert!(
         bottom.contains("Start time"),

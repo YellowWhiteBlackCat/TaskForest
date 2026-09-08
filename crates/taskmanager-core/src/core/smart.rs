@@ -47,10 +47,20 @@ pub struct DiskSmart {
     pub provider: Option<ProviderId>,
     pub failure: Option<SmartProviderFailureKind>,
     pub temperature_c: Option<f32>,
+    /// Additional NVMe thermal sensors reported separately from the composite
+    /// controller temperature. Values are normalized to Celsius and retain
+    /// their provider order (sensor 1, sensor 2, …).
+    pub temperature_sensors_c: Vec<f32>,
     pub critical_warning: Option<bool>,
     pub temp_critical_c: Option<f32>,
     pub percent_used: Option<f32>,
+    /// NVMe controller-reported available spare capacity, in percent.
+    pub available_spare_pct: Option<f32>,
+    /// NVMe controller-reported available-spare warning threshold, in percent.
+    pub available_spare_threshold_pct: Option<f32>,
     pub power_on_hours: Option<u64>,
+    /// NVMe lifetime unsafe-shutdown event counter.
+    pub unsafe_shutdowns: Option<u64>,
     /// Typed ATA/SATA SMART attribute table. `None` when the device does not
     /// expose ATA attributes (NVMe / SCSI / SAS) or the transport omitted the table.
     pub ata_attributes: Option<Vec<AtaSmartAttribute>>,
@@ -83,10 +93,14 @@ impl DiskSmart {
             provider: None,
             failure,
             temperature_c: None,
+            temperature_sensors_c: Vec::new(),
             critical_warning: None,
             temp_critical_c: None,
             percent_used: None,
+            available_spare_pct: None,
+            available_spare_threshold_pct: None,
             power_on_hours: None,
+            unsafe_shutdowns: None,
             ata_attributes: None,
         }
     }

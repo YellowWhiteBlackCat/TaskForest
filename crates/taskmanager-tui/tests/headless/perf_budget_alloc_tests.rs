@@ -203,6 +203,7 @@ fn minimal_snapshot() -> SystemSnapshot {
         processes: 0,
         threads: None,
         pressure: None,
+        load_average: None,
     }
 }
 

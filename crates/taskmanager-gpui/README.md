@@ -158,9 +158,12 @@ derives the height floor, first-frame state overlay, hover surface, legend,
 aesthetic injection, and summary row in one place; mini density cells render
 through the shared `mini_graph_cell`. The main column is one fixed
 `overflow_hidden` viewport — never a scrolling body — and the statistics rail
-width. Only the left device selector may scroll; the Performance main viewport
-and statistics rail are static, and lower content is capped, summarized, or
-omitted before it can reach the viewport edge. The CPU page adds its readout
+width. Only the left device selector may scroll at the page level; the
+Performance main viewport and statistics shell remain static. The CPU shell
+additionally owns a bounded nested details viewport so its complete
+topology/policy projection remains reachable on short windows without moving
+the chart or rail edge. Lower content is capped, summarized, or omitted only
+at the typed page rung, never silently made unreachable. The CPU page adds its readout
 band as the header slot and, when the chart-inventory budget permits, the
 per-core matrix below; it owns no metric/detail selector state. The GPU page
 likewise owns no metric/detail selector: the large aggregate utilization graph

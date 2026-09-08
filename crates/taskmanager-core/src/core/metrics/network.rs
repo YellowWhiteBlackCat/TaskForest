@@ -50,6 +50,24 @@ pub struct NetworkScalarObservations {
     /// Current native link/carrier state. A confirmed down link is
     /// `Available(false)`, not a provider failure.
     pub link_up: ScalarObservation<bool>,
+    /// Layer-3 maximum transmission unit in bytes.
+    pub mtu_bytes: ScalarObservation<u32>,
+    /// Number of packets currently queued for transmission. A measured zero
+    /// is valid and remains distinct from an unavailable observation.
+    pub tx_queue_len: ScalarObservation<u32>,
+    /// Receive-side packets dropped by the interface or kernel.
+    pub rx_drops: ScalarObservation<u64>,
+    /// Transmit-side packets dropped by the interface or kernel.
+    pub tx_drops: ScalarObservation<u64>,
+    /// Receive-side packets rejected because of malformed frames or driver
+    /// errors.
+    pub rx_errors: ScalarObservation<u64>,
+    /// Transmit-side packets rejected because of driver or link errors.
+    pub tx_errors: ScalarObservation<u64>,
+    /// Receive-side overrun/error counter (ring or FIFO exhaustion).
+    pub rx_overruns: ScalarObservation<u64>,
+    /// Transmit-side overrun/error counter when the driver exposes one.
+    pub tx_overruns: ScalarObservation<u64>,
 }
 
 impl NetworkScalarObservations {
@@ -71,6 +89,14 @@ impl NetworkScalarObservations {
                 .link_speed_mbps
                 .retain_previous(previous.link_speed_mbps),
             link_up: self.link_up.retain_previous(previous.link_up),
+            mtu_bytes: self.mtu_bytes.retain_previous(previous.mtu_bytes),
+            tx_queue_len: self.tx_queue_len.retain_previous(previous.tx_queue_len),
+            rx_drops: self.rx_drops.retain_previous(previous.rx_drops),
+            tx_drops: self.tx_drops.retain_previous(previous.tx_drops),
+            rx_errors: self.rx_errors.retain_previous(previous.rx_errors),
+            tx_errors: self.tx_errors.retain_previous(previous.tx_errors),
+            rx_overruns: self.rx_overruns.retain_previous(previous.rx_overruns),
+            tx_overruns: self.tx_overruns.retain_previous(previous.tx_overruns),
         }
     }
 
@@ -84,6 +110,14 @@ impl NetworkScalarObservations {
             utilization_pct: ScalarObservation::unavailable(failure),
             link_speed_mbps: ScalarObservation::unavailable(failure),
             link_up: ScalarObservation::unavailable(failure),
+            mtu_bytes: ScalarObservation::unavailable(failure),
+            tx_queue_len: ScalarObservation::unavailable(failure),
+            rx_drops: ScalarObservation::unavailable(failure),
+            tx_drops: ScalarObservation::unavailable(failure),
+            rx_errors: ScalarObservation::unavailable(failure),
+            tx_errors: ScalarObservation::unavailable(failure),
+            rx_overruns: ScalarObservation::unavailable(failure),
+            tx_overruns: ScalarObservation::unavailable(failure),
         }
     }
 }
@@ -107,6 +141,9 @@ pub struct NetworkWirelessObservations {
     /// Channel derived from an observed center frequency when unambiguous.
     #[serde(default)]
     pub channel: OptionalObservation<u32>,
+    /// Negotiated channel width in MHz, when the wireless driver exposes it.
+    #[serde(default)]
+    pub channel_width_mhz: OptionalObservation<u32>,
     /// Negotiated receive/transmit bitrates, rounded up to Mbps.
     #[serde(default)]
     pub rx_bitrate_mbps: OptionalObservation<u64>,
@@ -127,6 +164,9 @@ impl NetworkWirelessObservations {
             bssid: self.bssid.retain_previous(previous.bssid),
             frequency_mhz: self.frequency_mhz.retain_previous(previous.frequency_mhz),
             channel: self.channel.retain_previous(previous.channel),
+            channel_width_mhz: self
+                .channel_width_mhz
+                .retain_previous(previous.channel_width_mhz),
             rx_bitrate_mbps: self
                 .rx_bitrate_mbps
                 .retain_previous(previous.rx_bitrate_mbps),
@@ -146,6 +186,7 @@ impl NetworkWirelessObservations {
             bssid: OptionalObservation::unavailable(failure),
             frequency_mhz: OptionalObservation::unavailable(failure),
             channel: OptionalObservation::unavailable(failure),
+            channel_width_mhz: OptionalObservation::unavailable(failure),
             rx_bitrate_mbps: OptionalObservation::unavailable(failure),
             tx_bitrate_mbps: OptionalObservation::unavailable(failure),
             protocol: OptionalObservation::unavailable(failure),
@@ -161,6 +202,7 @@ impl NetworkWirelessObservations {
             bssid: OptionalObservation::not_applicable(observed_at_ms),
             frequency_mhz: OptionalObservation::not_applicable(observed_at_ms),
             channel: OptionalObservation::not_applicable(observed_at_ms),
+            channel_width_mhz: OptionalObservation::not_applicable(observed_at_ms),
             rx_bitrate_mbps: OptionalObservation::not_applicable(observed_at_ms),
             tx_bitrate_mbps: OptionalObservation::not_applicable(observed_at_ms),
             protocol: OptionalObservation::not_applicable(observed_at_ms),
@@ -193,6 +235,13 @@ pub struct NetworkMetrics {
     pub driver: Option<Arc<str>>,
     /// Human-readable adapter model or native hardware identifier.
     pub adapter: Option<Arc<str>>,
+    /// Software bridge/master interface owning this adapter, when the native
+    /// link topology exposes one (for example `br0` for a veth port).
+    pub master_interface: Option<Arc<str>>,
+    /// Peer interface name when a veth-style `iflink` resolves inside the
+    /// observed network namespace. An unresolved cross-namespace peer stays
+    /// absent rather than being guessed from a name suffix.
+    pub peer_interface: Option<Arc<str>>,
 }
 
 impl NetworkMetrics {
@@ -268,6 +317,55 @@ impl NetworkMetrics {
     }
 
     #[must_use]
+    pub fn current_mtu_bytes(&self) -> Option<u32> {
+        self.scalar_observations.mtu_bytes.current_value().copied()
+    }
+
+    #[must_use]
+    pub fn current_tx_queue_len(&self) -> Option<u32> {
+        self.scalar_observations
+            .tx_queue_len
+            .current_value()
+            .copied()
+    }
+
+    #[must_use]
+    pub fn current_rx_drops(&self) -> Option<u64> {
+        self.scalar_observations.rx_drops.current_value().copied()
+    }
+
+    #[must_use]
+    pub fn current_tx_drops(&self) -> Option<u64> {
+        self.scalar_observations.tx_drops.current_value().copied()
+    }
+
+    #[must_use]
+    pub fn current_rx_errors(&self) -> Option<u64> {
+        self.scalar_observations.rx_errors.current_value().copied()
+    }
+
+    #[must_use]
+    pub fn current_tx_errors(&self) -> Option<u64> {
+        self.scalar_observations.tx_errors.current_value().copied()
+    }
+
+    #[must_use]
+    pub fn current_rx_overruns(&self) -> Option<u64> {
+        self.scalar_observations
+            .rx_overruns
+            .current_value()
+            .copied()
+    }
+
+    #[must_use]
+    pub fn current_tx_overruns(&self) -> Option<u64> {
+        self.scalar_observations
+            .tx_overruns
+            .current_value()
+            .copied()
+    }
+
+    #[must_use]
     pub fn current_signal_dbm(&self) -> Option<i32> {
         self.wireless_observations
             .signal_dbm
@@ -315,6 +413,14 @@ impl NetworkMetrics {
     #[must_use]
     pub fn current_channel(&self) -> Option<u32> {
         self.wireless_observations.channel.current_value().copied()
+    }
+
+    #[must_use]
+    pub fn current_channel_width_mhz(&self) -> Option<u32> {
+        self.wireless_observations
+            .channel_width_mhz
+            .current_value()
+            .copied()
     }
 
     #[must_use]

@@ -86,9 +86,8 @@ const TABLE_VIEWPORT_HEIGHT_PX: f32 = 512.0;
 
 // ---- pure view model ----------------------------------------------------
 
-/// Map the shell's sort slot onto the ui-contract column token. `PSS` has no
-/// contract column, so sorting by it shows no header marker — honest absence
-/// rather than a fabricated nearest-column marker.
+/// Map the shell's sort slot onto the ui-contract column token. All 16 sort axes
+/// map onto their exact contract tokens (including PSS mapping to MemoryPss).
 fn contract_token(column: SortCol) -> Option<&'static str> {
     match column {
         SortCol::Pid => Some("PID"),
@@ -211,6 +210,22 @@ pub(crate) fn count_line_text(visible: usize, query: &str) -> String {
     )
 }
 
+fn count_line_text_for_shell(shell: &ShellApp, visible: usize, query: &str) -> String {
+    let base = count_line_text(visible, query);
+    let processes = shell
+        .projection()
+        .processes
+        .as_ref()
+        .map(|items| items.as_slice());
+    [
+        taskmanager_shell::presentation::uninterruptible_process_summary(processes),
+        taskmanager_shell::presentation::process_anomaly_summary(processes),
+    ]
+    .into_iter()
+    .flatten()
+    .fold(base, |line, summary| format!("{line} · {summary}"))
+}
+
 /// Honest empty-table copy: a quiet platform (no processes reported yet) is a
 /// different state from an over-narrow query — shared `empty.*` strings.
 pub(crate) fn empty_state_text(query: &str) -> String {
@@ -266,6 +281,59 @@ pub(crate) struct ProcessToggleRowSelection {
 pub(crate) struct ProcessScrollIntent {
     pub(crate) entity: Entity,
     pub(crate) rows: isize,
+}
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct ProcessTableContainer;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct ProcessDetailsContainer;
+
+pub(crate) fn sync_processes_responsive_layout(
+    windows: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
+    mut tables: Query<
+        &mut Node,
+        (
+            With<ProcessTableContainer>,
+            bevy::ecs::query::Without<ProcessDetailsContainer>,
+        ),
+    >,
+    mut details: Query<
+        &mut Node,
+        (
+            With<ProcessDetailsContainer>,
+            bevy::ecs::query::Without<ProcessTableContainer>,
+        ),
+    >,
+) {
+    let width = windows
+        .iter()
+        .next()
+        .map_or(1180.0, bevy::window::Window::width);
+    if width < 960.0 {
+        for mut node in &mut tables {
+            if node.width != percent(100) {
+                node.width = percent(100);
+            }
+        }
+        for mut node in &mut details {
+            if node.display != bevy::ui::Display::None {
+                node.display = bevy::ui::Display::None;
+            }
+        }
+    } else {
+        for mut node in &mut tables {
+            if node.width != percent(68) {
+                node.width = percent(68);
+            }
+        }
+        for mut node in &mut details {
+            if node.display != bevy::ui::Display::Flex {
+                node.display = bevy::ui::Display::Flex;
+                node.width = percent(32);
+            }
+        }
+    }
 }
 
 /// Search-box commit: replace the shell query with `text` (sanitized and
@@ -607,7 +675,7 @@ fn rebuild_table(
         commands.entity(root).add_one_related::<ChildOf>(child);
     }
     if let Ok(mut line) = surface.count.single_mut() {
-        line.0 = count_line_text(projection.total, &shell.query);
+        line.0 = count_line_text_for_shell(shell, projection.total, &shell.query);
     }
 }
 
@@ -677,7 +745,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     );
     let viewport_rows = rows_in_viewport(TABLE_VIEWPORT_HEIGHT_PX, palette.control_height_px);
     let projection = rows_projection(context.shell, viewport_rows, 0);
-    let count = count_line_text(projection.total, &context.shell.query);
+    let count = count_line_text_for_shell(context.shell, projection.total, &context.shell.query);
     let columns = visible_columns(&[]);
     let header = header_scene(
         &columns,
@@ -694,6 +762,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_8()),
         }
+        ProcessTableContainer
         Children [
             ( { header } ),
             ( { rows_root } ),

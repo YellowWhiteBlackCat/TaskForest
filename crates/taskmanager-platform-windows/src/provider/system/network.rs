@@ -179,6 +179,14 @@ impl NetworkTelemetryProvider for WinNetworkTelemetryProvider {
                 link_speed_mbps,
                 utilization_pct,
                 link_up,
+                mtu_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+                tx_queue_len: ScalarObservation::unavailable(FailureKind::Unsupported),
+                rx_drops: ScalarObservation::unavailable(FailureKind::Unsupported),
+                tx_drops: ScalarObservation::unavailable(FailureKind::Unsupported),
+                rx_errors: ScalarObservation::unavailable(FailureKind::Unsupported),
+                tx_errors: ScalarObservation::unavailable(FailureKind::Unsupported),
+                rx_overruns: ScalarObservation::unavailable(FailureKind::Unsupported),
+                tx_overruns: ScalarObservation::unavailable(FailureKind::Unsupported),
             };
             row.apply_observations(adapter_type, observations, wireless_observations);
             metrics.push(row);

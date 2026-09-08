@@ -29,8 +29,10 @@ fn diskstats_rates_use_one_elapsed_interval_and_whole_device_counters() {
         "future0".to_string(),
         DiskStatsState {
             reads_completed: 10,
+            reads_merged: 0,
             sectors_read: 100,
             writes_completed: 20,
+            writes_merged: 0,
             sectors_written: 200,
             io_time_ms: 300,
             weighted_time_ms: 300,
@@ -60,6 +62,22 @@ fn diskstats_rates_use_one_elapsed_interval_and_whole_device_counters() {
         (metrics[0]
             .current_response_time_ms()
             .expect("operations produce latency")
+            - (200.0 / 6.0))
+            .abs()
+            < 0.001
+    );
+    assert!(
+        (metrics[0]
+            .current_average_queue_depth()
+            .expect("weighted time produces queue depth")
+            - 0.1)
+            .abs()
+            < 0.001
+    );
+    assert!(
+        (metrics[0]
+            .current_service_time_ms()
+            .expect("completed operations produce service estimate")
             - (200.0 / 6.0))
             .abs()
             < 0.001
@@ -111,8 +129,10 @@ fn zero_io_is_current_but_response_time_without_operations_is_unavailable() {
         "future0".to_string(),
         DiskStatsState {
             reads_completed: 10,
+            reads_merged: 0,
             sectors_read: 100,
             writes_completed: 20,
+            writes_merged: 0,
             sectors_written: 200,
             io_time_ms: 300,
             weighted_time_ms: 300,
@@ -139,6 +159,8 @@ fn zero_io_is_current_but_response_time_without_operations_is_unavailable() {
     assert_eq!(metrics[0].current_iops(), Some(0));
     assert_eq!(metrics[0].current_active_time_pct(), Some(0.0));
     assert_eq!(metrics[0].current_response_time_ms(), None);
+    assert_eq!(metrics[0].current_average_queue_depth(), Some(0.0));
+    assert_eq!(metrics[0].current_service_time_ms(), None);
 }
 
 #[test]
@@ -148,8 +170,10 @@ fn counter_rollback_is_identity_change_instead_of_zero_activity() {
         "future0".to_string(),
         DiskStatsState {
             reads_completed: 10,
+            reads_merged: 0,
             sectors_read: 100,
             writes_completed: 20,
+            writes_merged: 0,
             sectors_written: 200,
             io_time_ms: 300,
             weighted_time_ms: 300,

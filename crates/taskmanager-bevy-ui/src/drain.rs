@@ -227,7 +227,9 @@ pub(crate) fn drain_system(
                             tray_res.sync_pause_checkmark(track.shell.paused());
                         }
                         crate::tray::TrayIntent::Quit => {
-                            track.shell.request_quit(taskmanager_shell::QuitReason::Tray);
+                            track
+                                .shell
+                                .request_quit(taskmanager_shell::QuitReason::Tray);
                         }
                     }
                 }

@@ -228,6 +228,10 @@ pub(crate) fn keyboard_dispatch_system(
                     Default::default(),
                 ));
             }
+            if applied {
+                crate::confirmation::republish(shell, &mut commands);
+                commands.trigger(ShellInteractionApplied);
+            }
             continue;
         }
         // 0b. Service log panel (frontend-local surface, TUI panel parity):

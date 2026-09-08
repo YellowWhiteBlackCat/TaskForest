@@ -331,6 +331,23 @@ fn disk_lines(
                 iops,
             )));
         }
+        if let Some((queue_depth, service_time)) = data.queue_service {
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {} · {} {}",
+                t("disk.queue_depth"),
+                queue_depth,
+                t("disk.service_time"),
+                service_time,
+            )));
+        }
+        if let Some((read_merges, write_merges)) = data.merged_requests {
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} RX {} · TX {}",
+                t("disk.merged_requests"),
+                read_merges,
+                write_merges,
+            )));
+        }
         // Top-level disk capacity + free space (the parent device, distinct from
         // per-partition children). Omitted when the provider supplies neither, so
         // a virtual/loop device prints no fake totals.
@@ -418,6 +435,16 @@ fn disk_lines(
                     lines.push(ratatui::text::Line::from(format!("  {summary}")));
                 }
             }
+            for (index, temperature) in disk.smart_temperature_sensors_c.iter().enumerate() {
+                if temperature.is_finite() {
+                    lines.push(ratatui::text::Line::from(format!(
+                        "  {} {} {:.0}\u{b0}C",
+                        t("disk.temperature_sensor"),
+                        index + 1,
+                        temperature
+                    )));
+                }
+            }
             // Power-on hours, only when the vendor exposes the counter.
             if let Some(hours) = disk.smart_power_on_hours {
                 lines.push(ratatui::text::Line::from(format!(
@@ -425,6 +452,26 @@ fn disk_lines(
                     t("disk.power_on"),
                     hours,
                     hours / 24,
+                )));
+            }
+            if let Some(spare) = disk.smart_available_spare_pct {
+                let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
+                let value = if spare <= threshold {
+                    format!("{spare:.0}% ⚠ (≤{threshold:.0}%)")
+                } else {
+                    format!("{spare:.0}%")
+                };
+                lines.push(ratatui::text::Line::from(format!(
+                    "  {} {}",
+                    t("disk.available_spare"),
+                    value
+                )));
+            }
+            if let Some(count) = disk.smart_unsafe_shutdowns {
+                lines.push(ratatui::text::Line::from(format!(
+                    "  {} {}",
+                    t("disk.unsafe_shutdowns"),
+                    count
                 )));
             }
             // SMART status verdict: when the provider is available but exposed

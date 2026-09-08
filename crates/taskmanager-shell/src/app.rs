@@ -179,6 +179,10 @@ pub struct SystemProjectionStore {
     /// `PlatformEventBatch::npu_inventory_events`. An empty device list is
     /// the honest no-NPU host; utilization facts stay typed.
     pub npu_inventory: Option<NpuInventorySnapshot>,
+    /// Bounded auxiliary NPU-utilization history. NPU inventory is an
+    /// application-side capability lane rather than one of the six fixed
+    /// system domains, so accepted aggregate samples live beside that lane.
+    pub npu_usage_history: std::collections::VecDeque<f32>,
     /// Latest filesystem-health facts and their independent provider status.
     storage_health: Option<taskmanager_core::core::storage_health::FilesystemHealthSnapshot>,
     storage_health_source: Option<Vec<SourceStatus>>,

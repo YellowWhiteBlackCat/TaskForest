@@ -35,6 +35,7 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::Query;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
+use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
@@ -46,7 +47,7 @@ use taskmanager_application::i18n::t;
 use taskmanager_application::{SourceNotice, source_notice};
 use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::core::startup::{
-    StartupEntry, StartupEntryId, StartupImpactEvidence, StartupScope,
+    StartupBootEvidenceSnapshot, StartupEntry, StartupEntryId, StartupImpactEvidence, StartupScope,
 };
 
 use taskmanager_shell::presentation::control_error_detail;
@@ -54,11 +55,14 @@ use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_24};
-use crate::widgets::controls::sort_indicator_scene;
+use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12, space_24};
+use crate::widgets::controls::{ControlTone, ControlVisual, sort_indicator_scene};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod menu;
+mod scene;
+
+use scene::startup_body_scene;
 
 // The inventory action-menu tests cover both the Startup and Sessions
 // contexts; they use full crate paths, so the mount point is arbitrary.
@@ -257,24 +261,24 @@ struct Column {
 fn columns() -> Vec<Column> {
     vec![
         Column {
+            sort: Some(InfoSortCol::Status),
+            label: t("common.status").to_owned(),
+            width_px: 120.0,
+        },
+        Column {
             sort: Some(InfoSortCol::Name),
             label: t("common.name").to_owned(),
             width_px: 220.0,
         },
         Column {
-            sort: Some(InfoSortCol::Status),
-            label: t("common.state").to_owned(),
-            width_px: 120.0,
+            sort: None,
+            label: t("startup.impact").to_owned(),
+            width_px: 170.0,
         },
         Column {
             sort: None,
             label: t("startup.source").to_owned(),
             width_px: 200.0,
-        },
-        Column {
-            sort: None,
-            label: t("startup.impact").to_owned(),
-            width_px: 170.0,
         },
         Column {
             sort: None,
@@ -375,217 +379,6 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
     }
 }
 
-fn startup_body_scene(
-    shell: &ShellApp,
-    palette: &UiPalette,
-    selection: &StartupSelection,
-) -> impl Scene + use<> {
-    let rows = startup_rows(shell);
-    let selected = selected_row(&rows, selection);
-    let sources = shell.projection().startup_source.as_deref();
-    let notice = source_notice_text(sources);
-    let empty = empty_state_text(sources);
-    let evidence = evidence_line(shell);
-    let children = body_children(&rows, selected, notice, evidence, empty, palette);
-    let header = header_scene(shell.startup_sort, palette);
-    bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_2()),
-        }
-        Children [
-            ( header ),
-            { children },
-        ]
-    }
-}
-
-fn body_children(
-    rows: &[StartupRowModel],
-    selected: Option<usize>,
-    notice: Option<String>,
-    evidence: Option<String>,
-    empty: String,
-    palette: &UiPalette,
-) -> Vec<Box<dyn Scene>> {
-    let mut children = Vec::new();
-    if let Some(text) = notice {
-        children.push(Box::new(caption_line_scene(text)) as Box<dyn Scene>);
-    }
-    if let Some(text) = evidence {
-        children.push(Box::new(caption_line_scene(text)) as Box<dyn Scene>);
-    }
-    if rows.is_empty() {
-        children.push(Box::new(empty_scene(empty)) as Box<dyn Scene>);
-    } else {
-        for (index, row) in rows.iter().enumerate() {
-            children.push(startup_row_scene(
-                row,
-                index,
-                selected == Some(index),
-                palette,
-            ));
-        }
-    }
-    children
-}
-
-/// Header row: one caption cell per column; every cell carries the
-/// [`StartupSortHeader`] identity for the pointer adapter.
-fn header_scene(sort: Option<(InfoSortCol, SortDir)>, palette: &UiPalette) -> impl Scene + use<> {
-    let cells: Vec<Box<dyn Scene>> = columns()
-        .into_iter()
-        .map(|column| {
-            let label = header_label(&column);
-            let direction = sorted_direction(&column, sort);
-            let indicator = sort_indicator_scene(direction, palette);
-            let width = column.width_px;
-            let sort_target = column.sort;
-            Box::new(bsn! {
-                Node {
-                    width: px(width),
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(space_4()),
-                    overflow: Overflow::clip_x(),
-                }
-                StartupSortHeader(sort_target)
-                Children [
-                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ),
-                    { indicator },
-                ]
-            }) as Box<dyn Scene>
-        })
-        .collect();
-    bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(space_8()),
-            padding: UiRect::horizontal(Val::Px(space_8())),
-        }
-        Children [
-            { cells }
-        ]
-    }
-}
-
-fn startup_row_scene(
-    row: &StartupRowModel,
-    index: usize,
-    selected: bool,
-    palette: &UiPalette,
-) -> Box<dyn Scene> {
-    let widths = columns();
-    let name = row.name.clone();
-    let state = if row.enabled {
-        t("common.enabled")
-    } else {
-        t("common.disabled")
-    }
-    .to_owned();
-    let source = row.source.clone();
-    let impact = row.impact.clone();
-    let exec = row.exec.clone();
-    let fill = if selected {
-        palette.nav_active_bg
-    } else {
-        Color::NONE
-    };
-    let chip = chip_fill(enabled_chip(row.enabled), palette);
-    let target = row.target.clone();
-    let height = palette.control_height_px;
-    let radius = palette.control_radius_px;
-    let name_width = widths[0].width_px;
-    let state_width = widths[1].width_px;
-    let source_width = widths[2].width_px;
-    let impact_width = widths[3].width_px;
-    let exec_width = widths[4].width_px;
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: px(height),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-            padding: UiRect::horizontal(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
-        }
-        BackgroundColor(fill)
-        StartupRowMarker(index, target)
-        Button
-        on(on_startup_row_activated)
-        Children [
-            ( text_cell_scene(name, name_width, Role::Body) ),
-            ( chip_cell_scene(state, state_width, chip, palette) ),
-            ( text_cell_scene(source, source_width, Role::Body) ),
-            ( text_cell_scene(impact, impact_width, Role::Body) ),
-            ( text_cell_scene(exec, exec_width, Role::Body) ),
-        ]
-    })
-}
-
-fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scene + use<> {
-    bsn! {
-        Node { width: px(width), align_items: AlignItems::FlexStart }
-        Children [
-            ( Text(text) TextRole(role) ),
-        ]
-    }
-}
-
-fn chip_cell_scene(
-    word: String,
-    width: f32,
-    fill: Color,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    let radius = palette.control_radius_px;
-    bsn! {
-        Node { width: px(width), align_items: AlignItems::Center }
-        Children [
-            (
-                Node {
-                    height: Val::Auto,
-                    padding: UiRect::horizontal(Val::Px(space_8())),
-                    border_radius: BorderRadius::all(Val::Px(radius)),
-                }
-                BackgroundColor(fill)
-                Children [
-                    ( Text(word) TextRole(Role::Caption) ),
-                ]
-            ),
-        ]
-    }
-}
-
-fn caption_line_scene(text: String) -> impl Scene + use<> {
-    bsn! {
-        Node { width: percent(100) }
-        Children [
-            ( Text(text) TextRole(Role::Caption) ),
-        ]
-    }
-}
-
-fn empty_scene(message: String) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            width: percent(100),
-            flex_grow: 1.0,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            padding: UiRect::all(Val::Px(space_24())),
-        }
-        Children [
-            ( Text(message) TextRole(Role::Body) ),
-        ]
-    }
-}
-
 // ---- observers and the single paint path ----
 
 /// The one authoritative repaint; see `paint_services` in the template page.
@@ -655,6 +448,9 @@ fn bind_startup_page(mut world: DeferredWorld<'_>, _context: HookContext) {
     commands.add_observer(on_startup_projection_folded);
     commands.add_observer(on_startup_sort_clicked);
     commands.add_observer(on_startup_row_clicked);
+    commands.add_observer(on_startup_toggle_button_activated);
+    commands.add_observer(on_startup_enable_button_activated);
+    commands.add_observer(on_startup_disable_button_activated);
     commands.add_observer(on_startup_selection_moved);
     // The initial paint rides the body's own insertion: the hook runs while
     // the page scene is still spawning (its children apply later in the same
@@ -727,6 +523,86 @@ fn on_startup_selection_moved(
 #[cfg(test)]
 #[path = "../../tests/headless/pages/startup.rs"]
 mod tests;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct StartupEnableButton;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct StartupDisableButton;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct StartupToggleButton(pub(crate) usize, pub(crate) StartupEntryId);
+
+fn on_startup_enable_button_activated(
+    _activate: On<Activate>,
+    mut track: NonSendMut<FrontendTrack>,
+    selection: Res<StartupSelection>,
+    mut commands: Commands,
+) {
+    if let Some(target) = &selection.target
+        && let Some(entry) = track
+            .shell
+            .sorted_startup_entries()
+            .into_iter()
+            .find(|e| &e.id == target)
+            .cloned()
+    {
+        let _ = track.shell.request_startup_control_for(entry, true);
+        crate::confirmation::republish(&track.shell, &mut commands);
+        commands.trigger(crate::input::ShellInteractionApplied);
+        commands.queue(paint_startup);
+    }
+}
+
+fn on_startup_disable_button_activated(
+    _activate: On<Activate>,
+    mut track: NonSendMut<FrontendTrack>,
+    selection: Res<StartupSelection>,
+    mut commands: Commands,
+) {
+    if let Some(target) = &selection.target
+        && let Some(entry) = track
+            .shell
+            .sorted_startup_entries()
+            .into_iter()
+            .find(|e| &e.id == target)
+            .cloned()
+    {
+        let _ = track.shell.request_startup_control_for(entry, false);
+        crate::confirmation::republish(&track.shell, &mut commands);
+        commands.trigger(crate::input::ShellInteractionApplied);
+        commands.queue(paint_startup);
+    }
+}
+
+fn on_startup_toggle_button_activated(
+    activate: On<Activate>,
+    buttons: Query<&StartupToggleButton>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut selection: ResMut<StartupSelection>,
+    mut commands: Commands,
+) {
+    let button = buttons
+        .get(activate.entity)
+        .or_else(|_| buttons.get(activate.event().entity));
+    let Ok(button) = button else {
+        return;
+    };
+    selection.target = Some(button.1.clone());
+    if let Some(entry) = track
+        .shell
+        .sorted_startup_entries()
+        .into_iter()
+        .find(|e| e.id == button.1)
+        .cloned()
+    {
+        let next_state = !entry.enabled;
+        let _ = track.shell.request_startup_control_for(entry, next_state);
+        crate::confirmation::republish(&track.shell, &mut commands);
+        commands.trigger(crate::input::ShellInteractionApplied);
+        commands.queue(paint_startup);
+    }
+}
 
 fn on_startup_row_activated(
     activate: On<Activate>,

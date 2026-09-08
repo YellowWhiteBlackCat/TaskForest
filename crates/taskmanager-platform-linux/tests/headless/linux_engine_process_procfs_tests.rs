@@ -66,9 +66,34 @@ fn one_stat_parse_owns_identity_threads_cpu_time_and_nice() {
             user_ticks: 40,
             system_ticks: 2,
             nice: -5,
+            policy: None,
+            minflt: 0,
+            majflt: 0,
         })
     );
     assert_eq!(parse_proc_stat("7 malformed"), None);
+}
+
+#[test]
+fn parse_proc_stat_extracts_scheduling_policy_when_available() {
+    let mut fields = vec!["0".to_owned(); 45];
+    fields[0] = "R".to_owned();
+    fields[7] = "420".to_string();
+    fields[9] = "15".to_string();
+    fields[11] = "100".to_string();
+    fields[12] = "50".to_string();
+    fields[16] = "0".to_string();
+    fields[17] = "4".to_string();
+    fields[19] = "1000".to_string();
+    fields[38] = "1".to_string(); // SCHED_FIFO
+    let text = format!("123 (realtime) {}", fields.join(" "));
+    let parsed = parse_proc_stat(&text).expect("parsed");
+    assert_eq!(
+        parsed.policy,
+        Some(taskmanager_core::ProcessSchedulingPolicy::Fifo)
+    );
+    assert_eq!(parsed.minflt, 420);
+    assert_eq!(parsed.majflt, 15);
 }
 
 #[test]
@@ -133,12 +158,37 @@ fn status_memory_breakdown_keeps_zero_swap_and_rejects_partial_kernels() {
 }
 
 #[test]
+fn smaps_rollup_keeps_uss_and_thp_counters_independently_available() {
+    let text = concat!(
+        "Rss:           100 kB\n",
+        "Pss:             80 kB\n",
+        "Private_Clean:  12 kB\n",
+        "Private_Dirty:  34 kB\n",
+        "AnonHugePages:   8 kB\n",
+    );
+    let fields = parse_proc_smaps_rollup(text);
+    assert_eq!(fields.private_clean_bytes, Ok(12 * 1024));
+    assert_eq!(fields.private_dirty_bytes, Ok(34 * 1024));
+    assert_eq!(fields.anon_huge_pages_bytes, Ok(8 * 1024));
+
+    let missing_thp = parse_proc_smaps_rollup("Private_Clean: 1 kB\nPrivate_Dirty: 2 kB\n");
+    assert_eq!(missing_thp.private_clean_bytes, Ok(1024));
+    assert_eq!(missing_thp.private_dirty_bytes, Ok(2 * 1024));
+    assert_eq!(
+        missing_thp.anon_huge_pages_bytes,
+        Err(FailureKind::Unsupported)
+    );
+}
+
+#[test]
 fn process_io_fields_fail_independently_without_fabricating_zero() {
-    let parsed = parse_proc_io("read_bytes: 0\nwrite_bytes: broken\n");
+    let parsed = parse_proc_io("read_bytes: 0\nwrite_bytes: broken\ncancelled_write_bytes: 12\n");
     assert_eq!(parsed.read_bytes, Ok(0));
     assert_eq!(parsed.write_bytes, Err(FailureKind::ProviderFault));
+    assert_eq!(parsed.cancelled_write_bytes, Ok(12));
 
     let missing = parse_proc_io("rchar: 12\n");
     assert_eq!(missing.read_bytes, Err(FailureKind::Unsupported));
     assert_eq!(missing.write_bytes, Err(FailureKind::Unsupported));
+    assert_eq!(missing.cancelled_write_bytes, Err(FailureKind::Unsupported));
 }

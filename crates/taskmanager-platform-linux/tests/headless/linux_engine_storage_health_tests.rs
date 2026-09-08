@@ -67,6 +67,27 @@ fn btrfs_and_xfs_health_parsers_preserve_zero_and_reported_errors() {
     );
 }
 
+#[test]
+fn mount_sources_are_classified_by_filesystem_topology() {
+    let filesystems = parse_mountinfo(
+        "1 1 0:1 / / rw - overlay overlay rw\n2 1 0:2 / /tmp rw - tmpfs tmpfs rw\n3 1 0:3 / /home rw - btrfs /dev/nvme0n1p2 rw\n4 1 0:4 / /net rw - nfs server:/export rw\n5 1 0:5 / /var rw - ext4 /dev/sda1 rw\n",
+        1,
+    );
+    assert_eq!(
+        filesystems
+            .iter()
+            .map(|filesystem| filesystem.backing_kind)
+            .collect::<Vec<_>>(),
+        vec![
+            taskmanager_core::FilesystemBackingKind::Overlay,
+            taskmanager_core::FilesystemBackingKind::Tmpfs,
+            taskmanager_core::FilesystemBackingKind::BtrfsSubvolume,
+            taskmanager_core::FilesystemBackingKind::Network,
+            taskmanager_core::FilesystemBackingKind::PhysicalBlock,
+        ]
+    );
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn btrfs_sysfs_error_stats_are_aggregated_without_a_privileged_command() {

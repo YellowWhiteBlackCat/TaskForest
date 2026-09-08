@@ -209,6 +209,10 @@ fn filesystem_row(
             )
         })
         .unwrap_or_else(&unavailable);
+    let inodes = filesystem
+        .inode_usage_percent
+        .filter(|value| value.is_finite())
+        .map_or_else(unavailable, |value| format!("{value:.1}%"));
     div()
         .p(taskmanager_ui::theme_binding::definite_length(
             tokens::SPACE_9,
@@ -249,10 +253,13 @@ fn filesystem_row(
                 .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
                 .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(format!(
-                    "{}: {} · {}",
+                    "{}: {} · {} · {}",
                     copy(SystemHealthText::Source),
                     source,
-                    filesystem.fs_type
+                    filesystem.fs_type,
+                    taskmanager_shell::presentation::filesystem_backing_label(
+                        filesystem.backing_kind
+                    )
                 )),
         )
         .child(
@@ -265,7 +272,7 @@ fn filesystem_row(
                     tokens::SPACE_8,
                 ))
                 .child(metric(theme, copy(SystemHealthText::Space), capacity))
-                .child(metric(theme, copy(SystemHealthText::Inodes), unavailable()))
+                .child(metric(theme, copy(SystemHealthText::Inodes), inodes))
                 .child(metric(theme, copy(SystemHealthText::ReadOnly), read_only))
                 .child(metric(theme, copy(SystemHealthText::Errors), errors)),
         )

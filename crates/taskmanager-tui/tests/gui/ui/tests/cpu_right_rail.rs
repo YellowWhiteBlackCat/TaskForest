@@ -208,6 +208,33 @@ fn right_rail_rows_translate_across_locales() {
     );
 }
 
+#[test]
+fn dense_right_rail_scroll_exposes_the_tail_without_an_omitted_rows_placeholder() {
+    let mut app = cpu_app();
+    with_full_spec(&mut app);
+
+    let top = frame_text(&app, 120, 36);
+    assert!(
+        top.contains("Processes"),
+        "the rail must start at its live rows"
+    );
+    assert!(
+        top.contains("Ctrl↑↓"),
+        "a clipped rail must advertise its keyboard scroll affordance:\n{top}"
+    );
+
+    app.scroll_cpu_details(isize::MAX);
+    let tail = frame_text(&app, 120, 36);
+    assert!(
+        tail.contains("Interrupts"),
+        "scrolling the rail must expose its final diagnostic row:\n{tail}"
+    );
+    assert!(
+        !tail.contains("more rows"),
+        "the rail must not replace accepted facts with an omitted-row placeholder:\n{tail}"
+    );
+}
+
 /// Speed-row parity (#3): a BogoMIPS fallback frequency carries the typed
 /// source qualifier so a boot-calibration value never masquerades as a
 /// native clock measurement; a native readout stays unqualified.

@@ -215,6 +215,20 @@ fn mixed_valid_and_malformed_rows_are_partial_not_available() {
 }
 
 #[test]
+fn systemd_inventory_keeps_timer_and_socket_units_visible() {
+    let output = "demo.service loaded active running Demo\n\
+                  demo.timer loaded active waiting Demo timer\n\
+                  demo.socket loaded active listening Demo socket\n";
+    let mut runner = FakeRunner::new([InventoryCommandResult::Success(output.to_owned())]);
+    let snapshot = snapshot(InitSystem::Systemd, &mut runner);
+    assert_eq!(snapshot.items.len(), 3);
+    assert!(snapshot.items.iter().any(|item| item.name == "demo"));
+    assert!(snapshot.items.iter().any(|item| item.name == "demo.timer"));
+    assert!(snapshot.items.iter().any(|item| item.name == "demo.socket"));
+    assert_eq!(snapshot.sources[0].outcome, SourceOutcome::Available);
+}
+
+#[test]
 fn forged_systemd_pattern_row_is_partial_and_never_receives_authority() {
     let output = "safe.service loaded active running Safe service\n\
                       wildcard*.service loaded active running Forged pattern\n";

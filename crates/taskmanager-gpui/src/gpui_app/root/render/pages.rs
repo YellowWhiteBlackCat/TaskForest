@@ -133,6 +133,7 @@ impl RootView {
                                         &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_MSR,
                                     ),
                                 },
+                                details_scroll: &self.cpu_details_scroll,
                             },
                             &mut self.cpu_core_history,
                         ),
@@ -370,6 +371,19 @@ impl RootView {
             TopPage::Apps => {
                 let page_metrics = vm::process_page_metrics(snap);
                 let process_count = self.processes().len();
+                let uninterruptible_count =
+                    taskmanager_shell::presentation::uninterruptible_process_count(
+                        self.projection()
+                            .processes
+                            .as_ref()
+                            .map(|items| items.as_slice()),
+                    );
+                let anomaly_summary = taskmanager_shell::presentation::process_anomaly_summary(
+                    self.projection()
+                        .processes
+                        .as_ref()
+                        .map(|items| items.as_slice()),
+                );
                 let hidden_cols = processes_view::effective_process_hidden_cols(
                     &self.processes_state.hidden_cols,
                     page_metrics.swap_total_bytes,
@@ -396,6 +410,8 @@ impl RootView {
                             theme: t,
                             application_count,
                             process_count,
+                            uninterruptible_count,
+                            anomaly_summary,
                             search_input: &search_input,
                             rows: &rows,
                             query: &query,

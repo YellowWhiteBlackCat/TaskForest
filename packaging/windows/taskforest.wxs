@@ -57,7 +57,7 @@
 
     <StandardDirectory Id="ProgramMenuFolder">
       <Directory Id="ShortcutFolder" Name="TaskForest">
-        <Component Id="StartMenuShortcut" Guid="67C87331-4F2F-4846-8681-7D86C731BA54">
+        <Component Id="StartMenuShortcut" Guid="$(var.ShortcutGuid)">
           <Shortcut Id="TaskForestShortcut"
                     Name="$(var.ShortcutName)"
                     Description="Eye-friendly native system monitor"

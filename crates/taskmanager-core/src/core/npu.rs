@@ -60,6 +60,11 @@ pub struct NpuMemoryReport {
     pub dedicated_total_bytes: ScalarObservation<u64>,
     /// Shared system-memory commitment in bytes.
     pub shared_total_bytes: ScalarObservation<u64>,
+    /// On-die scratchpad/SRAM capacity in bytes, when the accelerator driver
+    /// publishes a distinct resource. This is separate from dedicated memory:
+    /// a zero-sized dedicated pool does not prove that local SRAM is absent.
+    #[serde(default)]
+    pub sram_total_bytes: ScalarObservation<u64>,
 }
 
 /// One discovered NPU accelerator device.

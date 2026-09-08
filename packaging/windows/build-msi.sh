@@ -38,6 +38,7 @@ case "$ui" in
         shortcut_name="TaskForestG"
         upgrade_code="2C676326-A218-46D4-A591-39FB02798F3A"
         component_guid="64F61D3A-68C5-46CB-B8E0-3BAB0639CAFE"
+        shortcut_guid="67C87331-4F2F-4846-8681-7D86C731BA54"
         ;;
     I|i)
         exe_name="taskforest-i.exe"
@@ -45,6 +46,7 @@ case "$ui" in
         shortcut_name="TaskForestI"
         upgrade_code="4A7821B2-12C9-4C5D-912A-18FE9128A123"
         component_guid="75F72E4B-79D6-47DC-C9F1-4CB10740DBFF"
+        shortcut_guid="58A61C20-3E1E-4735-8570-6C75B620A943"
         ;;
     T|t)
         exe_name="taskforest-t.exe"
@@ -52,6 +54,7 @@ case "$ui" in
         shortcut_name="TaskForestT"
         upgrade_code="5B8932C3-23DA-4D6E-A23B-29AF0239B234"
         component_guid="86E83F5C-80E7-48ED-DA02-5DC21851EC00"
+        shortcut_guid="79B72D31-4F2F-4846-8681-7D86C731BA55"
         ;;
     B|b)
         exe_name="taskforest-b.exe"
@@ -59,6 +62,7 @@ case "$ui" in
         shortcut_name="TaskForestB"
         upgrade_code="6C9043D4-34EB-4E7F-B34C-3AB01340C345"
         component_guid="97F9406D-91F8-49FE-EB13-6ED32962FD11"
+        shortcut_guid="8AC83E42-5030-4957-9792-8E97D842CB66"
         ;;
     *)
         echo "build-msi: unknown UI target '$ui' (expected G, I, T, or B)" >&2
@@ -104,6 +108,7 @@ wix build -acceptEula wix7 -arch "$msi_arch" \
     -d "ShortcutName=$shortcut_name" \
     -d "UpgradeCode=$upgrade_code" \
     -d "ComponentGuid=$component_guid" \
+    -d "ShortcutGuid=$shortcut_guid" \
     -bindvariable "WixUILicenseRtf=$(cygpath -w "$script_dir/license.rtf" 2>/dev/null || printf '%s' "$script_dir/license.rtf")" \
     -ext WixToolset.UI.wixext/7.0.0 \
     -o "$output" \

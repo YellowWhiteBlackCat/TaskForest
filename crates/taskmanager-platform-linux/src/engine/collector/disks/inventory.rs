@@ -119,6 +119,16 @@ pub(super) fn merge_disk_inventory(
             iops: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
             active_time_pct: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
             response_time_ms: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
+            average_queue_depth: ScalarObservation::unavailable(
+                FailureKind::TemporarilyUnavailable,
+            ),
+            service_time_ms: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
+            read_merges_per_sec: ScalarObservation::unavailable(
+                FailureKind::TemporarilyUnavailable,
+            ),
+            write_merges_per_sec: ScalarObservation::unavailable(
+                FailureKind::TemporarilyUnavailable,
+            ),
         };
         let mut metric = DiskMetrics::new(format!("/dev/{}", device.name));
         metric.device_id = stable_disk_id(

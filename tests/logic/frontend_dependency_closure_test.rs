@@ -237,4 +237,3 @@ fn all_gui_frontends_strictly_exclude_x11_in_production_closure() {
         }
     }
 }
-

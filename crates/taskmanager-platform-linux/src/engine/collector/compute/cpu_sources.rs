@@ -9,6 +9,7 @@ use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::metrics::CpuTemperatureSource;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
+pub(super) mod diagnostics;
 mod temperatures;
 use temperatures::observe_temperatures_from_paths;
 
@@ -65,6 +66,8 @@ pub(super) struct CpuFreqObservation {
     pub driver: Option<String>,
     pub governor: Option<String>,
     pub power_preference: Option<String>,
+    pub boost_enabled: Option<bool>,
+    pub boost_max_frequency_mhz: Option<u64>,
     pub status: SourceStatus,
 }
 
@@ -308,6 +311,7 @@ fn observe_cpufreq_at(cpu_root: &Path, logical_cpu_count: usize) -> CpuFreqObser
         &mut failures,
         &mut observed,
     );
+    let boost_enabled = read_boost_enabled(cpu_root, &boot_cpufreq, &mut failures, &mut observed);
     let mut per_core_mhz = Vec::with_capacity(logical_cpu_count);
     // Package max boost = the highest `cpuinfo_max_freq` across ALL cores. On
     // hybrid CPUs (Intel P+E cores) cpu0 is often an E-core with a lower cap,
@@ -345,8 +349,38 @@ fn observe_cpufreq_at(cpu_root: &Path, logical_cpu_count: usize) -> CpuFreqObser
         driver,
         governor,
         power_preference,
+        boost_enabled,
+        boost_max_frequency_mhz: max_mhz,
         status: source_status(CPUFREQ_PROVIDER, observed, source_reached, failures),
     }
+}
+
+fn read_boost_enabled(
+    cpu_root: &Path,
+    boot_cpufreq: &Path,
+    failures: &mut FailureSummary,
+    observed: &mut usize,
+) -> Option<bool> {
+    let boost = cpu_root.join("cpufreq/boost");
+    if let Some(value) = read_optional_text(&boost, failures, observed) {
+        return match value.as_str() {
+            "0" => Some(false),
+            "1" => Some(true),
+            _ => {
+                failures.record(FailureKind::ProviderFault);
+                None
+            }
+        };
+    }
+    let no_turbo = boot_cpufreq.join("intel_pstate/no_turbo");
+    read_optional_text(&no_turbo, failures, observed).and_then(|value| match value.as_str() {
+        "0" => Some(true),
+        "1" => Some(false),
+        _ => {
+            failures.record(FailureKind::ProviderFault);
+            None
+        }
+    })
 }
 
 pub(super) fn observe_temperatures(logical_cpu_count: usize) -> CpuTemperatureObservation {

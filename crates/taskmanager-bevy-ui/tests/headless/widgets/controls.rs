@@ -15,8 +15,8 @@ use taskmanager_theme::Theme;
 
 use super::{
     MIN_SCROLLBAR_THUMB_PX, ScrollbarOrientation, SliderState, TooltipPlacement, TooltipSpec,
-    TooltipState, compute_scrollbar_geometry, scrollbar_scene, slider_scene, snap_slider_value,
-    thumb_drag_to_scroll, tooltip_anchored_scene, tooltip_scene,
+    TooltipState, bounded_device_title, compute_scrollbar_geometry, scrollbar_scene, slider_scene,
+    snap_slider_value, thumb_drag_to_scroll, tooltip_anchored_scene, tooltip_scene,
 };
 use crate::palette::ui_palette;
 
@@ -59,6 +59,19 @@ fn tooltip_state_transitions_follow_hover_and_focus() {
 
     state.set_focused(false);
     assert!(!state.is_visible(), "blur deactivates tooltip");
+}
+
+#[test]
+fn device_sidebar_title_uses_an_explicit_ellipsis_before_clipping() {
+    assert_eq!(bounded_device_title("CPU"), "CPU");
+    assert_eq!(
+        bounded_device_title("Intel Graphics (xe)"),
+        "Intel Graphics…"
+    );
+    assert_eq!(
+        bounded_device_title("Intel Graphics (xe) integrated extra"),
+        "Intel Graphics…"
+    );
 }
 
 #[test]

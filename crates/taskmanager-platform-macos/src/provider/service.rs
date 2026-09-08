@@ -146,6 +146,7 @@ impl ServiceControlProvider for MacServiceControlProvider {
             ServiceAction::Stop => run_launchctl(&["kill", "SIGTERM", &target]).map(|_| ()),
             ServiceAction::Enable => run_launchctl(&["enable", &target]).map(|_| ()),
             ServiceAction::Disable => run_launchctl(&["disable", &target]).map(|_| ()),
+            ServiceAction::ReloadDaemon => Err(ProviderFailure::Unsupported),
         }
     }
 }

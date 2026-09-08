@@ -88,8 +88,13 @@ impl FilesystemHealthProvider for MacFilesystemHealthProvider {
                     mount_point: PathBuf::from(disk.mount_point()),
                     source: None,
                     fs_type: disk.file_system().to_string_lossy().into_owned(),
+                    backing_kind:
+                        taskmanager_core::core::storage_health::FilesystemBackingKind::Unknown,
                     read_only: Some(read_only),
                     error_count: None,
+                    inode_used: None,
+                    inode_total: None,
+                    inode_usage_percent: None,
                     status: if read_only {
                         FilesystemHealthStatus::ReadOnly
                     } else {
@@ -338,6 +343,18 @@ impl taskmanager_platform_provider::StorageTelemetryProvider for MacStorageTelem
                     FailureKind::Unsupported,
                 ),
                 response_time_ms: taskmanager_core::ScalarObservation::unavailable(
+                    FailureKind::Unsupported,
+                ),
+                average_queue_depth: taskmanager_core::ScalarObservation::unavailable(
+                    FailureKind::Unsupported,
+                ),
+                service_time_ms: taskmanager_core::ScalarObservation::unavailable(
+                    FailureKind::Unsupported,
+                ),
+                read_merges_per_sec: taskmanager_core::ScalarObservation::unavailable(
+                    FailureKind::Unsupported,
+                ),
+                write_merges_per_sec: taskmanager_core::ScalarObservation::unavailable(
                     FailureKind::Unsupported,
                 ),
             });

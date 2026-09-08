@@ -29,12 +29,36 @@ fn preview_and_encoded_bundle_contain_only_redacted_content() {
     assert_eq!(preview.redactions.paths, 1, "{}", preview.files[0].excerpt);
     assert_eq!(preview.redactions.ipv4_addresses, 1);
     assert_eq!(preview.redactions.ipv6_addresses, 1);
+    assert_eq!(preview.manifest_sha256.len(), 64);
+    assert!(
+        preview
+            .manifest_sha256
+            .chars()
+            .all(|c| c.is_ascii_hexdigit())
+    );
+    assert_eq!(preview.files[0].sha256.len(), 64);
     let encoded = String::from_utf8(plan.encoded().unwrap()).unwrap();
     for secret in ["user=alice", "/home/<user>", "192.168.7.9", "2001:db8::4"] {
         assert!(!encoded.contains(secret));
     }
     assert!(encoded.contains("malice"));
     assert!(encoded.contains("https://example.test/x"));
+}
+
+#[test]
+fn preview_hashes_cover_only_the_sanitized_manifest() {
+    let plan = plan("path=/home/<user>/tool");
+    let preview = plan.preview();
+    let contents = plan
+        .sanitized_contents("facts.txt")
+        .expect("sanitized file");
+    use sha2::{Digest, Sha256};
+    let file_hash = Sha256::digest(contents.as_bytes())
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect::<String>();
+    assert_eq!(preview.files[0].sha256, file_hash);
+    assert_ne!(preview.files[0].sha256, "alice");
 }
 
 #[test]

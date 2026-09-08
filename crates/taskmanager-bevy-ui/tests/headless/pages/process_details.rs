@@ -116,7 +116,7 @@ fn resources_summary_exposes_memory_cpu_pids_and_cgroup_locator() {
 
     let summary = super::resources_summary(&snapshot);
     let expected = format!(
-        "256.0 MiB / 1.0 GiB · CPU 150% · 7 / 64 {} · /system.slice/worker.scope",
+        "256.0 MiB / 1.0 GiB (25%) · CPU 150% · 7 / 64 {} (11%) · /system.slice/worker.scope",
         t("proc_insights.pids")
     );
     assert_eq!(summary, expected);
@@ -188,6 +188,7 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         kind: None,
         container_id: None,
         sandboxed: None,
+        ..ProcessIsolation::default()
     };
     assert_eq!(super::isolation_summary(&host), host_process);
 
@@ -197,6 +198,7 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         kind: None,
         container_id: None,
         sandboxed: Some(false),
+        ..ProcessIsolation::default()
     };
     assert_eq!(
         super::isolation_summary(&host_not_sandboxed),
@@ -209,6 +211,7 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         kind: None,
         container_id: None,
         sandboxed: Some(true),
+        ..ProcessIsolation::default()
     };
     assert_eq!(
         super::isolation_summary(&host_sandboxed),
@@ -221,6 +224,7 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         kind: Some(IsolationKind::Docker),
         container_id: Some("c-abcdef123".into()),
         sandboxed: Some(true),
+        ..ProcessIsolation::default()
     };
     assert_eq!(
         super::isolation_summary(&docker_sandboxed),
@@ -233,6 +237,7 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         kind: Some(IsolationKind::Flatpak),
         container_id: Some("org.example.App".into()),
         sandboxed: Some(false),
+        ..ProcessIsolation::default()
     };
     assert_eq!(
         super::isolation_summary(&flatpak_not_sandboxed),
@@ -262,6 +267,9 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
                 state: ThreadState::Running,
                 cpu_time_secs: Some(2.5),
                 cpu_percent: Some(25.0),
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             ProcessThreadInfo {
                 tid: 102,
@@ -269,6 +277,9 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
                 state: ThreadState::Sleep,
                 cpu_time_secs: None,
                 cpu_percent: None,
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             ProcessThreadInfo {
                 tid: 103,
@@ -276,6 +287,9 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
                 state: ThreadState::UninterruptibleSleep,
                 cpu_time_secs: Some(0.1),
                 cpu_percent: None,
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             ProcessThreadInfo {
                 tid: 104,
@@ -283,6 +297,9 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
                 state: ThreadState::Idle,
                 cpu_time_secs: None,
                 cpu_percent: Some(1.0),
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
         ],
     };
@@ -317,21 +334,25 @@ fn open_files_summary_empty_unreadable_and_populated() {
                 fd: 0,
                 kind: OpenFileKind::File,
                 target: Some("/dev/null".into()),
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 1,
                 kind: OpenFileKind::Socket,
                 target: None, // unreadable readlink
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 2,
                 kind: OpenFileKind::Pipe,
                 target: Some("pipe:[12345]".into()),
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 3,
                 kind: OpenFileKind::File,
                 target: Some("/var/log/app.log".into()),
+                deleted: false,
             },
         ],
         unreadable_count: 1,
@@ -346,15 +367,15 @@ fn open_files_summary_empty_unreadable_and_populated() {
             taskmanager_application::i18n::t("proc_insights.unreadable")
         )
     );
-    assert_eq!(lines[1], "0 -> /dev/null");
+    assert_eq!(lines[1], "0 [file] -> /dev/null");
     assert_eq!(
         lines[2],
         format!(
-            "1 -> {}",
+            "1 [socket] -> {}",
             taskmanager_application::i18n::t("proc_insights.unreadable")
         )
     );
-    assert_eq!(lines[3], "2 -> pipe:[12345]");
+    assert_eq!(lines[3], "2 [pipe] -> pipe:[12345]");
     assert_eq!(lines[4], "…");
     assert_eq!(lines.len(), 5);
 }
@@ -385,6 +406,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
                 )),
                 state: taskmanager_core::core::process_telemetry::ConnectionState::Established,
                 provider_key: None,
+                rtt_ms: None,
             },
             ProcessConnection {
                 transport: ConnectionTransport::Local,
@@ -395,6 +417,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
                 remote: ConnectionEndpoint::Unspecified,
                 state: taskmanager_core::core::process_telemetry::ConnectionState::Established,
                 provider_key: None,
+                rtt_ms: None,
             },
         ],
         rx_bytes_per_sec: Some(1024 * 1024),
@@ -402,13 +425,20 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
         traffic_state: DeviceState::healthy(1000),
         traffic_failure: None,
         traffic_provider: None,
+        connection_counters: None,
     };
 
     let summary = super::network_summary(&normal);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], "2 · RX 1.0 MiB/s · TX 512.0 KiB/s");
-    assert_eq!(lines[1], "TCP 127.0.0.1:8080 -> 127.0.0.1:45678");
-    assert_eq!(lines[2], "UNIX /run/user/1000/bus -> —");
+    assert_eq!(
+        lines[1],
+        "TCP [ESTABLISHED · LOOPBACK] 127.0.0.1:8080 -> 127.0.0.1:45678"
+    );
+    assert_eq!(
+        lines[2],
+        "UNIX [ESTABLISHED · LOOPBACK] /run/user/1000/bus -> —"
+    );
     assert_eq!(lines.len(), 3);
 
     // Escalation-requiring snapshot
@@ -420,6 +450,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
         traffic_state: DeviceState::healthy(1000),
         traffic_failure: Some(FailureKind::RequiresEscalation),
         traffic_provider: None,
+        connection_counters: None,
     };
 
     let esc_summary = super::network_summary(&escalating);

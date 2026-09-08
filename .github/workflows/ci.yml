@@ -167,6 +167,11 @@ jobs:
         with:
           cache-workspace-crates: true
       - run: cargo nextest run --locked --workspace --all-targets --features test-support --profile ci -j 4 -E 'not binary(throughput)'
+      # Keep an explicit package-filtered product gate in addition to the
+      # broad workspace run: all four frontend products must be discovered and
+      # pass their own headless suites before this job can merge.
+      - name: Four frontend product nextest gate
+        run: timeout --kill-after=30s 3600s bash scripts/quality/four-frontends-nextest.sh
       # nextest does not execute doctests on stable Rust.
       - run: cargo test --locked --doc --workspace -j 4
       # The GPUI product advertises --demo; keep its actual composition path

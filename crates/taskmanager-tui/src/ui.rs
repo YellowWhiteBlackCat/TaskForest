@@ -26,6 +26,7 @@ mod perf_fan;
 mod perf_gpu;
 mod perf_memory;
 mod perf_networks;
+mod perf_npu;
 mod perf_overview;
 mod perf_overview_data;
 mod perf_selector_instances;
@@ -320,6 +321,13 @@ fn render_performance(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, plan
             theme,
             content,
             app.projection().sensors.as_ref(),
+        ),
+        PerfDevice::Npu => perf_npu::render_npu_section(
+            frame,
+            app,
+            theme,
+            content,
+            app.projection().npu_inventory.as_ref(),
         ),
     }
 }

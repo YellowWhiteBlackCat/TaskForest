@@ -151,6 +151,10 @@ pub struct TuiApp {
     /// clamps it against the current topology and visible grid height; it is
     /// reset whenever the selected Performance resource changes.
     pub cpu_core_scroll: usize,
+    /// Vertical line offset for the CPU details rail. The rail keeps its
+    /// pinned geometry, while Ctrl+Up/Ctrl+Down exposes lower topology and
+    /// policy rows on short terminals.
+    pub cpu_detail_scroll: usize,
     /// Vertical line offset for the standard GPU engine viewport. The primary
     /// utilization chart and fact strip never scroll; compact layout removes
     /// this optional region entirely.
@@ -281,6 +285,7 @@ impl TuiApp {
             perf_device: PerfDevice::Cpu,
             detail_scroll: 0,
             cpu_core_scroll: 0,
+            cpu_detail_scroll: 0,
             gpu_engine_scroll: 0,
             system_scroll: 0,
             health_rule_selection: 0,

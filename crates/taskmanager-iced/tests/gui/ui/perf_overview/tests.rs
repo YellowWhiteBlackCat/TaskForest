@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::metrics::MemoryMetrics;
 
 mod graph_summary_tests {
     use super::*;
@@ -183,9 +184,18 @@ mod memory_stats_tests {
     #[test]
     fn signed_rate_respects_the_unit_preferences() {
         taskmanager_test_support::pin_english();
-        assert_eq!(signed_memory_rate_text(1.5, true, true), "+1.5 MiB/s");
-        assert_eq!(signed_memory_rate_text(-0.5, true, true), "−512.0 KiB/s");
-        assert_eq!(signed_memory_rate_text(1.5, false, true), "+12.0 Mib/s");
+        assert_eq!(
+            stats::signed_memory_rate_text(1.5, true, true),
+            "+1.5 MiB/s"
+        );
+        assert_eq!(
+            stats::signed_memory_rate_text(-0.5, true, true),
+            "−512.0 KiB/s"
+        );
+        assert_eq!(
+            stats::signed_memory_rate_text(1.5, false, true),
+            "+12.0 Mib/s"
+        );
     }
 }
 
@@ -216,7 +226,11 @@ mod cpu_frequency_source_tests {
             frequency_mhz: Some(3_500),
             temperature_c: Some(54.0),
             power_w: Some(18.2),
-            pressure_pct: Some(0.5),
+            pressure: Some(
+                taskmanager_core::core::metrics::ResourcePressure::some_only(
+                    taskmanager_core::core::metrics::PressureWindow::new(0.5, 0.4, 0.3, 0),
+                ),
+            ),
         }));
         assert_eq!(
             metrics
@@ -232,7 +246,10 @@ mod cpu_frequency_source_tests {
                 ("Speed".to_string(), "3500 MHz".to_string()),
                 ("Temperature".to_string(), "54 °C".to_string()),
                 ("Power".to_string(), "18.2 W".to_string()),
-                ("Stall".to_string(), "0.5%".to_string()),
+                (
+                    "Stall".to_string(),
+                    "some 10s 0.5% · 60s 0.4% · 5m 0.3%".to_string(),
+                ),
             ]
         );
         assert_eq!(
@@ -264,7 +281,7 @@ mod cpu_frequency_source_tests {
             frequency_mhz: Some(2_400),
             temperature_c: None,
             power_w: None,
-            pressure_pct: None,
+            pressure: None,
         }));
         assert_eq!(
             projected.map(|metric| metric.kind),

@@ -46,6 +46,7 @@ use taskmanager_shell::{
 /// paths (`Enter` properties, `Delete` end-task, batch verbs) always resolve
 /// to the process the row actually renders.
 #[derive(Debug, Clone, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub(crate) enum ProjectedRow {
     /// A category or application aggregate header. The summed
     /// observation cells are carried here (computed once by the projection)
@@ -126,6 +127,7 @@ pub(crate) struct RowCells {
     pub swap: String,
     pub disk_read: String,
     pub disk_write: String,
+    pub network: String,
     pub cpu_time: String,
     pub threads: String,
     pub user: String,
@@ -152,6 +154,7 @@ pub(crate) struct ProcessRowFacts {
     pub swap_zero: bool,
     pub disk_read_zero: bool,
     pub disk_write_zero: bool,
+    pub network_zero: bool,
     pub cpu_time_zero: bool,
     pub threads_zero: bool,
     pub fds_zero: bool,
@@ -170,6 +173,7 @@ impl ProcessRowFacts {
             swap_zero: process.current_swap_bytes() == Some(0),
             disk_read_zero: process.current_disk_read_bytes_per_sec() == Some(0),
             disk_write_zero: process.current_disk_write_bytes_per_sec() == Some(0),
+            network_zero: process.current_network_bytes_per_sec() == Some(0),
             cpu_time_zero: process.current_cpu_time_secs() == Some(0),
             threads_zero: process.current_threads() == Some(0),
             fds_zero: process.current_fds() == Some(0),
@@ -334,6 +338,7 @@ pub(crate) fn build_row_cells_with_rules(
             .map_or_else(missing_value, bytes),
         disk_read: optional_bytes(process.current_disk_read_bytes_per_sec()),
         disk_write: optional_bytes(process.current_disk_write_bytes_per_sec()),
+        network: optional_bytes(process.current_network_bytes_per_sec()),
         cpu_time: optional_duration(process.current_cpu_time_secs()),
         threads: optional_count(process.current_threads()),
         user: process.current_user().unwrap_or_else(missing_value),

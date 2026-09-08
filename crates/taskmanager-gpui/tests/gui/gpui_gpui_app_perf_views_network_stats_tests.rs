@@ -68,3 +68,51 @@ fn rate_rows_keep_none_for_first_sample_gaps() {
         "utilization stays an honest gap until sampled"
     );
 }
+
+#[test]
+fn mtu_and_queue_rows_keep_measured_zero_visible() {
+    use taskmanager_core::core::metrics::{
+        NetworkAdapterType, NetworkScalarObservations, ScalarObservation,
+    };
+    let metrics = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        .scalar_observations(NetworkScalarObservations {
+            mtu_bytes: ScalarObservation::available(9000, 1),
+            tx_queue_len: ScalarObservation::available(0, 1),
+            ..Default::default()
+        })
+        .adapter_type(NetworkAdapterType::Ethernet)
+        .build();
+    let rows = network_stats(&metrics, false, UnitPreferences::default());
+    let find = |key: &'static str| {
+        rows.iter()
+            .find(|row| row.label() == i18n::t(key))
+            .unwrap_or_else(|| panic!("{key} row must exist"))
+    };
+    assert_eq!(find("net.mtu").value(), Some("9000 B"));
+    assert_eq!(find("net.tx_queue").value(), Some("0"));
+}
+
+#[test]
+fn packet_error_rows_are_omitted_until_a_counter_is_observed() {
+    use taskmanager_core::core::metrics::{NetworkScalarObservations, ScalarObservation};
+    let metrics = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        .scalar_observations(NetworkScalarObservations {
+            rx_drops: ScalarObservation::available(3, 1),
+            tx_errors: ScalarObservation::available(1, 1),
+            ..Default::default()
+        })
+        .build();
+    let rows = network_stats(&metrics, false, UnitPreferences::default());
+    let find = |key: &'static str| {
+        rows.iter()
+            .find(|row| row.label() == i18n::t(key))
+            .unwrap_or_else(|| panic!("{key} row must exist"))
+    };
+    assert_eq!(find("net.drops").value(), Some("3 / —"));
+    assert_eq!(find("net.errors").value(), Some("— / 1"));
+    assert!(
+        !rows
+            .iter()
+            .any(|row| row.label() == i18n::t("net.overruns"))
+    );
+}

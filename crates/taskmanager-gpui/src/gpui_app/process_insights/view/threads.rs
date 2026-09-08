@@ -47,14 +47,43 @@ fn format_thread(thread: &ProcessThreadInfo) -> String {
     } else {
         thread.comm.clone()
     };
-    format!(
-        "{}  {}  {}  {}  {}",
-        thread.tid,
-        comm,
-        thread.state.as_short_label(),
-        cpu,
-        cpu_percent,
-    )
+    let wait = thread.run_queue_wait_ns.map(|nanos| {
+        let kind = thread
+            .wait_kind
+            .map(taskmanager_core::core::process_telemetry::ThreadWaitKind::as_str)
+            .unwrap_or("wait");
+        format!("{kind} {:.1}ms", nanos as f64 / 1_000_000.0)
+    });
+    if let Some(ref wchan) = thread.wchan {
+        let mut line = format!(
+            "{}  {}  {}  {}  {}  [{}]",
+            thread.tid,
+            comm,
+            thread.state.as_short_label(),
+            cpu,
+            cpu_percent,
+            wchan,
+        );
+        if let Some(wait) = wait {
+            line.push_str("  ");
+            line.push_str(&wait);
+        }
+        line
+    } else {
+        let mut line = format!(
+            "{}  {}  {}  {}  {}",
+            thread.tid,
+            comm,
+            thread.state.as_short_label(),
+            cpu,
+            cpu_percent,
+        );
+        if let Some(wait) = wait {
+            line.push_str("  ");
+            line.push_str(&wait);
+        }
+        line
+    }
 }
 
 /// The threads card. Surfaces the per-thread list or an explicit typed message
@@ -95,11 +124,12 @@ pub(in crate::gpui_app::process_insights::view) fn threads_card(
             .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
             .font(mono_font_with_fallback(theme))
             .child(format!(
-                "{}  {}  {}  {}  {}",
+                "{}  {}  {}  {}  {}  {}",
                 labels.thread_id,
                 labels.thread_name,
                 labels.thread_state,
                 labels.thread_cpu_time,
+                labels.thread_wait,
                 labels.thread_cpu_percent
             )),
     );

@@ -62,10 +62,12 @@ pub fn collect_open_files_from_proc_dir(proc_dir: &Path, now_ms: u64) -> Process
         match std::fs::read_link(entry.path()) {
             Ok(target) => {
                 let target = target.to_string_lossy().to_string();
+                let deleted = target.ends_with(" (deleted)");
                 found.push(OpenFileEntry {
                     fd,
                     kind: classify_open_file_target(&target),
                     target: Some(target),
+                    deleted,
                 });
             }
             Err(_error) => {
@@ -78,6 +80,7 @@ pub fn collect_open_files_from_proc_dir(proc_dir: &Path, now_ms: u64) -> Process
                     fd,
                     kind: OpenFileKind::Other,
                     target: None,
+                    deleted: false,
                 });
             }
         }

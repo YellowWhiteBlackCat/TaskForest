@@ -118,6 +118,7 @@ impl CpuTelemetryProvider for WinCpuTelemetryProvider {
             frequency_implementation: Some("Windows Power Manager (powrprof)".into()),
             active_policy,
             energy_preference,
+            ..Default::default()
         };
 
         let mut observations = CpuScalarObservationFactory::build(

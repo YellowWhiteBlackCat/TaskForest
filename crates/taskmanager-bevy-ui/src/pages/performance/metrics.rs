@@ -2,6 +2,8 @@
 
 use super::*;
 
+pub(super) mod cpu;
+
 /// Percent readout. There is no shared percent formatter in
 /// `shell::presentation` (the TUI keeps its own in `ui/units.rs`), so this
 /// page owns one with the same semantics: missing and non-finite observations
@@ -102,6 +104,22 @@ pub(super) fn network_devices(shell: &ShellApp) -> Option<&[NetworkMetrics]> {
         })
 }
 
+pub(super) fn disks(shell: &ShellApp) -> Option<&[DiskMetrics]> {
+    shell
+        .projection()
+        .snapshot
+        .as_ref()
+        .map(|snapshot| snapshot.disks.as_slice())
+}
+
+pub(super) fn batteries(shell: &ShellApp) -> Option<&[taskmanager_core::core::power::BatteryInfo]> {
+    shell
+        .projection()
+        .power_supplies
+        .as_ref()
+        .map(|ps| ps.batteries.as_slice())
+}
+
 pub(crate) fn summary_value(shell: &ShellApp, field: SummaryField) -> String {
     match field {
         SummaryField::Cpu => {
@@ -161,15 +179,152 @@ pub(super) fn core_usage_fill_pct(shell: &ShellApp, index: usize) -> f32 {
 
 /// A disk rail row's caption: activity percentage and the two transfer rates.
 /// Each fact keeps its own dash-on-missing semantics.
+pub(super) struct PartitionViewModel {
+    pub(super) name: String,
+    pub(super) usage_text: String,
+    pub(super) pct: f32,
+}
+
+pub(super) fn disk_partition_view_models(disk: &DiskMetrics) -> Vec<PartitionViewModel> {
+    disk.partitions
+        .iter()
+        .map(|part| {
+            let name = if !part.mount_point.is_empty() {
+                format!("{} ({})", part.mount_point, part.fs_type)
+            } else {
+                part.name.clone()
+            };
+            let (used_str, cap_str, pct) =
+                match (part.current_used_bytes(), part.current_capacity_bytes()) {
+                    (Some(used), Some(cap)) if cap > 0 => {
+                        let pct = (used as f32 / cap as f32 * 100.0).clamp(0.0, 100.0);
+                        (bytes(used), bytes(cap), pct)
+                    }
+                    _ => (missing_value(), missing_value(), 0.0),
+                };
+            PartitionViewModel {
+                name,
+                usage_text: format!("{used_str} / {cap_str} ({pct:.0}%)"),
+                pct,
+            }
+        })
+        .collect()
+}
+
+pub(super) struct GpuVramViewModel {
+    pub(super) label: String,
+    pub(super) pct: f32,
+}
+
+pub(super) fn gpu_vram_view_model(gpu: &GpuMetrics) -> Option<GpuVramViewModel> {
+    let used = gpu.current_dedicated_vram_used_bytes()?;
+    let total = gpu.current_dedicated_vram_total_bytes()?;
+    if total == 0 {
+        return None;
+    }
+    let pct = (used as f32 / total as f32 * 100.0).clamp(0.0, 100.0);
+    Some(GpuVramViewModel {
+        label: format!(
+            "{}: {} / {} ({pct:.0}%)",
+            t("npu.dedicated_memory"),
+            bytes(used),
+            bytes(total)
+        ),
+        pct,
+    })
+}
+
 pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
     let rate = |value: Option<u64>| value.map_or_else(missing_value, bytes);
-    [
+    let mut parts = vec![
         disk.current_active_time_pct()
             .map_or_else(missing_value, |value| format!("{value:.0}%")),
         rate(disk.current_read_bytes_per_sec()),
         rate(disk.current_write_bytes_per_sec()),
-    ]
-    .join(" · ")
+    ];
+    if let Some(ms) = disk.current_response_time_ms() {
+        parts.push(format!("{ms:.1} ms"));
+    }
+    if let Some(depth) = disk.current_average_queue_depth() {
+        parts.push(format!("{} {depth:.2}", t("disk.queue_depth")));
+    }
+    if let Some(ms) = disk.current_service_time_ms() {
+        parts.push(format!("{} {ms:.1} ms", t("disk.service_time")));
+    }
+    for (index, temperature) in disk.smart_temperature_sensors_c.iter().enumerate() {
+        if temperature.is_finite() {
+            parts.push(format!(
+                "{} {} {:.0}\u{b0}C",
+                t("disk.temperature_sensor"),
+                index + 1,
+                temperature
+            ));
+        }
+    }
+    if let Some(spare) = disk.smart_available_spare_pct {
+        // The warning affordance is a semantic bitmap sibling in the scene;
+        // keep this dynamic text free of decoration codepoints (the tofu law).
+        parts.push(format!("{} {spare:.0}%", t("disk.available_spare")));
+    }
+    if let Some(count) = disk.smart_unsafe_shutdowns {
+        parts.push(format!("{} {count}", t("disk.unsafe_shutdowns")));
+    }
+    if disk.current_read_merges_per_sec().is_some() || disk.current_write_merges_per_sec().is_some()
+    {
+        parts.push(format!(
+            "{} {}/{}",
+            t("disk.merged_requests"),
+            disk.current_read_merges_per_sec()
+                .map_or_else(missing_value, |value| value.to_string()),
+            disk.current_write_merges_per_sec()
+                .map_or_else(missing_value, |value| value.to_string()),
+        ));
+    }
+    parts.join(" · ")
+}
+
+/// Whether the disk's observed spare pool crossed its typed warning level.
+/// The caller owns the warning icon; this predicate only folds facts and never
+/// treats an absent or non-finite SMART reading as a warning.
+pub(super) fn disk_spare_warning(disk: &DiskMetrics) -> bool {
+    let Some(spare) = disk.smart_available_spare_pct else {
+        return false;
+    };
+    if !spare.is_finite() {
+        return false;
+    }
+    let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
+    threshold.is_finite() && spare <= threshold
+}
+
+pub(super) fn disk_spare_warning_for(shell: &ShellApp, device_id: &str) -> bool {
+    disks(shell)
+        .and_then(|devices| devices.iter().find(|disk| disk.device_id == device_id))
+        .is_some_and(disk_spare_warning)
+}
+
+pub(super) fn battery_sidebar_title(
+    battery: &taskmanager_core::core::power::BatteryInfo,
+    index: usize,
+) -> String {
+    if !battery.model_name.trim().is_empty() {
+        battery.model_name.trim().to_string()
+    } else if !battery.display_name.trim().is_empty() {
+        battery.display_name.trim().to_string()
+    } else {
+        format!("{} {index}", t("common.battery"))
+    }
+}
+
+pub(super) fn battery_caption(battery: &taskmanager_core::core::power::BatteryInfo) -> String {
+    let charge = battery
+        .current_capacity_pct()
+        .map_or_else(missing_value, |pct| format!("{pct}%"));
+    let watts = battery
+        .current_power_w()
+        .filter(|w| w.is_finite())
+        .map_or(String::new(), |w| format!(" · {w:.1} W"));
+    format!("{charge}{watts}")
 }
 
 /// Per-core usages, one readout per projected core with honest dashes for
@@ -179,10 +334,15 @@ pub(super) fn core_summary(shell: &ShellApp) -> String {
     if count == 0 {
         return missing_value();
     }
-    (0..count)
+    let visible = count.min(3);
+    let mut summary = (0..visible)
         .map(|index| observed_percentage(core_usage_pct(shell, index)))
         .collect::<Vec<_>>()
-        .join(" ")
+        .join(" ");
+    if count > visible {
+        summary.push_str(" …");
+    }
+    summary
 }
 
 /// "used / total · pct" with a dash per missing side; the percentage comes
@@ -202,10 +362,17 @@ pub(super) fn memory_summary(memory: Option<&MemoryMetrics>) -> String {
         used.unwrap_or_else(missing_value),
         total.unwrap_or_else(missing_value)
     );
-    match percentage {
+    let mut summary = match percentage {
         Some(percentage) => format!("{line} · {percentage}"),
         None => line,
+    };
+    if let Some(rate) = memory.current_swap_in_bytes_per_sec() {
+        summary.push_str(&format!(" · {} {}/s", t("mem.swap_in_rate"), bytes(rate)));
     }
+    if let Some(rate) = memory.current_swap_out_bytes_per_sec() {
+        summary.push_str(&format!(" · {} {}/s", t("mem.swap_out_rate"), bytes(rate)));
+    }
+    summary
 }
 
 /// Sum one rate direction across the projected adapters. An empty or absent
@@ -228,6 +395,14 @@ pub(super) fn network_rate(
 }
 
 pub(super) fn curve_samples(shell: &ShellApp, curve: SystemCurve) -> Vec<f32> {
+    if curve == SystemCurve::Npu {
+        return shell
+            .projection()
+            .npu_usage_history
+            .iter()
+            .copied()
+            .collect();
+    }
     taskmanager_shell::presentation::trend::window(&shell.history, curve.series())
 }
 
@@ -253,44 +428,6 @@ pub(crate) fn curve_caption(shell: &ShellApp, curve: SystemCurve) -> String {
             curve.format_value(summary.maximum),
         )
     })
-}
-
-pub(super) fn cpu_field_text(shell: &ShellApp, field: CpuField) -> String {
-    let Some(cpu) = cpu_metrics(shell) else {
-        return missing_value();
-    };
-    match field {
-        CpuField::Brand => cpu
-            .brand
-            .as_deref()
-            .map(str::trim)
-            .filter(|brand| !brand.is_empty())
-            .map(str::to_owned)
-            .unwrap_or_else(missing_value),
-        CpuField::Usage => observed_percentage(cpu.current_global_usage_pct()),
-        CpuField::Frequency => cpu
-            .current_frequency_mhz()
-            .map(|value| megahertz(value as f32))
-            .unwrap_or_else(missing_value),
-        CpuField::Temperature => cpu
-            .current_temperature_c()
-            .filter(|value| value.is_finite())
-            .map(temperature_c)
-            .unwrap_or_else(missing_value),
-        CpuField::Power => cpu
-            .current_power_w()
-            .filter(|value| value.is_finite())
-            .map(power_w)
-            .unwrap_or_else(missing_value),
-        CpuField::Pressure => shell
-            .projection()
-            .snapshot
-            .as_ref()
-            .and_then(|s| s.pressure.as_ref())
-            .and_then(|p| p.cpu.current_value())
-            .map_or_else(missing_value, |c| format!("{:.1}%", c.some.avg10)),
-        CpuField::Core(index) => observed_percentage(core_usage_pct(shell, index)),
-    }
 }
 
 pub(super) fn curve_wanted(shell: &ShellApp, curve: SystemCurve) -> bool {
@@ -328,13 +465,34 @@ pub(crate) fn section_keys(shell: &ShellApp, section: Section) -> Vec<String> {
                 .map(|segment| segment_key(segment.kind))
                 .collect()
         }),
+        Section::Disk => disks(shell).map_or_else(Vec::new, |devices| {
+            devices.iter().map(|disk| disk.device_id.clone()).collect()
+        }),
+        Section::Battery => batteries(shell).map_or_else(Vec::new, |devices| {
+            devices.iter().map(|b| b.id.clone()).collect()
+        }),
     }
+}
+
+pub(super) fn battery_fact_line(battery: &taskmanager_core::core::power::BatteryInfo) -> String {
+    let charge = battery
+        .current_capacity_pct()
+        .map_or_else(missing_value, |pct| format!("{pct}%"));
+    let watts = battery
+        .current_power_w()
+        .filter(|w| w.is_finite())
+        .map_or_else(missing_value, |w| format!("{w:.1} W"));
+    format!(
+        "{}: {charge} · {}: {watts}",
+        t("battery.capacity"),
+        t("battery.power")
+    )
 }
 
 /// One GPU block's joined fact line; each fact keeps its own dash-on-missing
 /// semantics (TUI `gpu_data` parity via the shared formatters).
 pub(super) fn gpu_fact_line(gpu: &GpuMetrics) -> String {
-    [
+    let mut values = vec![
         observed_percentage(gpu.current_utilization_pct()),
         gpu.current_temperature_c()
             .filter(|value| value.is_finite())
@@ -345,21 +503,109 @@ pub(super) fn gpu_fact_line(gpu: &GpuMetrics) -> String {
             .filter(|value| value.is_finite())
             .map_or_else(missing_value, power_w),
         gpu_memory_line(gpu),
-    ]
-    .join(" · ")
+    ];
+    if let Some(connected) = gpu.display_connected {
+        values.push(format!(
+            "{} {}",
+            t("gpu.display_output"),
+            t(if connected { "common.yes" } else { "common.no" })
+        ));
+    }
+    if let Some(version) = gpu
+        .vbios_version
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        values.push(format!("{} {version}", t("gpu.vbios_version")));
+    }
+    if let Some(api) = gpu.graphics_api.as_ref()
+        && let Some(version) = api
+            .mesa_version
+            .as_deref()
+            .filter(|value| !value.is_empty())
+    {
+        values.push(format!("{} {version}", t("gpu.mesa_version")));
+    }
+    if let Some(rpm) = gpu.current_fan_speed_rpm() {
+        values.push(format!("{} {rpm} RPM", t("fan.rpm")));
+    }
+    if let Some(pct) = gpu
+        .current_fan_speed_pct()
+        .filter(|value| value.is_finite())
+    {
+        values.push(format!("{} {pct:.0}%", t("fan.pwm")));
+    }
+    if let Some(bandwidth) = gpu
+        .memory_bandwidth_gbps
+        .filter(|value| value.is_finite() && *value > 0.0)
+    {
+        values.push(format!("{} {bandwidth:.1} GB/s", t("gpu.memory_bandwidth")));
+    }
+    if let Some(depth) = gpu.queue_depth {
+        values.push(format!("{} {depth}", t("gpu.queue_depth")));
+    }
+    values.join(" · ")
 }
 
 pub(super) fn nic_fact_line(nic: &NetworkMetrics) -> String {
     let rate = |value: Option<u64>| {
         value.map_or_else(missing_value, |value| format!("{}/s", bytes(value)))
     };
-    [
+    let mut values = vec![
         rate(nic.current_rx_bytes_per_sec()),
         rate(nic.current_tx_bytes_per_sec()),
         nic.current_link_speed_mbps()
             .map_or_else(missing_value, |mbps| format!("{mbps} Mbps")),
-    ]
-    .join(" · ")
+    ];
+    if let Some(width) = nic.current_channel_width_mhz() {
+        values.push(format!("{width} MHz"));
+    }
+    if let Some(mtu) = nic.current_mtu_bytes() {
+        values.push(format!("{} {mtu} B", t("net.mtu")));
+    }
+    if let Some(queue) = nic.current_tx_queue_len() {
+        values.push(format!("{} {queue}", t("net.tx_queue")));
+    }
+    for (label, left, right) in [
+        (
+            t("net.drops"),
+            nic.current_rx_drops(),
+            nic.current_tx_drops(),
+        ),
+        (
+            t("net.errors"),
+            nic.current_rx_errors(),
+            nic.current_tx_errors(),
+        ),
+        (
+            t("net.overruns"),
+            nic.current_rx_overruns(),
+            nic.current_tx_overruns(),
+        ),
+    ] {
+        if left.is_some() || right.is_some() {
+            values.push(format!(
+                "{label} {} / {}",
+                left.map_or_else(missing_value, |value| value.to_string()),
+                right.map_or_else(missing_value, |value| value.to_string()),
+            ));
+        }
+    }
+    if let Some(master) = nic
+        .master_interface
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        values.push(format!("{} {master}", t("net.master")));
+    }
+    if let Some(peer) = nic
+        .peer_interface
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        values.push(format!("{} {peer}", t("net.peer")));
+    }
+    values.join(" · ")
 }
 
 /// A device block's current fact line from the projection; a device id that
@@ -373,6 +619,12 @@ pub(crate) fn device_line(shell: &ShellApp, section: Section, device: &str) -> S
             .and_then(|devices| devices.iter().find(|nic| &*nic.device_id == device))
             .map_or_else(missing_value, nic_fact_line),
         Section::MemorySegments => missing_value(),
+        Section::Disk => disks(shell)
+            .and_then(|devices| devices.iter().find(|disk| disk.device_id == device))
+            .map_or_else(missing_value, disk_caption),
+        Section::Battery => batteries(shell)
+            .and_then(|devices| devices.iter().find(|b| b.id == device))
+            .map_or_else(missing_value, battery_fact_line),
     }
 }
 

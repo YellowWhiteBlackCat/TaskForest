@@ -1,4 +1,4 @@
-use super::{bounded_heading, geometry_contract};
+use super::{bounded_heading, bounded_stat_text, geometry_contract};
 use crate::ui::device_chart::{DEVICE_CHART_HEIGHT, primary_graph_height};
 use crate::ui::responsive::{
     DeviceNavigationPresentation, PERFORMANCE_SIDEBAR_MIN_WIDTH, PERFORMANCE_STATS_MAX_WIDTH,
@@ -23,6 +23,19 @@ fn heading_projection_is_bounded_for_long_device_identity() {
     assert_eq!(
         bounded_heading("Intel Core Ultra 7 358H with extra suffix", 18),
         "Intel Core Ultra …"
+    );
+}
+
+#[test]
+fn stat_projection_is_single_line_and_bounded_for_dense_rails() {
+    let long = "Interrupts 2350000 · CPU19 110000 (5%) · CPU0 3% · CPU1 3% · CPU2 3% · CPU3 3%";
+    let bounded = bounded_stat_text(long, false, false);
+    assert_eq!(bounded.chars().count(), 20);
+    assert!(bounded.ends_with('…'));
+    assert_eq!(bounded_stat_text("Load basis", false, true), "Load basis");
+    assert_eq!(
+        bounded_stat_text("CPU power preference", true, true),
+        "CPU power pre…"
     );
 }
 

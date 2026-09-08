@@ -735,7 +735,7 @@ pub(crate) fn overlay_popup(area: Rect, scope: TuiInputScope) -> Option<Rect> {
             crate::TuiSurfaceKind::Health => (84, 30),
             crate::TuiSurfaceKind::Containers => (84, 22),
             crate::TuiSurfaceKind::ServiceMenu => (52, 13),
-            crate::TuiSurfaceKind::ProcessMenu => (52, 18),
+            crate::TuiSurfaceKind::ProcessMenu => (52, 19),
             crate::TuiSurfaceKind::BatchMenu => (52, 15),
             crate::TuiSurfaceKind::SessionMenu | crate::TuiSurfaceKind::StartupMenu => (52, 11),
             crate::TuiSurfaceKind::ColumnMenu => (

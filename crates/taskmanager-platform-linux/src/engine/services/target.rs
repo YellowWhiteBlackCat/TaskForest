@@ -7,12 +7,14 @@ use super::init_runtime::detection_provider_failure;
 use super::{InitSystem, ServiceManager};
 
 const SYSTEMD_PREFIX: &str = "linux.service.systemd:";
+const SYSTEMD_USER_PREFIX: &str = "linux.service.systemd-user:";
 const OPENRC_PREFIX: &str = "linux.service.openrc:";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(super) struct ResolvedServiceTarget {
     init: InitSystem,
     native: String,
+    user_scope: bool,
 }
 
 impl ResolvedServiceTarget {
@@ -22,6 +24,10 @@ impl ResolvedServiceTarget {
 
     pub(super) fn native(&self) -> &str {
         self.native.as_str()
+    }
+
+    pub(super) const fn user_scope(&self) -> bool {
+        self.user_scope
     }
 }
 
@@ -33,6 +39,10 @@ pub(super) fn systemd_service_id(service: &str) -> ServiceId {
     systemd_unit_id(service)
 }
 
+pub(super) fn systemd_user_service_id(service: &str) -> ServiceId {
+    ServiceId::new(format!("{SYSTEMD_USER_PREFIX}{service}"))
+}
+
 pub(super) fn openrc_service_id(service: &str) -> ServiceId {
     ServiceId::new(format!("{OPENRC_PREFIX}{service}"))
 }
@@ -41,10 +51,13 @@ pub(super) fn resolve_service_target(
     target: &ServiceId,
 ) -> Result<ResolvedServiceTarget, ProviderFailure> {
     let encoded = target.as_str();
-    let (init, native) = if let Some(native) = encoded.strip_prefix(SYSTEMD_PREFIX) {
-        (InitSystem::Systemd, native)
+    let (init, native, user_scope) = if let Some(native) = encoded.strip_prefix(SYSTEMD_USER_PREFIX)
+    {
+        (InitSystem::Systemd, native, true)
+    } else if let Some(native) = encoded.strip_prefix(SYSTEMD_PREFIX) {
+        (InitSystem::Systemd, native, false)
     } else if let Some(native) = encoded.strip_prefix(OPENRC_PREFIX) {
-        (InitSystem::Openrc, native)
+        (InitSystem::Openrc, native, false)
     } else {
         return Err(ProviderFailure::Rejected);
     };
@@ -53,12 +66,17 @@ pub(super) fn resolve_service_target(
         InitSystem::Openrc => valid_openrc_service_name(native),
         InitSystem::Unsupported => false,
     };
-    if !valid || native.contains(SYSTEMD_PREFIX) || native.contains(OPENRC_PREFIX) {
+    if !valid
+        || native.contains(SYSTEMD_PREFIX)
+        || native.contains(SYSTEMD_USER_PREFIX)
+        || native.contains(OPENRC_PREFIX)
+    {
         return Err(ProviderFailure::Rejected);
     }
     Ok(ResolvedServiceTarget {
         init,
         native: native.to_owned(),
+        user_scope,
     })
 }
 

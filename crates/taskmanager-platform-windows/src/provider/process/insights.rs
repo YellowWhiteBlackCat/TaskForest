@@ -104,6 +104,9 @@ fn thread_rows_with_rates(
             state: ThreadState::Other,
             cpu_time_secs: detail.cpu_time_secs,
             cpu_percent,
+            wchan: None,
+            run_queue_wait_ns: None,
+            wait_kind: None,
         });
     }
     // Dead tids leave with the old map; live ones carried their baselines over.
@@ -222,6 +225,7 @@ pub(crate) fn open_files_value_from_boundary(
             fd,
             kind,
             target: raw.target,
+            deleted: false,
         });
     }
     entries.sort_unstable_by_key(|entry| entry.fd);

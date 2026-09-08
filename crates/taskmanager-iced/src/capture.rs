@@ -27,6 +27,7 @@ pub(crate) fn device_name(device: PerfDevice) -> &'static str {
         PerfDevice::Disk(_) => "disk",
         PerfDevice::Network(_) => "network",
         PerfDevice::Gpu(_) => "gpu",
+        PerfDevice::Npu(_) => "npu",
         PerfDevice::Battery(_) => "battery",
         PerfDevice::Fan(_) => "fan",
     }

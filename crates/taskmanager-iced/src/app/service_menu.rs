@@ -20,7 +20,7 @@ impl IcedApp {
         let _ = self.shell.select_row(visual_index);
         self.open_context_menu(ContextMenu::Service {
             source_index,
-            service,
+            service: Box::new(service),
         });
     }
 

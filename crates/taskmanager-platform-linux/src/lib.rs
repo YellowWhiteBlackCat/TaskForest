@@ -115,7 +115,8 @@ pub use engine::sensors::{collect_sensor_center, collect_sensor_center_from};
 pub use engine::services::{
     InitSystem, ServiceLogCommandOutcome, ServiceLogStreamRequestError, ServiceLogStreamWorker,
     ServiceLogWorker, ServiceManager, classify_service_log_outcome, parse_openrc_description,
-    parse_openrc_status, parse_openrc_update, parse_systemctl_show_deps, parse_unit_description,
+    parse_openrc_status, parse_openrc_update, parse_systemctl_show_deps,
+    parse_systemctl_show_diagnostics, parse_systemctl_show_inventory, parse_unit_description,
 };
 #[cfg(feature = "test-support")]
 pub use engine::session::{SessionManager, parse_loginctl_sessions};

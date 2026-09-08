@@ -211,12 +211,50 @@ pub enum LimitValue {
     Value(u64),
 }
 
+impl LimitValue {
+    /// Return current consumption as a percentage of a finite limit.
+    ///
+    /// Unlimited limits and missing current measurements return `None` rather
+    /// than pretending that the process is at 0% usage. Values above 100% are
+    /// retained so an actual overrun remains visible to a renderer.
+    #[must_use]
+    pub fn usage_percent(self, current: Option<u64>) -> Option<f32> {
+        let (Self::Value(limit), Some(current)) = (self, current) else {
+            return None;
+        };
+        if limit == 0 {
+            return None;
+        }
+        let percent = current as f64 / limit as f64 * 100.0;
+        percent.is_finite().then_some(percent as f32)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ResourceLimit {
     pub kind: ResourceLimitKind,
     pub soft: LimitValue,
     pub hard: LimitValue,
     pub unit: Option<String>,
+}
+
+impl ResourceLimit {
+    /// Return the current usage percentage against this limit's soft ceiling.
+    #[must_use]
+    pub fn soft_usage_percent(&self, current: Option<u64>) -> Option<f32> {
+        self.soft.usage_percent(current)
+    }
+
+    /// Return whether current usage has entered a caller-supplied warning band
+    /// of the finite soft limit (for example `90.0` for a 90% warning).
+    #[must_use]
+    pub fn is_near_soft_limit(&self, current: Option<u64>, threshold_percent: f32) -> Option<bool> {
+        if !threshold_percent.is_finite() || threshold_percent < 0.0 {
+            return None;
+        }
+        self.soft_usage_percent(current)
+            .map(|percent| percent >= threshold_percent)
+    }
 }
 
 /// Platform-neutral resource-group CPU quota update.

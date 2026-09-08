@@ -728,6 +728,65 @@ fn every_domain_has_an_independent_typed_ingestion_lane() {
 }
 
 #[test]
+fn aggregate_network_history_excludes_loopback_but_keeps_physical_rates() {
+    let physical = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        .device_id(Arc::from("net:physical"))
+        .device_generation(DeviceGeneration::new(1))
+        .adapter_type(NetworkAdapterType::Ethernet)
+        .scalar_observations(NetworkScalarObservations {
+            rx_bytes_per_sec: ScalarObservation::available(100, 10),
+            tx_bytes_per_sec: ScalarObservation::available(50, 10),
+            ..Default::default()
+        })
+        .build();
+    let loopback = taskmanager_test_support::NetworkMetricsFixtureBuilder::new()
+        .device_id(Arc::from("net:loopback"))
+        .device_generation(DeviceGeneration::new(1))
+        .adapter_type(NetworkAdapterType::Loopback)
+        .scalar_observations(NetworkScalarObservations {
+            rx_bytes_per_sec: ScalarObservation::available(10_000, 10),
+            tx_bytes_per_sec: ScalarObservation::available(20_000, 10),
+            ..Default::default()
+        })
+        .build();
+    let observation = NetworkTelemetryObservation::current(
+        vec![physical, loopback],
+        10,
+        Vec::new(),
+        Vec::new(),
+        BTreeMap::from([
+            (
+                DeviceId::new("net:physical"),
+                lifecycle(DevicePresence::Present, 1, 10),
+            ),
+            (
+                DeviceId::new("net:loopback"),
+                lifecycle(DevicePresence::Present, 1, 10),
+            ),
+        ]),
+    );
+    let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);
+    ingestor
+        .ingest_correlated_network(stamp(1), &observation)
+        .expect("network ingestion");
+    assert_eq!(
+        store.system_history.network_rate_total().samples()[0].value,
+        Some(150),
+        "the system aggregate must not let loopback traffic inflate external throughput"
+    );
+    assert_eq!(
+        store
+            .system_history
+            .network_rate(&DeviceId::new("net:loopback"))
+            .expect("loopback per-device history")
+            .samples()[0]
+            .value,
+        Some(30_000),
+        "loopback remains inspectable in its own typed device history"
+    );
+}
+
+#[test]
 fn current_authoritative_lifecycle_prunes_expired_device_history() {
     let device_id = "disk:wwid:expired";
     let (store, ingestor) = TelemetryStore::shared_with_correlated_ingestion(2);

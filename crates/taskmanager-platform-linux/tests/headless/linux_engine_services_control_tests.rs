@@ -213,6 +213,45 @@ fn command_failures_are_typed_and_later_requests_recover() {
     );
 }
 
+#[test]
+fn daemon_reload_is_manager_scoped_and_never_receives_a_service_target() {
+    let mut runner = FakeRunner::new([ControlCommandResult::Success(String::new())]);
+    assert_eq!(
+        reload_daemon_with(Ok(InitSystem::Systemd), &mut runner),
+        Ok(())
+    );
+    assert_eq!(
+        runner.calls,
+        vec![("systemctl".to_owned(), vec!["daemon-reload".to_owned()])]
+    );
+
+    let mut runner = FakeRunner::new([]);
+    assert_eq!(
+        reload_daemon_with(Ok(InitSystem::Openrc), &mut runner),
+        Err(ProviderFailure::Unsupported)
+    );
+    assert!(runner.calls.is_empty());
+}
+
+#[test]
+fn daemon_reload_action_uses_the_selected_systemd_manager_without_unit_args() {
+    let mut runner = FakeRunner::new([ControlCommandResult::Success(String::new())]);
+    let mut detector = || Ok(InitSystem::Systemd);
+    assert_eq!(
+        control_service_with(
+            &resolved(InitSystem::Systemd, "demo.service"),
+            ServiceAction::ReloadDaemon,
+            &mut detector,
+            &mut runner,
+        ),
+        Ok(())
+    );
+    assert_eq!(
+        runner.calls,
+        vec![("systemctl".to_owned(), vec!["daemon-reload".to_owned()],)]
+    );
+}
+
 #[cfg(unix)]
 #[test]
 fn native_command_runner_classifies_missing_permission_nonzero_and_timeout() {

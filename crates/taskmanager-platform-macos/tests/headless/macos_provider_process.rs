@@ -115,6 +115,31 @@ fn injected_facts_cache_promotes_current_process_nice_and_threads_to_available()
 }
 
 #[test]
+fn injected_network_facts_cache_promotes_per_process_rates_without_fabricating_totals() {
+    let me = std::process::id();
+    let mut provider = MacProcessListProvider::new();
+    provider.process_facts = ProcessFactsCache::with_map(HashMap::new(), Instant::now());
+    provider.process_network_facts = super::network_facts::ProcessNetworkFactsCache::with_map(
+        HashMap::from([(me, (Some(4_096), Some(8_192)))]),
+        Instant::now(),
+    );
+    let snapshot = provider.refresh(1_000).expect("process list must refresh");
+    let row = snapshot
+        .items
+        .iter()
+        .find(|item| item.pid == me)
+        .expect("the test process must appear in its own process list");
+    assert_eq!(
+        row.scalar_observations().network_rx_bytes_per_sec,
+        ScalarObservation::available(4_096, 1_000)
+    );
+    assert_eq!(
+        row.scalar_observations().network_tx_bytes_per_sec,
+        ScalarObservation::available(8_192, 1_000)
+    );
+}
+
+#[test]
 fn empty_facts_cache_keeps_nice_and_threads_unavailable() {
     // A fresh-but-empty cache (no rows for any PID) keeps both scalars
     // honestly Unsupported — the provider never fabricates a 0 nice or

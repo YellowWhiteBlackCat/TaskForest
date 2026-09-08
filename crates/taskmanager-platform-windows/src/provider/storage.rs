@@ -70,8 +70,13 @@ impl FilesystemHealthProvider for WinFilesystemHealthProvider {
                     mount_point: PathBuf::from(disk.mount_point()),
                     source: None,
                     fs_type: disk.file_system().to_string_lossy().into_owned(),
+                    backing_kind:
+                        taskmanager_core::core::storage_health::FilesystemBackingKind::Unknown,
                     read_only: Some(read_only),
                     error_count: None,
+                    inode_used: None,
+                    inode_total: None,
+                    inode_usage_percent: None,
                     status: if read_only {
                         FilesystemHealthStatus::ReadOnly
                     } else {

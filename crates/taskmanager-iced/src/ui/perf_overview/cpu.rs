@@ -9,9 +9,9 @@ use taskmanager_application::{
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::CpuTemperatureSource;
 use taskmanager_platform_contract::{CapabilityId, CapabilityStatus};
-use taskmanager_shell::presentation::graph_summary;
 use taskmanager_shell::presentation::missing_value;
 use taskmanager_shell::presentation::trend::TrendSeries;
+use taskmanager_shell::presentation::{graph_summary, pressure_summary};
 use taskmanager_shell::viewmodel::StatRow;
 use taskmanager_theme::tokens;
 
@@ -74,7 +74,7 @@ pub(super) fn cpu_headline_label_value(
         CpuHeadlineKind::Pressure => (
             t("perf.stall").to_owned(),
             match metric.value {
-                Some(CpuHeadlineValue::PressurePercent(value)) => format!("{value:.1}%"),
+                Some(CpuHeadlineValue::Pressure(value)) => pressure_summary(&value),
                 _ => missing(),
             },
         ),
@@ -105,15 +105,22 @@ pub(crate) fn percent_text(title: &str, value: Option<f32>) -> String {
     )
 }
 
-pub(super) fn utilization_graph_summary_elements(
+pub(super) fn cpu_graph_summary_elements(
     app: &crate::IcedApp,
 ) -> Vec<Element<'static, Message, iced::Theme, iced::Renderer>> {
     let mut lines = Vec::new();
     let cpu_series = app.cached_metric_series(TrendSeries::CpuUsagePercent);
-    let memory_series = app.cached_metric_series(TrendSeries::MemoryUsagePercent);
     push_graph_summary(&mut lines, t("common.cpu"), &cpu_series, |value| {
         format!("{value:.0}%")
     });
+    lines
+}
+
+pub(super) fn memory_graph_summary_elements(
+    app: &crate::IcedApp,
+) -> Vec<Element<'static, Message, iced::Theme, iced::Renderer>> {
+    let mut lines = Vec::new();
+    let memory_series = app.cached_metric_series(TrendSeries::MemoryUsagePercent);
     push_graph_summary(&mut lines, t("common.memory"), &memory_series, |value| {
         format!("{value:.0}%")
     });

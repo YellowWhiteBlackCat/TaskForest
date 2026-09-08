@@ -72,6 +72,7 @@ pub(crate) fn thread_header<'a>(
         text("Name").width(Length::Fixed(196.0)).color(muted),
         text("State").width(Length::Fixed(48.0)).color(muted),
         text("CPU-time").width(Length::Fixed(72.0)).color(muted),
+        text("Wait").width(Length::Fixed(72.0)).color(muted),
         text("CPU%").width(Length::Fill).color(muted),
     ]
     .spacing(8)
@@ -88,11 +89,19 @@ pub(crate) fn thread_row<'a>(
     } else {
         thread.comm.clone()
     };
+    let wait = thread.run_queue_wait_ns.map(|nanos| {
+        let kind = thread
+            .wait_kind
+            .map(taskmanager_core::core::process_telemetry::ThreadWaitKind::as_str)
+            .unwrap_or("wait");
+        format!("{kind} {:.1}ms", nanos as f64 / 1_000_000.0)
+    });
     row![
         text(thread.tid.to_string()).width(Length::Fixed(56.0)),
         text(comm).width(Length::Fixed(196.0)),
         text(thread.state.as_short_label()).width(Length::Fixed(48.0)),
         text(cpu_time_text(thread.cpu_time_secs)).width(Length::Fixed(72.0)),
+        text(wait.unwrap_or_else(|| DASH.to_string())).width(Length::Fixed(72.0)),
         text(cpu_percent_text(thread.cpu_percent)).width(Length::Fill),
     ]
     .spacing(8)

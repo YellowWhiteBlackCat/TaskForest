@@ -155,6 +155,11 @@ else
     install -m644 "$desktop_src" "$work/usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestI.desktop"
     install -m644 "$metainfo_src" "$work/usr/share/metainfo/io.github.YellowWhiteBlackCat.TaskForestI.metainfo.xml"
     install -m644 "$icon_src" "$work/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg"
+    for size in 16 24 32 48 64 128 256 512; do
+        icon_png="$repo/packaging/linux/icons/hicolor/${size}x${size}/apps/taskforest-taskboard.png"
+        [[ -s "$icon_png" ]] || { echo "build-deb-iced: missing icon ladder asset: $icon_png" >&2; exit 1; }
+        install -Dm644 "$icon_png" "$work/usr/share/icons/hicolor/${size}x${size}/apps/taskforest-taskboard.png"
+    done
 
     if command -v strip >/dev/null 2>&1; then
         strip --strip-unneeded "$work/usr/bin/taskforest-i" 2>/dev/null || \

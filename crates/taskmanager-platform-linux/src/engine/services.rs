@@ -17,13 +17,14 @@ pub use init_runtime::InitSystem;
 pub(crate) mod inventory;
 mod parsing;
 mod target;
-#[cfg(feature = "test-support")]
+#[cfg(any(test, feature = "test-support"))]
+#[allow(unused_imports)]
 pub use parsing::{
     parse_openrc_description, parse_openrc_status, parse_openrc_update, parse_systemctl_show_deps,
-    parse_unit_description,
+    parse_systemctl_show_diagnostics, parse_systemctl_show_inventory, parse_unit_description,
 };
-#[cfg(not(feature = "test-support"))]
-pub(crate) use parsing::{parse_openrc_status, parse_openrc_update, parse_systemctl_show_deps};
+#[cfg(not(any(test, feature = "test-support")))]
+pub(crate) use parsing::{parse_openrc_status, parse_openrc_update};
 pub(crate) use target::{valid_openrc_service_name, valid_systemd_service_name};
 
 use std::collections::HashSet;
@@ -33,16 +34,17 @@ use std::process::Command;
 use std::time::Duration;
 #[cfg(feature = "test-support")]
 use taskmanager_core::core::services::{
-    ServiceDeps, ServiceItem, ServiceLogAvailability, ServiceLogEntry, ServiceLogErrorKind,
-    ServiceLogFailure, ServiceLogFeed, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
-    ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd, ServiceLogStreamSnapshot,
-    ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationKind, ServiceStatus,
+    ServiceDeps, ServiceDiagnostics, ServiceItem, ServiceLogAvailability, ServiceLogEntry,
+    ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevel, ServiceLogLevelFilter,
+    ServiceLogQuery, ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd,
+    ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationKind,
+    ServiceStatus,
 };
 #[cfg(not(feature = "test-support"))]
 use taskmanager_core::core::services::{
-    ServiceDeps, ServiceItem, ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure,
-    ServiceLogLevel, ServiceLogQuery, ServiceLogState, ServiceLogStreamState, ServiceLogTimeFilter,
-    ServiceRelationKind, ServiceStatus,
+    ServiceDeps, ServiceDiagnostics, ServiceItem, ServiceLogEntry, ServiceLogErrorKind,
+    ServiceLogFailure, ServiceLogLevel, ServiceLogQuery, ServiceLogState, ServiceLogStreamState,
+    ServiceLogTimeFilter, ServiceRelationKind, ServiceStatus,
 };
 #[cfg(all(test, not(feature = "test-support")))]
 use taskmanager_core::core::services::{
@@ -78,7 +80,10 @@ impl ServiceManager {
             if let Ok(entries) = fs::read_dir(path) {
                 for entry in entries.flatten() {
                     let file_name = entry.file_name().to_string_lossy().to_string();
-                    if target::valid_systemd_service_name(&file_name) {
+                    let activation_unit = file_name.ends_with(".service")
+                        || file_name.ends_with(".timer")
+                        || file_name.ends_with(".socket");
+                    if target::valid_systemd_unit_name(&file_name) && activation_unit {
                         let name = file_name
                             .strip_suffix(".service")
                             .unwrap_or(&file_name)
@@ -91,7 +96,7 @@ impl ServiceManager {
                             .unwrap_or_else(|| "Systemd Service Unit".to_string());
 
                         services.push(ServiceItem::from_inventory(
-                            target::systemd_service_id(&file_name),
+                            target::systemd_unit_id(&file_name),
                             name,
                             ServiceStatus::Inactive,
                             description,
@@ -136,6 +141,9 @@ impl ServiceManager {
             }
             let unit = target.native();
             let mut command = Command::new("journalctl");
+            if target.user_scope() {
+                command.arg("--user");
+            }
             command.args([
                 "--unit",
                 unit,

@@ -7,9 +7,6 @@ target
 # Stray build outputs (e.g. a misnamed `rust_out` binary from a botched build)
 rust_out
 
-# Local agent workflow scratch may contain machine-specific paths.
-.claude/*.wf.js
-
 # rustfmt backup files
 **/*.rs.bk
 
@@ -25,25 +22,26 @@ rust_out
 # Regenerated matrix overview (scripts/capture-niri.sh montage); run dir copy is enough
 docs/screenshots/contact-sheet.png
 
-# JetBrains IDE folder (uncomment to ignore the whole .idea/ tree)
-#.idea/
+# JetBrains IDE and VS Code folders
+.idea/
+.vscode/
+*.swp
+*~
 
 # Python bytecode caches (evidence-validator / build scripts)
 __pycache__/
 *.pyc
 
-# Claude Code parallel-agent worktrees (ephemeral)
-.claude/worktrees/
+# Local agent runtime configurations and scratch — private, never commit.
+.claude/
+.claude.json
+claude.json
+.codex/
+.zcode/
 
 # Agent scratch + Cargo temp on NVMe (scripts/agent-workdir.sh) — never commit
 .tmp/
 .cargo-tmp
-
-# Local agent session plans are private workspace material.
-.zcode/
-
-# Local agent runner configuration — private, never commit.
-.codex/
 
 # Private publication-preparation material. This directory is intentionally
 # outside the public documentation contract and must never be committed.

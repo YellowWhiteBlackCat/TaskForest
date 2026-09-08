@@ -1,14 +1,228 @@
-//! Correlated asynchronous lifecycles for service details and log streaming.
+//! Correlated asynchronous lifecycles for service details, log streaming, and operational states.
+//!
+//! # Service Lifecycle State Transitions
+//!
+//! Across all four frontends (GPUI, Iced, TUI, Bevy UI), service state management is
+//! governed by four canonical operational states:
+//!
+//! - **Active**: The service is running, accepting connections, and performing work.
+//!   Native equivalents: `active (running)`, `active (exited)`, `Started`, `Running`.
+//! - **Inactive**: The service is stopped, dormant, or uninstantiated.
+//!   Native equivalents: `inactive (dead)`, `Stopped`.
+//! - **Failed**: The service terminated abnormally, crashed, or failed during startup/reload.
+//!   Native equivalents: `failed`, `crashed`, `Error`.
+//! - **Reloading**: The service is actively reloading its dynamic configuration or
+//!   transitioning without terminating the process or tearing down active connections.
+//!   Native equivalents: `active (reloading)`, `reloading`.
+//!
+//! ## State Transition Matrix
+//!
+//! | Current State | Trigger / Action | Next State | Failure Fallback |
+//! |:--------------|:-----------------|:-----------|:-----------------|
+//! | `Inactive`    | `Start`          | `Active`   | `Failed` (exit error, binary missing) |
+//! | `Active`      | `Stop`           | `Inactive` | `Failed` (unclean termination, kill failure) |
+//! | `Active`      | `Reload`         | `Reloading`| `Failed` (invalid config, reload abort) |
+//! | `Active`      | Crash / Signal   | `Failed`   | N/A |
+//! | `Active`      | `Restart`        | `Active`   | `Failed` (teardown or restart error) |
+//! | `Reloading`   | Reload Complete  | `Active`   | `Failed` (config rejected, process panic) |
+//! | `Reloading`   | `Stop`           | `Inactive` | `Failed` |
+//! | `Failed`      | `Start`/`Restart`| `Active`   | `Failed` (underlying issue unresolved) |
+//! | `Failed`      | `Stop` / Reset   | `Inactive` | `Failed` |
+//!
+//! ## Asynchronous Correlation & Frontends
+//!
+//! 1. **Control Correlation**: Managed by [`LatestServiceControlRequest`](crate::LatestServiceControlRequest),
+//!    which tracks `(ControlRequestId, ServiceId, ServiceAction)` to ensure stale or duplicate
+//!    platform completions never overwrite newer user intent.
+//! 2. **Dependency Projection**: Managed by [`ServiceDependenciesLifecycle`], preserving
+//!    `last_good` dependencies across transient reloads, restarts, and temporary failures.
+//! 3. **Log Stream Projection**: Managed by [`ServiceLogStreamLifecycle`], retaining logs
+//!    across query filter reloads and enabling diagnostics inspection for failed, active,
+//!    and inactive services alike.
 
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::services::{
-    ServiceDeps, ServiceLogFailure, ServiceLogQuery, ServiceLogStreamSnapshot,
-    ServiceLogStreamState,
+    ServiceAction, ServiceDeps, ServiceLogFailure, ServiceLogQuery, ServiceLogStreamSnapshot,
+    ServiceLogStreamState, ServiceStatus,
 };
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::{RequestId, SubmissionErrorKind};
+
+/// Canonical operational lifecycle state of a system service for shared application use.
+///
+/// While [`ServiceStatus`] provides coarse 3-state classification (`Active`,
+/// `Inactive`, `Failed`, plus `Unknown`), the shared application layer models the
+/// fine-grained operational lifecycle transitions including transient states like
+/// [`ServiceLifecycleState::Reloading`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+pub enum ServiceLifecycleState {
+    /// Service is actively running and processing work.
+    Active,
+    /// Service is stopped, dormant, or uninstantiated.
+    #[default]
+    Inactive,
+    /// Service terminated abnormally, crashed, or encountered an unrecoverable failure.
+    Failed,
+    /// Service is actively reloading configuration or transitioning without dropping availability.
+    Reloading,
+}
+
+impl ServiceLifecycleState {
+    /// Returns true if this state represents an active operational service (running or reloading).
+    #[must_use]
+    pub const fn is_operational(self) -> bool {
+        matches!(self, Self::Active | Self::Reloading)
+    }
+
+    /// Returns true if the service is currently running.
+    #[must_use]
+    pub const fn is_active(self) -> bool {
+        matches!(self, Self::Active)
+    }
+
+    /// Returns true if the service is stopped or dormant.
+    #[must_use]
+    pub const fn is_inactive(self) -> bool {
+        matches!(self, Self::Inactive)
+    }
+
+    /// Returns true if the service has failed or crashed.
+    #[must_use]
+    pub const fn is_failed(self) -> bool {
+        matches!(self, Self::Failed)
+    }
+
+    /// Returns true if the service is reloading configuration.
+    #[must_use]
+    pub const fn is_reloading(self) -> bool {
+        matches!(self, Self::Reloading)
+    }
+
+    /// Returns a static string label for the lifecycle state.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "Active",
+            Self::Inactive => "Inactive",
+            Self::Failed => "Failed",
+            Self::Reloading => "Reloading",
+        }
+    }
+
+    /// Classifies provider active and sub-state strings into the canonical lifecycle state.
+    ///
+    /// Handles systemd, Windows SCM, launchd, and normalized strings.
+    #[must_use]
+    pub fn from_provider_states(active_state: &str, sub_state: &str) -> Self {
+        let sub = sub_state.trim().to_lowercase();
+        if sub == "reloading" {
+            return Self::Reloading;
+        }
+        let active = active_state.trim().to_lowercase();
+        match active.as_str() {
+            "reloading" => Self::Reloading,
+            "active" | "running" | "started" | "activating" => {
+                if sub == "failed" || sub == "crashed" {
+                    Self::Failed
+                } else if sub == "reloading" {
+                    Self::Reloading
+                } else {
+                    Self::Active
+                }
+            }
+            "failed" | "crashed" | "error" => Self::Failed,
+            "inactive" | "dead" | "stopped" | "deactivating" => Self::Inactive,
+            _ => match sub.as_str() {
+                "running" | "started" => Self::Active,
+                "failed" | "crashed" => Self::Failed,
+                "reloading" => Self::Reloading,
+                _ => Self::Inactive,
+            },
+        }
+    }
+
+    /// Checks whether a direct transition from `self` to `target` is a valid lifecycle step.
+    #[must_use]
+    pub const fn can_transition_to(self, target: Self) -> bool {
+        match (self, target) {
+            // Identity: staying in the same state is always valid (e.g. heartbeat/poll).
+            (Self::Active, Self::Active)
+            | (Self::Inactive, Self::Inactive)
+            | (Self::Failed, Self::Failed)
+            | (Self::Reloading, Self::Reloading) => true,
+
+            // From Inactive: can start into Active, or fail during startup.
+            (Self::Inactive, Self::Active | Self::Failed) => true,
+
+            // From Active: can stop (Inactive), reload (Reloading), crash (Failed),
+            // or restart (transiently Inactive).
+            (Self::Active, Self::Inactive | Self::Reloading | Self::Failed) => true,
+
+            // From Reloading: can finish reload (Active), fail reload (Failed),
+            // or be stopped (Inactive).
+            (Self::Reloading, Self::Active | Self::Failed | Self::Inactive) => true,
+
+            // From Failed: can be started/restarted (Active), or reset/stopped (Inactive).
+            (Self::Failed, Self::Active | Self::Inactive) => true,
+
+            // Inactive cannot directly reload without starting first.
+            (Self::Inactive, Self::Reloading) => false,
+            // Failed cannot directly reload without recovering/starting first.
+            (Self::Failed, Self::Reloading) => false,
+        }
+    }
+
+    /// Determines which control actions are valid from the current lifecycle state.
+    #[must_use]
+    pub const fn is_action_applicable(self, action: ServiceAction) -> bool {
+        match action {
+            ServiceAction::Start => matches!(self, Self::Inactive | Self::Failed),
+            ServiceAction::Stop => matches!(self, Self::Active | Self::Reloading | Self::Failed),
+            ServiceAction::Restart => true,
+            ServiceAction::Enable | ServiceAction::Disable | ServiceAction::ReloadDaemon => true,
+        }
+    }
+}
+
+impl std::fmt::Display for ServiceLifecycleState {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+impl From<&str> for ServiceLifecycleState {
+    fn from(value: &str) -> Self {
+        match value.trim().to_lowercase().as_str() {
+            "reloading" => Self::Reloading,
+            "active" | "running" | "activating" | "started" => Self::Active,
+            "inactive" | "dead" | "deactivating" | "stopped" => Self::Inactive,
+            "failed" | "crashed" | "error" => Self::Failed,
+            _ => Self::Inactive,
+        }
+    }
+}
+
+impl From<ServiceStatus> for ServiceLifecycleState {
+    fn from(status: ServiceStatus) -> Self {
+        match status {
+            ServiceStatus::Active => Self::Active,
+            ServiceStatus::Inactive | ServiceStatus::Unknown => Self::Inactive,
+            ServiceStatus::Failed => Self::Failed,
+        }
+    }
+}
+
+impl From<ServiceLifecycleState> for ServiceStatus {
+    fn from(state: ServiceLifecycleState) -> Self {
+        match state {
+            ServiceLifecycleState::Active | ServiceLifecycleState::Reloading => Self::Active,
+            ServiceLifecycleState::Inactive => Self::Inactive,
+            ServiceLifecycleState::Failed => Self::Failed,
+        }
+    }
+}
 
 /// One mapping for service observation admission across every frontend track.
 #[must_use]

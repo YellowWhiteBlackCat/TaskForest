@@ -8,6 +8,7 @@
 //! consume the shared shell [`StatRow`] contract so missing values render the
 //! ONE shared dash in a dim style — the same fold all frontend renderers read.
 
+use iced::alignment::Horizontal;
 use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_shell::presentation::missing_value;
@@ -222,13 +223,26 @@ fn stats_rail<'a>(
     edge: RailEdge,
     compact: bool,
 ) -> Elem<'a> {
+    let rail_padding = match edge {
+        RailEdge::Left if compact => 8.0,
+        RailEdge::Left => 12.0,
+        RailEdge::Top => 12.0,
+    };
+    // Iced container widths apply to the content box. Subtract the rail's
+    // horizontal padding from a fixed budget so the outer rail stays inside
+    // the slot arithmetic; otherwise long SMART labels can push the value
+    // column past the window edge by exactly the padding amount.
+    let content_width = match width {
+        Length::Fixed(value) => Length::Fixed((value - rail_padding * 2.0).max(0.0)),
+        other => other,
+    };
     let mut body = stats_panel(theme_snapshot, stats, compact);
     if let Some(footer) = footer {
         body = column![body, footer].spacing(12).into();
     }
     let mut rail = container(
         scrollable(body)
-            .width(Length::Fill)
+            .width(content_width)
             .height(Length::Fill)
             .direction(iced::widget::scrollable::Direction::Vertical(
                 iced::widget::scrollable::Scrollbar::new()
@@ -236,21 +250,18 @@ fn stats_rail<'a>(
                     .scroller_width(4),
             )),
     )
-    .width(width)
+    .width(content_width)
     .height(Length::Fill)
-    .padding(if compact { 2.0 } else { 4.0 });
+    .padding(rail_padding);
     match edge {
         RailEdge::Left => {
-            rail = rail
-                .style(move |_| theme::rail_divider_left(theme_snapshot))
-                .padding(if compact { 8.0 } else { 12.0 });
+            rail = rail.style(move |_| theme::rail_divider_left(theme_snapshot));
         }
         RailEdge::Top => {
             rail = rail
                 .height(Length::Fixed(PERFORMANCE_STATS_STACK_HEIGHT))
                 .max_height(PERFORMANCE_STATS_STACK_HEIGHT)
-                .style(move |_| theme::rail_divider_top(theme_snapshot))
-                .padding(12.0);
+                .style(move |_| theme::rail_divider_top(theme_snapshot));
         }
     }
     rail.into()
@@ -274,16 +285,24 @@ pub(super) fn stats_panel(
                 Some(value) => (value.to_owned(), false),
                 None => (missing_value(), true),
             };
+            let label = bounded_stat_text(stat.label(), compact, true);
+            let value = bounded_stat_text(&value, compact, false);
             row![
-                text(stat.label().to_owned())
+                text(label)
                     .size(if compact { 10 } else { 12 })
                     .color(theme::muted_text_color(theme_snapshot))
-                    .width(Length::Fill),
-                text(value).size(value_size).color(if missing {
-                    theme::muted_text_color(theme_snapshot)
-                } else {
-                    crate::theme_binding::color(theme_snapshot.palette().fg)
-                }),
+                    .width(Length::FillPortion(1))
+                    .wrapping(iced::widget::text::Wrapping::None),
+                text(value)
+                    .size(value_size)
+                    .color(if missing {
+                        theme::muted_text_color(theme_snapshot)
+                    } else {
+                        crate::theme_binding::color(theme_snapshot.palette().fg)
+                    })
+                    .width(Length::FillPortion(2))
+                    .align_x(Horizontal::Right)
+                    .wrapping(iced::widget::text::Wrapping::None),
             ]
             .spacing(if compact { 4 } else { 8 })
             .align_y(iced::Alignment::Start)
@@ -296,6 +315,27 @@ pub(super) fn stats_panel(
         .spacing(if compact { 5 } else { 9 })
         .width(Length::Fill)
         .into()
+}
+
+/// Keep every statistic row a single measured line. Iced's text widget wraps
+/// long intrinsic values when the label/value flex row becomes narrower than
+/// the value; the row then grows visually without reserving a matching line
+/// box in the dense rail. Bounded text plus explicit `Wrapping::None` makes
+/// the truncation an intentional, stable visual contract. The full value is
+/// still available from the shared projection and richer frontends.
+#[must_use]
+pub(super) fn bounded_stat_text(value: &str, compact: bool, label: bool) -> String {
+    let max_chars = match (compact, label) {
+        // The rail is split into a one-third label slot and a two-thirds
+        // value slot. These budgets are deliberately below the slot's
+        // smallest reference width so a no-wrap text run cannot paint into
+        // its sibling even when the renderer declines to clip glyphs.
+        (true, true) => 14,
+        (true, false) => 16,
+        (false, true) => 18,
+        (false, false) => 20,
+    };
+    bounded_heading(value, max_chars)
 }
 
 /// Text in a flex heading must never be allowed to establish an unbounded

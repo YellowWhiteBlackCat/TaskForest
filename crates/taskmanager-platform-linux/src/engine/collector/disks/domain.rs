@@ -158,8 +158,10 @@ fn apply_diskstats_rates(
             );
         let next_baseline = DiskStatsState {
             reads_completed: current.reads_completed,
+            reads_merged: current.reads_merged,
             sectors_read: current.sectors_read,
             writes_completed: current.writes_completed,
+            writes_merged: current.writes_merged,
             sectors_written: current.sectors_written,
             io_time_ms: current.io_time_ms,
             weighted_time_ms: current.weighted_time_ms,
@@ -180,10 +182,14 @@ fn apply_diskstats_rates(
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct DiskRateSample {
     read_bytes_per_sec: u64,
+    read_merges_per_sec: u64,
     write_bytes_per_sec: u64,
+    write_merges_per_sec: u64,
     iops: u64,
     active_time_pct: f32,
     response_time_ms: Option<f32>,
+    average_queue_depth: Option<f32>,
+    service_time_ms: Option<f32>,
 }
 
 impl DiskRateSample {
@@ -199,6 +205,14 @@ impl DiskRateSample {
         let writes = current
             .writes_completed
             .checked_sub(previous.writes_completed)
+            .ok_or(FailureKind::IdentityChanged)?;
+        let read_merges = current
+            .reads_merged
+            .checked_sub(previous.reads_merged)
+            .ok_or(FailureKind::IdentityChanged)?;
+        let write_merges = current
+            .writes_merged
+            .checked_sub(previous.writes_merged)
             .ok_or(FailureKind::IdentityChanged)?;
         let read_bytes = current
             .sectors_read
@@ -223,9 +237,14 @@ impl DiskRateSample {
             .ok_or(FailureKind::ProviderFault)?;
         let active_time_pct =
             ((io_time_ms as f64 / (elapsed_secs * 1_000.0)) * 100.0).clamp(0.0, 100.0) as f32;
+        let average_queue_depth = (elapsed_secs > 0.0)
+            .then(|| (weighted_time_ms as f64 / (elapsed_secs * 1_000.0)) as f32)
+            .filter(|value| value.is_finite() && *value >= 0.0);
         Ok(Self {
             read_bytes_per_sec: (read_bytes as f64 / elapsed_secs) as u64,
+            read_merges_per_sec: (read_merges as f64 / elapsed_secs) as u64,
             write_bytes_per_sec: (write_bytes as f64 / elapsed_secs) as u64,
+            write_merges_per_sec: (write_merges as f64 / elapsed_secs) as u64,
             iops: (operations as f64 / elapsed_secs) as u64,
             active_time_pct,
             // Average response time per I/O = weighted time / operations. Weighted
@@ -235,6 +254,13 @@ impl DiskRateSample {
             // under-reported latency by roughly the queue depth.
             response_time_ms: (operations > 0)
                 .then(|| (weighted_time_ms as f64 / operations as f64) as f32),
+            average_queue_depth,
+            // `/proc/diskstats` only publishes aggregate busy time, not
+            // per-request service intervals. Keep this visibly distinct from
+            // queue-inclusive response time and expose it as a lower-bound
+            // service-time estimate rather than inventing a precise latency.
+            service_time_ms: (operations > 0)
+                .then(|| (io_time_ms as f64 / operations as f64) as f32),
         })
     }
 }
@@ -243,13 +269,25 @@ fn apply_rate_sample(disk: &mut DiskMetrics, sample: DiskRateSample, now_ms: u64
     let mut observations = *disk.scalar_observations();
     observations.read_bytes_per_sec =
         ScalarObservation::available(sample.read_bytes_per_sec, now_ms);
+    observations.read_merges_per_sec =
+        ScalarObservation::available(sample.read_merges_per_sec, now_ms);
     observations.write_bytes_per_sec =
         ScalarObservation::available(sample.write_bytes_per_sec, now_ms);
+    observations.write_merges_per_sec =
+        ScalarObservation::available(sample.write_merges_per_sec, now_ms);
     observations.iops = ScalarObservation::available(sample.iops, now_ms);
     observations.active_time_pct = ScalarObservation::available(sample.active_time_pct, now_ms);
     observations.response_time_ms = sample.response_time_ms.map_or_else(
         || ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
         |response_time_ms| ScalarObservation::available(response_time_ms, now_ms),
+    );
+    observations.average_queue_depth = sample.average_queue_depth.map_or_else(
+        || ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
+        |queue_depth| ScalarObservation::available(queue_depth, now_ms),
+    );
+    observations.service_time_ms = sample.service_time_ms.map_or_else(
+        || ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
+        |service_time_ms| ScalarObservation::available(service_time_ms, now_ms),
     );
     disk.apply_scalar_observations(observations);
 }
@@ -257,10 +295,14 @@ fn apply_rate_sample(disk: &mut DiskMetrics, sample: DiskRateSample, now_ms: u64
 fn apply_rate_failure(disk: &mut DiskMetrics, failure: FailureKind) {
     let mut observations = *disk.scalar_observations();
     observations.read_bytes_per_sec = ScalarObservation::unavailable(failure);
+    observations.read_merges_per_sec = ScalarObservation::unavailable(failure);
     observations.write_bytes_per_sec = ScalarObservation::unavailable(failure);
+    observations.write_merges_per_sec = ScalarObservation::unavailable(failure);
     observations.iops = ScalarObservation::unavailable(failure);
     observations.active_time_pct = ScalarObservation::unavailable(failure);
     observations.response_time_ms = ScalarObservation::unavailable(failure);
+    observations.average_queue_depth = ScalarObservation::unavailable(failure);
+    observations.service_time_ms = ScalarObservation::unavailable(failure);
     disk.apply_scalar_observations(observations);
 }
 

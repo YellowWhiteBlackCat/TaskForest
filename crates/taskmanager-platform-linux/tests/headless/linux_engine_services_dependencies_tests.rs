@@ -50,7 +50,12 @@ fn successful_empty_systemd_response_is_authoritative() {
     )]);
 
     assert_eq!(
-        ServiceManager::fetch_deps_with(InitSystem::Systemd, "demo.service", &mut runner),
+        ServiceManager::fetch_deps_with_scope(
+            InitSystem::Systemd,
+            "demo.service",
+            false,
+            &mut runner
+        ),
         Ok(ServiceDeps::default())
     );
     assert_eq!(
@@ -79,7 +84,12 @@ fn every_command_failure_remains_distinct_from_empty_dependencies() {
     ] {
         let mut runner = FakeRunner::new([DependencyCommandResult::Failure(failure)]);
         assert_eq!(
-            ServiceManager::fetch_deps_with(InitSystem::Systemd, "demo.service", &mut runner,),
+            ServiceManager::fetch_deps_with_scope(
+                InitSystem::Systemd,
+                "demo.service",
+                false,
+                &mut runner,
+            ),
             Err(failure)
         );
     }
@@ -90,7 +100,7 @@ fn unsupported_init_backends_never_run_systemctl() {
     for init in [InitSystem::Openrc, InitSystem::Unsupported] {
         let mut runner = FakeRunner::new([]);
         assert_eq!(
-            ServiceManager::fetch_deps_with(init, "demo.service", &mut runner),
+            ServiceManager::fetch_deps_with_scope(init, "demo.service", false, &mut runner),
             Err(ProviderFailure::Unsupported)
         );
         assert!(runner.calls.is_empty());
@@ -105,12 +115,21 @@ fn a_later_request_recovers_after_a_transient_failure() {
     ]);
 
     assert_eq!(
-        ServiceManager::fetch_deps_with(InitSystem::Systemd, "demo.service", &mut runner),
+        ServiceManager::fetch_deps_with_scope(
+            InitSystem::Systemd,
+            "demo.service",
+            false,
+            &mut runner
+        ),
         Err(ProviderFailure::TimedOut)
     );
-    let recovered =
-        ServiceManager::fetch_deps_with(InitSystem::Systemd, "demo.service", &mut runner)
-            .expect("the later successful query must recover");
+    let recovered = ServiceManager::fetch_deps_with_scope(
+        InitSystem::Systemd,
+        "demo.service",
+        false,
+        &mut runner,
+    )
+    .expect("the later successful query must recover");
     assert_eq!(
         recovered
             .relation_targets(&taskmanager_core::ServiceRelationKind::Requires)

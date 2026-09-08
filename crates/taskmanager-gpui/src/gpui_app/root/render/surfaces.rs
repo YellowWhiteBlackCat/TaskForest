@@ -172,6 +172,11 @@ fn render_process_properties(
         max_dialog_width.min(480.0)
     };
     let content_width = (dialog_width - 50.0).max(270.0);
+    // The shared viewport reserves SPACE_16 for its pinned scrollbar rail.
+    // The insights grid must receive the post-rail width, otherwise two cards
+    // sized from the pre-rail width wrap into one left column and leave a
+    // misleading empty half of the Properties dialog.
+    let insights_width = (content_width - taskmanager_theme::tokens::SPACE_16.0).max(240.0);
     let content_height = (f32::from(viewport.height) - 150.0).max(260.0);
     let content: AnyElement = bounded_scroll_region_with_rail(
         BoundedScrollRailSpec {
@@ -191,7 +196,7 @@ fn render_process_properties(
             histories: &histories,
             active: view.details_section,
             insights: view.process_insights.render_state(),
-            available_width: content_width,
+            available_width: insights_width,
             net_escalation: *view.shell.network_escalation_state(),
             entity: close_entity,
             local_time_rules: &view.local_time_rules,

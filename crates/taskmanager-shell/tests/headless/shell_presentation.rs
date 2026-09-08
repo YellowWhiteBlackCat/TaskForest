@@ -1,5 +1,33 @@
 use super::*;
+use taskmanager_core::core::metrics::{
+    CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, NetworkAdapterType, NetworkMetrics,
+};
+use taskmanager_core::core::services::ServiceDiagnostics;
 use taskmanager_core::core::time::{LocalTimeRules, LocalTimeRulesObservation};
+
+#[test]
+fn service_exit_diagnostics_explain_configuration_failure_in_both_locales() {
+    let diagnostics = ServiceDiagnostics {
+        exec_main_status: Some(78),
+        ..Default::default()
+    };
+    for (language, explanation) in [
+        (i18n::Language::En, "Invalid configuration"),
+        (i18n::Language::Zh, "配置错误"),
+    ] {
+        i18n::set_language(language);
+        let rows = service_diagnostics_rows(&diagnostics);
+        for key in ["svc.exit_status", "svc.failure_cause"] {
+            let value = &rows
+                .iter()
+                .find(|row| row.0 == i18n::t(key))
+                .expect("diagnostic row")
+                .1;
+            assert_eq!(value, &format!("78 (EX_CONFIG) · {explanation}"));
+        }
+    }
+    assert_eq!(service_exit::exit_status_text(123), "123");
+}
 
 #[test]
 fn every_command_has_discoverable_help() {
@@ -65,6 +93,41 @@ fn byte_and_duration_formatting_is_binary_and_deterministic() {
     assert_eq!(duration(86_400 + 3_600), "1d 01h 00m");
     assert_eq!(optional_bytes(Some(0)), "0 B");
     assert_eq!(optional_bytes(None), "—");
+}
+
+#[test]
+fn normalized_load_summary_uses_the_shared_typed_fact() {
+    i18n::set_language(i18n::Language::En);
+    let load = taskmanager_core::SystemLoadAverage::from_raw(8.0, 4.0, 2.0, 4)
+        .expect("fixture load is valid");
+    assert_eq!(
+        load_average_summary(&load),
+        "Load 1m 2.00× · 5m 1.00× · 15m 0.50×"
+    );
+}
+
+#[test]
+fn topology_and_interrupt_summaries_keep_pairing_and_distribution_visible() {
+    i18n::set_language(i18n::Language::En);
+    let mut cpu = CpuMetrics::default();
+    cpu.brand = Some("AuthenticAMD Ryzen".into());
+    let mut package = CpuPackageMetrics::new(0);
+    package.chiplet_ids = vec![0, 1];
+    package.smt_sibling_groups = vec![vec![0, 8], vec![1, 9]];
+    package.logical_core_ids = (0..16).collect();
+    package.physical_core_count = Some(8);
+    cpu.packages = vec![package];
+    cpu.interrupts = Some(CpuInterruptSnapshot {
+        total: Some(100),
+        per_logical_cpu: vec![80, 20],
+    });
+    let topology = cpu_topology_summary(&cpu).expect("topology summary");
+    assert!(topology.contains("CCD0/1"));
+    assert!(topology.contains("SMT 0/8,1/9"));
+    let interrupts = cpu_interrupt_summary(&cpu).expect("interrupt summary");
+    assert!(interrupts.contains("CPU0 80%") && interrupts.contains("CPU1 20%"));
+    let compact = cpu_interrupt_compact_summary(&cpu).expect("compact interrupt summary");
+    assert_eq!(compact, "Total 100 · CPU0 80 (80%)");
 }
 
 #[test]
@@ -387,4 +450,297 @@ fn wifi_signal_quality_percent_clamps_the_ninety_to_thirty_window() {
     // A missing dBm observation stays missing instead of becoming a fake 0%.
     assert_eq!(optional_wifi_signal_quality_percent(Some(-60)), Some(50.0));
     assert_eq!(optional_wifi_signal_quality_percent(None), None);
+}
+
+#[test]
+fn virtual_interface_name_classification_matches_known_patterns() {
+    let virtual_names = [
+        "veth12345",
+        "veth_abc",
+        "docker0",
+        "docker_gwbridge",
+        "virbr0",
+        "virbr0-nic",
+        "virbr1",
+        "br-6a31c50409a6",
+        "br-lan",
+        "vnet0",
+        "vnet1",
+        "tun0",
+        "tun1",
+        "tap0",
+        "tap1",
+        "lo",
+        "lo0",
+        "vmnet1",
+        "vmnet8",
+        "vboxnet0",
+        "dummy0",
+        "flannel.1",
+        "cni0",
+        "cali1234",
+        "cilium_net",
+        "tailscale0",
+        "wg0",
+        "wg-home",
+        "br0",
+        "br1",
+        "utun0",
+        "utun3",
+        "vEthernet (WSL)",
+        "vEthernet (Default Switch)",
+        "VirtualBox Host-Only Ethernet Adapter",
+        "Hyper-V Virtual Ethernet Adapter",
+        "TAP-Windows Adapter V9",
+    ];
+
+    for name in virtual_names {
+        assert!(
+            is_virtual_network_interface(name),
+            "expected {name} to be classified as virtual"
+        );
+        assert!(
+            !is_physical_network_interface(name),
+            "expected {name} not to be physical"
+        );
+        assert_eq!(
+            classify_network_interface(name),
+            NetworkInterfaceGroup::Virtual,
+            "expected {name} to have group Virtual"
+        );
+    }
+}
+
+#[test]
+fn physical_interface_name_classification_excludes_physical_nics() {
+    let physical_names = [
+        "eth0",
+        "eth1",
+        "enp3s0",
+        "eno1",
+        "ens33",
+        "enx00e04c680123",
+        "wlan0",
+        "wlp2s0",
+        "wlo1",
+        "wwan0",
+        "en0",
+        "en1",
+        "Intel(R) Wi-Fi 6 AX200",
+        "Realtek Gaming 2.5GbE Family Controller",
+        "broadcom",
+    ];
+
+    for name in physical_names {
+        assert!(
+            is_physical_network_interface(name),
+            "expected {name} to be classified as physical"
+        );
+        assert!(
+            !is_virtual_network_interface(name),
+            "expected {name} not to be virtual"
+        );
+        assert_eq!(
+            classify_network_interface(name),
+            NetworkInterfaceGroup::Physical,
+            "expected {name} to have group Physical"
+        );
+    }
+}
+
+#[test]
+fn network_metrics_device_classification() {
+    // Explicit Virtual / Loopback / Vpn adapter types are always virtual
+    let mut virt_adapter = NetworkMetrics::new("any_name");
+    virt_adapter.apply_observations(
+        NetworkAdapterType::Virtual,
+        Default::default(),
+        Default::default(),
+    );
+    assert!(is_virtual_network_device(&virt_adapter));
+    assert!(is_virtual_nic(&virt_adapter));
+
+    let mut lo_adapter = NetworkMetrics::new("custom_lo");
+    lo_adapter.apply_observations(
+        NetworkAdapterType::Loopback,
+        Default::default(),
+        Default::default(),
+    );
+    assert!(is_virtual_network_device(&lo_adapter));
+
+    let mut vpn_adapter = NetworkMetrics::new("corporate");
+    vpn_adapter.apply_observations(
+        NetworkAdapterType::Vpn,
+        Default::default(),
+        Default::default(),
+    );
+    assert!(is_virtual_network_device(&vpn_adapter));
+
+    // WiFi is physical
+    let mut wifi_adapter = NetworkMetrics::new("wlan0");
+    wifi_adapter.apply_observations(
+        NetworkAdapterType::WiFi,
+        Default::default(),
+        Default::default(),
+    );
+    assert!(is_physical_network_device(&wifi_adapter));
+    assert!(is_physical_nic(&wifi_adapter));
+
+    // Ethernet with physical name -> Physical
+    let mut eth_adapter = NetworkMetrics::new("eth0");
+    eth_adapter.apply_observations(
+        NetworkAdapterType::Ethernet,
+        Default::default(),
+        Default::default(),
+    );
+    assert_eq!(
+        classify_network_device(&eth_adapter),
+        NetworkInterfaceGroup::Physical
+    );
+
+    // Ethernet with veth / docker name -> Virtual
+    let mut veth_adapter = NetworkMetrics::new("veth42a8b9");
+    veth_adapter.apply_observations(
+        NetworkAdapterType::Ethernet,
+        Default::default(),
+        Default::default(),
+    );
+    assert_eq!(
+        classify_network_device(&veth_adapter),
+        NetworkInterfaceGroup::Virtual
+    );
+
+    let mut docker_adapter = NetworkMetrics::new("docker0");
+    docker_adapter.apply_observations(
+        NetworkAdapterType::Ethernet,
+        Default::default(),
+        Default::default(),
+    );
+    assert_eq!(
+        classify_network_device(&docker_adapter),
+        NetworkInterfaceGroup::Virtual
+    );
+
+    // Other with virbr / br- -> Virtual
+    let mut virbr_adapter = NetworkMetrics::new("virbr0");
+    virbr_adapter.apply_observations(
+        NetworkAdapterType::Other,
+        Default::default(),
+        Default::default(),
+    );
+    assert_eq!(
+        classify_network_device(&virbr_adapter),
+        NetworkInterfaceGroup::Virtual
+    );
+
+    let mut br_adapter = NetworkMetrics::new("br-6a31c50409a6");
+    br_adapter.apply_observations(
+        NetworkAdapterType::Other,
+        Default::default(),
+        Default::default(),
+    );
+    assert_eq!(
+        classify_network_device(&br_adapter),
+        NetworkInterfaceGroup::Virtual
+    );
+}
+
+#[test]
+fn group_network_devices_partitions_physical_and_virtual() {
+    let mut eth0 = NetworkMetrics::new("eth0");
+    eth0.apply_observations(
+        NetworkAdapterType::Ethernet,
+        Default::default(),
+        Default::default(),
+    );
+
+    let mut wlan0 = NetworkMetrics::new("wlan0");
+    wlan0.apply_observations(
+        NetworkAdapterType::WiFi,
+        Default::default(),
+        Default::default(),
+    );
+
+    let mut docker0 = NetworkMetrics::new("docker0");
+    docker0.apply_observations(
+        NetworkAdapterType::Ethernet,
+        Default::default(),
+        Default::default(),
+    );
+
+    let mut veth1 = NetworkMetrics::new("veth1234");
+    veth1.apply_observations(
+        NetworkAdapterType::Ethernet,
+        Default::default(),
+        Default::default(),
+    );
+
+    let devices = [&eth0, &docker0, &wlan0, &veth1];
+    let (physical, virtual_devs) = group_network_devices(devices);
+
+    assert_eq!(physical.len(), 2);
+    assert_eq!(physical[0].interface_name.as_ref(), "eth0");
+    assert_eq!(physical[1].interface_name.as_ref(), "wlan0");
+
+    assert_eq!(virtual_devs.len(), 2);
+    assert_eq!(virtual_devs[0].interface_name.as_ref(), "docker0");
+    assert_eq!(virtual_devs[1].interface_name.as_ref(), "veth1234");
+}
+
+#[test]
+fn network_interface_group_properties() {
+    assert!(NetworkInterfaceGroup::Physical.is_physical());
+    assert!(!NetworkInterfaceGroup::Physical.is_virtual());
+    assert_eq!(NetworkInterfaceGroup::Physical.key(), "physical");
+
+    assert!(NetworkInterfaceGroup::Virtual.is_virtual());
+    assert!(!NetworkInterfaceGroup::Virtual.is_physical());
+    assert_eq!(NetworkInterfaceGroup::Virtual.key(), "virtual");
+
+    // Labels resolve through i18n
+    i18n::set_language(i18n::Language::En);
+    assert_eq!(NetworkInterfaceGroup::Physical.label(), "physical");
+    assert_eq!(NetworkInterfaceGroup::Virtual.label(), "Virtual");
+}
+
+#[test]
+fn service_cycle_members_are_folded_from_typed_inventory_graphs() {
+    use taskmanager_core::core::services::{
+        ServiceItem, ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind, ServiceStatus,
+    };
+
+    let first = ServiceItem::from_inventory(
+        "linux.service.systemd:first.service",
+        "first",
+        ServiceStatus::Active,
+        "",
+        "loaded",
+        "active",
+        "running",
+    )
+    .with_relations(ServiceRelationGraph::from_edges([
+        ServiceRelationEdge::new(
+            ServiceRelationKind::Before,
+            "linux.service.systemd:second.service",
+        ),
+    ]));
+    let second = ServiceItem::from_inventory(
+        "linux.service.systemd:second.service",
+        "second",
+        ServiceStatus::Active,
+        "",
+        "loaded",
+        "active",
+        "running",
+    )
+    .with_relations(ServiceRelationGraph::from_edges([
+        ServiceRelationEdge::new(
+            ServiceRelationKind::Before,
+            "linux.service.systemd:first.service",
+        ),
+    ]));
+
+    let members = service_cycle_members([&first, &second]);
+    assert!(members.contains(&first.id));
+    assert!(members.contains(&second.id));
 }

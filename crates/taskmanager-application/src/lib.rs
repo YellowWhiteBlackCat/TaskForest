@@ -220,8 +220,8 @@ pub use router::{
     default_bindings, default_router,
 };
 pub use service_lifecycle::{
-    ServiceAttemptId, ServiceDependenciesLifecycle, ServiceLogStreamLifecycle,
-    ServiceRequestCorrelation, service_submission_failure,
+    ServiceAttemptId, ServiceDependenciesLifecycle, ServiceLifecycleState,
+    ServiceLogStreamLifecycle, ServiceRequestCorrelation, service_submission_failure,
 };
 pub use source_status::{
     MergedSourceState, SourceLineProjection, SourceNotice, SourceStateKind, device_source_line,

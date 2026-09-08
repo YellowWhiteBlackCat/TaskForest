@@ -56,7 +56,7 @@ fn panel_rows_join_neutral_vm_values() {
         None,
         &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     );
-    assert_eq!(pairs.len(), 14);
+    assert_eq!(pairs.len(), 17);
     use taskmanager_application::process_details_vm::ProcessDetailsField;
     assert_eq!(pairs[0].1, vm(ProcessDetailsField::Name));
     assert_eq!(pairs[1].1, vm(ProcessDetailsField::Pid));
@@ -80,8 +80,10 @@ fn panel_rows_join_neutral_vm_values() {
         ),
         "pss/swap row joins the two VM values"
     );
+    assert_eq!(pairs[6].1, vm(ProcessDetailsField::Uss));
+    assert_eq!(pairs[7].1, vm(ProcessDetailsField::AnonHugePages));
     assert_eq!(
-        pairs[6].1,
+        pairs[8].1,
         format!(
             "{} / {}",
             vm(ProcessDetailsField::Threads),
@@ -89,13 +91,14 @@ fn panel_rows_join_neutral_vm_values() {
         ),
         "threads/fd row joins the two VM values"
     );
-    assert_eq!(pairs[7].1, vm(ProcessDetailsField::CpuTime));
-    assert_eq!(pairs[8].1, vm(ProcessDetailsField::Nice));
-    assert_eq!(pairs[9].1, vm(ProcessDetailsField::DiskReadRate));
-    assert_eq!(pairs[10].1, vm(ProcessDetailsField::DiskWriteRate));
-    assert_eq!(pairs[11].1, vm(ProcessDetailsField::StartTime));
-    assert_eq!(pairs[12].1, vm(ProcessDetailsField::Exe));
-    assert_eq!(pairs[13].1, vm(ProcessDetailsField::Cmdline));
+    assert_eq!(pairs[9].1, vm(ProcessDetailsField::CpuTime));
+    assert_eq!(pairs[10].1, vm(ProcessDetailsField::Nice));
+    assert_eq!(pairs[11].1, vm(ProcessDetailsField::DiskReadRate));
+    assert_eq!(pairs[12].1, vm(ProcessDetailsField::DiskWriteRate));
+    assert_eq!(pairs[13].1, vm(ProcessDetailsField::CancelledWriteBytes));
+    assert_eq!(pairs[14].1, vm(ProcessDetailsField::StartTime));
+    assert_eq!(pairs[15].1, vm(ProcessDetailsField::Exe));
+    assert_eq!(pairs[16].1, vm(ProcessDetailsField::Cmdline));
 }
 
 #[test]
@@ -108,9 +111,9 @@ fn verified_start_wraps_the_vm_timestamp() {
             0,
         ),
     );
-    assert_eq!(pairs[11].1, "2020-09-13 12:26:40");
+    assert_eq!(pairs[14].1, "2020-09-13 12:26:40");
     // Without a frozen identity there is no verification note.
-    assert!(!pairs[11].1.contains("token verified"));
+    assert!(!pairs[14].1.contains("token verified"));
 }
 
 #[test]
@@ -120,11 +123,11 @@ fn missing_observations_render_dashes_never_fabricated_values() {
         None,
         &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     );
-    assert_eq!(pairs.len(), 14);
-    for (index, expected) in [(4, "— / —"), (5, "— / —"), (6, "— / —")] {
+    assert_eq!(pairs.len(), 17);
+    for (index, expected) in [(4, "— / —"), (5, "— / —"), (8, "— / —")] {
         assert_eq!(pairs[index].1, expected, "row {index} joins two dashes");
     }
-    for index in [7, 8, 9, 10, 11, 12, 13] {
+    for index in [6, 7, 9, 10, 11, 12, 13, 14, 15, 16] {
         assert_eq!(pairs[index].1, "—", "row {index} must render the dash");
     }
     // Identity fields stay honest Text even on an empty row.

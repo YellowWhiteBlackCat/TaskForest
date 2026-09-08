@@ -1,6 +1,7 @@
 //! Pure CPU and memory observation view models for the Performance overview.
 
 use taskmanager_core::core::metrics::{CpuMetrics, MemoryMetrics};
+use taskmanager_core::core::metrics::{ResourcePressure, SystemSnapshot};
 
 /// Responsive CPU composition derived from the frame budget's typed chart
 /// inventory (GPUI `CpuChartLayout::for_inventory` parity). This is layout
@@ -33,7 +34,7 @@ pub(super) struct CpuObservation {
     pub frequency_mhz: Option<u64>,
     pub temperature_c: Option<f32>,
     pub power_w: Option<f32>,
-    pub pressure_pct: Option<f32>,
+    pub pressure: Option<ResourcePressure>,
 }
 
 impl From<&CpuMetrics> for CpuObservation {
@@ -43,7 +44,7 @@ impl From<&CpuMetrics> for CpuObservation {
             frequency_mhz: cpu.current_frequency_mhz(),
             temperature_c: cpu.current_temperature_c(),
             power_w: cpu.current_power_w().filter(|value| *value > 0.0),
-            pressure_pct: None,
+            pressure: None,
         }
     }
 }
@@ -57,7 +58,7 @@ pub(super) enum CpuHeadlineValue {
     TemperatureC(f32),
     FrequencyMhz(u64),
     PowerW(f32),
-    PressurePercent(f32),
+    Pressure(ResourcePressure),
 }
 
 /// One CPU headline item in the canonical product order.
@@ -87,7 +88,7 @@ pub(super) fn cpu_headline_metrics(observation: Option<CpuObservation>) -> [CpuH
         frequency_mhz: None,
         temperature_c: None,
         power_w: None,
-        pressure_pct: None,
+        pressure: None,
     });
     [
         CpuHeadlineMetric {
@@ -108,9 +109,22 @@ pub(super) fn cpu_headline_metrics(observation: Option<CpuObservation>) -> [CpuH
         },
         CpuHeadlineMetric {
             kind: CpuHeadlineKind::Pressure,
-            value: observed.pressure_pct.map(CpuHeadlineValue::PressurePercent),
+            value: observed.pressure.map(CpuHeadlineValue::Pressure),
         },
     ]
+}
+
+/// Enrich the CPU metrics with the system pressure observation that is owned
+/// by the same immutable snapshot. Keeping the join here prevents each
+/// renderer from inventing its own PSI lookup or silently dropping avg60/avg300.
+#[must_use]
+pub(super) fn cpu_observation(snapshot: &SystemSnapshot) -> CpuObservation {
+    let mut observation = CpuObservation::from(&snapshot.cpu);
+    observation.pressure = snapshot
+        .pressure
+        .as_ref()
+        .and_then(|pressure| pressure.cpu.current_value().copied());
+    observation
 }
 
 #[derive(Clone, Debug)]

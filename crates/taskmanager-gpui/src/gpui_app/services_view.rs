@@ -13,6 +13,7 @@
 //! entity (`Entity` is `!Send`). An `InputEvent::Change` subscription writes the new value back
 //! into `RootView.services_state.query` so [`filter_services`] keeps working.
 
+use std::collections::BTreeSet;
 use std::rc::Rc;
 
 use gpui::{
@@ -38,6 +39,7 @@ use taskmanager_ui::inputs::text_input::TextInputState;
 use taskmanager_ui::overlays::popup::{MenuEntry, MenuItem, PopupMenuState};
 use taskmanager_ui::primitives::button::ButtonState;
 use taskmanager_ui::primitives::toolbar::Toolbar;
+use taskmanager_ui_contract::IconId;
 
 pub use crate::gpui_app::list_view::ActionFeedback;
 
@@ -107,6 +109,8 @@ pub struct ServicesDelegate {
     root: Entity<RootView>,
     /// Live search query for name-cell highlighting (set per render).
     query: String,
+    /// Stable IDs participating in an observed typed service cycle.
+    cycle_members: BTreeSet<taskmanager_core::ServiceId>,
 }
 
 impl ServicesDelegate {
@@ -133,6 +137,7 @@ impl ServicesDelegate {
             ],
             theme,
             root,
+            cycle_members: BTreeSet::new(),
         }
     }
 
@@ -151,13 +156,22 @@ impl ServicesDelegate {
     /// an `Rc` memo owned by `RootView`; pointer identity makes an unchanged
     /// frame a pair of cheap handle checks instead of an O(N) comparison or
     /// clone.
-    fn set_data(&mut self, rows: Rc<Vec<ServiceItem>>, theme: Theme, query: &str) {
+    fn set_data(
+        &mut self,
+        rows: Rc<Vec<ServiceItem>>,
+        theme: Theme,
+        query: &str,
+        cycle_members: BTreeSet<taskmanager_core::ServiceId>,
+    ) {
         if !Rc::ptr_eq(&self.rows, &rows) {
             self.rows = rows;
         }
         self.theme = theme;
         if self.query != query {
             self.query = query.to_owned();
+        }
+        if self.cycle_members != cycle_members {
+            self.cycle_members = cycle_members;
         }
     }
 }
@@ -261,14 +275,26 @@ impl TableDelegate for ServicesDelegate {
                     .text_color(taskmanager_ui::theme_binding::hsla(color))
                     .child(s.status.as_str().to_string())
             }
-            1 => div()
-                .flex()
-                .min_w(px(0.0))
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg))
-                .child(div().flex_1().min_w(px(0.0)).truncate().child(
+            1 => {
+                let cycle = self.cycle_members.contains(&s.id);
+                let mut cell = div()
+                    .flex()
+                    .items_center()
+                    .gap(px(4.0))
+                    .min_w(px(0.0))
+                    .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                    .text_color(taskmanager_ui::theme_binding::hsla(theme.fg));
+                if cycle {
+                    cell = cell.child(
+                        taskmanager_ui::icons_binding::icon(IconId::TriangleAlert)
+                            .size(px(12.0))
+                            .text_color(taskmanager_ui::theme_binding::hsla(theme.warning)),
+                    );
+                }
+                cell.child(div().flex_1().min_w(px(0.0)).truncate().child(
                     crate::gpui_app::elements::highlighted_text(&s.name, &self.query, &self.theme),
-                )),
+                ))
+            }
             _ => div()
                 .flex()
                 .min_w(px(0.0))
@@ -358,6 +384,11 @@ fn build_service_menu(root: Entity<RootView>) -> Vec<MenuEntry> {
         action(i18n::t("svc.restart"), true, ServiceAction::Restart),
         action(i18n::t("svc.enable"), false, ServiceAction::Enable),
         action(i18n::t("svc.disable"), true, ServiceAction::Disable),
+        action(
+            i18n::t("svc.reload_daemon"),
+            false,
+            ServiceAction::ReloadDaemon,
+        ),
     ]
 }
 
@@ -390,7 +421,7 @@ pub fn render_services(
         // The full list is no longer read here: the action bar keys off the
         // selected/hovered identities and the table body reads the memoized
         // `rows` projection.
-        items: _,
+        items,
         sources,
         selected,
         hovered,
@@ -404,6 +435,7 @@ pub fn render_services(
     } = props;
     let theme = *theme;
     let selected = selected.cloned();
+    let cycle_members = taskmanager_shell::service_cycle_members(items);
 
     // The persistent Table entity, created lazily per window by `RootView::render`
     // (RootView::services_table) on the first Services render; reused after.
@@ -459,7 +491,7 @@ pub fn render_services(
         // spurious SelectRow emits (and thus extra frames) every render.
         ent.update(cx, |s, cx| {
             s.delegate_mut()
-                .set_data(Rc::clone(&rows), theme, query.trim());
+                .set_data(Rc::clone(&rows), theme, query.trim(), cycle_members.clone());
             if s.selected_row() != selected_row_ix {
                 match selected_row_ix {
                     Some(ix) => s.set_selected_row(ix, cx),

@@ -111,6 +111,7 @@ fn cpu_spec_rows_emit_hybrid_rows_in_order() {
         frequency_implementation: Some("driver".into()),
         active_policy: Some("governor".into()),
         energy_preference: Some("preference".into()),
+        ..Default::default()
     };
     let hardware = HardwareInfo {
         core_breakdown: CoreBreakdown {

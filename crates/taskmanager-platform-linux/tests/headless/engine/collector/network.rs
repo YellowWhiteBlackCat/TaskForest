@@ -9,8 +9,20 @@ fn interface(name: &str, arp_type: u64) -> SysfsInterface {
         mac_addr: Some(Arc::from("aa:bb:cc:dd:ee:ff")),
         link_speed: ScalarObservation::available(1_000, 1),
         link_up: ScalarObservation::available(true, 1),
+        mtu_bytes: ScalarObservation::available(1500, 1),
+        tx_queue_len: ScalarObservation::available(0, 1),
+        rx_drops: ScalarObservation::available(0, 1),
+        tx_drops: ScalarObservation::available(0, 1),
+        rx_errors: ScalarObservation::available(0, 1),
+        tx_errors: ScalarObservation::available(0, 1),
+        rx_overruns: ScalarObservation::available(0, 1),
+        tx_overruns: ScalarObservation::available(0, 1),
         driver: Some(Arc::from("fixture")),
         adapter: Some(Arc::from("fixture adapter")),
+        master_interface: None,
+        peer_interface: None,
+        ifindex: None,
+        iflink: None,
     }
 }
 
@@ -212,6 +224,70 @@ fn adapter_classification_is_independent_of_counter_or_iw_availability() {
 }
 
 #[test]
+#[cfg(unix)]
+fn sysfs_inventory_resolves_veth_peer_and_bridge_master() {
+    use std::os::unix::fs::symlink;
+
+    let root = crate::test_support::repo_temp_dir().join(format!(
+        "tm-net-topology-{}-{}",
+        std::process::id(),
+        Instant::now().elapsed().as_nanos()
+    ));
+    std::fs::create_dir_all(&root).expect("create network fixture root");
+
+    let seed = |name: &str, index: u32, link: u32, mac: &str| {
+        let base = root.join(name);
+        std::fs::create_dir_all(base.join("statistics")).expect("create interface statistics");
+        for (file, value) in [
+            ("ifindex", index.to_string()),
+            ("iflink", link.to_string()),
+            ("type", "1".to_owned()),
+            ("address", mac.to_owned()),
+            ("speed", "1000".to_owned()),
+            ("carrier", "1".to_owned()),
+            ("mtu", "1500".to_owned()),
+            ("tx_queue_len", "0".to_owned()),
+        ] {
+            std::fs::write(base.join(file), value).expect("write interface fact");
+        }
+        for stat in [
+            "rx_dropped",
+            "tx_dropped",
+            "rx_errors",
+            "tx_errors",
+            "rx_over_errors",
+            "tx_over_errors",
+        ] {
+            std::fs::write(base.join("statistics").join(stat), "0")
+                .expect("write interface counter");
+        }
+    };
+    seed("br0", 3, 3, "02:00:00:00:00:03");
+    seed("veth0", 2, 4, "02:00:00:00:00:02");
+    seed("veth-peer", 4, 2, "02:00:00:00:00:04");
+    symlink("../br0", root.join("veth0/master")).expect("link veth to bridge");
+
+    let observed = super::sources::read_sysfs_inventory(&root, 77);
+    let veth = observed
+        .value
+        .iter()
+        .find(|interface| interface.name.as_ref() == "veth0")
+        .expect("veth fixture row");
+    assert_eq!(veth.master_interface.as_deref(), Some("br0"));
+    assert_eq!(veth.peer_interface.as_deref(), Some("veth-peer"));
+    assert_eq!(
+        observed
+            .value
+            .iter()
+            .find(|interface| interface.name.as_ref() == "veth-peer")
+            .and_then(|interface| interface.peer_interface.as_deref()),
+        Some("veth0")
+    );
+
+    std::fs::remove_dir_all(root).expect("remove network fixture root");
+}
+
+#[test]
 fn wired_and_unassociated_wireless_fields_have_explicit_optional_states() {
     let wired = assemble_wireless_observations(
         false,
@@ -398,6 +474,7 @@ fn wifi_without_sysfs_speed_backfills_link_speed_and_utilization_from_iw_tx_bitr
                 signal_dbm: Some(-50),
                 frequency_mhz: Some(5180),
                 channel: Some(36),
+                channel_width_mhz: None,
                 rx_bitrate_mbps: Some(433),
                 tx_bitrate_mbps: Some(867),
                 protocol: Some("802.11ac (Wi-Fi 5)"),
@@ -485,6 +562,7 @@ fn wifi_without_sysfs_speed_and_without_iw_bitrate_keeps_typed_unavailable() {
                 signal_dbm: Some(-50),
                 frequency_mhz: None,
                 channel: None,
+                channel_width_mhz: None,
                 rx_bitrate_mbps: None,
                 tx_bitrate_mbps: None,
                 protocol: None,

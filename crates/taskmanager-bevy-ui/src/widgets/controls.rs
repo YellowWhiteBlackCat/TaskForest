@@ -9,6 +9,7 @@
 use bevy::color::Color;
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
+use bevy::picking::Pickable;
 use bevy::picking::hover::PickingInteraction;
 use bevy::scene::{Scene, bsn, template_value};
 use bevy::ui::prelude::{
@@ -140,8 +141,7 @@ pub(crate) fn stat_row_scene(
         Children [
             (
                 Node {
-                    min_width: px(0.0),
-                    flex_shrink: 1.0,
+                    flex_shrink: 0.0,
                     overflow: Overflow::clip_x(),
                 }
                 Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
@@ -193,6 +193,7 @@ pub(crate) fn device_row_with_accessory_scene(
     selected: bool,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
+    let title = bounded_device_title(&title);
     bsn! {
         Node {
             width: percent(100),
@@ -209,7 +210,7 @@ pub(crate) fn device_row_with_accessory_scene(
         ControlVisual(ControlTone::Surface, selected)
         Button
         Children [
-            ( { accessory } ),
+            ( { accessory } Pickable::IGNORE ),
             (
                 Node {
                     flex_grow: 1.0,
@@ -219,13 +220,31 @@ pub(crate) fn device_row_with_accessory_scene(
                     row_gap: Val::Px(space_2()),
                     overflow: Overflow::clip_x(),
                 }
+                Pickable::IGNORE
                 Children [
-                    ( Text(title) TextRole(Role::Body) template_value(no_wrap_text()) ),
-                    ( { caption } ),
+                    ( Text(title) TextRole(Role::Body) template_value(no_wrap_text()) Pickable::IGNORE ),
+                    ( { caption } Pickable::IGNORE ),
                 ]
             ),
         ]
     }
+}
+
+/// Keep the identity line in a device-sidebar row visibly bounded. Bevy's
+/// `NoWrap`/`clip_x` pair prevents layout damage, but a raw clip leaves a
+/// model such as `Intel Graphics (xe)` ending in an unexplained `(`. The
+/// ellipsis is part of the product contract and is measured in Unicode scalar
+/// values here because the sidebar title is a semantic identity preview; the
+/// full model remains available in the selected detail surface.
+#[must_use]
+pub(crate) fn bounded_device_title(value: &str) -> String {
+    const MAX_CHARS: usize = 15;
+    let chars: Vec<char> = value.chars().collect();
+    if chars.len() <= MAX_CHARS {
+        return value.to_owned();
+    }
+    let take = MAX_CHARS.saturating_sub(1).max(1);
+    format!("{}…", chars.into_iter().take(take).collect::<String>())
 }
 
 /// Chrome around one graph body. The graph itself remains a separate Scene so

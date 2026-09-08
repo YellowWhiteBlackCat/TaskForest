@@ -3,17 +3,20 @@
 use std::collections::{HashMap, HashSet};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::Path;
+use std::process::Command;
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
-use taskmanager_core::{FailureKind, ProviderId};
+use taskmanager_core::{FailureKind, NetworkConnectionCounters, ProviderId};
 
 use super::{
-    ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
-    ProcessConnection, ProcessIdentity, ProcessNetworkSnapshot, state_for_status,
-    status_from_io_error,
+    ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey, ConnectionState,
+    ConnectionTransport, ProcessConnection, ProcessIdentity, ProcessNetworkSnapshot,
+    state_for_status, status_from_io_error,
 };
+use taskmanager_platform_portable::run_with_timeout;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NetworkByteCounters {
@@ -289,6 +292,20 @@ pub(super) fn collect_from_proc_dir(proc_dir: &Path, now_ms: u64) -> ProcessNetw
             })
             .then_with(|| left.provider_key.cmp(&right.provider_key))
     });
+    // Synthetic proc roots must never execute a host command or leak the
+    // runner's socket table into a fixture. The live collector always passes
+    // an absolute `/proc/<pid>` path.
+    let rtt_by_inode = proc_dir
+        .starts_with("/proc/")
+        .then(read_socket_rtt_by_inode)
+        .unwrap_or_default();
+    for connection in &mut connections {
+        connection.rtt_ms = connection
+            .provider_key
+            .as_ref()
+            .and_then(ConnectionProviderKey::as_numeric)
+            .and_then(|inode| rtt_by_inode.get(&inode).copied());
+    }
     let status = if denied {
         DeviceStatus::PermissionDenied
     } else if unavailable || readable_tables == 0 {
@@ -296,6 +313,9 @@ pub(super) fn collect_from_proc_dir(proc_dir: &Path, now_ms: u64) -> ProcessNetw
     } else {
         DeviceStatus::Healthy
     };
+    let connection_counters = proc_dir
+        .parent()
+        .and_then(|proc_root| read_tcp_connection_counters(&proc_root.join("net/snmp")));
     ProcessNetworkSnapshot {
         state: state_for_status(status, now_ms),
         connections,
@@ -304,7 +324,47 @@ pub(super) fn collect_from_proc_dir(proc_dir: &Path, now_ms: u64) -> ProcessNetw
         traffic_state: state_for_status(DeviceStatus::Unsupported, now_ms),
         traffic_failure: Some(FailureKind::Unsupported),
         traffic_provider: None,
+        connection_counters,
     }
+}
+
+fn read_tcp_connection_counters(path: &Path) -> Option<NetworkConnectionCounters> {
+    let text = std::fs::read_to_string(path).ok()?;
+    parse_tcp_connection_counters(&text)
+}
+
+/// Parse the paired `Tcp:` header/value rows from `/proc/net/snmp`.
+/// Unknown kernel columns are ignored; the three counters are retained only
+/// when both rows and their positions are valid.
+pub fn parse_tcp_connection_counters(text: &str) -> Option<NetworkConnectionCounters> {
+    let mut header = None;
+    let mut values = None;
+    for line in text.lines().filter(|line| line.starts_with("Tcp:")) {
+        let fields = line.split_whitespace().skip(1).collect::<Vec<_>>();
+        if header.is_none() && fields.contains(&"ActiveOpens") {
+            header = Some(fields);
+        } else if values.is_none() {
+            values = Some(fields);
+        }
+    }
+    let header = header?;
+    let values = values?;
+    let value = |name: &str| {
+        header
+            .iter()
+            .position(|field| *field == name)
+            .and_then(|index| values.get(index))
+            .and_then(|value| value.parse::<u64>().ok())
+    };
+    let counters = NetworkConnectionCounters {
+        active_opens: value("ActiveOpens"),
+        passive_opens: value("PassiveOpens"),
+        retransmitted_segments: value("RetrSegs"),
+    };
+    (counters.active_opens.is_some()
+        || counters.passive_opens.is_some()
+        || counters.retransmitted_segments.is_some())
+    .then_some(counters)
 }
 
 fn parse_socket_inode(target: &str) -> Option<u64> {
@@ -335,6 +395,7 @@ pub fn parse_socket_table(
                 remote: remote.into(),
                 state,
                 provider_key: Some(provider_key.into()),
+                rtt_ms: None,
             })
         })
         .collect()
@@ -367,9 +428,53 @@ pub fn parse_local_socket_table(text: &str) -> Vec<ProcessConnection> {
                 remote: ConnectionEndpoint::Unspecified,
                 state,
                 provider_key: Some(provider_key.into()),
+                rtt_ms: None,
             })
         })
         .collect()
+}
+
+/// Parse the bounded `ss -tineH` text form into a socket-inode → RTT map.
+/// `ss` emits one address line followed by one indented TCP-info line; the
+/// parser keeps the association explicit and ignores entries without both an
+/// inode and a finite non-negative `rtt:` value.
+pub fn parse_ss_tcp_info(text: &str) -> HashMap<u64, f32> {
+    let mut current_inode = None;
+    let mut result = HashMap::new();
+    for line in text.lines() {
+        if !line.starts_with(char::is_whitespace) {
+            current_inode = line
+                .split_whitespace()
+                .find_map(|token| token.strip_prefix("ino:")?.parse::<u64>().ok());
+            continue;
+        }
+        let Some(inode) = current_inode else {
+            continue;
+        };
+        let Some(value) = line.split_whitespace().find_map(|token| {
+            let value = token.strip_prefix("rtt:")?.split('/').next()?;
+            value.parse::<f32>().ok()
+        }) else {
+            continue;
+        };
+        if value.is_finite() && value >= 0.0 {
+            result.insert(inode, value);
+        }
+    }
+    result
+}
+
+fn read_socket_rtt_by_inode() -> HashMap<u64, f32> {
+    let mut command = Command::new("ss");
+    command.args(["-t", "-i", "-n", "-e", "-H"]);
+    let Ok(output) = run_with_timeout(&mut command, Duration::from_millis(750)) else {
+        return HashMap::new();
+    };
+    if output.status.success() {
+        parse_ss_tcp_info(&String::from_utf8_lossy(&output.stdout))
+    } else {
+        HashMap::new()
+    }
 }
 
 /// Split the seven fixed `/proc/net/unix` columns while preserving the

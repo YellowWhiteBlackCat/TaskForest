@@ -75,9 +75,14 @@ fn shared_vram_observations_flow_to_their_own_accessors() {
 #[test]
 fn graphics_api_facts_roundtrip_as_optional_typed_identity() {
     let mut gpu = GpuMetrics::new("gpu:pci:0000:01:00.0", "Fixture GPU");
+    gpu.vbios_version = Some("101.0.0.0".into());
+    gpu.memory_bus_width_bits = Some(256);
+    gpu.memory_bandwidth_gbps = Some(160.0);
+    gpu.power_limit_w = Some(165.0);
     gpu.graphics_api = Some(GpuGraphicsApi {
         opengl_version: Some("4.6".into()),
         vulkan_version: Some("1.4.354".into()),
+        mesa_version: Some("25.1.4".into()),
     });
 
     let value = serde_json::to_value(&gpu).expect("GPU graphics API facts serialize");
@@ -89,6 +94,14 @@ fn graphics_api_facts_roundtrip_as_optional_typed_identity() {
         value["graphics_api"]["vulkan_version"],
         serde_json::json!("1.4.354")
     );
+    assert_eq!(
+        value["graphics_api"]["mesa_version"],
+        serde_json::json!("25.1.4")
+    );
+    assert_eq!(value["vbios_version"], serde_json::json!("101.0.0.0"));
+    assert_eq!(value["memory_bus_width_bits"], serde_json::json!(256));
+    assert_eq!(value["memory_bandwidth_gbps"], serde_json::json!(160.0));
+    assert_eq!(value["power_limit_w"], serde_json::json!(165.0));
 
     let decoded: GpuMetrics = serde_json::from_value(value).expect("GPU graphics API facts decode");
     assert_eq!(decoded.graphics_api, gpu.graphics_api);

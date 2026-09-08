@@ -398,6 +398,7 @@ fn import_alert_rules_rejects_invalid_json() {
 
 #[test]
 fn export_rules_message_reports_clipboard_notice() {
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
     let _ = app.update(Message::Alerts(AlertsMessage::ExportRules));
@@ -416,6 +417,7 @@ fn export_rules_message_reports_clipboard_notice() {
 
 #[test]
 fn import_rules_message_applies_and_reports_notice() {
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     use taskmanager_application::AlertRuleImportMode;
     use taskmanager_core::core::alerts::{
         AlertMetric, AlertRule, AlertRuleTransferEntry, AlertSeverity, export_alert_rules_json,
@@ -584,6 +586,7 @@ fn remove_alert_rule_deletes_rule_by_id() {
 
 #[test]
 fn add_rule_message_applies_and_reports_notice() {
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     use taskmanager_core::core::alerts::{AlertMetric, AlertRule, AlertSeverity};
 
     let mut app = crate::IcedApp::demo();
@@ -631,6 +634,7 @@ fn add_rule_message_applies_and_reports_notice() {
 
 #[test]
 fn remove_rule_message_applies_and_reports_notice() {
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     let mut app = crate::IcedApp::demo();
     let _ = app.update(Message::Alerts(AlertsMessage::OpenPage));
 

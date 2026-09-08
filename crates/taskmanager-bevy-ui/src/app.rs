@@ -72,6 +72,8 @@ use crate::palette::{UiPalette, no_wrap_text, space_8, space_12};
 use crate::runtime::SharedRuntime;
 use crate::widgets::controls::{ControlTone, ControlVisual, control_background};
 use crate::window::{Role, TextRole, WindowPalette};
+use bevy::picking::Pickable;
+use bevy::window::{PrimaryWindow, Window};
 
 /// `'static` borrow of the process-wide runtime, held in the bevy `World` so
 /// window rebuilds reuse the cached handle (charter boundary 5).
@@ -231,6 +233,30 @@ pub(crate) struct NavTarget(pub(crate) Page);
 /// still owns their font metrics.
 #[derive(Component, Clone, Default)]
 pub(crate) struct NavItemLabel;
+
+/// Marker on the nav-tab text container, toggled between Flex and None at the 800px breakpoint.
+#[derive(Component, Clone, Default)]
+pub(crate) struct NavTabLabelNode;
+
+/// Responsive breakpoint for the product navigation strip: below 800px the text
+/// labels hide completely and the tabs show only their semantic icons, preventing
+/// text clipping (e.g. "Perform", "Ap").
+pub(crate) fn sync_nav_strip_layout(
+    windows: Query<&Window, With<PrimaryWindow>>,
+    mut label_nodes: Query<&mut Node, With<NavTabLabelNode>>,
+) {
+    let width = windows.iter().next().map_or(1180.0, Window::width);
+    let display = if width < 800.0 {
+        bevy::ui::Display::None
+    } else {
+        bevy::ui::Display::Flex
+    };
+    for mut node in &mut label_nodes {
+        if node.display != display {
+            node.display = display;
+        }
+    }
+}
 
 /// Marker on the one node that hosts the routed page's content scene.
 #[derive(Component, Clone, Default)]
@@ -424,7 +450,10 @@ fn nav_button_activated(
     mut pending: ResMut<PendingEffects>,
     mut commands: Commands,
 ) {
-    let Ok(target) = targets.get(activate.event().entity) else {
+    let target = targets
+        .get(activate.entity)
+        .or_else(|_| targets.get(activate.event().entity));
+    let Ok(target) = target else {
         return;
     };
     // The keyboard adapter signals a re-render for every accepted route chord
@@ -560,6 +589,8 @@ impl Plugin for AppShellPlugin {
             >>()
             .add_observer(highlight_nav_items)
             .add_observer(despawn_page_content)
+            .add_observer(crate::widgets::table::on_process_sort_header_activated)
+            .add_observer(crate::app::containers::containers_fold_observer)
             .add_plugins(crate::input::InputPlugin)
             .add_systems(
                 Update,
@@ -567,6 +598,8 @@ impl Plugin for AppShellPlugin {
                     crate::input::keyboard_dispatch_system,
                     crate::pages::processes::input::scroll_intent_system,
                     mount_page_system,
+                    sync_nav_strip_layout,
+                    crate::pages::processes::sync_processes_responsive_layout,
                 )
                     .chain(),
             );
@@ -644,7 +677,7 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
         Button
         on(nav_button_activated)
         Children [
-            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel ),
+            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE ),
             (
                 Node {
                     min_width: px(0.0),
@@ -652,8 +685,10 @@ fn nav_tab_scene(page: Page, active: bool, palette: &UiPalette) -> impl Scene + 
                     overflow: Overflow::clip_x(),
                 }
                 NavItemLabel
+                NavTabLabelNode
+                Pickable::IGNORE
                 Children [
-                    ( Text(label) TextRole(Role::Body) NavItemLabel TextColor(ink) template_value(no_wrap_text()) ),
+                    ( Text(label) TextRole(Role::Body) NavItemLabel TextColor(ink) template_value(no_wrap_text()) Pickable::IGNORE ),
                 ]
             ),
         ]
@@ -684,7 +719,7 @@ fn nav_trailing_scene(page: Page, active: bool, palette: &UiPalette) -> impl Sce
         Button
         on(nav_button_activated)
         Children [
-            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel ),
+            ( { crate::icons::icon_scene(tab_icon(page), 18.0, ink) } NavItemLabel Pickable::IGNORE ),
         ]
     }
 }
@@ -696,7 +731,7 @@ pub(crate) fn nav_strip_scene(route: Page, palette: &UiPalette) -> impl Scene + 
         .iter()
         .map(|&page| Box::new(nav_tab_scene(page, page == route, palette)) as Box<dyn Scene>)
         .collect();
-    let trailing: Vec<Box<dyn Scene>> = [Page::Alerts, Page::Settings]
+    let trailing: Vec<Box<dyn Scene>> = [Page::Containers, Page::Alerts, Page::Settings]
         .iter()
         .map(|&page| Box::new(nav_trailing_scene(page, page == route, palette)) as Box<dyn Scene>)
         .collect();

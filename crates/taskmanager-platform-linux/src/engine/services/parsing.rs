@@ -6,10 +6,12 @@ mod proptests;
 
 use std::fs;
 
+use taskmanager_core::core::services::{ServiceRelationEdge, ServiceRelationGraph};
+
 use super::target::{
     openrc_service_id, systemd_unit_id, valid_openrc_service_name, valid_systemd_unit_name,
 };
-use super::{ServiceDeps, ServiceItem, ServiceRelationKind, ServiceStatus};
+use super::{ServiceDeps, ServiceDiagnostics, ServiceItem, ServiceRelationKind, ServiceStatus};
 
 /// Pure parser for one bounded `systemctl show <unit> -p <properties>` query
 /// (the **key=value** form — i.e. WITHOUT `--value`). We pick the key=value form
@@ -44,7 +46,14 @@ use super::{ServiceDeps, ServiceItem, ServiceRelationKind, ServiceStatus};
 ///     ]
 /// );
 /// ```
+#[cfg(any(test, feature = "test-support"))]
 pub fn parse_systemctl_show_deps(output: &str) -> ServiceDeps {
+    parse_systemctl_show_deps_for_scope(output, false)
+}
+
+/// Scope-aware form used by the user-service provider. The public parser above
+/// retains the historical system-manager namespace for existing callers.
+pub(crate) fn parse_systemctl_show_deps_for_scope(output: &str, user_scope: bool) -> ServiceDeps {
     let mut deps = ServiceDeps::default();
     for line in output.lines() {
         let line = line.trim();
@@ -68,11 +77,183 @@ pub fn parse_systemctl_show_deps(output: &str) -> ServiceDeps {
         let targets = value
             .split_whitespace()
             .filter(|target| valid_systemd_unit_name(target))
-            .map(systemd_unit_id)
+            .map(|target| {
+                if user_scope {
+                    super::target::systemd_user_service_id(target)
+                } else {
+                    systemd_unit_id(target)
+                }
+            })
             .collect::<Vec<_>>();
         deps.replace_relation_targets(kind, targets);
     }
     deps
+}
+
+/// Parse a bounded `systemctl show` multi-unit response into `(unit,
+/// diagnostics)` pairs. `systemctl` separates units with blank lines; unknown
+/// properties are ignored and malformed values remain absent. The parser is
+/// pure so fixtures can exercise failure attribution without a live D-Bus.
+#[cfg(any(test, feature = "test-support"))]
+pub fn parse_systemctl_show_diagnostics(output: &str) -> Vec<(String, ServiceDiagnostics)> {
+    parse_systemctl_show_inventory(output, false)
+        .into_iter()
+        .map(|(unit, diagnostics, _)| (unit, diagnostics))
+        .collect()
+}
+
+/// Parse one bounded multi-unit `systemctl show` response into diagnostics and
+/// the canonical relationship graph used for cycle analysis. `user_scope`
+/// keeps relation targets in the same provider namespace as the originating
+/// unit; system and user managers must never share a target identity.
+pub fn parse_systemctl_show_inventory(
+    output: &str,
+    user_scope: bool,
+) -> Vec<(String, ServiceDiagnostics, ServiceRelationGraph)> {
+    let mut result = Vec::new();
+    let mut current = String::new();
+    let mut diagnostics = ServiceDiagnostics::default();
+    let mut relations = ServiceRelationGraph::default();
+    let mut flush = |current: &mut String,
+                     diagnostics: &mut ServiceDiagnostics,
+                     relations: &mut ServiceRelationGraph| {
+        if !current.is_empty() {
+            result.push((
+                std::mem::take(current),
+                std::mem::take(diagnostics),
+                std::mem::take(relations),
+            ));
+        }
+    };
+
+    for raw_line in output.lines() {
+        let line = raw_line.trim();
+        if line.is_empty() {
+            flush(&mut current, &mut diagnostics, &mut relations);
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let value = value.trim();
+        match key {
+            "Id" if valid_systemd_unit_name(value) => current = value.to_owned(),
+            "UnitFileState" => diagnostics.unit_file_state = nonempty(value),
+            "Result" => diagnostics.result = nonempty(value),
+            "ExecMainCode" => diagnostics.exec_main_code = nonempty(value),
+            "ExecMainStatus" => diagnostics.exec_main_status = value.parse().ok(),
+            "OOMKilled" => diagnostics.oom_killed = parse_yes_no(value),
+            "MemoryMax" => diagnostics.memory_max_bytes = parse_systemd_bytes(value),
+            "MemoryCurrent" => diagnostics.memory_current_bytes = parse_systemd_bytes(value),
+            "StartLimitHit" => diagnostics.start_limit_hit = parse_yes_no(value),
+            "NeedDaemonReload" => diagnostics.daemon_reload_required = parse_yes_no(value),
+            "NextElapseUSecRealtime" => diagnostics.next_trigger_realtime = nonempty(value),
+            "NextElapseUSecMonotonic" => {
+                diagnostics.next_trigger_monotonic_usec = parse_systemd_duration_usec(value)
+            }
+            "NRestarts" => diagnostics.restart_count = value.parse().ok(),
+            "StartLimitIntervalUSec" => {
+                diagnostics.start_limit_interval_usec = parse_systemd_duration_usec(value)
+            }
+            "StartLimitBurst" => diagnostics.start_limit_burst = value.parse().ok(),
+            "JobTimeoutUSec" | "TimeoutStartUSec" => {
+                diagnostics.timeout_usec = parse_systemd_duration_usec(value);
+            }
+            "User" => diagnostics.user = nonempty(value),
+            "Triggers" => diagnostics.triggers = unit_list(value),
+            "TriggeredBy" => diagnostics.triggered_by = unit_list(value),
+            property @ ("Requires" | "Wants" | "Requisite" | "BindsTo" | "PartOf" | "Conflicts"
+            | "Before" | "After" | "WantedBy" | "RequiredBy" | "UpheldBy") => {
+                if let Some(kind) = relation_kind(property) {
+                    for target in unit_list(value) {
+                        let target = if user_scope {
+                            super::target::systemd_user_service_id(&target)
+                        } else {
+                            systemd_unit_id(&target)
+                        };
+                        relations.push(ServiceRelationEdge::new(kind.clone(), target));
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    flush(&mut current, &mut diagnostics, &mut relations);
+    result
+}
+
+fn relation_kind(property: &str) -> Option<ServiceRelationKind> {
+    Some(match property {
+        "Requires" => ServiceRelationKind::Requires,
+        "Wants" => ServiceRelationKind::Wants,
+        "Requisite" => ServiceRelationKind::Requisite,
+        "BindsTo" => ServiceRelationKind::BindsTo,
+        "PartOf" => ServiceRelationKind::PartOf,
+        "Conflicts" => ServiceRelationKind::Conflicts,
+        "Before" => ServiceRelationKind::Before,
+        "After" => ServiceRelationKind::After,
+        "WantedBy" => ServiceRelationKind::WantedBy,
+        "RequiredBy" => ServiceRelationKind::RequiredBy,
+        "UpheldBy" => ServiceRelationKind::UpheldBy,
+        _ => return None,
+    })
+}
+
+fn nonempty(value: &str) -> Option<String> {
+    (!value.is_empty() && value != "n/a" && value != "-").then(|| value.to_owned())
+}
+
+fn parse_yes_no(value: &str) -> Option<bool> {
+    match value.to_ascii_lowercase().as_str() {
+        "yes" | "true" | "1" => Some(true),
+        "no" | "false" | "0" => Some(false),
+        _ => None,
+    }
+}
+
+fn parse_systemd_bytes(value: &str) -> Option<u64> {
+    let value = value.trim();
+    if value.is_empty() || matches!(value, "infinity" | "max" | "n/a" | "-" | "0") {
+        return None;
+    }
+    value.parse::<u64>().ok()
+}
+
+fn unit_list(value: &str) -> Vec<String> {
+    value
+        .split_whitespace()
+        .filter(|unit| valid_systemd_unit_name(unit))
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn parse_systemd_duration_usec(value: &str) -> Option<u64> {
+    let value = value.trim();
+    if value.is_empty() || value == "infinity" || value == "n/a" {
+        return None;
+    }
+    if let Ok(raw) = value.parse::<u64>() {
+        return Some(raw);
+    }
+    let mut total = 0_u64;
+    let mut saw = false;
+    for token in value.split_whitespace() {
+        let (number, multiplier) = if let Some(number) = token.strip_suffix("min") {
+            (number, 60_u64 * 1_000_000)
+        } else if let Some(number) = token.strip_suffix("ms") {
+            (number, 1_000)
+        } else if let Some(number) = token.strip_suffix('s') {
+            (number, 1_000_000)
+        } else if let Some(number) = token.strip_suffix('h') {
+            (number, 3_600_u64 * 1_000_000)
+        } else {
+            continue;
+        };
+        let number = number.parse::<u64>().ok()?;
+        total = total.checked_add(number.checked_mul(multiplier)?)?;
+        saw = true;
+    }
+    saw.then_some(total)
 }
 
 /// Parse `rc-status --servicelist` output into [`ServiceItem`]s. Each service
@@ -207,7 +388,8 @@ pub(super) fn extract_openrc_description(name: &str) -> Option<String> {
 /// * Strips one matching pair of surrounding quotes (`"` or `'`).
 /// * Returns `None` for an empty value (after trim + quote strip), letting the
 ///   caller fall back to its default.
-#[cfg(feature = "test-support")]
+#[cfg(any(test, feature = "test-support"))]
+#[allow(dead_code)]
 pub fn parse_unit_description(text: &str) -> Option<String> {
     for line in text.lines() {
         let line = line.trim();

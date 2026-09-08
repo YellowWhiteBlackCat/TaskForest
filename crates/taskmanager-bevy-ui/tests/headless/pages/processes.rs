@@ -845,3 +845,20 @@ fn multi_select_processes_arms_batch_confirmation_gate() {
     assert_eq!(intent.action, ProcessBatchAction::Kill);
     assert_eq!(intent.targets.len(), 2);
 }
+
+#[test]
+fn process_sort_header_mounts_and_routes_sort_activation() {
+    let items = vec![process(20, "beta"), process(10, "alpha")];
+    let mut app = headless_page_app(ui_palette(&Theme::dark()), shell_with(items));
+    app.update();
+
+    let headers: Vec<_> = app
+        .world_mut()
+        .query_filtered::<Entity, With<crate::widgets::table::ProcessSortHeader>>()
+        .iter(app.world())
+        .collect();
+    assert!(
+        !headers.is_empty(),
+        "process table header mounts interactive sort headers"
+    );
+}

@@ -10,13 +10,14 @@ pub(crate) use cpu::*;
 pub(crate) mod memory;
 pub(crate) use memory::*;
 mod projection;
+mod stats;
 
 use crate::perf_chart::PerfChart;
 use crate::theme;
 use iced::Length;
 use iced::widget::{canvas, column, row, text};
 use std::rc::Rc;
-use taskmanager_core::core::metrics::{CpuTemperatureSource, MemoryMetrics};
+use taskmanager_core::core::metrics::CpuTemperatureSource;
 
 use taskmanager_shell::presentation::trend::TrendSeries;
 use taskmanager_shell::viewmodel::StatRow;
@@ -25,6 +26,7 @@ use taskmanager_theme::tokens;
 use super::responsive::{
     DeviceNavigationPresentation, PerformanceChartInventory, PerformancePageBudget,
 };
+use stats::memory_stats_rows;
 use taskmanager_shell::presentation::duration;
 
 /// Dispatch the two singleton Performance resources to their named renderers.
@@ -70,7 +72,7 @@ fn cpu_detail(
         .projection()
         .snapshot
         .as_ref()
-        .map(|snapshot| projection::CpuObservation::from(&snapshot.cpu));
+        .map(projection::cpu_observation);
     let bogomips = app
         .shell
         .projection()
@@ -107,12 +109,11 @@ fn cpu_detail(
         Length::Fixed(cpu::HEADLINE_CHART_FLOOR)
     };
     let mut chart_content = column![chart_time_axis(theme_snapshot)].spacing(8);
-    chart_content = chart_content.push(performance_chart(app, theme_snapshot, chart_height));
+    chart_content = chart_content.push(cpu_performance_chart(app, theme_snapshot, chart_height));
     // Vertical ladder (GPUI parity): the per-chart summary rows drop
     // explicitly at the Floor rung — before the headline floor is touched.
     if budget.vertical.carries_core_stack() {
-        chart_content =
-            chart_content.push(column(utilization_graph_summary_elements(app)).spacing(2));
+        chart_content = chart_content.push(column(cpu::cpu_graph_summary_elements(app)).spacing(2));
     }
     let chart_content = chart_content.height(extent.length());
     let mut left = vec![
@@ -131,6 +132,19 @@ fn cpu_detail(
             theme_snapshot,
         ),
     ];
+    if let Some(load) = app
+        .shell
+        .projection()
+        .snapshot
+        .as_ref()
+        .and_then(|snapshot| snapshot.load_average.as_ref())
+    {
+        left.push(
+            text(taskmanager_shell::presentation::load_average_summary(load))
+                .size(f32::from(tokens::FONT_12))
+                .into(),
+        );
+    }
     let chart_panel = perf_layout::graph_card(theme_snapshot, chart_content.into(), extent);
     match chart_layout {
         projection::CpuChartLayout::AggregateWithPerCore => {
@@ -189,10 +203,10 @@ fn memory_detail(
         Length::Fixed(cpu::HEADLINE_CHART_FLOOR)
     };
     let mut chart_content = column![chart_time_axis(theme_snapshot)].spacing(8);
-    chart_content = chart_content.push(performance_chart(app, theme_snapshot, chart_height));
+    chart_content = chart_content.push(memory_performance_chart(app, theme_snapshot, chart_height));
     if budget.vertical.carries_core_stack() {
         chart_content =
-            chart_content.push(column(utilization_graph_summary_elements(app)).spacing(2));
+            chart_content.push(column(cpu::memory_graph_summary_elements(app)).spacing(2));
     }
     let mut left = vec![
         overview_gauges(app),
@@ -232,7 +246,7 @@ fn memory_detail(
         .spacing(8);
         let swap_chart = canvas::Canvas::new(PerfChart::new(
             Rc::clone(&swap_samples),
-            swap_samples.clone(),
+            Rc::from([]),
             crate::theme_binding::color(theme_snapshot.memory).scale_alpha(0.75),
             crate::theme_binding::color(theme_snapshot.palette().border),
             crate::theme_binding::color(theme_snapshot.palette().border),
@@ -370,6 +384,25 @@ pub(crate) fn cpu_memory_header_and_stats(
                 Some(format_cache_kb(l3)),
             ));
         }
+        if let Some(topology) = taskmanager_shell::presentation::cpu_topology_summary(cpu) {
+            stats.push(StatRow::text(t("cpu.topology"), Some(topology)));
+        }
+        if let Some(idle_states) = taskmanager_shell::presentation::cpu_idle_state_summary(cpu) {
+            stats.push(StatRow::text(t("cpu.idle_states"), Some(idle_states)));
+        }
+        if let Some(interrupts) =
+            taskmanager_shell::presentation::cpu_interrupt_compact_summary(cpu)
+        {
+            stats.push(StatRow::text(t("cpu.interrupts"), Some(interrupts)));
+        }
+        if let Some(load) = snapshot.load_average.as_ref() {
+            stats.push(StatRow::text(
+                t("system.load_basis"),
+                Some(taskmanager_shell::presentation::load_average_basis_summary(
+                    load,
+                )),
+            ));
+        }
         if let Some(driver) = cpu.performance_policy.frequency_implementation.as_deref() {
             stats.push(StatRow::text(
                 t("cpu.cpufreq_driver"),
@@ -387,6 +420,9 @@ pub(crate) fn cpu_memory_header_and_stats(
                 t("cpu.power_preference"),
                 Some(preference.to_string()),
             ));
+        }
+        if let Some(power_limits) = taskmanager_shell::presentation::cpu_power_limits_summary(cpu) {
+            stats.push(StatRow::text(t("cpu.power_limits"), Some(power_limits)));
         }
         cpu::append_rapl_and_msr_stats(&app.shell, &mut stats);
         (t("common.cpu").to_string(), subtitle, stats)
@@ -430,153 +466,6 @@ pub(crate) fn format_cache_kb(kb: u64) -> String {
     } else {
         format!("{kb} KiB")
     }
-}
-
-/// The Memory stats rows as pre-folded shell [`StatRow`]s for the right-hand
-/// readout column — the same typed `current_*` accessors the gpui Memory page
-/// reads, so a legacy zero-filled field can never masquerade as a measured
-/// value in one frontend but not the other. The eight base rows always
-/// render: missing data is an honest `None` (the shared dash), a measured
-/// zero stays a real value. The four enrichment rows (committed / zram /
-/// zswap / usage rate) are data-gated like gpui — a host without zram shows
-/// no zram row rather than a misleading zero.
-fn memory_stats_rows(memory: &MemoryMetrics, use_bytes: bool, use_base2: bool) -> Vec<StatRow> {
-    let observed = projection::MemoryObservation::from(memory);
-    let opt = |value: Option<u64>| value.map(|v| memory_text_pref(v, use_bytes, use_base2));
-    let mut stats = vec![
-        StatRow::text(t("mem.in_use"), opt(observed.used_bytes)),
-        StatRow::text(t("mem.available"), opt(observed.projected_available_bytes)),
-        StatRow::text(
-            t("mem.hardware_reserved"),
-            opt(observed.hardware_reserved_bytes),
-        ),
-        StatRow::text(t("mem.cached"), opt(observed.cached_bytes)),
-        StatRow::pair(
-            t("mem.swap"),
-            match (observed.swap_used_bytes, observed.swap_total_bytes) {
-                (Some(used), Some(total)) => Some(format!(
-                    "{} / {}",
-                    memory_text_pref(used, use_bytes, use_base2),
-                    memory_text_pref(total, use_bytes, use_base2)
-                )),
-                _ => None,
-            },
-        ),
-        StatRow::text(
-            t("common.speed"),
-            observed.speed_mhz.map(|value| format!("{value} MT/s")),
-        ),
-        StatRow::pair(
-            t("mem.slots"),
-            match (observed.slots_used, observed.slots_total) {
-                (Some(used), Some(total)) => Some(format!("{used} / {total}")),
-                _ => None,
-            },
-        ),
-    ];
-    // Buffers are Linux-only; Windows reports absence and the row must not
-    // render a "缓冲区 —" placeholder.
-    if let Some(value) = observed.buffers_bytes {
-        stats.insert(
-            4,
-            StatRow::text(
-                t("mem.buffers"),
-                Some(memory_text_pref(value, use_bytes, use_base2)),
-            ),
-        );
-    }
-    // ZFS hosts report the ARC as a reclaimable component; the row stays
-    // hidden everywhere else instead of rendering a fake zero.
-    if let Some(arc) = observed.zfs_arc_bytes {
-        let swap_row = stats
-            .iter()
-            .position(|row| row.label() == t("mem.swap"))
-            .unwrap_or(stats.len());
-        stats.insert(
-            swap_row,
-            StatRow::text(
-                t("mem.zfs_arc"),
-                Some(memory_text_pref(arc, use_bytes, use_base2)),
-            ),
-        );
-    }
-    // Committed address space (RAM+swap backing; may exceed RAM on
-    // overcommit) — only when the full pair is current and the limit is real.
-    if let (Some(committed), Some(limit)) = (observed.committed_bytes, observed.commit_limit_bytes)
-        && limit > 0
-    {
-        stats.push(StatRow::pair(
-            t("mem.committed"),
-            Some(format!(
-                "{} / {}",
-                memory_text_pref(committed, use_bytes, use_base2),
-                memory_text_pref(limit, use_bytes, use_base2)
-            )),
-        ));
-    }
-    // zram compressed swap (only when a zram device exists).
-    if let (Some(used), Some(capacity)) = (
-        observed.compressed_swap_used_bytes,
-        observed.compressed_swap_capacity_bytes,
-    ) && capacity > 0
-    {
-        // The compression depth follows only when the core guarded ratio is
-        // derivable (both mm_stat sizes current).
-        let ratio = observed
-            .compressed_swap_compression_ratio
-            .map_or_else(String::new, |ratio| {
-                format!(" · {} {ratio:.1}:1", t("mem.compression_ratio"))
-            });
-        stats.push(StatRow::pair(
-            t("mem.zram_swap"),
-            Some(format!(
-                "{} / {}{ratio}",
-                memory_text_pref(used, use_bytes, use_base2),
-                memory_text_pref(capacity, use_bytes, use_base2)
-            )),
-        ));
-        // The RAM the zram store actually consumes (`mm_stat`
-        // `mem_used_total`, metadata included): a distinct fact from both
-        // the swap-used view and the compressed size, so its own row.
-        if let Some(ram) = observed.compressed_swap_memory_used_bytes {
-            stats.push(StatRow::text(
-                t("mem.zram_ram_used"),
-                Some(memory_text_pref(ram, use_bytes, use_base2)),
-            ));
-        }
-    }
-    // zswap front-swap compressor (only when the module is loaded).
-    if let Some(on) = observed.compressed_swap_cache_enabled {
-        let state = if on {
-            t("common.enabled")
-        } else {
-            t("common.disabled")
-        };
-        stats.push(StatRow::text(t("mem.zswap"), Some(state.to_string())));
-    }
-    // Live used-memory delta rate (MiB/s; signed: − when freeing). Suppressed
-    // near zero so an idle machine doesn't show a noisy +0.0 row.
-    if let Some(rate) = observed
-        .used_rate_mib_per_sec
-        .filter(|rate| rate.abs() >= 0.05)
-    {
-        stats.push(StatRow::text(
-            t("mem.usage_rate"),
-            Some(signed_memory_rate_text(rate, use_bytes, use_base2)),
-        ));
-    }
-    stats
-}
-
-/// One signed memory-usage rate (MiB/s) as `±{quantity}/s` on the same
-/// preference-driven ladder as the byte rows (`+1.5 MiB/s`, `−512.0 KiB/s`).
-fn signed_memory_rate_text(rate_mib_per_sec: f32, use_bytes: bool, use_base2: bool) -> String {
-    let sign = if rate_mib_per_sec < 0.0 { "−" } else { "+" };
-    let per_sec = (rate_mib_per_sec.abs() * 1024.0 * 1024.0).round() as u64;
-    format!(
-        "{sign}{}/s",
-        memory_text_pref(per_sec, use_bytes, use_base2)
-    )
 }
 
 /// The Cpu-only system-wide device trend strip: one labeled mini polyline per
@@ -646,26 +535,53 @@ fn trend_strip_panel(
 ///
 /// Too-few-samples is honest: until at least one series has two points the
 /// chart shows a "collecting" placeholder instead of a fabricated flat line.
-fn performance_chart(
+fn cpu_performance_chart(
     app: &crate::IcedApp,
     theme_snapshot: &taskmanager_theme::Theme,
     height: Length,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     let cpu = app.cached_metric_series(TrendSeries::CpuUsagePercent);
-    let memory = app.cached_metric_series(TrendSeries::MemoryUsagePercent);
-    if cpu.len() < 2 && memory.len() < 2 {
-        // No polyline can be drawn yet; do not invent points.
+    if cpu.len() < 2 {
         return text(t("common.collecting_telemetry"))
             .size(f32::from(tokens::FONT_13))
             .into();
     }
     let palette = theme_snapshot.palette();
     let cpu_color = crate::theme_binding::color(palette.accent);
-    let memory_color = crate::theme_binding::color(palette.success);
     canvas::Canvas::new(PerfChart::new(
         cpu,
-        memory,
+        Rc::from([]),
         cpu_color,
+        cpu_color,
+        crate::theme_binding::color(theme_snapshot.palette().border),
+        crate::perf_chart::ReadoutColors {
+            bg: crate::theme_binding::color(palette.surface),
+            fg: crate::theme_binding::color(palette.fg),
+        },
+        true,
+    ))
+    .width(Length::Fill)
+    .height(height)
+    .into()
+}
+
+fn memory_performance_chart(
+    app: &crate::IcedApp,
+    theme_snapshot: &taskmanager_theme::Theme,
+    height: Length,
+) -> Element<'static, Message, iced::Theme, iced::Renderer> {
+    let memory = app.cached_metric_series(TrendSeries::MemoryUsagePercent);
+    if memory.len() < 2 {
+        return text(t("common.collecting_telemetry"))
+            .size(f32::from(tokens::FONT_13))
+            .into();
+    }
+    let palette = theme_snapshot.palette();
+    let memory_color = crate::theme_binding::color(palette.success);
+    canvas::Canvas::new(PerfChart::new(
+        memory,
+        Rc::from([]),
+        memory_color,
         memory_color,
         crate::theme_binding::color(theme_snapshot.palette().border),
         crate::perf_chart::ReadoutColors {

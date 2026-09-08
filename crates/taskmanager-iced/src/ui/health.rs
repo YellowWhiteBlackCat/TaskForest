@@ -14,7 +14,9 @@ use crate::i18n::{self, Key};
 use crate::theme;
 
 use super::overlays::{metric_label, modal_overlay, suggestion_text};
-use taskmanager_shell::presentation::{bytes, missing_value};
+use taskmanager_shell::presentation::{
+    bytes, health_score_for_snapshot, health_score_summary, missing_value,
+};
 
 mod projection;
 
@@ -101,6 +103,14 @@ pub(super) struct HealthRow {
 pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
     let observed = projection::HealthObservation::from(snapshot);
     let mut rows = Vec::new();
+
+    if let Some(score) = health_score_for_snapshot(snapshot) {
+        rows.push(HealthRow {
+            label: taskmanager_application::i18n::t("system.health_score").to_owned(),
+            value: health_score_summary(&score),
+            healthy: score.score >= 80,
+        });
+    }
 
     let cpu_usage = observed.cpu_usage_pct;
     // The clock piece goes through the source-aware readout so a BogoMIPS-only

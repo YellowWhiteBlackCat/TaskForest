@@ -1,25 +1,19 @@
 //! CPU detail/specification surface kept separate from the graph renderer.
 
-use gpui::{Div, InteractiveElement, ParentElement, Styled, div, px};
+use gpui::{Div, InteractiveElement, ParentElement, ScrollHandle, Styled, div, px};
 
 use crate::gpui_app::formatting;
 use taskmanager_application::i18n;
 use taskmanager_core::core::hardware::{CoreBreakdown, HardwareInfo};
 use taskmanager_core::core::metrics::{CpuMetrics, SystemSnapshot};
 use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{Length, Theme};
 use taskmanager_ui::data::key_value_row::KeyValueRow;
 
 use super::msr_readouts::MsrReadoutsModel;
 use super::package_power::PackagePowerModel;
 use super::{EscalationReadouts, format_uptime, stats::CpuDetailsStats};
-
-const CPU_SPEC_ROW_SLOT: f32 = 26.0;
-const CPU_DETAILS_RESERVE: f32 = 194.0;
-const CPU_PACKAGE_POWER_RESERVE: f32 = 120.0;
-const CPU_MSR_RESERVE: f32 = 180.0;
-const MAX_CPU_SPEC_ROWS: usize = 32;
 
 pub(super) fn render_pinned(
     theme: &Theme,
@@ -28,14 +22,13 @@ pub(super) fn render_pinned(
     live: &CpuDetailsStats,
     units: UnitPreferences,
     escalation: &EscalationReadouts,
-    content_height: f32,
+    scroll: &ScrollHandle,
 ) -> Div {
     let EscalationReadouts {
         package_power,
         msr_readouts,
     } = escalation;
     let cpu = &snap.cpu;
-    let spec_rows = spec_row_budget(content_height, package_power, msr_readouts);
     // Per-core average + maximum temperature, surfaced as a note beneath the
     // package reading. The typed CPU sensor source exposes Intel `coretemp`
     // channels as genuine per-core values and keeps AMD `k10temp` die readings
@@ -45,7 +38,7 @@ pub(super) fn render_pinned(
     // provider emits typed `None` for unmapped logical cores (topology-mapped
     // SMT siblings still carry their parent physical core's reading), so the
     // legacy `>0.0` sentinel is no longer needed here.
-    div()
+    let panel = div()
         .debug_selector(|| "tm-cpu-details-panel".to_string())
         .w_full()
         .h_full()
@@ -81,7 +74,30 @@ pub(super) fn render_pinned(
                 .w_full()
                 .bg(taskmanager_ui::theme_binding::fill(theme.border)),
         )
-        .child(spec_grid(theme, cpu, hardware, units, spec_rows))
+        // The complete projection belongs to one bounded, independently
+        // scrollable rail. Previously a height budget silently replaced lower
+        // topology/policy facts with "N more rows"; that made the screenshot
+        // look tidy while making accepted data unreachable. The owned rail
+        // keeps the chart and page viewport pinned and exposes every row.
+        .child(spec_grid(theme, cpu, hardware, units));
+    div()
+        .relative()
+        .flex()
+        .flex_col()
+        .flex_1()
+        .min_w(px(0.0))
+        .min_h(px(0.0))
+        .w_full()
+        .debug_selector(|| "tm-cpu-details-scroll-frame".to_string())
+        .child(taskmanager_ui::layout::scroll_region_with_rail(
+            "cpu-details-scroll",
+            "tm-cpu-details-scroll",
+            "cpu-details-scrollbar",
+            "tm-cpu-details-scrollbar",
+            scroll.clone(),
+            theme.palette(),
+            panel,
+        ))
 }
 
 fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> Div {
@@ -124,14 +140,35 @@ fn live_stats(theme: &Theme, snap: &SystemSnapshot, live: &CpuDetailsStats) -> D
             &threads.to_string(),
         ));
     }
-    if let Some(pressure) = snap.pressure.as_ref() {
-        if let Some(cpu_pressure) = pressure.cpu.current_value() {
-            col = col.child(kv_row(
+    if let Some(pressure) = snap.pressure.as_ref()
+        && let Some(cpu_pressure) = pressure.cpu.current_value()
+    {
+        let some = format!(
+            "some {}",
+            taskmanager_shell::presentation::pressure_window_values_compact_summary(
+                &cpu_pressure.some,
+            )
+        );
+        col = col.child(kv_row_bounded(theme, i18n::t("perf.stall"), &some));
+        if let Some(full) = cpu_pressure.full.as_ref() {
+            let full_summary =
+                taskmanager_shell::presentation::pressure_window_values_compact_summary(full);
+            col = col.child(kv_row_bounded(
                 theme,
-                i18n::t("perf.stall"),
-                &format!("{:.1}%", cpu_pressure.some.avg10),
+                i18n::t("perf.stall_full"),
+                &full_summary,
             ));
         }
+    }
+    if let Some(load) = snap.load_average.as_ref() {
+        let summary = taskmanager_shell::presentation::load_average_values_compact_summary(load);
+        col = col.child(kv_row_bounded(
+            theme,
+            i18n::t("system.load_normalized"),
+            &summary,
+        ));
+        let basis = taskmanager_shell::presentation::load_average_basis_summary(load);
+        col = col.child(kv_row_bounded(theme, i18n::t("system.load_basis"), &basis));
     }
     col.child(kv_row(
         theme,
@@ -151,6 +188,19 @@ pub(super) fn kv_row(theme: &Theme, label: &str, value: &str) -> Div {
     KeyValueRow::new(label, value, theme.palette())
         .selectable_value(gpui::ElementId::Name(
             format!("cpu-detail-value:{label}").into(),
+        ))
+        .render()
+}
+
+/// Pressure values contain three horizons and are wider than an ordinary
+/// scalar. Reserve a small, explicit label slot so the label itself cannot be
+/// squeezed to one glyph when the details rail is at its minimum width; the
+/// value then truncates inside its own bounded slot.
+fn kv_row_bounded(theme: &Theme, label: &str, value: &str) -> Div {
+    KeyValueRow::new(label, value, theme.palette())
+        .label_width(Length(72.0))
+        .selectable_value(gpui::ElementId::Name(
+            format!("cpu-detail-pressure-value:{label}").into(),
         ))
         .render()
 }
@@ -185,21 +235,11 @@ fn spec_grid(
     cpu: &CpuMetrics,
     hardware: &HardwareInfo,
     units: UnitPreferences,
-    max_rows: Option<usize>,
 ) -> Div {
-    // Performance details are intentionally static: the page's only scrollable
-    // surface is the device selector on the left. Missing optional facts were
-    // removed by `cpu_spec_rows`; the remaining rows are painted in place so
-    // the right rail cannot hide a second implicit list viewport.
+    // All accepted facts are painted in this one details viewport. The outer
+    // CPU rail owns vertical scrolling; no row budget is allowed to turn
+    // real telemetry into an unreachable count hint.
     let rows = cpu_spec_rows(cpu, hardware, units);
-    let row_limit = max_rows.map_or(rows.len(), |limit| {
-        if rows.len() > limit {
-            limit.saturating_sub(1)
-        } else {
-            limit
-        }
-    });
-    let omitted = rows.len().saturating_sub(row_limit);
     let mut column = div()
         .flex()
         .flex_col()
@@ -207,51 +247,19 @@ fn spec_grid(
         .min_w(px(0.0))
         .min_h(px(0.0))
         .w_full();
-    for (index, (label, value)) in rows.into_iter().take(row_limit).enumerate() {
-        let row = kv_row(theme, &label, &value);
+    for (index, (label, value)) in rows.into_iter().enumerate() {
+        let row = if value.chars().count() > 20 {
+            kv_row_bounded(theme, &label, &value)
+        } else {
+            kv_row(theme, &label, &value)
+        };
         #[cfg(any(test, feature = "test-support"))]
         let row = row.debug_selector(move || format!("tm-cpu-spec:{index}"));
         #[cfg(not(any(test, feature = "test-support")))]
         let _ = index;
         column = column.child(row);
     }
-    if omitted > 0 {
-        column = column.child(
-            div()
-                .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
-                .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-                .child(i18n::t("common.more_rows").replace("{count}", &omitted.to_string())),
-        );
-    }
     column
-}
-
-fn spec_row_budget(
-    content_height: f32,
-    package_power: &PackagePowerModel,
-    msr_readouts: &MsrReadoutsModel,
-) -> Option<usize> {
-    if content_height <= 0.0 {
-        return None;
-    }
-    let mut reserved = CPU_DETAILS_RESERVE;
-    if matches!(package_power, PackagePowerModel::Packages(_)) {
-        reserved += CPU_PACKAGE_POWER_RESERVE;
-    }
-    if matches!(msr_readouts, MsrReadoutsModel::Rows(_)) {
-        reserved += CPU_MSR_RESERVE;
-    }
-    let available = (content_height - reserved).max(0.0);
-    let mut rows = 0_usize;
-    let mut used = 0.0_f32;
-    for _ in 0..MAX_CPU_SPEC_ROWS {
-        if used + CPU_SPEC_ROW_SLOT > available {
-            break;
-        }
-        rows += 1;
-        used += CPU_SPEC_ROW_SLOT;
-    }
-    Some(rows)
 }
 
 /// Pure data-layer builder for the CPU specification rows (ADR-020
@@ -287,8 +295,11 @@ pub(crate) fn cpu_spec_rows(
             format!("\u{00d7}{multiplier:.1}")
         });
     let mut rows: Vec<(String, String)> = cpu_identity_rows(hardware);
+    rows.push((i18n::t("cpu.base_speed").to_string(), base_speed));
+    if let Some(power_limits) = taskmanager_shell::presentation::cpu_power_limits_summary(cpu) {
+        rows.push((i18n::t("cpu.power_limits").to_string(), power_limits));
+    }
     rows.extend([
-        (i18n::t("cpu.base_speed").to_string(), base_speed),
         (i18n::t("cpu.multiplier").to_string(), multiplier),
         // Real socket count from HardwareInfo (distinct physical_package_id
         // values), shared with system_view.rs. Was hardcoded "1".
@@ -350,10 +361,22 @@ pub(crate) fn cpu_spec_rows(
             preference.clone(),
         ));
     }
-    // The Performance detail rail has no scroll surface. Keep only accepted
-    // facts here; an unavailable optional value is represented by absence and
-    // its authorization/recovery affordance belongs to the Settings
-    // permission center, never a dashed row in this panel.
+    // Lower-priority topology counters come after policy facts. The rail has
+    // a finite height and admits whole rows; at the reference viewport this
+    // keeps governor/EPP evidence visible before optional diagnostic rows.
+    if let Some(topology) = taskmanager_shell::presentation::cpu_topology_summary(cpu) {
+        rows.push((i18n::t("cpu.topology").to_string(), topology));
+    }
+    if let Some(idle_states) = taskmanager_shell::presentation::cpu_idle_state_summary(cpu) {
+        rows.push((i18n::t("cpu.idle_states").to_string(), idle_states));
+    }
+    if let Some(interrupts) = taskmanager_shell::presentation::cpu_interrupt_summary(cpu) {
+        rows.push((i18n::t("cpu.interrupts").to_string(), interrupts));
+    }
+    // An unavailable optional value is represented by absence and its
+    // authorization/recovery affordance belongs to the Settings permission
+    // center, never a dashed row in this panel. Accepted rows remain reachable
+    // through the CPU details viewport above.
     let missing = formatting::missing_value();
     rows.retain(|(_, value)| !value.trim().is_empty() && value != &missing);
     rows

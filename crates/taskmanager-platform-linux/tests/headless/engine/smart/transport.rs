@@ -331,6 +331,29 @@ mod tests_inner {
         assert_eq!(out.critical_warning, Some(false));
     }
 
+    #[test]
+    fn nvme_health_log_maps_spare_and_unsafe_shutdown_fields() {
+        let out = parse_smartctl_json(
+            r#"{
+                "nvme_smart_health_information_log": {
+                    "critical_warning": 0,
+                    "available_spare": 96,
+                    "available_spare_threshold": 10,
+                    "percentage_used": 4,
+                    "power_on_hours": 880,
+                    "unsafe_shutdowns": 12
+                }
+            }"#,
+        )
+        .expect("NVMe health log parses");
+        assert_eq!(out.critical_warning, Some(false));
+        assert_eq!(out.available_spare_pct, Some(96.0));
+        assert_eq!(out.available_spare_threshold_pct, Some(10.0));
+        assert_eq!(out.percent_used, Some(4.0));
+        assert_eq!(out.power_on_hours, Some(880));
+        assert_eq!(out.unsafe_shutdowns, Some(12));
+    }
+
     #[cfg(target_os = "linux")]
     #[test]
     fn exit_bits_keep_health_results_but_reject_command_failures() {

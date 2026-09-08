@@ -54,7 +54,11 @@ pub use input_dispatch::InputDispatch;
 pub use keys::{LocalBinding, ShellKeyEvent, route_key, shell_local_bindings};
 pub use memory::{MemSegment, MemSegmentKind, SwapBreakdown, memory_segments, swap_breakdown};
 pub use presentation::{
-    CommandHelp, GraphSummary, PageHelp, command_help, graph_summary, page_help,
-    process_batch_action_label,
+    CommandHelp, GraphSummary, NetworkInterfaceGroup, NetworkInterfaceKind, PageHelp,
+    classify_network_device, classify_network_interface, classify_network_interface_name,
+    command_help, graph_summary, group_network_devices, is_physical_network_device,
+    is_physical_network_interface, is_physical_nic, is_virtual_network_device,
+    is_virtual_network_interface, is_virtual_nic, page_help, process_batch_action_label,
+    service_cycle_members,
 };
 pub use process_filter::{ProcessStatusFilter, matches_process_query};

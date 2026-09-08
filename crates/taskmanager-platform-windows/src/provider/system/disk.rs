@@ -258,6 +258,10 @@ impl StorageTelemetryProvider for WinStorageTelemetryProvider {
                 iops: iops_obs,
                 active_time_pct: active_time_obs,
                 response_time_ms: response_time_obs,
+                average_queue_depth: ScalarObservation::unavailable(FailureKind::Unsupported),
+                service_time_ms: ScalarObservation::unavailable(FailureKind::Unsupported),
+                read_merges_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
+                write_merges_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
             });
             metrics.push(row);
         }

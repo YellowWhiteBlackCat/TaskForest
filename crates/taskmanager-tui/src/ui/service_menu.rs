@@ -31,12 +31,13 @@ pub struct ServiceMenuTarget {
 }
 
 /// The actions offered by the menu, in display order.
-pub const MENU_ACTIONS: [ServiceAction; 5] = [
+pub const MENU_ACTIONS: [ServiceAction; 6] = [
     ServiceAction::Start,
     ServiceAction::Stop,
     ServiceAction::Restart,
     ServiceAction::Enable,
     ServiceAction::Disable,
+    ServiceAction::ReloadDaemon,
 ];
 
 /// Render the service-action menu from the committed focus plan.  The
@@ -113,6 +114,7 @@ pub fn action_label(action: ServiceAction) -> &'static str {
         ServiceAction::Restart => t("svc.restart"),
         ServiceAction::Enable => t("svc.enable"),
         ServiceAction::Disable => t("svc.disable"),
+        ServiceAction::ReloadDaemon => t("svc.reload_daemon"),
     }
 }
 

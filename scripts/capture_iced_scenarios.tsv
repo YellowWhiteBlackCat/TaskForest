@@ -5,6 +5,7 @@ memory	memory	1180x780
 disk	disk	1180x780
 network	network	1180x780
 gpu	gpu	1180x780
+npu	npu	1180x780
 battery	battery	1180x780
 fan	fan	1180x780
 service-details	service-details	1180x780
@@ -24,6 +25,7 @@ memory-compact	memory	720x480
 disk-compact	disk	720x480
 network-compact	network	720x480
 gpu-compact	gpu	720x480
+npu-compact	npu	720x480
 battery-compact	battery	720x480
 fan-compact	fan	720x480
 service-details-compact	service-details	720x480

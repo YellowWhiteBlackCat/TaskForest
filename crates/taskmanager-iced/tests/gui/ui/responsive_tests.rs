@@ -12,7 +12,6 @@ use super::{
     SystemSurfacePresentation, VerticalSpace, layout_profile, nav_rail_width, vertical_space,
 };
 use crate::app::Message;
-use crate::ui::performance::compact_toolbar_columns;
 use iced::Size;
 
 fn frame(width: f32, height: f32) -> Size {
@@ -265,26 +264,6 @@ fn chrome_presentation_matches_the_pre_port_single_row_breakpoint() {
                 expected
             );
         }
-    }
-}
-
-#[test]
-fn wrapped_toolbar_columns_match_the_pre_port_chunk_breakpoint() {
-    // The oracle is the pre-port performance.rs expression: three columns
-    // below 560px, five from 560px up.
-    let mut width = 320.0;
-    while width <= 1400.0 {
-        let expected = if width < 560.0 { 3 } else { 5 };
-        assert_eq!(
-            compact_toolbar_columns(width),
-            expected,
-            "toolbar chunk flip must stay exact at {width}"
-        );
-        width += 1.0;
-    }
-    for width in [559.0, 559.999, 560.0, 560.001] {
-        let expected = if width < 560.0 { 3 } else { 5 };
-        assert_eq!(compact_toolbar_columns(width), expected);
     }
 }
 

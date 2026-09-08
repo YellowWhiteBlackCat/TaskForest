@@ -36,7 +36,10 @@ fn assert_grounded(smart: &taskmanager_core::core::smart::DiskSmart) {
         smart.temperature_c.is_some()
             || smart.critical_warning.is_some()
             || smart.percent_used.is_some()
-            || smart.power_on_hours.is_some(),
+            || smart.available_spare_pct.is_some()
+            || smart.available_spare_threshold_pct.is_some()
+            || smart.power_on_hours.is_some()
+            || smart.unsafe_shutdowns.is_some(),
         "a parsed sample must derive at least one field from the input"
     );
 }

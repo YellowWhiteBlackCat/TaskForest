@@ -45,6 +45,17 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
     let npu_panels = npu_models
         .iter()
         .map(|model| npu_info_panel(theme_snapshot, model));
+    let smbios_snapshot = match shell.smbios_memory_state() {
+        taskmanager_application::SmbiosMemoryState::Ready(ready) => Some(&ready.snapshot),
+        _ => None,
+    };
+    let memory_slots_panel = smbios_snapshot.map(|snapshot| {
+        let rows = taskmanager_shell::presentation::smbios_memory_inventory_rows(snapshot)
+            .into_iter()
+            .map(|(label, value)| SystemInfoRow { label, value })
+            .collect::<Vec<_>>();
+        info_panel(theme_snapshot, t("system.memory_slots"), &rows)
+    });
     let content = std::iter::once(
         // Dashboard segment leads the System page (summary card + history
         // window selection + alert mirror); the window pills publish
@@ -52,6 +63,7 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
         super::system_dashboard::render_system_dashboard(app, app.system_dashboard_window),
     )
     .chain(std::iter::once(hardware_panel))
+    .chain(memory_slots_panel)
     .chain(npu_panels)
     .chain(std::iter::once(telemetry_panel))
     .collect::<Vec<_>>();
@@ -68,6 +80,7 @@ pub(super) fn system_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, ic
                     hardware,
                     shell.projection().snapshot.as_ref(),
                     shell.projection().npu_inventory.as_ref(),
+                    smbios_snapshot,
                 ),
             },
             false,
@@ -89,6 +102,7 @@ pub(crate) fn format_system_spec_export(
     hardware: Option<&HardwareInfo>,
     snapshot: Option<&SystemSnapshot>,
     npu_inventory: Option<&NpuInventorySnapshot>,
+    smbios_memory: Option<&taskmanager_core::core::metrics::SmbiosMemorySnapshot>,
 ) -> String {
     let mut lines = Vec::new();
     lines.push("# System Specifications".to_string());
@@ -96,6 +110,13 @@ pub(crate) fn format_system_spec_export(
         let cpu = snapshot.map(|snap: &SystemSnapshot| &snap.cpu);
         for row in hardware_info_rows(hw, cpu) {
             lines.push(format!("- {}: {}", row.label, row.value));
+        }
+    }
+    if let Some(smbios) = smbios_memory {
+        lines.push(format!("## {}", t("system.memory_slots")));
+        for (label, value) in taskmanager_shell::presentation::smbios_memory_inventory_rows(smbios)
+        {
+            lines.push(format!("- {}: {}", label, value));
         }
     }
     if let Some(snap) = snapshot {
@@ -198,6 +219,9 @@ pub(crate) fn hardware_info_rows(
         t("system.field.kernel_compiler"),
         hardware.kernel_compiler.as_deref(),
     );
+    if let Some(errors) = taskmanager_shell::presentation::kernel_error_summary(hardware) {
+        push_value(&mut rows, t("system.kernel_errors"), Some(errors));
+    }
     push_text(
         &mut rows,
         t("system.hostname"),
@@ -503,3 +527,60 @@ fn push_value<T: ToString>(rows: &mut Vec<SystemInfoRow>, label: &str, value: Op
         });
     }
 }
+
+/// Time-window options for the resource history view, matching GPUI timeline window (1m, 5m, 15m, 60m).
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum ResourceHistoryWindow {
+    OneMinute,
+    FiveMinutes,
+    FifteenMinutes,
+    #[default]
+    SixtyMinutes,
+}
+
+impl ResourceHistoryWindow {
+    pub const ALL: [Self; 4] = [
+        Self::OneMinute,
+        Self::FiveMinutes,
+        Self::FifteenMinutes,
+        Self::SixtyMinutes,
+    ];
+
+    pub const fn minutes(self) -> u64 {
+        match self {
+            Self::OneMinute => 1,
+            Self::FiveMinutes => 5,
+            Self::FifteenMinutes => 15,
+            Self::SixtyMinutes => 60,
+        }
+    }
+
+    pub const fn id(self) -> &'static str {
+        match self {
+            Self::OneMinute => "history-1m",
+            Self::FiveMinutes => "history-5m",
+            Self::FifteenMinutes => "history-15m",
+            Self::SixtyMinutes => "history-60m",
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::OneMinute => "1m",
+            Self::FiveMinutes => "5m",
+            Self::FifteenMinutes => "15m",
+            Self::SixtyMinutes => "60m",
+        }
+    }
+}
+
+impl std::fmt::Display for ResourceHistoryWindow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.label())
+    }
+}
+
+#[allow(dead_code)]
+pub type HistoryWindow = ResourceHistoryWindow;
+#[allow(unused_imports)]
+pub(crate) use super::system_dashboard::history_window_label;

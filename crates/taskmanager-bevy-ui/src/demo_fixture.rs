@@ -54,5 +54,8 @@ fn demo_cpu_frame(seed: &CpuMetrics, timestamp_ms: u64, offset: u64) -> CpuMetri
     frame.l2_cache_kb = seed.l2_cache_kb;
     frame.l3_cache_kb = seed.l3_cache_kb;
     frame.performance_policy = seed.performance_policy.clone();
+    frame.packages = seed.packages.clone();
+    frame.idle_states = seed.idle_states.clone();
+    frame.interrupts = seed.interrupts.clone();
     frame
 }

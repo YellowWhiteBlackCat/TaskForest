@@ -23,6 +23,8 @@ mod draw_predicate;
 mod focus_ring;
 #[path = "tests/group_view.rs"]
 mod group_view;
+#[path = "tests/keys_gpu.rs"]
+mod keys_gpu;
 #[path = "tests/keys_navigation.rs"]
 mod keys_navigation;
 #[path = "tests/overlays.rs"]

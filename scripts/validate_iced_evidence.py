@@ -54,6 +54,7 @@ def metadata(path: Path) -> dict[str, str]:
         "disk",
         "network",
         "gpu",
+        "npu",
         "battery",
         "fan",
     }:

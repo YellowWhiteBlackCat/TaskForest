@@ -8,8 +8,11 @@ fn complete_readout(pci_bus_id: &str) -> NvmlDeviceReadout {
         uuid: Ok(format!("GPU-{pci_bus_id}")),
         utilization: Ok((41, 12)),
         memory: Ok((2_048, 8_192)),
+        memory_bus_width_bits: Ok(256),
+        memory_clock_mhz: Ok(2_500),
         temperature_c: Ok(63.0),
         power_w: Ok(145.0),
+        power_limit_w: Ok(250.0),
         current_clock_mhz: Ok(1_900),
         max_clock_mhz: Ok(2_500),
         encoder_pct: Ok(7.0),
@@ -34,12 +37,14 @@ fn partial_api_failures_keep_successful_fields_and_only_real_provenance() {
     assert!(sample.fields.contains(&GpuMetricField::Identity));
     assert!(sample.fields.contains(&GpuMetricField::Utilization));
     assert!(sample.fields.contains(&GpuMetricField::Fan));
+    assert!(sample.fields.contains(&GpuMetricField::MemoryBandwidth));
     assert!(!sample.fields.contains(&GpuMetricField::Brand));
     assert!(!sample.fields.contains(&GpuMetricField::Memory));
     assert!(!sample.fields.contains(&GpuMetricField::Throttle));
     assert!(!sample.fields.contains(&GpuMetricField::DriverVersion));
     assert_eq!(sample.metrics.current_fan_speed_pct(), Some(48.0));
     assert_eq!(sample.metrics.current_utilization_pct(), Some(41.0));
+    assert_eq!(sample.metrics.memory_bandwidth_gbps, Some(160.0));
     assert_eq!(sample.metrics.current_memory_total_bytes(), None);
     assert_eq!(
         sample.metrics.driver_version, None,

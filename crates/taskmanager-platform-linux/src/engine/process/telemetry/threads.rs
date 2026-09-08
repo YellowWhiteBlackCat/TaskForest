@@ -10,7 +10,7 @@ use std::path::Path;
 
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::{
-    FailureKind, ProcessIdentity, ProcessThreadInfo, ProcessThreads, ThreadState,
+    FailureKind, ProcessIdentity, ProcessThreadInfo, ProcessThreads, ThreadState, ThreadWaitKind,
 };
 
 use super::{state_for_status, status_from_io_error};
@@ -219,12 +219,26 @@ fn collect_threads_from_proc_dir_inner<'a>(
             }
             Some(_) => None,
         };
+        let wchan = std::fs::read_to_string(task_dir.join(tid.to_string()).join("wchan"))
+            .ok()
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty() && s != "0");
+        let run_queue_wait_ns =
+            read_run_queue_wait_ns(&task_dir.join(tid.to_string()).join("schedstat"));
+        let wait_kind = ThreadWaitKind::from_observation(
+            ThreadState::from_char(fields.state_char),
+            wchan.as_deref(),
+            run_queue_wait_ns,
+        );
         threads.push(ProcessThreadInfo {
             tid,
             comm: fields.comm,
             state: ThreadState::from_char(fields.state_char),
             cpu_time_secs,
             cpu_percent,
+            wchan,
+            run_queue_wait_ns,
+            wait_kind,
         });
     }
 
@@ -241,6 +255,17 @@ fn collect_threads_from_proc_dir_inner<'a>(
         state: state_for_status(DeviceStatus::Healthy, now_ms),
         threads,
     }
+}
+
+/// Read the scheduler run-queue delay (the second field of schedstat). The
+/// value is nanoseconds and is intentionally kept separate from D-state or
+/// futex sleep time, which procfs does not expose as a portable counter.
+fn read_run_queue_wait_ns(path: &Path) -> Option<u64> {
+    std::fs::read_to_string(path)
+        .ok()?
+        .split_whitespace()
+        .nth(1)
+        .and_then(|value| value.parse::<u64>().ok())
 }
 
 #[cfg(test)]

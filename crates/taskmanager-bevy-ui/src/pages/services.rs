@@ -36,18 +36,21 @@ use bevy::ecs::lifecycle::{Add, HookContext};
 use bevy::ecs::observer::On;
 use bevy::ecs::query::With;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
+use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
+use bevy::text::TextColor;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
     UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::Button;
+use bevy::ui_widgets::{Activate, Button};
+use taskmanager_application::AppAction;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{SourceNotice, source_notice};
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
 use taskmanager_core::core::source::SourceStatus;
 use taskmanager_core::core::target::ServiceId;
 
@@ -59,11 +62,15 @@ use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12, space_24};
 use crate::widgets::controls::sort_indicator_scene;
 use crate::window::{Role, TextRole, WindowPalette};
+use taskmanager_ui_contract::IconId;
 
 pub(crate) mod dependencies_panel;
 pub(crate) mod details_modal;
 pub(crate) mod log_panel;
 pub(crate) mod menu;
+mod scene;
+
+use scene::{services_body_scene, services_search_input_scene};
 
 // ---- pure core: row view model, chips, empty/notice/status copy ----
 
@@ -74,20 +81,39 @@ pub(crate) struct ServiceRowModel {
     pub(crate) name: String,
     pub(crate) status: ServiceStatus,
     pub(crate) description: String,
+    pub(crate) cycle: bool,
 }
 
-/// Project the table's whole material through the shared sort order. The
-/// renderer, the selection model and the tests all consume this one function,
-/// so the visible order can never drift from the shell's.
+/// Project the table's whole material through the shared sort order and query filter.
 pub(crate) fn service_rows(shell: &ShellApp) -> Vec<ServiceRowModel> {
+    service_rows_filtered(shell, &shell.query)
+}
+
+pub(crate) fn service_rows_filtered(shell: &ShellApp, query: &str) -> Vec<ServiceRowModel> {
+    let q = query.trim().to_lowercase();
+    let cycle_members = shell
+        .projection()
+        .services
+        .as_deref()
+        .map(taskmanager_shell::service_cycle_members)
+        .unwrap_or_default();
     shell
         .sorted_services()
         .into_iter()
+        .filter(|service| {
+            if q.is_empty() {
+                true
+            } else {
+                service.name.to_lowercase().contains(&q)
+                    || service.description.to_lowercase().contains(&q)
+            }
+        })
         .map(|service: &ServiceItem| ServiceRowModel {
             target: service.id.clone(),
             name: service.name.clone(),
             status: service.status,
             description: service.description.clone(),
+            cycle: cycle_members.contains(&service.id),
         })
         .collect()
 }
@@ -297,6 +323,9 @@ pub(crate) struct ServiceRowClicked(pub(crate) usize);
 #[derive(Event)]
 pub(crate) struct ServiceSelectionMoved(pub(crate) isize);
 
+#[derive(Component, Clone, Default)]
+pub(crate) struct ServicesSearchInput;
+
 // ---- render adapters (bsn!) ----
 
 /// Content-region scene for the Services page: title, summary line and the
@@ -304,9 +333,10 @@ pub(crate) struct ServiceSelectionMoved(pub(crate) isize);
 /// [`paint_services`] (queued by the insert hook and every observer), so the
 /// declarative tree stays structure-only and there is exactly one render
 /// authority for the rows.
-pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
+pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     let title = Page::Services.title();
     let waiting = t("common.waiting_inventory").to_owned();
+    let search = services_search_input_scene(context.palette, &context.shell.query);
     bsn! {
         Node {
             width: percent(100),
@@ -319,9 +349,20 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
         Children [
             ( Text(title) TextRole(Role::Heading) ),
             (
-                Text(waiting)
-                ServicesStatusLine
-                TextRole(Role::Caption)
+                Node {
+                    width: percent(100),
+                    flex_direction: FlexDirection::Row,
+                    align_items: AlignItems::Center,
+                    justify_content: JustifyContent::SpaceBetween,
+                }
+                Children [
+                    (
+                        Text(waiting)
+                        ServicesStatusLine
+                        TextRole(Role::Caption)
+                    ),
+                    ( { search } ),
+                ]
             ),
             (
                 Node {
@@ -355,283 +396,140 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
     }
 }
 
-/// The table body: header row plus (notice, rows or empty state). Rebuilt as
-/// one scene by [`paint_services`].
-fn services_body_scene(
-    shell: &ShellApp,
-    palette: &UiPalette,
-    selection: &ServiceSelection,
-) -> impl Scene + use<> {
-    let rows = service_rows(shell);
-    let selected = selected_row(&rows, selection);
-    let notice = source_notice_text(shell.projection().services_source.as_deref());
-    let empty = empty_state_text(shell.projection().services_source.as_deref());
-    let children = body_children(&rows, selected, notice, empty, palette);
-    let header = header_scene(shell.services_sort, palette);
-    let toolbar = services_toolbar_scene(selection.target.is_some(), palette);
-    bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_2()),
-        }
-        Children [
-            ( toolbar ),
-            ( header ),
-            { children },
-        ]
-    }
-}
+#[derive(Component, Clone, Default)]
+pub(crate) struct ServiceStartButton;
 
-fn body_children(
-    rows: &[ServiceRowModel],
-    selected: Option<usize>,
-    notice: Option<String>,
-    empty: String,
-    palette: &UiPalette,
-) -> Vec<Box<dyn Scene>> {
-    let mut children = Vec::new();
-    if let Some(text) = notice {
-        children.push(Box::new(caption_line_scene(text)) as Box<dyn Scene>);
+#[derive(Component, Clone, Default)]
+pub(crate) struct ServiceStopButton;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct ServiceRestartButton;
+
+fn on_service_start_button_activated(
+    activate: On<Activate>,
+    buttons: Query<&ServiceStartButton>,
+    mut track: NonSendMut<FrontendTrack>,
+    selection: Res<ServiceSelection>,
+    mut commands: Commands,
+) {
+    let button = buttons
+        .get(activate.entity)
+        .or_else(|_| buttons.get(activate.event().entity));
+    if button.is_err() {
+        return;
     }
-    if rows.is_empty() {
-        children.push(Box::new(empty_scene(empty)) as Box<dyn Scene>);
-    } else {
-        for (index, row) in rows.iter().enumerate() {
-            children.push(service_row_scene(
-                row,
-                index,
-                selected == Some(index),
-                palette,
-            ));
+    if let Some(target) = &selection.target {
+        let service = track
+            .shell
+            .sorted_services()
+            .into_iter()
+            .find(|s| &s.id == target)
+            .cloned();
+        if let Some(service) = service {
+            if track
+                .shell
+                .select_service_control(&service, ServiceAction::Start)
+            {
+                let _ = track.shell.apply_action(AppAction::RequestServiceControl);
+                crate::confirmation::republish(&track.shell, &mut commands);
+                commands.trigger(crate::input::ShellInteractionApplied);
+            }
+            commands.queue(paint_services);
         }
     }
-    children
 }
 
-/// Header row: one caption cell per column; every cell carries the
-/// [`ServicesSortHeader`] identity (`Some` on sortable columns) for the
-/// pointer adapter.
-fn services_toolbar_scene(has_selection: bool, palette: &UiPalette) -> Box<dyn Scene> {
-    Box::new(bsn! {
-        Node {
-            width: percent(100.0),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
+fn on_service_stop_button_activated(
+    activate: On<Activate>,
+    buttons: Query<&ServiceStopButton>,
+    mut track: NonSendMut<FrontendTrack>,
+    selection: Res<ServiceSelection>,
+    mut commands: Commands,
+) {
+    let button = buttons
+        .get(activate.entity)
+        .or_else(|_| buttons.get(activate.event().entity));
+    if button.is_err() {
+        return;
+    }
+    if let Some(target) = &selection.target {
+        let service = track
+            .shell
+            .sorted_services()
+            .into_iter()
+            .find(|s| &s.id == target)
+            .cloned();
+        if let Some(service) = service {
+            if track
+                .shell
+                .select_service_control(&service, ServiceAction::Stop)
+            {
+                let _ = track.shell.apply_action(AppAction::RequestServiceControl);
+                crate::confirmation::republish(&track.shell, &mut commands);
+                commands.trigger(crate::input::ShellInteractionApplied);
+            }
+            commands.queue(paint_services);
         }
-        Children [
-            ( Node { flex_grow: 1.0 } ),
-            (
-                Node {
-                    height: px(palette.control_height_px),
-                    padding: UiRect::horizontal(Val::Px(space_12())),
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-                }
-                BackgroundColor({
-                    if has_selection { palette.nav_active_bg } else { palette.content_bg }
-                })
-                ControlVisual(ControlTone::Surface, has_selection)
-                Button
-                on(details_modal::on_details_button_activated)
-                details_modal::ServiceDetailsOpenButton
-                Children [
-                    (
-                        Text({ t("common.details").to_owned() })
-                        TextRole(Role::Caption)
-                        template_value(no_wrap_text())
-                    )
-                ]
-            ),
-            (
-                Node {
-                    height: px(palette.control_height_px),
-                    padding: UiRect::horizontal(Val::Px(space_12())),
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-                }
-                BackgroundColor({
-                    if has_selection { palette.nav_active_bg } else { palette.content_bg }
-                })
-                ControlVisual(ControlTone::Surface, has_selection)
-                Button
-                on(dependencies_panel::services_dependencies_button_activated)
-                dependencies_panel::ServicesDependenciesOpenButton
-                Children [
-                    (
-                        Text({ t("svc.dependencies").to_owned() })
-                        TextRole(Role::Caption)
-                        template_value(no_wrap_text())
-                    )
-                ]
-            ),
-            (
-                Node {
-                    height: px(palette.control_height_px),
-                    padding: UiRect::horizontal(Val::Px(space_12())),
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    border_radius: BorderRadius::all(Val::Px(palette.control_radius_px)),
-                }
-                BackgroundColor({
-                    if has_selection { palette.nav_active_bg } else { palette.content_bg }
-                })
-                ControlVisual(ControlTone::Surface, has_selection)
-                Button
-                on(log_panel::services_logs_button_activated)
-                log_panel::ServicesLogsOpenButton
-                Children [
-                    (
-                        Text({ t("svc.logs").to_owned() })
-                        TextRole(Role::Caption)
-                        template_value(no_wrap_text())
-                    )
-                ]
-            ),
-        ]
-    })
-}
-
-fn header_scene(sort: Option<(InfoSortCol, SortDir)>, palette: &UiPalette) -> impl Scene + use<> {
-    let cells: Vec<Box<dyn Scene>> = columns()
-        .into_iter()
-        .map(|column| {
-            let label = header_label(&column);
-            let direction = sorted_direction(&column, sort);
-            let indicator = sort_indicator_scene(direction, palette);
-            let width = column.width_px;
-            let sort_target = column.sort;
-            Box::new(bsn! {
-                Node {
-                    width: px(width),
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(space_4()),
-                    overflow: Overflow::clip_x(),
-                }
-                ServicesSortHeader(sort_target)
-                Children [
-                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ),
-                    { indicator },
-                ]
-            }) as Box<dyn Scene>
-        })
-        .collect();
-    bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(space_8()),
-            padding: UiRect::horizontal(Val::Px(space_8())),
-        }
-        Children [
-            { cells }
-        ]
     }
 }
 
-fn service_row_scene(
-    row: &ServiceRowModel,
-    index: usize,
-    selected: bool,
-    palette: &UiPalette,
-) -> Box<dyn Scene> {
-    let widths = columns();
-    let name = row.name.clone();
-    let description = row.description.clone();
-    let status = row.status.as_str().to_owned();
-    let fill = if selected {
-        palette.nav_active_bg
-    } else {
-        Color::NONE
-    };
-    let chip = chip_fill(service_chip(row.status), palette);
-    let target = row.target.clone();
-    let height = palette.control_height_px;
-    let radius = palette.control_radius_px;
-    let name_width = widths[0].width_px;
-    let status_width = widths[1].width_px;
-    let description_width = widths[2].width_px;
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: px(height),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-            padding: UiRect::horizontal(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
+fn on_service_restart_button_activated(
+    activate: On<Activate>,
+    buttons: Query<&ServiceRestartButton>,
+    mut track: NonSendMut<FrontendTrack>,
+    selection: Res<ServiceSelection>,
+    mut commands: Commands,
+) {
+    let button = buttons
+        .get(activate.entity)
+        .or_else(|_| buttons.get(activate.event().entity));
+    if button.is_err() {
+        return;
+    }
+    if let Some(target) = &selection.target {
+        let service = track
+            .shell
+            .sorted_services()
+            .into_iter()
+            .find(|s| &s.id == target)
+            .cloned();
+        if let Some(service) = service {
+            if track
+                .shell
+                .select_service_control(&service, ServiceAction::Restart)
+            {
+                let _ = track.shell.apply_action(AppAction::RequestServiceControl);
+                crate::confirmation::republish(&track.shell, &mut commands);
+                commands.trigger(crate::input::ShellInteractionApplied);
+            }
+            commands.queue(paint_services);
         }
-        BackgroundColor(fill)
-        ServicesRowMarker(index, target)
-        Children [
-            ( text_cell_scene(name, name_width, Role::Body) ),
-            ( chip_cell_scene(status, status_width, chip, palette) ),
-            ( text_cell_scene(description, description_width, Role::Body) ),
-        ]
-    })
-}
-
-fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scene + use<> {
-    bsn! {
-        Node { width: px(width), align_items: AlignItems::FlexStart }
-        Children [
-            ( Text(text) TextRole(role) ),
-        ]
     }
 }
 
-fn chip_cell_scene(
-    word: String,
-    width: f32,
-    fill: Color,
-    palette: &UiPalette,
-) -> impl Scene + use<> {
-    let radius = palette.control_radius_px;
-    bsn! {
-        Node { width: px(width), align_items: AlignItems::Center }
-        Children [
-            (
-                Node {
-                    height: Val::Auto,
-                    padding: UiRect::horizontal(Val::Px(space_8())),
-                    border_radius: BorderRadius::all(Val::Px(radius)),
-                }
-                BackgroundColor(fill)
-                Children [
-                    ( Text(word) TextRole(Role::Caption) ),
-                ]
-            ),
-        ]
+fn on_services_sort_header_activated(
+    activate: On<Activate>,
+    headers: Query<&ServicesSortHeader>,
+    mut commands: Commands,
+) {
+    let header = headers
+        .get(activate.entity)
+        .or_else(|_| headers.get(activate.event().entity));
+    if let Ok(ServicesSortHeader(Some(col))) = header {
+        commands.trigger(ServiceSortClicked(*col));
     }
 }
 
-fn caption_line_scene(text: String) -> impl Scene + use<> {
-    bsn! {
-        Node { width: percent(100) }
-        Children [
-            ( Text(text) TextRole(Role::Caption) ),
-        ]
-    }
-}
-
-fn empty_scene(message: String) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            width: percent(100),
-            flex_grow: 1.0,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            padding: UiRect::all(Val::Px(space_24())),
-        }
-        Children [
-            ( Text(message) TextRole(Role::Body) ),
-        ]
+fn on_services_row_activated(
+    activate: On<Activate>,
+    markers: Query<&ServicesRowMarker>,
+    mut commands: Commands,
+) {
+    let marker = markers
+        .get(activate.entity)
+        .or_else(|_| markers.get(activate.event().entity));
+    if let Ok(marker) = marker {
+        commands.trigger(ServiceRowClicked(marker.0));
     }
 }
 
@@ -686,6 +584,18 @@ fn paint_services(world: &mut World) {
     if let Ok(mut text) = line_query.single_mut(world) {
         text.0 = line;
     }
+    let shell_query = world.non_send::<FrontendTrack>().shell.query.clone();
+    let new_text = if shell_query.is_empty() {
+        t("search.services").to_owned()
+    } else {
+        shell_query
+    };
+    let mut search_query = world.query_filtered::<&mut Text, With<ServicesSearchInput>>();
+    for mut text_node in search_query.iter_mut(world) {
+        if text_node.0 != new_text {
+            text_node.0 = new_text.clone();
+        }
+    }
 }
 
 /// Insert hook: bind the page's observers once; the initial paint rides
@@ -708,21 +618,19 @@ fn bind_services_page(mut world: DeferredWorld<'_>, _context: HookContext) {
         rendered_revision: None,
     });
     commands.init_resource::<dependencies_panel::ServicesDependenciesRenderState>();
-    commands.add_observer(dependencies_panel::on_services_dependencies_requested);
-    commands.add_observer(dependencies_panel::on_dependencies_panel_repaint_required);
-    commands.add_observer(dependencies_panel::on_dependencies_panel_slot_added);
-    commands.add_observer(dependencies_panel::on_services_fold_dependencies_gate);
-    commands.add_observer(dependencies_panel::services_dependencies_button_activated);
     commands.init_resource::<log_panel::ServicesLogRenderState>();
     commands.add_observer(on_services_projection_folded);
     commands.add_observer(on_services_sort_clicked);
     commands.add_observer(on_services_row_clicked);
     commands.add_observer(on_services_selection_moved);
+    commands.add_observer(dependencies_panel::on_services_dependencies_requested);
+    commands.add_observer(dependencies_panel::on_dependencies_panel_repaint_required);
+    commands.add_observer(dependencies_panel::on_dependencies_panel_slot_added);
+    commands.add_observer(dependencies_panel::on_services_fold_dependencies_gate);
     commands.add_observer(log_panel::on_services_logs_requested);
     commands.add_observer(log_panel::on_log_panel_repaint_required);
     commands.add_observer(log_panel::on_log_panel_slot_added);
     commands.add_observer(log_panel::on_services_fold_log_gate);
-    commands.add_observer(log_panel::services_logs_button_activated);
     // The initial paint rides the body's own insertion: the hook runs while
     // the page scene is still spawning (its children apply later in the same
     // command queue), so painting here would find no body yet. The observer

@@ -322,6 +322,28 @@ pub(super) fn append_body_cells(
             )),
         );
     }
+    if !hidden_cols.contains(&SortCol::Pss) {
+        line = line.child(
+            numeric_cell(
+                theme,
+                row.cell_text.pss.clone(),
+                zero_value_color(
+                    theme.memory,
+                    theme.fg_dim,
+                    gray_zero_values,
+                    row.pss == Some(0),
+                ),
+                ui_size,
+            )
+            .w(live_width(col_widths, SortCol::Pss))
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
+        );
+    }
     if !hidden_cols.contains(&SortCol::DiskRead) {
         line = line.child(
             numeric_cell(
@@ -358,6 +380,28 @@ pub(super) fn append_body_cells(
                 ui_size,
             )
             .w(live_width(col_widths, SortCol::DiskWrite))
+            .pl(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            ))
+            .pr(taskmanager_ui::theme_binding::definite_length(
+                tokens::SPACE_8,
+            )),
+        );
+    }
+    if !hidden_cols.contains(&SortCol::Network) {
+        line = line.child(
+            numeric_cell(
+                theme,
+                row.cell_text.network.clone(),
+                zero_value_color(
+                    theme.fg_dim,
+                    theme.fg_dim,
+                    gray_zero_values,
+                    row.network == Some(0),
+                ),
+                ui_size,
+            )
+            .w(live_width(col_widths, SortCol::Network))
             .pl(taskmanager_ui::theme_binding::definite_length(
                 tokens::SPACE_8,
             ))

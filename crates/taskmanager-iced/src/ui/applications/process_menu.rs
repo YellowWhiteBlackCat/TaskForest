@@ -127,13 +127,60 @@ pub(super) fn panel(
         ),
         action_button(
             theme_snapshot,
+            FocusTarget::ProcessMenuAffinity,
+            t("proc.affinity"),
+            ProcessMenuAction::Affinity,
+            false,
+        ),
+        action_button(
+            theme_snapshot,
             FocusTarget::ProcessMenuProperties,
-            "Properties",
+            t("dialog.properties"),
             ProcessMenuAction::Properties,
             false,
         ),
     ]
     .spacing(6);
+
+    let priority_and_mode = row![
+        text(t("proc.priority")).size(f32::from(tokens::FONT_12)),
+        action_button(
+            theme_snapshot,
+            FocusTarget::ProcessMenuPriorityHigh,
+            taskmanager_shell::presentation::priority_tier_label(
+                taskmanager_core::core::process::PriorityTier::High
+            ),
+            ProcessMenuAction::Priority(taskmanager_core::core::process::PriorityTier::High),
+            false,
+        ),
+        action_button(
+            theme_snapshot,
+            FocusTarget::ProcessMenuPriorityNormal,
+            taskmanager_shell::presentation::priority_tier_label(
+                taskmanager_core::core::process::PriorityTier::Normal
+            ),
+            ProcessMenuAction::Priority(taskmanager_core::core::process::PriorityTier::Normal),
+            false,
+        ),
+        action_button(
+            theme_snapshot,
+            FocusTarget::ProcessMenuPriorityLow,
+            taskmanager_shell::presentation::priority_tier_label(
+                taskmanager_core::core::process::PriorityTier::Low
+            ),
+            ProcessMenuAction::Priority(taskmanager_core::core::process::PriorityTier::Low),
+            false,
+        ),
+        action_button(
+            theme_snapshot,
+            FocusTarget::ProcessMenuEfficiencyMode,
+            t("proc.efficiency_mode"),
+            ProcessMenuAction::EfficiencyMode,
+            false,
+        ),
+    ]
+    .spacing(6)
+    .align_y(iced::Alignment::Center);
 
     let copy = row![
         text(t("common.copy")).size(f32::from(tokens::FONT_12)),
@@ -185,9 +232,17 @@ pub(super) fn panel(
     );
 
     container(
-        column![header, primary, signals, secondary, copy, close]
-            .spacing(6)
-            .padding(8),
+        column![
+            header,
+            primary,
+            priority_and_mode,
+            signals,
+            secondary,
+            copy,
+            close
+        ]
+        .spacing(6)
+        .padding(8),
     )
     .style(move |_| theme::panel_style(&theme_snapshot))
     .width(Length::Shrink)

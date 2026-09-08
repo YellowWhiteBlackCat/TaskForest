@@ -164,6 +164,7 @@ impl HostTelemetryProvider for WinHostTelemetryProvider {
             processes,
             threads,
             pressure: ScalarObservation::unavailable(FailureKind::Unsupported),
+            load_average: ScalarObservation::unavailable(FailureKind::Unsupported),
         };
         if sources.is_empty() {
             return Err(ProviderFailure::TemporarilyUnavailable);
@@ -374,6 +375,8 @@ impl MemoryScalarObservationFactory {
             swap_total_bytes: ScalarObservation::available(swap_total, observed_at_ms),
             swap_used_bytes: ScalarObservation::available(swap_used, observed_at_ms),
             used_rate_mib_per_sec: used_rate,
+            swap_in_bytes_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
+            swap_out_bytes_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
         }
     }
 }
@@ -632,6 +635,7 @@ fn npu_device_from_setupapi(
         memory: NpuMemoryReport {
             dedicated_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
             shared_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+            sram_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
         },
         ..NpuDevice::default()
     }

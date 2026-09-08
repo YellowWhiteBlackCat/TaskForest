@@ -236,6 +236,12 @@ pub struct RootView {
     pub dashboard_scroll: ScrollHandle,
     /// Per-window System health scroll state.
     pub system_health_scroll: ScrollHandle,
+    /// Per-window CPU specification/details scroll state. The CPU rail can
+    /// contain live counters, escalation-backed sections, and the complete
+    /// topology/policy projection at once; keeping this handle here makes all
+    /// accepted rows reachable without changing the page-level chart scroll
+    /// contract.
+    pub cpu_details_scroll: ScrollHandle,
     /// The app-level overlay host replacing the gc `Root` wrapper (P4): every
     /// modal/popup layer renders through a `taskmanager_ui` LayerStack.
     ///
@@ -731,6 +737,7 @@ impl RootView {
             processes_scroll: processes_view::ProcessesScrollState::default(),
             dashboard_scroll: ScrollHandle::new(),
             system_health_scroll: ScrollHandle::new(),
+            cpu_details_scroll: ScrollHandle::new(),
             telemetry,
             live_graph_history,
             telemetry_ingestor,

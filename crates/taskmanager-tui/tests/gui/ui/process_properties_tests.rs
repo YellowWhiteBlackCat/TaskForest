@@ -72,7 +72,7 @@ fn overview_rows_mirror_the_neutral_vm() {
             0,
         ),
     );
-    assert_eq!(pairs.len(), 7);
+    assert_eq!(pairs.len(), 15);
     let fields = [
         ProcessDetailsField::Name,
         ProcessDetailsField::Pid,
@@ -80,6 +80,14 @@ fn overview_rows_mirror_the_neutral_vm() {
         ProcessDetailsField::User,
         ProcessDetailsField::Status,
         ProcessDetailsField::Threads,
+        ProcessDetailsField::Pss,
+        ProcessDetailsField::Uss,
+        ProcessDetailsField::AnonHugePages,
+        ProcessDetailsField::SchedPolicy,
+        ProcessDetailsField::OomScore,
+        ProcessDetailsField::PageFaults,
+        ProcessDetailsField::NetworkRate,
+        ProcessDetailsField::CancelledWriteBytes,
         ProcessDetailsField::StartTime,
     ];
     for (row, field) in pairs.iter().zip(fields) {

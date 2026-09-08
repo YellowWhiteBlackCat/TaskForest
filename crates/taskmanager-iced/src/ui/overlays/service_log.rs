@@ -4,7 +4,7 @@ use iced::widget::{column, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::services::{
-    ServiceLogAvailability, ServiceLogLevelFilter, ServiceLogTimeFilter,
+    ServiceLogAvailability, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogTimeFilter,
 };
 use taskmanager_core::core::target::ServiceId;
 
@@ -31,7 +31,11 @@ pub(crate) fn service_log_overlay<'a>(
     } else {
         entries
             .iter()
-            .map(|entry| text(format!("[{:?}] {}", entry.level, entry.message)).into())
+            .map(|entry| {
+                text(format!("[{:?}] {}", entry.level, entry.message))
+                    .color(log_level_color(theme_snapshot, entry.level))
+                    .into()
+            })
             .collect()
     };
     let feed = &open.feed;
@@ -111,6 +115,16 @@ pub(crate) fn service_log_overlay<'a>(
         body,
         app.modal_appear_progress(),
     )
+}
+
+fn log_level_color(theme: &taskmanager_theme::Theme, level: ServiceLogLevel) -> iced::Color {
+    let palette = theme.palette();
+    crate::theme_binding::color(match level {
+        ServiceLogLevel::Error => palette.danger,
+        ServiceLogLevel::Warning => palette.warning,
+        ServiceLogLevel::Info => palette.fg,
+        ServiceLogLevel::Debug | ServiceLogLevel::Unknown => palette.fg_muted,
+    })
 }
 
 fn service_log_empty_message(shell: &ShellApp) -> String {

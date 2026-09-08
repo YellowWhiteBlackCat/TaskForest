@@ -42,7 +42,7 @@ pub(super) fn render<'a>(
             .chain([
                 focus::dynamic_button(
                     theme_snapshot,
-                    FocusTarget::ProcessColumnsClose,
+                    FocusTarget::ProcessColumnsReset,
                     t("common.reset").to_owned(),
                     Message::ResetProcessColumns,
                     false,

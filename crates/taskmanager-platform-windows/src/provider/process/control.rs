@@ -300,7 +300,11 @@ impl ProcessControlProvider for WinProcessControlProvider {
                     }
                 }
                 ProcessBatchAction::SetEfficiencyMode(enable) => {
-                    let tier = if enable { PriorityTier::Low } else { PriorityTier::Normal };
+                    let tier = if enable {
+                        PriorityTier::Low
+                    } else {
+                        PriorityTier::Normal
+                    };
                     match self.set_priority_from_snapshot(&target, tier) {
                         Ok(()) => ProcessBatchTargetResult::Applied,
                         Err(failure) => ProcessBatchTargetResult::Failed(failure.kind()),

@@ -222,7 +222,7 @@ impl StartupDelegate {
         Self {
             rows: Rc::new(Vec::new()),
             query: String::new(),
-            // 5 columns: Status 80 / Name 280 / Impact 90 / Source 140 / Command 400.
+            // 5 columns: Status 80 / Name 280 / Impact 110 / Source 140 / Command 400.
             // Impact sits right after Name (where Win11 TM puts it) so the boot-cost
             // badge is visible without horizontal scrolling. Fixed widths (no native
             // flex column) — matching services_view. Status + Name carry the shared
@@ -235,7 +235,7 @@ impl StartupDelegate {
                 TableColumn::new("name", i18n::t("common.name"))
                     .width(px(280.0))
                     .sortable(),
-                TableColumn::new("impact", i18n::t("startup.impact")).width(px(90.0)),
+                TableColumn::new("impact", i18n::t("startup.impact")).width(px(110.0)),
                 TableColumn::new("source", i18n::t("startup.source")).width(px(140.0)),
                 TableColumn::new("command", i18n::t("startup.command")).width(px(400.0)),
             ],

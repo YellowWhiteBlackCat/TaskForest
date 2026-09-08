@@ -61,6 +61,22 @@ fn full_sysfs_shape_reports_driver_and_typed_unsupported_utilization() {
 }
 
 #[test]
+fn explicit_sram_sysfs_resource_is_read_without_relabeling_generic_memory() {
+    let scratch = ScratchDir::new("sram");
+    write_standard_intel_shape(scratch.path());
+    fs::write(scratch.path().join("accel0/device/sram_size"), "32768\n").expect("sram size");
+    let snapshot = discover_accelerators(scratch.path(), 42).expect("discovery succeeds");
+    assert_eq!(
+        snapshot.devices[0]
+            .memory
+            .sram_total_bytes
+            .current_value()
+            .copied(),
+        Some(32_768)
+    );
+}
+
+#[test]
 fn unbound_driver_shape_keeps_driver_none_without_failing() {
     let scratch = ScratchDir::new("unbound");
     fs::create_dir_all(scratch.path().join("accel3")).expect("node dir");

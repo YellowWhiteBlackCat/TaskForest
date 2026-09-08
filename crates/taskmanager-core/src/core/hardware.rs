@@ -473,6 +473,11 @@ pub struct HardwareInfo {
     /// `"gcc 14.2.0"`. `None` when the platform exposes no compiler record.
     #[serde(default)]
     pub kernel_compiler: Option<String>,
+    /// Bounded kernel messages at priority `error` or more severe. `None`
+    /// means the native log source was unavailable; `Some(empty)` is a
+    /// successful read that found no matching errors.
+    #[serde(default)]
+    pub kernel_errors: Option<Vec<crate::core::KernelLogEntry>>,
     #[serde(default)]
     pub hostname: Option<String>,
     /// Login shell reported by the active user session.
@@ -650,6 +655,7 @@ impl HardwareInfo {
             kernel_cmdline: kernel.command_line,
             kernel_build: kernel.build,
             kernel_compiler: kernel.compiler,
+            kernel_errors: None,
             hostname: host.hostname,
             shell: host.shell,
             terminal: host.terminal,

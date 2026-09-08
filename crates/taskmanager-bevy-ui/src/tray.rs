@@ -213,11 +213,11 @@ pub fn spawn_tray_host(
 /// Drain pending tray events from the receiver without blocking.
 pub fn drain_tray_events(tray: &mut TrayResource) -> Vec<TrayEvent> {
     let mut events = Vec::new();
-    if let Some(rx) = tray.events_rx.as_ref() {
-        if let Ok(rx) = rx.lock() {
-            while let Ok(event) = rx.try_recv() {
-                events.push(event);
-            }
+    if let Some(rx) = tray.events_rx.as_ref()
+        && let Ok(rx) = rx.lock()
+    {
+        while let Ok(event) = rx.try_recv() {
+            events.push(event);
         }
     }
     events

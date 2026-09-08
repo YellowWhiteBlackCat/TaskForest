@@ -498,7 +498,7 @@ fn packaging_matrix_enforces_complete_parity_across_all_frontends() {
     // 1. Linux packaging must build and validate all 4 frontends for DEB and RPM
     for ui in ["G", "I", "T", "B"] {
         assert!(
-            packaging.contains(&format!("TaskForest-${{ui}}-")),
+            packaging.contains("TaskForest-${ui}-"),
             "Packaging workflow must iterate over frontend {ui} for packages"
         );
     }
@@ -528,9 +528,47 @@ fn packaging_matrix_enforces_complete_parity_across_all_frontends() {
 
     // 3. Negative gate for TUI RPM spec: strictly zero graphical dependencies
     let tui_spec = include_str!("../../packaging/rpm/taskforest-t.spec");
-    assert!(!tui_spec.contains("wayland"), "taskforest-t.spec must not depend on wayland");
-    assert!(!tui_spec.contains("vulkan"), "taskforest-t.spec must not depend on vulkan");
-    assert!(!tui_spec.contains("fontconfig"), "taskforest-t.spec must not depend on fontconfig");
+    assert!(
+        !tui_spec.contains("wayland"),
+        "taskforest-t.spec must not depend on wayland"
+    );
+    assert!(
+        !tui_spec.contains("vulkan"),
+        "taskforest-t.spec must not depend on vulkan"
+    );
+    assert!(
+        !tui_spec.contains("fontconfig"),
+        "taskforest-t.spec must not depend on fontconfig"
+    );
+
+    // 4. Windows packaging upload and WiX shortcut GUID parameterization
+    let wix = include_str!("../../packaging/windows/taskforest.wxs");
+    assert!(
+        wix.contains("$(var.ShortcutGuid)"),
+        "taskforest.wxs must parameterize ShortcutGuid per frontend"
+    );
+    assert!(
+        build_msi.contains("ShortcutGuid=$shortcut_guid"),
+        "build-msi.sh must pass ShortcutGuid to WiX"
+    );
+    assert!(
+        !packaging.contains(
+            "TaskForest-G-*-${{ matrix.arch }}.msi\n            checksums-sha256-windows"
+        ),
+        "packaging.yml must not shadow the Windows MSI glob upload"
+    );
+
+    // 5. RPM specs for secondary frontends must not introduce conflicting polkit helpers
+    for spec in [
+        include_str!("../../packaging/rpm/taskforest-i.spec"),
+        include_str!("../../packaging/rpm/taskforest-t.spec"),
+        include_str!("../../packaging/rpm/taskforest-b.spec"),
+    ] {
+        assert!(
+            !spec.contains("/usr/libexec/taskforest-privilege-helper"),
+            "secondary frontend RPM specs must not package conflicting shared polkit helpers"
+        );
+    }
 }
 
 #[test]
@@ -550,5 +588,3 @@ fn release_documentation_matches_24_package_full_parity_matrix() {
         }
     }
 }
-
-

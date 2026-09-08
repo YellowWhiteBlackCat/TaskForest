@@ -87,6 +87,10 @@ pub(crate) struct UiPalette {
     pub(crate) body_color: Color,
     /// Dimmed ink (captions, summary lines, idle nav labels).
     pub(crate) dim_color: Color,
+    /// Destructive/error ink.
+    pub(crate) danger_color: Color,
+    /// Warning ink.
+    pub(crate) warning_color: Color,
     /// Page-title type metrics (size + weight; handle stamped later).
     pub(crate) heading: TextFont,
     /// Body type metrics.
@@ -126,6 +130,8 @@ pub(crate) fn ui_palette(theme: &Theme) -> UiPalette {
         heading_color: theme_color(theme.fg),
         body_color: theme_color(theme.fg),
         dim_color: theme_color(theme.fg_dim),
+        danger_color: theme_color(theme.danger),
+        warning_color: theme_color(theme.warning),
         high_contrast: theme.hc,
         border_color: theme_color(theme.border),
         heading: TextFont {

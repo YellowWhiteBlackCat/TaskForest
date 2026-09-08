@@ -303,8 +303,8 @@ fn perf_device_selector_tabs_cover_every_variant_with_a_localized_label() {
     // non-empty; each tab's focus-operation id is unique and tab-bound.
     assert_eq!(
         PerfDevice::ALL.len(),
-        7,
-        "exactly seven Performance resources are selectable"
+        8,
+        "exactly eight Performance resources are selectable"
     );
 
     let labels: Vec<&'static str> = PerfDevice::ALL.into_iter().map(perf_device_label).collect();
@@ -313,6 +313,7 @@ fn perf_device_selector_tabs_cover_every_variant_with_a_localized_label() {
     assert_eq!(perf_device_label(PerfDevice::Cpu), "CPU");
     assert_eq!(perf_device_label(PerfDevice::Memory), "Memory");
     assert_eq!(perf_device_label(PerfDevice::Gpu(0)), "GPU");
+    assert_eq!(perf_device_label(PerfDevice::Npu(0)), "NPU");
     assert_eq!(perf_device_label(PerfDevice::Disk(0)), "Disk");
     assert_eq!(perf_device_label(PerfDevice::Network(0)), "Network");
     assert_eq!(perf_device_label(PerfDevice::Battery(0)), "Battery");
@@ -427,7 +428,7 @@ fn compact_device_labels_are_bounded_without_losing_the_family_name() {
     assert_eq!(bounded_sidebar_label("CPU 39%", 18), "CPU 39%");
     assert_eq!(
         bounded_sidebar_label("GPU Intel Core Ultra Graphics", 18),
-        "GPU Intel Core Ul…"
+        "GPU"
     );
     assert_eq!(
         bounded_sidebar_label("网络设备很长的型号", 6),
@@ -441,12 +442,6 @@ fn compact_control_rows_have_a_bounded_row_count() {
     assert_eq!(chunk_count(5, 3), 2);
     assert_eq!(chunk_count(7, 4), 2);
     assert_eq!(chunk_count(1, 0), 1);
-}
-
-#[test]
-fn compact_toolbar_stays_single_row_when_the_route_strip_has_room() {
-    assert_eq!(compact_toolbar_columns(720.0), 5);
-    assert_eq!(compact_toolbar_columns(520.0), 3);
 }
 
 #[test]
@@ -592,10 +587,12 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
             ("Write", "40.0 MiB/s"),
             ("IOPS", "—"),
             ("Response", "—"),
+            ("Avg queue", "—"),
+            ("Service estimate", "—"),
             ("Capacity", "500.0 GiB"),
             ("Free", "250.0 GiB"),
             ("Type", "SATA SSD"),
-            ("Filesystem", ""),
+            ("Filesystem", "—"),
             ("Temperature", "33 °C"),
             ("Endurance used", "2%"),
             ("Power-on", "7200 h (300 d)"),
@@ -639,11 +636,13 @@ fn disk_summary_keeps_honest_dashes_and_omits_unavailable_scalars() {
             ("Write", "—"),
             ("IOPS", "—"),
             ("Response", "—"),
+            ("Avg queue", "—"),
+            ("Service estimate", "—"),
             ("Capacity", "—"),
             ("Free", "—"),
-            // Type/FileSystem always render (GPUI parity) with honest empties.
-            ("Type", ""),
-            ("Filesystem", ""),
+            // Type/Filesystem always render with an honest unavailable marker.
+            ("Type", "—"),
+            ("Filesystem", "—"),
         ]
     );
     // Rate-family gaps keep their rows with the shared dash (GPUI parity);

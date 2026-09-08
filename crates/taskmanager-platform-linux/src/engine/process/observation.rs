@@ -7,7 +7,7 @@ use taskmanager_core::{
 use super::PreviousProcessView;
 use super::procfs::{
     FdCount, ProcIoFields, ProcStatFields, clock_ticks_per_second, read_fd_count, read_proc_io,
-    read_proc_stat, read_proc_status_memory,
+    read_proc_oom_score, read_proc_stat, read_proc_status_memory,
 };
 use super::rates::{ProcessRateInput, ProcessRateState};
 
@@ -18,6 +18,11 @@ pub(super) struct ProcessScalarEvidence {
     pub(super) memory: SourceOutcome,
     pub(super) io: SourceOutcome,
     pub(super) rates: SourceOutcome,
+    pub(super) policy: Option<taskmanager_core::ProcessSchedulingPolicy>,
+    pub(super) minflt: Option<u64>,
+    pub(super) majflt: Option<u64>,
+    pub(super) oom_score: Option<u32>,
+    pub(super) cancelled_write_bytes: Option<u64>,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -33,6 +38,7 @@ struct ProcessScalarInputs {
     fds: Option<Result<FdCount, FailureKind>>,
     memory: Result<u64, FailureKind>,
     io: Result<ProcIoFields, FailureKind>,
+    oom_score: Option<u32>,
 }
 
 #[derive(Clone, Copy)]
@@ -69,6 +75,7 @@ pub(super) fn observe_process_scalars<P: PreviousProcessView + ?Sized>(
     };
     let memory = read_proc_status_memory(pid);
     let io = read_proc_io(pid);
+    let oom_score = read_proc_oom_score(pid);
     let confirmation = match stat {
         Ok(_) => read_proc_stat(pid).map(|stat| stat.start_ticks),
         Err(failure) => Err(failure),
@@ -81,6 +88,7 @@ pub(super) fn observe_process_scalars<P: PreviousProcessView + ?Sized>(
             fds,
             memory,
             io,
+            oom_score,
         },
         ProcessObservationContext {
             boot_time,
@@ -120,6 +128,7 @@ fn observations_from_results<P: PreviousProcessView + ?Sized>(
         fds,
         memory,
         io,
+        oom_score,
     } = inputs;
     let observed_at_ms = context.observed_at_ms;
     let previous = context.previous;
@@ -208,6 +217,9 @@ fn observations_from_results<P: PreviousProcessView + ?Sized>(
         };
     }
     let rates_outcome = rate_outcome(&observations);
+    let policy = stat.as_ref().ok().and_then(|s| s.policy);
+    let minflt = stat.as_ref().ok().map(|s| s.minflt);
+    let majflt = stat.as_ref().ok().map(|s| s.majflt);
 
     (
         observations,
@@ -217,6 +229,11 @@ fn observations_from_results<P: PreviousProcessView + ?Sized>(
             memory: memory_outcome,
             io: io_outcome,
             rates: rates_outcome,
+            policy,
+            minflt,
+            majflt,
+            oom_score,
+            cancelled_write_bytes: cancelled_write_bytes(&io),
         },
     )
 }
@@ -291,6 +308,7 @@ fn unavailable_identity_observations(failure: FailureKind) -> ProcessScalarObser
         memory_bytes: ScalarObservation::unavailable(failure),
         memory_pss_bytes: ScalarObservation::unavailable(failure),
         memory_uss_bytes: ScalarObservation::unavailable(failure),
+        memory_anon_huge_pages_bytes: ScalarObservation::unavailable(failure),
         swap_bytes: ScalarObservation::unavailable(failure),
         disk_read_bytes_total: ScalarObservation::unavailable(failure),
         disk_write_bytes_total: ScalarObservation::unavailable(failure),
@@ -339,6 +357,13 @@ fn io_fields(
         Ok(fields) => (fields.read_bytes, fields.write_bytes),
         Err(failure) => (Err(failure), Err(failure)),
     }
+}
+
+fn cancelled_write_bytes(result: &Result<ProcIoFields, FailureKind>) -> Option<u64> {
+    result
+        .as_ref()
+        .ok()
+        .and_then(|fields| fields.cancelled_write_bytes.as_ref().ok().copied())
 }
 
 fn start_time_observation(

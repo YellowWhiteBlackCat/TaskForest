@@ -510,3 +510,94 @@ fn keyboard_moves_clamp_and_selection_clears_when_target_leaves() {
         "the selection resource stays id-keyed and honest"
     );
 }
+
+#[test]
+fn sessions_table_columns_match_shared_contract() {
+    let cols = super::columns();
+    let labels: Vec<String> = cols.iter().map(|c| c.label.clone()).collect();
+    assert_eq!(
+        labels,
+        vec![
+            t("users.session"),
+            t("common.user"),
+            t("users.seat"),
+            t("users.tty"),
+            t("users.remote"),
+            t("users.logon"),
+        ],
+        "table column headers must align to Session, User, Seat, TTY, Remote, Logon"
+    );
+}
+
+#[test]
+fn sessions_toolbar_mounts_disconnect_and_lock_buttons() {
+    let (mut app, events) = headless_sessions_app();
+    route_to_sessions(&mut app);
+    push_sessions(
+        &events,
+        vec![session_item("2", "ada", Some("seat0"), Some("tty1"))],
+    );
+    app.update();
+    app.update();
+
+    let disconnect_buttons: Vec<_> = app
+        .world_mut()
+        .query_filtered::<Entity, With<super::SessionDisconnectButton>>()
+        .iter(app.world())
+        .collect();
+    let lock_buttons: Vec<_> = app
+        .world_mut()
+        .query_filtered::<Entity, With<super::SessionLockButton>>()
+        .iter(app.world())
+        .collect();
+
+    assert_eq!(
+        disconnect_buttons.len(),
+        1,
+        "sessions toolbar mounts exactly one Disconnect button"
+    );
+    assert_eq!(
+        lock_buttons.len(),
+        1,
+        "sessions toolbar mounts exactly one Lock button"
+    );
+}
+
+#[test]
+fn sessions_toolbar_buttons_arm_confirmation_for_selected_session() {
+    let (mut app, events) = headless_sessions_app();
+    route_to_sessions(&mut app);
+    push_sessions(
+        &events,
+        vec![session_item("2", "ada", Some("seat0"), Some("tty1"))],
+    );
+    app.update();
+    app.update();
+
+    // Select row 0 ("2")
+    app.world_mut().trigger(SessionRowClicked(0));
+    app.update();
+
+    let lock_button = app
+        .world_mut()
+        .query_filtered::<Entity, With<super::SessionLockButton>>()
+        .iter(app.world())
+        .next()
+        .expect("lock button exists");
+
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::Activate {
+            entity: lock_button,
+        });
+    app.update();
+
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .pending_confirmation()
+            .is_some(),
+        "activating lock button arms confirmation"
+    );
+}

@@ -25,10 +25,22 @@ output=$3
 ui=${4:-G}
 
 case "$ui" in
-    G|g) spec_file="$script_dir/taskforest.spec" ;;
-    I|i) spec_file="$script_dir/taskforest-i.spec" ;;
-    T|t) spec_file="$script_dir/taskforest-t.spec" ;;
-    B|b) spec_file="$script_dir/taskforest-b.spec" ;;
+    G|g)
+        spec_file="$script_dir/taskforest.spec"
+        ui_tag="G"
+        ;;
+    I|i)
+        spec_file="$script_dir/taskforest-i.spec"
+        ui_tag="I"
+        ;;
+    T|t)
+        spec_file="$script_dir/taskforest-t.spec"
+        ui_tag="T"
+        ;;
+    B|b)
+        spec_file="$script_dir/taskforest-b.spec"
+        ui_tag="B"
+        ;;
     *) echo "build-rpm: unknown UI target '$ui' (expected G, I, T, or B)" >&2; exit 1 ;;
 esac
 
@@ -45,9 +57,44 @@ trap 'rm -rf "$work"' EXIT
 topdir="$work/rpmbuild"
 mkdir -p "$topdir"/{BUILD,BUILDROOT,RPMS,SOURCES,SPECS,SRPMS}
 
+# Prepare the UI-specific staged tree.
+# For GPUI (G), the PKGBUILD release tree ($staged) contains the full layout authority.
+# For Iced, TUI, and Bevy, if the provided staged tree does not have the frontend binary,
+# generate its dedicated standalone staging tree using the respective build-deb-*.sh --stage-only.
+target_staged="$staged"
+case "$ui_tag" in
+    G)
+        [[ -f "$target_staged/usr/bin/taskforest-g" ]] || {
+            echo "build-rpm: $target_staged is missing /usr/bin/taskforest-g" >&2
+            exit 1
+        }
+        ;;
+    I)
+        if [[ ! -f "$target_staged/usr/bin/taskforest-i" ]]; then
+            mkdir -p "$work/stage-i"
+            "$repo/packaging/debian/build-deb-iced.sh" --stage-only "$work/stage-i" >/dev/null
+            target_staged="$work/stage-i"
+        fi
+        ;;
+    T)
+        if [[ ! -f "$target_staged/usr/bin/taskforest-t" ]]; then
+            mkdir -p "$work/stage-t"
+            "$repo/packaging/debian/build-deb-tui.sh" --stage-only "$work/stage-t" >/dev/null
+            target_staged="$work/stage-t"
+        fi
+        ;;
+    B)
+        if [[ ! -f "$target_staged/usr/bin/taskforest-b" ]]; then
+            mkdir -p "$work/stage-b"
+            "$repo/packaging/debian/build-deb-bevy.sh" --stage-only "$work/stage-b" >/dev/null
+            target_staged="$work/stage-b"
+        fi
+        ;;
+esac
+
 # tar with top-level usr/ so the spec's %install can extract straight into
 # the build root.
-tar -C "$staged" -czf "$topdir/SOURCES/taskforest-tree.tar.gz" usr
+tar -C "$target_staged" -czf "$topdir/SOURCES/taskforest-tree.tar.gz" usr
 spec_name=$(basename "$spec_file")
 cp "$spec_file" "$topdir/SPECS/$spec_name"
 

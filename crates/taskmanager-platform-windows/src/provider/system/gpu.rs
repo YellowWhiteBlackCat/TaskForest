@@ -117,6 +117,28 @@ impl WinGpuTelemetryProvider {
                     provider: GPU_TELEMETRY_PROVIDER,
                 });
             }
+            if let Ok(width) = device.memory_bus_width()
+                && width > 0
+            {
+                row.memory_bus_width_bits = Some(width);
+                provenance.push(GpuMetricProvenance {
+                    field: GpuMetricField::MemoryBusWidth,
+                    provider: GPU_TELEMETRY_PROVIDER,
+                });
+            }
+            if let (Some(width), Ok(clock)) = (
+                row.memory_bus_width_bits,
+                device.clock_info(nvml_wrapper::enum_wrappers::device::Clock::Memory),
+            ) {
+                let bandwidth = clock as f32 * width as f32 / 4_000.0;
+                if bandwidth.is_finite() && bandwidth > 0.0 {
+                    row.memory_bandwidth_gbps = Some(bandwidth);
+                    provenance.push(GpuMetricProvenance {
+                        field: GpuMetricField::MemoryBandwidth,
+                        provider: GPU_TELEMETRY_PROVIDER,
+                    });
+                }
+            }
             if let Ok(temp) =
                 device.temperature(nvml_wrapper::enum_wrappers::device::TemperatureSensor::Gpu)
             {
@@ -134,6 +156,16 @@ impl WinGpuTelemetryProvider {
                     field: GpuMetricField::Power,
                     provider: GPU_TELEMETRY_PROVIDER,
                 });
+            }
+            if let Ok(limit) = device.enforced_power_limit() {
+                let watts = limit as f32 / 1000.0;
+                if watts.is_finite() && watts > 0.0 {
+                    row.power_limit_w = Some(watts);
+                    provenance.push(GpuMetricProvenance {
+                        field: GpuMetricField::PowerLimit,
+                        provider: GPU_TELEMETRY_PROVIDER,
+                    });
+                }
             }
             if let Ok(freq) = device.clock_info(nvml_wrapper::enum_wrappers::device::Clock::SM) {
                 observations.frequency_mhz =

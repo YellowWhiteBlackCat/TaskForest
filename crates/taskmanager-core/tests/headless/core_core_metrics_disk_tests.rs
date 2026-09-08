@@ -12,12 +12,18 @@ fn typed_disk_zero_is_current_while_failure_is_not() {
         iops: ScalarObservation::available(0, 10),
         active_time_pct: ScalarObservation::available(0.0, 10),
         response_time_ms: ScalarObservation::available(0.0, 10),
+        average_queue_depth: ScalarObservation::available(0.0, 10),
+        service_time_ms: ScalarObservation::available(0.0, 10),
+        read_merges_per_sec: ScalarObservation::available(0, 10),
+        write_merges_per_sec: ScalarObservation::available(0, 10),
     });
 
     assert_eq!(disk.current_capacity_bytes(), Some(0));
     assert_eq!(disk.current_available_bytes(), Some(0));
     assert_eq!(disk.current_iops(), Some(0));
     assert_eq!(disk.current_active_time_pct(), Some(0.0));
+    assert_eq!(disk.current_average_queue_depth(), Some(0.0));
+    assert_eq!(disk.current_service_time_ms(), Some(0.0));
 
     disk.apply_scalar_observations(DiskScalarObservations::unavailable(
         FailureKind::PermissionDenied,
@@ -165,6 +171,10 @@ fn typed_measured_zero_roundtrips_as_current_and_projects_legacy_zero() {
         iops: ScalarObservation::available(0, 42),
         active_time_pct: ScalarObservation::available(0.0, 42),
         response_time_ms: ScalarObservation::available(0.0, 42),
+        average_queue_depth: ScalarObservation::available(0.0, 42),
+        service_time_ms: ScalarObservation::available(0.0, 42),
+        read_merges_per_sec: ScalarObservation::available(0, 42),
+        write_merges_per_sec: ScalarObservation::available(0, 42),
     });
 
     let wire = serde_json::to_value(&disk).expect("serialize typed zero");
@@ -174,6 +184,8 @@ fn typed_measured_zero_roundtrips_as_current_and_projects_legacy_zero() {
     assert_eq!(decoded.current_capacity_bytes(), Some(0));
     assert_eq!(decoded.current_iops(), Some(0));
     assert_eq!(decoded.current_active_time_pct(), Some(0.0));
+    assert_eq!(decoded.current_average_queue_depth(), Some(0.0));
+    assert_eq!(decoded.current_service_time_ms(), Some(0.0));
 
     let mut typed_only = wire;
     let object = typed_only.as_object_mut().expect("disk wire object");
@@ -185,6 +197,8 @@ fn typed_measured_zero_roundtrips_as_current_and_projects_legacy_zero() {
         "iops",
         "active_time_pct",
         "response_time_ms",
+        "average_queue_depth",
+        "service_time_ms",
     ] {
         object.remove(key);
     }

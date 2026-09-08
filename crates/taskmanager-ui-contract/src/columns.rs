@@ -26,10 +26,10 @@ pub struct ProcessColumnSpec {
 }
 
 /// The complete column inventory in canonical order: Name → User → PID →
-/// Threads → StartTime → Status → CPU → Memory → Swap → DiskRead → DiskWrite →
-/// CPUTime → FDs → Nice (Swap follows Memory so the two memory resources stay
-/// adjacent). Values mirror the GPUI processes table this vocabulary was
-/// extracted from; adopting frontends must not carry diverging copies.
+/// Threads → StartTime → Status → CPU → Memory → Swap → MemoryPss → DiskRead →
+/// DiskWrite → Network → CPUTime → FDs → Nice (Swap and MemoryPss follow Memory
+/// so memory resources stay adjacent). Values mirror the GPUI processes table
+/// this vocabulary was extracted from; adopting frontends must not carry diverging copies.
 pub const PROCESS_COLUMNS: &[ProcessColumnSpec] = &[
     ProcessColumnSpec {
         id: "Name",

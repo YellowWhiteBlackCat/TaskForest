@@ -15,6 +15,30 @@ fn provider_pci_identity_normalizes_to_linux_sysfs_shape() {
 }
 
 #[test]
+fn drm_connector_state_marks_the_gpu_with_a_connected_display_output() {
+    let root = crate::test_support::repo_temp_dir().join(format!(
+        "tm_gpu_connector_{}_{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    let card = root.join("card0");
+    std::fs::create_dir_all(card.join("device")).unwrap();
+    std::fs::create_dir_all(root.join("card0-HDMI-A-1")).unwrap();
+    std::fs::write(card.join("device/vbios_version"), "101.0.0.0\n").unwrap();
+    std::fs::write(root.join("card0-HDMI-A-1/status"), "connected\n").unwrap();
+
+    let gpus = detect_gpu_metrics_from_paths(&root, &root.join("nvidia"), &root.join("modules"));
+    assert_eq!(gpus.len(), 1);
+    assert_eq!(gpus[0].display_connected, Some(true));
+    assert_eq!(gpus[0].vbios_version.as_deref(), Some("101.0.0.0"));
+
+    std::fs::remove_dir_all(root).ok();
+}
+
+#[test]
 fn a_sparse_secondary_identity_provider_does_not_erase_richer_pci_identity() {
     let device_id = stable_gpu_id("card0", Some("0000:00:02.0"));
     let mut baseline = GpuMetrics::new(device_id.clone(), "Intel");

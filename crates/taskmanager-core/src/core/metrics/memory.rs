@@ -108,6 +108,15 @@ pub struct MemoryScalarObservations {
     pub swap_total_bytes: ScalarObservation<u64>,
     pub swap_used_bytes: ScalarObservation<u64>,
     pub used_rate_mib_per_sec: ScalarObservation<f32>,
+    /// Bytes paged into swap per second, derived from the kernel's cumulative
+    /// `pswpin` counter. The first sample is unavailable because a rate needs
+    /// two identity-bound counter readings.
+    #[serde(default)]
+    pub swap_in_bytes_per_sec: ScalarObservation<u64>,
+    /// Bytes paged out of RAM per second, derived from the kernel's cumulative
+    /// `pswpout` counter.
+    #[serde(default)]
+    pub swap_out_bytes_per_sec: ScalarObservation<u64>,
 }
 
 impl MemoryScalarObservations {
@@ -129,6 +138,12 @@ impl MemoryScalarObservations {
             used_rate_mib_per_sec: self
                 .used_rate_mib_per_sec
                 .retain_previous(previous.used_rate_mib_per_sec),
+            swap_in_bytes_per_sec: self
+                .swap_in_bytes_per_sec
+                .retain_previous(previous.swap_in_bytes_per_sec),
+            swap_out_bytes_per_sec: self
+                .swap_out_bytes_per_sec
+                .retain_previous(previous.swap_out_bytes_per_sec),
         }
     }
 
@@ -141,6 +156,8 @@ impl MemoryScalarObservations {
             swap_total_bytes: ScalarObservation::unavailable(failure),
             swap_used_bytes: ScalarObservation::unavailable(failure),
             used_rate_mib_per_sec: ScalarObservation::unavailable(failure),
+            swap_in_bytes_per_sec: ScalarObservation::unavailable(failure),
+            swap_out_bytes_per_sec: ScalarObservation::unavailable(failure),
         }
     }
 }
@@ -348,6 +365,22 @@ impl MemoryMetrics {
     #[must_use]
     pub const fn scalar_observations(&self) -> &MemoryScalarObservations {
         &self.scalar_observations
+    }
+
+    #[must_use]
+    pub fn current_swap_in_bytes_per_sec(&self) -> Option<u64> {
+        self.scalar_observations
+            .swap_in_bytes_per_sec
+            .current_value()
+            .copied()
+    }
+
+    #[must_use]
+    pub fn current_swap_out_bytes_per_sec(&self) -> Option<u64> {
+        self.scalar_observations
+            .swap_out_bytes_per_sec
+            .current_value()
+            .copied()
     }
 
     #[must_use]

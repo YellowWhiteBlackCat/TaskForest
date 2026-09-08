@@ -6,12 +6,13 @@ use taskmanager_core::core::device_state::{DeviceLifecycle, DevicePresence, Devi
 use taskmanager_core::core::hardware::HardwareInfo;
 use taskmanager_core::core::identity::{DeviceGeneration, DeviceId, ProviderId};
 use taskmanager_core::core::metrics::{
-    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, DiskMetrics,
-    DiskScalarObservations, GpuMetrics, GpuScalarObservations, GpuTelemetryObservation,
+    CpuIdleState, CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics, CpuPerformancePolicy,
+    CpuScalarObservations, CpuTelemetryObservation, DiskMetrics, DiskScalarObservations,
+    GpuGraphicsApi, GpuMetrics, GpuScalarObservations, GpuTelemetryObservation,
     MemoryCompositionObservations, MemoryMetrics, MemoryOptionalObservations,
     MemoryScalarObservations, MemoryTelemetryObservation, NetworkAdapterType, NetworkMetrics,
     NetworkScalarObservations, NetworkTelemetryObservation, NetworkWirelessObservations,
-    OptionalObservation, ScalarObservation, ScalarObservationGroup,
+    OptionalObservation, ScalarObservation, ScalarObservationGroup, SystemLoadAverage,
 };
 use taskmanager_core::core::metrics::{StorageTelemetryObservation, SystemSnapshot};
 use taskmanager_core::core::npu::NpuInventorySnapshot;
@@ -39,6 +40,9 @@ use taskmanager_telemetry_store::{
 use crate::{DirectTrackState, FeedbackLifecycle, FeedbackSeverity, FeedbackSource, ShellApp};
 
 mod cpu_topology;
+mod inventory;
+
+use inventory::{services, sessions, startup};
 
 pub use cpu_topology::{CpuClusterSpec, CpuTopologySpec, demo_cpu_topology};
 use cpu_topology::{
@@ -205,7 +209,7 @@ pub fn demo_app() -> ShellApp {
         FeedbackSource::Demo,
         FeedbackSeverity::Info,
         FeedbackLifecycle::UntilReplaced,
-        "Demo snapshot · no host actions",
+        taskmanager_application::i18n::t("status.demo_snapshot"),
     );
     app
 }
@@ -418,6 +422,61 @@ fn snapshot() -> SystemSnapshot {
     cpu.brand = Some("Intel(R) Core(TM) Ultra 7 358H".into());
     cpu.physical_cores = Some(demo_cpu_topology().physical_cores());
     cpu.logical_cores = Some(demo_cpu_topology().logical_cores());
+    cpu.performance_policy = CpuPerformancePolicy {
+        frequency_implementation: Some("intel_pstate".into()),
+        active_policy: Some("powersave".into()),
+        energy_preference: Some("balance_performance".into()),
+        boost_enabled: Some(true),
+        boost_max_frequency_mhz: Some(4_800),
+        power_limit_1_w: Some(89.0),
+        power_limit_2_w: Some(95.0),
+        power_time_window_ms: Some(55_000),
+    };
+    cpu.packages = vec![CpuPackageMetrics {
+        package_id: 0,
+        numa_node_id: Some(0),
+        numa_node_ids: vec![0],
+        logical_core_ids: (0..cpu.logical_cores.unwrap_or_default()).collect(),
+        chiplet_ids: vec![0],
+        smt_threads_per_core: Some(2),
+        smt_sibling_groups: vec![(0..2).collect()],
+        physical_core_count: cpu.physical_cores,
+        local_memory_bytes: Some(32 * GIB),
+        numa_hit_ratio_pct: Some(99.8),
+        is_throttled: Some(false),
+        package_throttle_count: Some(0),
+        core_throttle_count: Some(0),
+        thermal_margin_c: Some(46.0),
+        temperature_c: Some(54.0),
+        power_w: Some(18.8),
+        frequency_mhz: Some(3_284),
+    }];
+    cpu.idle_states = vec![
+        CpuIdleState {
+            name: "C1".into(),
+            description: Some("C1-HLT".into()),
+            residency_us: Some(611_700_000),
+            residency_pct: Some(12.5),
+            usage_count: Some(611_700),
+            latency_us: Some(1),
+            disabled: Some(false),
+        },
+        CpuIdleState {
+            name: "C10".into(),
+            description: Some("深度空闲".into()),
+            residency_us: Some(4_300_000_000),
+            residency_pct: Some(82.5),
+            usage_count: Some(4_300_000),
+            latency_us: Some(200),
+            disabled: Some(false),
+        },
+    ];
+    cpu.interrupts = Some(CpuInterruptSnapshot {
+        total: Some(2_350_000),
+        per_logical_cpu: (0..cpu.logical_cores.unwrap_or_default())
+            .map(|index| 80_000 + u64::from((index % 4) as u8) * 10_000)
+            .collect(),
+    });
     SystemSnapshot {
         timestamp_ms: 1_785_292_800_000,
         cpu,
@@ -457,6 +516,8 @@ fn snapshot() -> SystemSnapshot {
                 read_bytes_per_sec: ScalarObservation::available(84 * MIB, 1_785_292_800_000),
                 write_bytes_per_sec: ScalarObservation::available(31 * MIB, 1_785_292_800_000),
                 active_time_pct: ScalarObservation::available(12.7, 1_785_292_800_000),
+                average_queue_depth: ScalarObservation::available(0.42, 1_785_292_800_000),
+                service_time_ms: ScalarObservation::available(1.8, 1_785_292_800_000),
                 ..Default::default()
             });
             disk
@@ -486,6 +547,12 @@ fn snapshot() -> SystemSnapshot {
         gpu: vec![{
             let mut gpu = GpuMetrics::new("gpu:demo:xe", "Intel Graphics (xe)");
             gpu.driver = Some("xe".into());
+            gpu.vbios_version = Some("101.0.0.0".into());
+            gpu.graphics_api = Some(GpuGraphicsApi {
+                opengl_version: Some("4.6".into()),
+                vulkan_version: Some("1.4.304".into()),
+                mesa_version: Some("25.1.4".into()),
+            });
             // The same accepted observation drives the row and the seeded
             // history ring, so the demo row carries the generation its ring
             // was reset for (generation-scoped reads refuse an unbound 0).
@@ -506,6 +573,7 @@ fn snapshot() -> SystemSnapshot {
         processes: 347,
         threads: Some(2_816),
         pressure: None,
+        load_average: SystemLoadAverage::from_raw(2.4, 1.8, 1.2, 8),
     }
 }
 
@@ -573,103 +641,6 @@ fn processes() -> Vec<ProcessItem> {
         process
     })
     .collect()
-}
-
-fn services() -> Vec<ServiceItem> {
-    [
-        (
-            "NetworkManager.service",
-            ServiceStatus::Active,
-            "Network manager",
-        ),
-        (
-            "bluetooth.service",
-            ServiceStatus::Active,
-            "Bluetooth service",
-        ),
-        (
-            "docker.service",
-            ServiceStatus::Inactive,
-            "Container engine",
-        ),
-        (
-            "systemd-timesyncd.service",
-            ServiceStatus::Active,
-            "Network time",
-        ),
-        (
-            "demo-failed.service",
-            ServiceStatus::Failed,
-            "Recovery required",
-        ),
-    ]
-    .into_iter()
-    .map(|(name, status, description)| {
-        ServiceItem::from_inventory(
-            ServiceId::new(format!("fixture.service:{name}")),
-            name,
-            status,
-            description,
-            "",
-            "",
-            "",
-        )
-    })
-    .collect()
-}
-
-fn startup() -> Vec<StartupEntry> {
-    vec![
-        StartupEntry {
-            id: "user-service:ssh-agent.service".into(),
-            name: "SSH Agent".into(),
-            exec: "ssh-agent.service".into(),
-            enabled: true,
-            source: StartupSource::UserService,
-            scope: StartupScope::User,
-            control_policy: StartupControlPolicy::Direct,
-            locator: "ssh-agent.service".into(),
-            impact: StartupImpact::Low,
-            impact_evidence: StartupImpactEvidence::Measured { duration_ms: 42 },
-        },
-        StartupEntry {
-            id: "desktop:clipboard-sync.desktop".into(),
-            name: "Clipboard Sync".into(),
-            exec: "wl-paste --watch".into(),
-            enabled: true,
-            source: StartupSource::DesktopEntry,
-            scope: StartupScope::User,
-            control_policy: StartupControlPolicy::Direct,
-            locator: "clipboard-sync.desktop".into(),
-            impact: StartupImpact::None,
-            impact_evidence: StartupImpactEvidence::Unknown {
-                reason: StartupImpactUnknownReason::NotInstrumented,
-            },
-        },
-    ]
-}
-
-fn sessions() -> Vec<SessionItem> {
-    vec![
-        SessionItem {
-            id: "2".into(),
-            uid: 1000,
-            user: "devuser".into(),
-            seat: Some("seat0".into()),
-            tty: Some("tty2".into()),
-            remote: false,
-            timestamp: Some("2026-07-29 08:41".into()),
-        },
-        SessionItem {
-            id: "9".into(),
-            uid: 1000,
-            user: "devuser".into(),
-            seat: None,
-            tty: Some("pts/4".into()),
-            remote: true,
-            timestamp: Some("2026-07-29 11:20".into()),
-        },
-    ]
 }
 
 #[cfg(test)]

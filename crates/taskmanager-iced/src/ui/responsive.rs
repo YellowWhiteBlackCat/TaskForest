@@ -33,8 +33,8 @@ pub const NAV_RAIL_WIDTH: f32 = 144.0;
 /// budget decides whether the device rail and statistics column can coexist
 /// with a readable main viewport; renderers only consume the result.
 pub const PERFORMANCE_MAIN_MIN_WIDTH: f32 = 360.0;
-pub const PERFORMANCE_STATS_MIN_WIDTH: f32 = 236.0;
-pub const PERFORMANCE_STATS_MAX_WIDTH: f32 = 280.0;
+pub const PERFORMANCE_STATS_MIN_WIDTH: f32 = 260.0;
+pub const PERFORMANCE_STATS_MAX_WIDTH: f32 = 320.0;
 pub const PERFORMANCE_SIDEBAR_MIN_WIDTH: f32 = 248.0;
 pub const PERFORMANCE_SIDEBAR_MAX_WIDTH: f32 = 460.0;
 pub const PERFORMANCE_SLOT_GAP: f32 = 12.0;
@@ -75,12 +75,6 @@ const GENEROUS_CONTENT_HEIGHT: f32 = 960.0;
 /// `[1320, 1600)` back to the wrapped composition, so the pre-port threshold
 /// is kept verbatim as a typed fact instead of a `ui.rs` literal.
 pub const CHROME_SINGLE_ROW_MIN_WIDTH: f32 = 1320.0;
-
-/// The width from which the wrapped action toolbar chunks into five columns
-/// instead of three. Iced-specific (GPUI's chrome has no wrapped-row mode);
-/// preserved from the pre-port `performance.rs` literal so 560px remains the
-/// exact flip point.
-pub const COMPACT_TOOLBAR_FIVE_COLUMN_MIN_WIDTH: f32 = 560.0;
 
 /// Horizontal layout capacity shared by every page (GPUI parity).
 ///

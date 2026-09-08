@@ -18,7 +18,10 @@ fn clear_smart_values(disk: &mut DiskMetrics) {
     disk.smart_critical_warning = None;
     disk.smart_temp_critical_c = None;
     disk.smart_percent_used = None;
+    disk.smart_available_spare_pct = None;
+    disk.smart_available_spare_threshold_pct = None;
     disk.smart_power_on_hours = None;
+    disk.smart_unsafe_shutdowns = None;
 }
 
 pub(super) const GPU_ENGINE_CAPTURE_DEVICE_ID: &str = "gpu:capture:engine-inventory";
@@ -37,6 +40,7 @@ pub(super) fn gpu_engine_inventory_frame(index: u64, observed_at_ms: u64) -> Gpu
     gpu.graphics_api = Some(GpuGraphicsApi {
         opengl_version: Some("4.6".into()),
         vulkan_version: Some("1.4.354".into()),
+        mesa_version: Some("25.1.4".into()),
     });
     gpu.device_generation = DeviceGeneration::new(1);
     gpu.device_state = DeviceState::healthy(observed_at_ms);
@@ -157,6 +161,7 @@ pub(super) fn npu_inventory_fixture() -> NpuInventorySnapshot {
             memory: NpuMemoryReport {
                 dedicated_total_bytes: ScalarObservation::available(0, 1_000),
                 shared_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+                sram_total_bytes: ScalarObservation::available(32 * 1024 * 1024, 1_000),
             },
         }],
         1_000,

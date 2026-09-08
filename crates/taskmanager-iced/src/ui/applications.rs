@@ -226,10 +226,7 @@ pub(crate) fn sort_col_contract_id(column: SortCol) -> &'static str {
         SortCol::CpuTime => "CPUTime",
         SortCol::Fds => "FDs",
         SortCol::Nice => "Nice",
-        // PSS is part of the shared shell superset but not the
-        // neutral inventory (GPUI does not surface it either); the token
-        // keeps the arm exhaustive and never resolves to a contract row.
-        SortCol::Pss => "PSS",
+        SortCol::Pss => "MemoryPss",
     }
 }
 
@@ -256,7 +253,7 @@ pub(crate) fn sort_col_from_contract_id(token: &str) -> Option<SortCol> {
         "CPUTime" => Some(SortCol::CpuTime),
         "FDs" => Some(SortCol::Fds),
         "Nice" => Some(SortCol::Nice),
-        "PSS" => Some(SortCol::Pss),
+        "MemoryPss" | "PSS" => Some(SortCol::Pss),
         _ => None,
     }
 }
@@ -345,36 +342,26 @@ pub(crate) fn apps_columns_with(
         )
     }
     let mut columns = vec![
-        spec(SortCol::Pid, widths),
         spec(SortCol::Name, widths),
+        spec(SortCol::User, widths),
+        spec(SortCol::Pid, widths),
+        spec(SortCol::Threads, widths),
+        spec(SortCol::StartTime, widths),
+        spec(SortCol::State, widths),
         spec(SortCol::Cpu, widths),
         spec(SortCol::Memory, widths),
-        spec(SortCol::Pss, widths),
     ];
     if swap_visible {
         columns.push(spec(SortCol::Swap, widths));
     }
-    // Advanced typed columns (disk rate, cumulative CPU time, thread count) sit
-    // next to memory and are individually sortable via per-header click. They
-    // are absent from the TUI display cycle but available here because the
-    // window can scroll horizontally past the table baseline.
     columns.extend([
+        spec(SortCol::Pss, widths),
         spec(SortCol::DiskRead, widths),
         spec(SortCol::DiskWrite, widths),
+        spec(SortCol::Network, widths),
         spec(SortCol::CpuTime, widths),
-        spec(SortCol::Threads, widths),
-    ]);
-    columns.push(spec(SortCol::User, widths));
-    // GPUI-parity advanced columns (mirrors the gpui processes_view header):
-    // process state, open-fd count, nice, and the local-time start clock
-    // (`HH:MM`, gpui `format_start_time` parity). Each is individually
-    // sortable via per-header click (advanced columns stay out of the
-    // `s`-key display cycle so the TUI is unaffected).
-    columns.extend([
-        spec(SortCol::State, widths),
         spec(SortCol::Fds, widths),
         spec(SortCol::Nice, widths),
-        spec(SortCol::StartTime, widths),
     ]);
     columns
 }
@@ -417,7 +404,12 @@ pub(crate) fn trend_header_index_for(columns: &[(SortCol, f32)]) -> usize {
         .or_else(|| {
             columns
                 .iter()
-                .position(|(column, _)| *column == SortCol::Name)
+                .position(|(column, _)| *column == SortCol::Memory)
+        })
+        .or_else(|| {
+            columns
+                .iter()
+                .position(|(column, _)| *column == SortCol::State)
                 .map(|index| index + 1)
         })
         .unwrap_or(0)
@@ -520,7 +512,7 @@ pub(crate) fn localized_sort_column_label(column: SortCol) -> &'static str {
         SortCol::CpuTime => t("proc.cpu_time"),
         SortCol::DiskRead => t("proc.disk_read"),
         SortCol::DiskWrite => t("proc.disk_write"),
-        SortCol::Network => "Network",
+        SortCol::Network => t("proc.network"),
         SortCol::StartTime => t("proc.start"),
         SortCol::Fds => t("proc.fds"),
         SortCol::Nice => t("proc.nice"),

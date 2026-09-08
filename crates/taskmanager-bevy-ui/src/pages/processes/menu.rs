@@ -38,10 +38,14 @@ pub(crate) enum ProcessMenuAction {
     Kill,
     Priority(PriorityTier),
     EfficiencyMode,
+    OpenLocation,
+    SearchOnline,
+    Affinity,
+    Properties,
 }
 
 /// The actions in display order.
-const MENU_ACTIONS: [ProcessMenuAction; 9] = [
+const MENU_ACTIONS: [ProcessMenuAction; 13] = [
     ProcessMenuAction::EndTask,
     ProcessMenuAction::EndProcessTree,
     ProcessMenuAction::Suspend,
@@ -51,6 +55,10 @@ const MENU_ACTIONS: [ProcessMenuAction; 9] = [
     ProcessMenuAction::Priority(PriorityTier::Normal),
     ProcessMenuAction::Priority(PriorityTier::Low),
     ProcessMenuAction::EfficiencyMode,
+    ProcessMenuAction::OpenLocation,
+    ProcessMenuAction::SearchOnline,
+    ProcessMenuAction::Affinity,
+    ProcessMenuAction::Properties,
 ];
 
 /// Localized label for one menu action. The three priority tiers route through
@@ -67,6 +75,10 @@ fn action_label(action: ProcessMenuAction) -> String {
             taskmanager_shell::presentation::priority_tier_label(tier).to_owned()
         }
         ProcessMenuAction::EfficiencyMode => t("proc.efficiency_mode").to_owned(),
+        ProcessMenuAction::OpenLocation => t("proc.open_location").to_owned(),
+        ProcessMenuAction::SearchOnline => t("proc.search_online").to_owned(),
+        ProcessMenuAction::Affinity => t("proc.affinity").to_owned(),
+        ProcessMenuAction::Properties => t("dialog.properties").to_owned(),
     }
 }
 
@@ -144,6 +156,51 @@ impl ActionMenuContext for ProcessMenuCtx {
                 .request_process_batch(ProcessBatchAction::SetEfficiencyMode(true))
                 .into_iter()
                 .collect(),
+            ProcessMenuAction::OpenLocation => {
+                if let Some(process) = shell.visible_process_at(shell.selected)
+                    && let Some(target) =
+                        taskmanager_core::core::process::FrozenProcessIdentity::from_process(
+                            process,
+                        )
+                {
+                    return vec![PlatformEffect::RevealResource(
+                        taskmanager_application::ResourceRevealRequest {
+                            target,
+                            cached_executable: process.current_exe_path().map(ToOwned::to_owned),
+                        },
+                    )];
+                }
+                Vec::new()
+            }
+            ProcessMenuAction::SearchOnline => {
+                if let Some(process) = shell.visible_process_at(shell.selected)
+                    && !process.name.trim().is_empty()
+                {
+                    return vec![PlatformEffect::OpenUrl(
+                        taskmanager_application::UrlOpenRequest {
+                            url: taskmanager_shell::presentation::search_url_for(&process.name),
+                        },
+                    )];
+                }
+                Vec::new()
+            }
+            ProcessMenuAction::Affinity => {
+                if let Some(process) = shell.visible_process_at(shell.selected)
+                    && let Some(target) =
+                        taskmanager_core::core::process::FrozenProcessIdentity::from_process(
+                            process,
+                        )
+                {
+                    return vec![PlatformEffect::ProcessAffinity(
+                        taskmanager_application::ProcessAffinityRequest { target },
+                    )];
+                }
+                Vec::new()
+            }
+            ProcessMenuAction::Properties => {
+                let _ = shell.apply_action(AppAction::OpenProperties);
+                Vec::new()
+            }
         }
     }
 }

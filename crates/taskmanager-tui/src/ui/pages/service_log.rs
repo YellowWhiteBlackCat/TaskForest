@@ -6,7 +6,7 @@ use ratatui::style::Style;
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Paragraph, Wrap};
 use taskmanager_application::i18n::t;
-use taskmanager_core::core::services::ServiceLogAvailability;
+use taskmanager_core::core::services::{ServiceLogAvailability, ServiceLogLevel};
 use taskmanager_core::core::target::ServiceId;
 
 use super::super::panel;
@@ -66,7 +66,16 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         )));
     } else {
         for entry in entries.iter().take(12) {
-            lines.push(Line::from(entry.message.clone()));
+            let color = match entry.level {
+                ServiceLogLevel::Error => theme.danger,
+                ServiceLogLevel::Warning => theme.warn,
+                ServiceLogLevel::Info => theme.fg_dim,
+                ServiceLogLevel::Debug | ServiceLogLevel::Unknown => theme.dim,
+            };
+            lines.push(Line::from(Span::styled(
+                entry.message.clone(),
+                Style::new().fg(color),
+            )));
         }
         if entries.len() > 12 {
             lines.push(Line::from(Span::styled(

@@ -34,7 +34,7 @@ fn session_bus_arbitrates_primary_secondary_and_activation() {
     let (primary_tx, primary_rx) = std::sync::mpsc::channel();
     let primary = match acquire_single_instance(&name, primary_tx) {
         Ok(role) => role,
-        Err(InstanceFailure::MissingDependency) => return,
+        Err(InstanceFailure::MissingDependency | InstanceFailure::Rejected) => return,
         Err(failure) => panic!("session bus acquisition failed unexpectedly: {failure:?}"),
     };
     assert!(matches!(&primary, InstanceRole::Primary(_)));

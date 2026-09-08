@@ -17,6 +17,9 @@ pub struct ProcStatFields {
     pub(super) user_ticks: u64,
     pub(super) system_ticks: u64,
     pub(super) nice: i32,
+    pub(super) policy: Option<taskmanager_core::ProcessSchedulingPolicy>,
+    pub(super) minflt: u64,
+    pub(super) majflt: u64,
 }
 
 impl ProcStatFields {
@@ -49,6 +52,7 @@ pub(super) struct FdCount {
 pub struct ProcIoFields {
     pub read_bytes: Result<u64, FailureKind>,
     pub write_bytes: Result<u64, FailureKind>,
+    pub cancelled_write_bytes: Result<u64, FailureKind>,
 }
 
 /// Resident-memory components needed by the platform-neutral hybrid PSS
@@ -62,25 +66,55 @@ pub(super) struct ProcStatusMemoryFields {
     pub(super) rss_shmem_bytes: u64,
 }
 
+/// Independent memory counters exported by Linux `smaps_rollup`.
+///
+/// Each field is kept as its own result because older kernels, restricted
+/// procfs mounts, and permission changes can hide one counter without making
+/// an already-readable status snapshot dishonest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ProcSmapsRollupFields {
+    pub(super) private_clean_bytes: Result<u64, FailureKind>,
+    pub(super) private_dirty_bytes: Result<u64, FailureKind>,
+    pub(super) anon_huge_pages_bytes: Result<u64, FailureKind>,
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct ProcMemoryObservations {
     pub(super) pss_fields: Result<ProcStatusMemoryFields, FailureKind>,
     pub(super) swap_bytes: Result<u64, FailureKind>,
+    pub(super) uss_bytes: Result<u64, FailureKind>,
+    pub(super) anon_huge_pages_bytes: Result<u64, FailureKind>,
 }
 
 pub fn parse_proc_stat(text: &str) -> Option<ProcStatFields> {
     let _ = text.find('(')?;
     let rparen = text.rfind(')')?;
-    // One allocation-free walk that materializes only the five fields the
-    // observation reads (previously a full Vec<&str> per read per tick).
-    let [user_ticks, system_ticks, nice, threads, start_ticks] =
-        nth_fields(&text[rparen + 1..], [11, 12, 16, 17, 19])?;
+    let tail = &text[rparen + 1..];
+    // Indices: 7=minflt, 9=majflt, 11=utime, 12=stime, 16=nice, 17=threads, 19=starttime
+    let [
+        minflt,
+        majflt,
+        user_ticks,
+        system_ticks,
+        nice,
+        threads,
+        start_ticks,
+    ] = nth_fields(tail, [7, 9, 11, 12, 16, 17, 19])?;
+    // Field 41 (policy, tail index 38) is present on Linux 2.6+ but optional on short fixtures.
+    let policy = tail
+        .split_whitespace()
+        .nth(38)
+        .and_then(|p| p.parse::<u32>().ok())
+        .map(taskmanager_core::ProcessSchedulingPolicy::from_linux_policy);
     Some(ProcStatFields {
         user_ticks: user_ticks.parse().ok()?,
         system_ticks: system_ticks.parse().ok()?,
         nice: nice.parse().ok()?,
         threads: threads.parse().ok()?,
         start_ticks: start_ticks.parse().ok()?,
+        policy,
+        minflt: minflt.parse().ok()?,
+        majflt: majflt.parse().ok()?,
     })
 }
 
@@ -183,6 +217,16 @@ pub(super) fn read_proc_status_memory(pid: u32) -> Result<u64, FailureKind> {
     parse_proc_status_memory(&text)
 }
 
+pub(super) fn read_proc_oom_score(pid: u32) -> Option<u32> {
+    let mut path = [0_u8; 32];
+    let file_path = write_proc_path(&mut path, pid, "oom_score").ok()?;
+    fs::read_to_string(file_path)
+        .ok()?
+        .trim()
+        .parse::<u32>()
+        .ok()
+}
+
 /// Parse all fields required for an independent hybrid-PSS and per-process
 /// swap observation. Missing fields are `Unsupported`, while malformed or
 /// duplicated fields are provider faults; neither case is converted to zero.
@@ -203,16 +247,62 @@ pub(super) fn read_proc_memory_observations(
     let mut path = [0_u8; 32];
     let text = fs::read_to_string(write_proc_path(&mut path, pid, "status")?)
         .map_err(|error| io_failure(&error))?;
+    let smaps = read_proc_smaps_rollup(pid);
+    let (uss_bytes, anon_huge_pages_bytes) = match smaps {
+        Ok(fields) => {
+            let ProcSmapsRollupFields {
+                private_clean_bytes,
+                private_dirty_bytes,
+                anon_huge_pages_bytes,
+            } = fields;
+            (
+                sum_memory_bytes(private_clean_bytes, private_dirty_bytes),
+                anon_huge_pages_bytes,
+            )
+        }
+        Err(failure) => (Err(failure), Err(failure)),
+    };
     Ok(ProcMemoryObservations {
         pss_fields: parse_proc_status_memory_fields(&text),
         swap_bytes: parse_unique_kib_field(&text, "VmSwap:"),
+        uss_bytes,
+        anon_huge_pages_bytes,
     })
+}
+
+/// Parse the private memory and transparent huge-page counters from one
+/// `smaps_rollup` payload. Results remain independent so callers can expose a
+/// valid USS value even if the kernel omits the optional THP counter.
+pub(super) fn parse_proc_smaps_rollup(text: &str) -> ProcSmapsRollupFields {
+    ProcSmapsRollupFields {
+        private_clean_bytes: parse_unique_kib_field(text, "Private_Clean:"),
+        private_dirty_bytes: parse_unique_kib_field(text, "Private_Dirty:"),
+        anon_huge_pages_bytes: parse_unique_kib_field(text, "AnonHugePages:"),
+    }
+}
+
+fn read_proc_smaps_rollup(pid: u32) -> Result<ProcSmapsRollupFields, FailureKind> {
+    let mut path = [0_u8; 32];
+    let text = fs::read_to_string(write_proc_path(&mut path, pid, "smaps_rollup")?)
+        .map_err(|error| io_failure(&error))?;
+    Ok(parse_proc_smaps_rollup(&text))
+}
+
+fn sum_memory_bytes(
+    left: Result<u64, FailureKind>,
+    right: Result<u64, FailureKind>,
+) -> Result<u64, FailureKind> {
+    match (left, right) {
+        (Ok(left), Ok(right)) => left.checked_add(right).ok_or(FailureKind::ProviderFault),
+        (Err(failure), _) | (_, Err(failure)) => Err(failure),
+    }
 }
 
 pub fn parse_proc_io(text: &str) -> ProcIoFields {
     ProcIoFields {
         read_bytes: parse_unique_u64_field(text, "read_bytes:"),
         write_bytes: parse_unique_u64_field(text, "write_bytes:"),
+        cancelled_write_bytes: parse_unique_u64_field(text, "cancelled_write_bytes:"),
     }
 }
 

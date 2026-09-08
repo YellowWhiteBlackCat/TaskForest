@@ -243,7 +243,9 @@ pub(super) fn process_cells_with_local_time<'a>(input: ProcessCellInput<'a>) -> 
         };
         cells.push(trend);
     }
-    cells.push(zero_tinted_cell(data.memory, gray_zero, theme));
+    if visible(SortCol::Memory) {
+        cells.push(zero_tinted_cell(data.memory, gray_zero, theme));
+    }
     if visible(SortCol::Pss) {
         cells.push(zero_tinted_cell(data.pss, gray_zero, theme));
     }
@@ -376,7 +378,9 @@ pub(super) fn group_header_cells(
         // widened table (and matches the gpui `show_spark=false` blank cell).
         cells.push(Cell::from(MISSING_VALUE));
     }
-    cells.push(Cell::from(memory.map_or_else(missing_value, bytes)));
+    if visible(SortCol::Memory) {
+        cells.push(Cell::from(memory.map_or_else(missing_value, bytes)));
+    }
     if visible(SortCol::Pss) {
         cells.push(Cell::from(MISSING_VALUE));
     }
@@ -443,7 +447,7 @@ fn detail_panel_pairs_with_local_time(
     } else {
         text(ProcessDetailsField::StartTime)
     };
-    vec![
+    let mut pairs = vec![
         (t("common.name"), text(ProcessDetailsField::Name)),
         (t("proc.pid"), text(ProcessDetailsField::Pid)),
         (t("common.user"), text(ProcessDetailsField::User)),
@@ -464,6 +468,11 @@ fn detail_panel_pairs_with_local_time(
                 text(ProcessDetailsField::Swap)
             ),
         ),
+        (t("proc.uss"), text(ProcessDetailsField::Uss)),
+        (
+            t("proc.anon_huge_pages"),
+            text(ProcessDetailsField::AnonHugePages),
+        ),
         (
             t("common.threads_fd"),
             format!(
@@ -479,10 +488,18 @@ fn detail_panel_pairs_with_local_time(
             t("proc.disk_write"),
             text(ProcessDetailsField::DiskWriteRate),
         ),
+        (
+            t("proc.cancelled_write"),
+            text(ProcessDetailsField::CancelledWriteBytes),
+        ),
         (t("proc.start"), start),
         (t("common.executable"), text(ProcessDetailsField::Exe)),
         (t("prop.command"), text(ProcessDetailsField::Cmdline)),
-    ]
+    ];
+    if let Some(summary) = taskmanager_shell::presentation::command_identity_summary(process) {
+        pairs.push((t("proc_insights.command_identity"), summary));
+    }
+    pairs
 }
 
 /// Detail panel for the selected process: frozen identity facts plus the

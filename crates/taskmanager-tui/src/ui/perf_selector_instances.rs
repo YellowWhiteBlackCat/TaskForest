@@ -191,6 +191,30 @@ pub(super) fn perf_selector_instances(app: &TuiApp, theme: TuiTheme) -> Vec<Sele
                 )
             })
             .collect(),
+        PerfDevice::Npu => app
+            .projection()
+            .npu_inventory
+            .as_ref()
+            .map(|npu| npu.devices.as_slice())
+            .unwrap_or(&[])
+            .iter()
+            .enumerate()
+            .map(|(index, dev)| {
+                let trend = String::new();
+                let brand = dev.brand.as_deref().unwrap_or(dev.device_id.as_str());
+                let util = dev
+                    .utilization_pct
+                    .current_value()
+                    .map_or_else(missing_value, |u| format!("{u:.0}%"));
+                selector_instance(
+                    IconId::Gpu,
+                    &format!("{} {}", t("npu.title"), index + 1),
+                    &trend,
+                    format!("{brand} · {util}"),
+                    theme,
+                )
+            })
+            .collect(),
     }
 }
 

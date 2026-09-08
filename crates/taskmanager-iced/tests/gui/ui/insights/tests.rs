@@ -16,6 +16,9 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
         state: taskmanager_core::core::process_telemetry::ThreadState::Running,
         cpu_time_secs: None,
         cpu_percent: None,
+        wchan: None,
+        run_queue_wait_ns: None,
+        wait_kind: None,
     };
     let warm = ProcessThreadInfo {
         tid: 4242,
@@ -23,6 +26,9 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
         state: taskmanager_core::core::process_telemetry::ThreadState::Sleep,
         cpu_time_secs: Some(12.5),
         cpu_percent: Some(18.5),
+        wchan: None,
+        run_queue_wait_ns: None,
+        wait_kind: None,
     };
     assert_eq!(cpu_time_text(gap.cpu_time_secs), "—");
     assert_eq!(cpu_percent_text(gap.cpu_percent), "—");
@@ -39,11 +45,13 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
         fd: 0,
         kind: taskmanager_core::core::process_telemetry::OpenFileKind::File,
         target: Some("/dev/null".into()),
+        deleted: false,
     };
     let unreadable = OpenFileEntry {
         fd: 9,
         kind: taskmanager_core::core::process_telemetry::OpenFileKind::Other,
         target: None,
+        deleted: false,
     };
     assert!(format_open_file_row(&readable).contains("/dev/null"));
     let denied_line = format_open_file_row(&unreadable);
@@ -141,6 +149,7 @@ mod connection_tests {
             remote,
             state: taskmanager_core::core::process_telemetry::ConnectionState::Established,
             provider_key: None,
+            rtt_ms: None,
         }
     }
 
@@ -152,14 +161,20 @@ mod connection_tests {
             ConnectionEndpoint::Ip("127.0.0.1:80".parse().unwrap()),
             ConnectionEndpoint::Ip("10.0.0.2:443".parse().unwrap()),
         );
-        assert_eq!(format_connection(&v4), "TCP  127.0.0.1:80 → 10.0.0.2:443");
+        assert_eq!(
+            format_connection(&v4),
+            "TCP [ESTABLISHED · EXTERNAL]  127.0.0.1:80 → 10.0.0.2:443"
+        );
         let v6 = connection(
             ConnectionTransport::Udp,
             ConnectionAddressFamily::Ipv6,
             ConnectionEndpoint::Ip("[::1]:53".parse().unwrap()),
             ConnectionEndpoint::Ip("[fe80::1]:53".parse().unwrap()),
         );
-        assert_eq!(format_connection(&v6), "UDP6  [::1]:53 → [fe80::1]:53");
+        assert_eq!(
+            format_connection(&v6),
+            "UDP6 [ESTABLISHED · EXTERNAL]  [::1]:53 → [fe80::1]:53"
+        );
         let local = connection(
             ConnectionTransport::Tcp,
             ConnectionAddressFamily::Local,

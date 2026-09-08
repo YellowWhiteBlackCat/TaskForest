@@ -120,9 +120,53 @@ fn accel_device(node_root: PathBuf, _name: &str) -> NpuDevice {
         memory: NpuMemoryReport {
             dedicated_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
             shared_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+            sram_total_bytes: read_sram_total(&node_root).map_or_else(
+                || ScalarObservation::unavailable(FailureKind::Unsupported),
+                |bytes| ScalarObservation::available(bytes, 0),
+            ),
         },
         ..NpuDevice::default()
     }
+}
+
+/// Read an explicitly named SRAM resource when a kernel accelerator driver
+/// exposes one. Drivers have used both a byte-valued sysfs node and a small
+/// `mem_info` key/value file; accept only those names and units so an
+/// unrelated memory counter cannot be relabelled as SRAM.
+fn read_sram_total(node_root: &Path) -> Option<u64> {
+    for path in [
+        node_root.join("device/sram_size"),
+        node_root.join("device/sram_total_bytes"),
+        node_root.join("device/memory/sram_size"),
+    ] {
+        if let Ok(text) = fs::read_to_string(path)
+            && let Some(bytes) = parse_size_bytes(text.trim())
+        {
+            return Some(bytes);
+        }
+    }
+    let text = fs::read_to_string(node_root.join("device/mem_info")).ok()?;
+    text.lines().find_map(|line| {
+        let (key, value) = line.split_once(':')?;
+        let key = key.trim().to_ascii_lowercase();
+        key.contains("sram")
+            .then(|| parse_size_bytes(value.trim()))
+            .flatten()
+    })
+}
+
+fn parse_size_bytes(value: &str) -> Option<u64> {
+    let mut fields = value.split_whitespace();
+    let number = fields.next()?.parse::<u64>().ok()?;
+    let unit = fields.next().unwrap_or("bytes").to_ascii_lowercase();
+    let multiplier = match unit.as_str() {
+        "b" | "byte" | "bytes" => 1,
+        "kib" | "kb" => 1024,
+        "mib" | "mb" => 1024 * 1024,
+        "gib" | "gb" => 1024 * 1024 * 1024,
+        _ => return None,
+    };
+    number.checked_mul(multiplier)
 }
 
 fn io_failure(error: io::Error) -> ProviderFailure {

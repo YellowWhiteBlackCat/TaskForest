@@ -321,11 +321,7 @@ fn actions_dropdown(
                     availability,
                     &entity,
                 ),
-                overflow_entry(
-                    ProcessToolbarAction::EfficiencyMode,
-                    availability,
-                    &entity,
-                ),
+                overflow_entry(ProcessToolbarAction::EfficiencyMode, availability, &entity),
                 MenuEntry::Separator,
                 overflow_entry(ProcessToolbarAction::Affinity, availability, &entity),
                 overflow_entry(
@@ -372,7 +368,12 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     } else {
         match selected_identity {
             Some(identity) => format!("{} {}", i18n::t("hint.selected_pid"), identity.pid()),
-            None => i18n::t("hint.select_process").to_string(),
+            None => i18n::t(if actions == ProcessActionPresentation::Essential {
+                "hint.select_process_short"
+            } else {
+                "hint.select_process"
+            })
+            .to_string(),
         }
     };
     let availability = ProcessActionAvailability {
@@ -408,6 +409,9 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     match surface {
         ProcessActionSurface::Standalone => content.push(
             div()
+                .min_w(gpui::px(0.0))
+                .flex_shrink()
+                .truncate()
                 .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
                 .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(hint)
@@ -421,6 +425,8 @@ pub(super) fn action_bar(props: ProcessActionBarProps<'_>, cx: &mut Context<Root
     // wrapping or on how many process commands the platform supports.
     let content = div()
         .flex()
+        .w_full()
+        .min_w(gpui::px(0.0))
         .items_center()
         .gap(taskmanager_ui::theme_binding::definite_length(
             tokens::SPACE_8,

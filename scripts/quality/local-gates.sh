@@ -608,6 +608,9 @@ if maybe nextest-perf; then
         run_stage nextest-perf standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager-gates --test performance -j 4 --profile ci
     fi
 fi
+if maybe four-frontends-nextest; then
+    run_stage four-frontends-nextest standard bash scripts/quality/four-frontends-nextest.sh
+fi
 if maybe live-smoke; then
     if scope_skip live-smoke "root acceptance layer" standard; then
         # One real-collector tick per supported platform (host-neutral invariants

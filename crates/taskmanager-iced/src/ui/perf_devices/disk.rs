@@ -103,6 +103,16 @@ pub(crate) fn disk_summary_lines(
                 .map(|value| format!("{value:.2} ms")),
         ),
         StatRow::text(
+            t("disk.queue_depth"),
+            disk.current_average_queue_depth()
+                .map(|value| format!("{value:.2}")),
+        ),
+        StatRow::text(
+            t("disk.service_time"),
+            disk.current_service_time_ms()
+                .map(|value| format!("{value:.2} ms")),
+        ),
+        StatRow::text(
             t("disk.capacity"),
             observed
                 .capacity_bytes
@@ -114,9 +124,28 @@ pub(crate) fn disk_summary_lines(
                 .available_bytes
                 .map(|v| quantity_text_pref(v, use_bytes, use_base2)),
         ),
-        StatRow::text(t("common.type"), Some(disk.disk_type.trim().to_string())),
-        StatRow::text(t("disk.filesystem"), Some(disk.fs_type.trim().to_string())),
+        StatRow::text(
+            t("common.type"),
+            (!disk.disk_type.trim().is_empty()).then(|| disk.disk_type.trim().to_string()),
+        ),
+        StatRow::text(
+            t("disk.filesystem"),
+            (!disk.fs_type.trim().is_empty()).then(|| disk.fs_type.trim().to_string()),
+        ),
     ];
+    if disk.current_read_merges_per_sec().is_some() || disk.current_write_merges_per_sec().is_some()
+    {
+        rows.push(StatRow::text(
+            t("disk.merged_requests"),
+            Some(format!(
+                "{} / {}",
+                disk.current_read_merges_per_sec()
+                    .map_or_else(missing_value, |value| value.to_string()),
+                disk.current_write_merges_per_sec()
+                    .map_or_else(missing_value, |value| value.to_string())
+            )),
+        ));
+    }
     if let Some(serial) = disk.serial.as_deref().filter(|value| !value.is_empty()) {
         rows.push(StatRow::text(t("disk.serial"), Some(serial.to_owned())));
     }
@@ -145,11 +174,28 @@ pub(crate) fn disk_summary_lines(
             rows.push(StatRow::text(t("proc.trend"), Some(trend)));
         }
     }
+    for (index, temperature) in disk.smart_temperature_sensors_c.iter().enumerate() {
+        if temperature.is_finite() {
+            rows.push(StatRow::text(
+                format!("{} {}", t("disk.temperature_sensor"), index + 1),
+                Some(format!("{temperature:.0} \u{b0}C")),
+            ));
+        }
+    }
     if let Some(pct) = disk.smart_percent_used {
         rows.push(StatRow::text(
             t("disk.endurance_used"),
             Some(format!("{pct:.0}%")),
         ));
+    }
+    if let Some(spare) = disk.smart_available_spare_pct {
+        let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
+        let value = if spare <= threshold {
+            format!("{spare:.0}% ⚠ (≤{threshold:.0}%)")
+        } else {
+            format!("{spare:.0}%")
+        };
+        rows.push(StatRow::text(t("disk.available_spare"), Some(value)));
     }
     if let Some(hours) = disk.smart_power_on_hours {
         let days = hours / 24;
@@ -160,6 +206,12 @@ pub(crate) fn disk_summary_lines(
                     .replace("{hours}", &hours.to_string())
                     .replace("{days}", &days.to_string()),
             ),
+        ));
+    }
+    if let Some(count) = disk.smart_unsafe_shutdowns {
+        rows.push(StatRow::text(
+            t("disk.unsafe_shutdowns"),
+            Some(count.to_string()),
         ));
     }
     if smart_section_visible(disk) && !has_smart_fields(disk) {
@@ -652,15 +704,19 @@ fn disk_block<'a>(
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
     let temperature_samples =
         app.cached_disk_temperature_series(&disk.device_id, disk.device_generation.get());
+    let subtitle = [
+        disk.name.trim_start_matches("/dev/").trim(),
+        disk.disk_type.trim(),
+        disk.fs_type.trim(),
+    ]
+    .into_iter()
+    .filter(|part| !part.is_empty())
+    .collect::<Vec<_>>()
+    .join(" · ");
     perf_layout::main_with_stats(
         theme_snapshot,
         disk_title(disk),
-        format!(
-            "{} · {} · {}",
-            disk.name.trim_start_matches("/dev/"),
-            disk.disk_type,
-            disk.fs_type
-        ),
+        subtitle,
         Some(disk_vital_line(disk, app.drive_units())),
         graphs,
         disk_summary_lines(

@@ -174,8 +174,10 @@ pub struct RowCellText {
     pub cpu: String,
     pub memory: String,
     pub swap: String,
+    pub pss: String,
     pub disk_read: String,
     pub disk_write: String,
+    pub network: String,
     pub cpu_time: String,
     pub threads: String,
     pub fds: String,
@@ -209,11 +211,19 @@ impl RowCellText {
                 || "\u{2014}".to_string(),
                 |bytes| format_memory(units, bytes),
             ),
+            pss: row.pss.map_or_else(
+                || "\u{2014}".to_string(),
+                |bytes| format_memory(units, bytes),
+            ),
             disk_read: row.disk_read.map_or_else(
                 || "\u{2014}".to_string(),
                 |bytes| format_bytes_rate(units, bytes),
             ),
             disk_write: row.disk_write.map_or_else(
+                || "\u{2014}".to_string(),
+                |bytes| format_bytes_rate(units, bytes),
+            ),
+            network: row.network.map_or_else(
                 || "\u{2014}".to_string(),
                 |bytes| format_bytes_rate(units, bytes),
             ),
@@ -269,10 +279,12 @@ pub struct VisibleRow {
     pub memory_aggregate: Option<AggregateMetric<u64>>,
     /// Typed per-process swap bytes; this is never included in `mem`.
     pub swap: Option<u64>,
+    pub pss: Option<u64>,
     /// Typed disk read rate; `None` renders as "—".
     pub disk_read: Option<u64>,
     /// Typed disk write rate; `None` renders as "—".
     pub disk_write: Option<u64>,
+    pub network: Option<u64>,
     /// Thread count. On leaf/instance rows = `ProcessItem::current_threads()`;
     /// on aggregate rows (group/type) = the SUM across the group's available
     /// members. `None` renders as "—".
@@ -489,8 +501,10 @@ fn visible_row_from_shared(
                 cpu_aggregate: None,
                 memory_aggregate: None,
                 swap: process.current_swap_bytes(),
+                pss: process.current_memory_pss_bytes(),
                 disk_read: process.current_disk_read_bytes_per_sec(),
                 disk_write: process.current_disk_write_bytes_per_sec(),
+                network: process.current_network_bytes_per_sec(),
                 threads: process.current_threads(),
                 start_time_secs: process.current_start_time_secs(),
                 cpu_time_secs: process.current_cpu_time_secs(),
@@ -553,8 +567,10 @@ fn group_row_from_shared(
         cpu_aggregate: Some(aggregate.cpu().clone()),
         memory_aggregate: Some(aggregate.memory().clone()),
         swap: aggregate.swap().current_value().copied(),
+        pss: aggregate.memory_pss().current_value().copied(),
         disk_read: aggregate.disk_read().current_value().copied(),
         disk_write: aggregate.disk_write().current_value().copied(),
+        network: None,
         threads: aggregate
             .threads()
             .current_value()

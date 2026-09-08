@@ -155,6 +155,9 @@ pub fn read_nvme_smart(name: &str) -> DiskSmart {
     if let Some(sysfs_value) = sysfs.value {
         out.failure = strongest_smart_failure(out.failure, sysfs_value.failure);
         out.temperature_c = sysfs_value.temperature_c.or(out.temperature_c);
+        if !sysfs_value.temperature_sensors_c.is_empty() {
+            out.temperature_sensors_c = sysfs_value.temperature_sensors_c;
+        }
         out.critical_warning = sysfs_value.critical_warning.or(out.critical_warning);
         out.temp_critical_c = sysfs_value.temp_critical_c.or(out.temp_critical_c);
         out.availability = SmartAvailability::Available;
@@ -287,6 +290,7 @@ fn read_sysfs_hwmon_in(base: &std::path::Path, ctrl: &str) -> SmartSysfsObservat
             Err(observed) => (None, Some(observed)),
         };
         failure = strongest_smart_failure(failure, critical_failure);
+        let temperature_sensors_c = read_hwmon_temperature_sensors(&hw);
         return SmartSysfsObservation {
             value: Some(DiskSmart {
                 availability: SmartAvailability::Available,
@@ -297,13 +301,17 @@ fn read_sysfs_hwmon_in(base: &std::path::Path, ctrl: &str) -> SmartSysfsObservat
                 provider: None,
                 failure,
                 temperature_c: Some(temperature_c),
+                temperature_sensors_c,
                 // Preserve the provider's three states: a missing alarm node is
                 // unknown, while a reported 0/1 is healthy/warning. Read or
                 // parse failure is additionally retained in `failure`.
                 critical_warning,
                 temp_critical_c,
                 percent_used: None,
+                available_spare_pct: None,
+                available_spare_threshold_pct: None,
                 power_on_hours: None,
+                unsafe_shutdowns: None,
                 ata_attributes: None,
             }),
             failure,
@@ -313,6 +321,21 @@ fn read_sysfs_hwmon_in(base: &std::path::Path, ctrl: &str) -> SmartSysfsObservat
         value: None,
         failure: failure.or(Some(SmartProviderFailureKind::UnsupportedProtocol)),
     }
+}
+
+#[cfg(target_os = "linux")]
+fn read_hwmon_temperature_sensors(hw: &std::path::Path) -> Vec<f32> {
+    let mut sensors = Vec::new();
+    for index in 2..=8 {
+        let path = hw.join(format!("temp{index}_input"));
+        if let Ok(Some(value)) = read_milli(&path)
+            && value.is_finite()
+            && (-50.0..=200.0).contains(&value)
+        {
+            sensors.push(value);
+        }
+    }
+    sensors
 }
 
 #[cfg(target_os = "linux")]
@@ -402,6 +425,17 @@ pub fn parse_smart_log_stdout(stdout: &str) -> Option<DiskSmart> {
                 // already °C, so parse it directly (no Kelvin conversion).
                 out.temperature_c = parse_leading_f32(val);
             }
+            "temperature sensor 1"
+            | "temperature sensor 2"
+            | "temperature sensor 3"
+            | "temperature sensor 4"
+            | "temperature sensor 5" => {
+                if let Some(value) = parse_leading_f32(val)
+                    .filter(|value| value.is_finite() && (-50.0..=200.0).contains(value))
+                {
+                    out.temperature_sensors_c.push(value);
+                }
+            }
             "critical_warning" => {
                 // Emitted as "0" or "0x0"; any nonzero value is a warning.
                 let raw = val.split_whitespace().next().unwrap_or(val);
@@ -414,10 +448,22 @@ pub fn parse_smart_log_stdout(stdout: &str) -> Option<DiskSmart> {
                 }
             }
             "percentage_used" => {
-                out.percent_used = parse_leading_f32(val);
+                out.percent_used =
+                    parse_leading_f32(val).filter(|value| value.is_finite() && *value >= 0.0);
+            }
+            "available_spare" => {
+                out.available_spare_pct = parse_leading_f32(val)
+                    .filter(|value| value.is_finite() && (0.0..=100.0).contains(value));
+            }
+            "available_spare_threshold" => {
+                out.available_spare_threshold_pct = parse_leading_f32(val)
+                    .filter(|value| value.is_finite() && (0.0..=100.0).contains(value));
             }
             "power_on_hours" => {
                 out.power_on_hours = parse_leading_u64(val);
+            }
+            "unsafe_shutdowns" => {
+                out.unsafe_shutdowns = parse_leading_u64(val);
             }
             _ => {}
         }
@@ -429,7 +475,11 @@ pub fn parse_smart_log_stdout(stdout: &str) -> Option<DiskSmart> {
     let any = out.temperature_c.is_some()
         || out.critical_warning.is_some()
         || out.percent_used.is_some()
-        || out.power_on_hours.is_some();
+        || out.available_spare_pct.is_some()
+        || out.available_spare_threshold_pct.is_some()
+        || out.power_on_hours.is_some()
+        || out.unsafe_shutdowns.is_some()
+        || !out.temperature_sensors_c.is_empty();
     if any {
         out.availability = SmartAvailability::Available;
         out.failure = None;

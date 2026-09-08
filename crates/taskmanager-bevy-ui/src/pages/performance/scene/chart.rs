@@ -24,11 +24,12 @@ pub(crate) fn curve_card_scene(
     // gap-aware projection feeds rotated 2px segments — the same visual
     // grammar as GPUI's graphs, honest gaps included.
     let segments = if curve_warm(&samples) {
-        line_segments(
+        crate::widgets::chart::line_segments_scaled(
             &taskmanager_shell::presentation::trend::window(&shell.history, curve.series()),
             CHART_STRIP_WIDTH_PX,
             strip_height,
             MAX_CHART_POINTS,
+            100.0,
         )
     } else {
         Vec::new()

@@ -24,6 +24,13 @@ pub struct ProcessScalarObservations {
     /// Unique set size (private memory not shared with any other process).
     #[serde(default)]
     pub memory_uss_bytes: ScalarObservation<u64>,
+    /// Anonymous transparent huge pages charged to this process.
+    ///
+    /// This is sourced from Linux `smaps_rollup` when the kernel exposes it;
+    /// it is independent from RSS/PSS/USS so an unavailable THP counter never
+    /// changes the meaning of the other memory values.
+    #[serde(default)]
+    pub memory_anon_huge_pages_bytes: ScalarObservation<u64>,
     /// Swap charged to this process. It is not part of either RSS or PSS.
     #[serde(default)]
     pub swap_bytes: ScalarObservation<u64>,
@@ -53,6 +60,9 @@ impl ProcessScalarObservations {
             memory_bytes: self.memory_bytes.transition_failure(failure),
             memory_pss_bytes: self.memory_pss_bytes.transition_failure(failure),
             memory_uss_bytes: self.memory_uss_bytes.transition_failure(failure),
+            memory_anon_huge_pages_bytes: self
+                .memory_anon_huge_pages_bytes
+                .transition_failure(failure),
             swap_bytes: self.swap_bytes.transition_failure(failure),
             disk_read_bytes_total: self.disk_read_bytes_total.transition_failure(failure),
             disk_write_bytes_total: self.disk_write_bytes_total.transition_failure(failure),
@@ -82,6 +92,9 @@ impl ProcessScalarObservations {
             memory_uss_bytes: self
                 .memory_uss_bytes
                 .retain_previous(previous.memory_uss_bytes),
+            memory_anon_huge_pages_bytes: self
+                .memory_anon_huge_pages_bytes
+                .retain_previous(previous.memory_anon_huge_pages_bytes),
             swap_bytes: self.swap_bytes.retain_previous(previous.swap_bytes),
             disk_read_bytes_total: self
                 .disk_read_bytes_total
@@ -172,6 +185,15 @@ impl ProcessItem {
     pub const fn current_memory_uss_bytes(&self) -> Option<u64> {
         self.scalar_observations
             .memory_uss_bytes
+            .current_value()
+            .copied()
+    }
+
+    /// Current anonymous transparent huge-page charge, in bytes.
+    #[must_use]
+    pub const fn current_memory_anon_huge_pages_bytes(&self) -> Option<u64> {
+        self.scalar_observations
+            .memory_anon_huge_pages_bytes
             .current_value()
             .copied()
     }

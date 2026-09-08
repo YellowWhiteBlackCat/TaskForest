@@ -119,6 +119,22 @@ package() {
     "$pkgdir/usr/share/metainfo/io.github.YellowWhiteBlackCat.TaskForestG.metainfo.xml"
   install -Dm644 packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg \
     "$pkgdir/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg"
+  install -Dm644 packaging/linux/icons/hicolor/16x16/apps/taskforest-taskboard.png \
+    "$pkgdir/usr/share/icons/hicolor/16x16/apps/taskforest-taskboard.png"
+  install -Dm644 packaging/linux/icons/hicolor/24x24/apps/taskforest-taskboard.png \
+    "$pkgdir/usr/share/icons/hicolor/24x24/apps/taskforest-taskboard.png"
+  install -Dm644 packaging/linux/icons/hicolor/32x32/apps/taskforest-taskboard.png \
+    "$pkgdir/usr/share/icons/hicolor/32x32/apps/taskforest-taskboard.png"
+  install -Dm644 packaging/linux/icons/hicolor/48x48/apps/taskforest-taskboard.png \
+    "$pkgdir/usr/share/icons/hicolor/48x48/apps/taskforest-taskboard.png"
+  install -Dm644 packaging/linux/icons/hicolor/64x64/apps/taskforest-taskboard.png \
+    "$pkgdir/usr/share/icons/hicolor/64x64/apps/taskforest-taskboard.png"
+  install -Dm644 packaging/linux/icons/hicolor/128x128/apps/taskforest-taskboard.png \
+    "$pkgdir/usr/share/icons/hicolor/128x128/apps/taskforest-taskboard.png"
+  install -Dm644 packaging/linux/icons/hicolor/256x256/apps/taskforest-taskboard.png \
+    "$pkgdir/usr/share/icons/hicolor/256x256/apps/taskforest-taskboard.png"
+  install -Dm644 packaging/linux/icons/hicolor/512x512/apps/taskforest-taskboard.png \
+    "$pkgdir/usr/share/icons/hicolor/512x512/apps/taskforest-taskboard.png"
   # First Run owns activation of this optional rule through the fixed helper;
   # ship the audited asset for View/Copy without enabling it at install time.
   install -Dm644 packaging/linux/99-taskforest.rules \

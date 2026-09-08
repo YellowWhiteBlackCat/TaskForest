@@ -33,6 +33,7 @@ struct SnapshotJson {
     uptime_secs: u64,
     processes: usize,
     threads: Option<usize>,
+    load_average: Option<crate::core::metrics::SystemLoadAverage>,
 }
 
 fn serialized<T: Serialize>(value: &T) -> Value {
@@ -527,6 +528,7 @@ pub fn snapshot_to_json_with_extras(
             uptime_secs: snap.uptime_secs,
             processes: snap.processes,
             threads: snap.threads,
+            load_average: snap.load_average,
         },
         processes: &process_rows,
         containers: extras.containers,

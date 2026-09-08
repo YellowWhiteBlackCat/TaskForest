@@ -49,6 +49,15 @@ pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
             format!("{critical:.0} \u{b0}C"),
         ));
     }
+    for (index, temperature) in disk.smart_temperature_sensors_c.iter().enumerate() {
+        if temperature.is_finite() {
+            column = column.child(prop_row(
+                theme,
+                &format!("{} {}", i18n::t("disk.temperature_sensor"), index + 1),
+                format!("{temperature:.0} \u{b0}C"),
+            ));
+        }
+    }
     if let Some(percent) = disk.smart_percent_used {
         let value = if percent >= 100.0 {
             format!(
@@ -60,12 +69,28 @@ pub fn render_smart_dialog(theme: &Theme, disk: &DiskMetrics) -> Div {
         };
         column = column.child(prop_row(theme, i18n::t("disk.endurance_used"), value));
     }
+    if let Some(spare) = disk.smart_available_spare_pct {
+        let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
+        let value = if spare <= threshold {
+            format!("{spare:.0}%  ⚠ (warning ≤ {threshold:.0}%)")
+        } else {
+            format!("{spare:.0}%")
+        };
+        column = column.child(prop_row(theme, i18n::t("disk.available_spare"), value));
+    }
     if let Some(hours) = disk.smart_power_on_hours {
         let days = hours / 24;
         column = column.child(prop_row(
             theme,
             i18n::t("disk.power_on_hours"),
             format!("{hours} h  ({:.1} yr, {days} d)", days as f64 / 365.25),
+        ));
+    }
+    if let Some(count) = disk.smart_unsafe_shutdowns {
+        column = column.child(prop_row(
+            theme,
+            i18n::t("disk.unsafe_shutdowns"),
+            count.to_string(),
         ));
     }
     if disk.smart_critical_warning == Some(true) {

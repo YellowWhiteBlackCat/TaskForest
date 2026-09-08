@@ -1,11 +1,13 @@
 use taskmanager_application::{
-    ServiceDependenciesLifecycle, ServiceLogStreamLifecycle, ServiceRequestCorrelation,
+    ServiceDependenciesLifecycle, ServiceLifecycleState, ServiceLogStreamLifecycle,
+    ServiceRequestCorrelation,
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::services::{
-    ServiceDeps, ServiceLogEntries, ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure,
-    ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery, ServiceLogStreamSnapshot,
-    ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationKind,
+    ServiceAction, ServiceDeps, ServiceLogEntries, ServiceLogEntry, ServiceLogErrorKind,
+    ServiceLogFailure, ServiceLogLevel, ServiceLogLevelFilter, ServiceLogQuery,
+    ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationKind,
+    ServiceStatus,
 };
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::{RequestId, SubmissionErrorKind};
@@ -180,4 +182,111 @@ fn admission_attempt_identity_and_filter_generation_are_not_implicit() {
         )
     ));
     assert!(logs.resolve(request(11), ready(errors, "filtered")));
+}
+
+#[test]
+fn service_lifecycle_state_transitions_follow_canonical_matrix() {
+    use ServiceLifecycleState::*;
+
+    // Reflexive transitions (heartbeat/poll)
+    for state in [Active, Inactive, Failed, Reloading] {
+        assert!(state.can_transition_to(state));
+    }
+
+    // Inactive transitions
+    assert!(Inactive.can_transition_to(Active));
+    assert!(Inactive.can_transition_to(Failed));
+    assert!(!Inactive.can_transition_to(Reloading));
+
+    // Active transitions
+    assert!(Active.can_transition_to(Inactive));
+    assert!(Active.can_transition_to(Reloading));
+    assert!(Active.can_transition_to(Failed));
+
+    // Reloading transitions
+    assert!(Reloading.can_transition_to(Active));
+    assert!(Reloading.can_transition_to(Failed));
+    assert!(Reloading.can_transition_to(Inactive));
+
+    // Failed transitions
+    assert!(Failed.can_transition_to(Active));
+    assert!(Failed.can_transition_to(Inactive));
+    assert!(!Failed.can_transition_to(Reloading));
+
+    // Action applicability
+    assert!(Inactive.is_action_applicable(ServiceAction::Start));
+    assert!(!Inactive.is_action_applicable(ServiceAction::Stop));
+    assert!(Inactive.is_action_applicable(ServiceAction::Restart));
+
+    assert!(!Active.is_action_applicable(ServiceAction::Start));
+    assert!(Active.is_action_applicable(ServiceAction::Stop));
+    assert!(Active.is_action_applicable(ServiceAction::Restart));
+
+    assert!(Reloading.is_action_applicable(ServiceAction::Stop));
+    assert!(Failed.is_action_applicable(ServiceAction::Start));
+    assert!(Failed.is_action_applicable(ServiceAction::Stop));
+}
+
+#[test]
+fn service_lifecycle_state_provider_classification_and_conversions() {
+    use ServiceLifecycleState::*;
+
+    // Provider state classification
+    assert_eq!(
+        ServiceLifecycleState::from_provider_states("active", "running"),
+        Active
+    );
+    assert_eq!(
+        ServiceLifecycleState::from_provider_states("active", "reloading"),
+        Reloading
+    );
+    assert_eq!(
+        ServiceLifecycleState::from_provider_states("active", "failed"),
+        Failed
+    );
+    assert_eq!(
+        ServiceLifecycleState::from_provider_states("inactive", "dead"),
+        Inactive
+    );
+    assert_eq!(
+        ServiceLifecycleState::from_provider_states("failed", "failed"),
+        Failed
+    );
+
+    // From string representations
+    assert_eq!(ServiceLifecycleState::from("active"), Active);
+    assert_eq!(ServiceLifecycleState::from("running"), Active);
+    assert_eq!(ServiceLifecycleState::from("reloading"), Reloading);
+    assert_eq!(ServiceLifecycleState::from("inactive"), Inactive);
+    assert_eq!(ServiceLifecycleState::from("failed"), Failed);
+    assert_eq!(ServiceLifecycleState::from("stopped"), Inactive);
+
+    // Conversions to and from ServiceStatus
+    assert_eq!(ServiceLifecycleState::from(ServiceStatus::Active), Active);
+    assert_eq!(
+        ServiceLifecycleState::from(ServiceStatus::Inactive),
+        Inactive
+    );
+    assert_eq!(ServiceLifecycleState::from(ServiceStatus::Failed), Failed);
+    assert_eq!(
+        ServiceLifecycleState::from(ServiceStatus::Unknown),
+        Inactive
+    );
+
+    assert_eq!(ServiceStatus::from(Active), ServiceStatus::Active);
+    assert_eq!(ServiceStatus::from(Reloading), ServiceStatus::Active);
+    assert_eq!(ServiceStatus::from(Inactive), ServiceStatus::Inactive);
+    assert_eq!(ServiceStatus::from(Failed), ServiceStatus::Failed);
+
+    // Queries and displays
+    assert!(Active.is_operational());
+    assert!(Reloading.is_operational());
+    assert!(!Inactive.is_operational());
+    assert!(!Failed.is_operational());
+
+    assert_eq!(Active.as_str(), "Active");
+    assert_eq!(Inactive.as_str(), "Inactive");
+    assert_eq!(Failed.as_str(), "Failed");
+    assert_eq!(Reloading.as_str(), "Reloading");
+    assert_eq!(format!("{Reloading}"), "Reloading");
 }

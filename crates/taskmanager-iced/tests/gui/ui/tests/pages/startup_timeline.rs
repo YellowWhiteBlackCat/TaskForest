@@ -150,3 +150,51 @@ fn startup_page_keyboard_navigation_skips_the_timeline_block() {
     assert_eq!(app.shell.selected, 0);
     let _view = view(&app);
 }
+
+/// Verify format_impact_time scales across milliseconds, fractional seconds, and minutes cleanly.
+#[test]
+fn format_impact_time_handles_ms_seconds_and_minutes_cleanly() {
+    use crate::ui::startup_table::format_impact_time;
+
+    assert_eq!(format_impact_time(0), "0 ms");
+    assert_eq!(format_impact_time(42), "42 ms");
+    assert_eq!(format_impact_time(999), "999 ms");
+    assert_eq!(format_impact_time(1_000), "1 s");
+    assert_eq!(format_impact_time(1_200), "1.2 s");
+    assert_eq!(format_impact_time(1_234), "1.23 s");
+    assert_eq!(format_impact_time(2_500), "2.5 s");
+    assert_eq!(format_impact_time(4_200), "4.2 s");
+    assert_eq!(format_impact_time(60_000), "1 min");
+    assert_eq!(format_impact_time(65_400), "1m 5.4s");
+}
+
+/// The boot timeline Gantt chart renders cleanly in both standard and compact modes,
+/// and handles long unit names and untimed lists without panic or overflow.
+#[test]
+fn boot_timeline_block_handles_compact_and_standard_modes_cleanly() {
+    use crate::ui::startup_table::boot_timeline_block;
+    let theme = taskmanager_theme::Theme::dark();
+    let evidence = timeline_evidence();
+
+    // Standard mode renders
+    let standard = boot_timeline_block(&theme, Some(&evidence), false);
+    assert!(standard.is_some(), "standard timeline block must render");
+
+    // Compact mode renders
+    let compact = boot_timeline_block(&theme, Some(&evidence), true);
+    assert!(compact.is_some(), "compact timeline block must render");
+
+    // Long unit names and untimed lists are handled cleanly in both modes
+    let mut extreme_evidence = timeline_evidence();
+    extreme_evidence.critical_chain.push(
+        taskmanager_core::core::startup::StartupCriticalChainNode {
+            unit: "systemd-networkd-wait-online-extra-long-unit-name.service".into(),
+            activated_at_ms: Some(3_000),
+            duration_ms: Some(15_400),
+        },
+    );
+    let standard_extreme = boot_timeline_block(&theme, Some(&extreme_evidence), false);
+    assert!(standard_extreme.is_some());
+    let compact_extreme = boot_timeline_block(&theme, Some(&extreme_evidence), true);
+    assert!(compact_extreme.is_some());
+}

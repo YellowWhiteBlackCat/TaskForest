@@ -47,7 +47,7 @@ use bevy::ui::prelude::{
     AlignItems, Display, FlexDirection, JustifyContent, Node, Overflow, UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::{Activate, ScrollArea};
+use bevy::ui_widgets::Activate;
 use bevy::window::{PrimaryWindow, Window};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::StorageDeviceKey;
@@ -74,7 +74,7 @@ use crate::widgets::chart::{
     segment_layout,
 };
 use crate::widgets::controls::ControlVisual;
-use crate::widgets::layout::PerformanceLayoutMode;
+use crate::widgets::layout::{PerformanceLayoutMode, cpu_core_grid_visible};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod scene;
@@ -83,11 +83,11 @@ mod metrics;
 
 use bevy::math::Rot2;
 use bevy::ui::UiTransform;
+use metrics::cpu::cpu_field_text;
 use metrics::{
-    core_usage_count, core_usage_fill_pct, cpu_field_text, cpu_metrics, curve_caption,
-    curve_samples, curve_wanted, curve_warm, disk_caption, dyn_field_text, gpu_devices,
-    gpu_fact_line, memory_metrics, network_devices, nic_fact_line, section_keys, segment_key,
-    segment_value, summary_value,
+    core_usage_count, core_usage_fill_pct, cpu_metrics, curve_caption, curve_samples, curve_wanted,
+    curve_warm, disk_spare_warning_for, dyn_field_text, gpu_devices, gpu_fact_line, memory_metrics,
+    network_devices, nic_fact_line, section_keys, segment_key, segment_value, summary_value,
 };
 use scene::blocks::block_scene;
 
@@ -109,6 +109,21 @@ pub(crate) struct PerformancePageRoot;
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerformanceFocus(pub(crate) SystemCurve);
 
+/// High-level device categories for performance view routing.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) enum DeviceCategoryKind {
+    #[default]
+    Cpu,
+    Memory,
+    Disk,
+    Network,
+    Gpu,
+    Battery,
+}
+
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct DeviceViewCategory(pub(crate) DeviceCategoryKind);
+
 /// A compact device selector identity. It is frontend-local presentation
 /// state: the shell still owns the device facts and stable ids, while this
 /// value only chooses which already-mounted surface receives emphasis.
@@ -120,17 +135,18 @@ pub(crate) enum PerformanceDeviceTarget {
     Disk(String),
     Network(String),
     Gpu(String),
+    Battery(String),
 }
 
 impl PerformanceDeviceTarget {
-    /// Top-level devices have a corresponding system curve. Per-disk focus
-    /// intentionally returns `None` until the disk-specific hero chart lands;
+    /// Top-level devices have a corresponding system curve. Per-disk/battery focus
+    /// intentionally returns `None` until the device-specific hero chart lands;
     /// selecting it still produces a real, visible local selection state.
     fn curve(&self) -> Option<SystemCurve> {
         match self {
             Self::Cpu => Some(SystemCurve::Cpu),
             Self::Memory => Some(SystemCurve::Memory),
-            Self::Disk(_) => None,
+            Self::Disk(_) | Self::Battery(_) => None,
             Self::Network(_) => Some(SystemCurve::Network),
             Self::Gpu(_) => Some(SystemCurve::Gpu),
         }
@@ -213,11 +229,18 @@ pub(crate) struct PerformanceCompactNav;
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub(crate) struct PerformanceCompactDevicePills;
 
+/// Optional lower band of the CPU surface. The compact contract hides the
+/// whole core group when its footprint cannot fit; the main pane has no
+/// scroll owner, so it must never leave a half-rendered group at the bottom.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub(crate) struct PerformanceOptionalCoreGrid;
+
 type DeviceRailQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceDeviceSidebar>>;
 type StatsRailQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceStatsRail>>;
 type WideNavQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceWideNav>>;
 type CompactNavQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompactNav>>;
 type CompactPillsQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceCompactDevicePills>>;
+type OptionalCoreGridQuery<'w, 's> = Query<'w, 's, &'w mut Node, With<PerformanceOptionalCoreGrid>>;
 
 /// Once-per-`World` guard so remounts never stack duplicate observers (two
 /// observers on one trigger would run before either's spawn commands apply
@@ -254,6 +277,12 @@ pub(crate) struct DynSection(pub(crate) Section);
 #[derive(Component, Clone, Default)]
 pub(crate) struct DynBlock(pub(crate) Section, pub(crate) String);
 
+/// Visibility marker for the disk SMART spare-pool warning plate. The icon is
+/// mounted once with the disk block and only its display token changes as the
+/// folded projection changes, so a warning never becomes stale between ticks.
+#[derive(Component, Clone, Default)]
+pub(crate) struct DynDiskSpareAlert(pub(crate) String);
+
 /// One curve card root. The CPU/memory/network cards are always wanted; the
 /// GPU card stays `Display::None` until GPU facts exist ("add GPU when data
 /// exists" — a host without GPU telemetry never shows an empty fourth card).
@@ -266,6 +295,8 @@ pub(crate) enum Section {
     Gpu,
     Network,
     MemorySegments,
+    Disk,
+    Battery,
 }
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -300,6 +331,11 @@ pub(crate) enum CpuField {
     Temperature,
     Power,
     Pressure,
+    Load,
+    Topology,
+    IdleStates,
+    PowerLimits,
+    Interrupts,
     Core(usize),
 }
 
@@ -330,13 +366,8 @@ pub(crate) enum SystemCurve {
 
 impl SystemCurve {
     /// The strip order; the GPU and NPU cards are always spawned but display-gated.
-    pub(crate) const STRIP: [Self; 5] = [
-        Self::Cpu,
-        Self::Memory,
-        Self::Network,
-        Self::Gpu,
-        Self::Npu,
-    ];
+    pub(crate) const STRIP: [Self; 5] =
+        [Self::Cpu, Self::Memory, Self::Network, Self::Gpu, Self::Npu];
 
     fn series(self) -> TrendSeries {
         match self {
@@ -480,7 +511,10 @@ fn device_button_activated(
     mut curve_focus: ResMut<PerformanceFocus>,
     mut commands: Commands,
 ) {
-    let Ok(button) = buttons.get(activate.event().entity) else {
+    let button = buttons
+        .get(activate.entity)
+        .or_else(|_| buttons.get(activate.event().entity));
+    let Ok(button) = button else {
         return;
     };
     if device_focus.0 == button.0 {
@@ -518,15 +552,30 @@ fn sync_focus_changed(
     }
 }
 
-/// Apply the selected device token to every compact pill in place. The pills
-/// remain a stable BSN scene; only their theme-backed fill changes.
+/// Apply the selected device token to every compact pill and update the main view.
 fn sync_device_focus_changed(
     _changed: On<PerformanceDeviceFocusChanged>,
     focus: Res<PerformanceDeviceFocus>,
     mut buttons: Query<(&PerformanceDeviceButton, &mut ControlVisual)>,
+    mut categories: Query<(&DeviceViewCategory, &mut Node), Without<PerformanceDeviceButton>>,
 ) {
     for (button, mut visual) in &mut buttons {
         visual.1 = button.0 == focus.0;
+    }
+    let target_kind = match &focus.0 {
+        PerformanceDeviceTarget::Cpu => DeviceCategoryKind::Cpu,
+        PerformanceDeviceTarget::Memory => DeviceCategoryKind::Memory,
+        PerformanceDeviceTarget::Disk(_) => DeviceCategoryKind::Disk,
+        PerformanceDeviceTarget::Network(_) => DeviceCategoryKind::Network,
+        PerformanceDeviceTarget::Gpu(_) => DeviceCategoryKind::Gpu,
+        PerformanceDeviceTarget::Battery(_) => DeviceCategoryKind::Battery,
+    };
+    for (cat, mut node) in &mut categories {
+        node.display = if cat.0 == target_kind {
+            Display::Flex
+        } else {
+            Display::None
+        };
     }
 }
 
@@ -543,9 +592,11 @@ pub(crate) fn sync_performance_layout(
         WideNavQuery<'_, '_>,
         CompactNavQuery<'_, '_>,
         CompactPillsQuery<'_, '_>,
+        OptionalCoreGridQuery<'_, '_>,
     )>,
 ) {
     let width = windows.iter().next().map_or(1180.0, Window::width);
+    let height = windows.iter().next().map_or(780.0, Window::height);
     let mode = crate::widgets::layout::performance_layout_mode(width);
     state.0 = mode;
     let sidebar_on = sidebar.is_none_or(|s| s.0);
@@ -577,6 +628,13 @@ pub(crate) fn sync_performance_layout(
             PerformanceLayoutMode::Compact => Display::Flex,
         };
     }
+    for mut node in &mut rails.p5() {
+        node.display = match mode {
+            PerformanceLayoutMode::Wide if cpu_core_grid_visible(height) => Display::Flex,
+            PerformanceLayoutMode::Compact => Display::None,
+            PerformanceLayoutMode::Wide => Display::None,
+        };
+    }
 }
 
 /// The pages' data-refresh trigger consumer (see [`crate::drain`]): re-read
@@ -594,17 +652,19 @@ fn refresh_on_fold(
     focus: Res<PerformanceFocus>,
     mut texts: Query<(&DynText, &mut Text)>,
     mut bars: Query<(&DynBar, &mut Node), Without<DynText>>,
+    mut disk_alerts: Query<(&DynDiskSpareAlert, &mut Node), Without<DynBar>>,
     mut strips: Query<(Entity, &SparkStrip, &Children, &mut ChartSurface)>,
     gates: Query<(Entity, &CurveGate)>,
     sections: Query<(Entity, &DynSection)>,
     blocks: Query<(Entity, &DynBlock)>,
-    mut nodes: Query<&mut Node, Without<DynBar>>,
+    mut nodes: Query<&mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
     mut transforms: Query<&mut UiTransform>,
     mut commands: Commands,
 ) {
     let shell = track.shell();
     rewrite_texts(shell, &mut texts);
     rewrite_core_bars(shell, &mut bars);
+    sync_disk_spare_alerts(shell, &mut disk_alerts);
     sync_strips(
         shell,
         &palette.inner,
@@ -615,6 +675,22 @@ fn refresh_on_fold(
     );
     sync_card_gates(shell, focus.0, &gates, &mut nodes);
     sync_blocks(shell, &palette.inner, &sections, &blocks, &mut commands);
+}
+
+fn sync_disk_spare_alerts(
+    shell: &ShellApp,
+    alerts: &mut Query<(&DynDiskSpareAlert, &mut Node), Without<DynBar>>,
+) {
+    for (alert, mut node) in alerts.iter_mut() {
+        let wanted = if disk_spare_warning_for(shell, &alert.0) {
+            Display::Flex
+        } else {
+            Display::None
+        };
+        if node.display != wanted {
+            node.display = wanted;
+        }
+    }
 }
 
 /// Rewrite every marked text from the current projection, skipping values
@@ -652,7 +728,7 @@ fn sync_strips(
     shell: &ShellApp,
     palette: &UiPalette,
     strips: &mut Query<(Entity, &SparkStrip, &Children, &mut ChartSurface)>,
-    nodes: &mut Query<&mut Node, Without<DynBar>>,
+    nodes: &mut Query<&mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
     transforms: &mut Query<&mut UiTransform>,
     commands: &mut Commands,
 ) {
@@ -698,7 +774,7 @@ fn sync_card_gates(
     shell: &ShellApp,
     focus: SystemCurve,
     gates: &Query<(Entity, &CurveGate)>,
-    nodes: &mut Query<&mut Node, Without<DynBar>>,
+    nodes: &mut Query<&mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
 ) {
     let active = if curve_wanted(shell, focus) {
         focus
