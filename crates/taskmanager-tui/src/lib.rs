@@ -28,6 +28,7 @@ mod clipboard;
 mod column_prefs;
 mod command_palette;
 mod demo;
+mod diagnostic_report;
 mod functional;
 mod history_runtime;
 mod menus;
@@ -55,6 +56,9 @@ pub use functional::functional_declaration;
 pub use command_palette::{CommandPalette, CommandPaletteRow, PaletteLocalAction};
 
 pub use demo::demo_app;
+pub use diagnostic_report::{
+    DEFAULT_DIAGNOSTIC_FILENAME, default_diagnostic_path, format_diagnostic_summary,
+};
 pub use menus::BatchMenuTarget;
 pub use runtime::{run_demo, run_live, snapshot_text};
 pub use selectors::{FocusPanel, PerfDevice};

@@ -169,6 +169,40 @@ pub(super) fn handle_open_modal(app: &mut TuiApp, key: KeyEvent) -> InputDispatc
                         None => app.open_process_affinity(),
                     }
                 }
+                ratatui::crossterm::event::KeyCode::Char(c) => {
+                    let action = match c {
+                        'e' | 'E' => Some(crate::ui::process_menu::ProcessMenuAction::EndTask),
+                        't' | 'T' => {
+                            Some(crate::ui::process_menu::ProcessMenuAction::EndProcessTree)
+                        }
+                        's' | 'S' => Some(crate::ui::process_menu::ProcessMenuAction::Suspend),
+                        'r' | 'R' => Some(crate::ui::process_menu::ProcessMenuAction::Resume),
+                        'k' | 'K' => Some(crate::ui::process_menu::ProcessMenuAction::Kill),
+                        'h' | 'H' => Some(crate::ui::process_menu::ProcessMenuAction::PriorityHigh),
+                        'n' | 'N' => {
+                            Some(crate::ui::process_menu::ProcessMenuAction::PriorityNormal)
+                        }
+                        'l' | 'L' => Some(crate::ui::process_menu::ProcessMenuAction::PriorityLow),
+                        'm' | 'M' => {
+                            Some(crate::ui::process_menu::ProcessMenuAction::EfficiencyMode)
+                        }
+                        'o' | 'O' => Some(crate::ui::process_menu::ProcessMenuAction::OpenLocation),
+                        'w' | 'W' => Some(crate::ui::process_menu::ProcessMenuAction::SearchOnline),
+                        _ => None,
+                    };
+                    if let Some(act) = action {
+                        if let Some(menu) = app.process_menu_mut()
+                            && let Some(pos) = crate::ui::process_menu::MENU_ACTIONS
+                                .iter()
+                                .position(|&a| a == act)
+                        {
+                            menu.selection = pos;
+                        }
+                        app.process_menu_select()
+                    } else {
+                        None
+                    }
+                }
                 ratatui::crossterm::event::KeyCode::Esc => {
                     app.close_local_overlays();
                     None

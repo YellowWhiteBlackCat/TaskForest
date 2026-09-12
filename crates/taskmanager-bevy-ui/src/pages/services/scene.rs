@@ -2,6 +2,19 @@
 
 use super::*;
 
+pub(crate) fn on_services_search_input_activated(
+    _activate: On<Activate>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut text_state: Option<ResMut<crate::input::TextInputState>>,
+    mut commands: Commands,
+) {
+    track.shell.open_search();
+    if let Some(ref mut state) = text_state {
+        state.cursor = track.shell.query.chars().count();
+    }
+    commands.trigger(crate::input::ShellInteractionApplied);
+}
+
 pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
     let text = if query.is_empty() {
         t("search.services").to_owned()
@@ -26,6 +39,8 @@ pub(super) fn services_search_input_scene(palette: &UiPalette, query: &str) -> i
         }
         BackgroundColor({ palette.panel_fill })
         ServicesSearchInput
+        Button
+        on(on_services_search_input_activated)
         Children [
             ( Text(text) TextRole(Role::Body) TextColor(ink) template_value(no_wrap_text()) ),
         ]

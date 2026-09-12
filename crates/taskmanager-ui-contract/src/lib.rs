@@ -24,9 +24,9 @@ pub use accessibility::{
     SemanticSnapshotError, SemanticSort, SemanticState,
 };
 pub use capabilities::{
-    CapabilityEntry, CapabilityFinding, CapabilityFindingKind, CapabilityStatus, CapabilitySupport,
-    ComponentCapability, FrontendCapabilityDeclaration, capability_drift, capability_findings,
-    capability_report,
+    CapabilityEntry, CapabilityFinding, CapabilityFindingKind, CapabilitySemanticSpec,
+    CapabilityStatus, CapabilitySupport, ComponentCapability, FrontendCapabilityDeclaration,
+    capability_drift, capability_findings, capability_report,
 };
 pub use columns::{PROCESS_COLUMNS, ProcessColumnSpec, find};
 pub use command::{CommandDescriptor, descriptor};

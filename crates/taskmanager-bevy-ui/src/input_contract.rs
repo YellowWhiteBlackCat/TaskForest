@@ -49,6 +49,8 @@ pub(crate) fn shared_key(key: KeyCode) -> Option<taskmanager_application::KeyCod
         KeyCode::PageDown => taskmanager_application::KeyCode::PageDown,
         KeyCode::ArrowUp => taskmanager_application::KeyCode::ArrowUp,
         KeyCode::ArrowDown => taskmanager_application::KeyCode::ArrowDown,
+        KeyCode::ArrowLeft => taskmanager_application::KeyCode::ArrowLeft,
+        KeyCode::ArrowRight => taskmanager_application::KeyCode::ArrowRight,
         KeyCode::Tab => taskmanager_application::KeyCode::Tab,
         KeyCode::F5 => taskmanager_application::KeyCode::F5,
         KeyCode::F9 => taskmanager_application::KeyCode::F9,

@@ -389,6 +389,10 @@ fn execute_tui_local_direct(
             app.export_snapshot();
             InputDispatch::Consumed
         }
+        TuiDirectAction::ExportDiagnosticReport => {
+            let _ = app.export_diagnostic_report();
+            InputDispatch::Consumed
+        }
         TuiDirectAction::SelectPerfResource => {
             let Some(digit) = digit else {
                 return InputDispatch::Unhandled;

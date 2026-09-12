@@ -1,4 +1,7 @@
 use super::formatting::{
+    environment_preview_lines, format_env_entry, format_open_file_row, open_files_preview_lines,
+};
+use super::formatting::{
     format_capability_line, format_capability_row, format_engine_cycles, format_engine_time,
     is_dangerous_capability,
 };
@@ -15,6 +18,9 @@ use taskmanager_core::core::device_state::DeviceState;
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::FrozenProcessIdentity;
+use taskmanager_core::core::process_telemetry::{
+    OpenFileEntry, ProcessEnvironment, ProcessEnvironmentEntry, ProcessOpenFiles,
+};
 use taskmanager_core::core::process_telemetry::{
     OpenFileKind, ProcessEnvironmentEntry, ProcessGpuDevice, ProcessGpuEngineUsage,
     ProcessGpuEngines, ProcessGpuSnapshot, ThreadState,
@@ -837,4 +843,44 @@ fn insights_lines_renders_capabilities_with_warning_markers() {
         "CAP_SYS_PTRACE must render with warning marker: {text}"
     );
     assert!(text.contains("cpu"), "safe controller must render: {text}");
+}
+
+#[test]
+fn insights_lines_renders_cpu_affinity_when_observed() {
+    use taskmanager_application::ProcessAffinityReady;
+
+    let _guard = en();
+    let target = FrozenProcessIdentity::from_authoritative_parts(300, "aff-proc", 1000, 1000)
+        .expect("valid target");
+    let revision = ProcessInsightsRevision::new(1);
+    let mut tracker = ProcessInsightsProjection::default();
+    tracker.begin(target.clone(), revision);
+    let projection = tracker.snapshot().expect("snapshot exists");
+
+    let mut app = crate::demo_app();
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::ProcessInsights(Box::new(Some(projection))),
+    );
+
+    // Seed affinity ready state
+    let ready = ProcessAffinityReady {
+        target,
+        cpus: vec![0, 1, 2, 3],
+        request_id: taskmanager_platform_contract::RequestId::new(1).expect("valid request id"),
+    };
+    seed_projection_fact(
+        &mut app.shell,
+        ProjectionSeedFact::ProcessAffinity(Some(ready)),
+    );
+
+    let text = render_text(insights_lines(&app, TuiTheme::default(), 300));
+    assert!(
+        text.contains("Affinity"),
+        "must render Affinity label: {text}"
+    );
+    assert!(
+        text.contains("CPUs 0, 1, 2, 3") || text.contains("4 /") || text.contains("All"),
+        "must render CPUs list: {text}"
+    );
 }

@@ -70,6 +70,19 @@ pub(crate) struct ShellInteractionApplied;
 #[derive(Resource, Default)]
 pub(crate) struct QuitForwarded(pub(crate) bool);
 
+#[path = "input/text_input.rs"]
+mod text_input;
+pub(crate) use text_input::TextInputState;
+
+pub(crate) fn commit_query_to_shell(shell: &mut ShellApp, text: &str) {
+    while !shell.query.is_empty() {
+        shell.pop_search_char();
+    }
+    if !text.is_empty() {
+        shell.push_search_text(text);
+    }
+}
+
 /// The input plugin: resources only. The keyboard adapter system itself is
 /// registered once by [`crate::app::AppShellPlugin`], chained before the page
 /// mount system — registering it here too would create a second system
@@ -81,7 +94,8 @@ impl Plugin for InputPlugin {
         app.init_resource::<PendingEffects>()
             .init_resource::<QuitForwarded>()
             .init_resource::<crate::drain::FeedbackCache>()
-            .init_resource::<crate::pages::services::log_panel::ServiceLogExportDir>();
+            .init_resource::<crate::pages::services::log_panel::ServiceLogExportDir>()
+            .init_resource::<TextInputState>();
     }
 }
 
@@ -167,6 +181,7 @@ pub(crate) fn keyboard_dispatch_system(
     perf_device_focus: Option<Res<crate::pages::performance::PerformanceDeviceFocus>>,
     export_dir: Option<Res<crate::pages::services::log_panel::ServiceLogExportDir>>,
     feedback_cache: Option<ResMut<crate::drain::FeedbackCache>>,
+    mut text_state: Option<ResMut<TextInputState>>,
     mut commands: Commands,
 ) {
     let events: Vec<KeyboardInput> = presses
@@ -407,6 +422,92 @@ pub(crate) fn keyboard_dispatch_system(
                     taskmanager_core::core::smart::SmartSelfTestKind::Short,
                 )
             {
+                applied = true;
+                continue;
+            }
+        }
+        // 2d. Search input editing: when search owns the keyboard, handle text navigation & editing.
+        if matches!(context, KeyboardOwner::Search) {
+            let mut query = shell.query.clone();
+            let mut state = text_state.as_deref_mut().cloned().unwrap_or_default();
+            let mut consumed = true;
+
+            let is_ctrl = modifiers.control;
+
+            match event.key_code {
+                KeyCode::ArrowLeft => {
+                    if is_ctrl {
+                        state.move_word_left(&query);
+                    } else {
+                        state.move_left(&query);
+                    }
+                }
+                KeyCode::ArrowRight => {
+                    if is_ctrl {
+                        state.move_word_right(&query);
+                    } else {
+                        state.move_right(&query);
+                    }
+                }
+                KeyCode::Home => state.move_home(),
+                KeyCode::End => state.move_end(&query),
+                KeyCode::Backspace => {
+                    let changed = if is_ctrl {
+                        state.delete_word_backward(&mut query)
+                    } else {
+                        state.delete_backward(&mut query)
+                    };
+                    if changed {
+                        commit_query_to_shell(shell, &query);
+                    }
+                }
+                KeyCode::Delete => {
+                    if state.delete_forward(&mut query) {
+                        commit_query_to_shell(shell, &query);
+                    }
+                }
+                KeyCode::Escape => {
+                    if !query.is_empty() {
+                        state.clear_line(&mut query);
+                        commit_query_to_shell(shell, &query);
+                    } else {
+                        shell.close_search();
+                    }
+                }
+                KeyCode::KeyU if is_ctrl => {
+                    state.clear_line(&mut query);
+                    commit_query_to_shell(shell, &query);
+                }
+                KeyCode::KeyC if is_ctrl => {
+                    state.copy_to_clipboard(&query);
+                }
+                KeyCode::KeyX if is_ctrl => {
+                    state.cut_to_clipboard(&mut query);
+                    commit_query_to_shell(shell, &query);
+                }
+                KeyCode::KeyV if is_ctrl => {
+                    state.paste_from_clipboard(&mut query);
+                    commit_query_to_shell(shell, &query);
+                }
+                _ => {
+                    if let Some(ch) = text_char(event, modifiers) {
+                        if !is_ctrl && !modifiers.alt {
+                            state.insert_char(&mut query, ch);
+                            commit_query_to_shell(shell, &query);
+                        } else {
+                            consumed = false;
+                        }
+                    } else {
+                        consumed = false;
+                    }
+                }
+            }
+
+            if let Some(ref mut ts) = text_state {
+                **ts = state;
+            }
+
+            if consumed {
                 applied = true;
                 continue;
             }

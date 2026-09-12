@@ -18,7 +18,8 @@ use bevy::picking::Pickable;
 use bevy::scene::{Scene, bsn, on, template_value};
 use bevy::text::{LineBreak, TextLayout};
 use bevy::ui::prelude::{
-    AlignItems, FlexDirection, JustifyContent, Node, Overflow, Val, percent, px,
+    AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
+    UiRect, Val, percent, px,
 };
 use bevy::ui::widget::Text;
 use bevy::ui_widgets::{Activate, Button};
@@ -26,6 +27,7 @@ use taskmanager_ui_contract::{PROCESS_COLUMNS, ProcessColumnSpec};
 
 use crate::app::FrontendTrack;
 use crate::palette::{UiPalette, no_wrap_text, space_4, space_8};
+use crate::widgets::controls::{ControlTone, ControlVisual};
 use crate::window::{Role, TextRole};
 
 /// Active sort as a table-projection input: the ui-contract column token
@@ -47,6 +49,92 @@ pub(crate) fn visible_columns(hidden: &[&str]) -> Vec<&'static ProcessColumnSpec
         .iter()
         .filter(|spec| spec.hideable && !hidden.contains(&spec.id) || !spec.hideable)
         .collect()
+}
+
+/// Minimum width in pixels for any rendered column to remain legible.
+pub(crate) const MIN_COLUMN_WIDTH_PX: f32 = 40.0;
+/// Maximum width in pixels for any column when resizing or distributing.
+pub(crate) const MAX_COLUMN_WIDTH_PX: f32 = 1200.0;
+
+/// Clamp a column width to the supported range.
+#[must_use]
+pub(crate) fn clamp_column_width(width: f32) -> f32 {
+    width.clamp(MIN_COLUMN_WIDTH_PX, MAX_COLUMN_WIDTH_PX)
+}
+
+/// Distribute available horizontal width across table columns.
+///
+/// If `available_width` is `None` or non-positive, returns contract `default_width` for each column.
+/// When `available_width` is `Some(w)`:
+/// - If `w` exceeds total default width:
+///   Fixed/numeric columns keep their legible default widths; the primary identity column
+///   (`Name`) flexes to absorb the surplus space.
+/// - If `w` is less than total default width:
+///   Columns are scaled proportionally down to `MIN_COLUMN_WIDTH_PX`.
+#[must_use]
+pub(crate) fn distribute_column_widths(
+    columns: &[&ProcessColumnSpec],
+    available_width: Option<f32>,
+) -> Vec<f32> {
+    distribute_column_widths_with_overrides(columns, None, available_width)
+}
+
+/// Distribute column widths while respecting optional per-column width overrides.
+#[must_use]
+pub(crate) fn distribute_column_widths_with_overrides(
+    columns: &[&ProcessColumnSpec],
+    overrides: Option<&std::collections::HashMap<&str, f32>>,
+    available_width: Option<f32>,
+) -> Vec<f32> {
+    if columns.is_empty() {
+        return Vec::new();
+    }
+    let base_widths: Vec<f32> = columns
+        .iter()
+        .map(|spec| {
+            if let Some(ovr) = overrides.and_then(|map| map.get(spec.id).copied()) {
+                clamp_column_width(ovr)
+            } else {
+                clamp_column_width(spec.default_width)
+            }
+        })
+        .collect();
+
+    let Some(avail) = available_width else {
+        return base_widths;
+    };
+    if avail <= 0.0 {
+        return base_widths;
+    }
+
+    let total_base: f32 = base_widths.iter().sum();
+    let total_min = MIN_COLUMN_WIDTH_PX * (columns.len() as f32);
+
+    if avail >= total_base {
+        let surplus = avail - total_base;
+        let name_idx = columns.iter().position(|spec| spec.id == "Name");
+        let mut result = base_widths;
+        if let Some(idx) = name_idx {
+            result[idx] = clamp_column_width(result[idx] + surplus);
+        } else {
+            let add_per_col = surplus / (columns.len() as f32);
+            for w in &mut result {
+                *w = clamp_column_width(*w + add_per_col);
+            }
+        }
+        result
+    } else if avail <= total_min {
+        vec![MIN_COLUMN_WIDTH_PX; columns.len()]
+    } else {
+        let factor = (avail - total_min) / (total_base - total_min).max(1e-6);
+        base_widths
+            .iter()
+            .map(|&base| {
+                let shrunk = MIN_COLUMN_WIDTH_PX + (base - MIN_COLUMN_WIDTH_PX) * factor;
+                clamp_column_width(shrunk)
+            })
+            .collect()
+    }
 }
 
 /// How many rows of `row_height_px` fit in `viewport_height_px`. A
@@ -156,11 +244,10 @@ pub(crate) fn on_process_sort_header_activated(
     }
 }
 
-/// Render adapter: the header row. One text cell per column, widths from the
-/// contract's default-width tokens; numeric columns right-align; the sorted
-/// column carries the semantic direction icon.
-pub(crate) fn header_scene(
+/// Header row with explicit column widths.
+pub(crate) fn header_scene_with_widths(
     columns: &[&ProcessColumnSpec],
+    widths: &[f32],
     sort: Option<SortProjection>,
     palette: &UiPalette,
 ) -> impl Scene + use<> {
@@ -168,7 +255,7 @@ pub(crate) fn header_scene(
         .iter()
         .map(|column| sorted_direction(column, sort))
         .collect();
-    let cells = header_cells(columns, &directions, palette);
+    let cells = header_cells(columns, widths, &directions, palette);
     bsn! {
         Node {
             width: percent(100),
@@ -180,6 +267,18 @@ pub(crate) fn header_scene(
             { cells }
         ]
     }
+}
+
+/// Render adapter: the header row. One text cell per column, widths from the
+/// contract's default-width tokens; numeric columns right-align; the sorted
+/// column carries the semantic direction icon.
+pub(crate) fn header_scene(
+    columns: &[&ProcessColumnSpec],
+    sort: Option<SortProjection>,
+    palette: &UiPalette,
+) -> impl Scene + use<> {
+    let widths = distribute_column_widths(columns, None);
+    header_scene_with_widths(columns, &widths, sort, palette)
 }
 
 /// A data cell: contract width, right-aligned when numeric, and strictly
@@ -217,22 +316,17 @@ fn cell_scene(cell: String, width: f32, numeric_column: bool, label: bool) -> im
 
 fn header_cells(
     columns: &[&ProcessColumnSpec],
+    widths: &[f32],
     directions: &[Option<bool>],
     palette: &UiPalette,
 ) -> Vec<impl Scene + use<>> {
     columns
         .iter()
+        .zip(widths.iter().copied())
         .zip(directions.iter().copied())
-        .map(|(column, direction)| {
+        .map(|((column, width), direction)| {
             let label = header_label(column);
-            header_cell_scene(
-                label,
-                column.id,
-                column.default_width,
-                column.numeric,
-                direction,
-                palette,
-            )
+            header_cell_scene(label, column.id, width, column.numeric, direction, palette)
         })
         .collect()
 }
@@ -253,17 +347,28 @@ fn header_cell_scene(
     } else {
         JustifyContent::FlexStart
     };
+    let is_sorted = direction.is_some();
     let indicator = crate::widgets::controls::sort_indicator_scene(direction, palette);
+    let bg = if is_sorted {
+        palette.nav_active_bg
+    } else {
+        bevy::color::Color::NONE
+    };
+    let radius = palette.control_radius_px;
     bsn! {
         Node {
             width: px(width),
-            height: Val::Auto,
+            height: px(palette.control_height_px),
             flex_direction: FlexDirection::Row,
             justify_content: align,
             align_items: AlignItems::Center,
+            padding: UiRect::horizontal(Val::Px(space_4())),
             column_gap: Val::Px(space_4()),
+            border_radius: BorderRadius::all(Val::Px(radius)),
             overflow: Overflow::clip_x(),
         }
+        BackgroundColor({ bg })
+        ControlVisual(ControlTone::Surface, is_sorted)
         Button
         ProcessSortHeader(column_id)
         on(on_process_sort_header_activated)
@@ -274,14 +379,15 @@ fn header_cell_scene(
     }
 }
 
-/// Render adapter: one body row from pre-formatted cell strings. Cells pair
-/// with the same column slice the header used; row height/spacing come from
-/// the palette via the page (the row node here stays unstyled chrome).
-pub(crate) fn row_scene(cells: &[String], columns: &[&ProcessColumnSpec]) -> impl Scene + use<> {
+/// Body row with explicit column widths.
+pub(crate) fn row_scene_with_widths(
+    cells: &[String],
+    columns: &[&ProcessColumnSpec],
+    widths: &[f32],
+) -> impl Scene + use<> {
     let owned: Vec<String> = cells.to_vec();
-    let widths: Vec<f32> = columns.iter().map(|column| column.default_width).collect();
     let numeric: Vec<bool> = columns.iter().map(|column| column.numeric).collect();
-    let cells = row_cells(&owned, &widths, &numeric);
+    let cells = row_cells(&owned, widths, &numeric);
     bsn! {
         Node {
             width: percent(100),
@@ -293,6 +399,14 @@ pub(crate) fn row_scene(cells: &[String], columns: &[&ProcessColumnSpec]) -> imp
             { cells }
         ]
     }
+}
+
+/// Render adapter: one body row from pre-formatted cell strings. Cells pair
+/// with the same column slice the header used; row height/spacing come from
+/// the palette via the page (the row node here stays unstyled chrome).
+pub(crate) fn row_scene(cells: &[String], columns: &[&ProcessColumnSpec]) -> impl Scene + use<> {
+    let widths = distribute_column_widths(columns, None);
+    row_scene_with_widths(cells, columns, &widths)
 }
 
 fn row_cells(cells: &[String], widths: &[f32], numeric: &[bool]) -> Vec<impl Scene + use<>> {

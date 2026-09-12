@@ -143,3 +143,49 @@ fn the_sort_indicator_rests_on_exactly_one_column_with_a_typed_direction() {
     assert_eq!(sorted_direction(cpu, Some(descending)), Some(true));
     assert_eq!(sorted_direction(cpu, None), None);
 }
+
+#[test]
+fn table_column_width_distribution_balances_surplus_to_name() {
+    let columns = visible_columns(&[]);
+    let total_default: f32 = columns.iter().map(|c| c.default_width).sum();
+    let surplus = 200.0;
+    let available = total_default + surplus;
+    let distributed = super::distribute_column_widths(&columns, Some(available));
+    assert_eq!(distributed.len(), columns.len());
+    let name_idx = columns.iter().position(|c| c.id == "Name").unwrap();
+    assert_eq!(
+        distributed[name_idx],
+        columns[name_idx].default_width + surplus
+    );
+    for (i, spec) in columns.iter().enumerate() {
+        if i != name_idx {
+            assert_eq!(distributed[i], spec.default_width);
+        }
+    }
+}
+
+#[test]
+fn table_column_width_distribution_shrinks_gracefully_when_constrained() {
+    let columns = visible_columns(&[]);
+    let distributed = super::distribute_column_widths(&columns, Some(800.0));
+    assert_eq!(distributed.len(), columns.len());
+    let total_dist: f32 = distributed.iter().sum();
+    assert!((total_dist - 800.0).abs() < 1.0);
+    for w in &distributed {
+        assert!(*w >= super::MIN_COLUMN_WIDTH_PX);
+    }
+}
+
+#[test]
+fn table_column_width_distribution_respects_overrides() {
+    let columns = visible_columns(&[]);
+    let mut overrides = std::collections::HashMap::new();
+    overrides.insert("CPU", 140.0);
+    overrides.insert("Memory", 180.0);
+    let distributed =
+        super::distribute_column_widths_with_overrides(&columns, Some(&overrides), None);
+    let cpu_idx = columns.iter().position(|c| c.id == "CPU").unwrap();
+    let mem_idx = columns.iter().position(|c| c.id == "Memory").unwrap();
+    assert_eq!(distributed[cpu_idx], 140.0);
+    assert_eq!(distributed[mem_idx], 180.0);
+}

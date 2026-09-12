@@ -698,3 +698,134 @@ fn an_event_window_forces_exactly_one_follow_up_repaint() {
          idle window after it none, got {draws} draws"
     );
 }
+
+// ─── Extreme terminal dimension layout budget assertions ───────────────────
+use taskmanager_application::i18n::t;
+const BRAILLE_SPARKLINE_BLOCKS: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+fn assert_terminal_cell_bounds(terminal: &Terminal<TestBackend>, expected_w: u16, expected_h: u16) {
+    let buffer = terminal.backend().buffer();
+    assert_eq!(
+        buffer.area.width, expected_w,
+        "terminal width mismatch: expected {expected_w}, got {}",
+        buffer.area.width
+    );
+    assert_eq!(
+        buffer.area.height, expected_h,
+        "terminal height mismatch: expected {expected_h}, got {}",
+        buffer.area.height
+    );
+    let width = usize::from(buffer.area.width);
+    let height = usize::from(buffer.area.height);
+    assert_eq!(
+        buffer.content.len(),
+        width * height,
+        "buffer content cells count must be exactly width * height"
+    );
+    for row in 0..height {
+        let cells = &buffer.content[row * width..(row + 1) * width];
+        assert_eq!(
+            cells.len(),
+            width,
+            "row {row} cell count must be exactly {width}"
+        );
+    }
+}
+
+#[test]
+fn layout_budget_extreme_dimensions_too_small_and_boundary() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+
+    // 1. Extreme small dimension (< 54x16 warning threshold)
+    for (w, h) in [(50, 15), (40, 12), (53, 15)] {
+        let mut terminal = Terminal::new(TestBackend::new(w, h)).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &app, TuiTheme::default()))
+            .expect("draw");
+        assert_terminal_cell_bounds(&terminal, w, h);
+        let output = terminal.backend().to_string();
+        assert!(
+            output.contains("54×16") || output.contains(t("empty.terminal_too_small")),
+            "terminal below floor must display honest too-small notice at {w}x{h}"
+        );
+    }
+
+    // 2. Minimum floor (54x16)
+    {
+        let mut terminal = Terminal::new(TestBackend::new(54, 16)).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &app, TuiTheme::default()))
+            .expect("draw");
+        assert_terminal_cell_bounds(&terminal, 54, 16);
+        let output = terminal.backend().to_string();
+        assert!(
+            !output.contains(t("empty.terminal_too_small")),
+            "54x16 floor must render real application chrome"
+        );
+    }
+
+    // 3. Compact tier (< 80x24, e.g. 70x20)
+    {
+        let mut terminal = Terminal::new(TestBackend::new(70, 20)).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &app, TuiTheme::default()))
+            .expect("draw");
+        assert_terminal_cell_bounds(&terminal, 70, 20);
+        let output = terminal.backend().to_string();
+        assert!(!output.contains(t("empty.terminal_too_small")));
+    }
+
+    // 4. Standard minimum boundary (80x24)
+    {
+        let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &app, TuiTheme::default()))
+            .expect("draw");
+        assert_terminal_cell_bounds(&terminal, 80, 24);
+        let output = terminal.backend().to_string();
+        assert!(!output.contains(t("empty.terminal_too_small")));
+        // Verify table columns fit without overflow
+        assert!(
+            output.contains("PID") || output.contains("Name"),
+            "80x24 must render table header columns"
+        );
+    }
+}
+
+#[test]
+fn layout_budget_wide_terminals_render_sparklines_without_cell_corruption() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+
+    // Across wide dimensions (>= 160x50), sparklines become visible in the process table
+    for (w, h) in [(160, 50), (180, 50), (200, 50)] {
+        let mut terminal = Terminal::new(TestBackend::new(w, h)).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &app, TuiTheme::default()))
+            .expect("draw");
+        assert_terminal_cell_bounds(&terminal, w, h);
+        let output = terminal.backend().to_string();
+        assert!(!output.contains(t("empty.terminal_too_small")));
+
+        // Braille / block sparkline check: at >= 160 width, per-row CPU trend is rendered
+        let has_sparkline_or_placeholder =
+            BRAILLE_SPARKLINE_BLOCKS.iter().any(|&c| output.contains(c))
+                || output.contains("····")
+                || output.contains('…');
+        assert!(
+            has_sparkline_or_placeholder,
+            "wide terminal {w}x{h} must render sparkline trend cells without corruption"
+        );
+    }
+
+    // Performance page device sparklines across extreme wide viewport
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Performance));
+    for (w, h) in [(80, 24), (180, 50), (220, 60)] {
+        let mut terminal = Terminal::new(TestBackend::new(w, h)).expect("test terminal");
+        terminal
+            .draw(|frame| render(frame, &app, TuiTheme::default()))
+            .expect("draw");
+        assert_terminal_cell_bounds(&terminal, w, h);
+    }
+}

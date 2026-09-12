@@ -183,3 +183,29 @@ fn deliberate_differences_carry_non_empty_explanations() {
         );
     }
 }
+
+/// Every component capability has an explicit, toolkit-neutral semantic
+/// specification defining user-facing behavior, interaction semantics,
+/// and invariant expectations.
+#[test]
+fn every_capability_has_explicit_toolkit_neutral_semantic_specification() {
+    for capability in ComponentCapability::ALL {
+        let spec = capability.semantic_spec();
+        assert_eq!(spec.capability, *capability);
+        assert!(
+            !spec.user_facing_behavior.is_empty(),
+            "capability {} must define user-facing behavior",
+            capability.id()
+        );
+        assert!(
+            !spec.keyboard_pointer_semantics.is_empty(),
+            "capability {} must define keyboard/pointer semantics",
+            capability.id()
+        );
+        assert!(
+            !spec.invariant_expectations.is_empty(),
+            "capability {} must define invariant expectations",
+            capability.id()
+        );
+    }
+}

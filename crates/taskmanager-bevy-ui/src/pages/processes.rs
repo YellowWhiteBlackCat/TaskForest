@@ -50,7 +50,7 @@ use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Val, percent, px,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::Button;
+use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -374,6 +374,47 @@ pub(crate) struct ProcessCountLine;
 #[derive(Component, Clone, Default)]
 pub(crate) struct ProcessSearchInput;
 
+/// Table column width configuration on the Processes page.
+#[derive(Resource, Clone, Debug, Default)]
+pub(crate) struct ProcessColumnWidthConfig {
+    pub(crate) overrides: std::collections::HashMap<String, f32>,
+    #[allow(dead_code)]
+    pub(crate) available_width: Option<f32>,
+}
+
+/// Event to resize a table column by ID.
+#[derive(Clone, Debug, PartialEq, EntityEvent)]
+pub(crate) struct ProcessColumnResize {
+    pub(crate) entity: Entity,
+    pub(crate) column_id: String,
+    pub(crate) width: f32,
+}
+
+pub(crate) fn on_process_column_resize(
+    trigger: On<ProcessColumnResize>,
+    mut config: Option<ResMut<ProcessColumnWidthConfig>>,
+    mut commands: Commands,
+) {
+    let event = trigger.event();
+    if let Some(ref mut cfg) = config {
+        cfg.overrides.insert(event.column_id.clone(), event.width);
+        commands.trigger(crate::input::ShellInteractionApplied);
+    }
+}
+
+pub(crate) fn on_search_input_activated(
+    _activate: On<Activate>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut text_state: Option<ResMut<crate::input::TextInputState>>,
+    mut commands: Commands,
+) {
+    track.shell.open_search();
+    if let Some(ref mut state) = text_state {
+        state.cursor = track.shell.query.chars().count();
+    }
+    commands.trigger(crate::input::ShellInteractionApplied);
+}
+
 /// Shared observer parameters for the table surface, bundled to keep every
 /// observer under the argument budget.
 #[derive(SystemParam)]
@@ -419,6 +460,8 @@ fn bootstrap_processes_page(
     mut commands: Commands,
 ) {
     let root = trigger.event().entity;
+    commands.init_resource::<ProcessColumnWidthConfig>();
+    commands.init_resource::<crate::input::TextInputState>();
     let Some(palette) = palette else {
         return;
     };
@@ -553,16 +596,15 @@ fn on_query_commit(
     trigger: On<ProcessQueryCommit>,
     mut track: NonSendMut<FrontendTrack>,
     mut surface: TableSurface,
+    mut text_state: Option<ResMut<crate::input::TextInputState>>,
     mut commands: Commands,
 ) {
     let text = trigger.event().text.clone();
     let shell = &mut track.shell;
     ensure_applications_row_context(shell);
-    while !shell.query.is_empty() {
-        shell.pop_search_char();
-    }
-    if !text.is_empty() {
-        shell.push_search_text(&text);
+    crate::input::commit_query_to_shell(shell, &text);
+    if let Some(ref mut state) = text_state {
+        state.cursor = shell.query.chars().count();
     }
     surface.scroll.top = 0; // the cursor reset puts row 0 back in view
     let Ok(root) = surface.roots.single() else {
@@ -699,6 +741,8 @@ fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
         }
         BackgroundColor({ palette.panel_fill })
         ProcessSearchInput
+        Button
+        on(on_search_input_activated)
         Children [
             ( Text(text) TextRole(Role::Body) ),
         ]
@@ -726,6 +770,7 @@ fn rows_root_scene(
         on(on_toggle_row_selection)
         on(on_scroll_intent)
         on(on_query_commit)
+        on(on_process_column_resize)
         ProcessRowsRoot
         Children [
             { rows },

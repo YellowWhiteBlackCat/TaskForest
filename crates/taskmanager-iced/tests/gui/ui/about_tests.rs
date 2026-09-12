@@ -102,3 +102,60 @@ fn copy_about_details_message_records_the_footer_feedback() {
         feedback.text()
     );
 }
+
+/// The diagnostic report / bundle export action from the About modal records
+/// clipboard success feedback in the shell footer.
+#[test]
+fn export_diagnostics_report_records_clipboard_feedback_notice() {
+    use taskmanager_application::i18n::{Language, set_language};
+    set_language(Language::En);
+    let mut app = crate::IcedApp::demo();
+    let _ = app.update(Message::OpenAbout);
+    assert!(app.about_open());
+
+    let _ = app.update(Message::GenerateDiagnosticsReport);
+    let feedback = app.shell.feedback_notice().expect("feedback recorded");
+    assert_eq!(
+        feedback.source(),
+        taskmanager_shell::FeedbackSource::Clipboard
+    );
+    assert_eq!(
+        feedback.severity(),
+        taskmanager_shell::FeedbackSeverity::Success
+    );
+    assert!(
+        feedback.text().contains("Copied"),
+        "feedback text must indicate copied status: {}",
+        feedback.text()
+    );
+    assert!(
+        feedback.text().contains("Diagnostic bundle"),
+        "feedback text must name the diagnostic bundle artifact: {}",
+        feedback.text()
+    );
+}
+
+/// The system diagnostics markdown report generated for the About modal includes
+/// hardware facts, live telemetry summary, and strictly redacts host usernames.
+#[test]
+fn system_diagnostics_report_generates_markdown_and_redacts_process_usernames() {
+    let app = crate::IcedApp::demo();
+    let report = crate::export::system_diagnostics_markdown(
+        app.shell.projection().hardware.as_ref(),
+        app.shell.projection().snapshot.as_ref(),
+        vec!["taskforest-admin".to_string(), "alice".to_string()],
+    )
+    .expect("the diagnostic report generates cleanly");
+
+    assert!(report.contains("TaskForest System Diagnostics Report"));
+    assert!(report.contains("OS:"));
+    assert!(report.contains("Kernel:"));
+    assert!(report.contains("Hostname:"));
+    assert!(report.contains("CPU:"));
+    assert!(report.contains("Cores:"));
+    assert!(report.contains("Uptime:"));
+
+    // Host usernames and sensitive paths must be redacted
+    assert!(!report.contains("taskforest-admin"));
+    assert!(!report.contains("alice"));
+}

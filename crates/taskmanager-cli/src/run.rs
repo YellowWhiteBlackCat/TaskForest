@@ -170,6 +170,27 @@ pub fn run(binary_name: &'static str, handlers: FrontendHandlers) {
                 std::process::exit(1);
             }
         }
+        CliMode::ExportDiagnosticBundle { path } => {
+            let host = NativeAppHost::production();
+            let mut client = match host.spawn_client() {
+                Ok(client) => client,
+                Err(error) => {
+                    eprintln!(
+                        "{binary_name} --export-diagnostic-bundle: native composition failed: {error}"
+                    );
+                    std::process::exit(1);
+                }
+            };
+            let config = taskmanager_application::ConfigStore::new(host.config_path())
+                .load()
+                .ok();
+            if let Err(error) =
+                cli::run_export_diagnostic_bundle_with(&mut client, &path, config.as_ref())
+            {
+                eprintln!("{binary_name} --export-diagnostic-bundle: {error}");
+                std::process::exit(1);
+            }
+        }
         CliMode::Gui { app_id, demo } => {
             #[cfg(target_os = "linux")]
             if binary_name != "taskforest-t"

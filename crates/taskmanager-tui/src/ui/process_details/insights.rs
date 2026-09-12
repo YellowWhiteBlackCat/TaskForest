@@ -10,16 +10,16 @@ use ratatui::text::Span;
 use taskmanager_application::{ProcessInsightUnavailable, i18n::t};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process_telemetry::{
-    ConnectionEndpoint, ConnectionTransport, LimitValue, OpenFileEntry, ProcessEnvironment,
-    ProcessEnvironmentEntry, ProcessOpenFiles, ProcessThreadInfo, ProcessThreads,
+    ConnectionEndpoint, ConnectionTransport, LimitValue, ProcessThreadInfo, ProcessThreads,
 };
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::TuiTheme;
 
 mod formatting;
-use formatting::{
-    capabilities_preview_lines_with_limit, format_engine_usage_line, format_gpu_device_row,
+pub(crate) use formatting::{
+    capabilities_preview_lines_with_limit, environment_preview_lines_with_limit,
+    format_engine_usage_line, format_gpu_device_row, open_files_preview_lines_with_limit,
 };
 
 /// Whether the network facet for `pid` reports the typed
@@ -387,6 +387,43 @@ pub(crate) fn insights_lines_with_limit(
             lines.extend(environment_preview_lines_with_limit(env, theme, limit))
         }
     }
+    // CPU Affinity: render observed affinity state for this process
+    match app.shell.process_affinity_state() {
+        taskmanager_application::ProcessAffinityState::Ready(ready) if ready.target.pid == pid => {
+            let total = app.logical_cpu_count();
+            let cpus_summary = if ready.cpus.is_empty() {
+                missing_value()
+            } else if total > 0 && ready.cpus.len() == total {
+                format!("All ({total} CPUs)")
+            } else if ready.cpus.len() <= 8 {
+                let mut sorted: Vec<u32> = ready.cpus.to_vec();
+                sorted.sort_unstable();
+                let joined = sorted
+                    .iter()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("CPUs {joined}")
+            } else {
+                format!("{} / {total} CPUs", ready.cpus.len())
+            };
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc.affinity"),
+                cpus_summary,
+            )));
+        }
+        taskmanager_application::ProcessAffinityState::Loading { target, .. }
+            if target.pid == pid =>
+        {
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc.affinity"),
+                t("common.collecting_telemetry"),
+            )));
+        }
+        _ => {}
+    }
     lines
 }
 
@@ -578,131 +615,6 @@ fn thread_preview_lines_with_limit(
         )));
     }
     if threads.threads.len() > limit {
-        out.push(ratatui::text::Line::from(Span::styled(
-            "    …",
-            Style::new().fg(theme.dim),
-        )));
-    }
-    out
-}
-
-/// Compact open-file row: `fd [kind] → target`. A descriptor whose readlink failed
-/// (`target: None`) surfaces the typed unreadable marker, never a blank or a
-/// fabricated path.
-fn format_open_file_row(entry: &OpenFileEntry, unreadable: &str) -> String {
-    let target = entry
-        .target
-        .clone()
-        .unwrap_or_else(|| unreadable.to_string());
-    if entry.deleted {
-        format!(
-            "{} [{}] → {} [deleted]",
-            entry.fd,
-            entry.resolved_kind(),
-            target
-        )
-    } else {
-        format!("{} [{}] → {}", entry.fd, entry.resolved_kind(), target)
-    }
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-fn open_files_preview_lines(
-    open_files: &ProcessOpenFiles,
-    theme: TuiTheme,
-) -> Vec<ratatui::text::Line<'static>> {
-    open_files_preview_lines_with_limit(open_files, theme, OPEN_FILES_PREVIEW)
-}
-
-/// Bounded Open-files-facet preview: the entry count (plus an "N unreadable"
-/// marker when readlink failed for any descriptor), then the first
-/// `limit` `fd → target` rows and an honest "…" when more remain.
-fn open_files_preview_lines_with_limit(
-    open_files: &ProcessOpenFiles,
-    theme: TuiTheme,
-    limit: usize,
-) -> Vec<ratatui::text::Line<'static>> {
-    let unreadable_label = t("proc_insights.unreadable");
-    let mut out = Vec::new();
-    if open_files.entries.is_empty() {
-        out.push(ratatui::text::Line::from(Span::styled(
-            format!("  {}", t("proc_insights.no_open_files")),
-            Style::new().fg(theme.dim),
-        )));
-        return out;
-    }
-    let header = if open_files.unreadable_count > 0 {
-        format!(
-            "  {} {} · {} {}",
-            t("proc_insights.open_files"),
-            open_files.entries.len(),
-            open_files.unreadable_count,
-            unreadable_label,
-        )
-    } else {
-        format!(
-            "  {} {}",
-            t("proc_insights.open_files"),
-            open_files.entries.len()
-        )
-    };
-    out.push(ratatui::text::Line::from(header));
-    for entry in open_files.entries.iter().take(limit) {
-        out.push(ratatui::text::Line::from(format!(
-            "    {}",
-            format_open_file_row(entry, unreadable_label)
-        )));
-    }
-    if open_files.entries.len() > limit {
-        out.push(ratatui::text::Line::from(Span::styled(
-            "    …",
-            Style::new().fg(theme.dim),
-        )));
-    }
-    out
-}
-
-/// Format one environment entry as `key=escaped_value`. Newlines and carriage returns
-/// are escaped to keep each entry on a single terminal row.
-fn format_env_entry(entry: &ProcessEnvironmentEntry) -> String {
-    taskmanager_application::process_details_vm::format_env_entry(entry)
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-fn environment_preview_lines(
-    env: &ProcessEnvironment,
-    theme: TuiTheme,
-) -> Vec<ratatui::text::Line<'static>> {
-    environment_preview_lines_with_limit(env, theme, ENVIRONMENT_PREVIEW)
-}
-
-/// Bounded Environment-facet preview: the entry count, then the first
-/// `limit` `key=value` rows and an honest "…" when more remain.
-fn environment_preview_lines_with_limit(
-    env: &ProcessEnvironment,
-    theme: TuiTheme,
-    limit: usize,
-) -> Vec<ratatui::text::Line<'static>> {
-    let mut out = Vec::new();
-    if env.entries.is_empty() {
-        out.push(ratatui::text::Line::from(Span::styled(
-            format!("  {}", t("prop.environment_empty")),
-            Style::new().fg(theme.dim),
-        )));
-        return out;
-    }
-    out.push(ratatui::text::Line::from(format!(
-        "  {} {}",
-        t("prop.environment"),
-        env.entries.len()
-    )));
-    for entry in env.entries.iter().take(limit) {
-        out.push(ratatui::text::Line::from(format!(
-            "    {}",
-            format_env_entry(entry)
-        )));
-    }
-    if env.entries.len() > limit || env.truncated_count > 0 {
         out.push(ratatui::text::Line::from(Span::styled(
             "    …",
             Style::new().fg(theme.dim),
