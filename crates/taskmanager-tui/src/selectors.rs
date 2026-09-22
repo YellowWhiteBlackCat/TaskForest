@@ -6,6 +6,7 @@ use taskmanager_core::core::directory_usage::{
 };
 use taskmanager_core::core::identity::DeviceId;
 use taskmanager_core::core::metrics::GpuMetrics;
+use taskmanager_core::core::sensors::SensorQuantity;
 use taskmanager_platform_contract::CapabilityId;
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource};
 
@@ -162,8 +163,14 @@ impl TuiApp {
             .sensors
             .as_ref()
             .is_some_and(|sensors| {
+                // The Fan resource is also the TUI's thermal surface: any fan
+                // channel OR any temperature reading backs it, so a fanless
+                // host still reaches the system thermal-zone group.
                 sensors.readings.iter().any(|reading| {
-                    reading.quantity() == &taskmanager_core::core::sensors::SensorQuantity::FanSpeed
+                    matches!(
+                        reading.quantity(),
+                        SensorQuantity::FanSpeed | SensorQuantity::Temperature
+                    )
                 })
             })
         {

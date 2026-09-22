@@ -54,6 +54,8 @@ mod device_render;
 mod device_system;
 #[path = "tests/directory_usage_render.rs"]
 mod directory_usage_render;
+#[path = "tests/fan_thermal_render.rs"]
+mod fan_thermal_render;
 #[path = "tests/focus_control.rs"]
 mod focus_control;
 #[path = "tests/focus_paint.rs"]
