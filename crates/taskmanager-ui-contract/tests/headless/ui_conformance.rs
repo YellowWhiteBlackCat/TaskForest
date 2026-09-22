@@ -1,9 +1,10 @@
 //! Contract-tag authority tests (P4 evidence closure): the Rust
-//! [`ContractTag`] enum is the single source for the committed manifest's
-//! `contract_tag` column.
+//! [`ContractTag`] enum is the single source for the committed declaration
+//! files' contract vocabulary — the facet manifest's `contract_tag` column and
+//! the unified interaction matrix's `contract_tag` and `paths` columns.
 //!
-//! The manifest is a textual artifact whose contract is the text itself, so
-//! reading it here is a mechanical consistency check, not a source-inspection
+//! These files are textual artifacts whose contract is the text itself, so
+//! reading them here is a mechanical consistency check, not a source-inspection
 //! test: we never read production Rust source and never prove behavior from
 //! source text.
 
@@ -16,13 +17,21 @@ const MANIFEST: &str = include_str!(concat!(
     "/../../scripts/parity/cross_frontend_manifest.tsv"
 ));
 
-/// Extract the `contract_tag` column from manifest text.
+/// The committed unified interaction matrix (S4), embedded for the same reason
+/// as [`MANIFEST`].  It is the second declaration source that references the
+/// Rust vocabulary; the resolver owns no tag set of its own.
+const MATRIX: &str = include_str!(concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../../scripts/parity/cross_frontend_matrix.tsv"
+));
+
+/// Extract one column from committed TSV text.
 ///
 /// The column is located by header name, so column reordering cannot silently
 /// change what is validated. Comment and blank lines are skipped, matching the
 /// resolver's parsing contract.
-fn manifest_contract_tags(manifest: &str) -> Vec<&str> {
-    let mut lines = manifest.lines();
+fn column_values<'a>(table: &'a str, column: &str) -> Vec<&'a str> {
+    let mut lines = table.lines();
     let header = loop {
         match lines.next() {
             Some(line) if !line.trim().is_empty() && !line.trim_start().starts_with('#') => {
@@ -32,14 +41,28 @@ fn manifest_contract_tags(manifest: &str) -> Vec<&str> {
             None => return Vec::new(),
         }
     };
-    let tag_index = header
+    let column_index = header
         .split('\t')
-        .position(|field| field.trim() == "contract_tag")
-        .expect("manifest header must declare a contract_tag column");
+        .position(|field| field.trim() == column)
+        .unwrap_or_else(|| panic!("committed table header must declare a {column} column"));
     lines
         .filter(|line| !line.trim().is_empty() && !line.trim_start().starts_with('#'))
-        .filter_map(|line| line.split('\t').nth(tag_index))
+        .filter_map(|line| line.split('\t').nth(column_index))
         .map(str::trim)
+        .collect()
+}
+
+/// Extract the `contract_tag` column from manifest text.
+fn manifest_contract_tags(manifest: &str) -> Vec<&str> {
+    column_values(manifest, "contract_tag")
+}
+
+/// Every token of the unified matrix's `paths` column, in declaration order.
+fn matrix_path_tokens(matrix: &str) -> Vec<&str> {
+    column_values(matrix, "paths")
+        .into_iter()
+        .flat_map(|paths| paths.split('|'))
+        .filter(|token| !token.is_empty())
         .collect()
 }
 
@@ -47,7 +70,7 @@ fn manifest_contract_tags(manifest: &str) -> Vec<&str> {
 /// and the pinned count makes adding or dropping a tag a conscious change.
 #[test]
 fn all_contract_tags_are_unique_and_named() {
-    assert_eq!(ContractTag::ALL.len(), 28);
+    assert_eq!(ContractTag::ALL.len(), 37);
     let mut ids: Vec<_> = ContractTag::ALL.iter().map(|tag| tag.id()).collect();
     let count = ids.len();
     ids.sort_unstable();
@@ -105,6 +128,58 @@ fn unknown_contract_tag_is_rejected() {
         unknown,
         vec!["not-a-contract-tag"],
         "the validator must reject an unknown contract tag"
+    );
+}
+
+/// Every `contract_tag` and every `paths` token in the committed unified
+/// interaction matrix (S4) is a known [`ContractTag`].  The matrix is the
+/// second declaration source referencing the vocabulary; validating both
+/// columns here keeps the Rust enum the single authority and covers the path
+/// tokens that never lead a row (so they cannot drift as an unowned copy).
+#[test]
+fn every_matrix_contract_tag_is_known() {
+    let tags = column_values(MATRIX, "contract_tag");
+    assert!(
+        !tags.is_empty(),
+        "the committed unified matrix must declare at least one row"
+    );
+    for tag in tags {
+        assert!(
+            ContractTag::from_id(tag).is_some(),
+            "unified matrix declares unknown contract_tag {tag:?}"
+        );
+    }
+    let tokens = matrix_path_tokens(MATRIX);
+    assert!(
+        !tokens.is_empty(),
+        "the committed unified matrix must declare at least one path token"
+    );
+    for token in tokens {
+        assert!(
+            ContractTag::from_id(token).is_some(),
+            "unified matrix declares unknown paths token {token:?}"
+        );
+    }
+}
+
+/// The matrix validator is not a rubber stamp either: a synthetic matrix row
+/// carrying an unknown `paths` token is reported, and the row's primary
+/// `contract_tag` cannot mask it.
+#[test]
+fn unknown_matrix_path_token_is_rejected() {
+    let synthetic = concat!(
+        "subject_kind\tcase_id\tfrontend\tp0_id\ttarget\ttest_name\tpaths\t",
+        "capture_scenarios\tcontract_tag\tplatform\n",
+        "interaction\tcase-x\tgpui\t-\tlib\t-\tchart|not-a-contract-tag\t-\tchart\t\n",
+    );
+    let unknown: Vec<_> = matrix_path_tokens(synthetic)
+        .into_iter()
+        .filter(|token| ContractTag::from_id(token).is_none())
+        .collect();
+    assert_eq!(
+        unknown,
+        vec!["not-a-contract-tag"],
+        "the matrix validator must reject an unknown path token"
     );
 }
 

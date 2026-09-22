@@ -3,18 +3,22 @@
 //! [`ContractTag`] is the single authoritative vocabulary for the "contract
 //! property" that a cross-frontend evidence anchor proves. The committed
 //! declaration manifest (`scripts/parity/cross_frontend_manifest.tsv`) carries
-//! these stable ids in its `contract_tag` column; the Python resolver only
-//! discovers and counts anchors, and this crate mechanically validates that
-//! every declared tag names a known variant. The manifest is a textual artifact
-//! whose contract is its text; the tag set lives here and is never copied into
-//! TSV, Python, or bash.
+//! these stable ids in its `contract_tag` column, and the unified interaction
+//! matrix (`scripts/parity/cross_frontend_matrix.tsv`, S4) references them from
+//! its `contract_tag` and `paths` columns; the Python resolver only discovers
+//! and counts anchors, and this crate mechanically validates that every declared
+//! tag and path token names a known variant. Both declarations are textual
+//! artifacts whose contract is their text; the tag set lives here and is never
+//! copied into TSV, Python, or bash.
 //!
-//! The vocabulary folds the three sets that were drifting independently:
+//! The vocabulary folds the sets that were drifting independently:
 //!
 //! - the shared interaction paths previously copied as `ALLOWED_PATHS` in the
 //!   GPUI/Iced matrices (`keyboard`, `pointer`, `focus`, ...);
 //! - presentation conformance properties (`accessibility`, `theme`, `chart`);
-//! - process-insight honesty domains (`network`, `gpu`, `resources`, ...).
+//! - process-insight honesty domains (`network`, `gpu`, `resources`, ...);
+//! - the Bevy interaction paths that the S4 unified matrix used before they
+//!   were folded here (`confirmation`, `route`, `history`, `layout`, ...).
 //!
 //! ## Honesty boundary
 //!
@@ -62,12 +66,25 @@ pub enum ContractTag {
     Partial,
     Honesty,
     CaptureVisual,
+    // Bevy interaction paths folded from the S4 unified matrix (D5).  The
+    // matrix used these tokens before the enum folded them; keeping them in
+    // one family records that provenance instead of aliasing them onto the
+    // GPUI/Iced paths.
+    Confirmation,
+    History,
+    Identity,
+    Layout,
+    Navigation,
+    Projection,
+    Render,
+    Route,
+    Selection,
 }
 
 impl ContractTag {
     /// Canonical order. Declarations, reports, and the manifest validator fold
     /// against this list, never against a hand-maintained copy.
-    pub const ALL: [Self; 28] = [
+    pub const ALL: [Self; 37] = [
         Self::Keyboard,
         Self::Pointer,
         Self::Focus,
@@ -96,6 +113,15 @@ impl ContractTag {
         Self::Partial,
         Self::Honesty,
         Self::CaptureVisual,
+        Self::Confirmation,
+        Self::History,
+        Self::Identity,
+        Self::Layout,
+        Self::Navigation,
+        Self::Projection,
+        Self::Render,
+        Self::Route,
+        Self::Selection,
     ];
 
     /// Stable machine id used by the evidence manifest and matrix reports.
@@ -130,6 +156,15 @@ impl ContractTag {
             Self::Partial => "partial",
             Self::Honesty => "honesty",
             Self::CaptureVisual => "capture-visual",
+            Self::Confirmation => "confirmation",
+            Self::History => "history",
+            Self::Identity => "identity",
+            Self::Layout => "layout",
+            Self::Navigation => "navigation",
+            Self::Projection => "projection",
+            Self::Render => "render",
+            Self::Route => "route",
+            Self::Selection => "selection",
         }
     }
 

@@ -728,3 +728,44 @@ fn seam_event_loop_esc_dismisses_feedback_notice() {
     assert!(outcome.is_ok());
     assert!(app.shell.feedback_notice().is_none());
 }
+
+/// The supervised capture path writes its typed frame identity once demo data
+/// is ready: driving the production loop in demo mode with a marker path
+/// records `demo_data_ready` plus the live page the frame shows. This is the
+/// TUI's `mc07-tui-capture-visual` anchor — a single supervised frame with no
+/// scenario table, so the anchor proves the frame-marker contract rather than
+/// a per-scenario capture matrix.
+#[test]
+fn capture_marker_records_the_typed_demo_frame_identity() {
+    let marker = crate::ui::test_support::repo_temp_dir()
+        .join(format!("tui-capture-marker-{}", std::process::id()));
+    let mut app = crate::demo_app();
+    // Pin a non-default page so the assertion proves the marker reads the
+    // live page instead of a constant.
+    app.application.active_page = AppPage::Applications;
+    let mut terminal = Terminal::new(TestBackend::new(80, 24)).expect("test terminal");
+    let outcome = run_event_loop(
+        &mut terminal,
+        &mut app,
+        None,
+        ScriptedEventSource::new(vec![key(
+            ratatui::crossterm::event::KeyCode::Char('q'),
+            KeyEventKind::Press,
+        )]),
+        true,
+        Some(marker.as_os_str()),
+    );
+    assert!(outcome.is_ok());
+    assert!(app.should_quit(), "the quit key must have ended the loop");
+
+    let text = std::fs::read_to_string(&marker).expect("capture marker file");
+    std::fs::remove_file(&marker).expect("remove capture marker scratch");
+    assert!(
+        text.contains("TUI_CAPTURE_MARKER event=demo_data_ready mode=demo"),
+        "marker must name the demo data readiness: {text:?}"
+    );
+    assert!(
+        text.contains("TUI_CAPTURE_MARKER event=frame_ready page=applications"),
+        "marker must carry the live page the captured frame shows: {text:?}"
+    );
+}
