@@ -225,9 +225,13 @@ fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
             .expect("demo process fixture");
         let mut observations = *process.scalar_observations();
         observations.memory_pss_bytes = ScalarObservation::available(512 * 1024 * 1024, 1);
+        observations.memory_uss_bytes = ScalarObservation::available(256 * 1024 * 1024, 1);
         observations.swap_bytes = ScalarObservation::available(0, 1);
         process.apply_scalar_observations(observations);
     });
+    // The fixture edit resets the shell cursor; re-resolve the canonical
+    // Applications cursor so the details panel keeps the selected process.
+    app.reconcile_applications_cursor();
 
     let text = frame_text(&app, 140, 40);
 
@@ -240,6 +244,36 @@ fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
     assert!(
         text.contains("0 B"),
         "measured zero swap must remain visible"
+    );
+
+    // The definition's private facet: the details panel folds the same
+    // canonical observation the table does, so an observed USS paints its
+    // real value there (no table column carries USS).
+    let uss_row = text
+        .lines()
+        .find(|line| line.contains("USS"))
+        .unwrap_or_else(|| panic!("the private memory detail row must render:\n{text}"));
+    assert!(
+        uss_row.contains("256.0 MiB"),
+        "the observed private (USS) facet must paint its real value: {uss_row:?}"
+    );
+
+    // A process whose private facet was never observed keeps the shared dash;
+    // nothing in the frame may invent a zero-byte USS.
+    let mut cold = crate::demo_app();
+    let _ = cold.apply_action(AppAction::SelectPage(AppPage::Applications));
+    let cold_text = frame_text(&cold, 140, 40);
+    let cold_uss_row = cold_text
+        .lines()
+        .find(|line| line.contains("USS"))
+        .unwrap_or_else(|| panic!("the private memory detail row must render:\n{cold_text}"));
+    assert!(
+        cold_uss_row.contains('—'),
+        "an unobserved private facet must render the honest dash: {cold_uss_row:?}"
+    );
+    assert!(
+        !cold_uss_row.contains("0 B"),
+        "an unobserved private facet must never read as a fabricated 0 B: {cold_uss_row:?}"
     );
 }
 

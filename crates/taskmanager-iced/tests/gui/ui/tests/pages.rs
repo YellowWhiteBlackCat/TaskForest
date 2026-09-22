@@ -353,8 +353,11 @@ fn applications_header_renders_a_clickable_sort_target_for_every_column() {
 
 #[test]
 fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
+    taskmanager_test_support::pin_english();
     let mut process = taskmanager_core::core::process::ProcessItem::default();
     let mut observations = *process.scalar_observations();
+    observations.memory_bytes =
+        taskmanager_core::core::metrics::ScalarObservation::available(1024 * 1024 * 1024, 1);
     observations.memory_pss_bytes =
         taskmanager_core::core::metrics::ScalarObservation::available(512 * 1024 * 1024, 1);
     observations.swap_bytes = taskmanager_core::core::metrics::ScalarObservation::available(0, 1);
@@ -364,6 +367,7 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
         &process,
         &taskmanager_core::core::time::LocalTimeRulesObservation::unsupported(0),
     );
+    assert_eq!(cells.memory, "1.0 GiB");
     assert_eq!(cells.pss, "512.0 MiB");
     assert_eq!(cells.swap, "0 B");
 
@@ -380,6 +384,75 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
         ("—", "—"),
         "unknown observations must not fall back to RSS or zero"
     );
+
+    // The definition's private facet: the same canonical observation family
+    // feeds the properties overlay, so an observed USS reaches the painted
+    // row (the table's own columns stay resident/PSS/swap), and an unobserved
+    // USS keeps the shared dash instead of a fabricated zero.
+    let mut private = taskmanager_test_support::ProcessItemFixtureBuilder::new()
+        .pid(4_242)
+        .name("private".to_owned())
+        .current_memory_bytes(1024 * 1024 * 1024)
+        .build();
+    let mut observations = *private.scalar_observations();
+    observations.start_token = taskmanager_core::core::metrics::ScalarObservation::available(7, 1);
+    observations.memory_uss_bytes =
+        taskmanager_core::core::metrics::ScalarObservation::available(256 * 1024 * 1024, 1);
+    private.apply_scalar_observations(observations);
+
+    let mut shell = taskmanager_shell::demo_app();
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![private.clone()])),
+    );
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
+            taskmanager_shell::fixture::ProjectionSeedDomain::Processes,
+        ),
+    );
+    let identity = taskmanager_core::core::process::ProcessLiveKey::from_process(&private)
+        .expect("observed private identity");
+    let rows = overlays::process_details::property_rows(identity, &shell);
+    assert_eq!(
+        rows.iter()
+            .find(|(label, _)| label == "USS")
+            .map(|(_, value)| value.as_str()),
+        Some("256.0 MiB"),
+        "the details surface must paint the observed private (USS) facet"
+    );
+
+    let mut observations = *private.scalar_observations();
+    observations.memory_uss_bytes = taskmanager_core::core::metrics::ScalarObservation::default();
+    private.apply_scalar_observations(observations);
+    let mut cold = taskmanager_shell::demo_app();
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut cold,
+        taskmanager_shell::fixture::ProjectionSeedFact::Processes(Some(vec![private.clone()])),
+    );
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut cold,
+        taskmanager_shell::fixture::ProjectionSeedFact::AdvanceRevision(
+            taskmanager_shell::fixture::ProjectionSeedDomain::Processes,
+        ),
+    );
+    let cold_identity = taskmanager_core::core::process::ProcessLiveKey::from_process(&private)
+        .expect("cold private identity");
+    let cold_rows = overlays::process_details::property_rows(cold_identity, &cold);
+    assert_eq!(
+        cold_rows
+            .iter()
+            .find(|(label, _)| label == "USS")
+            .map(|(_, value)| value.as_str()),
+        Some("—"),
+        "an unobserved private facet must keep the honest dash"
+    );
+    assert!(
+        cold_rows
+            .iter()
+            .all(|(label, value)| label != "USS" || value != "0 B"),
+        "an unobserved private facet must never read as a fabricated 0 B"
+    );
 }
 
 #[test]
@@ -391,6 +464,23 @@ fn pages_cover_the_six_shared_pages() {
             AppPage::ALL.contains(&page),
             "every page enum variant must be tabbed"
         );
+    }
+
+    // The help vocabulary is only one half of a page sweep: the sweep must also
+    // drive the production renderer through every page branch with the typed
+    // demo fixture. Iced's headless tests have no pixel read-back, so the proof
+    // is that the router lands the requested page and the real `view` entry
+    // resolves each page's own branch (a page whose projection or layout wiring
+    // is missing fails here instead of only showing up in a capture).
+    let mut app = crate::IcedApp::demo();
+    for page in AppPage::ALL {
+        let _ = app.update(crate::app::Message::SelectPage(page));
+        assert_eq!(
+            app.shell.page(),
+            page,
+            "SelectPage must land on {page:?} for the sweep"
+        );
+        let _element = view(&app);
     }
 }
 

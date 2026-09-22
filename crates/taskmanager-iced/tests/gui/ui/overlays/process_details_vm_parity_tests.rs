@@ -35,6 +35,8 @@ fn fixture() -> ProcessItem {
         taskmanager_core::core::metrics::ScalarObservation::available(600, 42);
     observations.memory_pss_bytes =
         taskmanager_core::core::metrics::ScalarObservation::available(50 * 1024 * 1024, 42);
+    observations.memory_uss_bytes =
+        taskmanager_core::core::metrics::ScalarObservation::available(32 * 1024 * 1024, 42);
     observations.swap_bytes =
         taskmanager_core::core::metrics::ScalarObservation::available(2 * 1024 * 1024, 42);
     observations.disk_read_bytes_total =
@@ -152,6 +154,9 @@ fn property_pairs_mirror_the_neutral_vm() {
         value(ProcessDetailsField::Cpu),
         Some(format!("{:>6}", "12.5%"))
     );
+    // The private (USS) facet is a real observation in this fixture: the row
+    // carries its value, not a placeholder that would pass a mirror check.
+    assert_eq!(value(ProcessDetailsField::Uss), Some("32.0 MiB".to_owned()));
     assert_eq!(
         value(ProcessDetailsField::StartTime),
         Some("2020-09-13 12:26:40".to_owned())

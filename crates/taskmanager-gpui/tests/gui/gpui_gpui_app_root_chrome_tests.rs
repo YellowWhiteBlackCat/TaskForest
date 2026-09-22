@@ -40,6 +40,7 @@ fn overview_and_command_rows_mirror_the_neutral_vm() {
     let mut observations = *item.scalar_observations();
     observations.start_token = ScalarObservation::available(600, 42);
     observations.memory_pss_bytes = ScalarObservation::available(50 * 1024 * 1024, 42);
+    observations.memory_uss_bytes = ScalarObservation::available(256 * 1024 * 1024, 42);
     observations.swap_bytes = ScalarObservation::available(2 * 1024 * 1024, 42);
     item.apply_scalar_observations(observations);
 
@@ -64,6 +65,29 @@ fn overview_and_command_rows_mirror_the_neutral_vm() {
     }
     assert_eq!(text(ProcessDetailsField::StartTime), "2020-09-13 12:26:40");
     assert_eq!(text(ProcessDetailsField::Memory), "100.0 MiB");
+    assert_eq!(text(ProcessDetailsField::Pss), "50.0 MiB");
+
+    // The definition's private facet: the observed USS reaches the overview
+    // row the details dialog paints, and a never-observed USS keeps the
+    // shared dash instead of a fabricated zero.
+    let uss_row = OVERVIEW_FIELDS
+        .iter()
+        .position(|(field, _)| *field == ProcessDetailsField::Uss)
+        .expect("the overview carries the USS row");
+    assert_eq!(
+        overview[uss_row].1, "256.0 MiB",
+        "the observed private (USS) facet must render its real value"
+    );
+    let mut cold = item.clone();
+    let mut cold_observations = *cold.scalar_observations();
+    cold_observations.memory_uss_bytes = ScalarObservation::default();
+    cold.apply_scalar_observations(cold_observations);
+    let cold_overview = vm_rows(&cold, &OVERVIEW_FIELDS, &utc);
+    assert_eq!(
+        cold_overview[uss_row].1,
+        missing_value(),
+        "an unobserved private facet must keep the honest dash"
+    );
 
     let command = vm_rows(&item, &COMMAND_FIELDS, &utc);
     assert_eq!(command.len(), COMMAND_FIELDS.len());
