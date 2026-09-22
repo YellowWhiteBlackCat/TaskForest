@@ -12,8 +12,14 @@ discovery payloads and proves the resolver is not a rubber stamp:
 * malformed declarations fail loudly instead of being skipped;
 * the unified interaction matrix is consumed as a second declaration source:
   exact `test_name` anchors and GPUI's stable case-prefix channel both resolve
-  against discovery, deleting either anchor is `dangling`, and malformed matrix
-  rows are rejected;
+  against discovery, deleting either anchor is `dangling`, a TUI/iced/bevy
+  explicit anchor reports the owning frontend, requirement id and case id, and
+  malformed matrix rows are rejected;
+* `test_name=pending` matrix rows are counted and reported, never dangling, and
+  can never cover a requirement;
+* the optional requirement authority rejects an unknown `p0_id`, reports
+  per-frontend `P0-MC-*` coverage, and `--require-requirement-coverage` fails
+  closed on an uncovered `(frontend, requirement)` cell;
 * the `--scope auto` diff-scope only skips when no evidence-relevant path
   changed, evaluates fail-closed when the git probe fails, and never treats a
   skipped diff as a resolved anchor set.
@@ -119,6 +125,13 @@ def write_interaction_matrix(path: Path, rows: list[str]) -> Path:
     return path
 
 
+def write_requirements(path: Path, ids: list[str]) -> Path:
+    path.write_text(
+        "\n".join(["requirement_id", *ids]) + "\n", encoding="utf-8"
+    )
+    return path
+
+
 def write_json_discovery(path: Path, names: list[str]) -> Path:
     payload = {
         "rust-suites": {
@@ -141,12 +154,16 @@ def namespace(
     scope: str = "all",
     base: str | None = None,
     interaction_matrix: Path | None = None,
+    requirements: Path | None = None,
+    require_requirement_coverage: bool = False,
 ) -> argparse.Namespace:
     return argparse.Namespace(
         manifest=str(manifest),
         interaction_matrix=str(interaction_matrix) if interaction_matrix else None,
         discovery=[f"{frontend}={path}" for frontend, path in discovery.items()],
         capture_scenarios=[],
+        requirements=str(requirements) if requirements else None,
+        require_requirement_coverage=require_requirement_coverage,
         nextest=False,
         nextest_timeout=30,
         scope=scope,
@@ -195,6 +212,7 @@ def base_discovery(tmp: Path) -> dict[str, Path]:
 INTERACTION_GPUI_TEST = "gpui_behavior::nav_chrome::mc00_page_sweep_case_strip_renders_tabs"
 INTERACTION_ICED_TEST = "ui::tests::pages::page_sweep_covers_pages"
 INTERACTION_BEVY_TEST = "pages::process_tree::tests::collapse_hides_descendants"
+INTERACTION_TUI_TEST = "ui::tests::pages::tui_page_sweep_covers_pages"
 
 INTERACTION_ROWS = [
     interaction_row("mc00-page-sweep", "gpui", target="gui", paths="success|responsive"),
@@ -211,6 +229,13 @@ INTERACTION_ROWS = [
         test_name=INTERACTION_BEVY_TEST,
         paths="keyboard|lifecycle|success",
     ),
+    interaction_row(
+        "mc00-tui-page-sweep",
+        "tui",
+        test_name=INTERACTION_TUI_TEST,
+        paths="success|responsive",
+    ),
+    interaction_row("mc05-tui-chart-hover", "tui", test_name="pending", paths="pointer"),
 ]
 
 
@@ -223,7 +248,9 @@ def interaction_discovery(tmp: Path) -> dict[str, Path]:
         "iced": write_json_discovery(
             tmp / "iced.json", ["suite::beta_ok", INTERACTION_ICED_TEST]
         ),
-        "tui": write_json_discovery(tmp / "tui.json", ["suite::tui_ok"]),
+        "tui": write_json_discovery(
+            tmp / "tui.json", ["suite::tui_ok", INTERACTION_TUI_TEST]
+        ),
         "bevy": write_json_discovery(
             tmp / "bevy.json", ["suite::bevy_ok", INTERACTION_BEVY_TEST]
         ),
@@ -236,11 +263,20 @@ def run_interaction(
     discovery: dict[str, Path],
     *,
     manifest_rows: list[str] | None = None,
+    requirements: Path | None = None,
+    require_requirement_coverage: bool = False,
 ):
     manifest = write_manifest(tmp / "manifest.tsv", manifest_rows or BASE_ROWS)
     matrix = write_interaction_matrix(tmp / "interaction.tsv", rows)
     return resolver.resolve(
-        namespace(manifest, discovery, tmp, interaction_matrix=matrix)
+        namespace(
+            manifest,
+            discovery,
+            tmp,
+            interaction_matrix=matrix,
+            requirements=requirements,
+            require_requirement_coverage=require_requirement_coverage,
+        )
     )
 
 
@@ -523,24 +559,203 @@ def test_platform_column_is_reserved(tmp: Path) -> None:
 def test_interaction_matrix_resolves(tmp: Path) -> None:
     report = run_interaction(tmp, INTERACTION_ROWS, interaction_discovery(tmp))
     check(report["status"] == "pass", "a consistent interaction matrix passes")
-    check(report["counts"]["interaction_cells"] == 3, "interaction cells counted")
-    check(report["counts"]["interaction_anchored"] == 3, "interaction anchors counted")
+    check(report["counts"]["interaction_cells"] == 5, "interaction cells counted")
+    check(report["counts"]["interaction_anchored"] == 4, "interaction anchors counted")
+    check(
+        report["counts"]["interaction_pending"] == 1,
+        "pending interaction rows are counted separately",
+    )
     check(report["counts"]["interaction_dangling"] == 0, "no interaction dangling")
     check(report["counts"]["dangling"] == 0, "interaction cells add no dangling")
     check(
-        report["counts"]["cells"] == 4 and report["counts"]["pending"] == 1,
-        "facet grid counts stay independent of the interaction matrix",
+        report["counts"]["cells"] == 4 and report["counts"]["pending"] == 2,
+        "facet grid counts stay independent of the interaction matrix "
+        "(one facet + one interaction pending cell)",
     )
     check(
-        report["interaction_matrix"]["cases"] == 3
+        report["interaction_matrix"]["cases"] == 5
         and report["interaction_matrix"]["path"].endswith("interaction.tsv"),
         "the report records the interaction matrix source",
     )
     check(
-        report["interaction_matrix"]["anchored"] == 3
+        report["interaction_matrix"]["anchored"] == 4
+        and report["interaction_matrix"]["pending"] == 1
         and report["interaction_matrix"]["dangling"] == 0,
-        "the interaction block mirrors anchored/dangling counts",
+        "the interaction block mirrors anchored/pending/dangling counts",
     )
+    check(
+        report["requirement_coverage"] is None,
+        "without a requirement authority the coverage block stays null",
+    )
+
+
+def test_interaction_pending_rows() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        discovery = interaction_discovery(tmp)
+        # The pending row must not depend on the frontend's discovery at all.
+        write_json_discovery(discovery["tui"], ["suite::tui_ok"])
+        report = run_interaction(tmp, INTERACTION_ROWS, discovery)
+        check(
+            report["status"] == "fail",
+            "deleting the anchored TUI test fails while the pending row stays inert",
+        )
+        pending = [
+            cell
+            for cell in report["pending"]
+            if cell["subject_kind"] == "interaction"
+        ]
+        check(
+            pending == [
+                {
+                    "subject_kind": "interaction",
+                    "subject_id": "mc05-tui-chart-hover",
+                    "frontend": "tui",
+                }
+            ],
+            "a pending matrix row lands in the shared pending list",
+        )
+        check(
+            report["counts"]["interaction_dangling"] == 1
+            and report["counts"]["interaction_anchored"] == 4,
+            "a pending row is neither anchored nor dangling",
+        )
+
+
+def test_interaction_tui_anchor_dangling_report(tmp: Path) -> None:
+    discovery = interaction_discovery(tmp)
+    # Simulate renaming/deleting the anchored TUI test.
+    write_json_discovery(discovery["tui"], ["suite::tui_ok"])
+    report = run_interaction(tmp, INTERACTION_ROWS, discovery)
+    by_subject = {item["subject_id"]: item for item in report["dangling"]}
+    item = by_subject["mc00-tui-page-sweep"]
+    check(
+        item["frontend"] == "tui"
+        and item["test_id"] == INTERACTION_TUI_TEST
+        and item["channel"] == "test-name"
+        and item["p0_id"] == "P0-MC-00"
+        and item["subject_kind"] == "interaction",
+        "a dangling TUI anchor names frontend, requirement, case and test id",
+    )
+
+
+def test_requirement_coverage_report(tmp: Path) -> None:
+    requirements = write_requirements(tmp / "requirements.tsv", ["P0-MC-00", "P0-MC-01"])
+    rows = [
+        interaction_row(
+            "mc00-nav-keyboard", "iced", test_name=INTERACTION_ICED_TEST, paths="success"
+        ),
+        interaction_row(
+            "bev-tree-collapse",
+            "bevy",
+            p0_id="-",
+            test_name=INTERACTION_BEVY_TEST,
+            paths="success",
+        ),
+        interaction_row("mc05-tui-chart-hover", "tui", test_name="pending", paths="success"),
+    ]
+    report = run_interaction(
+        tmp, rows, interaction_discovery(tmp), requirements=requirements
+    )
+    check(report["status"] == "pass", "a coverage report alone does not fail a run")
+    coverage = report["requirement_coverage"]
+    check(
+        coverage is not None and coverage["requirements"] == ["P0-MC-00", "P0-MC-01"],
+        "the coverage block names the requirement authority's ids",
+    )
+    check(
+        coverage["frontends"]["iced"]["covered"] == ["P0-MC-00"]
+        and coverage["frontends"]["iced"]["missing"] == ["P0-MC-01"],
+        "an anchored success row covers its requirement on its own frontend",
+    )
+    check(
+        coverage["frontends"]["bevy"]["covered"] == []
+        and coverage["frontends"]["bevy"]["unmapped_cells"] == 1,
+        "an unmapped cell never covers a requirement",
+    )
+    check(
+        coverage["frontends"]["tui"]["covered"] == []
+        and coverage["frontends"]["tui"]["pending_cells"] == 1,
+        "a pending cell never covers a requirement",
+    )
+    check(
+        coverage["frontends"]["gpui"]["missing"] == ["P0-MC-00", "P0-MC-01"],
+        "a frontend with no interaction rows misses every requirement",
+    )
+
+
+def test_require_requirement_coverage_fails_closed(tmp: Path) -> None:
+    requirements = write_requirements(tmp / "requirements.tsv", ["P0-MC-00", "P0-MC-01"])
+    rows = [
+        interaction_row(
+            "mc00-nav-keyboard", "iced", test_name=INTERACTION_ICED_TEST, paths="success"
+        ),
+    ]
+    report = run_interaction(
+        tmp,
+        rows,
+        interaction_discovery(tmp),
+        requirements=requirements,
+        require_requirement_coverage=True,
+    )
+    check(
+        report["status"] == "fail",
+        "--require-requirement-coverage fails on an uncovered (frontend, requirement) cell",
+    )
+    pairs = {
+        (item["frontend"], item["subject_id"])
+        for item in report["invalid"]
+        if item.get("reason", "").startswith("requirement has no success-path")
+    }
+    check(
+        ("bevy", "P0-MC-01") in pairs and ("tui", "P0-MC-00") in pairs,
+        "every uncovered pair is reported by frontend and requirement id",
+    )
+    check(
+        ("iced", "P0-MC-01") in pairs and ("iced", "P0-MC-00") not in pairs,
+        "the covered cell is not reported",
+    )
+
+
+def test_requirement_authority_rejects_unknown_id(tmp: Path) -> None:
+    requirements = write_requirements(tmp / "requirements.tsv", ["P0-MC-00"])
+    rows = [
+        interaction_row(
+            "mc99-unknown", "iced", test_name=INTERACTION_ICED_TEST, p0_id="P0-MC-99"
+        ),
+    ]
+    report = run_interaction(
+        tmp,
+        rows,
+        interaction_discovery(tmp),
+        requirements=requirements,
+        require_requirement_coverage=True,
+    )
+    check(
+        report["status"] == "fail",
+        "an unknown p0_id fails once the requirement authority is supplied",
+    )
+    check(
+        any(
+            item.get("reason", "").startswith("unknown requirement id")
+            and item["subject_id"] == "P0-MC-99"
+            for item in report["invalid"]
+        ),
+        "the unknown requirement id is reported precisely",
+    )
+    with tempfile.TemporaryDirectory() as raw:
+        missing = Path(raw) / "absent.tsv"
+        try:
+            run_interaction(
+                tmp,
+                rows,
+                interaction_discovery(tmp),
+                requirements=missing,
+            )
+        except resolver.ResolveError:
+            check(True, "a missing requirement authority is a fatal usage error")
+        else:
+            check(False, "a missing requirement authority is a fatal usage error")
 
 
 def test_interaction_matrix_dangling(tmp: Path) -> None:
@@ -572,7 +787,7 @@ def test_interaction_matrix_dangling(tmp: Path) -> None:
         "interaction dangling feeds the shared dangling count",
     )
     check(
-        report["counts"]["interaction_anchored"] == 3,
+        report["counts"]["interaction_anchored"] == 4,
         "dangling cells are still counted as anchored declarations",
     )
 
@@ -593,6 +808,14 @@ def test_interaction_matrix_malformed() -> None:
     check_interaction_error(
         [interaction_row("case-a", "iced")],
         "an implicit anchor channel is rejected for a frontend without one",
+    )
+    check_interaction_error(
+        [interaction_row("case-a", "tui")],
+        "a TUI row without a test_name is rejected (TUI has no prefix channel)",
+    )
+    check_interaction_error(
+        [interaction_row("case-a", "bevy", test_name="pending", contract_tag="failure")],
+        "a pending row still has to declare contract_tag = first paths token",
     )
     check_interaction_error(
         [
@@ -661,13 +884,18 @@ def test_interaction_matrix_absent_leaves_report_unchanged(tmp: Path) -> None:
     report = run(tmp, BASE_ROWS, base_discovery(tmp))
     check(
         report["interaction_matrix"]
-        == {"path": None, "cases": 0, "anchored": 0, "dangling": 0},
+        == {"path": None, "cases": 0, "anchored": 0, "pending": 0, "dangling": 0},
         "without --interaction-matrix the report stays interaction-empty",
     )
     check(
         report["counts"]["interaction_cells"] == 0
+        and report["counts"]["interaction_pending"] == 0
         and report["counts"]["interaction_dangling"] == 0,
         "without --interaction-matrix no interaction count moves",
+    )
+    check(
+        report["requirement_coverage"] is None,
+        "without a requirement authority there is no coverage block",
     )
 
 
@@ -686,9 +914,14 @@ def main() -> int:
         test_auto_scope_relevant_runs(tmp)
         test_platform_column_is_reserved(tmp)
         test_interaction_matrix_resolves(tmp)
+        test_interaction_pending_rows()
         test_interaction_matrix_dangling(tmp)
+        test_interaction_tui_anchor_dangling_report(tmp)
         test_interaction_matrix_malformed()
         test_interaction_frontend_needs_discovery(tmp)
+        test_requirement_coverage_report(tmp)
+        test_require_requirement_coverage_fails_closed(tmp)
+        test_requirement_authority_rejects_unknown_id(tmp)
         test_interaction_matrix_absent_leaves_report_unchanged(tmp)
 
     if FAILURES:

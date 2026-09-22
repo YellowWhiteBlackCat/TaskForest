@@ -44,11 +44,32 @@ a second declaration source: one row per `(frontend, case_id)`:
   resolver only checks the matrix-internal equality and never defines tags.
 * `platform` stays the same reserved, opaque column as in the manifest.
 * Anchor source recognition: a row with an explicit `test_name` resolves by
-  exact nextest membership (iced/bevy rows).  A row whose `test_name` is `-`
+  exact nextest membership (iced/bevy/tui rows).  A row whose `test_name` is `-`
   uses the owning frontend's stable case-prefix channel instead (GPUI:
   `<case_id>` with `-` normalized to `_`, plus `_case_`); the resolver accepts
-  that channel only for the frontends in `CASE_PREFIX_CHANNELS`.  Either way a
-  missing anchor is `dangling` (R4) and fails the run.
+  that channel only for the frontends in `CASE_PREFIX_CHANNELS`.  A row whose
+  `test_name` is `pending` declares a case with no discoverable anchor yet: it
+  is counted in `interaction_matrix.pending` and in the shared `pending` list,
+  and is never treated as dangling.  Either anchored way, a missing anchor is
+  `dangling` (R4) and fails the run.
+
+Requirement coverage (`--requirements PATH`, `--require-requirement-coverage`)
+--------------------------------------------------------------------------------
+The committed `scripts/interaction_requirements.tsv` is the public requirement
+id vocabulary (`P0-MC-*`), already read by the GPUI/Iced matrix validators; this
+resolver does not define ids.  When the authority is supplied (or demanded by
+`--require-requirement-coverage`, whose default path is that file), the resolver
+
+* rejects an interaction `p0_id` that is neither `-` nor a declared requirement,
+* reports `requirement_coverage` per frontend: a requirement counts as covered
+  on a frontend when at least one interaction row for that frontend declares the
+  id and carries the `success` path token (the per-frontend generalization of
+  the existing GPUI validator rule),
+* with `--require-requirement-coverage`, records every uncovered
+  `(frontend, requirement)` pair as `invalid` (fail-closed).
+
+Without either flag the coverage block is `null` and the run keeps its original
+anchor-resolution semantics; `p0_id` stays opaque.
 
 Scopes
 ------
@@ -137,6 +158,15 @@ INTERACTION_TARGETS = {"gui", "lib"}
 # frontend must name its test: a silent prefix convention there would be
 # unverifiable.
 CASE_PREFIX_CHANNELS = {"gpui"}
+
+# Marker for a matrix row whose anchor has not been assigned yet.  It mirrors
+# the manifest's `pending` evidence kind: the case is declared, no discoverable
+# test binds it yet, and the row is counted/reported instead of dangling.
+INTERACTION_PENDING_MARKER = "pending"
+
+# The public requirement id vocabulary read by the GPUI/Iced matrix validators.
+# It is an input authority, never a second vocabulary owned by this resolver.
+DEFAULT_REQUIREMENTS = "scripts/interaction_requirements.tsv"
 
 # The unified matrix keeps `p0_id` and `capture_scenarios` as declared data.
 # `-` is the committed "no value" marker; `platform` may be empty (reserved).
@@ -365,8 +395,9 @@ def read_interaction_matrix(path: Path) -> list[dict[str, str]]:
 
     Structural rules only: the schema, the `interaction` subject kind, the
     frontend/target vocabulary the resolver can actually resolve against, the
-    `contract_tag == first paths token` matrix-internal equality, and the
-    per-frontend `(frontend, case_id)` key.  No contract-tag vocabulary and no
+    `contract_tag == first paths token` matrix-internal equality, the per-frontend
+    `(frontend, case_id)` key, and the `pending` marker (a declared case whose
+    anchor is not assigned yet).  No contract-tag vocabulary and no
     capture-scenario resolution happen here; those stay with the Rust authority
     and the per-frontend capture validators.
     """
@@ -430,6 +461,90 @@ def read_interaction_matrix(path: Path) -> list[dict[str, str]]:
     if not rows:
         raise ResolveError(f"{path}: interaction matrix has no data rows")
     return rows
+
+
+def read_requirements(path: Path) -> list[str]:
+    """Read the public requirement-id vocabulary (`requirement_id` header).
+
+    `scripts/interaction_requirements.tsv` is an input authority (already read by
+    the GPUI/Iced matrix validators); this resolver only checks membership and
+    computes coverage against it, it never defines or copies the ids.
+    """
+    if not path.is_file():
+        raise ResolveError(f"requirement vocabulary not found: {path}")
+    lines = [
+        line.strip()
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    ]
+    if not lines or lines[0] != "requirement_id":
+        raise ResolveError(f"{path}: expected a requirement_id header")
+    ids: list[str] = []
+    for line in lines[1:]:
+        if "\t" in line:
+            raise ResolveError(f"{path}: malformed requirement row {line!r}")
+        if line in ids:
+            raise ResolveError(f"{path}: duplicate requirement id {line!r}")
+        ids.append(line)
+    if not ids:
+        raise ResolveError(f"{path}: no requirement ids")
+    return ids
+
+
+def requirement_coverage(
+    interaction_rows: list[dict[str, str]],
+    requirements: list[str],
+    frontends: list[str],
+) -> dict:
+    """Per-frontend `P0-MC-*` coverage over the interaction matrix.
+
+    A requirement counts as covered on a frontend when at least one interaction
+    row for that frontend declares the id and carries the `success` path token.
+    This is the per-frontend generalization of the existing GPUI validator rule
+    ("every requirement has a success path");  the ids themselves come from the
+    supplied vocabulary, never from this module.  A `pending` row owns no anchor
+    and can never cover a requirement.
+    """
+    covered: dict[str, set[str]] = {frontend: set() for frontend in frontends}
+    unmapped: dict[str, int] = {frontend: 0 for frontend in frontends}
+    pending_rows: dict[str, int] = {frontend: 0 for frontend in frontends}
+    unknown: list[dict] = []
+    for row in interaction_rows:
+        frontend = row["frontend"].strip()
+        p0_id = row["p0_id"].strip()
+        if row["test_name"].strip() == INTERACTION_PENDING_MARKER:
+            # A pending case owns no anchor, so it can never cover a requirement.
+            if frontend in pending_rows:
+                pending_rows[frontend] += 1
+            continue
+        if p0_id == "-":
+            if frontend in unmapped:
+                unmapped[frontend] += 1
+            continue
+        if p0_id not in requirements:
+            unknown.append({
+                "reason": "unknown requirement id (not in the requirement vocabulary)",
+                "subject_kind": INTERACTION_SUBJECT_KIND,
+                "subject_id": p0_id,
+                "frontend": frontend,
+            })
+            continue
+        paths = {token for token in row["paths"].split("|") if token}
+        if "success" in paths:
+            covered[frontend].add(p0_id)
+    return {
+        "requirements": list(requirements),
+        "frontends": {
+            frontend: {
+                "covered": [q for q in requirements if q in covered[frontend]],
+                "missing": [q for q in requirements if q not in covered[frontend]],
+                "unmapped_cells": unmapped[frontend],
+                "pending_cells": pending_rows[frontend],
+            }
+            for frontend in frontends
+        },
+        "unknown": unknown,
+    }
 
 
 def parse_json_discovery(text: str) -> set[str]:
@@ -581,6 +696,7 @@ def skipped_report(
         "visual_unverified": 0,
         "interaction_cells": 0,
         "interaction_anchored": 0,
+        "interaction_pending": 0,
         "interaction_dangling": 0,
     }
     return {
@@ -589,8 +705,10 @@ def skipped_report(
             "path": str(interaction_path) if interaction_path else None,
             "cases": 0,
             "anchored": 0,
+            "pending": 0,
             "dangling": 0,
         },
+        "requirement_coverage": None,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "status": "pass",
         "skipped": True,
@@ -740,13 +858,24 @@ def resolve(args: argparse.Namespace) -> dict:
     # Unified interaction matrix: each row is an `interaction` subject whose
     # anchor resolves against the owning frontend's discovery.  Rows with an
     # explicit test_name use exact membership; rows on a frontend with the
-    # stable case-prefix channel resolve through `<case_id>_case_*`.
-    interaction_cells = interaction_anchored = interaction_dangling = 0
+    # stable case-prefix channel resolve through `<case_id>_case_*`; rows marked
+    # `pending` declare a case whose anchor is not assigned yet and are counted,
+    # never dangling.
+    interaction_cells = interaction_anchored = interaction_pending = 0
+    interaction_dangling = 0
     for row in interaction_rows:
         interaction_cells += 1
-        interaction_anchored += 1
         frontend = row["frontend"]
         test_name = row["test_name"]
+        if test_name == INTERACTION_PENDING_MARKER:
+            interaction_pending += 1
+            pending_cells.append({
+                "subject_kind": INTERACTION_SUBJECT_KIND,
+                "subject_id": row["case_id"],
+                "frontend": frontend,
+            })
+            continue
+        interaction_anchored += 1
         if test_name == "-":
             prefix = f"{row['case_id'].replace('-', '_')}_case_"
             if not any(
@@ -762,6 +891,7 @@ def resolve(args: argparse.Namespace) -> dict:
                     "subject_kind": INTERACTION_SUBJECT_KIND,
                     "subject_id": row["case_id"],
                     "frontend": frontend,
+                    "p0_id": row["p0_id"],
                     "test_id": f"{prefix}*",
                     "channel": "case-prefix",
                 })
@@ -772,9 +902,40 @@ def resolve(args: argparse.Namespace) -> dict:
                 "subject_kind": INTERACTION_SUBJECT_KIND,
                 "subject_id": row["case_id"],
                 "frontend": frontend,
+                "p0_id": row["p0_id"],
                 "test_id": test_name,
                 "channel": "test-name",
             })
+
+    # Optional requirement-coverage authority (`--requirements` or
+    # `--require-requirement-coverage`).  Without it `p0_id` stays opaque.
+    requirement_coverage_report = None
+    coverage_authority = getattr(args, "requirements", None)
+    require_coverage = bool(getattr(args, "require_requirement_coverage", False))
+    if coverage_authority or require_coverage:
+        coverage_path = Path(coverage_authority or DEFAULT_REQUIREMENTS)
+        if not coverage_path.is_absolute():
+            coverage_path = repo / coverage_path
+        if not coverage_path.is_file():
+            raise ResolveError(f"requirement vocabulary not found: {coverage_path}")
+        authority_ids = read_requirements(coverage_path)
+        requirement_coverage_report = requirement_coverage(
+            interaction_rows, authority_ids, required_frontends
+        )
+        requirement_coverage_report["authority"] = str(coverage_path)
+        invalid.extend(requirement_coverage_report["unknown"])
+        if require_coverage:
+            for frontend in required_frontends:
+                for p0_id in requirement_coverage_report["frontends"][frontend]["missing"]:
+                    invalid.append({
+                        "reason": (
+                            "requirement has no success-path interaction row "
+                            "on this frontend (--require-requirement-coverage)"
+                        ),
+                        "subject_kind": INTERACTION_SUBJECT_KIND,
+                        "subject_id": p0_id,
+                        "frontend": frontend,
+                    })
 
     status = "pass" if not dangling and not invalid else "fail"
     return {
@@ -783,8 +944,10 @@ def resolve(args: argparse.Namespace) -> dict:
             "path": str(interaction_path) if interaction_path else None,
             "cases": interaction_cells,
             "anchored": interaction_anchored,
+            "pending": interaction_pending,
             "dangling": interaction_dangling,
         },
+        "requirement_coverage": requirement_coverage_report,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "status": status,
         "skipped": False,
@@ -793,13 +956,16 @@ def resolve(args: argparse.Namespace) -> dict:
             "cells": cells,
             "anchored_behavior": anchored_behavior,
             "anchored_visual": anchored_visual,
-            "pending": pending,
+            # Shared pending total (manifest + interaction matrix); the facet
+            # share is `pending - interaction_pending`, mirroring `dangling`.
+            "pending": pending + interaction_pending,
             "none": none,
             "dangling": len(dangling),
             "invalid": len(invalid),
             "visual_unverified": len(visual_unverified),
             "interaction_cells": interaction_cells,
             "interaction_anchored": interaction_anchored,
+            "interaction_pending": interaction_pending,
             "interaction_dangling": interaction_dangling,
         },
         "frontends": {
@@ -834,7 +1000,25 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "unified interaction matrix (S4) to resolve as a second declaration "
             "source; each row's anchor is checked against the owning frontend's "
-            "discovery"
+            "discovery (`test_name=pending` rows are counted, never dangling)"
+        ),
+    )
+    parser.add_argument(
+        "--requirements",
+        default=None,
+        metavar="PATH",
+        help=(
+            "requirement id vocabulary (default with --require-requirement-coverage: "
+            f"{DEFAULT_REQUIREMENTS}); enables the per-frontend requirement_coverage "
+            "report and rejects unknown p0_id values"
+        ),
+    )
+    parser.add_argument(
+        "--require-requirement-coverage",
+        action="store_true",
+        help=(
+            "fail when a declared requirement has no success-path interaction row "
+            "on a frontend (per-frontend generalization of the GPUI validator rule)"
         ),
     )
     parser.add_argument(
@@ -908,21 +1092,46 @@ def format_summary(report: dict) -> str:
         lines.append("          no test discovery was run; nothing to resolve")
         return "\n".join(lines)
     interaction = report.get("interaction_matrix") or {}
-    # `counts.dangling` is the shared total (manifest + interaction matrix); the
-    # facet line shows the manifest share so the two sources stay readable.
+    # `counts.dangling`/`counts.pending` are the shared totals (manifest +
+    # interaction matrix); the facet line shows the manifest share so the two
+    # sources stay readable.
     interaction_dangling = int(interaction.get("dangling") or 0)
     facet_dangling = counts.get("dangling", 0) - interaction_dangling
+    interaction_pending = int(interaction.get("pending") or 0)
+    facet_pending = counts.get("pending", 0) - interaction_pending
     lines.append(
         (
             "cells:    {cells} manifest cells | {anchored_behavior} behavior anchors | "
-            "{pending} pending | {none} none | {facet_dangling} dangling | {invalid} invalid"
-        ).format(facet_dangling=facet_dangling, **counts)
+            "{facet_pending} pending | {none} none | {facet_dangling} dangling | {invalid} invalid"
+        ).format(
+            facet_pending=facet_pending,
+            facet_dangling=facet_dangling,
+            **counts,
+        )
     )
     if interaction.get("cases"):
-        lines.append(
-            "matrix:   {cases} interaction cases | {anchored} anchored | "
-            "{dangling} dangling  ({path})".format(**interaction)
-        )
+        if interaction.get("pending"):
+            lines.append(
+                "matrix:   {cases} interaction cases | {anchored} anchored | "
+                "{pending} pending | {dangling} dangling  ({path})".format(**interaction)
+            )
+        else:
+            lines.append(
+                "matrix:   {cases} interaction cases | {anchored} anchored | "
+                "{dangling} dangling  ({path})".format(**interaction)
+            )
+        coverage = report.get("requirement_coverage")
+        if coverage:
+            for frontend, info in coverage["frontends"].items():
+                lines.append(
+                    "  {frontend:5s} requirements covered {covered}/{total}"
+                    " (unmapped cells: {unmapped})".format(
+                        frontend=frontend,
+                        covered=len(info["covered"]),
+                        total=len(coverage["requirements"]),
+                        unmapped=info["unmapped_cells"],
+                    )
+                )
     for frontend, info in report["frontends"].items():
         lines.append(
             f"  {frontend:5s} discovered {info['discovered_tests']} tests  ({info['discovery_source']})"
