@@ -1,9 +1,11 @@
 # TaskForest binary-only RPM spec.
 #
 # The %files list mirrors the staged /usr tree from
-# packaging/linux/stage-release-tree.sh (the PKGBUILD layout authority). The
-# staged tree is shipped as Source0 and unpacked straight into the build root,
-# so this spec owns metadata only — never a second copy of the layout.
+# packaging/linux/stage-release-tree.sh (the PKGBUILD layout authority) minus
+# the assets owned by taskforest-common (the shared hicolor icon set, which
+# build-rpm.sh excludes from this package's Source0). The staged tree is
+# shipped as Source0 and unpacked straight into the build root, so this spec
+# owns metadata only — never a second copy of the layout.
 #
 # BuildRequires are deliberately empty: the binaries are prebuilt by the
 # release pipeline, and the brp scripts are disabled so a Fedora-destined
@@ -19,7 +21,7 @@ Summary:    Eye-friendly native system monitor built with GPUI
 License:    Apache-2.0
 URL:        https://github.com/YellowWhiteBlackCat/TaskForest
 Source0:     taskforest-tree.tar.gz
-Requires:   fontconfig, freetype, libxkbcommon, libwayland-client, vulkan-loader
+Requires:   taskforest-common, fontconfig, freetype, libxkbcommon, libwayland-client, vulkan-loader
 Recommends: polkit
 Suggests:   smartmontools, nvme-cli, xfsprogs, iw, mesa-vulkan-drivers
 ExclusiveArch: x86_64 aarch64
@@ -54,7 +56,6 @@ tar -xf %{SOURCE0} -C %{buildroot}
 /usr/libexec/taskforest-msr-helper
 /usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestG.desktop
 /usr/share/metainfo/io.github.YellowWhiteBlackCat.TaskForestG.metainfo.xml
-/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg
 %dir /usr/share/taskforest
 %dir /usr/share/taskforest/setup
 /usr/share/taskforest/setup/99-taskforest.rules

@@ -7,23 +7,31 @@
 ## 发布面
 
 当前官方发布矩阵已实现四个独立前端产品（TaskForest-G、TaskForest-I、TaskForest-T、
-TaskForest-B）全量一碗水端平：Linux 同时提供四端的 amd64/arm64 DEB 与 x86_64/aarch64 RPM 发布物；
-Windows 同时提供四端的 x64/arm64 MSI 安装包。macOS 打包、签名和公证暂缓。
+TaskForest-B）四端发行物与前端语义同权（即「四端平权」）：Linux 同时提供四端的 amd64/arm64 DEB
+与 x86_64/aarch64 RPM 发布物，另有共享数据包 `taskforest-common` 的同架构 DEB/RPM；
+Windows 同时提供四端的 x64/arm64 MSI 安装包。macOS 打包、签名
+和公证暂缓。该平权仅指四端发行物与前端语义同权，不含「跨平台功能对等」；平台能力边界见下方说明。
 
 ### 0.1.3 发行面与平价矩阵
 
 正式发行面已扩展至全前端全格式产品体系：Linux 发布流水线原生构建与发布四端（GPUI、
 Iced、TUI、Bevy）全量 DEB 与 RPM 安装包；Windows 原生流水线构建与发布四端全量 MSI。
-四端严格保持 Wayland-only，彻底不含 X11 依赖；TUI 具备零图形栈依赖独立运行能力。
+三大图形前端（GPUI、Iced、Bevy）严格保持 Wayland-only，彻底不含 X11 依赖；TUI 为零图形栈
+终端渲染，不依赖任何显示服务器（X11 同样不受支持）。
 所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 为 `G`/`I`/`T`/`B`）。
 
-该边界只约束发行物，不扩大平台能力。发行面内没有合格数据源、授权或原生实现的能力，
-必须继续以 typed `Unsupported`、`Unavailable` 或权限结果呈现，不得用空值、静态占位或
-未接线按钮把它写成正式版功能。
+该边界只约束发行物，不扩大平台能力。「四端平权」不等于四端「功能对等」，也不表示三个平台
+具备相同的系统级能力。发行面内没有合格数据源、授权或原生实现的能力，必须继续以 typed
+`Unsupported`、`PermissionRequired`、`RequiresEscalation`、`MissingDependency` 或
+`TemporarilyUnavailable` 呈现（这五个是 `platform-contract::CapabilityStatus` 的真实变体名）；
+`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 是不同轴，不得
+混用。平台按 typed 原因诚实降级是产品承诺的一部分，不得用空值、静态占位或未接线按钮把它写成
+正式版功能。
 
-只有推送与根 `Cargo.toml` 版本一致的 `vX.Y.Z` tag，才会创建正式 Release 并生成以下 24 项产物。
+只有推送与根 `Cargo.toml` 版本一致的 `vX.Y.Z` tag，才会创建正式 Release 并生成以下 28 项
+产物：四端各 4 个 DEB/RPM 包，加共享数据包 `taskforest-common` 的两架构 DEB/RPM。
 所有发布产物遵循统一命名 `TaskForest-<UI>-<版本>-<平台>.<格式>`（UI 对应为 `G`、`I`、`T`、`B`，
-平台为 `x64`/`arm64`）；权威定义见 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)。
+共享数据包用 `Common`，平台为 `x64`/`arm64`）；权威定义见 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)。
 包内元数据仍遵守发行版惯例：DEB `Architecture` 为 `amd64`/`arm64`，RPM arch 为
 `x86_64`/`aarch64`，与文件名中的 `x64`/`arm64` 是固定映射。
 
@@ -45,6 +53,10 @@ Iced、TUI、Bevy）全量 DEB 与 RPM 安装包；Windows 原生流水线构建
 | Linux | arm64 | `TaskForest-T-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh ... T` |
 | Linux | x64 | `TaskForest-B-<ver>-x64.rpm` | `x86_64` | `packaging/rpm/build-rpm.sh ... B` |
 | Linux | arm64 | `TaskForest-B-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh ... B` |
+| Linux | x64 | `TaskForest-Common-<ver>-x64.deb` | `amd64` | `packaging/debian/build-deb-common.sh` |
+| Linux | arm64 | `TaskForest-Common-<ver>-arm64.deb` | `arm64` | `packaging/debian/build-deb-common.sh` |
+| Linux | x64 | `TaskForest-Common-<ver>-x64.rpm` | `x86_64` | `packaging/rpm/build-rpm.sh ... C` |
+| Linux | arm64 | `TaskForest-Common-<ver>-arm64.rpm` | `aarch64` | `packaging/rpm/build-rpm.sh ... C` |
 | Windows | x64 | `TaskForest-G-<ver>-x64.msi` | `x64` | `packaging/windows/build-msi.sh ... G` |
 | Windows | arm64 | `TaskForest-G-<ver>-arm64.msi` | `arm64` | `packaging/windows/build-msi.sh ... G` |
 | Windows | x64 | `TaskForest-I-<ver>-x64.msi` | `x64` | `packaging/windows/build-msi.sh ... I` |
@@ -65,15 +77,19 @@ Linux amd64/arm64 和 Windows x64/arm64 均使用对应的 GitHub-hosted 原生 
 `packaging/arch/PKGBUILD::package()` 是系统安装树的唯一布局权威：
 
 1. `packaging/linux/stage-release-tree.sh` 从该布局生成 staged tree；
-2. DEB 和 RPM 构建器只叠加格式元数据；
+2. DEB 和 RPM 构建器只叠加格式元数据；共享图标资产由数据包 `taskforest-common`
+   独占，四端包从自身文件清单移除这些路径并声明对该包的依赖；
 3. `packaging/arch/stage-package-sim.sh` 检查 manifest、权限和 polkit `exec.path`；
 4. 发布包只包含 DEB/RPM 的系统安装树；正式发布面不包含便携包或后台服务。
 
 ## Windows MSI
 
-WiX 文件 `packaging/windows/taskforest.wxs` 是 MSI 文件清单权威。MSI 安装 GPUI 可执行文件、
-同目录的身份校验 UAC process-control helper、LICENSE 和开始菜单入口，不安装后台历史服务或
-autostart。Linux 专用 helper 和 polkit policy 不进入 MSI。
+WiX 文件 `packaging/windows/taskforest.wxs` 是 MSI 文件清单权威。该文件对四端参数化，
+每个 `TaskForest-<UI>` MSI 安装所选前端的可执行文件（`G`/`I`/`T`/`B`）、同目录的身份校验
+UAC process-control helper、LICENSE、THIRD-PARTY-NOTICES 和开始菜单入口，不安装后台历史
+服务或 autostart。Linux 专用 helper 和 polkit policy 不进入 MSI。共享的 helper、LICENSE、
+notices 与安装标记使用四端一致的组件 GUID，由 Windows Installer 引用计数，只在最后一个
+产品卸载时移除；不设单独的 common MSI。
 
 MSI 的 `ProductVersion` 属性受 Windows Installer 硬性限制只能为数字段 `X.Y.Z`；完整版本
 （含 `rcN`）出现在文件名、MSI 摘要 Description、ARP comments 以及安装后的

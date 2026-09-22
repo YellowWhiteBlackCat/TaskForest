@@ -16,7 +16,10 @@
 # Every Linux package format replays the PKGBUILD layout authority through
 # packaging/linux/stage-release-tree.sh, so Arch/deb/rpm installs identical
 # trees by construction. All four frontend products (TaskForest-G,
-# TaskForest-I, TaskForest-T, TaskForest-B) are packaged as DEB releases.
+# TaskForest-I, TaskForest-T, TaskForest-B) are packaged as DEB, RPM and MSI
+# releases. Linux additionally ships the shared data-only package
+# taskforest-common, which owns the hicolor icon set the four frontend
+# packages consume instead of installing byte-identical copies.
 #
 # Token policy is owned by the CALLER: this workflow declares no `permissions`
 # block, because a called workflow can only restrict the caller's GITHUB_TOKEN.
@@ -172,6 +175,12 @@ jobs:
             "${{ steps.version.outputs.version }}" \
             "TaskForest-B-${{ steps.version.outputs.version }}-${{ matrix.arch }}.deb" \
             "$DEB_ARCH"
+          # Shared data-only package: owns the hicolor icon set the four
+          # frontend DEBs depend on. It needs no staged tree of its own.
+          packaging/debian/build-deb-common.sh \
+            "${{ steps.version.outputs.version }}" \
+            "TaskForest-Common-${{ steps.version.outputs.version }}-${{ matrix.arch }}.deb" \
+            "$DEB_ARCH"
       - name: Build RPM
         run: |
           for ui in G I T B; do
@@ -180,10 +189,16 @@ jobs:
               "TaskForest-${ui}-${{ steps.version.outputs.version }}-${{ matrix.arch }}.rpm" \
               "$ui"
           done
+          # Shared data-only package; the C target regenerates its own small
+          # staging tree and ships the Common file name.
+          packaging/rpm/build-rpm.sh staging \
+            "${{ steps.version.outputs.version }}" \
+            "TaskForest-Common-${{ steps.version.outputs.version }}-${{ matrix.arch }}.rpm" \
+            C
       - name: Validate DEB package
         run: |
           set -euo pipefail
-          for ui in G I T B; do
+          for ui in G I T B Common; do
             deb=$(find . -maxdepth 1 -type f -name "TaskForest-${ui}-*-${{ matrix.arch }}.deb" -print -quit)
             test -n "$deb"
             test -f "$deb"
@@ -196,7 +211,7 @@ jobs:
       - name: Validate RPM package
         run: |
           set -euo pipefail
-          for ui in G I T B; do
+          for ui in G I T B Common; do
             rpm_file=$(find . -maxdepth 1 -type f -name "TaskForest-${ui}-*-${{ matrix.arch }}.rpm" -print -quit)
             test -n "$rpm_file"
             test "$(rpm -qp --queryformat '%{ARCH}\n' "$rpm_file")" = "$RPM_ARCH"
@@ -214,10 +229,12 @@ jobs:
             "$(find . -maxdepth 1 -type f -name "TaskForest-I-*-${{ matrix.arch }}.deb" -print -quit)"
             "$(find . -maxdepth 1 -type f -name "TaskForest-T-*-${{ matrix.arch }}.deb" -print -quit)"
             "$(find . -maxdepth 1 -type f -name "TaskForest-B-*-${{ matrix.arch }}.deb" -print -quit)"
+            "$(find . -maxdepth 1 -type f -name "TaskForest-Common-*-${{ matrix.arch }}.deb" -print -quit)"
             "$(find . -maxdepth 1 -type f -name "TaskForest-G-*-${{ matrix.arch }}.rpm" -print -quit)"
             "$(find . -maxdepth 1 -type f -name "TaskForest-I-*-${{ matrix.arch }}.rpm" -print -quit)"
             "$(find . -maxdepth 1 -type f -name "TaskForest-T-*-${{ matrix.arch }}.rpm" -print -quit)"
             "$(find . -maxdepth 1 -type f -name "TaskForest-B-*-${{ matrix.arch }}.rpm" -print -quit)"
+            "$(find . -maxdepth 1 -type f -name "TaskForest-Common-*-${{ matrix.arch }}.rpm" -print -quit)"
           )
           for file in "${files[@]}"; do test -n "$file" && test -f "$file"; done
           sha256sum "${files[@]}" > "checksums-sha256-linux-${{ matrix.arch }}.txt"
@@ -264,10 +281,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
-      # GPUI product only — the release surface deliberately skips the Iced
-      # build. The fixed UAC process-control helper is built for the same
-      # native target and installed beside the app so the runas path can find
-      # the exact helper it names.
+      # All four frontend products (T-G/T-I/T-T/T-B) are built for the native
+      # target. The fixed UAC process-control helper is built for the same
+      # target and installed beside the app so the runas path can find the
+      # exact helper it names.
       - name: Build release exe
         shell: bash
         run: |
@@ -401,6 +418,10 @@ jobs:
           rpm_t_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-T-*-arm64.rpm' -print -quit)
           rpm_b_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-B-*-x64.rpm' -print -quit)
           rpm_b_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-B-*-arm64.rpm' -print -quit)
+          deb_common_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-Common-*-x64.deb' -print -quit)
+          deb_common_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-Common-*-arm64.deb' -print -quit)
+          rpm_common_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-Common-*-x64.rpm' -print -quit)
+          rpm_common_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-Common-*-arm64.rpm' -print -quit)
 
           msi_g_amd64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-x64.msi' -print -quit)
           msi_g_arm64=$(find . -maxdepth 1 -type f -name 'TaskForest-G-*-arm64.msi' -print -quit)
@@ -420,6 +441,8 @@ jobs:
             "$rpm_i_amd64" "$rpm_i_arm64" \
             "$rpm_t_amd64" "$rpm_t_arm64" \
             "$rpm_b_amd64" "$rpm_b_arm64" \
+            "$deb_common_amd64" "$deb_common_arm64" \
+            "$rpm_common_amd64" "$rpm_common_arm64" \
             "$msi_g_amd64" "$msi_g_arm64" \
             "$msi_i_amd64" "$msi_i_arm64" \
             "$msi_t_amd64" "$msi_t_arm64" \
@@ -451,7 +474,9 @@ jobs:
             "$(basename "$rpm_g_amd64")" \
             "$(basename "$rpm_i_amd64")" \
             "$(basename "$rpm_t_amd64")" \
-            "$(basename "$rpm_b_amd64")"
+            "$(basename "$rpm_b_amd64")" \
+            "$(basename "$deb_common_amd64")" \
+            "$(basename "$rpm_common_amd64")"
           check_checksum_manifest checksums-sha256-linux-arm64.txt \
             "$(basename "$deb_g_arm64")" \
             "$(basename "$deb_i_arm64")" \
@@ -460,7 +485,9 @@ jobs:
             "$(basename "$rpm_g_arm64")" \
             "$(basename "$rpm_i_arm64")" \
             "$(basename "$rpm_t_arm64")" \
-            "$(basename "$rpm_b_arm64")"
+            "$(basename "$rpm_b_arm64")" \
+            "$(basename "$deb_common_arm64")" \
+            "$(basename "$rpm_common_arm64")"
           check_checksum_manifest checksums-sha256-windows-x64.txt \
             "$(basename "$msi_g_amd64")" \
             "$(basename "$msi_i_amd64")" \

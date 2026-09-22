@@ -10,7 +10,7 @@ Summary:    Native system monitor built with Bevy UI
 License:    Apache-2.0
 URL:        https://github.com/YellowWhiteBlackCat/TaskForest
 Source0:     taskforest-tree.tar.gz
-Requires:   fontconfig, freetype, libxkbcommon, libwayland-client, vulkan-loader
+Requires:   taskforest-common, fontconfig, freetype, libxkbcommon, libwayland-client, vulkan-loader
 Recommends: polkit
 Suggests:   taskforest, smartmontools, nvme-cli, xfsprogs, iw, mesa-vulkan-drivers
 ExclusiveArch: x86_64 aarch64
@@ -36,7 +36,6 @@ tar -xf %{SOURCE0} -C %{buildroot}
 /usr/bin/taskforest-b
 /usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestB.desktop
 /usr/share/metainfo/io.github.YellowWhiteBlackCat.TaskForestB.metainfo.xml
-/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg
 %dir /usr/share/licenses/taskforest-b
 /usr/share/licenses/taskforest-b/LICENSE
 /usr/share/licenses/taskforest-b/THIRD-PARTY-NOTICES.txt

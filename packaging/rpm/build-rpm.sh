@@ -41,7 +41,11 @@ case "$ui" in
         spec_file="$script_dir/taskforest-b.spec"
         ui_tag="B"
         ;;
-    *) echo "build-rpm: unknown UI target '$ui' (expected G, I, T, or B)" >&2; exit 1 ;;
+    C|c|common)
+        spec_file="$script_dir/taskforest-common.spec"
+        ui_tag="C"
+        ;;
+    *) echo "build-rpm: unknown UI target '$ui' (expected G, I, T, B, or C)" >&2; exit 1 ;;
 esac
 
 # RPM's Version field forbids dashes; a Cargo prerelease like 0.1.0-rc5
@@ -90,10 +94,36 @@ case "$ui_tag" in
             target_staged="$work/stage-b"
         fi
         ;;
+    C)
+        # The common package owns only the shared data assets; it never reuses
+        # a frontend staged tree. Regenerate its small dedicated tree so the
+        # spec's %files matches Source0 exactly.
+        mkdir -p "$work/stage-common"
+        "$repo/packaging/debian/build-deb-common.sh" --stage-only "$work/stage-common" >/dev/null
+        target_staged="$work/stage-common"
+        ;;
 esac
 
-# tar with top-level usr/ so the spec's %install can extract straight into
-# the build root.
+# For a frontend product, drop the destinations owned by taskforest-common so
+# the spec's %files never lists a path another package owns; the manifest is
+# the authority for that set. Empty parent directories are pruned so no
+# orphaned icon directory reaches the RPM either. The common package itself
+# keeps its full tree. tar uses top-level usr/ so the spec's %install can
+# extract straight into the build root.
+if [[ "$ui_tag" != "C" ]]; then
+    manifest="$repo/docs/system-install-manifest.tsv"
+    [[ -f "$manifest" ]] || { echo "build-rpm: missing $manifest" >&2; exit 1; }
+    filtered="$work/staged-filtered"
+    cp -a "$target_staged" "$filtered"
+    while IFS= read -r destination; do
+        [[ "$destination" == /usr/* ]] || continue
+        rm -f "$filtered$destination"
+        rmdir -p --ignore-fail-on-non-empty "$(dirname "$filtered$destination")" \
+            2>/dev/null || true
+    done < <(awk -F'\t' -v provider="packaging/rpm/taskforest-common.spec" \
+        'NR > 1 && index($7, provider) { print $4 }' "$manifest")
+    target_staged="$filtered"
+fi
 tar -C "$target_staged" -czf "$topdir/SOURCES/taskforest-tree.tar.gz" usr
 spec_name=$(basename "$spec_file")
 cp "$spec_file" "$topdir/SPECS/$spec_name"

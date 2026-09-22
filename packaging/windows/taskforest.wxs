@@ -2,14 +2,22 @@
 <!--
   TaskForest Windows installer (WiX v4+ schema, built by `wix build`).
 
-  Per-machine install of the GPUI frontend into Program Files, with one Start
-  Menu shortcut. History persistence is owned by the running frontend session.
-  Design notes:
+  Per-machine install of a TaskForest frontend product into Program Files,
+  with one Start Menu shortcut. History persistence is owned by the running
+  frontend session. Design notes:
 
   - No service or autostart registration is installed by this MSI.
   - The identity-checked Windows UAC process-control helper ships next to the
-    GPUI executable. Other privileged helpers and Linux polkit policies remain
-    Linux-native and are not part of this MSI.
+    packaged frontend executable. Other privileged helpers and Linux polkit
+    policies remain Linux-native and are not part of this MSI.
+  - Shared-component ownership: the process-control helper, LICENSE, notices,
+    and the family install markers live in components whose GUID is identical
+    in every TaskForest MSI. Windows Installer reference-counts an identical
+    component across products, so those paths have exactly one owner and are
+    removed only when the last product uninstalls. The per-UI executable and
+    its Start Menu shortcut stay in per-UI components. There is no fifth
+    "common" MSI: a per-machine product that needs no bootstrapper is simpler
+    and keeps each MSI self-contained.
   - AllowSameVersionUpgrades lets an rc build (numeric version collared to
     x.y.z) upgrade in place for the final release.
   - Unsigned until an Authenticode secret exists; SmartScreen will warn.
@@ -64,6 +72,14 @@
                     Target="[INSTALLFOLDER]$(var.ExeName)"
                     Icon="TaskForest.ico"
                     WorkingDirectory="INSTALLFOLDER" />
+        </Component>
+        <!-- Family install markers shared by all four products. The fixed GUID
+             is deliberately identical in every TaskForest MSI so Windows
+             Installer reference-counts this component: the markers and the
+             Start Menu folder are removed only when the last product leaves,
+             never by one product's uninstall while another is installed. -->
+        <Component Id="TaskForestFamilyMarkers"
+                   Guid="A1B2C3D4-E5F6-4A7B-8C9D-0E1F2A3B4C5D">
           <RemoveFolder Id="RemoveShortcutFolder" On="uninstall" />
           <RegistryValue Root="HKLM"
                          Key="Software\TaskForest"

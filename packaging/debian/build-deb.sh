@@ -3,9 +3,12 @@
 #
 # The staged /usr tree comes from packaging/linux/stage-release-tree.sh, which
 # replays the PKGBUILD layout authority verbatim — this wrapper only adds the
-# DEBIAN/control metadata and calls dpkg-deb. No maintainer scripts: modern dpkg
-# file triggers already reload systemd user units and polkit actions, and the
-# package intentionally runs no install-time privileged code.
+# DEBIAN/control metadata and calls dpkg-deb. The manifest-declared assets of
+# taskforest-common (the shared hicolor icon set) are removed from the copy so
+# exactly one DEB owns each shared path; the frontend package depends on
+# taskforest-common instead. No maintainer scripts: modern dpkg file triggers
+# already reload systemd user units and polkit actions, and the package
+# intentionally runs no install-time privileged code.
 #
 # Usage: packaging/debian/build-deb.sh STAGED_TREE VERSION OUTPUT_DEB [DEB_ARCH]
 # (STAGED_TREE is the directory containing usr/; it is copied, never mutated.)
@@ -42,6 +45,22 @@ esac
 work=$(mktemp -d "$repo/.tmp/build-deb.XXXXXX")
 trap 'rm -rf "$work"' EXIT
 cp -a "$staged/usr" "$work/usr"
+
+# taskforest-common is the single DEB owner of the shared hicolor icon set. The
+# PKGBUILD-derived staged tree carries those assets for the monolithic Arch
+# package, so remove exactly the destinations the manifest attributes to the
+# common data package before packaging the GPUI product. The manifest is the
+# authority; no hand-maintained path list lives here.
+manifest="$repo/docs/system-install-manifest.tsv"
+[[ -f "$manifest" ]] || { echo "build-deb: missing $manifest" >&2; exit 1; }
+while IFS= read -r destination; do
+    [[ "$destination" == /usr/* ]] || continue
+    rm -f "$work$destination"
+    rmdir -p --ignore-fail-on-non-empty "$(dirname "$work$destination")" \
+        2>/dev/null || true
+done < <(awk -F'\t' -v provider="packaging/debian/build-deb-common.sh" \
+    'NR > 1 && index($7, provider) { print $4 }' "$manifest")
+
 # A staged tree copied from an NTFS-mounted checkout can carry mode 0777.
 # Normalize the package-owned directory metadata before dpkg-deb validates the
 # DEBIAN control directory; native Linux runners already have these modes.

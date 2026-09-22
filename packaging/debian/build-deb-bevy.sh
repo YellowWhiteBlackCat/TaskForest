@@ -2,7 +2,8 @@
 # Build the TaskForest-B (Bevy frontend) .deb package.
 #
 # Standalone Wayland-native Bevy UI frontend product (`taskforest-b`) along
-# with its desktop entry, AppStream metainfo, icon, and license notices.
+# with its desktop entry, AppStream metainfo, and license notices. The shared
+# hicolor icon set belongs to taskforest-common, which this package depends on.
 #
 # Strict Wayland-only: A Wayland session is required and X11 is not supported.
 # Zero X11 packages, zero X11 dependencies.
@@ -136,27 +137,18 @@ else
 
     desktop_src="$repo/packaging/linux/io.github.YellowWhiteBlackCat.TaskForestB.desktop"
     metainfo_src="$repo/packaging/linux/io.github.YellowWhiteBlackCat.TaskForestB.metainfo.xml"
-    icon_src="$repo/packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg"
 
     [[ -f "$desktop_src" ]] || { echo "build-deb-bevy: desktop file missing: $desktop_src" >&2; exit 1; }
     [[ -f "$metainfo_src" ]] || { echo "build-deb-bevy: metainfo file missing: $metainfo_src" >&2; exit 1; }
-    [[ -s "$icon_src" ]] || { echo "build-deb-bevy: icon file missing or empty: $icon_src" >&2; exit 1; }
 
     mkdir -p "$work/usr/bin" \
         "$work/usr/share/applications" \
         "$work/usr/share/metainfo" \
-        "$work/usr/share/icons/hicolor/scalable/apps" \
         "$work/usr/share/licenses/taskforest-b"
 
     install -m 755 "$bin" "$work/usr/bin/taskforest-b"
     install -m 644 "$desktop_src" "$work/usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestB.desktop"
     install -m 644 "$metainfo_src" "$work/usr/share/metainfo/io.github.YellowWhiteBlackCat.TaskForestB.metainfo.xml"
-    install -m 644 "$icon_src" "$work/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg"
-    for size in 16 24 32 48 64 128 256 512; do
-        icon_png="$repo/packaging/linux/icons/hicolor/${size}x${size}/apps/taskforest-taskboard.png"
-        [[ -s "$icon_png" ]] || { echo "build-deb-bevy: missing icon ladder asset: $icon_png" >&2; exit 1; }
-        install -Dm644 "$icon_png" "$work/usr/share/icons/hicolor/${size}x${size}/apps/taskforest-taskboard.png"
-    done
 
     if command -v strip >/dev/null 2>&1; then
         strip --strip-unneeded "$work/usr/bin/taskforest-b" 2>/dev/null || \
