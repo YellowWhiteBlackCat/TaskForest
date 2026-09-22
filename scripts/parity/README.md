@@ -133,8 +133,23 @@ Anchored batches (2026-09-22):
   battery/SMART/log surfaces, and the Bevy namespace audit). The survey added
   `pending` rows only where a real near-miss exists; a feature with no test
   touching its surface stays without a row.
+- Fourth batch (W16-A): the two GPUI cells whose `pending` notes rested on
+  test-tree-only fixtures. `crates/taskmanager-gpui/tests/gui/gpui_app/system_view/detail_rows.rs`
+  used to define `battery_detail_rows` / `thermal_control_rows` inside the test
+  tree; no production System-page code ever rendered them (their i18n keys had
+  zero production references), so the five tests that folded them proved a
+  surface that does not exist. The fixture and those tests were deleted; the
+  GPUI battery and thermal-zone claims are now anchored on the shape's real
+  delivery surfaces - the Performance page battery panel
+  (`perf_views::dynamic_stats::tests`, charge + power + voltage + health +
+  cycle rows with honest absence) and the System Health sensor center
+  (`system_health_view::stats::tests`, one labelled row per thermal-zone
+  reading with its real value and typed absence). The fixture's thermal-control
+  half (`system.cooling` / `system.throttle`) matches
+  `power.thermal-throttle-events`, which this shape declares `Unsupported`, and
+  gained no row.
 
-The table now carries **37 anchored + 24 `pending`** rows (per frontend: gpui 7,
+The table now carries **39 anchored + 22 `pending`** rows (per frontend: gpui 9,
 iced 11, tui 14, bevy 5 anchored). Every other source-complete cell keeps its G2
 finding until a real test is anchored; the batches are a bounded delivery,
 never a blanket `Ready` claim. A `pending` row is a survey record, not a

@@ -56,6 +56,22 @@
 # SMART/battery/log surfaces, the thermal-zone source traversal, the
 # process-details fault and huge-page counters, and the Bevy namespace audit);
 # a feature with no test touching its surface at all stays without a row.
+#
+# Fourth anchored batch (2026-09-22, W16-A): the GPUI cells whose
+# `power.battery-inventory` / `power.thermal-zones` claims were previously
+# recorded as pending on the strength of evidence that turned out to be
+# test-tree-only. The GPUI System hardware page never rendered battery or
+# thermal-control rows: `system_view/detail_rows.rs` defined its own
+# `battery_detail_rows` / `thermal_control_rows` folds inside the test tree and
+# the tests asserted those, while the i18n keys they used
+# (`system.battery_power`, `system.battery_cycles`, `system.cooling`,
+# `system.throttle`) had zero production references. That fixture and its five
+# tests were deleted rather than rendered; the two real GPUI delivery surfaces
+# now carry anchors - the Performance page's battery stat panel
+# (`battery_stats`, charge/power/voltage/health/cycles with honest absence) and
+# the System Health sensor center (`sensor_rows`, one labelled row per
+# thermal-zone reading). `power.thermal-throttle-events` (the fake fixture's
+# other half) stays declared `Unsupported` by this shape and gained no row.
 feature_id	frontend	test_id	status	note
 handles.enumeration	gpui	gpui_app::process_insights::view::open_files::tests::populated_open_files_render_with_unreadable_marker	anchored	-
 handles.enumeration	iced	ui::insights::tests::open_file_row_marks_an_unreadable_target_not_blank	anchored	-
@@ -106,8 +122,8 @@ storage.swap-throughput	iced	-	pending	no Iced test seeds or asserts the swap-in
 storage.swap-throughput	tui	-	pending	no TUI test seeds or asserts the swap-in/swap-out throughput rows; the memory-stats test renders every other measured fact
 storage.iops-queue-latency	gpui	-	pending	the only GPUI IOPS assertion is a first-sample dash; no test renders a real IOPS/queue-depth/latency value
 storage.iops-queue-latency	iced	-	pending	the disk-summary test pins the IOPS/Response/Avg-queue rows as dashes; no test renders a real value for any of the three
-power.battery-inventory	gpui	-	pending	no GPUI product test asserts charge/voltage/cycles; the perf battery_stats test proves health + estimates only, and the system_view battery_detail_rows tests fold a test-tree-only row helper no product code renders
-power.thermal-zones	gpui	-	pending	the readout test proves the CPU temperature source qualifier ("ACPI thermal zone"); no test traverses the sensor inventory and names each reading
+power.battery-inventory	gpui	gpui_app::perf_views::dynamic_stats::tests::battery_stats_render_charge_power_voltage_health_and_cycles_with_honest_absence	anchored	-
+power.thermal-zones	gpui	gpui_app::system_health_view::stats::tests::sensor_rows_traverse_every_thermal_zone_reading_and_name_its_source	anchored	-
 power.thermal-zones	iced	-	pending	the thermal-panel test asserts only that the panel appears when temperatures exist; no reading or source label is asserted
 power.thermal-zones	tui	-	pending	the fan test asserts a same-device temperature value ("54.5 °C"); the painted source label and any thermal-zone traversal are unasserted
 services.log-stream	gpui	-	pending	the details-state tests prove the typed log-state projection; no test asserts the painted stream rows or a level-filtered fold

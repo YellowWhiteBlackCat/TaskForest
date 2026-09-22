@@ -28,7 +28,7 @@ pub use localized::localized_text;
 mod self_test;
 mod stats;
 use self_test::self_test_card;
-use stats::{filesystem_capacity, sensor_value_vm};
+use stats::{filesystem_capacity, sensor_rows};
 use taskmanager_theme::Theme;
 
 /// Copy identifiers are resolved by the caller so this isolated component can
@@ -345,56 +345,8 @@ fn sensor_group(
         .gap(taskmanager_ui::theme_binding::definite_length(
             tokens::SPACE_5,
         ));
-    let mut count = 0;
-    let quantity = group.quantity();
-    for reading in readings
-        .iter()
-        .filter(|reading| reading.quantity() == &quantity)
-    {
-        count += 1;
-        let value = sensor_value_vm(reading, copy);
-        rows = rows.child(
-            div()
-                .p(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_8,
-                ))
-                .rounded(taskmanager_ui::theme_binding::absolute(
-                    tokens::control_radius(theme),
-                ))
-                .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
-                .flex()
-                .flex_row()
-                .flex_wrap()
-                .items_center()
-                .justify_between()
-                .gap(taskmanager_ui::theme_binding::definite_length(
-                    tokens::SPACE_6,
-                ))
-                .child(
-                    div()
-                        .flex_1()
-                        .min_w(px(120.0))
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .child(reading.label().to_owned()),
-                )
-                .child(
-                    div()
-                        .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
-                        .text_color(taskmanager_ui::theme_binding::hsla(if value.present {
-                            theme.fg
-                        } else {
-                            state_color(theme, reading.state().status)
-                        }))
-                        .child(value.text),
-                )
-                .child(badge(
-                    theme,
-                    copy(SystemHealthText::DeviceStatus(reading.state().status)),
-                    state_color(theme, reading.state().status),
-                )),
-        );
-    }
-    if count == 0 {
+    let folded = sensor_rows(readings, group, copy);
+    if folded.is_empty() {
         rows = rows.child(
             div()
                 .py(taskmanager_ui::theme_binding::definite_length(
@@ -404,6 +356,49 @@ fn sensor_group(
                 .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
                 .child(copy(SystemHealthText::NoReadings)),
         );
+    } else {
+        for row in folded {
+            rows = rows.child(
+                div()
+                    .p(taskmanager_ui::theme_binding::definite_length(
+                        tokens::SPACE_8,
+                    ))
+                    .rounded(taskmanager_ui::theme_binding::absolute(
+                        tokens::control_radius(theme),
+                    ))
+                    .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_card_bg))
+                    .flex()
+                    .flex_row()
+                    .flex_wrap()
+                    .items_center()
+                    .justify_between()
+                    .gap(taskmanager_ui::theme_binding::definite_length(
+                        tokens::SPACE_6,
+                    ))
+                    .child(
+                        div()
+                            .flex_1()
+                            .min_w(px(120.0))
+                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                            .child(row.label),
+                    )
+                    .child(
+                        div()
+                            .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
+                            .text_color(taskmanager_ui::theme_binding::hsla(if row.present {
+                                theme.fg
+                            } else {
+                                state_color(theme, row.status)
+                            }))
+                            .child(row.value),
+                    )
+                    .child(badge(
+                        theme,
+                        copy(SystemHealthText::DeviceStatus(row.status)),
+                        state_color(theme, row.status),
+                    )),
+            );
+        }
     }
     div()
         .p(taskmanager_ui::theme_binding::definite_length(

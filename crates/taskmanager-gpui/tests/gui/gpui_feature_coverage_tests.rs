@@ -121,7 +121,12 @@ fn the_reference_undelivered_set_is_pinned() {
 /// this shape is pinned below; `Ready` itself stays host-derived. The third
 /// survey (W15-A) added no anchor for this shape and recorded its remaining
 /// near-misses (SMART, swap throughput, IOPS/queue/latency, battery, thermal
-/// zones, log stream) as explicit `pending` gaps in the same table.
+/// zones, log stream) as explicit `pending` gaps in the same table. The fourth
+/// batch (W16-A) deleted the test-tree-only battery/thermal-control fixture
+/// whose tests proved a System-page surface no product code rendered, then
+/// anchored this shape's two real delivery surfaces: the Performance battery
+/// panel (`power.battery-inventory`) and the System Health sensor center
+/// (`power.thermal-zones`).
 #[test]
 fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() {
     let declaration = feature_coverage_declaration();
@@ -218,7 +223,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        7,
+        9,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

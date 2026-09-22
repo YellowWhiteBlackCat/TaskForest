@@ -601,7 +601,12 @@ fn the_committed_feature_evidence_table_is_structurally_clean() {
 /// (W15-A) anchors `storage.smart-health` (iced/tui),
 /// `storage.iops-queue-latency` (tui), `power.battery-inventory` (iced/tui),
 /// and `services.log-stream` (iced), and records the surveyed near-misses of
-/// the same survey as explicit `pending` gaps. The
+/// the same survey as explicit `pending` gaps; the fourth batch (W16-A)
+/// converts the two GPUI `pending` cells that rested on test-tree-only
+/// fixtures into anchors on the shape's real delivery surfaces
+/// (`power.battery-inventory` on the Performance battery panel,
+/// `power.thermal-zones` on the System Health sensor center) after deleting
+/// the unshipped fixture. The
 /// per-frontend anchored counts and the surveyed pending gaps are pinned, so
 /// growing either batch must move this pin in the same change.
 #[test]
@@ -624,11 +629,11 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        37,
+        39,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
-        (FrontendShape::Gpui, 7usize),
+        (FrontendShape::Gpui, 9usize),
         (FrontendShape::Iced, 11),
         (FrontendShape::Tui, 14),
         (FrontendShape::Bevy, 5),
@@ -645,7 +650,7 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.pending_count(),
-        24,
+        22,
         "the surveyed pending-gap census moved"
     );
     for row in table.rows().iter().filter(|row| !row.is_anchored()) {
