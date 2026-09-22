@@ -3,8 +3,9 @@
 //! `PlatformEventBatch`.
 
 use super::super::{
-    ContainerRollupEvent, GpuEngineRowsEvent, HardwareInventoryEvent, MsrReadoutEvent,
-    NpuInventoryEvent, RaplPowerEvent, SmbiosMemoryEvent, SystemTelemetryDomainOutcome,
+    ContainerRollupEvent, CpuThrottleEvent, GpuEngineRowsEvent, HardwareInventoryEvent,
+    MsrReadoutEvent, NpuInventoryEvent, RaplPowerEvent, SmbiosMemoryEvent,
+    SystemTelemetryDomainOutcome,
 };
 use super::{CorrelatedEvent, PlatformEventBatch, PlatformEventContext};
 
@@ -15,6 +16,7 @@ pub type CorrelatedNpuInventoryEvent = CorrelatedEvent<NpuInventoryEvent>;
 pub type CorrelatedSmbiosMemoryEvent = CorrelatedEvent<SmbiosMemoryEvent>;
 pub type CorrelatedRaplPowerEvent = CorrelatedEvent<RaplPowerEvent>;
 pub type CorrelatedMsrReadoutEvent = CorrelatedEvent<MsrReadoutEvent>;
+pub type CorrelatedCpuThrottleEvent = CorrelatedEvent<CpuThrottleEvent>;
 
 pub(super) fn push_hardware_inventory(
     batch: &mut PlatformEventBatch,
@@ -83,6 +85,16 @@ pub(super) fn push_msr_readout(
 ) {
     batch
         .msr_readout_events
+        .push(CorrelatedEvent::new(context, event));
+}
+
+pub(super) fn push_cpu_throttle(
+    batch: &mut PlatformEventBatch,
+    context: PlatformEventContext,
+    event: CpuThrottleEvent,
+) {
+    batch
+        .cpu_throttle_events
         .push(CorrelatedEvent::new(context, event));
 }
 

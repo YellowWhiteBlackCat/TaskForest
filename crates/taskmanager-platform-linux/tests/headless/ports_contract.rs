@@ -20,8 +20,8 @@ use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
-    ContainerRollup, CpuMetrics, CpuTelemetryObservation, DesktopAppearance, DeviceGeneration,
-    DeviceId, DeviceState, DeviceStatus, DirectoryScanControl, DirectoryScanSpec,
+    ContainerRollup, CpuMetrics, CpuTelemetryObservation, CpuThrottleSnapshot, DesktopAppearance,
+    DeviceGeneration, DeviceId, DeviceState, DeviceStatus, DirectoryScanControl, DirectoryScanSpec,
     DirectoryScanStatus, DirectoryScanTotals, DirectoryUsageSnapshot, FilesystemHealthSnapshot,
     FrozenProcessIdentity, GpuEngineMetric, GpuEngineRowsSnapshot, GpuTelemetryObservation,
     HardwareInfo, HostRuntimeFacts, HostRuntimeObservation, MemoryMetrics,
@@ -47,7 +47,7 @@ use taskmanager_platform_linux::{
     SystemObservationProviders, SystemProviders,
 };
 use taskmanager_platform_provider::{
-    CommandLaunchProvider, ContainerRollupProvider, CpuTelemetryProvider,
+    CommandLaunchProvider, ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider,
     DesktopAppearanceProvider, DirectoryUsageProvider, FilesystemHealthProvider,
     GpuEngineRowsProvider, GpuTelemetryProvider, HardwareInventoryProvider, HostTelemetryProvider,
     MemoryTelemetryProvider, MsrReadoutProvider, NetworkTelemetryProvider, NpuInventoryProvider,

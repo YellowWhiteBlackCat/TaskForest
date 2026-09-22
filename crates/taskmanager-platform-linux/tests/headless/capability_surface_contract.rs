@@ -8,14 +8,18 @@
 //! lane whose provider can only answer a typed absence.
 
 use std::collections::BTreeSet;
+use std::time::Duration;
 
+use taskmanager_application::{CpuThrottleEvent, CpuThrottleRequest, PlatformEvent};
 use taskmanager_platform_conformance::assert_capability_surface_matches_catalog;
-use taskmanager_platform_contract::{CapabilityId, CapabilityStatus, PlatformAxis, PlatformSource};
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityStatus, PlatformAxis, PlatformSource, RequestEnvelope, RequestId,
+};
 use taskmanager_platform_linux::{LinuxPlatformRuntime, capability_surface};
 
-/// The Linux adapter registers 48 real lanes; the number is pinned so a
+/// The Linux adapter registers 49 real lanes; the number is pinned so a
 /// registration change must move the layer-B declaration in the same change.
-const DECLARED_PRESENT_LANES: usize = 48;
+const DECLARED_PRESENT_LANES: usize = 49;
 
 #[test]
 fn the_linux_capability_surface_is_the_live_catalog_registration_face() {
@@ -102,4 +106,64 @@ fn the_linux_absence_declarations_are_typed_and_catalog_consistent() {
         absent_with_source.is_empty(),
         "Linux registers no pending lane, so no absent declaration may have a source: {absent_with_source:?}"
     );
+}
+
+/// The registered `telemetry.cpu.throttle` lane is a real read, not a
+/// declaration: one live request answers with the per-package counters the
+/// periodic CPU projection carries, or with a typed failure when the host
+/// exposes no CPU counter tree at all — never a fabricated zero.
+#[cfg(target_os = "linux")]
+#[test]
+fn the_linux_cpu_throttle_lane_answers_the_shared_counter_read() {
+    let handle = LinuxPlatformRuntime::spawn().expect("complete Linux composition");
+    let port = handle
+        .facets()
+        .system()
+        .cpu_throttle()
+        .expect("the registered lane must expose its request port");
+    port.try_submit(RequestEnvelope {
+        id: RequestId::new(7).expect("request id"),
+        capability: CapabilityId::TELEMETRY_CPU_THROTTLE,
+        submitted_at_ms: 1,
+        payload: CpuThrottleRequest::Refresh,
+    })
+    .expect("the throttle lane accepts a refresh");
+
+    for _ in 0..500 {
+        if let Some(event) = handle.events().try_recv().expect("event port") {
+            match event.outcome {
+                Ok(PlatformEvent::CpuThrottle(CpuThrottleEvent::Update(snapshot))) => {
+                    assert!(
+                        snapshot.is_success(),
+                        "a readable /sys CPU tree must answer with counter rows: {snapshot:?}"
+                    );
+                    assert!(
+                        snapshot
+                            .packages
+                            .windows(2)
+                            .all(|pair| pair[0].package_id < pair[1].package_id),
+                        "package rows must stay sorted and unique: {snapshot:?}"
+                    );
+                    if std::fs::read_to_string(
+                        "/sys/devices/system/cpu/cpu0/thermal_throttle/package_throttle_count",
+                    )
+                    .is_ok()
+                    {
+                        assert!(
+                            snapshot
+                                .packages
+                                .iter()
+                                .any(|row| row.package_throttle_count.is_some()),
+                            "an exposed kernel counter must reach the lane answer: {snapshot:?}"
+                        );
+                    }
+                    return;
+                }
+                Ok(other) => panic!("expected a CpuThrottle event, got {other:?}"),
+                Err(failure) => panic!("the throttle lane reported a failure: {failure:?}"),
+            }
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    panic!("no CpuThrottle update event arrived from the live lane");
 }

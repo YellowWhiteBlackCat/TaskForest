@@ -1,4 +1,4 @@
-//! Windows auxiliary system providers: the request/response lanes outside
+//! macOS auxiliary system providers: the request/response lanes outside
 //! domain observation ownership, boxed into one immutable composition group.
 //! Split from `system.rs` so that file stays inside the workspace line budget.
 
@@ -19,7 +19,7 @@ use super::{
 };
 
 /// Hardware operations outside domain observation ownership.
-pub struct WinSystemAuxiliaryProviders {
+pub struct MacSystemAuxiliaryProviders {
     pub(super) hardware_inventory: HardwareInventoryRegistration,
     pub(super) gpu_engine_rows: GpuEngineRowsRegistration,
     pub(super) npu_inventory: NpuInventoryRegistration,
@@ -29,7 +29,7 @@ pub struct WinSystemAuxiliaryProviders {
     pub(super) cpu_throttle: CpuThrottleRegistration,
 }
 
-impl WinSystemAuxiliaryProviders {
+impl MacSystemAuxiliaryProviders {
     #[allow(clippy::too_many_arguments)]
     #[must_use]
     pub fn new<P, E, N, S, R, M, C>(

@@ -14,15 +14,16 @@
 //! (ADR-019).
 
 use taskmanager_application::{
-    ContainerRollupRequest, CpuTelemetryRequest, DesktopNotificationRequest, GpuEngineRowsRequest,
-    GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
-    MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, ProcessAffinityControlRequest,
-    ProcessAffinityRequest, ProcessControlRequest, ProcessGpuRequest, ProcessIsolationRequest,
-    ProcessListRequest, ProcessNetworkEscalationRequest, ProcessNetworkRequest,
-    ProcessOpenFilesRequest, ProcessResourceControlRequest, ProcessResourcesRequest,
-    ProcessThreadsRequest, RaplPowerRequest, SessionControlRequest, SessionInventoryRequest,
-    SetupScriptRequest, SmbiosMemoryRequest, StartupControlRequest, StartupEvidenceRequest,
-    StartupInventoryRequest, StorageTelemetryRequest,
+    ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, DesktopNotificationRequest,
+    GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest,
+    MemoryTelemetryRequest, MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest,
+    ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
+    ProcessGpuRequest, ProcessIsolationRequest, ProcessListRequest,
+    ProcessNetworkEscalationRequest, ProcessNetworkRequest, ProcessOpenFilesRequest,
+    ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest,
+    RaplPowerRequest, SessionControlRequest, SessionInventoryRequest, SetupScriptRequest,
+    SmbiosMemoryRequest, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
+    StorageTelemetryRequest,
 };
 use taskmanager_core::ProviderId;
 use taskmanager_platform_contract::{
@@ -85,8 +86,8 @@ pub use service::MacServiceProviders;
 pub use storage::{MacDirectoryUsageProvider, MacStorageProviders};
 pub use system::{
     MacSystemAuxiliaryProviders, MacSystemObservationProviders, MacSystemProviders,
-    PendingGpuEngineRowsProvider, PendingMsrReadoutProvider, PendingNpuInventoryProvider,
-    PendingRaplPowerProvider, PendingSmbiosMemoryProvider,
+    PendingCpuThrottleProvider, PendingGpuEngineRowsProvider, PendingMsrReadoutProvider,
+    PendingNpuInventoryProvider, PendingRaplPowerProvider, PendingSmbiosMemoryProvider,
 };
 
 const HOST_TELEMETRY_PROVIDER: ProviderId = ProviderId::borrowed("macos.system.host");
@@ -100,6 +101,8 @@ const NPU_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("macos.accelerat
 const SMBIOS_MEMORY_PROVIDER: ProviderId = ProviderId::borrowed("macos.telemetry.memory.smbios");
 const RAPL_POWER_PROVIDER: ProviderId = ProviderId::borrowed("macos.telemetry.cpu.package-power");
 const MSR_READOUT_PROVIDER: ProviderId = ProviderId::borrowed("macos.telemetry.cpu.msr");
+const CPU_THROTTLE_PROVIDER: ProviderId =
+    ProviderId::borrowed("macos.telemetry.cpu.throttle-pending");
 const HARDWARE_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("macos.hardware.inventory");
 const CONTAINER_ROLLUP_PROVIDER: ProviderId = ProviderId::borrowed("macos.containers.unavailable");
 const PROCESS_LIST_PROVIDER: ProviderId = ProviderId::borrowed("macos.process.list");
@@ -259,6 +262,7 @@ const REGISTERED_CAPABILITY_SOURCES: &[(CapabilityId, PlatformSource)] = &[
     (CapabilityId::TELEMETRY_MEMORY_SMBIOS, absent()),
     (CapabilityId::TELEMETRY_CPU_PACKAGE_POWER, absent()),
     (CapabilityId::TELEMETRY_CPU_MSR, absent()),
+    (CapabilityId::TELEMETRY_CPU_THROTTLE, absent()),
 ];
 
 /// The typed honest absence for a registered-pending lane.
@@ -331,6 +335,10 @@ pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {
                 ProviderRegistration::<MsrReadoutRequest, _>::new(
                     MSR_READOUT_PROVIDER.clone(),
                     PendingMsrReadoutProvider,
+                ),
+                ProviderRegistration::<CpuThrottleRequest, _>::new(
+                    CPU_THROTTLE_PROVIDER.clone(),
+                    PendingCpuThrottleProvider,
                 ),
             ),
         ),

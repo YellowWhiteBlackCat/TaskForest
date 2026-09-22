@@ -15,7 +15,7 @@ use taskmanager_platform_contract::CompositeSourceSnapshot;
 #[cfg(target_os = "linux")]
 use nix::unistd::{SysconfVar, sysconf};
 
-mod cpu_sources;
+pub(crate) mod cpu_sources;
 mod memory_sources;
 
 // Pure zram mm_stat parser seam for the fuzz workspace; reachable only

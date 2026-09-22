@@ -5,7 +5,6 @@ mod composition;
 mod hwmon;
 mod iio;
 mod thermal;
-pub mod trend;
 
 #[cfg(test)]
 #[path = "../../tests/headless/engine/sensors/composition_tests.rs"]
@@ -46,7 +45,6 @@ pub(crate) fn collect_sensor_center_source(
     composition::collect_sensor_center_source_from_roots(
         Path::new("/sys/class/hwmon"),
         Path::new("/sys/class/thermal"),
-        Path::new("/sys/devices/system/cpu"),
         Path::new("/sys/bus/iio/devices"),
         now_ms,
     )

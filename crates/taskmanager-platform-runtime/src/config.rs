@@ -8,20 +8,20 @@ use std::sync::OnceLock;
 use std::time::Instant;
 
 use taskmanager_application::{
-    CommandLaunchRequest, ContainerRollupRequest, CpuTelemetryRequest, DesktopAppearanceRequest,
-    DesktopNotificationRequest, DirectoryUsageRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
-    NetworkTelemetryRequest, NpuInventoryRequest, PowerSupplyRequest,
-    ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
-    ProcessEnvironmentRequest, ProcessGpuRequest, ProcessIsolationRequest, ProcessListRequest,
-    ProcessNetworkEscalationRequest, ProcessNetworkRequest, ProcessOpenFilesRequest,
-    ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest,
-    RaplPowerRequest, ResourceRevealRequest, SensorRequest, ServiceControlRequest,
-    ServiceDependenciesRequest, ServiceInventoryRequest, ServiceLogSnapshotRequest,
-    ServiceLogStreamRequest, SessionControlRequest, SessionInventoryRequest, SetupScriptRequest,
-    SmartControlRequest, SmartObservationRequest, SmbiosMemoryRequest, StartupControlRequest,
-    StartupEvidenceRequest, StartupInventoryRequest, StorageHealthRequest, StorageTelemetryRequest,
-    UrlOpenRequest,
+    CommandLaunchRequest, ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest,
+    DesktopAppearanceRequest, DesktopNotificationRequest, DirectoryUsageRequest,
+    GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest,
+    MemoryTelemetryRequest, MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest,
+    PowerSupplyRequest, ProcessAffinityControlRequest, ProcessAffinityRequest,
+    ProcessControlRequest, ProcessEnvironmentRequest, ProcessGpuRequest, ProcessIsolationRequest,
+    ProcessListRequest, ProcessNetworkEscalationRequest, ProcessNetworkRequest,
+    ProcessOpenFilesRequest, ProcessResourceControlRequest, ProcessResourcesRequest,
+    ProcessThreadsRequest, RaplPowerRequest, ResourceRevealRequest, SensorRequest,
+    ServiceControlRequest, ServiceDependenciesRequest, ServiceInventoryRequest,
+    ServiceLogSnapshotRequest, ServiceLogStreamRequest, SessionControlRequest,
+    SessionInventoryRequest, SetupScriptRequest, SmartControlRequest, SmartObservationRequest,
+    SmbiosMemoryRequest, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
+    StorageHealthRequest, StorageTelemetryRequest, UrlOpenRequest,
 };
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_platform_contract::{
@@ -196,6 +196,7 @@ pub struct SystemProviderBindings {
     pub(crate) smbios_memory: crate::ProviderBinding<SmbiosMemoryRequest>,
     pub(crate) rapl_power: crate::ProviderBinding<RaplPowerRequest>,
     pub(crate) msr_readout: crate::ProviderBinding<MsrReadoutRequest>,
+    pub(crate) cpu_throttle: crate::ProviderBinding<CpuThrottleRequest>,
 }
 
 /// Required system capability bindings installed as one named composition
@@ -228,6 +229,7 @@ impl SystemProviderBindings {
             smbios_memory: crate::ProviderBinding::absent(),
             rapl_power: crate::ProviderBinding::absent(),
             msr_readout: crate::ProviderBinding::absent(),
+            cpu_throttle: crate::ProviderBinding::absent(),
         }
     }
 
@@ -295,6 +297,20 @@ impl SystemProviderBindings {
         msr_readout: &crate::ProviderRegistration<MsrReadoutRequest, P>,
     ) -> Self {
         self.msr_readout = msr_readout.binding();
+        self
+    }
+
+    /// Attach the optional CPU thermal-throttle counter provider. Native
+    /// adapters without this facet leave it absent: no catalog descriptor,
+    /// request port, or execution lane is created (mirrors
+    /// `with_msr_readout`), and the UI reports the capability as honestly
+    /// unavailable.
+    #[must_use]
+    pub fn with_cpu_throttle<P>(
+        mut self,
+        cpu_throttle: &crate::ProviderRegistration<CpuThrottleRequest, P>,
+    ) -> Self {
+        self.cpu_throttle = cpu_throttle.binding();
         self
     }
 }
@@ -676,6 +692,7 @@ impl RuntimeProviderBindings {
             route::<SmbiosMemoryRequest>(&self.system.smbios_memory, observation, system),
             route::<RaplPowerRequest>(&self.system.rapl_power, observation, system),
             route::<MsrReadoutRequest>(&self.system.msr_readout, observation, system),
+            route::<CpuThrottleRequest>(&self.system.cpu_throttle, observation, system),
             route::<ProcessListRequest>(&self.process.list, observation, process),
             route::<ProcessControlRequest>(&self.process.control, control, process),
             route::<ProcessNetworkRequest>(&self.process.network, observation, process),

@@ -11,8 +11,9 @@ use taskmanager_application::{
     ProcessFacets, SensorFacets, ServiceFacets, StorageFacets, SystemFacets,
 };
 
+use super::facet_attach::{attach_optional, attach_system_auxiliary_facets};
 use super::lanes::RuntimeLanes;
-use super::port::{ChannelRequestPort, request_lane};
+use super::port::request_lane;
 use crate::config::{DeliveryClass, RuntimeBudgets, RuntimeConfig, RuntimeProviderBindings};
 use crate::delivery::LaneStartRegistry;
 use crate::delivery::{
@@ -28,7 +29,6 @@ use crate::sensor::PendingSensorRuntimeLanes;
 use crate::service::PendingServiceRuntimeLanes;
 use crate::storage::PendingStorageRuntimeLanes;
 use crate::system::PendingSystemRuntimeLanes;
-use taskmanager_platform_contract::CapabilityRequest;
 
 mod budget;
 use budget::validate_runtime_config;
@@ -40,17 +40,6 @@ pub struct ChannelRuntime {
     pub publisher: Arc<RuntimeEventPublisher>,
     pub lanes: RuntimeLanes,
     pub(crate) lane_starters: Arc<LaneStartRegistry>,
-}
-
-fn attach_optional<R, F, T>(facets: T, port: Option<Arc<ChannelRequestPort<R>>>, attach: F) -> T
-where
-    R: CapabilityRequest,
-    F: FnOnce(T, Arc<ChannelRequestPort<R>>) -> T,
-{
-    match port {
-        Some(port) => attach(facets, port),
-        None => facets,
-    }
 }
 
 impl ChannelRuntime {
@@ -163,6 +152,12 @@ impl ChannelRuntime {
         let (msr_readout_port, msr_readout_rx) = request_lane(
             observation_capacity,
             bindings.system.msr_readout.as_ref(),
+            ecs_scheduler.clone(),
+            lane_starters.clone(),
+        );
+        let (cpu_throttle_port, cpu_throttle_rx) = request_lane(
+            observation_capacity,
+            bindings.system.cpu_throttle.as_ref(),
             ecs_scheduler.clone(),
             lane_starters.clone(),
         );
@@ -430,21 +425,15 @@ impl ChannelRuntime {
         let system = attach_optional(system, containers_port, |system, port| {
             system.with_containers(port)
         });
-        let system = attach_optional(system, gpu_engine_rows_port, |system, port| {
-            system.with_gpu_engine_rows(port)
-        });
-        let system = attach_optional(system, npu_inventory_port, |system, port| {
-            system.with_npu_inventory(port)
-        });
-        let system = attach_optional(system, smbios_memory_port, |system, port| {
-            system.with_smbios_memory(port)
-        });
-        let system = attach_optional(system, rapl_power_port, |system, port| {
-            system.with_rapl_power(port)
-        });
-        let system = attach_optional(system, msr_readout_port, |system, port| {
-            system.with_msr_readout(port)
-        });
+        let system = attach_system_auxiliary_facets(
+            system,
+            gpu_engine_rows_port,
+            npu_inventory_port,
+            smbios_memory_port,
+            rapl_power_port,
+            msr_readout_port,
+            cpu_throttle_port,
+        );
 
         let process = ProcessFacets::default();
         let process = attach_optional(process, process_list_port, |process, port| {
@@ -604,6 +593,7 @@ impl ChannelRuntime {
                         smbios_memory_rx,
                         rapl_power_rx,
                         msr_readout_rx,
+                        cpu_throttle_rx,
                     ),
                 ),
                 process: PendingProcessRuntimeLanes::new(

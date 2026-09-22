@@ -3,11 +3,16 @@
 use std::{fs, path::Path};
 use taskmanager_core::core::metrics::{CpuIdleState, CpuInterruptSnapshot, CpuPackageMetrics};
 
+use super::throttle::{collect_package_counters_at, read_trimmed, read_u32, read_u64};
+
 /// Read package/socket topology and the cumulative thermal-throttle counters
 /// exported by Linux sysfs. The result is deliberately package-scoped: a
 /// package counter is repeated for every logical CPU, while core counters are
 /// counted once per physical-core identity. Missing topology remains absent
 /// instead of being collapsed into a fake single socket.
+///
+/// The counter fields come from [`collect_package_counters_at`], the same read
+/// and aggregation the `telemetry.cpu.throttle` lane answer uses.
 pub(in super::super) fn observe_cpu_packages(logical_cpu_count: usize) -> Vec<CpuPackageMetrics> {
     observe_cpu_packages_at(
         Path::new("/sys/devices/system/cpu"),
@@ -27,7 +32,6 @@ pub(in super::super) fn observe_cpu_packages_at(
     struct PackageAccumulator {
         package: CpuPackageMetrics,
         physical_cores: BTreeSet<u32>,
-        counted_core_throttle: BTreeSet<u32>,
         frequency_sum_mhz: u64,
         frequency_samples: u64,
     }
@@ -53,25 +57,18 @@ pub(in super::super) fn observe_cpu_packages_at(
         let Some(package_id) = read_u32(&topology.join("physical_package_id")) else {
             continue;
         };
-        let entry = packages.entry(package_id).or_default();
+        let entry = packages
+            .entry(package_id)
+            .or_insert_with(|| PackageAccumulator {
+                // `CpuPackageMetrics::default()` reports package 0; every real
+                // socket must carry the kernel-provided index it was read from.
+                package: CpuPackageMetrics::new(package_id),
+                ..PackageAccumulator::default()
+            });
         entry.package.logical_core_ids.push(cpu);
 
         if let Some(core_id) = read_u32(&topology.join("core_id")) {
             entry.physical_cores.insert(core_id);
-            let throttle_dir = cpu_path.join("thermal_throttle");
-            // `core_throttle_count` is per physical core on current kernels;
-            // choose the first logical sibling for a stable package total.
-            if entry.counted_core_throttle.insert(core_id)
-                && let Some(value) = read_u64(&throttle_dir.join("core_throttle_count"))
-            {
-                entry.package.core_throttle_count = Some(
-                    entry
-                        .package
-                        .core_throttle_count
-                        .unwrap_or_default()
-                        .saturating_add(value),
-                );
-            }
         }
 
         if let Some(siblings) = read_trimmed(&topology.join("thread_siblings_list")) {
@@ -112,19 +109,16 @@ pub(in super::super) fn observe_cpu_packages_at(
                 .saturating_add(frequency_khz / 1_000);
             entry.frequency_samples = entry.frequency_samples.saturating_add(1);
         }
+    }
 
-        let throttle_dir = cpu_path.join("thermal_throttle");
-        // The package counter is repeated on sibling CPUs. Maximum is the
-        // deterministic de-duplication rule and also tolerates a partially
-        // readable package where only one sibling exposes the file.
-        if let Some(value) = read_u64(&throttle_dir.join("package_throttle_count")) {
-            entry.package.package_throttle_count = Some(
-                entry
-                    .package
-                    .package_throttle_count
-                    .unwrap_or_default()
-                    .max(value),
-            );
+    // The cumulative trigger counters come from the one shared read
+    // (`throttle::collect_package_counters_at`); each row is assigned to the
+    // package accumulator the topology loop built. A package the topology loop
+    // never saw cannot receive counters, exactly as before.
+    for counters in collect_package_counters_at(cpu_root).packages {
+        if let Some(accumulator) = packages.get_mut(&counters.package_id) {
+            accumulator.package.package_throttle_count = counters.package_throttle_count;
+            accumulator.package.core_throttle_count = counters.core_throttle_count;
         }
     }
 
@@ -407,19 +401,4 @@ pub(in super::super) fn parse_interrupts(
         total: Some(per_cpu.iter().copied().fold(0_u64, u64::saturating_add)),
         per_logical_cpu: per_cpu,
     })
-}
-
-fn read_trimmed(path: &Path) -> Option<String> {
-    fs::read_to_string(path)
-        .ok()
-        .map(|value| value.trim().to_owned())
-        .filter(|value| !value.is_empty())
-}
-
-fn read_u32(path: &Path) -> Option<u32> {
-    read_trimmed(path)?.parse().ok()
-}
-
-fn read_u64(path: &Path) -> Option<u64> {
-    read_trimmed(path)?.parse().ok()
 }

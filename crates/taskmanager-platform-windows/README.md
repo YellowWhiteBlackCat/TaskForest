@@ -96,8 +96,8 @@ transactions, preserving capability identity without positional wiring.
 ```text
 src/provider/
 ├── process/                   list, insights, control, uac (ADR-035 transport)
-├── system/                    cpu_freq, cpu_info, disk, gpu, hardware_inventory,
-│                              msr_readout, network, auxiliary
+├── system/                    cpu_freq, cpu_info, cpu_throttle, disk, gpu,
+│                              hardware_inventory, msr_readout, network, auxiliary
 ├── service/ (+ log_runtime)  storage/  environment/ (+ sessions, boot_evidence)
 ├── power/  sensor/  integration/
 src/bindings.rs                taskmanager-windows-api consumption wrappers

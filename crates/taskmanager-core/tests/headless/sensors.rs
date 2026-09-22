@@ -1,6 +1,7 @@
 //! Sensor lifecycle and thermal-availability regression tests.
 
 use super::*;
+use crate::FailureKind;
 
 #[cfg(test)]
 fn temperature_snapshot(
@@ -61,123 +62,6 @@ fn fan_reading(device_id: DeviceId, id: &str, rpm: u64, observed_at_ms: u64) -> 
         SensorMeasurementObservation::unavailable(descriptor, FailureKind::ProviderFault)
     });
     SensorReading::from_measurement_observation(device_id, id.into(), "Fan".into(), observation)
-}
-
-#[cfg(test)]
-mod throttle_availability_tests {
-    use super::*;
-    use crate::core::FailureKind;
-
-    #[test]
-    fn typed_failure_retains_a_legacy_success_only_as_stale() {
-        let previous = ThermalThrottleSnapshot::from_observations(
-            10,
-            ScalarObservation::available(0, 10),
-            ScalarObservation::default(),
-        );
-        let current = ThermalThrottleSnapshot::from_observations(
-            20,
-            ScalarObservation::unavailable(FailureKind::PermissionDenied),
-            ScalarObservation::default(),
-        );
-
-        let retained = current.retain_previous(previous);
-
-        assert_eq!(
-            retained.core_events_observation().availability(),
-            ScalarAvailability::Stale(FailureKind::PermissionDenied)
-        );
-        assert_eq!(
-            retained.core_events_observation().last_known_value(),
-            Some(&0)
-        );
-        assert_eq!(
-            retained.core_events_observation().last_success_ms(),
-            Some(10)
-        );
-        assert_eq!(retained.current_core_events(), None);
-    }
-
-    #[test]
-    fn explicit_unavailability_never_falls_back_to_a_legacy_number() {
-        let snapshot = ThermalThrottleSnapshot::from_observations(
-            10,
-            ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
-            ScalarObservation::default(),
-        );
-
-        assert_eq!(snapshot.current_core_events(), None);
-    }
-
-    #[test]
-    fn legacy_throttle_number_migrates_only_when_legacy_state_is_current() {
-        let current: ThermalThrottleSnapshot = serde_json::from_value(serde_json::json!({
-            "state": {"status": "healthy", "last_success_ms": 10},
-            "timestamp_ms": 10,
-            "core_events": 7,
-            "package_events": null
-        }))
-        .expect("legacy current throttle snapshot");
-        let unavailable: ThermalThrottleSnapshot = serde_json::from_value(serde_json::json!({
-            "state": {"status": "permission_denied", "last_success_ms": null},
-            "timestamp_ms": 20,
-            "core_events": 7,
-            "package_events": null
-        }))
-        .expect("legacy unavailable throttle snapshot");
-
-        assert_eq!(current.current_core_events(), Some(7));
-        assert_eq!(
-            current.core_events_observation().last_success_ms(),
-            Some(10)
-        );
-        assert_eq!(unavailable.current_core_events(), None);
-        assert_eq!(
-            unavailable.core_events_observation().last_known_value(),
-            None
-        );
-    }
-
-    #[test]
-    fn typed_throttle_failure_wins_over_conflicting_legacy_number() {
-        let snapshot: ThermalThrottleSnapshot = serde_json::from_value(serde_json::json!({
-            "state": {"status": "healthy", "last_success_ms": 10},
-            "timestamp_ms": 20,
-            "core_events": 99,
-            "package_events": null,
-            "core_events_observation": {
-                "value": null,
-                "availability": {"status": "unavailable", "failure": "permission_denied"},
-                "last_success_ms": null
-            }
-        }))
-        .expect("conflicting throttle snapshot");
-
-        assert_eq!(snapshot.current_core_events(), None);
-        assert_eq!(
-            snapshot.core_events_observation().availability(),
-            ScalarAvailability::Unavailable(FailureKind::PermissionDenied)
-        );
-        let encoded = serde_json::to_value(snapshot).expect("serialize canonical throttle");
-        assert_eq!(encoded["core_events"], serde_json::Value::Null);
-    }
-
-    #[test]
-    fn typed_only_throttle_wire_preserves_partial_availability() {
-        let typed = ScalarObservation::partial(7, 20, FailureKind::TemporarilyUnavailable);
-        let snapshot: ThermalThrottleSnapshot = serde_json::from_value(serde_json::json!({
-            "timestamp_ms": 20,
-            "core_events_observation": typed
-        }))
-        .expect("typed-only throttle snapshot");
-
-        assert_eq!(snapshot.current_core_events(), Some(7));
-        assert_eq!(
-            snapshot.core_events_observation().availability(),
-            ScalarAvailability::Partial(FailureKind::TemporarilyUnavailable)
-        );
-        assert_eq!(snapshot.state(), DeviceState::healthy(20));
-    }
 }
 
 #[cfg(test)]

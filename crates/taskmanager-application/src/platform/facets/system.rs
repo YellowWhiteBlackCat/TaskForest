@@ -16,6 +16,7 @@ use taskmanager_platform_contract::{
     CapabilityId, CompositeSourceSnapshot, RequestId, RequestPort, SubmissionError,
 };
 
+use super::cpu_throttle::CpuThrottleRequestPort;
 use super::gpu_engine_rows::GpuEngineRowsRequestPort;
 use super::msr_readout::MsrReadoutRequestPort;
 use super::npu_inventory::NpuInventoryRequestPort;
@@ -279,6 +280,7 @@ pub struct SystemFacets {
     smbios_memory: Option<Arc<SmbiosMemoryRequestPort>>,
     rapl_power: Option<Arc<RaplPowerRequestPort>>,
     msr_readout: Option<Arc<MsrReadoutRequestPort>>,
+    cpu_throttle: Option<Arc<CpuThrottleRequestPort>>,
 }
 
 impl SystemFacets {
@@ -361,6 +363,12 @@ impl SystemFacets {
     }
 
     #[must_use]
+    pub fn with_cpu_throttle(mut self, port: Arc<CpuThrottleRequestPort>) -> Self {
+        self.cpu_throttle = Some(port);
+        self
+    }
+
+    #[must_use]
     pub fn host(&self) -> Option<&HostTelemetryRequestPort> {
         self.host.as_deref()
     }
@@ -423,5 +431,10 @@ impl SystemFacets {
     #[must_use]
     pub fn msr_readout(&self) -> Option<&MsrReadoutRequestPort> {
         self.msr_readout.as_deref()
+    }
+
+    #[must_use]
+    pub fn cpu_throttle(&self) -> Option<&CpuThrottleRequestPort> {
+        self.cpu_throttle.as_deref()
     }
 }

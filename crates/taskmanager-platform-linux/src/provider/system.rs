@@ -3,21 +3,21 @@
 use std::time::Instant;
 
 use taskmanager_application::{
-    ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
-    NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest, SmbiosMemoryRequest,
-    StorageTelemetryRequest,
+    ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, GpuEngineRowsRequest,
+    GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
+    MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest,
+    SmbiosMemoryRequest, StorageTelemetryRequest,
 };
 use taskmanager_core::{
-    ContainerRollup, CpuTelemetryObservation, GpuTelemetryObservation, HardwareInfo,
-    HostRuntimeObservation, MemoryTelemetryObservation, NetworkTelemetryObservation, ProviderId,
-    StorageTelemetryObservation,
+    ContainerRollup, CpuTelemetryObservation, CpuThrottleSnapshot, GpuTelemetryObservation,
+    HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation, NetworkTelemetryObservation,
+    ProviderId, StorageTelemetryObservation,
 };
 use taskmanager_platform_contract::{CompositeSourceSnapshot, ProviderFailure};
 use taskmanager_platform_provider::{
-    ContainerRollupProvider, CpuTelemetryProvider, GpuTelemetryProvider, HardwareInventoryProvider,
-    HostTelemetryProvider, MemoryTelemetryProvider, NetworkTelemetryProvider,
-    StorageTelemetryProvider,
+    ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider, GpuTelemetryProvider,
+    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider,
+    NetworkTelemetryProvider, StorageTelemetryProvider,
 };
 use taskmanager_platform_runtime::ProviderRegistration;
 
@@ -54,6 +54,8 @@ const SMBIOS_MEMORY_PROVIDER: ProviderId =
 const RAPL_POWER_PROVIDER: ProviderId =
     ProviderId::borrowed("linux.telemetry.cpu.package-power.rapl-helper");
 const MSR_READOUT_PROVIDER: ProviderId = ProviderId::borrowed("linux.telemetry.cpu.msr-helper");
+const CPU_THROTTLE_PROVIDER: ProviderId =
+    ProviderId::borrowed("linux.telemetry.cpu.throttle-sysfs");
 
 pub(super) struct NativeHostTelemetryProvider {
     pub(super) collector: LinuxHostTelemetryCollector,
@@ -132,6 +134,22 @@ pub(super) struct NativeHardwareInventoryProvider {
 impl HardwareInventoryProvider for NativeHardwareInventoryProvider {
     fn refresh(&mut self) -> Result<CompositeSourceSnapshot<HardwareInfo>, ProviderFailure> {
         Ok(self.collector.refresh())
+    }
+}
+
+/// The `telemetry.cpu.throttle` lane provider. One call reads the cumulative
+/// `thermal_throttle/{core,package}_throttle_count` counters through
+/// [`crate::engine::collector::collect_package_counters_at`] — the same read
+/// and aggregation that fills the periodic CPU projection's per-package
+/// counters. No counter is invented: a package that exposes none keeps `None`
+/// on its row.
+pub(super) struct NativeCpuThrottleProvider;
+
+impl CpuThrottleProvider for NativeCpuThrottleProvider {
+    fn read_cpu_throttle(&mut self) -> Result<CpuThrottleSnapshot, ProviderFailure> {
+        Ok(crate::engine::collector::collect_package_counters_at(
+            std::path::Path::new("/sys/devices/system/cpu"),
+        ))
     }
 }
 
@@ -236,6 +254,10 @@ pub(super) fn native_system_providers() -> (SystemProviders, StorageTargetResolv
             )
             .with_initial_status(initial_status)
         },
+        ProviderRegistration::<CpuThrottleRequest, _>::new(
+            CPU_THROTTLE_PROVIDER.clone(),
+            NativeCpuThrottleProvider,
+        ),
     );
     (
         SystemProviders::new(observations, auxiliary),

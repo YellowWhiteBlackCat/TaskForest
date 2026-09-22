@@ -11,6 +11,7 @@ use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 
 pub(super) mod diagnostics;
 mod temperatures;
+pub(crate) mod throttle;
 use temperatures::observe_temperatures_from_paths;
 
 const SYSINFO_PROVIDER: &str = "linux.telemetry.cpu.sysinfo";

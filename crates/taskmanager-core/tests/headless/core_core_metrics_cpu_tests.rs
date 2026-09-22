@@ -233,7 +233,8 @@ fn cpu_package_metrics_thermal_throttling_and_numa_topology_round_trip() {
     let mut pkg = CpuPackageMetrics::new(0);
     assert_eq!(pkg.package_id, 0);
     assert!(!pkg.is_currently_throttled());
-    assert_eq!(pkg.total_throttle_events(), None);
+    assert_eq!(pkg.package_throttle_count, None);
+    assert_eq!(pkg.core_throttle_count, None);
 
     pkg.numa_node_id = Some(0);
     pkg.numa_node_ids = vec![0, 1];
@@ -256,7 +257,6 @@ fn cpu_package_metrics_thermal_throttling_and_numa_topology_round_trip() {
     assert!(!pkg.contains_numa_node(2));
     assert!(pkg.contains_logical_core(3));
     assert!(!pkg.contains_logical_core(16));
-    assert_eq!(pkg.total_throttle_events(), Some(60));
 
     let encoded = serde_json::to_value(&pkg).expect("serialize CpuPackageMetrics");
     assert_eq!(encoded["package_id"], 0);

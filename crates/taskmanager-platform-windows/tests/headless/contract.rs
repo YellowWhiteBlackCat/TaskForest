@@ -146,6 +146,10 @@ const STANDARD_SURFACE: &[(&str, &str)] = &[
         "windows.telemetry.cpu.package-power",
     ),
     ("telemetry.cpu.msr", "windows.telemetry.cpu.msr"),
+    (
+        "telemetry.cpu.throttle",
+        "windows.telemetry.cpu.throttle-pending",
+    ),
     ("sensors", "windows.sensor.registry"),
     ("hardware.power-supplies", "windows.power-supply.registry"),
 ];
@@ -166,6 +170,10 @@ const PENDING_CAPABILITIES: &[&str] = &[
     "telemetry.memory.smbios",
     "telemetry.cpu.package_power",
     "telemetry.cpu.msr",
+    // The cumulative Linux `thermal_throttle` counters have no Windows
+    // source with the same semantics (PDH/native counters are
+    // instantaneous); the lane stays registered-pending.
+    "telemetry.cpu.throttle",
 ];
 
 /// Lanes implemented natively through the audited Windows API boundary
@@ -458,6 +466,10 @@ fn assert_complete_facet_surface(facets: &PlatformFacets) {
     assert!(
         facets.system().rapl_power().is_some(),
         "the registered-pending rapl facet must expose its request port"
+    );
+    assert!(
+        facets.system().cpu_throttle().is_some(),
+        "the registered-pending cpu-throttle facet must expose its request port"
     );
     assert!(
         facets.system().containers().is_some(),

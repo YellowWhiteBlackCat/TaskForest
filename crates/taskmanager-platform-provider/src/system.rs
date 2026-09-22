@@ -1,10 +1,11 @@
 //! System-domain observation and on-demand readout provider traits: the
 //! periodic host/cpu/memory/storage/network/gpu/container refresh contracts
 //! plus the frontend-paced request/response facets (per-engine GPU rows, NPU
-//! inventory, SMBIOS memory, CPU package power, CPU MSR readouts).
+//! inventory, SMBIOS memory, CPU package power, CPU MSR readouts, CPU
+//! thermal-throttle counters).
 
 use taskmanager_core::{
-    ContainerRollup, CpuTelemetryObservation, DeviceId, GpuEngineRowsSnapshot,
+    ContainerRollup, CpuTelemetryObservation, CpuThrottleSnapshot, DeviceId, GpuEngineRowsSnapshot,
     GpuTelemetryObservation, HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation,
     MsrReadoutSnapshot, NetworkTelemetryObservation, NpuInventorySnapshot, RaplPowerSnapshot,
     SmbiosMemorySnapshot, StorageTelemetryObservation,
@@ -110,4 +111,16 @@ pub trait RaplPowerProvider: Send + 'static {
 /// fabricated zero for a register the CPU does not implement.
 pub trait MsrReadoutProvider: Send + 'static {
     fn read_msr_readouts(&mut self) -> Result<MsrReadoutSnapshot, ProviderFailure>;
+}
+
+/// On-demand CPU thermal-throttle trigger-counter reads (capability
+/// `telemetry.cpu.throttle`).
+///
+/// One call = ONE bounded read of the cumulative
+/// `thermal_throttle/{core,package}_throttle_count` counters, aggregated for
+/// the whole host by the shared core rule. Implementations answer with real
+/// per-package counters — a counter the host does not expose stays absent on
+/// its row — or a typed failure snapshot; never a fabricated zero.
+pub trait CpuThrottleProvider: Send + 'static {
+    fn read_cpu_throttle(&mut self) -> Result<CpuThrottleSnapshot, ProviderFailure>;
 }

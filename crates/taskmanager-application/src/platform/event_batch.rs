@@ -8,11 +8,12 @@ use taskmanager_platform_contract::{
 
 use super::facets::PlatformEventVisitor;
 use super::{
-    ContainerRollupEvent, DesktopAppearanceEvent, DirectoryUsageEvent, GpuEngineRowsEvent,
-    HardwareInventoryEvent, MsrReadoutEvent, NpuInventoryEvent, PlatformEvent, PowerSupplyEvent,
-    ProcessAffinityEvent, ProcessEvent, ProjectedProcessInsights, ProjectedStartupEvidence,
-    ProjectedSystemTelemetry, RaplPowerEvent, SensorEvent, ServiceEvent, SessionEvent, ShellEvent,
-    SmartEvent, SmbiosMemoryEvent, StartupEvent, StartupEvidenceEvent, StorageHealthEvent,
+    ContainerRollupEvent, CpuThrottleEvent, DesktopAppearanceEvent, DirectoryUsageEvent,
+    GpuEngineRowsEvent, HardwareInventoryEvent, MsrReadoutEvent, NpuInventoryEvent, PlatformEvent,
+    PowerSupplyEvent, ProcessAffinityEvent, ProcessEvent, ProjectedProcessInsights,
+    ProjectedStartupEvidence, ProjectedSystemTelemetry, RaplPowerEvent, SensorEvent, ServiceEvent,
+    SessionEvent, ShellEvent, SmartEvent, SmbiosMemoryEvent, StartupEvent, StartupEvidenceEvent,
+    StorageHealthEvent,
 };
 
 mod environment;
@@ -36,9 +37,9 @@ pub use storage::{
     CorrelatedDirectoryUsageEvent, CorrelatedSmartEvent, CorrelatedStorageHealthEvent,
 };
 pub use system::{
-    CorrelatedGpuEngineRowsEvent, CorrelatedHardwareInventoryEvent, CorrelatedMsrReadoutEvent,
-    CorrelatedNpuInventoryEvent, CorrelatedRaplPowerEvent, CorrelatedSmbiosMemoryEvent,
-    CorrelatedSystemTelemetryOutcome,
+    CorrelatedCpuThrottleEvent, CorrelatedGpuEngineRowsEvent, CorrelatedHardwareInventoryEvent,
+    CorrelatedMsrReadoutEvent, CorrelatedNpuInventoryEvent, CorrelatedRaplPowerEvent,
+    CorrelatedSmbiosMemoryEvent, CorrelatedSystemTelemetryOutcome,
 };
 
 pub type CorrelatedContainerRollupEvent = CorrelatedEvent<ContainerRollupEvent>;
@@ -77,6 +78,7 @@ pub struct PlatformEventBatch {
     pub smbios_memory_events: Vec<CorrelatedSmbiosMemoryEvent>,
     pub rapl_power_events: Vec<CorrelatedRaplPowerEvent>,
     pub msr_readout_events: Vec<CorrelatedMsrReadoutEvent>,
+    pub cpu_throttle_events: Vec<CorrelatedCpuThrottleEvent>,
     pub failures: Vec<OperationFailure>,
 }
 
@@ -165,6 +167,7 @@ impl PlatformEventBatch {
             smbios_memory_events,
             rapl_power_events,
             msr_readout_events,
+            cpu_throttle_events,
             failures,
         } = self;
         system_telemetry_outcomes.is_empty()
@@ -191,6 +194,7 @@ impl PlatformEventBatch {
             && smbios_memory_events.is_empty()
             && rapl_power_events.is_empty()
             && msr_readout_events.is_empty()
+            && cpu_throttle_events.is_empty()
             && failures.is_empty()
     }
 
@@ -230,6 +234,7 @@ impl PlatformEventBatch {
             smbios_memory_events,
             rapl_power_events,
             msr_readout_events,
+            cpu_throttle_events,
             failures,
         } = &mut self;
         sort_correlated(system_telemetry_outcomes);
@@ -256,6 +261,7 @@ impl PlatformEventBatch {
         sort_correlated(smbios_memory_events);
         sort_correlated(rapl_power_events);
         sort_correlated(msr_readout_events);
+        sort_correlated(cpu_throttle_events);
         failures.sort_by_key(|failure| failure.sequence);
         self
     }
@@ -370,6 +376,10 @@ impl PlatformEventVisitor for BatchEventVisitor<'_> {
 
     fn visit_msr_readout(&mut self, event: MsrReadoutEvent) {
         system::push_msr_readout(self.batch, self.context.clone(), event);
+    }
+
+    fn visit_cpu_throttle(&mut self, event: CpuThrottleEvent) {
+        system::push_cpu_throttle(self.batch, self.context.clone(), event);
     }
 }
 

@@ -246,6 +246,15 @@ impl MsrReadoutProvider for FakeProvider {
     }
 }
 
+impl CpuThrottleProvider for FakeProvider {
+    fn read_cpu_throttle(&mut self) -> Result<CpuThrottleSnapshot, ProviderFailure> {
+        // One bounded immediate call: the contract fixture only needs the
+        // throttle lane wired so the capability is published; no sysfs read
+        // happens here.
+        Ok(CpuThrottleSnapshot::success(Vec::new()))
+    }
+}
+
 impl HardwareInventoryProvider for FakeProvider {
     fn refresh(&mut self) -> Result<CompositeSourceSnapshot<HardwareInfo>, ProviderFailure> {
         Ok(CompositeSourceSnapshot::new(

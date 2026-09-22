@@ -39,7 +39,6 @@ fn snapshot(
         thermal_control: ThermalControlSnapshot {
             zones: vec![zone],
             cooling_devices: vec![cooling],
-            throttle: Default::default(),
         },
         device_lifecycles: Default::default(),
     }

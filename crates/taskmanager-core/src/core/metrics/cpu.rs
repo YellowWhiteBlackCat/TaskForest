@@ -297,6 +297,12 @@ pub struct CpuPerformancePolicy {
 /// domains. This struct models per-package telemetry with explicit differentiation
 /// between normal unthrottled operation, active thermal throttling trips, and
 /// unobserved or unsupported capabilities (following ADR-016 scalar authenticity).
+///
+/// This type is the single authority for the cumulative trigger counters: the
+/// `power.thermal-throttle-events` delivery names them, and the
+/// `telemetry.cpu.throttle` lane answer is a projection of the same rows produced
+/// by
+/// [`aggregate_package_throttle_counters`](super::aggregate_package_throttle_counters).
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct CpuPackageMetrics {
     /// Zero-based physical socket or package index (e.g. 0 for Socket 0).
@@ -356,12 +362,19 @@ pub struct CpuPackageMetrics {
     ///
     /// Sourced from Linux sysfs `/sys/devices/system/cpu/cpu*/thermal_throttle/package_throttle_count`
     /// or x86 MSR `IA32_PACKAGE_THERM_STATUS` (0x1B1).
+    ///
+    /// This field is the delivery authority for the `power.thermal-throttle-events`
+    /// fact; the `telemetry.cpu.throttle` lane answer is the same per-package
+    /// fact projected by
+    /// [`aggregate_package_throttle_counters`](super::aggregate_package_throttle_counters).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub package_throttle_count: Option<u64>,
     /// Cumulative count of core-level thermal throttling events across cores within this package.
     ///
     /// Sourced from Linux sysfs `/sys/devices/system/cpu/cpu*/thermal_throttle/core_throttle_count`
-    /// or x86 MSR `IA32_THERM_STATUS` (0x19C).
+    /// or x86 MSR `IA32_THERM_STATUS` (0x19C). Sibling hyperthreads of one
+    /// physical core report the same kernel counter and are counted once; the
+    /// value is `None` when no core counter in this package was readable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub core_throttle_count: Option<u64>,
     /// Thermal headroom in degrees Celsius below the critical maximum junction temperature ($T_j\text{Max}$).
@@ -422,17 +435,6 @@ impl CpuPackageMetrics {
     #[must_use]
     pub fn contains_logical_core(&self, core_id: usize) -> bool {
         self.logical_core_ids.contains(&core_id)
-    }
-
-    /// Total number of thermal throttle events recorded across package and core counters.
-    #[must_use]
-    pub fn total_throttle_events(&self) -> Option<u64> {
-        match (self.package_throttle_count, self.core_throttle_count) {
-            (Some(pkg), Some(core)) => Some(pkg.saturating_add(core)),
-            (Some(pkg), None) => Some(pkg),
-            (None, Some(core)) => Some(core),
-            (None, None) => None,
-        }
     }
 }
 

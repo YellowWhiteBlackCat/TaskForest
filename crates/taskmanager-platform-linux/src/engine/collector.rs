@@ -26,6 +26,10 @@ pub(crate) mod domains;
 mod lifecycle;
 mod network;
 mod sources;
+// The one Linux read of the cumulative CPU thermal-throttle counters, shared
+// by the periodic CPU package observation and the `telemetry.cpu.throttle`
+// lane provider.
+pub(crate) use compute::cpu_sources::throttle::collect_package_counters_at;
 // Gated hop for the zram mm_stat parser seam (fuzz workspace reachability).
 #[cfg(feature = "test-support")]
 pub use compute::parse_zram_mm_stat;
