@@ -3,11 +3,53 @@
 #
 # When a diff touches a UI boundary, the standard gate must run the headless
 # frontend interaction matrices (--with-gui), and a capture-acceptance run must
-# carry fresh pixel receipts (--require-capture). Pure core changes never
-# force re-capture. A receipt is only fresh when its frontend-scoped source
-# manifest hash still matches the current worktree and its metadata records
-# the private background-Niri route; mtime alone is not evidence after a
-# dirty-tree change.
+# carry fresh pixel receipts (--require-capture) for every frontend whose
+# pixels the diff can actually move. Pure core changes never force re-capture.
+# A receipt is only fresh when its frontend-scoped source manifest hash still
+# matches the current worktree and its metadata records the private
+# background-Niri route; mtime alone is not evidence after a dirty-tree
+# change.
+#
+# Impact routing (W22-B): the two requirements are separate judgments.
+#
+#   * `ui_touched` keeps the existing headless requirement: any UI-boundary
+#     path still needs `--with-gui`. Contract, registry and gate layers
+#     (`crates/taskmanager-ui-contract/tests/**`, the declaration-only
+#     modules) set it too; their evidence channel is the headless suite, not
+#     pixels.
+#   * `gpui_touched`/`tui_touched`/`iced_touched`/`bevy_touched` mean "this
+#     diff can change what that frontend paints", so `--require-capture`
+#     demands a fresh receipt for it. Paths that cannot move pixels (the
+#     contract test tree, declaration registries, vocabulary and conformance
+#     modules) set none. A path consumed by several renderers names each
+#     consumer; GPUI is never the default guess for a shared contract.
+#   * The closing `crates/taskmanager-ui-contract/*` arm is the conservative
+#     default for an unlisted path (new module, `lib.rs`, `Cargo.toml`), so a
+#     new file cannot silently lose its capture demand.
+#
+# The frontend sets below follow real render consumers (module imports under
+# `crates/*/src`), not a broad directory prefix:
+#
+#   ui-contract `tests/**`, `README.md`, `capabilities.rs`, `conformance.rs`,
+#     `functional.rs`, `keybindings.rs`, `message.rs`, `feature_coverage*`,
+#     `accessibility*`            -> headless only (no paint path)
+#   ui-contract `src/focus.rs`    -> gpui (`taskmanager-ui` focus policy)
+#   ui-contract `src/columns.rs`  -> gpui + iced + bevy (shared table specs;
+#                                    the TUI builds its own column model)
+#   ui-contract `src/navigation.rs` -> gpui + iced + tui (shared page help;
+#                                    Bevy maps its own page labels)
+#   ui-contract `src/icon.rs`, `src/command.rs` -> all four (painted icon and
+#     command vocabulary resolved by the shared shell presentation)
+#   `locales/*`                   -> all four (catalog strings are embedded
+#                                    by the shared application layer)
+#   `taskmanager-icons/*`         -> gpui + iced + bevy (semantic SVG assets;
+#                                    the TUI maps `IconId` to terminal glyphs
+#                                    itself and does not link this crate)
+#
+# Frontend test trees and root acceptance tests (`tests/gui/*`,
+# `crates/taskmanager-*/tests/**`) keep their existing per-frontend routing;
+# narrowing that dev-only layer is a separate owner decision, not an implicit
+# part of this refinement.
 #
 # Usage:
 #   bash scripts/quality/ui-evidence-route.sh [--base <ref>] [--with-gui]
@@ -66,8 +108,92 @@ while IFS= read -r path; do
         iced_touched=1
         bevy_touched=1
         ;;
-    crates/taskmanager-gpui/* | crates/taskmanager-ui/* | \
-        crates/taskmanager-icons/* | crates/taskmanager-ui-contract/* | tests/gui/* | locales/* | \
+    crates/taskmanager-icons/*)
+        # Semantic icon registry (ADR-017): every asset-rendering shape
+        # materializes these bytes.  The TUI maps `IconId` to terminal glyphs
+        # itself and does not link this crate.
+        ui_touched=1
+        gpui_touched=1
+        iced_touched=1
+        bevy_touched=1
+        ;;
+    locales/*)
+        # `locales/{en,zh}.json` are include_str!-embedded by the shared
+        # application layer every product links; a string change repaints all
+        # four frontends.
+        ui_touched=1
+        gpui_touched=1
+        tui_touched=1
+        iced_touched=1
+        bevy_touched=1
+        ;;
+    crates/taskmanager-ui-contract/tests/* | \
+        crates/taskmanager-ui-contract/README.md)
+        # Contract gate tests and crate docs: dev-only, not linked into any
+        # product binary; their evidence is the headless contract suite and
+        # never a pixel frame.  The headless route requirement still applies.
+        ui_touched=1
+        ;;
+    crates/taskmanager-ui-contract/src/capabilities.rs | \
+        crates/taskmanager-ui-contract/src/conformance.rs | \
+        crates/taskmanager-ui-contract/src/functional.rs | \
+        crates/taskmanager-ui-contract/src/keybindings.rs | \
+        crates/taskmanager-ui-contract/src/message.rs | \
+        crates/taskmanager-ui-contract/src/feature_coverage.rs | \
+        crates/taskmanager-ui-contract/src/feature_coverage/* | \
+        crates/taskmanager-ui-contract/src/accessibility.rs | \
+        crates/taskmanager-ui-contract/src/accessibility/*)
+        # Declaration registries and vocabulary (capability/feature/intent/
+        # keybinding coverage, message keys, contract tags) plus the semantic
+        # accessibility model.  Consumed by declaration adapters and headless
+        # gates; no frontend paint path reads them, and a pixel frame cannot
+        # prove their claims.
+        ui_touched=1
+        ;;
+    crates/taskmanager-ui-contract/src/focus.rs)
+        # Modal focus/restore policy consumed by the GPUI reference component
+        # layer (`taskmanager-ui`); Iced owns a local FocusTarget.
+        ui_touched=1
+        gpui_touched=1
+        ;;
+    crates/taskmanager-ui-contract/src/columns.rs)
+        # Shared process-table column specs, consumed by the GPUI, Iced and
+        # Bevy tables; the TUI builds its own terminal column model.
+        ui_touched=1
+        gpui_touched=1
+        iced_touched=1
+        bevy_touched=1
+        ;;
+    crates/taskmanager-ui-contract/src/icon.rs | \
+        crates/taskmanager-ui-contract/src/command.rs)
+        # Painted shared vocabulary: icon identities and per-command
+        # icon/label descriptors resolved by the shared shell presentation
+        # every frontend paints.
+        ui_touched=1
+        gpui_touched=1
+        tui_touched=1
+        iced_touched=1
+        bevy_touched=1
+        ;;
+    crates/taskmanager-ui-contract/src/navigation.rs)
+        # Shared page descriptors painted by the GPUI/Iced help overlays and
+        # the TUI header; Bevy resolves its own page labels.
+        ui_touched=1
+        gpui_touched=1
+        tui_touched=1
+        iced_touched=1
+        ;;
+    crates/taskmanager-ui-contract/*)
+        # Conservative default: an unlisted ui-contract path (new module,
+        # `lib.rs` surface, Cargo manifest) may reach any consumer.  Demand
+        # all four receipts rather than guessing a narrower set.
+        ui_touched=1
+        gpui_touched=1
+        tui_touched=1
+        iced_touched=1
+        bevy_touched=1
+        ;;
+    crates/taskmanager-gpui/* | crates/taskmanager-ui/* | tests/gui/* | \
         scripts/capture-niri.sh | scripts/capture-windows.sh | \
         scripts/accept-gpui-interactions.sh | scripts/windows/accept-gpui-interactions.sh | \
         scripts/gpui_interaction_matrix.tsv | \
@@ -93,6 +219,20 @@ while IFS= read -r path; do
         ;;
     esac
 done <"$changed"
+
+capture_frontends=""
+if [[ "$gpui_touched" == "1" ]]; then
+    capture_frontends="gpui"
+fi
+if [[ "$tui_touched" == "1" ]]; then
+    capture_frontends="${capture_frontends:+$capture_frontends }tui"
+fi
+if [[ "$iced_touched" == "1" ]]; then
+    capture_frontends="${capture_frontends:+$capture_frontends }iced"
+fi
+if [[ "$bevy_touched" == "1" ]]; then
+    capture_frontends="${capture_frontends:+$capture_frontends }bevy"
+fi
 
 if [[ "$ui_touched" == "0" ]]; then
     echo "PASS ui-evidence-route: no UI boundary changes (base=$base)"
@@ -190,6 +330,12 @@ if [[ "$require_capture" == "1" ]]; then
         echo "     missing:$missing (run the selected frontend capture workflow)" >&2
         exit 1
     fi
+fi
+
+if [[ "$require_capture" == "1" && -z "$capture_frontends" ]]; then
+    echo "PASS ui-evidence-route: UI boundary is contract/registry-only (base=$base);"
+    echo "     headless matrix covers it and no pixel receipt is owed"
+    exit 0
 fi
 
 echo "PASS ui-evidence-route: UI boundary covered by headless matrix and capture receipts"

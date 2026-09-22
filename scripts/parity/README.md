@@ -409,16 +409,18 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   `ICED_CAPTURE_MARKER event=target_ready mode=demo page=performance device=health`
   (the modal rides the Performance page, so the validator's default page mapping
   applies unchanged). The scenario row is `health-modal` / `health` / `1180x780`
-  and `mc06-local-modals` declares it as its capture scenario. The runner still
-  carries no key or pointer injection: the surface is reached by a declared
-  scenario token, never by synthesized input. Two evidence-frame properties are
-  deliberate and must not be mistaken for product layout: the modal body stays
-  the production fixed 430px scrollable, and a capture frame bounds it to its
-  end (Iced clamps the requested offset to the real content height), so the
-  thermal-zone panel - which sits below the device summary - is inside the
-  frame; and the capture fixture publishes more than one thermal zone plus one
-  unreadable zone, so the pixels show the per-reading traversal and the honest
-  dash, never a fabricated `0.0 °C`. The headless anchor stays the traversal row
+  and `mc06-local-modals` declares it as its capture scenario (the Iced
+  compatibility matrix carries it from W19-B; the unified matrix row is synced
+  in W22-B). The runner still carries no key or pointer injection: the surface
+  is reached by a declared scenario token, never by synthesized input. Two
+  evidence-frame properties are deliberate and must not be mistaken for
+  product layout: the modal body stays the production fixed 430px scrollable,
+  and a capture frame bounds it to its end (Iced clamps the requested offset
+  to the real content height), so the thermal-zone panel - which sits below
+  the device summary - is inside the frame; and the capture fixture publishes
+  more than one thermal zone plus one unreadable zone, so the pixels show the
+  per-reading traversal and the honest dash, never a fabricated `0.0 °C`. The
+  headless anchor stays the traversal row
   in `feature_evidence.tsv`; the pixel frame is the targeted run
   `TM_ICED_CAPTURE_SCENARIOS=health-modal bash scripts/capture-iced.sh`,
   preconditioned on a Wayland session plus `dbus-run-session`,
@@ -468,6 +470,30 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   the always-run evidence; the pixel frame is the targeted run, preconditioned
   on a Wayland session plus `dbus-run-session`, `kwin_wayland --virtual` and
   `niri` and bounded by the supervisor's 30-minute limit.
+- **UI evidence route impact table (W22-B).** `scripts/quality/ui-evidence-route.sh`
+  keeps the headless requirement for every UI-boundary path but now demands
+  fresh pixel receipts only from the frontends whose paint path a diff can
+  move. `crates/taskmanager-ui-contract/` is no longer one GPUI glob:
+  `tests/**`, `README.md`, the declaration registries (`capabilities.rs`,
+  `conformance.rs`, `functional.rs`, `keybindings.rs`, `message.rs`,
+  `feature_coverage*`) and the semantic accessibility model demand no pixel
+  receipt (their evidence channel is the headless suite); `src/columns.rs`
+  routes to GPUI + Iced + Bevy (the TUI owns its column model), `src/focus.rs`
+  to GPUI, `src/navigation.rs` to GPUI + Iced + TUI, `src/icon.rs` and
+  `src/command.rs` to all four, and every unlisted ui-contract path falls back
+  to all four (fail-closed, never narrower than the old table). `locales/*`
+  routes to all four because the catalog strings are `include_str!`-embedded
+  by the shared application layer each product links, and
+  `crates/taskmanager-icons/*` to GPUI + Iced + Bevy because the TUI maps
+  `IconId` to terminal glyphs itself and does not link that crate. The
+  requirement is derived from real render consumers (module imports under
+  `crates/*/src`), never from a directory prefix. W21-B's diagnostic
+  (`--base 277f9b28~1`, a TUI delivery plus a ui-contract gate-test change)
+  reproduced the old over-demand (`missing: gpui-capture` only); under the new
+  table the same diff is covered by the fresh TUI receipt and no GPUI receipt
+  is owed. The conservative route direction is unchanged: it can demand more
+  receipts than before (a shared path names every consumer), never fewer than
+  its own paint impact.
 
 ## Discipline
 
