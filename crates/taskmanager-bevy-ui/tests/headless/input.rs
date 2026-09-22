@@ -845,3 +845,8 @@ fn text_input_word_navigation_and_deletion() {
     press_ctrl(&mut app, KeyCode::Backspace, None);
     assert_eq!(query_of(&app), "first second ");
 }
+
+// The dispatch-arm behavior tests (0b / 2b / 2c / 3a) live in a sibling
+// path-mounted module so each test file stays inside the per-file budget.
+#[path = "input_arms.rs"]
+mod dispatch_arms;
