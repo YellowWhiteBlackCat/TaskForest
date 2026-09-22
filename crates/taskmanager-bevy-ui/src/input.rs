@@ -30,29 +30,36 @@
 //! 5. **Re-render signal**: any shell mutation triggers
 //!    [`ShellInteractionApplied`] so mounted pages rebuild from the folded
 //!    state (never polling).
+//!
+//! The keyboard adapter itself lives in the [`dispatch`] submodule: it owns
+//! the per-press frame and the ordered arm chain, where each arm is one
+//! small method whose doc comment carries the precedence number from the
+//! parity contract.
 
-use bevy::app::{App, AppExit, Plugin};
+use bevy::app::{App, Plugin};
 use bevy::ecs::event::Event;
-use bevy::ecs::message::{MessageReader, MessageWriter};
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut, SystemParam};
+use bevy::ecs::system::{Res, ResMut, SystemParam};
 use bevy::input::ButtonInput;
-use bevy::input::ButtonState;
 use bevy::input::keyboard::{KeyCode, KeyboardInput};
 use taskmanager_application::{Modifiers, PlatformEffect};
 
-use taskmanager_shell::{InputDispatch, ShellApp, ShellKeyEvent};
+use taskmanager_shell::ShellApp;
 
-use crate::app::{
-    FrontendTrack, Page, Route, action_for_page, modifier_state, request_route, route_key_press,
-};
-use crate::confirmation::{ConfirmationChanged, PendingConfirmationView};
-use crate::input_contract::shared_key;
-use crate::menu_modal::{MenuModal, MenuModalChanged, ModalDriver};
+use crate::app::{Page, modifier_state};
+use crate::menu_modal::{MenuModal, ModalDriver};
 use crate::pages::processes::menu::ProcessMenuCtx;
 use crate::pages::services::menu::ServiceMenuCtx;
 use crate::pages::sessions::menu::SessionMenuCtx;
 use crate::pages::startup::menu::StartupMenuCtx;
+
+#[path = "input/dispatch.rs"]
+mod dispatch;
+#[path = "input/text_input.rs"]
+mod text_input;
+
+pub(crate) use dispatch::keyboard_dispatch_system;
+pub(crate) use text_input::TextInputState;
 
 /// Platform effects produced by shell state transitions on the input path.
 /// The drain system submits them through the shared `queue_effect` seam.
@@ -66,13 +73,9 @@ pub(crate) struct ShellInteractionApplied;
 
 /// Forwards the shell's quit decision to the runner exactly once. The TUI
 /// polls `quit_reason` in its loop; the Bevy adapter translates the first
-/// observation into [`AppExit`].
+/// observation into [`bevy::app::AppExit`].
 #[derive(Resource, Default)]
 pub(crate) struct QuitForwarded(pub(crate) bool);
-
-#[path = "input/text_input.rs"]
-mod text_input;
-pub(crate) use text_input::TextInputState;
 
 pub(crate) fn commit_query_to_shell(shell: &mut ShellApp, text: &str) {
     while !shell.query.is_empty() {
@@ -104,6 +107,7 @@ impl Plugin for InputPlugin {
 /// frontend's own local modals (the per-inventory action menus), which own
 /// the keyboard ahead of the shell's free bindings — a frontend-local modal
 /// can never have its keys stolen by navigation chords.
+#[derive(Clone, Copy)]
 enum KeyboardOwner {
     Gate,
     FrontendMenu,
@@ -111,6 +115,40 @@ enum KeyboardOwner {
     SharedSurface,
     Search,
     Free,
+}
+
+/// One per-inventory action menu, as a typed surface. A menu is identified by
+/// its kind, never by a presence flag, so a captured snapshot can be matched
+/// against the resource it belongs to.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FrontendMenuKind {
+    Service,
+    Startup,
+    Session,
+    Process,
+}
+
+/// The frontend-local action menus that owned the keyboard when a press
+/// landed, in drive order (Services, Startup, Sessions, Process).
+///
+/// The four menus are independent resources, so the snapshot keeps one
+/// presence slot per resource: `Some(kind)` is the typed surface that was
+/// present, `None` an absent one. A press captured before the first arm runs
+/// therefore keeps every surface it belonged to, and no later mutation can
+/// change the decision.
+#[derive(Clone, Copy)]
+struct FrontendMenus([Option<FrontendMenuKind>; 4]);
+
+impl FrontendMenus {
+    /// Whether no frontend-local surface owned the keyboard.
+    fn is_empty(self) -> bool {
+        self.0.iter().all(Option::is_none)
+    }
+
+    /// Whether `kind`'s surface owned the keyboard.
+    fn holds(self, kind: FrontendMenuKind) -> bool {
+        self.0.contains(&Some(kind))
+    }
 }
 
 /// Bundled action-menu modal resources to keep the dispatch system under the argument budget.
@@ -122,6 +160,18 @@ pub(crate) struct InventoryActionModals<'w> {
     pub(crate) proc: ResMut<'w, MenuModal<ProcessMenuCtx>>,
 }
 
+impl InventoryActionModals<'_> {
+    /// The frontend-local action menus present this instant, in drive order.
+    fn present(&self) -> FrontendMenus {
+        FrontendMenus([
+            self.svc.is_open().then_some(FrontendMenuKind::Service),
+            self.stu.is_open().then_some(FrontendMenuKind::Startup),
+            self.ses.is_open().then_some(FrontendMenuKind::Session),
+            self.proc.is_open().then_some(FrontendMenuKind::Process),
+        ])
+    }
+}
+
 /// Bundled table selections for the inventory pages.
 #[derive(SystemParam)]
 pub(crate) struct InventorySelections<'w> {
@@ -130,10 +180,10 @@ pub(crate) struct InventorySelections<'w> {
     pub(crate) ses: Option<Res<'w, crate::pages::sessions::SessionSelection>>,
 }
 
-fn keyboard_owner(shell: &ShellApp, modal_open: bool, page: Page) -> KeyboardOwner {
+fn keyboard_owner(shell: &ShellApp, frontend_menus: FrontendMenus, page: Page) -> KeyboardOwner {
     if shell.confirmation_kind().is_some() {
         KeyboardOwner::Gate
-    } else if modal_open {
+    } else if !frontend_menus.is_empty() {
         KeyboardOwner::FrontendMenu
     } else if shell.service_log.is_some() && page == Page::Services {
         KeyboardOwner::ServiceLogPanel
@@ -162,454 +212,6 @@ fn text_char(event: &KeyboardInput, modifiers: Modifiers) -> Option<char> {
     let mut chars = text.chars();
     let only = chars.next()?;
     (chars.next().is_none() && !only.is_control()).then_some(only)
-}
-
-/// The `Update` keyboard adapter: normalize every just-pressed Bevy key and
-/// forward it through the shell's routers. One pass, in modal-precedence
-/// order; effects and re-render signals collect for the frame tail.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn keyboard_dispatch_system(
-    mut presses: MessageReader<KeyboardInput>,
-    keys: Res<ButtonInput<KeyCode>>,
-    mut track: NonSendMut<FrontendTrack>,
-    mut modals: InventoryActionModals,
-    selections: InventorySelections,
-    mut pending: ResMut<PendingEffects>,
-    mut route: ResMut<Route>,
-    mut quit: ResMut<QuitForwarded>,
-    mut exits: MessageWriter<AppExit>,
-    perf_device_focus: Option<Res<crate::pages::performance::PerformanceDeviceFocus>>,
-    export_dir: Option<Res<crate::pages::services::log_panel::ServiceLogExportDir>>,
-    feedback_cache: Option<ResMut<crate::drain::FeedbackCache>>,
-    mut text_state: Option<ResMut<TextInputState>>,
-    mut commands: Commands,
-) {
-    let events: Vec<KeyboardInput> = presses
-        .read()
-        .filter(|event| event.state == ButtonState::Pressed)
-        .cloned()
-        .collect();
-    let modifiers = modifiers_from(&keys);
-    let shell = &mut track.shell;
-    let armed_before = shell.confirmation_kind();
-    let mut applied = false;
-    for event in &events {
-        let modal_open = modals.svc.is_open()
-            || modals.stu.is_open()
-            || modals.ses.is_open()
-            || modals.proc.is_open();
-        let context = keyboard_owner(shell, modal_open, route.page);
-        // 0a. Open action menus (frontend-local modals): an open modal owns
-        //     the keyboard ahead of navigation chords and the shell; its
-        //     overlay mounts/despawns with the session transition.
-        if modal_open {
-            let svc_before = modals.svc.is_open();
-            let stu_before = modals.stu.is_open();
-            let ses_before = modals.ses.is_open();
-            let proc_before = modals.proc.is_open();
-            if svc_before {
-                applied |= modals.svc.drive(shell, event.key_code, &mut pending.0);
-            }
-            if stu_before {
-                applied |= modals.stu.drive(shell, event.key_code, &mut pending.0);
-            }
-            if ses_before {
-                applied |= modals.ses.drive(shell, event.key_code, &mut pending.0);
-            }
-            if proc_before {
-                applied |= modals.proc.drive(shell, event.key_code, &mut pending.0);
-            }
-            if svc_before && !modals.svc.is_open() {
-                commands.trigger(MenuModalChanged::<ServiceMenuCtx>(
-                    false,
-                    Default::default(),
-                ));
-            }
-            if stu_before && !modals.stu.is_open() {
-                commands.trigger(MenuModalChanged::<StartupMenuCtx>(
-                    false,
-                    Default::default(),
-                ));
-            }
-            if ses_before && !modals.ses.is_open() {
-                commands.trigger(MenuModalChanged::<SessionMenuCtx>(
-                    false,
-                    Default::default(),
-                ));
-            }
-            if proc_before && !modals.proc.is_open() {
-                commands.trigger(MenuModalChanged::<ProcessMenuCtx>(
-                    false,
-                    Default::default(),
-                ));
-            }
-            if applied {
-                crate::confirmation::republish(shell, &mut commands);
-                commands.trigger(ShellInteractionApplied);
-            }
-            continue;
-        }
-        // 0b. Service log panel (frontend-local surface, TUI panel parity):
-        //     F/P/L/T/E/Esc are consumed ahead of navigation chords and the
-        //     shell routers while the panel owns the Services page keyboard.
-        if matches!(context, KeyboardOwner::ServiceLogPanel)
-            && modifiers == Modifiers::NONE
-            && let Some(action) = crate::pages::services::log_panel::log_panel_key(event.key_code)
-        {
-            use crate::pages::services::log_panel::ServiceLogControlAction;
-            match action {
-                ServiceLogControlAction::ToggleFollow => shell.toggle_service_log_follow(),
-                ServiceLogControlAction::TogglePaused => shell.toggle_service_log_paused(),
-                ServiceLogControlAction::CycleLevel => shell.cycle_service_log_level(),
-                ServiceLogControlAction::CycleTime => shell.cycle_service_log_time(),
-                ServiceLogControlAction::Export => {
-                    let dir = export_dir.as_deref().and_then(|d| d.0.as_deref());
-                    crate::pages::services::log_panel::export_service_log(shell, dir);
-                }
-                ServiceLogControlAction::Close => shell.close_service_log(),
-            }
-            applied = true;
-            commands.trigger(crate::pages::services::log_panel::LogPanelRepaintRequired);
-            continue;
-        }
-        // 0c. Active feedback notice dismissal: when no confirmation or modal
-        //     is open, bare Escape clears the notice immediately.
-        if matches!(context, KeyboardOwner::Free)
-            && event.key_code == KeyCode::Escape
-            && modifiers == Modifiers::NONE
-            && shell.feedback_notice().is_some()
-        {
-            shell.clear_feedback_notice();
-            applied = true;
-            continue;
-        }
-        // 1. Frontend navigation: route chords move the Bevy route AND the
-        //    shell page so scope derivation follows the visible page.
-        if matches!(context, KeyboardOwner::Free)
-            && let Some(page) = route_key_press(event.key_code, modifier_state(&keys))
-        {
-            if let Some(action) = action_for_page(page)
-                && let Some(effect) = shell.apply_action(action)
-            {
-                pending.0.push(effect);
-            }
-            request_route(&mut route, page, &mut commands);
-            applied = true;
-            continue;
-        }
-        // 2. Dialog-scope Enter: confirm whatever gate is armed.
-        if matches!(context, KeyboardOwner::Gate)
-            && event.key_code == KeyCode::Enter
-            && modifiers == Modifiers::NONE
-            && let Some(kind) = shell.confirmation_kind()
-        {
-            if let Some(effect) = crate::confirmation::confirm_armed(shell, kind) {
-                pending.0.push(effect);
-            }
-            applied = true;
-            continue;
-        }
-        // 2a. Applications action menu: the TUI-local `a` chord (TUI
-        //     `OpenProcessMenu` parity) opens the process control menu —
-        //     end task/tree, suspend/resume, force kill, and the neutral
-        //     priority tiers. Bare Enter stays with the shell (it expands a
-        //     tree row / jumps to the next search match there), so this menu
-        //     does not join the inventory Enter arm below.
-        if matches!(context, KeyboardOwner::Free)
-            && route.page == Page::Processes
-            && event.key_code == KeyCode::KeyA
-            && modifiers == Modifiers::NONE
-        {
-            let opened =
-                crate::pages::processes::menu::open_for_selected(modals.proc.as_mut(), shell);
-            if opened {
-                commands.trigger(MenuModalChanged::<ProcessMenuCtx>(true, Default::default()));
-                applied = true;
-                continue;
-            }
-        }
-        // 2b. Closed-menu Enter / 'a' attempt: bare Enter or 'a' over a selected row on
-        //     an inventory page opens that page's action menu (TUI
-        //     Enter-actions parity, one arm per inventory).
-        if matches!(context, KeyboardOwner::Free)
-            && (event.key_code == KeyCode::Enter
-                || (event.key_code == KeyCode::KeyA && route.page != Page::Processes))
-            && modifiers == Modifiers::NONE
-        {
-            let opened = match route.page {
-                Page::Services => {
-                    let target = selections
-                        .svc
-                        .as_ref()
-                        .and_then(|state| state.target.as_ref())
-                        .or_else(|| shell.sorted_services().first().map(|s| &s.id));
-                    match target {
-                        Some(target) => {
-                            crate::pages::services::menu::open_for(&mut modals.svc, shell, target)
-                        }
-                        None => false,
-                    }
-                }
-                Page::Startup => {
-                    let target = selections
-                        .stu
-                        .as_ref()
-                        .and_then(|state| state.target.clone())
-                        .or_else(|| shell.sorted_startup_entries().first().map(|e| e.id.clone()));
-                    match target {
-                        Some(target) => {
-                            crate::pages::startup::menu::open_for(&mut modals.stu, shell, &target)
-                        }
-                        None => false,
-                    }
-                }
-                Page::Sessions => {
-                    let target = selections
-                        .ses
-                        .as_ref()
-                        .and_then(|state| state.target.clone())
-                        .or_else(|| shell.sorted_sessions().first().map(|s| s.id.clone()));
-                    match target {
-                        Some(target) => {
-                            crate::pages::sessions::menu::open_for(&mut modals.ses, shell, &target)
-                        }
-                        None => false,
-                    }
-                }
-                _ => false,
-            };
-            if opened {
-                match route.page {
-                    Page::Services => commands
-                        .trigger(MenuModalChanged::<ServiceMenuCtx>(true, Default::default())),
-                    Page::Startup => commands
-                        .trigger(MenuModalChanged::<StartupMenuCtx>(true, Default::default())),
-                    Page::Sessions => commands
-                        .trigger(MenuModalChanged::<SessionMenuCtx>(true, Default::default())),
-                    _ => {}
-                }
-                applied = true;
-                continue;
-            }
-        }
-        // 2c. Performance page: 't' chord triggers SMART self-test for the selected disk.
-        if matches!(context, KeyboardOwner::Free)
-            && route.page == Page::Performance
-            && event.key_code == KeyCode::KeyT
-            && modifiers == Modifiers::NONE
-        {
-            let disk_target = match &perf_device_focus {
-                Some(focus) => match &focus.0 {
-                    crate::pages::performance::PerformanceDeviceTarget::Disk(id) => {
-                        Some(id.clone())
-                    }
-                    _ => None,
-                },
-                None => None,
-            };
-            let disk_id = disk_target.or_else(|| {
-                shell
-                    .projection()
-                    .snapshot
-                    .as_ref()
-                    .and_then(|snapshot| snapshot.disks.first())
-                    .map(|d| d.device_id.clone())
-            });
-            if let Some(disk_id) = disk_id
-                && crate::pages::performance::request_smart_self_test(
-                    shell,
-                    &disk_id,
-                    taskmanager_core::core::smart::SmartSelfTestKind::Short,
-                )
-            {
-                applied = true;
-                continue;
-            }
-        }
-        // 2d. Search input editing: when search owns the keyboard, handle text navigation & editing.
-        if matches!(context, KeyboardOwner::Search) {
-            let mut query = shell.query.clone();
-            let mut state = text_state.as_deref_mut().cloned().unwrap_or_default();
-            let mut consumed = true;
-
-            let is_ctrl = modifiers.control;
-
-            match event.key_code {
-                KeyCode::ArrowLeft => {
-                    if is_ctrl {
-                        state.move_word_left(&query);
-                    } else {
-                        state.move_left(&query);
-                    }
-                }
-                KeyCode::ArrowRight => {
-                    if is_ctrl {
-                        state.move_word_right(&query);
-                    } else {
-                        state.move_right(&query);
-                    }
-                }
-                KeyCode::Home => state.move_home(),
-                KeyCode::End => state.move_end(&query),
-                KeyCode::Backspace => {
-                    let changed = if is_ctrl {
-                        state.delete_word_backward(&mut query)
-                    } else {
-                        state.delete_backward(&mut query)
-                    };
-                    if changed {
-                        commit_query_to_shell(shell, &query);
-                    }
-                }
-                KeyCode::Delete => {
-                    if state.delete_forward(&mut query) {
-                        commit_query_to_shell(shell, &query);
-                    }
-                }
-                KeyCode::Escape => {
-                    if !query.is_empty() {
-                        state.clear_line(&mut query);
-                        commit_query_to_shell(shell, &query);
-                    } else {
-                        shell.close_search();
-                    }
-                }
-                KeyCode::KeyU if is_ctrl => {
-                    state.clear_line(&mut query);
-                    commit_query_to_shell(shell, &query);
-                }
-                KeyCode::KeyC if is_ctrl => {
-                    state.copy_to_clipboard(&query);
-                }
-                KeyCode::KeyX if is_ctrl => {
-                    state.cut_to_clipboard(&mut query);
-                    commit_query_to_shell(shell, &query);
-                }
-                KeyCode::KeyV if is_ctrl => {
-                    state.paste_from_clipboard(&mut query);
-                    commit_query_to_shell(shell, &query);
-                }
-                _ => {
-                    if let Some(ch) = text_char(event, modifiers) {
-                        if !is_ctrl && !modifiers.alt {
-                            state.insert_char(&mut query, ch);
-                            commit_query_to_shell(shell, &query);
-                        } else {
-                            consumed = false;
-                        }
-                    } else {
-                        consumed = false;
-                    }
-                }
-            }
-
-            if let Some(ref mut ts) = text_state {
-                **ts = state;
-            }
-
-            if consumed {
-                applied = true;
-                continue;
-            }
-        }
-        // 3. Layout-correct characters through the shell char router.
-        if text_char(event, modifiers).is_some_and(|character| {
-            dispatch(
-                shell.handle_local_char(character, modifiers),
-                &mut pending.0,
-            )
-        }) {
-            applied = true;
-            continue;
-        }
-        // 3a. Table row selection motion for non-process inventory tables.
-        if matches!(context, KeyboardOwner::Free) && modifiers == Modifiers::NONE {
-            match route.page {
-                Page::Startup => match event.key_code {
-                    KeyCode::ArrowUp => {
-                        commands.trigger(crate::pages::startup::StartupSelectionMoved(-1));
-                        applied = true;
-                    }
-                    KeyCode::ArrowDown => {
-                        commands.trigger(crate::pages::startup::StartupSelectionMoved(1));
-                        applied = true;
-                    }
-                    _ => {}
-                },
-                Page::Sessions => match event.key_code {
-                    KeyCode::ArrowUp => {
-                        commands.trigger(crate::pages::sessions::SessionSelectionMoved(-1));
-                        applied = true;
-                    }
-                    KeyCode::ArrowDown => {
-                        commands.trigger(crate::pages::sessions::SessionSelectionMoved(1));
-                        applied = true;
-                    }
-                    _ => {}
-                },
-                Page::Services => match event.key_code {
-                    KeyCode::ArrowUp => {
-                        commands.trigger(crate::pages::services::ServiceSelectionMoved(-1));
-                        applied = true;
-                    }
-                    KeyCode::ArrowDown => {
-                        commands.trigger(crate::pages::services::ServiceSelectionMoved(1));
-                        applied = true;
-                    }
-                    _ => {}
-                },
-                _ => {}
-            }
-        }
-
-        // 4. Fixed-key router (arrows, Delete, Escape, F5, F9, chorded letters).
-        if let Some(shared) = shared_key(event.key_code) {
-            if shared == taskmanager_application::KeyCode::F9
-                && modifiers == taskmanager_application::Modifiers::NONE
-            {
-                commands.trigger(crate::pages::performance::TogglePerformanceSidebar);
-                applied = true;
-            } else {
-                let outcome = shell.handle_local_key(ShellKeyEvent::new(shared, modifiers));
-                applied |= dispatch(outcome, &mut pending.0);
-            }
-        }
-    }
-    if applied {
-        commands.trigger(ShellInteractionApplied);
-    }
-    if armed_before != shell.confirmation_kind() {
-        let view = shell
-            .pending_confirmation()
-            .and_then(PendingConfirmationView::from_pending);
-        commands.trigger(ConfirmationChanged(view));
-    }
-    if let Some(mut cache) = feedback_cache {
-        let feedback = shell.feedback_text().to_owned();
-        if cache.0.as_deref() != Some(feedback.as_str()) {
-            cache.0 = Some(feedback.clone());
-            commands.trigger(crate::drain::FeedbackChanged(feedback));
-        }
-    }
-    // Quit forwarding is frame-level, not key-level: a quit requested
-    // outside the keyboard (tray, platform lifecycle) still exits exactly
-    // once. The TUI checks the same state every loop iteration.
-    if !quit.0 && shell.quit_reason().is_some() {
-        exits.write(AppExit::Success);
-        quit.0 = true;
-    }
-}
-
-/// Record one dispatch outcome: `true` when the shell consumed the input.
-fn dispatch(outcome: InputDispatch, pending: &mut Vec<PlatformEffect>) -> bool {
-    match outcome {
-        InputDispatch::Unhandled => false,
-        InputDispatch::Consumed => true,
-        InputDispatch::Effect(effect) => {
-            pending.push(*effect);
-            true
-        }
-    }
 }
 
 #[cfg(test)]
