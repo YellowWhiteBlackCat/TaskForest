@@ -578,7 +578,7 @@ if maybe parity-evidence; then
     # are only counted and reported.  Out of scope the resolver prints
     # "PASS ... (skipped)" and the stage is green without discovering anything.
     if scope_skip parity-evidence "merge-owner evidence surface" standard; then
-        run_stage parity-evidence standard python3 scripts/parity/resolve_frontend_evidence.py \
+        run_stage parity-evidence standard timeout --kill-after=30s 900s python3 scripts/parity/resolve_frontend_evidence.py \
             --nextest --scope auto \
             --report-json target/cross-frontend-evidence/parity-evidence/manifest-validation.json
     fi
