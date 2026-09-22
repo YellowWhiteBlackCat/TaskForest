@@ -36,8 +36,11 @@ pub use conformance::ContractTag;
 pub use feature_coverage::{
     FeatureArea, FeatureCoverageDeclaration, FeatureCoverageEntry, FeatureCoverageFinding,
     FeatureCoverageFindingKind, FeatureCoverageStatus, FeatureId, FeatureOrigin,
-    FeatureSemanticSpec, feature_coverage_drift, feature_coverage_findings,
-    feature_coverage_report,
+    FeaturePlatformCell, FeaturePlatformLedger, FeaturePlatformStatus, FeatureSemanticSpec,
+    MISSING_DECLARATION_REASON, MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PartialCause,
+    PlatformBinding, PlatformCapabilitySurface, PlatformSource, PlatformSourceError,
+    PlatformUnavailability, classify, feature_coverage_drift, feature_coverage_findings,
+    feature_coverage_report, feature_platform_report,
 };
 pub use focus::{FocusCycle, FocusCycleStep, FocusRestoreToken, FocusTarget, ModalFocusPolicy};
 pub use functional::{

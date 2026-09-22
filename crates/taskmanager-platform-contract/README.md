@@ -56,6 +56,7 @@ reaches the same function through the lossless `from_kind` conversion.
 
 ```text
 src/capability.rs                 capability/request/outcome vocabulary
+src/platform.rs                   platform axis identity (linux/windows/macos)
 src/port.rs  scheduler.rs         port and scheduling vocabulary
 src/envelope.rs                   typed event envelope (EventSequence)
 src/failure.rs                    unified failure vocabulary

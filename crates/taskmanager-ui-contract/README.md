@@ -40,5 +40,7 @@ src/feature_coverage.rs          FeatureId/FeatureArea coverage registry and the
 │                                feature_coverage_findings gate: one explicit
 │                                declaration per frontend, proving declaration
 │                                discipline only, never behavioral equivalence
+src/feature_coverage/            delivery semantic specs, per-feature platform
+                                 binding, and the read-only three-axis ledger fold
 src/accessibility/               neutral accessibility model and snapshots
 ```

@@ -98,6 +98,21 @@
 //! decision and a semantic specification) rather than claimed as covered. A
 //! gate that never sees a feature cannot protect it.
 //!
+//! ## Platform axis fold (P5)
+//!
+//! [`FeatureId::ALL`] is also the feature axis of the three-axis parity
+//! ledger. [`FeatureId::platform_binding`] declares, per feature and again as
+//! an exhaustive `const fn`, what the platform axis should provide: a
+//! capability requirement set, an explicit vocabulary gap, or a
+//! `NotApplicable` delivery that has no operating-system source step.
+//! [`feature_platform_report`] folds that declaration against a supplied
+//! [`PlatformCapabilitySurface`] and one frontend declaration into
+//! [`FeaturePlatformLedger`], where `Missing` (no frontend entry) and
+//! `Unsupported`/`Unregistered` (no platform source) come from different axes
+//! and never infer each other. The platform identity type is
+//! `taskmanager-platform-contract::PlatformAxis`; this crate composes it and
+//! never re-exports it.
+//!
 //! ## Honesty boundary
 //!
 //! Like the capability registry, this proves DECLARATION discipline: every
@@ -111,8 +126,16 @@
 use crate::capabilities::CapabilitySupport;
 use crate::keybindings::FrontendShape;
 
+mod platform_axis;
+mod platform_binding;
 mod semantic_spec;
 
+pub use platform_axis::{
+    FeaturePlatformCell, FeaturePlatformLedger, FeaturePlatformStatus, MISSING_DECLARATION_REASON,
+    MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PartialCause, PlatformCapabilitySurface,
+    PlatformSource, PlatformSourceError, PlatformUnavailability, classify, feature_platform_report,
+};
+pub use platform_binding::PlatformBinding;
 pub use semantic_spec::FeatureSemanticSpec;
 
 /// One functional area of the 225-item four-frontend parity blueprint.
