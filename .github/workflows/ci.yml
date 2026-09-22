@@ -141,7 +141,13 @@ jobs:
       # `test-support` is DEV-only: gpui's upstream test-support hard-wires
       # X11, so it is enabled for test targets but never for the release build
       # below (strict Wayland product policy).
-      - run: cargo clippy --locked --workspace --all-targets --features test-support -- -D warnings
+      #
+      # The trailing `-W` flags mirror the local standard gate's clippy stage
+      # (scripts/quality/local-gates.sh) and are what activate clippy.toml's
+      # workspace structural ratchets: both lints are allow-by-default
+      # (restriction / pedantic), so `-D warnings` alone never enables them.
+      # Keep this command identical to the local gate.
+      - run: cargo clippy --locked --workspace --all-targets --features test-support -- -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
 
   test:
     name: Linux (workspace tests + doctests)
