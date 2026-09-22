@@ -987,19 +987,36 @@ fn alt_7_reaches_the_app_history_page_through_the_shared_router() {
 
 #[test]
 fn control_hold_pauses_telemetry_through_the_shared_policy() {
+    use ratatui::crossterm::event::{Event, KeyEventKind};
+
     let mut app = crate::demo_app();
     assert!(!app.paused(), "not paused by default");
     assert!(!app.shell.control_held());
 
-    // The event loop mirrors the live Ctrl state into the shared policy on
-    // every key event (Press and Release alike); the policy then pauses
-    // telemetry refresh while held — the same authority iced drives.
-    app.shell.set_control_held(true);
+    // Drive the production terminal seam, not the policy setter: the event
+    // loop mirrors every key event's live Ctrl state into the shared policy
+    // (Press and Release alike), and the policy pauses telemetry refresh while
+    // held. A Release-kind key isolates the modifier sync from any chord.
+    let frame = ratatui::layout::Rect::new(0, 0, 80, 24);
+    let plan = crate::ui::TuiFramePlan::build(&app, frame);
+    let held = Event::Key(KeyEvent::new_with_kind(
+        ratatui::crossterm::event::KeyCode::Char('x'),
+        KeyModifiers::CONTROL,
+        KeyEventKind::Release,
+    ));
+    let reaction = crate::runtime::seam::apply_terminal_event_with_plan(&mut app, held, &plan);
+    assert!(reaction.dirty, "a key event repaints");
     assert!(app.shell.control_held());
     assert!(app.paused(), "held control pauses telemetry refresh");
 
     // A Release-style sync (Ctrl no longer in the modifiers) clears the hold.
-    app.shell.set_control_held(false);
+    let released = Event::Key(KeyEvent::new_with_kind(
+        ratatui::crossterm::event::KeyCode::Char('x'),
+        KeyModifiers::NONE,
+        KeyEventKind::Release,
+    ));
+    let reaction = crate::runtime::seam::apply_terminal_event_with_plan(&mut app, released, &plan);
+    assert!(reaction.dirty, "the release repaints");
     assert!(!app.shell.control_held());
     assert!(!app.paused());
 }
