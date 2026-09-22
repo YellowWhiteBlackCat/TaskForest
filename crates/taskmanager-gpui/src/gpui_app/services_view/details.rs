@@ -365,8 +365,7 @@ pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div
                         .child(line);
                     // One selector per painted stream line: a frame test can
                     // count the rows that survived the shared level filter.
-                    let row = with_log_line_selector(row, index);
-                    row
+                    with_log_line_selector(row, index)
                 })),
         ),
         ServiceLogState::Loading => panel
