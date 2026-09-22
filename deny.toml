@@ -23,17 +23,22 @@ unmaintained = "workspace"
 unsound = "all"
 # A yanked crate means the publisher retracted the release; never ship one.
 yanked = "deny"
-# Per-advisory opt-outs. Each is a TRANSITIVE dependency TaskForest cannot bump
-# directly (pinned by gpui 0.2.2 or a target-specific resolver) AND whose
-# vulnerable/unsound code path TaskForest never calls. Revisit on each gpui bump.
-ignore = [
-    # git2 0.20.4 is pulled transitively via gpui_util -> gpui 0.2.2; the fix is
-    # git2 >=0.21, unreachable without a gpui update. The unsound paths
-    # (Remote::list() null deref; Signature from a buffer-created BlameHunk)
-    # are not used by TaskForest, which never drives git2 directly.
-    "RUSTSEC-2026-0183",
-    "RUSTSEC-2026-0184",
-]
+# Per-advisory opt-outs. An entry is only valid while the vulnerable crate
+# version is reachable in this checked graph: a stale entry silently suppresses
+# a real finding later and warns `advisory-not-detected` today. Revisit on each
+# gpui bump.
+#
+# Intentionally empty. RUSTSEC-2026-0183 / RUSTSEC-2026-0184 (unsound git2
+# Remote::list() and BlameHunk::blame_buffer paths, patched in git2 >= 0.21.0)
+# match nothing here: git2 0.20.4 stays in Cargo.lock only through gpui_util's
+# [dev-dependencies] and its optional `test-support` dependency, which gpui
+# enables from its own [dev-dependencies]. The checked graph (CI's
+# cargo-deny-action and scripts/quality/local-gates.sh both run the default
+# `cargo deny check`) excludes dev-dependencies: `cargo deny list` contains no
+# git2 and `cargo tree -e normal,build --all-features -i git2` prints nothing.
+# If a future gpui bump promotes git2 to a production dependency, let the gate
+# fail on < 0.21.0 and fix it with a gpui/git2 bump, not a re-added ignore.
+ignore = []
 
 # licenses: reject any license expression not explicitly approved below. The
 # allow-list starts permissive (OSI-approved, royalty-free) and is tightened as
