@@ -541,6 +541,16 @@ fi
 if maybe parity-declaration; then
     run_stage parity-declaration quick run_py scripts/quality/parity_declaration_consistency.py
 fi
+if maybe clippy-parity-self; then
+    # CI's `lint` job and this script's clippy stage must not drift apart
+    # again: the self-test proves the comparator goes red on a dropped `-W`
+    # ratchet, ignores flag order/whitespace, and fails closed on a stage it
+    # cannot parse.
+    run_stage clippy-parity-self quick run_py scripts/quality/clippy_command_parity_guard.py --self-test
+fi
+if maybe clippy-parity; then
+    run_stage clippy-parity quick run_py scripts/quality/clippy_command_parity_guard.py
+fi
 
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 
