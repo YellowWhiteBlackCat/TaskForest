@@ -19,8 +19,11 @@ GPUI、Iced、TUI 与 Bevy 四大前端均已全部纳入官方发行包矩阵�
 （`Unsupported` / `PermissionRequired` / `RequiresEscalation` / `MissingDependency` /
 `TemporarilyUnavailable`，均为 `platform-contract::CapabilityStatus` 的真实变体名；
 `PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴）；
-平台按 typed 原因诚实降级是产品承诺的一部分，平台缺席不视为落空，也不得
-用空值、静态占位或未接线按钮伪装为已实现功能。
+未注册的期望身份以 typed 缺席呈现——`Unsupported`、无 provider 归属，不以"无条目"静默
+消失（`CapabilityId::EXPECTED_SURFACE`，机制见
+[ADR-053](../adr/053-product-expected-capability-surface.md)）。平台按 typed 原因诚实降级
+是产品承诺的一部分，typed 缺席不视为落空，也不得用空值、静态占位或未接线按钮伪装为
+已实现功能。
 
 ## 程序与兼容名称
 

@@ -29,7 +29,19 @@
 - **稳定身份与 generation**：设备/进程身份重用后必须断开旧基线；per-device 历史读边必须
   携带 generation（[STATE_OWNERSHIP](STATE_OWNERSHIP.md)）。
 - **capability facet / provider**：一个能力一个 facet，一个 facet 一个 provider；运行时
-  注册发现，缺失不伪造（ADR-007、[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md)）。
+  注册发现，缺失不伪造（ADR-007、[TELEMETRY_MANIFEST](TELEMETRY_MANIFEST.md)）。产品
+  期望面内的身份不因未注册而消失：catalog 以 typed 缺席作答（见下条）。
+- **期望面（expected surface）**：`CapabilityId::EXPECTED_SURFACE` 声明的"每个平台都必须
+  作答"的能力身份全集，是产品事实而非平台能力声明。runtime catalog 先为每个期望身份发布
+  typed 缺席 descriptor，真实注册只替换自身条目；`registered` 与 `typed_absences` 是两个
+  catalog 投影，期望身份缺 descriptor 即缺陷（身份成员资格不伪造可用性）；期望面外的
+  vendor/诊断身份不受此承诺约束（产品平台轴为 Linux、Windows、macOS；
+  [ADR-053](../adr/053-product-expected-capability-surface.md)）。
+- **typed 缺席（typed absence）**：`CapabilityDescriptor::typed_absence` 的缺席形态——
+  `Unsupported`、无 provider 归属、无观测时间、无 last success；既不是伪造的零，也不是
+  对运行时瞬态的断言。已注册但当前不可用/失败的 lane 保留 provider 归属，可携带
+  `TemporarilyUnavailable`、`Degraded` 等状态；`is_typed_absence` 区分两者
+  （ADR-053；字段级缺席/可用性语义见 [SCALAR_AVAILABILITY](SCALAR_AVAILABILITY.md)）。
 
 ## 运行时与状态
 
@@ -59,6 +71,12 @@
   达成形态，不是失败。不得表述为四端「功能对等」或 Linux-only 能力「跨平台可用」，缺口不得用
   `0`、空值或静态占位表示
   （[CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、[ARCH §8](ARCH.md)）。
+- **Ready（静态来源承诺）**：对等/覆盖账本中"平台 × 前端"格子的就绪状态，表示该组合声明
+  的来源与前端语义入口均已具备；这是**静态来源承诺**，不是运行时实测 `Available`——运行时
+  可用性由 catalog 的 typed 状态（真实观测、typed 缺席或 typed 降级）承载，并在真机
+  conformance 核验。不得把 Ready 读作四端"功能对等"或"跨平台可用"
+  （[CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、ADR-053）。生命周期状态机中的
+  同名 `Ready`（request session / ECS work）另见 [STATE_OWNERSHIP](STATE_OWNERSHIP.md)。
 - **同异律**：五条跨前端定律——语义完备、映射穷尽、同一、语义平价、折叠
   （[ARCH §8](ARCH.md)）。
 - **折叠律**：渲染入口只回放数据层折叠，不重算（"一次折叠，四端渲染"）。

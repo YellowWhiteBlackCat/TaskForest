@@ -26,7 +26,10 @@ Iced、TUI、Bevy）全量 DEB 与 RPM 安装包；Windows 原生流水线构建
 `TemporarilyUnavailable` 呈现（这五个是 `platform-contract::CapabilityStatus` 的真实变体名）；
 `PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 是不同轴，不得
 混用。平台按 typed 原因诚实降级是产品承诺的一部分，不得用空值、静态占位或未接线按钮把它写成
-正式版功能。
+正式版功能。能力身份承诺面由产品期望面（`CapabilityId::EXPECTED_SURFACE`）声明：runtime
+catalog 为每个平台未注册的期望身份发布 typed 缺席 descriptor（`Unsupported`、无 provider
+归属），"无条目"不是合法的产品答案；机制与不可逆性见
+[ADR-053](../adr/053-product-expected-capability-surface.md)。
 
 只有推送与根 `Cargo.toml` 版本一致的 `vX.Y.Z` tag，才会创建正式 Release 并生成以下 28 项
 产物：四端各 4 个 DEB/RPM 包，加共享数据包 `taskforest-common` 的两架构 DEB/RPM。
