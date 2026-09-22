@@ -167,3 +167,7 @@ pub(super) fn optional_memory(value: Option<u64>, units: UnitPreferences) -> Str
         units.format_quantity(value, QuantityFamily::Memory, false)
     })
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/gpui_gpui_app_perf_views_memory_stats_tests.rs"]
+mod tests;

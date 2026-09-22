@@ -127,9 +127,13 @@ fn the_reference_undelivered_set_is_pinned() {
 /// anchored this shape's two real delivery surfaces: the Performance battery
 /// panel (`power.battery-inventory`) and the System Health sensor center
 /// (`power.thermal-zones`). The fifth batch (W16-B/W16-C) closed the TUI and
-/// Iced/Bevy observation gaps and added no GPUI anchor: this shape's remaining
-/// surveyed gaps (SMART evidence, swap rates, IOPS/queue/latency, inventory
-/// state, device topology, log stream) stay explicit `pending` rows.
+/// Iced/Bevy observation gaps and added no GPUI anchor. The sixth batch
+/// (W18-A) closed this shape's six remaining surveyed gaps: the painted
+/// services inventory rows and their typed active state, the disk page's
+/// painted partition rows with their observed usage fraction, the SMART
+/// health evidence families, the swap-in/out throughput rates, the
+/// IOPS/queue/latency fold, and the painted service-log stream under its
+/// level filter.
 #[test]
 fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() {
     let declaration = feature_coverage_declaration();
@@ -226,7 +230,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        9,
+        15,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

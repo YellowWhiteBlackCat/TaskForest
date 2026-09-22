@@ -160,7 +160,10 @@ fn partition_row(
         .overflow_hidden()
         .bg(taskmanager_ui::theme_binding::fill(theme.sidebar_bg));
     if let Some(fraction) = usage.1 {
-        bar = bar.child(
+        // The fill width is the typed used/total fraction; the test-support
+        // selector exposes only that painted bar (never a value), so a render
+        // test can prove the projected usage reached the pixel geometry.
+        bar = bar.child(partition_slot(
             div()
                 .absolute()
                 .left_0()
@@ -168,7 +171,9 @@ fn partition_row(
                 .bottom_0()
                 .w(relative(fraction))
                 .bg(taskmanager_ui::theme_binding::fill(theme.disk)),
-        );
+            index,
+            "fill",
+        ));
     }
     let bar = partition_slot(bar, index, "bar");
 

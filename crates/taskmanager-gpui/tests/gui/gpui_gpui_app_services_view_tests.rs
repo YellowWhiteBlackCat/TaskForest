@@ -1,10 +1,19 @@
-use super::{MenuEntry, build_service_menu};
+use super::{MenuEntry, ServiceFilter, build_service_menu};
 use crate::gpui_app::root::RootView;
 use crate::gpui_app::root::TopPage;
 use gpui::{AppContext, TestAppContext, VisualTestContext, px};
 use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_theme::Theme;
 use taskmanager_ui::overlays::popup::MenuItem;
+
+fn service(id: &str, name: &str, status: ServiceStatus) -> ServiceItem {
+    ServiceItem::from_inventory(id, name, status, "fixture unit", "", "", "")
+}
+
+/// `debug_bounds` takes a `&'static str`; the row/status selectors are indexed.
+fn selector(text: String) -> &'static str {
+    Box::leak(text.into_boxed_str())
+}
 
 /// The row context menu carries the six service actions (Win11 TM
 /// parity), labeled through i18n so the menu reads localized copy.
@@ -93,5 +102,112 @@ async fn service_search_highlight_keeps_name_cell_bounded(cx: &mut TestAppContex
     assert!(
         highlighted_row.size.width > px(0.0),
         "the highlighted service row must retain a usable width: {highlighted_row:?}"
+    );
+}
+
+/// The inventory's typed active state is the painted list's authority: every
+/// unit paints its own row and a status cell carrying its typed state token,
+/// a row never paints another unit's state, and the typed status filter is the
+/// painted membership authority (a filter with no member paints an empty
+/// inventory, never a placeholder row). The filtered phases use fresh windows
+/// because `debug_bounds` keeps the last frame that painted a selector, so a
+/// dropped row is only observable as "never painted in this window".
+#[gpui::test]
+async fn inventory_rows_paint_each_units_typed_active_state(cx: &mut TestAppContext) {
+    let services = || {
+        vec![
+            service(
+                "fixture.service:active",
+                "active-unit",
+                ServiceStatus::Active,
+            ),
+            service(
+                "fixture.service:failed",
+                "failed-unit",
+                ServiceStatus::Failed,
+            ),
+            service(
+                "fixture.service:inactive",
+                "inactive-unit",
+                ServiceStatus::Inactive,
+            ),
+        ]
+    };
+    let wrapped_root = |cx: &mut TestAppContext, filter: ServiceFilter, list: Vec<ServiceItem>| {
+        let win = cx.add_window(|_window, cx| RootView::new(Theme::dark(), cx));
+        let view = win.entity(cx).expect("window root RootView entity");
+        view.update(cx, |v, cx| {
+            v.mark_telemetry_frame_ready();
+            v.page = TopPage::Services;
+            v.services_state.filter = filter;
+            v.replace_services_for_test(list, Vec::new());
+            cx.notify();
+        });
+        (win, view)
+    };
+    // First draw binds the persistent table delegate; the second paints the
+    // synchronized virtual rows.
+    let draw = |cx: &mut TestAppContext, win: gpui::WindowHandle<RootView>| {
+        for _ in 0..2 {
+            cx.update_window(win.into(), |_, window, cx| window.draw(cx).clear())
+                .unwrap();
+        }
+    };
+
+    // Unfiltered: one painted row per unit, each with its own typed state.
+    let (win, _view) = wrapped_root(cx, ServiceFilter::All, services());
+    draw(cx, win);
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    for (ix, status) in ["Active", "Failed", "Inactive"].into_iter().enumerate() {
+        let row = vcx
+            .debug_bounds(selector(format!("tm-svc-row:{ix}")))
+            .unwrap_or_else(|| panic!("unit {ix} must paint its inventory row"));
+        assert!(row.size.height > px(10.0), "row {ix} collapsed: {row:?}");
+        let cell = selector(format!("tm-svc-status:{ix}:{status}"));
+        assert!(
+            vcx.debug_bounds(cell).is_some(),
+            "{cell}: the row must paint its own typed active state"
+        );
+    }
+    assert!(
+        vcx.debug_bounds("tm-svc-status:0:Failed").is_none(),
+        "a row must not paint another unit's typed state"
+    );
+    assert!(
+        vcx.debug_bounds("tm-svc-status:3:Unknown").is_none(),
+        "no row beyond the projected inventory may be painted"
+    );
+    drop(vcx);
+
+    // Typed status filter: only the matching unit reaches the frame.
+    let (win, _view) = wrapped_root(cx, ServiceFilter::Failed, services());
+    draw(cx, win);
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    assert!(
+        vcx.debug_bounds("tm-svc-status:0:Failed").is_some(),
+        "the matching unit must stay painted"
+    );
+    assert!(
+        vcx.debug_bounds("tm-svc-row:1").is_none(),
+        "the typed filter must keep every non-matching row out of the frame"
+    );
+    drop(vcx);
+
+    // A typed filter with no member paints an empty inventory, never a
+    // placeholder row.
+    let (win, _view) = wrapped_root(
+        cx,
+        ServiceFilter::Inactive,
+        vec![service(
+            "fixture.service:active",
+            "active-unit",
+            ServiceStatus::Active,
+        )],
+    );
+    draw(cx, win);
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    assert!(
+        vcx.debug_bounds("tm-svc-row:0").is_none(),
+        "a typed-status filter with no member must paint no inventory row"
     );
 }

@@ -113,6 +113,60 @@
 # are supporting evidence, not the anchor.  Together with the eighteen rows
 # above the batch now carries nineteen anchors, and no `pending` row remains
 # on any shape whose delivered surface a real test proves.
+# Sixth anchored batch (2026-09-22, W18-A): the six GPUI cells that the W15-A
+# and W16-B/W16-C surveys left as explicit `pending` gaps.  Each anchor was
+# hand-checked clause by clause against the feature's `delivery_definition`
+# and its test id confirmed by membership in
+# `cargo nextest list -p taskmanager-gpui --features test-support`.
+# `services.inventory` is anchored on the painted inventory frame: one row per
+# projected unit, each carrying a status cell whose test-support selector
+# spells the same typed `ServiceStatus` token the cell paints, and the typed
+# status filter is the painted membership authority (only the matching unit
+# reaches the frame; an empty match paints no placeholder row).
+# `storage.device-topology` is anchored on the disk page's painted partition
+# rows: the mounted partitions paint identity/usage/bar slots whose fill width
+# is the observed used/total fraction (40% and 80%), the unmounted unit stays
+# as the compact summary line instead of a fabricated row, and a partition
+# without observations paints no fill at all (never a 0% bar).
+# `storage.smart-health` is anchored on the production `disk_stats` row fold:
+# reported availability, the shared temperature readout with its critical
+# bound, every per-sensor temperature, percentage used, available spare with
+# its warning threshold, power-on hours, and unsafe shutdowns each carry the
+# real projected value, while a provider without SMART telemetry grows none of
+# those rows and never a fabricated `0%`/`0 h`/`0`.
+# `storage.swap-throughput` is anchored on the Memory page's production stat
+# fold: the observed swap-in (2.0 MiB/s) and swap-out (512.0 KiB/s) rates each
+# render their own row (the swap used/total occupancy row is a separate fact),
+# and an unobserved or typed-unavailable rate leaves no row at all.
+# `storage.iops-queue-latency` is anchored on the same disk fold: observed
+# IOPS 137, response 1.54 ms, average queue depth 2.25, and the separate
+# service-time estimate 0.42 ms each reach their row, while a first-sample gap
+# keeps the row's value as the shared dash.
+# `services.log-stream` is anchored on the painted service-details dialog: an
+# accepted batch paints one row per projected entry, and advancing the painted
+# level control (All -> Errors) before the next batch leaves only the error row
+# painted; a cold or rejected stream paints the typed state and no fabricated
+# row.  Two GPUI observation limits are recorded here: the harness exposes
+# geometry per debug selector (no text readback), so the inventory status-cell
+# selector derives its token from the same typed `ServiceStatus` the cell
+# paints; and a `debug_bounds` entry survives the frame that painted it, so the
+# states that must be absent are asserted on a fresh window (never as an
+# in-window disappearance).
+# Follow-up in the same batch (2026-09-22, W18-A): the TUI
+# `storage.swap-throughput` cell was converted from `pending` to anchored after
+# the TUI line landed its painted-frame test.  The anchor seeds both rates
+# through the canonical `MemoryScalarObservations` group the Linux provider
+# fills (`swap_in_bytes_per_sec` / `swap_out_bytes_per_sec`) and asserts the
+# painted frame carries `Swap in 2.0 MiB/s` and `Swap out 512.0 KiB/s`; a
+# `TimedOut` observation keeps both labelled rows on the shared dash and the
+# test explicitly rejects a fabricated `Swap in 0 B` / `Swap out 0 B`.  The
+# production rows are the TUI memory stats' typed
+# `current_swap_in/out_bytes_per_sec` readouts, which keep the labelled shared
+# dash when the observation is absent.  The same batch's sibling honesty test
+# (`memory_stats_rows_render_honest_dashes_when_unavailable`) covers the
+# never-observed demo case.  With this row the sixth batch carries seven
+# anchors; the only remaining surveyed gap in the table is the TUI
+# `power.thermal-zones` cell.
 feature_id	frontend	test_id	status	note
 handles.enumeration	gpui	gpui_app::process_insights::view::open_files::tests::populated_open_files_render_with_unreadable_marker	anchored	-
 handles.enumeration	iced	ui::insights::tests::open_file_row_marks_an_unreadable_target_not_blank	anchored	-
@@ -145,22 +199,22 @@ security.sandbox-detection	bevy	pages::processes::details::tests::isolation_summ
 hardware.heterogeneous-cores	gpui	gpui_app::cpu_view::topology_tests::hybrid_core_counts_render_as_separate_aligned_rows	anchored	-
 hardware.heterogeneous-cores	tui	ui::perf_core_grid::tests::grouped_grid_headers_carry_the_typed_labels_and_counts	anchored	-
 hardware.core-frequency	tui	ui::perf_core_grid::tests::the_cell_readout_is_utilization_frequency_temperature	anchored	-
-services.inventory	gpui	-	pending	no GPUI test asserts the inventory rows' typed active state; the row-memo test asserts name order only and the context-menu test proves lifecycle actions
-storage.device-topology	gpui	-	pending	no GPUI test asserts the painted partition rows; the disk-page layout case mounts two partition children but asserts panel geometry, and the partition_stats tests prove usage formatting only
+services.inventory	gpui	gpui_app::services_view::tests::inventory_rows_paint_each_units_typed_active_state	anchored	-
+storage.device-topology	gpui	gpui_app::perf_views::device_topology_tests::disk_page_paints_each_partition_row_with_its_observed_usage_fraction	anchored	-
 storage.smart-health	iced	ui::tests::devices::disk_summary_projects_real_rates_active_time_smart_and_partition_space	anchored	-
 storage.smart-health	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
 storage.iops-queue-latency	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
 power.battery-inventory	iced	ui::tests::battery::battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_honest	anchored	-
 power.battery-inventory	tui	ui::tests::device_render::battery_detail_section_renders_capacity_status_rate_and_voltage	anchored	-
 services.log-stream	iced	app::tests::service_details::service_details_merged_log_panel_folds_its_own_stream	anchored	-
-storage.smart-health	gpui	-	pending	no GPUI test asserts the SMART readout family; the disk_stats tests cover the power-on row and the temperature trend only, so availability/endurance/spare/unsafe-shutdowns stay unproven
-storage.swap-throughput	gpui	-	pending	no GPUI test seeds or asserts the swap-in/swap-out throughput rows; the composition-card test folds swap occupancy (used/total) only
-storage.swap-throughput	tui	-	pending	no TUI test seeds or asserts the swap-in/swap-out throughput rows; the memory-stats test renders every other measured fact
-storage.iops-queue-latency	gpui	-	pending	the only GPUI IOPS assertion is a first-sample dash; no test renders a real IOPS/queue-depth/latency value
+storage.smart-health	gpui	gpui_app::perf_views::disk_stats::tests::disk_stats_render_the_smart_health_evidence_families	anchored	-
+storage.swap-throughput	gpui	gpui_app::perf_views::memory_stats::tests::swap_throughput_rows_render_the_observed_system_rates	anchored	-
+storage.swap-throughput	tui	ui::tests::memory_selector_parity::memory_stats_rows_render_the_observed_swap_throughput_rates	anchored	-
+storage.iops-queue-latency	gpui	gpui_app::perf_views::disk_stats::tests::disk_stats_render_the_observed_iops_latency_and_queue_depth	anchored	-
 power.battery-inventory	gpui	gpui_app::perf_views::dynamic_stats::tests::battery_stats_render_charge_power_voltage_health_and_cycles_with_honest_absence	anchored	-
 power.thermal-zones	gpui	gpui_app::system_health_view::stats::tests::sensor_rows_traverse_every_thermal_zone_reading_and_name_its_source	anchored	-
 power.thermal-zones	tui	-	pending	the fan test asserts a same-device temperature value ("54.5 °C"); the painted source label and any thermal-zone traversal are unasserted
-services.log-stream	gpui	-	pending	the details-state tests prove the typed log-state projection; no test asserts the painted stream rows or a level-filtered fold
+services.log-stream	gpui	gpui_app::services_view::log_stream_tests::service_details_paints_the_stream_rows_and_the_level_filter_drops_lower_rows	anchored	-
 memory.page-faults	tui	runtime::tests::process_properties::overview_renders_observed_page_fault_counters	anchored	-
 memory.page-faults	iced	ui::overlays::process_details::vm_parity_tests::observed_fault_and_huge_page_counters_reach_the_rendered_rows	anchored	-
 memory.page-faults	bevy	pages::processes::details::tests::observed_page_fault_and_huge_page_counters_reach_the_overview_rows	anchored	-

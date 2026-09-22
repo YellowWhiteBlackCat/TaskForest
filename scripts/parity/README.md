@@ -184,9 +184,46 @@ Anchored batches (2026-09-22):
   never a fabricated `0.0 °C`. The same module's panel test (panel appears for
   a temperature channel, absent for a fan-only snapshot) and capture-fixture
   test are supporting evidence, not the anchor.
+- Sixth batch (2026-09-22, W18-A): the six GPUI cells the previous surveys
+  left as explicit `pending` gaps, each hand-checked clause by clause against
+  the feature's `delivery_definition` and each test id confirmed by membership
+  in `cargo nextest list -p taskmanager-gpui --features test-support`.
+  `services.inventory` anchors the painted inventory frame (one row per
+  projected unit; each row's status cell carries its typed `ServiceStatus`
+  token; the typed status filter is the painted membership authority and an
+  empty match paints no placeholder row). `storage.device-topology` anchors
+  the disk page's painted partition rows (identity/usage/bar slots, the fill
+  width equal to the observed used/total fraction, the unmounted unit kept as
+  the compact summary line, and no fill at all for an unobserved partition).
+  `storage.smart-health` anchors the production `disk_stats` fold on all six
+  definition families (availability, temperature with its critical bound and
+  per-sensor rows, percentage used, available spare with its threshold,
+  power-on hours, unsafe shutdowns) with the unobserved provider growing none
+  of them. `storage.swap-throughput` anchors the Memory page's stat fold on
+  the real swap-in/swap-out rates (the used/total occupancy row is a separate
+  fact; an unobserved or typed-unavailable rate leaves no row).
+  `storage.iops-queue-latency` anchors the same fold on IOPS 137, response
+  1.54 ms, average queue depth 2.25, and the separate service-time estimate,
+  with a first-sample gap kept as the shared dash. `services.log-stream`
+  anchors the painted service-details dialog: the accepted batch paints one
+  row per projected entry and advancing the painted level control
+  (All → Errors) before the next batch leaves only the error row painted,
+  while a cold or rejected stream paints the typed state and no fabricated
+  row. Two GPUI observation limits are recorded with this batch: the harness
+  exposes geometry per debug selector (no text readback), so the inventory
+  status-cell selector derives its token from the same typed `ServiceStatus`
+  the cell paints; and a `debug_bounds` entry survives the frame that painted
+  it, so states that must be absent are asserted on a fresh window rather than
+  as an in-window disappearance. A follow-up in the same batch converted the
+  TUI `storage.swap-throughput` cell after the TUI line landed its
+  painted-frame test (`Swap in 2.0 MiB/s` and `Swap out 512.0 KiB/s` on one
+  frame through the canonical memory scalar group; a `TimedOut` observation
+  keeps both labelled rows on the shared dash, with an explicit
+  no-fabricated-`0 B/s` assertion), leaving the TUI `power.thermal-zones` cell
+  as the table's only surveyed gap.
 
-The table now carries **58 anchored + 8 `pending`** rows (per frontend: gpui 9,
-iced 17, tui 17, bevy 15 anchored; pending: gpui 6, tui 2, bevy 0). No `pending`
+The table now carries **65 anchored + 1 `pending`** rows (per frontend: gpui 15,
+iced 17, tui 18, bevy 15 anchored; pending: tui 1). No `pending`
 row remains on a shape whose delivered surface a real test proves.
 Every other source-complete cell keeps its G2 finding until a real test is
 anchored; the batches are a bounded delivery, never a blanket `Ready` claim. A
@@ -354,6 +391,26 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
 - TUI capture stays a single supervised frame (`scripts/capture-tui.sh`) with no
   scenario table, so TUI rows declare `capture_scenarios = -`; the anchored
   marker test proves the frame-marker contract, not a per-scenario matrix.
+- Iced capture reaches the six shared pages, the eight Performance devices and
+  the `service-details` local surface only: the scenario table's `device` token
+  is resolved in the application by `capture_device_from_name` /
+  `capture_page_from_name` plus that one local-surface branch, and the runner
+  carries no key or pointer injection. The iced health modal
+  (`LocalSurface::Health`) therefore has no pixel channel in this table -
+  including its `power.thermal-zones` panel, whose anchor is the traversal row in
+  `feature_evidence.tsv` - and a scenario name must never be committed ahead of
+  the app-side target: the marker validator requires the application to emit the
+  declared `device` token, so a `health` row with the current binary fails
+  closed (`expected one target marker for 'health'`) instead of producing a
+  Performance-page PNG under a health name. Once the application owns that
+  target, the scenario row is `health-modal` / `health` / `1180x780` and the
+  targeted run is
+  `TM_ICED_CAPTURE_SCENARIOS=health-modal bash scripts/capture-iced.sh`,
+  preconditioned on a Wayland session plus `dbus-run-session`,
+  `kwin_wayland --virtual` and `niri` (the private supervisor route; the
+  operator desktop is untouched and the run must not share the host with other
+  heavy work). Owner decision: land the application target with the scenario and
+  matrix rows in one change, or record the cell as a pixel-evidence SKIP.
 
 ## Discipline
 

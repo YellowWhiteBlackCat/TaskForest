@@ -619,7 +619,15 @@ fn the_committed_feature_evidence_table_is_structurally_clean() {
 /// health line's real thermal-zone surface landed and the Iced
 /// `power.thermal-zones` cell moved from `pending` to the traversal test (one
 /// row per shared temperature reading, each named by its own source label, a
-/// failed read kept as the shared dash). The
+/// failed read kept as the shared dash). The sixth batch (W18-A) closes the
+/// six GPUI `pending` gaps: the painted services inventory rows with their
+/// typed active state under the typed status filter, the disk page's painted
+/// partition rows with their observed usage fraction, the SMART health
+/// evidence families, the swap-in/out throughput rates, the IOPS/queue/latency
+/// fold, and the painted service-log stream under its level filter. A
+/// follow-up in the same batch converted the TUI `storage.swap-throughput`
+/// cell after the TUI line landed its painted swap-rate test, leaving the TUI
+/// `power.thermal-zones` cell as the table's only surveyed gap. The
 /// per-frontend anchored counts and the surveyed pending gaps are pinned, so
 /// growing either batch must move this pin in the same change.
 #[test]
@@ -642,13 +650,13 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        58,
+        65,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
-        (FrontendShape::Gpui, 9usize),
+        (FrontendShape::Gpui, 15usize),
         (FrontendShape::Iced, 17),
-        (FrontendShape::Tui, 17),
+        (FrontendShape::Tui, 18),
         (FrontendShape::Bevy, 15),
     ] {
         assert_eq!(
@@ -663,7 +671,7 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.pending_count(),
-        8,
+        1,
         "the surveyed pending-gap census moved"
     );
     for row in table.rows().iter().filter(|row| !row.is_anchored()) {
@@ -714,11 +722,12 @@ fn the_evidence_closure_requires_a_complete_source_commitment() {
         );
     }
 
-    let pending_feature = FeatureId::DiskSmartHealth;
-    // The Bevy pair carried this witness until the fifth batch (W16-B/W16-C)
-    // anchored it; the GPUI SMART gap is still a surveyed `pending` row, so it
-    // stays the live witness that a pending row can never become an anchor.
-    let pending_frontend = FrontendShape::Gpui;
+    let pending_feature = FeatureId::ThermalZoneSensors;
+    // The GPUI `storage.smart-health` pair carried this witness until the
+    // sixth batch (W18-A) anchored it. The witness is deliberately the TUI
+    // thermal-zone gap: any change that anchors this cell must re-pick the
+    // witness in the same change, exactly as this batch did.
+    let pending_frontend = FrontendShape::Tui;
     assert!(
         table
             .pending_note(pending_feature, pending_frontend)

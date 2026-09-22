@@ -1,5 +1,7 @@
 //! Service properties, dependency rows, and bounded journal feed rendering.
 
+#[cfg(any(test, feature = "test-support"))]
+use gpui::InteractiveElement;
 use gpui::{ClipboardItem, Context, Div, ParentElement, Styled, div, prelude::FluentBuilder, px};
 
 use taskmanager_ui_contract::IconId;
@@ -337,18 +339,23 @@ pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div
                 .gap(taskmanager_ui::theme_binding::definite_length(
                     tokens::SPACE_2,
                 ))
-                .children(lines.iter().cloned().map(|line| {
+                .children(lines.iter().cloned().enumerate().map(|(index, line)| {
                     let color = match line.trim_start() {
                         text if text.starts_with("[Error]") => theme.danger,
                         text if text.starts_with("[Warning]") => theme.warning,
                         text if text.starts_with("[Debug]") => theme.fg_dim,
                         _ => theme.fg,
                     };
-                    div()
+                    let row = div()
                         .min_w(px(0.0))
                         .whitespace_normal()
                         .text_color(taskmanager_ui::theme_binding::hsla(color))
-                        .child(line)
+                        .child(line);
+                    // One selector per painted stream line: a frame test can
+                    // count the rows that survived the shared level filter.
+                    #[cfg(any(test, feature = "test-support"))]
+                    let row = row.debug_selector(move || format!("tm-svc-log-line:{index}"));
+                    row
                 })),
         ),
         ServiceLogState::Loading => panel
