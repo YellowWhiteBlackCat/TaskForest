@@ -94,7 +94,12 @@ fn the_unsupported_feature_set_is_pinned() {
 /// `security.posix-capabilities`, `security.sandbox-detection`,
 /// `hardware.heterogeneous-cores`, `hardware.core-frequency`) plus the third
 /// batch (W15-A: `storage.smart-health`, `power.battery-inventory`,
-/// `services.log-stream`) land in `scripts/parity/feature_evidence.tsv`:
+/// `services.log-stream`) plus the fifth batch (W16-C: the observed swap
+/// throughput rates, the IOPS/response/queue/service rows, the page-fault and
+/// anonymous huge-page counters, and the per-adapter GPU enumeration; W17-A:
+/// the thermal-zone traversal that names every shared temperature reading by
+/// its own source label) land in
+/// `scripts/parity/feature_evidence.tsv`:
 /// every anchored `(feature, frontend)` cell folds to `Ready` on the platform
 /// axis whose static source surface is complete and carries the hand-declared
 /// nextest anchor. G2 is not relaxed: a source-complete delivery cell without a
@@ -197,7 +202,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        11,
+        17,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

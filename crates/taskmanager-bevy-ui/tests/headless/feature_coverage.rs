@@ -122,7 +122,11 @@ fn the_unsupported_feature_set_is_pinned() {
 /// this shape is pinned below; `Ready` itself stays host-derived. The third
 /// survey (W15-A) added no anchor for this shape and recorded its remaining
 /// near-misses (log stream, namespace audit) as explicit `pending` gaps in the
-/// same table.
+/// same table. The fifth batch (W16-C) anchored those two cells together with
+/// this shape's remaining observation gaps: the swap-in/out throughput rates,
+/// the IOPS/response/queue/service rows, the six-family SMART evidence, the
+/// projected partition rows, the per-adapter GPU blocks with their
+/// per-engine rows, and the page-fault / anonymous huge-page counters.
 #[test]
 fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() {
     let declaration = feature_coverage_declaration();
@@ -219,7 +223,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        5,
+        15,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

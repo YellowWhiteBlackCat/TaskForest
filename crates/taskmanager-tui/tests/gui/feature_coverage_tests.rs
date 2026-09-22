@@ -104,7 +104,11 @@ fn the_terminal_difference_set_is_pinned() {
 /// `security.posix-capabilities`, `security.sandbox-detection`,
 /// `hardware.heterogeneous-cores`, `hardware.core-frequency`) plus the third
 /// batch (W15-A: `storage.smart-health`, `storage.iops-queue-latency`,
-/// `power.battery-inventory`) land in `scripts/parity/feature_evidence.tsv`:
+/// `power.battery-inventory`) plus the fifth batch (W16-B: the observed
+/// page-fault and anonymous huge-page counters, the painted service log
+/// stream with its level filter, and the disk panel's queue/service row that
+/// completes the `storage.iops-queue-latency` clauses) land in
+/// `scripts/parity/feature_evidence.tsv`:
 /// every anchored `(feature, frontend)` cell folds to `Ready` on the platform
 /// axis whose static source surface is complete and carries the hand-declared
 /// nextest anchor. G2 is not relaxed: a source-complete delivery cell without a
@@ -207,7 +211,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        14,
+        17,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

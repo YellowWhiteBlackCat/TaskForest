@@ -130,9 +130,13 @@ Anchored batches (2026-09-22):
   named in the `pending` notes of the same survey (SMART spare/unsafe
   shutdowns, the queue-depth row, battery health, thermal-zone source
   traversal, the process-details fault and huge-page counters, the GPUI
-  battery/SMART/log surfaces, and the Bevy namespace audit). The survey added
-  `pending` rows only where a real near-miss exists; a feature with no test
-  touching its surface stays without a row.
+  battery/SMART/log surfaces, and the Bevy namespace audit). The fifth batch
+  below closes several of those recorded clauses (queue depth, thermal-zone
+  source traversal, the process-details counters, the Bevy namespace audit and
+  log stream, the Bevy SMART family); each remaining `pending` note still
+  names its own live gap.
+  The survey added `pending` rows only where a real near-miss exists; a
+  feature with no test touching its surface stays without a row.
 - Fourth batch (W16-A): the two GPUI cells whose `pending` notes rested on
   test-tree-only fixtures. `crates/taskmanager-gpui/tests/gui/gpui_app/system_view/detail_rows.rs`
   used to define `battery_detail_rows` / `thermal_control_rows` inside the test
@@ -148,12 +152,46 @@ Anchored batches (2026-09-22):
   half (`system.cooling` / `system.throttle`) matches
   `power.thermal-throttle-events`, which this shape declares `Unsupported`, and
   gained no row.
+- Fifth batch (W16-B/W16-C): eighteen new anchored rows plus one re-verified
+  row, each hand-checked clause by clause against the feature's
+  `delivery_definition` and each test id confirmed by membership in
+  `cargo nextest list` before it was committed. W16-B closed the TUI
+  observation gaps - the Properties-modal page-fault counters, the
+  details-panel anonymous huge-page charge, the painted service log stream
+  whose rows follow the shared level filter, and the disk panel's
+  queue/service row (the already-anchored TUI `storage.iops-queue-latency`
+  row is the re-verified one: the same frame test now writes the
+  queue/service pair explicitly and proves all three clauses - IOPS, latency
+  and queue depth - in one frame). W16-C closed the Iced/Bevy observations -
+  swap-in/out throughput rates, IOPS/response/queue/service rows, the
+  PageFaults/AnonHugePages counters, per-adapter GPU enumeration (Iced and
+  Bevy) with Bevy's per-engine rows, Bevy partition rows and the six-family
+  Bevy SMART evidence (availability, temperature, percentage used, available
+  spare, power-on hours, unsafe shutdowns), the Bevy painted log stream under
+  its level filter, and the Bevy Linux namespace audit. Five cells had no row
+  before and were newly surveyed
+  (Iced `gpu.adapter-enumeration`; Bevy `storage.iops-queue-latency`,
+  `gpu.adapter-enumeration`, `memory.page-faults`,
+  `memory.transparent-huge-pages`); the other thirteen replace a surveyed
+  `pending` row with the verified anchor. The TUI `storage.iops-queue-latency`
+  row keeps `-` in its note column (the schema reserves notes for pending
+  rows), so this paragraph carries its clause record. The same batch gained a
+  nineteenth anchor in W17-A: the Iced health line landed the real
+  `power.thermal-zones` delivery surface (the health modal's thermal-zone
+  panel) and the Iced cell moved from `pending` to the traversal test - one
+  row per shared sensor-center temperature reading, each named by the
+  reading's own source label, with a failed read kept as the shared dash and
+  never a fabricated `0.0 °C`. The same module's panel test (panel appears for
+  a temperature channel, absent for a fan-only snapshot) and capture-fixture
+  test are supporting evidence, not the anchor.
 
-The table now carries **39 anchored + 22 `pending`** rows (per frontend: gpui 9,
-iced 11, tui 14, bevy 5 anchored). Every other source-complete cell keeps its G2
-finding until a real test is anchored; the batches are a bounded delivery,
-never a blanket `Ready` claim. A `pending` row is a survey record, not a
-delivery claim, and it never becomes an anchor.
+The table now carries **58 anchored + 8 `pending`** rows (per frontend: gpui 9,
+iced 17, tui 17, bevy 15 anchored; pending: gpui 6, tui 2, bevy 0). No `pending`
+row remains on a shape whose delivered surface a real test proves.
+Every other source-complete cell keeps its G2 finding until a real test is
+anchored; the batches are a bounded delivery, never a blanket `Ready` claim. A
+`pending` row is a survey record, not a delivery claim, and it never becomes an
+anchor.
 
 ## Unified interaction matrix
 

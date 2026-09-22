@@ -126,7 +126,10 @@ fn the_reference_undelivered_set_is_pinned() {
 /// whose tests proved a System-page surface no product code rendered, then
 /// anchored this shape's two real delivery surfaces: the Performance battery
 /// panel (`power.battery-inventory`) and the System Health sensor center
-/// (`power.thermal-zones`).
+/// (`power.thermal-zones`). The fifth batch (W16-B/W16-C) closed the TUI and
+/// Iced/Bevy observation gaps and added no GPUI anchor: this shape's remaining
+/// surveyed gaps (SMART evidence, swap rates, IOPS/queue/latency, inventory
+/// state, device topology, log stream) stay explicit `pending` rows.
 #[test]
 fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() {
     let declaration = feature_coverage_declaration();

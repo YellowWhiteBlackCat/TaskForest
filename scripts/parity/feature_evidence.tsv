@@ -72,6 +72,47 @@
 # the System Health sensor center (`sensor_rows`, one labelled row per
 # thermal-zone reading). `power.thermal-throttle-events` (the fake fixture's
 # other half) stays declared `Unsupported` by this shape and gained no row.
+#
+# Fifth anchored batch (2026-09-22, W16-B/W16-C): eighteen new anchored rows
+# plus one re-verified row, each hand-checked clause by clause against the
+# feature's `delivery_definition` and each test id checked by membership in
+# `cargo nextest list` before it was committed.  W16-B closed the TUI
+# observation gaps: the Properties-modal page-fault counters (minor + major on
+# one painted row, honest dash when unobserved), the details-panel anonymous
+# huge-page charge (value + RSS share, never a fabricated 0 B), the painted
+# service log stream with its level filter reaching the drawn rows, and the
+# disk panel's queue/service row.  The already-anchored
+# `storage.iops-queue-latency` TUI row is the re-verified one: the same frame
+# test now writes the queue/service pair explicitly and proves all three
+# definition clauses in one frame - IOPS 137, latency 1.50 ms, queue depth
+# 2.50 - and omits the row when the pair is unobserved.  W16-C closed the
+# Iced/Bevy observations: the swap-in/out throughput rates, the
+# IOPS/response/queue/service rows, the PageFaults/AnonHugePages counters, the
+# per-adapter GPU enumeration (Iced and Bevy) with Bevy's per-engine rows, the
+# Bevy partition rows and the six-family Bevy SMART evidence (availability,
+# temperature, percentage used, available spare, power-on hours, unsafe
+# shutdowns), the Bevy painted log stream under its level filter, and the Bevy
+# Linux namespace audit (per-kind host/isolated status).  Five cells had no row
+# before and are newly surveyed (Iced `gpu.adapter-enumeration`; Bevy
+# `storage.iops-queue-latency`, `gpu.adapter-enumeration`,
+# `memory.page-faults`, `memory.transparent-huge-pages`); the other thirteen
+# replace a surveyed `pending` row with the verified anchor.  An anchored row
+# still carries `-` in the note column by schema, so the batch clause record
+# lives here.  The remaining `pending` rows keep their honest gaps: no test
+# proves the shape's delivered surface for them yet.
+#
+# Follow-up in the same batch (2026-09-22, W17-A): the Iced
+# `power.thermal-zones` cell was converted from `pending` to anchored after
+# the Iced health line landed the real delivery surface (the health modal's
+# thermal-zone panel).  The anchor is the traversal test - one row per shared
+# sensor-center temperature reading, each named by the reading's own source
+# label, with a failed read kept as the shared dash and never a fabricated
+# `0.0 °C`.  The same module's panel test proves the painted panel appears for
+# a temperature channel and stays absent for a fan-only snapshot, and its
+# capture-fixture test only seeds a named zone for the evidence run; those two
+# are supporting evidence, not the anchor.  Together with the eighteen rows
+# above the batch now carries nineteen anchors, and no `pending` row remains
+# on any shape whose delivered surface a real test proves.
 feature_id	frontend	test_id	status	note
 handles.enumeration	gpui	gpui_app::process_insights::view::open_files::tests::populated_open_files_render_with_unreadable_marker	anchored	-
 handles.enumeration	iced	ui::insights::tests::open_file_row_marks_an_unreadable_target_not_blank	anchored	-
@@ -104,12 +145,8 @@ security.sandbox-detection	bevy	pages::processes::details::tests::isolation_summ
 hardware.heterogeneous-cores	gpui	gpui_app::cpu_view::topology_tests::hybrid_core_counts_render_as_separate_aligned_rows	anchored	-
 hardware.heterogeneous-cores	tui	ui::perf_core_grid::tests::grouped_grid_headers_carry_the_typed_labels_and_counts	anchored	-
 hardware.core-frequency	tui	ui::perf_core_grid::tests::the_cell_readout_is_utilization_frequency_temperature	anchored	-
-storage.smart-health	bevy	-	pending	no Bevy test asserts the SMART evidence rows (availability, spare, power-on hours, unsafe shutdowns); only the self-test arming flow is covered
-storage.swap-throughput	bevy	-	pending	no Bevy test asserts the system swap-in/swap-out throughput rows; the composition bar test only folds totals
 services.inventory	gpui	-	pending	no GPUI test asserts the inventory rows' typed active state; the row-memo test asserts name order only and the context-menu test proves lifecycle actions
 storage.device-topology	gpui	-	pending	no GPUI test asserts the painted partition rows; the disk-page layout case mounts two partition children but asserts panel geometry, and the partition_stats tests prove usage formatting only
-storage.device-topology	bevy	-	pending	no Bevy test asserts the disk block's partition rows; only the device-block list and joined fact lines are covered
-gpu.engine-utilization	bevy	-	pending	no Bevy test asserts the rendered per-engine utilization rows; the performance tests cover device blocks and aggregate GPU presence only
 storage.smart-health	iced	ui::tests::devices::disk_summary_projects_real_rates_active_time_smart_and_partition_space	anchored	-
 storage.smart-health	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
 storage.iops-queue-latency	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
@@ -118,19 +155,28 @@ power.battery-inventory	tui	ui::tests::device_render::battery_detail_section_ren
 services.log-stream	iced	app::tests::service_details::service_details_merged_log_panel_folds_its_own_stream	anchored	-
 storage.smart-health	gpui	-	pending	no GPUI test asserts the SMART readout family; the disk_stats tests cover the power-on row and the temperature trend only, so availability/endurance/spare/unsafe-shutdowns stay unproven
 storage.swap-throughput	gpui	-	pending	no GPUI test seeds or asserts the swap-in/swap-out throughput rows; the composition-card test folds swap occupancy (used/total) only
-storage.swap-throughput	iced	-	pending	no Iced test seeds or asserts the swap-in/swap-out throughput rows; the memory-stats row-set test pins the row family without them
 storage.swap-throughput	tui	-	pending	no TUI test seeds or asserts the swap-in/swap-out throughput rows; the memory-stats test renders every other measured fact
 storage.iops-queue-latency	gpui	-	pending	the only GPUI IOPS assertion is a first-sample dash; no test renders a real IOPS/queue-depth/latency value
-storage.iops-queue-latency	iced	-	pending	the disk-summary test pins the IOPS/Response/Avg-queue rows as dashes; no test renders a real value for any of the three
 power.battery-inventory	gpui	gpui_app::perf_views::dynamic_stats::tests::battery_stats_render_charge_power_voltage_health_and_cycles_with_honest_absence	anchored	-
 power.thermal-zones	gpui	gpui_app::system_health_view::stats::tests::sensor_rows_traverse_every_thermal_zone_reading_and_name_its_source	anchored	-
-power.thermal-zones	iced	-	pending	the thermal-panel test asserts only that the panel appears when temperatures exist; no reading or source label is asserted
 power.thermal-zones	tui	-	pending	the fan test asserts a same-device temperature value ("54.5 °C"); the painted source label and any thermal-zone traversal are unasserted
 services.log-stream	gpui	-	pending	the details-state tests prove the typed log-state projection; no test asserts the painted stream rows or a level-filtered fold
-services.log-stream	tui	-	pending	the panel-key tests drive the shared feed state machine; no test asserts the rendered stream rows
-services.log-stream	bevy	-	pending	no single Bevy test proves the painted stream rows with a level filter applied: the panel tests cover the shell visible-entry fold, the control chords, and the export path separately
-security.namespace-audit	bevy	-	pending	the isolation-summary test covers kind/container/sandboxed only; no test sets or asserts the namespace audit entries
-memory.page-faults	iced	-	pending	the details parity test pins the PageFaults row to the VM value, which is the shared dash for its fixture; no test observes the counters
-memory.page-faults	tui	-	pending	the properties parity test pins the PageFaults row to the VM value, which is the shared dash for its fixture; no test observes the counters
-memory.transparent-huge-pages	iced	-	pending	the details parity test pins the AnonHugePages row to the VM value, which is the shared dash for its fixture; no test observes the charge
-memory.transparent-huge-pages	tui	-	pending	the properties parity test pins the AnonHugePages row to the VM value, which is the shared dash for its fixture; no test observes the charge
+memory.page-faults	tui	runtime::tests::process_properties::overview_renders_observed_page_fault_counters	anchored	-
+memory.page-faults	iced	ui::overlays::process_details::vm_parity_tests::observed_fault_and_huge_page_counters_reach_the_rendered_rows	anchored	-
+memory.page-faults	bevy	pages::processes::details::tests::observed_page_fault_and_huge_page_counters_reach_the_overview_rows	anchored	-
+memory.transparent-huge-pages	tui	ui::tests::process_render::process_details_panel_renders_the_observed_anonymous_huge_page_charge	anchored	-
+memory.transparent-huge-pages	iced	ui::overlays::process_details::vm_parity_tests::observed_fault_and_huge_page_counters_reach_the_rendered_rows	anchored	-
+memory.transparent-huge-pages	bevy	pages::processes::details::tests::observed_page_fault_and_huge_page_counters_reach_the_overview_rows	anchored	-
+storage.swap-throughput	iced	ui::perf_overview::tests::memory_stats_tests::swap_throughput_rows_render_the_observed_system_rates	anchored	-
+storage.swap-throughput	bevy	pages::performance::tests::memory_summary_renders_the_observed_swap_throughput_rates	anchored	-
+storage.iops-queue-latency	iced	ui::tests::devices::disk_summary_renders_observed_iops_latency_and_queue_depth	anchored	-
+storage.iops-queue-latency	bevy	pages::performance::device_rows_tests::disk_caption_renders_observed_iops_latency_and_queue_depth	anchored	-
+storage.smart-health	bevy	pages::performance::device_rows_tests::disk_caption_renders_observed_smart_evidence_rows	anchored	-
+storage.device-topology	bevy	pages::performance::device_rows_tests::disk_block_renders_the_projected_partition_rows	anchored	-
+gpu.adapter-enumeration	iced	ui::tests::devices::gpu_selector_enumerates_every_projected_adapter	anchored	-
+gpu.adapter-enumeration	bevy	pages::performance::device_rows_tests::gpu_section_enumerates_every_projected_adapter	anchored	-
+gpu.engine-utilization	bevy	pages::performance::device_rows_tests::gpu_section_enumerates_every_projected_adapter	anchored	-
+services.log-stream	tui	runtime::tests::service_control::service_log_panel_paints_the_stream_and_the_level_filter_drops_lower_rows	anchored	-
+services.log-stream	bevy	pages::services::service_logs_tests::painted_rows_follow_the_level_filter	anchored	-
+security.namespace-audit	bevy	pages::processes::details::tests::isolation_summary_renders_the_linux_namespace_audit	anchored	-
+power.thermal-zones	iced	ui::health::tests::thermal_zone_tests::thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source	anchored	-
