@@ -346,6 +346,14 @@ impl TooltipState {
     }
 }
 
+/// Typed identity of the tooltip bubble surface. The delivered-surface census
+/// (`tests/headless/capabilities.rs`) queries it to prove that no tooltip is
+/// mounted today; a future hover/focus wiring gets one query target for the
+/// bubble subtree.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) struct TooltipSurface;
+
 /// An explanation banner styled with caption typography and theme tokens.
 /// When `key_hint` is provided, renders the shortcut hint alongside the text.
 #[allow(dead_code)]
@@ -376,6 +384,7 @@ pub(crate) fn tooltip_scene(spec: &TooltipSpec, palette: &UiPalette) -> impl Sce
             border_radius: BorderRadius::all(Val::Px(radius)),
         }
         BackgroundColor(bg)
+        TooltipSurface
         Children [
             ( Text(text) TextRole(Role::Caption) template_value(no_wrap_text()) ),
             { hint_scenes }
@@ -487,6 +496,13 @@ pub(crate) fn snap_slider_value(val: f32, min: f32, max: f32, step: f32) -> f32 
     }
 }
 
+/// Typed identity of the slider surface. The delivered-surface census
+/// (`tests/headless/capabilities.rs`) queries it to prove that no slider is
+/// mounted today: bounded settings ride discrete radio choices instead.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) struct SliderSurface;
+
 /// A bounded numeric slider control scene with track, active progress fill,
 /// and value readout caption.
 #[allow(dead_code)]
@@ -507,6 +523,7 @@ pub(crate) fn slider_scene(state: &SliderState, palette: &UiPalette) -> impl Sce
             column_gap: Val::Px(space_8()),
             padding: UiRect::axes(Val::Px(space_8()), Val::Px(space_2())),
         }
+        SliderSurface
         Children [
             (
                 Node {
@@ -652,6 +669,13 @@ pub(crate) fn thumb_drag_to_scroll(
     }
 }
 
+/// Typed identity of the scrollbar rail surface. The delivered-surface census
+/// (`tests/headless/capabilities.rs`) queries it to prove that no rail is
+/// mounted today: pages scroll through the official ScrollArea.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) struct ScrollbarSurface;
+
 /// A visible scrollbar rail + thumb component reflecting viewport offset and content extent.
 #[allow(dead_code)]
 pub(crate) fn scrollbar_scene(
@@ -682,6 +706,7 @@ pub(crate) fn scrollbar_scene(
                     overflow: Overflow::clip(),
                 }
                 BackgroundColor(rail_fill)
+                ScrollbarSurface
                 Children [
                     (
                         Node {
@@ -714,6 +739,7 @@ pub(crate) fn scrollbar_scene(
                     overflow: Overflow::clip(),
                 }
                 BackgroundColor(rail_fill)
+                ScrollbarSurface
                 Children [
                     (
                         Node {

@@ -19,6 +19,7 @@
 //! activation flows back to the caller as [`MenuOutcome`].
 
 use bevy::color::Color;
+use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::scene::{Scene, bsn, template_value};
 use bevy::ui::prelude::{
@@ -258,6 +259,14 @@ impl DropdownMenuState {
     }
 }
 
+/// Typed identity of the anchored dropdown menu surface. The delivered-surface
+/// census (`tests/headless/capabilities.rs`) queries it to prove that no
+/// control-anchored popover is mounted today; a future column-visibility or
+/// preset host gets one query target for the dropdown subtree.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[allow(dead_code)]
+pub(crate) struct DropdownMenuSurface;
+
 /// An anchored dropdown menu attached to a trigger control.
 /// Renders a trigger button with chevron affordance and, when open, mounts
 /// the anchored popup menu scene directly beneath it.
@@ -293,6 +302,7 @@ pub(crate) fn dropdown_menu_scene(
             flex_direction: FlexDirection::Column,
             align_items: AlignItems::FlexStart,
         }
+        DropdownMenuSurface
         Children [
             (
                 Node {

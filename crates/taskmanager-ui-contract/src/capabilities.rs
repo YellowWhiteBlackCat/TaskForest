@@ -97,6 +97,17 @@
 //! tests and evidence route (CORE-06), and a `Ported` cell claims the
 //! intent to match, never the match itself.
 //!
+//! ## Semantic-spec writing rule
+//!
+//! Each [`CapabilitySemanticSpec`] states the SEMANTIC result every shape must
+//! deliver (or declare an explained divergence from). Toolkit-specific
+//! presentation details - animation style, hover timing, which affordance
+//! paints a control, the concrete trigger chord - belong to the reference
+//! component, to the per-shape declaration, or to the shape's own charter:
+//! writing them into the shared spec turns a legitimate porting difference
+//! into an apparent false promise. Keep every clause checkable against
+//! delivered behavior, and never claim a state or affordance no shape ships.
+//!
 //! ## Delivered-surface vocabulary (intentionally asymmetric)
 //!
 //! This registry is the DELIVERED-SURFACE vocabulary. A capability is admitted
@@ -174,8 +185,9 @@ pub enum ComponentCapability {
     ///   available for a specific row, device, or selection (e.g. End Task,
     ///   affinity, priority).
     /// - **Interaction semantics**: Triggered via pointer secondary click (right-click)
-    ///   or keyboard ContextMenu / Shift+F10 on a focused item; Up/Down arrow keys
-    ///   traverse items; Enter/Space activates; Escape dismisses.
+    ///   on the target; keyboard-first shapes open the same item set through their
+    ///   focused-target action entry. Up/Down arrow keys traverse items;
+    ///   Enter/Space activates; Escape dismisses.
     /// - **Invariant expectations**: Closes on outside click, item activation,
     ///   or window blur; actions apply strictly to the entity identity captured
     ///   at invocation; bounds are clamped within the viewport.
@@ -197,9 +209,8 @@ pub enum ComponentCapability {
     ///
     /// - **User-facing behavior**: A floating badge revealing descriptive text,
     ///   keyboard shortcut hints, or status explanations on inspection.
-    /// - **Interaction semantics**: Appears on pointer hover after a brief dwell
-    ///   time or immediately on keyboard focus; dismisses immediately on pointer
-    ///   exit, pointer click, or Escape.
+    /// - **Interaction semantics**: Appears on pointer hover or keyboard focus;
+    ///   dismisses immediately on pointer exit, pointer click, or Escape.
     /// - **Invariant expectations**: Strictly non-interactive and read-only;
     ///   never captures focus; never occludes anchor controls in a way that
     ///   obstructs interaction; terminal shapes without pointer hover route hints
@@ -231,11 +242,11 @@ pub enum ComponentCapability {
 
     /// A specialized type-to-filter query input.
     ///
-    /// - **User-facing behavior**: A dedicated filter field equipped with search icon,
-    ///   clear button, match feedback, and instant list filtering.
-    /// - **Interaction semantics**: Fast keyboard access via global slash (/) or
-    ///   Ctrl+F; typing immediately filters active projection; Escape clears query
-    ///   or restores focus to the filtered list.
+    /// - **User-facing behavior**: A dedicated filter field equipped with a search
+    ///   icon, match feedback, and instant list filtering.
+    /// - **Interaction semantics**: Fast keyboard access via the shared Ctrl+F
+    ///   focus-search chord; typing immediately filters active projection; Escape
+    ///   clears query or restores focus to the filtered list.
     /// - **Invariant expectations**: Filtering never blocks the UI thread; an
     ///   empty query immediately restores the full projection; preserves row
     ///   selection when the selected item satisfies the new query.
@@ -246,9 +257,8 @@ pub enum ComponentCapability {
     /// - **User-facing behavior**: Visual text selection highlighting across
     ///   detail readouts, scalar values, or log streams, enabling clipboard export.
     /// - **Interaction semantics**: Pointer drag selects character ranges;
-    ///   double-click selects words; triple-click selects whole lines/blocks;
-    ///   Ctrl/Cmd+C copies selection to the system clipboard; Linux middle-click
-    ///   synchronizes with the primary selection.
+    ///   double-click selects words; triple-click selects the whole readout;
+    ///   Ctrl/Cmd+C copies the selection to the system clipboard.
     /// - **Invariant expectations**: At most one active text selection per window;
     ///   read-only text is never mutable; table row selection and column resize
     ///   take arbitration precedence over cell text dragging.
@@ -259,7 +269,7 @@ pub enum ComponentCapability {
     /// - **User-facing behavior**: An interactive switch indicating immediate
     ///   boolean state (e.g. alert rule enabled/disabled).
     /// - **Interaction semantics**: Pointer click or Space/Enter toggles state;
-    ///   animated thumb transition; Tab moves focus in and out.
+    ///   Tab moves focus in and out.
     /// - **Invariant expectations**: State changes dispatch typed application
     ///   intents immediately; disabled switches reject toggles and show disabled
     ///   styling; ON/OFF states remain unambiguous across all high-contrast themes.
@@ -277,15 +287,15 @@ pub enum ComponentCapability {
     ///   axis project this as discrete selectable option lists.
     Slider,
 
-    /// A two-state or tri-state boolean selection control.
+    /// A two-state boolean selection control.
     ///
-    /// - **User-facing behavior**: A labeled checkbox box supporting checked,
-    ///   unchecked, and optional indeterminate states (e.g. column visibility).
+    /// - **User-facing behavior**: A labeled checkbox reflecting checked or
+    ///   unchecked state (e.g. column visibility, alert-rule toggles).
     /// - **Interaction semantics**: Pointer click on box or label, or keyboard
     ///   Space key, toggles selection state; Tab traverses focus.
     /// - **Invariant expectations**: Clicking the text label activates the box;
-    ///   indeterminate state visually distinguishes partial group selection;
-    ///   keyboard and pointer triggers yield identical transitions.
+    ///   checked and unchecked states stay visually distinct; keyboard and
+    ///   pointer triggers yield identical transitions.
     Checkbox,
 
     /// A single-choice selection control over an enumerated set.
@@ -465,7 +475,15 @@ impl ComponentCapability {
             Self::VirtualList => "data/virtual_list.rs",
             Self::Tree => "data/tree.rs",
             Self::Scrollbar => "primitives/scrollbar.rs",
-            Self::FocusVisible => "focus.rs",
+            // Focus-visible is ring composition, not the modal focus policy:
+            // `styled.rs` owns the toolkit-neutral ring contract
+            // (`focus_ring_refinement`/`apply_focus_ring`) over
+            // `palette.ring`, whose alpha already encodes the
+            // keyboard/pointer modality decision. The modality signal itself
+            // is frontend-owned (GPUI: `gpui_app/root/input_modality.rs`).
+            // `focus.rs` owns the modal trap/restore chain instead — that is
+            // ModalOverlay's invariant, not this capability's.
+            Self::FocusVisible => "styled.rs",
         }
     }
 
@@ -484,7 +502,7 @@ impl ComponentCapability {
             Self::ContextMenu => CapabilitySemanticSpec {
                 capability: self,
                 user_facing_behavior: "Transient contextual menu displaying operations available for a targeted object or selection",
-                keyboard_pointer_semantics: "Triggered via pointer secondary click or keyboard context menu key / Shift+F10 on focused row; Up/Down arrow keys traverse items; Enter/Space activates item; Escape closes",
+                keyboard_pointer_semantics: "Triggered via pointer secondary click on the targeted row or element; keyboard-first shapes open the same item set through their focused-target action entry; Up/Down arrow keys traverse items; Enter/Space activates item; Escape closes",
                 invariant_expectations: "Closes on outside click, item activation, or window blur; actions apply strictly to snapshot identity captured at menu invocation; clamped within viewport bounds",
             },
             Self::DropdownMenu => CapabilitySemanticSpec {
@@ -496,7 +514,7 @@ impl ComponentCapability {
             Self::Tooltip => CapabilitySemanticSpec {
                 capability: self,
                 user_facing_behavior: "Lightweight transient explanation bubble revealing contextual label, shortcut hint, or status detail on inspection",
-                keyboard_pointer_semantics: "Appears on pointer hover after dwell delay or on keyboard focus; dismisses immediately on pointer exit, pointer click, or Escape",
+                keyboard_pointer_semantics: "Appears on pointer hover or on keyboard focus; dismisses immediately on pointer exit, pointer click, or Escape",
                 invariant_expectations: "Strictly non-interactive and read-only; never captures or traps keyboard/pointer focus; never blocks interaction with underlying anchor control; terminal shapes route hints to footer line",
             },
             Self::Toast => CapabilitySemanticSpec {
@@ -513,20 +531,20 @@ impl ComponentCapability {
             },
             Self::SearchInput => CapabilitySemanticSpec {
                 capability: self,
-                user_facing_behavior: "Specialized type-to-filter query input with search icon, clear button, match feedback, and instant list filtering",
-                keyboard_pointer_semantics: "Fast keyboard access via slash (/) or Ctrl+F; typing immediately filters active projection; Escape clears query or restores focus to filtered list",
+                user_facing_behavior: "Specialized type-to-filter query input with search icon, Escape-clears contract, match feedback, and instant list filtering",
+                keyboard_pointer_semantics: "Fast keyboard access via the shared Ctrl+F focus-search chord; typing immediately filters active projection; Escape clears query or restores focus to filtered list",
                 invariant_expectations: "Filtering never blocks UI thread; empty query restores full projection; preserves active row selection when matched item remains in view",
             },
             Self::TextSelection => CapabilitySemanticSpec {
                 capability: self,
                 user_facing_behavior: "Continuous text selection highlighting across read-only data, detail labels, or log streams enabling clipboard export",
-                keyboard_pointer_semantics: "Pointer drag selects character ranges; double-click selects words; triple-click selects whole lines/blocks; Ctrl/Cmd+C copies selection; Linux middle-click syncs selection",
+                keyboard_pointer_semantics: "Pointer drag selects character ranges; double-click selects words; triple-click selects the whole readout; Ctrl/Cmd+C copies the selection to the system clipboard",
                 invariant_expectations: "At most one active text selection per window; read-only text is never mutable; table row selection and column resize take arbitration precedence",
             },
             Self::Switch => CapabilitySemanticSpec {
                 capability: self,
                 user_facing_behavior: "Two-state binary toggle control indicating immediate boolean state",
-                keyboard_pointer_semantics: "Pointer click or Space/Enter toggles boolean state; animated thumb transition; Tab navigates focus",
+                keyboard_pointer_semantics: "Pointer click or Space/Enter toggles boolean state; Tab navigates focus",
                 invariant_expectations: "State changes dispatch typed application intents immediately; disabled state prevents toggle; visually distinct ON and OFF presentation across all themes",
             },
             Self::Slider => CapabilitySemanticSpec {
@@ -537,9 +555,9 @@ impl ComponentCapability {
             },
             Self::Checkbox => CapabilitySemanticSpec {
                 capability: self,
-                user_facing_behavior: "Two-state or tri-state selection control with box indicator and label",
+                user_facing_behavior: "Two-state selection control with box indicator and label",
                 keyboard_pointer_semantics: "Pointer click on box or label, or keyboard Space key, toggles selection state; Tab traverses focus",
-                invariant_expectations: "Clicking label toggles checkbox; indeterminate state visually distinct from checked/unchecked; identical state transitions across pointer and keyboard",
+                invariant_expectations: "Clicking label toggles checkbox; checked and unchecked states are visually distinct; identical state transitions across pointer and keyboard",
             },
             Self::Select => CapabilitySemanticSpec {
                 capability: self,
