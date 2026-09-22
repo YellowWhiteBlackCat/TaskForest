@@ -22,8 +22,8 @@ use taskmanager_core::core::process_telemetry::{
     OpenFileEntry, ProcessEnvironment, ProcessEnvironmentEntry, ProcessOpenFiles,
 };
 use taskmanager_core::core::process_telemetry::{
-    OpenFileKind, ProcessEnvironmentEntry, ProcessGpuDevice, ProcessGpuEngineUsage,
-    ProcessGpuEngines, ProcessGpuSnapshot, ThreadState,
+    OpenFileKind, ProcessGpuDevice, ProcessGpuEngineUsage, ProcessGpuEngines, ProcessGpuSnapshot,
+    ThreadState,
 };
 use taskmanager_shell::fixture::{ProjectionSeedFact, seed_projection_fact};
 

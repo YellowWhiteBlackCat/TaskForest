@@ -66,8 +66,8 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Local {
             route: "header.screenshot",
         },
-        ProductIntent::FirstRunSetup => SurfaceDecision::Local {
-            route: "first-run.dialog",
+        ProductIntent::FirstRunSetup => SurfaceDecision::Unsupported {
+            reason: "the Bevy product shape does not yet expose a first-run setup surface",
         },
         ProductIntent::GpuMetricInspection => SurfaceDecision::AcceptedDifference {
             route: "performance.gpu.metric-summary",

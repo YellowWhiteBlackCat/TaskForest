@@ -17,7 +17,7 @@ mod health;
 mod health_data;
 pub(crate) mod help;
 mod highlight;
-mod pages;
+pub(crate) mod pages;
 mod perf_battery;
 mod perf_core_grid;
 mod perf_data;

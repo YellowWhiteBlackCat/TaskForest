@@ -67,6 +67,7 @@ fn joined(lines: &[Line<'_>]) -> String {
 
 #[test]
 fn full_fact_strip_keeps_every_current_gpu_scalar_together() {
+    taskmanager_test_support::pin_english();
     let text = joined(&gpu_fact_lines(&[observed_gpu()], GpuFactDensity::Full));
     for fact in [
         "55.0%",
