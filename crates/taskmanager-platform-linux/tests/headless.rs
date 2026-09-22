@@ -1,3 +1,5 @@
+#[path = "headless/capability_surface_contract.rs"]
+mod capability_surface_contract;
 #[path = "headless/conformance.rs"]
 mod conformance;
 #[path = "headless/native_liveness.rs"]

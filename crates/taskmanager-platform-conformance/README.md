@@ -18,6 +18,21 @@ Keep assertions portable across minimal runners. Each adapter runs the same
 contract on its native host; the suite proves shared semantics, not hardware
 coverage or pixel acceptance.
 
+## Capability-surface same-source scenario
+
+`assert_fresh_surface_descriptors` proves the M3.2 fresh-runtime face: the
+declared lane set, the typed initial status, the provider attribution, and the
+typed absence for every unregistered product-expected identity. The stricter
+live-catalog companion is `assert_capability_surface_matches_catalog`: it
+cross-checks one platform's layer-B declaration
+(`PlatformCapabilitySurface`) against the running catalog in both directions —
+every declared `Present` lane is really registered under the adapter's
+provider prefix, every registered lane is declared, and no product-expected
+identity answers `Undeclared`. Whether a registered lane is a real source or a
+registered-pending one is the adapter declaration's own split, because the
+catalog publishes both as a registered descriptor; the adapter's typed-outcome
+contract test proves the pending lanes answer `Unsupported`.
+
 ## Escalation/permission capability invariant
 
 An escalatable denial and a hard permission denial are distinct capability

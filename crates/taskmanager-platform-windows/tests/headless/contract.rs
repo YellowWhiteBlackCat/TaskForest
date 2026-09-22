@@ -24,6 +24,7 @@
 //! boundary's typed `Unsupported` fallback — exactly the honesty the contract
 //! asserts.
 
+use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
@@ -45,10 +46,12 @@ use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::target::{ServiceId, SessionId};
 use taskmanager_core::{DeviceStatus, DirectoryScanSpec};
+use taskmanager_platform_conformance::assert_capability_surface_matches_catalog;
 use taskmanager_platform_contract::{
-    CapabilityId, CapabilityStatus, OperationFailure, RetryDisposition,
+    CapabilityId, CapabilityStatus, OperationFailure, PlatformAxis, PlatformSource,
+    RetryDisposition,
 };
-use taskmanager_platform_windows::WindowsPlatformRuntime;
+use taskmanager_platform_windows::{WindowsPlatformRuntime, capability_surface};
 
 const DRAIN_DEADLINE: Duration = Duration::from_secs(5);
 const DRAIN_POLL: Duration = Duration::from_millis(5);
@@ -1046,5 +1049,51 @@ fn event_port_stays_idle_and_live_before_any_submission() {
     assert!(
         matches!(handle.events().try_recv(), Ok(None)),
         "an idle second-OS adapter must not emit fabricated events"
+    );
+}
+
+/// The Windows layer-B declaration is the live catalog's registration face, and
+/// the lanes it declares with an absence are exactly this contract's
+/// registered-pending census: the declaration is co-located with the real
+/// provider registration and cross-checked against both independent facts.
+#[test]
+fn capability_surface_matches_the_live_catalog_and_the_pending_census() {
+    let handle = WindowsPlatformRuntime::spawn().expect("complete Windows composition");
+    let snapshot = handle.capabilities().snapshot();
+    let surface = capability_surface();
+
+    assert_eq!(
+        assert_capability_surface_matches_catalog(
+            &snapshot,
+            &surface,
+            PlatformAxis::Windows,
+            "windows.",
+        ),
+        Ok(())
+    );
+    assert_eq!(snapshot.registered().count(), STANDARD_SURFACE.len());
+    assert_eq!(
+        surface.present_count(PlatformAxis::Windows),
+        STANDARD_SURFACE.len() - PENDING_CAPABILITIES.len(),
+        "the declared-present set is the registered face minus the pending census"
+    );
+
+    let mut declared_pending: BTreeSet<&str> = BTreeSet::new();
+    for descriptor in snapshot.registered() {
+        let declared = surface.source(PlatformAxis::Windows, &descriptor.id);
+        assert_ne!(
+            declared,
+            PlatformSource::Undeclared,
+            "{} is registered but silently undeclared",
+            descriptor.id
+        );
+        if declared != PlatformSource::Present {
+            declared_pending.insert(descriptor.id.as_str());
+        }
+    }
+    let expected_pending: BTreeSet<&str> = PENDING_CAPABILITIES.iter().copied().collect();
+    assert_eq!(
+        declared_pending, expected_pending,
+        "the layer-B absence declarations and the registered-pending census must agree"
     );
 }

@@ -10,8 +10,8 @@
 use std::path::{Path, PathBuf};
 
 use taskmanager_platform_contract::{
-    InProcessCaptureFn, NativeWindowCapture, WindowCaptureBackend, WindowCaptureFailure,
-    WindowCaptureReceipt,
+    InProcessCaptureFn, NativeWindowCapture, PlatformCapabilitySurface, WindowCaptureBackend,
+    WindowCaptureFailure, WindowCaptureReceipt,
 };
 
 #[cfg(all(not(debug_assertions), not(feature = "hardware-all")))]
@@ -21,6 +21,36 @@ compile_error!(
 
 #[cfg(target_os = "linux")]
 pub use taskmanager_platform_linux::NativePlatformRuntime;
+
+/// The selected adapter's layer-B capability registration surface.
+///
+/// Each adapter declares the surface next to its real route/provider
+/// registration; this composition edge is the one address a frontend uses to
+/// fold its feature declaration against the platform axis. The declaration is
+/// static data, never an operating-system read: runtime availability stays in
+/// the `CapabilityCatalog` snapshot, which platform conformance checks
+/// separately.
+#[cfg(target_os = "linux")]
+#[must_use]
+pub fn capability_surface() -> PlatformCapabilitySurface {
+    taskmanager_platform_linux::capability_surface()
+}
+
+/// The selected adapter's layer-B capability registration surface (see the
+/// Linux variant for the ownership rule).
+#[cfg(target_os = "macos")]
+#[must_use]
+pub fn capability_surface() -> PlatformCapabilitySurface {
+    taskmanager_platform_macos::capability_surface()
+}
+
+/// The selected adapter's layer-B capability registration surface (see the
+/// Linux variant for the ownership rule).
+#[cfg(target_os = "windows")]
+#[must_use]
+pub fn capability_surface() -> PlatformCapabilitySurface {
+    taskmanager_platform_windows::capability_surface()
+}
 
 #[cfg(target_os = "linux")]
 pub fn native_config_path() -> PathBuf {

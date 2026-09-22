@@ -16,7 +16,7 @@ mod process;
 mod smoke;
 mod source;
 
-pub use capability::assert_fresh_surface_descriptors;
+pub use capability::{assert_capability_surface_matches_catalog, assert_fresh_surface_descriptors};
 pub use escalation::{
     admits_escalation, assert_capability_failure_status, projected_capability_status,
 };

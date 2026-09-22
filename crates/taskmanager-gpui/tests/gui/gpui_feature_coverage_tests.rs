@@ -6,9 +6,10 @@
 //! undelivered item is a reasoned `Unsupported` gap - never source text.
 
 use super::*;
-use taskmanager_platform_contract::{PlatformAxis, PlatformCapabilitySurface};
+use taskmanager_app_host::native_capability_surface;
+use taskmanager_platform_contract::PlatformAxis;
 use taskmanager_ui_contract::{
-    FeatureCoverageFindingKind, FeaturePlatformLedger, FeaturePlatformStatus,
+    FeatureCoverageFindingKind, FeaturePlatformLedger, FeaturePlatformStatus, NO_EVIDENCE,
     PLATFORM_GATE_BASELINE, PLATFORM_GATE_POLICY, PlatformGateRule, feature_coverage_drift,
     feature_coverage_findings, feature_coverage_report, feature_platform_gate_findings,
 };
@@ -102,24 +103,54 @@ fn the_reference_undelivered_set_is_pinned() {
     );
 }
 
-/// P5 M3.4 hard gate: this shape's real declaration folds over
-/// `FeatureId::ALL x PlatformAxis::ALL` and must satisfy G1-G6 against the
-/// product gate policy.
+/// P5 M3.4 hard gate against the REAL layer-B declaration of the selected
+/// native adapter (reached through the app-host composition edge).
 ///
-/// Layer-B per-platform source declarations have not landed yet, so the fold
-/// runs against an empty `PlatformCapabilitySurface`: no cell may claim
-/// `Ready`, which is the honest shape today. The gate still proves the
-/// exhaustive grid, the typed reasons, zero false success, the bidirectional
-/// capability binding, and this shape's `Missing` ceiling against the live
-/// baseline.
+/// The real declaration makes source-complete cells appear on the host
+/// platform. No P4 behaviour anchor has landed yet, so G2 refuses every one of
+/// them: the gate's only open rule is the evidence closure, and no cell is a
+/// proven delivery claim. Every other rule - the G1 grid, the G3 typed reasons,
+/// G4 zero false success, the G5 binding census, and this shape's G6 ceilings -
+/// is green, so the open set is exactly the source-complete set: neither a new
+/// platform source nor a lost one can hide behind the evidence gap.
 #[test]
-fn the_three_axis_gate_is_green_for_this_shape() {
+fn the_three_axis_gate_reports_only_the_evidence_gap_for_this_shape() {
     let declaration = feature_coverage_declaration();
-    let sources = PlatformCapabilitySurface::new();
-    let ledger = FeaturePlatformLedger::from_declaration(&declaration, &sources);
+    let sources = native_capability_surface();
+    // Evidence seam (P4): the cross-frontend manifest carries no `feature` row
+    // yet, so every cell answers `NO_EVIDENCE`. When anchors land, this closure
+    // returns them and the census assertions below must move in the same change.
+    let ledger = FeaturePlatformLedger::from_declarations_with_evidence(
+        std::slice::from_ref(&declaration),
+        &sources,
+        |_, _, _| NO_EVIDENCE,
+    );
     assert_eq!(ledger.len(), FeatureId::ALL.len() * PlatformAxis::ALL.len());
+
     let findings = feature_platform_gate_findings(&ledger, &sources, &PLATFORM_GATE_POLICY);
-    assert!(findings.is_empty(), "{findings:?}");
+    let source_complete = ledger
+        .iter()
+        .filter(|cell| matches!(cell.status, FeaturePlatformStatus::Ready))
+        .count();
+    assert!(
+        source_complete > 0,
+        "the selected adapter's declaration must make some cells source-complete"
+    );
+    assert!(
+        findings
+            .iter()
+            .all(|finding| finding.rule() == PlatformGateRule::G2),
+        "the P4 evidence closure is the only rule that may be open: {findings:?}"
+    );
+    assert_eq!(
+        findings.len(),
+        source_complete,
+        "G2 must refuse exactly the source-complete cells and nothing else"
+    );
+    assert!(
+        ledger.iter().all(|cell| !cell.has_evidence()),
+        "a P4 behaviour anchor appeared: move the evidence-census assertions in the same change"
+    );
 
     let missing = ledger
         .iter()
@@ -130,11 +161,14 @@ fn the_three_axis_gate_is_green_for_this_shape() {
         PLATFORM_GATE_BASELINE.missing_ceiling(FrontendShape::Gpui),
         "a shape that changes its gap set must move its baseline in the same change"
     );
-    assert!(
-        !ledger
+    assert_eq!(
+        ledger
             .iter()
-            .any(|cell| matches!(cell.status, FeaturePlatformStatus::Ready)),
-        "an undeclared platform source must never fold to Ready"
+            .filter(|cell| matches!(cell.status, FeaturePlatformStatus::Unregistered(_)))
+            .count(),
+        0,
+        "every remaining vocabulary-gap feature is declared a frontend gap, so no cell \
+         may claim delivery of a feature with no capability identity"
     );
 }
 
@@ -157,7 +191,7 @@ fn the_three_axis_gate_rejects_an_untyped_declaration() {
         .expect("a capability-backed delivered entry");
     victim.support = CapabilitySupport::Divergent { reason: "" };
 
-    let sources = PlatformCapabilitySurface::new();
+    let sources = native_capability_surface();
     let ledger = FeaturePlatformLedger::from_declaration(&sabotaged, &sources);
     let findings = feature_platform_gate_findings(&ledger, &sources, &PLATFORM_GATE_POLICY);
     assert!(

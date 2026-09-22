@@ -103,3 +103,57 @@ fn declarations_replace_and_stay_deterministic() {
         PlatformSource::Absent(CapabilityStatus::Unsupported)
     );
 }
+
+/// `declaring` mirrors one platform's registrations and never leaves an
+/// expected identity undeclared: unregistered lanes answer the unsupported
+/// absence (the M3.2 "Undeclared 归零" shape), a registered-pending lane keeps
+/// its explicit absence, and a vendor registration stays visible verbatim.
+#[test]
+fn declaring_pads_the_expected_surface_and_keeps_registered_lanes() {
+    let vendor = CapabilityId::owned("vendor.diagnostic");
+    let registered = [
+        (CapabilityId::TELEMETRY_CPU, PlatformSource::Present),
+        (
+            CapabilityId::ACCELERATOR_NPU,
+            PlatformSource::absent(CapabilityStatus::Unsupported).expect("admissible absence"),
+        ),
+        (vendor.clone(), PlatformSource::Present),
+    ];
+    let surface = PlatformCapabilitySurface::declaring(PlatformAxis::Linux, &registered);
+
+    assert_eq!(
+        surface.source(PlatformAxis::Linux, &CapabilityId::TELEMETRY_CPU),
+        PlatformSource::Present
+    );
+    assert_eq!(
+        surface.source(PlatformAxis::Linux, &CapabilityId::ACCELERATOR_NPU),
+        PlatformSource::Absent(CapabilityStatus::Unsupported)
+    );
+    assert_eq!(
+        surface.source(PlatformAxis::Linux, &CapabilityId::TELEMETRY_PRESSURE),
+        PlatformSource::Absent(CapabilityStatus::Unsupported),
+        "an unregistered expected identity answers the typed absence, never Undeclared"
+    );
+    assert_eq!(
+        surface.source(PlatformAxis::Linux, &vendor),
+        PlatformSource::Present,
+        "a vendor registration stays visible"
+    );
+    assert_eq!(surface.len(), CapabilityId::EXPECTED_SURFACE.len() + 1);
+    assert_eq!(surface.present_count(PlatformAxis::Linux), 2);
+    assert_eq!(surface.present_count(PlatformAxis::Windows), 0);
+    assert!(!surface.is_empty());
+
+    for expected in CapabilityId::EXPECTED_SURFACE {
+        assert_ne!(
+            surface.source(PlatformAxis::Linux, &expected),
+            PlatformSource::Undeclared,
+            "an expected identity on the declared platform must never be Undeclared"
+        );
+        assert_eq!(
+            surface.source(PlatformAxis::Windows, &expected),
+            PlatformSource::Undeclared,
+            "another platform stays undeclared: a surface is one platform's declaration"
+        );
+    }
+}

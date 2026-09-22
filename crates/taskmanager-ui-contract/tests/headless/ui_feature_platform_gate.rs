@@ -460,7 +460,7 @@ fn g6_reports_an_unregistered_count_above_its_ceiling() {
 
     let baseline = PlatformGateBaseline {
         missing_by_frontend: PLATFORM_GATE_BASELINE.missing_by_frontend,
-        unregistered_per_frontend: 41,
+        unregistered_per_frontend: 2,
         unbound_expected_capabilities: PLATFORM_GATE_BASELINE.unbound_expected_capabilities,
     };
     let policy = PlatformGatePolicy {
@@ -472,8 +472,8 @@ fn g6_reports_an_unregistered_count_above_its_ceiling() {
     assert!(
         findings.contains(&PlatformGateFinding::UnregisteredCeilingExceeded {
             frontend: FrontendShape::Tui,
-            counted: 42,
-            ceiling: 41,
+            counted: 3,
+            ceiling: 2,
         }),
         "{findings:?}"
     );

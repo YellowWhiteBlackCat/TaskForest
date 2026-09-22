@@ -11,6 +11,12 @@ This crate is the executable composition edge: it selects the native adapter and
 owns the resulting paths and safe callbacks, but does not inspect OS files,
 define domain rules, provider semantics, page state, or toolkit widgets.
 
+`native_capability_surface()` is the layer-B pass-through a frontend folds its
+feature declaration against: it returns the selected adapter's static
+`(capability -> source)` declaration, which the adapter co-locates with its real
+route/provider registration. It is declaration data, never an OS read; runtime
+availability stays with the capability catalog snapshot.
+
 `NativeAppHost` lazily owns one shared `ConfigCoordinator`. Cloned hosts and
 additional windows receive independent `ConfigClient` cursors backed by that
 same worker; no frontend receives a `ConfigStore` or performs config file I/O.

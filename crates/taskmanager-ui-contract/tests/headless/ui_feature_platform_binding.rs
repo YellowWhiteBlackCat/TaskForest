@@ -71,7 +71,7 @@ fn platform_binding_is_total_typed_and_explained() {
     }
     assert_eq!(
         (requires, not_applicable, not_in_vocabulary),
-        (53, 8, 14),
+        (66, 8, 1),
         "binding-shape counts are part of the contract; changing one is a conscious registry change"
     );
     assert_eq!(
@@ -96,12 +96,17 @@ fn required_capabilities_are_a_pinned_product_expectation_surface() {
         required,
         [
             "accelerator.npu",
+            "desktop.responsiveness",
             "hardware.inventory",
             "hardware.power-supplies",
             "history.process-events",
+            "ipc.dbus",
+            "ipc.pipe-graph",
             "ipc.posix",
             "ipc.sysv",
+            "memory.vma-map",
             "network.socket-inventory",
+            "numa.topology",
             "process.affinity",
             "process.affinity.control",
             "process.control",
@@ -112,6 +117,8 @@ fn required_capabilities_are_a_pinned_product_expectation_surface() {
             "process.insights.resources",
             "process.insights.threads",
             "process.list",
+            "profiling.pmu",
+            "profiling.syscalls",
             "sensors",
             "services",
             "services.control",
@@ -121,11 +128,14 @@ fn required_capabilities_are_a_pinned_product_expectation_surface() {
             "storage.smart",
             "telemetry.cpu",
             "telemetry.cpu.package_power",
+            "telemetry.cpu.throttle",
             "telemetry.gpu",
             "telemetry.gpu.engines",
             "telemetry.host",
             "telemetry.memory",
+            "telemetry.pressure",
             "telemetry.storage",
+            "threads.context-switch",
         ]
     );
 }

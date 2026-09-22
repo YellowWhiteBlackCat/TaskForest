@@ -661,11 +661,16 @@ static PRODUCT_EXPECTED_SURFACE: [CapabilityId; 81] = CapabilityId::EXPECTED_SUR
 /// change. Removal condition: the M1 feature expansion (or a deliberate
 /// feature-independent declaration with its reason) covers each identity.
 ///
-/// Several entries already have a capability identity while their feature is
-/// still declared `NotInVocabulary` (for example `telemetry.pressure`,
-/// `ipc.dbus`, `profiling.pmu`, `memory.vma-map`, `numa.topology`,
-/// `filesystem.fd-limits`): rebinding those features is the cheapest first
-/// removal step and belongs to the M3.3 lowering pass.
+/// The M3.3 lowering pass recovered the identities whose owning feature was
+/// still declared `NotInVocabulary` (`telemetry.pressure`, `ipc.dbus`,
+/// `profiling.pmu`, `memory.vma-map`, `numa.topology`,
+/// `threads.context-switch`, `telemetry.cpu.throttle`,
+/// `profiling.syscalls`, `ipc.pipe-graph`, `desktop.responsiveness`). The
+/// identities that stay here are owned by no current feature: their facts
+/// either ride an already-bound lane (for example `process.scheduling` and
+/// `filesystem.fd-limits` ride the process row/resource lanes,
+/// `power.c-states` rides CPU telemetry) or belong to a surface the 75-item
+/// registry has not admitted yet.
 static UNBOUND_EXPECTED_CAPABILITIES: &[CapabilityId] = &[
     CapabilityId::TELEMETRY_NETWORK,
     CapabilityId::TELEMETRY_MEMORY_SMBIOS,
@@ -688,10 +693,7 @@ static UNBOUND_EXPECTED_CAPABILITIES: &[CapabilityId] = &[
     CapabilityId::DESKTOP_APPEARANCE,
     CapabilityId::DESKTOP_NOTIFY,
     CapabilityId::FIRST_RUN_SETUP,
-    CapabilityId::TELEMETRY_PRESSURE,
     CapabilityId::TELEMETRY_GPU_HANG,
-    CapabilityId::TELEMETRY_CPU_THROTTLE,
-    CapabilityId::MEMORY_VMA_MAP,
     CapabilityId::MEMORY_COMPRESSION,
     CapabilityId::MEMORY_HUGEPAGES,
     CapabilityId::FILESYSTEM_FILE_LOCKS,
@@ -699,24 +701,17 @@ static UNBOUND_EXPECTED_CAPABILITIES: &[CapabilityId] = &[
     CapabilityId::FILESYSTEM_FD_LIMITS,
     CapabilityId::PROCESS_SCHEDULING,
     CapabilityId::PROCESS_OOM_SCORE,
-    CapabilityId::THREADS_CONTEXT_SWITCH,
     CapabilityId::THREADS_WAIT_CHANNEL,
     CapabilityId::NETWORK_SOCKET_CONTROL,
     CapabilityId::NETWORK_TRAFFIC_CONTROL,
     CapabilityId::STORAGE_IO_ACCOUNTING,
     CapabilityId::STORAGE_IO_PRIORITY,
     CapabilityId::STORAGE_WRITEBACK,
-    CapabilityId::NUMA_TOPOLOGY,
     CapabilityId::POWER_C_STATES,
     CapabilityId::POWER_PROFILES,
     CapabilityId::SERVICES_TIMERS,
     CapabilityId::SERVICES_SOCKET_ACTIVATION,
-    CapabilityId::IPC_DBUS,
-    CapabilityId::IPC_PIPE_GRAPH,
-    CapabilityId::PROFILING_PMU,
     CapabilityId::PROFILING_OFF_CPU,
-    CapabilityId::PROFILING_SYSCALLS,
-    CapabilityId::DESKTOP_RESPONSIVENESS,
 ];
 
 /// The accepted gaps at M3.4, each with its removal condition.
@@ -724,8 +719,15 @@ static UNBOUND_EXPECTED_CAPABILITIES: &[CapabilityId] = &[
 /// - `Missing` ceilings are the frontend-axis parity gaps the four shapes
 ///   already declare explicitly (their own P1 tests pin the same sets);
 ///   delivering the feature lowers the ceiling.
-/// - `unregistered_per_frontend` is `14 NotInVocabulary features x 3
-///   platforms`; M3.3 registers the identities and drives it to zero.
+/// - `unregistered_per_frontend` is the live `NotInVocabulary` census
+///   multiplied by the three platforms. The M3.3 lowering pass rebound every
+///   feature whose capability identity already existed
+///   (`memory.vma-map`, `threads.context-switch`, `network.socket-inventory`,
+///   `telemetry.cpu.throttle`, `telemetry.pressure`,
+///   `desktop.responsiveness`, `ipc.dbus`, `ipc.pipe-graph`,
+///   `profiling.pmu`, `profiling.syscalls`, `numa.topology`), leaving only
+///   `tracing.cpu-flame-graph`, whose stack-sampling facts still have no
+///   identity; registering one drives the ceiling to zero.
 /// - `unbound_expected_capabilities` is the feature-axis vocabulary gap
 ///   census; it only shrinks.
 pub static PLATFORM_GATE_BASELINE: PlatformGateBaseline<'static> = PlatformGateBaseline {
@@ -735,7 +737,7 @@ pub static PLATFORM_GATE_BASELINE: PlatformGateBaseline<'static> = PlatformGateB
         (FrontendShape::Tui, 78),
         (FrontendShape::Bevy, 96),
     ],
-    unregistered_per_frontend: 42,
+    unregistered_per_frontend: 3,
     unbound_expected_capabilities: UNBOUND_EXPECTED_CAPABILITIES,
 };
 

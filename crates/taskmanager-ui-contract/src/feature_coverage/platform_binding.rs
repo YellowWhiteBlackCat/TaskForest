@@ -116,6 +116,16 @@ static HOST_LOAD_LANES: &[CapabilityId] =
     &[CapabilityId::TELEMETRY_HOST, CapabilityId::TELEMETRY_CPU];
 static STORAGE_TELEMETRY_LANES: &[CapabilityId] = &[CapabilityId::TELEMETRY_STORAGE];
 static STORAGE_SMART_LANES: &[CapabilityId] = &[CapabilityId::SMART];
+static MEMORY_VMA_LANES: &[CapabilityId] = &[CapabilityId::MEMORY_VMA_MAP];
+static THREAD_CONTEXT_SWITCH_LANES: &[CapabilityId] = &[CapabilityId::THREADS_CONTEXT_SWITCH];
+static CPU_THROTTLE_LANES: &[CapabilityId] = &[CapabilityId::TELEMETRY_CPU_THROTTLE];
+static PRESSURE_LANES: &[CapabilityId] = &[CapabilityId::TELEMETRY_PRESSURE];
+static DESKTOP_RESPONSIVENESS_LANES: &[CapabilityId] = &[CapabilityId::DESKTOP_RESPONSIVENESS];
+static DBUS_LANES: &[CapabilityId] = &[CapabilityId::IPC_DBUS];
+static PIPE_GRAPH_LANES: &[CapabilityId] = &[CapabilityId::IPC_PIPE_GRAPH];
+static PMU_PROFILING_LANES: &[CapabilityId] = &[CapabilityId::PROFILING_PMU];
+static SYSCALL_PROFILING_LANES: &[CapabilityId] = &[CapabilityId::PROFILING_SYSCALLS];
+static NUMA_TOPOLOGY_LANES: &[CapabilityId] = &[CapabilityId::NUMA_TOPOLOGY];
 static HARDWARE_TOPOLOGY_LANES: &[CapabilityId] = &[
     CapabilityId::HARDWARE_INVENTORY,
     CapabilityId::TELEMETRY_CPU,
@@ -171,10 +181,7 @@ impl super::FeatureId {
             Self::MemoryBreakdownRssPss
             | Self::MemoryPageFaults
             | Self::MemoryTransparentHugePages => Requires(PROCESS_ROW_LANES),
-            Self::MemoryVmaMap => NotInVocabulary(
-                "the per-process VMA map has no capability identity yet; \
-                 planned vocabulary (M3.3)",
-            ),
+            Self::MemoryVmaMap => Requires(MEMORY_VMA_LANES),
             Self::MemoryLeakTrend => NotApplicable(
                 "the leak trend is derived from the shared history projection; \
                  the memory samples it folds are owned by process telemetry",
@@ -189,32 +196,28 @@ impl super::FeatureId {
             // the frontend saturation surface is what is missing.
             Self::HandleFdLimitSaturation => Requires(PROCESS_RESOURCE_LANES),
             // -- Area 4: thread topology -----------------------------------
+            // The wait channel rides the threads insight lane's per-thread
+            // `wchan` field; the context-switch counters have their own
+            // declared identity.
             Self::ThreadTopologyEnumeration
             | Self::ThreadRunqueueLatency
             | Self::ThreadUninterruptibleSleepDiagnosis
             | Self::ThreadWaitChannelClassification => Requires(PROCESS_THREAD_LANES),
-            Self::ThreadContextSwitchRates => NotInVocabulary(
-                "per-thread context-switch counters have no capability identity \
-                 yet; planned vocabulary (M3.3)",
-            ),
+            Self::ThreadContextSwitchRates => Requires(THREAD_CONTEXT_SWITCH_LANES),
             // -- Area 5: network and sockets -------------------------------
             // The per-connection RTT rides the registered per-process network
             // insight lane, next to the throughput rates.
             Self::ProcessNetworkThroughput | Self::SocketRttMetrics => {
                 Requires(PROCESS_NETWORK_LANES)
             }
-            // Queue depth and the unix-domain peer topology are not part of
-            // that lane; they need the declared system socket-inventory
-            // identity, which no adapter registers yet, so the fold stays
-            // honestly unsupported until one does. The sibling
-            // `SocketInventory`/`ListeningPortTopology` entries keep their
-            // pre-existing vocabulary-gap note until the M3.3 lowering pass
-            // rebinds them.
-            Self::SocketQueueBacklog | Self::UdsPeerTopology => Requires(SOCKET_INVENTORY_LANES),
-            Self::SocketInventory | Self::ListeningPortTopology => NotInVocabulary(
-                "the system socket/listening-port inventory has no capability \
-                 identity yet; planned vocabulary (M3.3)",
-            ),
+            // The system socket/listening-port inventory has its own declared
+            // identity; the sibling queue-depth and unix-domain peer rows ride
+            // the same lane. No adapter registers it yet, so the fold stays
+            // honestly unsupported on every platform until one does.
+            Self::SocketInventory
+            | Self::ListeningPortTopology
+            | Self::SocketQueueBacklog
+            | Self::UdsPeerTopology => Requires(SOCKET_INVENTORY_LANES),
             // -- Area 6: storage and filesystem I/O ------------------------
             // Per-process logical/physical bytes ride the process row scalars.
             Self::ProcessLogicalPhysicalIo => Requires(PROCESS_ROW_LANES),
@@ -232,10 +235,12 @@ impl super::FeatureId {
             Self::HardwareTopologyTree | Self::CpuHeterogeneousCoreClass => {
                 Requires(HARDWARE_TOPOLOGY_LANES)
             }
-            Self::CpuCacheTopology
-            | Self::NumaMemoryDistribution
-            | Self::CpuCStateAnalysis
-            | Self::CpuCoreFrequency => Requires(CPU_METRIC_LANES),
+            Self::CpuCacheTopology | Self::CpuCStateAnalysis | Self::CpuCoreFrequency => {
+                Requires(CPU_METRIC_LANES)
+            }
+            // The NUMA memory distribution is a per-node fact: it needs the
+            // declared NUMA topology identity, which no adapter registers yet.
+            Self::NumaMemoryDistribution => Requires(NUMA_TOPOLOGY_LANES),
             // -- Area 8: accelerator telemetry -----------------------------
             Self::GpuAdapterEnumeration | Self::GpuMemoryReadout => Requires(GPU_TELEMETRY_LANES),
             Self::NpuTelemetry => Requires(NPU_INVENTORY_LANES),
@@ -247,11 +252,9 @@ impl super::FeatureId {
             Self::ThermalZoneSensors => Requires(THERMAL_SENSOR_LANES),
             // Battery facts ride the power-supply lane.
             Self::BatteryPowerInventory => Requires(POWER_SUPPLY_LANES),
-            Self::ThermalThrottleEvents => NotInVocabulary(
-                "CPU thermal-throttle / PROCHOT event counters have no \
-                 capability identity yet; the sensor lane covers temperature \
-                 readouts only; planned vocabulary (M3.3)",
-            ),
+            // Thermal-throttle trigger counters are their own reliability fact,
+            // distinct from the temperature readouts the sensor lane carries.
+            Self::ThermalThrottleEvents => Requires(CPU_THROTTLE_LANES),
             // -- Area 10: security isolation -------------------------------
             Self::LinuxNamespaceAudit
             | Self::PosixCapabilitiesAudit
@@ -267,10 +270,9 @@ impl super::FeatureId {
             Self::ServiceInventoryStatus => Requires(SERVICE_INVENTORY_LANES),
             Self::ServiceLifecycleControl => Requires(SERVICE_LIFECYCLE_LANES),
             // -- Area 12: pressure and saturation --------------------------
-            Self::PsiMultiWindowTelemetry => NotInVocabulary(
-                "PSI stall windows have no capability identity yet; planned \
-                 `telemetry.pressure` vocabulary (M3.3)",
-            ),
+            // The PSI stall windows are their own declared identity; no adapter
+            // registers a dedicated lane yet.
+            Self::PsiMultiWindowTelemetry => Requires(PRESSURE_LANES),
             Self::MemoryThrashingHealthScore => NotApplicable(
                 "the score and its auditable deduction bill are a shared \
                  projection over already-typed inputs; the pressure input is \
@@ -284,38 +286,37 @@ impl super::FeatureId {
             // The normalized load folds the host load triple against the
             // logical-processor count, so both telemetry lanes are required.
             Self::PressureLoadAverageNormalized => Requires(HOST_LOAD_LANES),
-            Self::UnresponsiveAppDetection => NotInVocabulary(
-                "UI responsiveness / unresponsive-window probes have no \
-                 capability identity yet; planned vocabulary (M3.3)",
-            ),
+            // The probe mechanism is windowing-system specific; its declared
+            // identity is the desktop-responsiveness lane.
+            Self::UnresponsiveAppDetection => Requires(DESKTOP_RESPONSIVENESS_LANES),
             // -- Area 13: IPC and D-Bus ------------------------------------
             // Shared memory spans both POSIX and System V object families, so
             // both declared identities are required; no adapter registers
             // either yet.
             Self::SharedMemorySegments => Requires(IPC_SHARED_MEMORY_LANES),
-            Self::DbusServiceTopology | Self::DbusIntrospection | Self::PipeDeadlockDiagnosis => {
-                NotInVocabulary(
-                    "D-Bus and pipe-topology facts have no capability identity \
-                 yet; planned `ipc.*` vocabulary (M3.3)",
-                )
-            }
+            // Bus topology and introspection ride one declared D-Bus identity;
+            // pipe deadlock detection needs the declared pipe-graph identity.
+            // No adapter registers either lane yet.
+            Self::DbusServiceTopology | Self::DbusIntrospection => Requires(DBUS_LANES),
+            Self::PipeDeadlockDiagnosis => Requires(PIPE_GRAPH_LANES),
             // -- Area 14: dynamic tracing ----------------------------------
             // The process lifecycle event stream has its own declared identity
             // (no adapter registers it yet).
             Self::ProcessEventTrace => Requires(PROCESS_EVENT_LANES),
-            // Stack-sampling has no declared identity, unlike the PMU/off-CPU
-            // profiling lanes.
+            // Stack-sampling (the flame graph) has no declared identity: the
+            // declared `profiling.*` lanes cover hardware counters, syscall
+            // distributions and off-CPU attribution, not sampled call stacks.
             Self::CpuFlameGraph => NotInVocabulary(
                 "stack-sampling profiler facts have no capability identity yet; \
                  the declared `profiling.*` lanes cover PMU counters and off-CPU \
                  time only",
             ),
-            Self::PmuCounterAbstraction
-            | Self::SyscallDistributionProfiling
-            | Self::SlowSyscallTrap => NotInVocabulary(
-                "profiling/tracing sources have no capability identity yet; \
-                 planned `profiling.*` vocabulary (M3.3)",
-            ),
+            // PMU counters and the syscall distribution each have their declared
+            // identity; no adapter registers either lane yet.
+            Self::PmuCounterAbstraction => Requires(PMU_PROFILING_LANES),
+            Self::SyscallDistributionProfiling | Self::SlowSyscallTrap => {
+                Requires(SYSCALL_PROFILING_LANES)
+            }
             // -- Area 15: history and time travel --------------------------
             Self::MultiResolutionRingBuffer
             | Self::MultiFormatExport

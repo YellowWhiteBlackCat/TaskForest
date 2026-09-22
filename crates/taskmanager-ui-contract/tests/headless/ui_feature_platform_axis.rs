@@ -174,9 +174,11 @@ fn missing_and_unsupported_are_produced_by_different_axes() {
     }
 
     // (4) A vocabulary gap is `Unregistered`, not a frontend `Missing`.
+    // `tracing.cpu-flame-graph` is the remaining `NotInVocabulary` feature: the
+    // declared `profiling.*` identities do not cover sampled call stacks.
     let status = classify(
         &all_ported(FrontendShape::Gpui),
-        FeatureId::PsiMultiWindowTelemetry,
+        FeatureId::CpuFlameGraph,
         PlatformAxis::Linux,
         &sources,
     );
@@ -444,8 +446,10 @@ fn an_empty_surface_yields_no_ready_cells() {
         }
     }
     assert_eq!(ready, 0, "no undeclared source may ever fold to Ready");
-    assert_eq!(unsupported, 53 * PlatformAxis::ALL.len());
-    assert_eq!(unregistered, 14 * PlatformAxis::ALL.len());
+    assert_eq!(unsupported, 66 * PlatformAxis::ALL.len());
+    // `tracing.cpu-flame-graph` is the only remaining vocabulary-gap feature:
+    // its cells are counted once per platform.
+    assert_eq!(unregistered, PlatformAxis::ALL.len());
     assert_eq!(not_applicable, 8 * PlatformAxis::ALL.len());
 }
 

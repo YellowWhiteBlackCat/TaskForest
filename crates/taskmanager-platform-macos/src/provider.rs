@@ -25,6 +25,9 @@ use taskmanager_application::{
     StartupInventoryRequest, StorageTelemetryRequest,
 };
 use taskmanager_core::ProviderId;
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
+};
 use taskmanager_platform_runtime::ProviderRegistration;
 
 use self::environment::{
@@ -188,6 +191,87 @@ impl MacOsProviderRegistry {
             power,
         }
     }
+}
+
+/// Layer B of the three-axis parity ledger: the capability identities this
+/// adapter registers a provider for, with the honest static source of each.
+///
+/// The list is declared AT the registration site and must stay in step with
+/// [`macos_provider_registry`]: `Present` means the registered provider really
+/// serves the capability, and `Absent(Unsupported)` marks a registered-pending
+/// provider that can only answer a typed absence (the macOS lib doc's
+/// typed-Unsupported set). The matching proof is
+/// `capability_surface_matches_the_live_catalog_and_the_pending_census`, which
+/// compares this declaration with the live runtime catalog in both directions
+/// and asserts the registered-pending lanes are exactly the ones the contract
+/// test lists.
+const REGISTERED_CAPABILITY_SOURCES: &[(CapabilityId, PlatformSource)] = &[
+    // -- system telemetry and hardware inventory (real sources) --------------
+    (CapabilityId::TELEMETRY_HOST, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_CPU, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_MEMORY, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_STORAGE, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_NETWORK, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_GPU, PlatformSource::Present),
+    (CapabilityId::HARDWARE_INVENTORY, PlatformSource::Present),
+    // -- process list -------------------------------------------------------
+    (CapabilityId::PROCESS_LIST, PlatformSource::Present),
+    // -- services, startup and sessions ------------------------------------
+    (CapabilityId::SERVICES, PlatformSource::Present),
+    (CapabilityId::SERVICE_CONTROL, PlatformSource::Present),
+    (CapabilityId::SERVICE_LOGS, PlatformSource::Present),
+    (CapabilityId::STARTUP, PlatformSource::Present),
+    (CapabilityId::STARTUP_EVIDENCE, PlatformSource::Present),
+    (CapabilityId::STARTUP_CONTROL, PlatformSource::Present),
+    (CapabilityId::SESSIONS, PlatformSource::Present),
+    // -- shell integration -------------------------------------------------
+    (CapabilityId::COMMAND_LAUNCH, PlatformSource::Present),
+    (CapabilityId::URL_OPEN, PlatformSource::Present),
+    (CapabilityId::DESKTOP_APPEARANCE, PlatformSource::Present),
+    // -- storage, sensors, power -------------------------------------------
+    (CapabilityId::STORAGE_HEALTH, PlatformSource::Present),
+    (CapabilityId::SMART, PlatformSource::Present),
+    (CapabilityId::SMART_CONTROL, PlatformSource::Present),
+    (CapabilityId::DIRECTORY_USAGE, PlatformSource::Present),
+    (CapabilityId::SENSORS, PlatformSource::Present),
+    (CapabilityId::POWER_SUPPLIES, PlatformSource::Present),
+    // -- registered-pending lanes: typed absence only -----------------------
+    (CapabilityId::CONTAINERS, absent()),
+    (CapabilityId::PROCESS_NETWORK_ESCALATION, absent()),
+    (CapabilityId::PROCESS_CONTROL, absent()),
+    (CapabilityId::PROCESS_INSIGHTS_NETWORK, absent()),
+    (CapabilityId::PROCESS_INSIGHTS_GPU, absent()),
+    (CapabilityId::PROCESS_INSIGHTS_RESOURCES, absent()),
+    (CapabilityId::PROCESS_INSIGHTS_ISOLATION, absent()),
+    (CapabilityId::PROCESS_INSIGHTS_THREADS, absent()),
+    (CapabilityId::PROCESS_INSIGHTS_OPEN_FILES, absent()),
+    (CapabilityId::PROCESS_AFFINITY, absent()),
+    (CapabilityId::PROCESS_AFFINITY_CONTROL, absent()),
+    (CapabilityId::PROCESS_RESOURCE_CONTROL, absent()),
+    (CapabilityId::SERVICE_DEPENDENCIES, absent()),
+    (CapabilityId::SERVICE_LOG_STREAM, absent()),
+    (CapabilityId::SESSION_CONTROL, absent()),
+    (CapabilityId::RESOURCE_REVEAL, absent()),
+    (CapabilityId::DESKTOP_NOTIFY, absent()),
+    (CapabilityId::FIRST_RUN_SETUP, absent()),
+    (CapabilityId::TELEMETRY_GPU_ENGINES, absent()),
+    (CapabilityId::ACCELERATOR_NPU, absent()),
+    (CapabilityId::TELEMETRY_MEMORY_SMBIOS, absent()),
+    (CapabilityId::TELEMETRY_CPU_PACKAGE_POWER, absent()),
+    (CapabilityId::TELEMETRY_CPU_MSR, absent()),
+];
+
+/// The typed honest absence for a registered-pending lane.
+const fn absent() -> PlatformSource {
+    PlatformSource::Absent(CapabilityStatus::Unsupported)
+}
+
+/// The macOS layer-B capability surface: the lanes above keep their declared
+/// source, and every other product-expected identity answers
+/// `Absent(Unsupported)` because this adapter registers no source for it.
+#[must_use]
+pub fn capability_surface() -> PlatformCapabilitySurface {
+    PlatformCapabilitySurface::declaring(PlatformAxis::Macos, REGISTERED_CAPABILITY_SOURCES)
 }
 
 pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {

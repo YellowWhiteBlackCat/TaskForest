@@ -36,8 +36,12 @@ use crate::{CapabilityId, CapabilityStatus, PlatformAxis};
 pub enum PlatformSource {
     /// A real provider is registered for the capability.
     Present,
-    /// Registered but honestly absent, with the typed capability-level
-    /// reason. The status is restricted to the four absence projections of
+    /// The capability answers with a typed absence, with the typed
+    /// capability-level reason: either a registered provider that can only
+    /// answer an absence (a registered-pending lane), or a product-expected
+    /// identity this platform registers no source for at all
+    /// ([`PlatformCapabilitySurface::declaring`] pads those). The status is
+    /// restricted to the four absence projections of
     /// `ProviderFailure::capability_status`
     /// ([`PlatformSource::is_absence_projection`]); runtime transients are not
     /// static commitments.
@@ -115,6 +119,79 @@ impl PlatformCapabilitySurface {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Declare one platform's complete layer-B surface from the lanes its
+    /// adapter registers a provider for.
+    ///
+    /// `registered` names every identity the adapter registers a provider
+    /// identity for, with its honest static source:
+    ///
+    /// - [`PlatformSource::Present`] - the registered provider really serves
+    ///   the capability;
+    /// - [`PlatformSource::Absent`] - a registered provider that can only answer
+    ///   a typed absence (a registered-pending lane).
+    ///
+    /// Every other product-expected identity answers
+    /// [`PlatformSource::Absent`] with [`CapabilityStatus::Unsupported`]: the
+    /// adapter registers no source for it, so the honest static fact is the
+    /// unsupported absence, never a silent omission. The identity set therefore
+    /// comes from [`CapabilityId::EXPECTED_SURFACE`], the one authority for
+    /// "which capabilities the product answers for", and the result never
+    /// answers [`PlatformSource::Undeclared`] for an expected capability.
+    ///
+    /// A declaration outside the expected surface is kept verbatim: an adapter
+    /// may register a vendor/diagnostic lane, and the surface stays a truthful
+    /// mirror of the registrations instead of dropping it.
+    #[must_use]
+    pub fn declaring(
+        platform: PlatformAxis,
+        registered: &[(CapabilityId, PlatformSource)],
+    ) -> Self {
+        let mut surface = Self::new();
+        for capability in CapabilityId::EXPECTED_SURFACE {
+            let source = registered
+                .iter()
+                .find(|(candidate, _)| *candidate == capability)
+                .map_or(
+                    PlatformSource::Absent(CapabilityStatus::Unsupported),
+                    |(_, source)| *source,
+                );
+            surface.declare(platform, capability, source);
+        }
+        for (capability, source) in registered {
+            if !capability.is_expected() {
+                surface.declare(platform, capability.clone(), *source);
+            }
+        }
+        surface
+    }
+
+    /// Number of declared `(platform, capability)` pairs.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Whether no pair is declared at all.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// How many of this platform's declared pairs are `Present`.
+    ///
+    /// This is the count of capabilities the adapter registers a real source
+    /// for; registered-pending and unregistered lanes are excluded because
+    /// their honest static source is `Absent`.
+    #[must_use]
+    pub fn present_count(&self, platform: PlatformAxis) -> usize {
+        self.entries
+            .iter()
+            .filter(|((declared_platform, _), source)| {
+                *declared_platform == platform && **source == PlatformSource::Present
+            })
+            .count()
     }
 
     /// Declare one platform's source commitment, replacing and returning any

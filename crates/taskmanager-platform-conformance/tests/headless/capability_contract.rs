@@ -183,3 +183,116 @@ fn surface_descriptors_reject_fabricated_attribution_and_success() {
         .is_err()
     );
 }
+
+/// The layer-B declaration and the live catalog must agree in both directions:
+/// the declared-present lane is registered, the registered lane is declared,
+/// and a registered-pending lane is declared with its typed absence.
+#[test]
+fn catalog_surface_accepts_a_declaration_that_mirrors_the_catalog() {
+    let registered = [
+        ("telemetry.cpu", "fixture.system.cpu"),
+        ("process.list", "fixture.process.list"),
+    ];
+    let surface = PlatformCapabilitySurface::declaring(
+        PlatformAxis::Linux,
+        &[
+            (CapabilityId::TELEMETRY_CPU, PlatformSource::Present),
+            (
+                CapabilityId::PROCESS_LIST,
+                PlatformSource::absent(CapabilityStatus::Unsupported).expect("admissible absence"),
+            ),
+        ],
+    );
+    assert_eq!(
+        assert_capability_surface_matches_catalog(
+            &fresh_snapshot(&registered),
+            &surface,
+            PlatformAxis::Linux,
+            "fixture.",
+        ),
+        Ok(())
+    );
+
+    // Every expected identity is declared: no silent absence is left.
+    for expected in CapabilityId::EXPECTED_SURFACE {
+        assert_ne!(
+            surface.source(PlatformAxis::Linux, &expected),
+            PlatformSource::Undeclared
+        );
+    }
+}
+
+/// A `Present` declaration without a registered descriptor is the forbidden
+/// fabricated source.
+#[test]
+fn catalog_surface_rejects_a_present_declaration_without_a_registration() {
+    let registered = [("telemetry.cpu", "fixture.system.cpu")];
+    let surface = PlatformCapabilitySurface::declaring(
+        PlatformAxis::Linux,
+        &[
+            (CapabilityId::TELEMETRY_CPU, PlatformSource::Present),
+            (CapabilityId::TELEMETRY_PRESSURE, PlatformSource::Present),
+        ],
+    );
+    assert!(
+        assert_capability_surface_matches_catalog(
+            &fresh_snapshot(&registered),
+            &surface,
+            PlatformAxis::Linux,
+            "fixture.",
+        )
+        .is_err(),
+        "a declared source must exist in the catalog"
+    );
+}
+
+/// An empty declaration is the silent-absence shape M3.2 forbids.
+#[test]
+fn catalog_surface_rejects_an_undeclared_expected_capability() {
+    assert!(
+        assert_capability_surface_matches_catalog(
+            &fresh_snapshot(&[]),
+            &PlatformCapabilitySurface::new(),
+            PlatformAxis::Linux,
+            "fixture.",
+        )
+        .is_err(),
+        "Undeclared must never pass as the declared surface"
+    );
+}
+
+/// A registration owned by another platform identity is not this adapter's
+/// source, and a fabricated vendor typed absence is still rejected.
+#[test]
+fn catalog_surface_rejects_foreign_attribution_and_fabricated_absences() {
+    let registered = [("telemetry.cpu", "other.system.cpu")];
+    let surface = PlatformCapabilitySurface::declaring(
+        PlatformAxis::Linux,
+        &[(CapabilityId::TELEMETRY_CPU, PlatformSource::Present)],
+    );
+    assert!(
+        assert_capability_surface_matches_catalog(
+            &fresh_snapshot(&registered),
+            &surface,
+            PlatformAxis::Linux,
+            "fixture.",
+        )
+        .is_err(),
+        "a lane must be attributed to its own adapter prefix"
+    );
+
+    let mut descriptors: Vec<CapabilityDescriptor> = fresh_snapshot(&[]).iter().cloned().collect();
+    descriptors.push(CapabilityDescriptor::typed_absence(CapabilityId::owned(
+        "vendor.probe",
+    )));
+    assert!(
+        assert_capability_surface_matches_catalog(
+            &CapabilitySnapshot::from_descriptors(descriptors),
+            &PlatformCapabilitySurface::declaring(PlatformAxis::Linux, &[]),
+            PlatformAxis::Linux,
+            "fixture.",
+        )
+        .is_err(),
+        "a vendor identity is never silently absent on the product surface"
+    );
+}

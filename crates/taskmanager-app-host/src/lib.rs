@@ -17,7 +17,8 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_platform_contract::{
-    InProcessCaptureFn, InstanceEvent, InstanceFailure, InstanceRole, TrayController, TrayFailure,
+    InProcessCaptureFn, InstanceEvent, InstanceFailure, InstanceRole, PlatformCapabilitySurface,
+    TrayController, TrayFailure,
 };
 use taskmanager_platform_native::{
     NativePlatformRuntime, history_lock_holder_is_gone, native_config_path, native_history_dir,
@@ -75,6 +76,18 @@ pub fn spawn_tray(
     events: std::sync::mpsc::Sender<taskmanager_core::core::tray::TrayEvent>,
 ) -> Result<Box<dyn TrayController>, TrayFailure> {
     taskmanager_platform_native::tray::spawn_tray(spec, events)
+}
+
+/// The selected native adapter's static capability registration surface (layer
+/// B of the three-axis parity ledger).
+///
+/// Frontends consume the declaration through this composition edge exactly like
+/// every other native seam. It is static declaration data - never an
+/// operating-system read: runtime availability stays in the capability catalog
+/// snapshot, which platform conformance checks separately.
+#[must_use]
+pub fn native_capability_surface() -> PlatformCapabilitySurface {
+    taskmanager_platform_native::capability_surface()
 }
 
 pub fn acquire_single_instance(

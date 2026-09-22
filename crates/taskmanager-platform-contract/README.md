@@ -57,6 +57,11 @@ three-axis parity ledger folds against: `Present`, a typed
 `Absent(CapabilityStatus)` restricted to the four absence projections, or the
 forbidden silent `Undeclared`. It is a declaration, never a runtime status;
 runtime availability stays with the catalog snapshot and platform conformance.
+`PlatformCapabilitySurface::declaring` is the layer-B constructor adapters use
+next to their real route/provider registration: it takes the lanes the adapter
+registers with their honest source and pads every other product-expected
+identity with the unsupported absence, so the declaration covers the complete
+expected face and `Undeclared` never hides a missing lane.
 
 ## Module map
 

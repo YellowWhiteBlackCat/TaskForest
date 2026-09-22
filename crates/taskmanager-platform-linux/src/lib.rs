@@ -142,6 +142,7 @@ pub use engine::storage_health::{
     parse_mountinfo, parse_xfs_health_output,
 };
 pub use platform_handle::{LinuxPlatformRuntime, NativePlatformRuntime};
+pub use provider::capability_surface;
 
 #[cfg(test)]
 #[path = "../tests/common/test_support.rs"]
