@@ -591,9 +591,15 @@ fn the_committed_feature_evidence_table_is_structurally_clean() {
     assert_eq!(cells.len(), count, "one row per (feature, frontend) cell");
 }
 
-/// The first batch is a conscious census: four features, each anchored on every
-/// frontend, plus the surveyed pending gaps. Growing the batch must move this
-/// pin in the same change.
+/// The anchored batches are a conscious census: the first batch anchors four
+/// features on every frontend; the second batch (W14-A) anchors eight further
+/// features on the frontends whose delivered surface a real test proves
+/// (`gpu.engine-utilization`, `memory.breakdown-rss-pss`,
+/// `storage.device-topology`, `services.inventory`,
+/// `security.posix-capabilities`, `security.sandbox-detection`,
+/// `hardware.heterogeneous-cores`, `hardware.core-frequency`). The
+/// per-frontend anchored counts and the surveyed pending gaps are pinned, so
+/// growing either batch must move this pin in the same change.
 #[test]
 fn the_first_anchor_batch_is_a_conscious_census() {
     let table = PLATFORM_GATE_POLICY.feature_evidence();
@@ -614,12 +620,28 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        16,
+        31,
         "the anchored batch census moved"
     );
+    for (frontend, anchored) in [
+        (FrontendShape::Gpui, 7usize),
+        (FrontendShape::Iced, 8),
+        (FrontendShape::Tui, 11),
+        (FrontendShape::Bevy, 5),
+    ] {
+        assert_eq!(
+            table
+                .rows_for(frontend)
+                .filter(|row| row.is_anchored())
+                .count(),
+            anchored,
+            "{}: the anchored census moved",
+            frontend.name()
+        );
+    }
     assert_eq!(
         table.pending_count(),
-        2,
+        6,
         "the surveyed pending-gap census moved"
     );
     for row in table.rows().iter().filter(|row| !row.is_anchored()) {

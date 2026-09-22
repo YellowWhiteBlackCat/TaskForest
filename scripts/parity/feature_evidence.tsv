@@ -30,6 +30,18 @@
 # `services.dependency-dag`.  The anchor proves the shape's delivered surface
 # for that feature (the P1 semantic specification owns "what counts as
 # delivered"; this table owns "a real test exists and resolves").
+
+# Second anchored batch (2026-09-22, W14-A): eight further features whose
+# delivered surface exists on the frontends listed below and whose whole
+# `Requires` capability set is `Present` on the Linux source lane -
+# `gpu.engine-utilization`, `memory.breakdown-rss-pss`,
+# `storage.device-topology`, `services.inventory`,
+# `security.posix-capabilities`, `security.sandbox-detection`,
+# `hardware.heterogeneous-cores`, `hardware.core-frequency`.  Every anchor was
+# hand-verified against the feature's semantic specification (the P1
+# `delivery_definition`) and checked by membership in `cargo nextest list`.
+# A frontend with no test proving the shape's delivered surface stays
+# unanchored; a surveyed near-miss is recorded below as an explicit gap.
 feature_id	frontend	test_id	status	note
 handles.enumeration	gpui	gpui_app::process_insights::view::open_files::tests::populated_open_files_render_with_unreadable_marker	anchored	-
 handles.enumeration	iced	ui::insights::tests::open_file_row_marks_an_unreadable_target_not_blank	anchored	-
@@ -47,5 +59,24 @@ services.dependency-dag	gpui	gpui_app::services_view::details_state::tests::deta
 services.dependency-dag	iced	app::tests::service_details::service_details_entry_projects_lifecycle_and_dependency_facts	anchored	-
 services.dependency-dag	tui	ui::tests::service_details_render::a_resolved_dependency_capture_paints_its_relation_targets	anchored	-
 services.dependency-dag	bevy	pages::services::service_dependencies_tests::dependencies_panel_renders_relations_scene	anchored	-
+gpu.engine-utilization	gpui	gpui_app::perf_views::gpu_engines_panel::tests::mc04_gpu_panel_case_ready_session_renders_only_the_matching_session_payload	anchored	-
+gpu.engine-utilization	iced	ui::perf_devices::tests::gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact	anchored	-
+gpu.engine-utilization	tui	ui::perf_gpu::tests::standard_engine_projection_includes_live_and_pmu_rows	anchored	-
+memory.breakdown-rss-pss	gpui	processes_view_test::memory_projection_prefers_current_pss_and_falls_back_to_typed_rss	anchored	-
+memory.breakdown-rss-pss	iced	ui::tests::pages::apps_resource_projection_preserves_typed_pss_swap_and_measured_zero	anchored	-
+memory.breakdown-rss-pss	tui	ui::tests::process_render::apps_table_projects_typed_pss_and_swap_without_zero_fallbacks	anchored	-
+storage.device-topology	iced	ui::tests::devices::disk_summary_projects_real_rates_active_time_smart_and_partition_space	anchored	-
+storage.device-topology	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
+services.inventory	iced	ui::tests::pages::service_projection_preserves_fixture_rows_and_typed_status	anchored	-
+services.inventory	tui	ui::tests::service_details_render::the_selected_service_renders_its_state_triplet	anchored	-
+security.posix-capabilities	tui	ui::process_details::insights::tests::insights_lines_renders_capabilities_with_warning_markers	anchored	-
+security.sandbox-detection	bevy	pages::processes::details::tests::isolation_summary_exposes_sandboxed_and_container_dimensions	anchored	-
+hardware.heterogeneous-cores	gpui	gpui_app::cpu_view::topology_tests::hybrid_core_counts_render_as_separate_aligned_rows	anchored	-
+hardware.heterogeneous-cores	tui	ui::perf_core_grid::tests::grouped_grid_headers_carry_the_typed_labels_and_counts	anchored	-
+hardware.core-frequency	tui	ui::perf_core_grid::tests::the_cell_readout_is_utilization_frequency_temperature	anchored	-
 storage.smart-health	bevy	-	pending	no Bevy test asserts the SMART evidence rows (availability, spare, power-on hours, unsafe shutdowns); only the self-test arming flow is covered
 storage.swap-throughput	bevy	-	pending	no Bevy test asserts the system swap-in/swap-out throughput rows; the composition bar test only folds totals
+services.inventory	gpui	-	pending	no GPUI test asserts the inventory rows' typed active state; the row-memo test asserts name order only and the context-menu test proves lifecycle actions
+storage.device-topology	gpui	-	pending	no GPUI test asserts the painted partition rows; the disk-page layout case mounts two partition children but asserts panel geometry, and the partition_stats tests prove usage formatting only
+storage.device-topology	bevy	-	pending	no Bevy test asserts the disk block's partition rows; only the device-block list and joined fact lines are covered
+gpu.engine-utilization	bevy	-	pending	no Bevy test asserts the rendered per-engine utilization rows; the performance tests cover device blocks and aggregate GPU presence only

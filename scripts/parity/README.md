@@ -101,12 +101,28 @@ cell can never carry an anchor) while G2 is untouched: a `Ready` cell without a
 committed anchor is still a finding, so the table cannot be used to make a cell
 `Ready`; it can only document a real test.
 
-First anchored batch (2026-09-22): `handles.enumeration`, `threads.topology`,
-`services.lifecycle-control`, and `services.dependency-dag`, each anchored on
-all four frontends (16 rows), plus two surveyed `pending` gaps on Bevy
-(`storage.smart-health`, `storage.swap-throughput`). Every other
-source-complete cell keeps its G2 finding until a real test is anchored; the
-batch is a bounded first delivery, never a blanket `Ready` claim.
+Anchored batches (2026-09-22):
+
+- First batch (W13-A): `handles.enumeration`, `threads.topology`,
+  `services.lifecycle-control`, and `services.dependency-dag`, each anchored on
+  all four frontends (16 rows), plus two surveyed `pending` gaps on Bevy
+  (`storage.smart-health`, `storage.swap-throughput`).
+- Second batch (W14-A): eight further features whose delivered surface exists on
+  the frontends below and whose whole `Requires` capability set is `Present` on
+  the Linux source lane - `gpu.engine-utilization` (gpui/iced/tui),
+  `memory.breakdown-rss-pss` (gpui/iced/tui), `storage.device-topology`
+  (iced/tui), `services.inventory` (iced/tui), `security.posix-capabilities`
+  (tui), `security.sandbox-detection` (bevy),
+  `hardware.heterogeneous-cores` (gpui/tui), and `hardware.core-frequency`
+  (tui) - 15 rows. Anchors are partial by design: a frontend stays unanchored
+  where no test proves the shape's delivered surface, and four further
+  surveyed near-misses are recorded as `pending` (GPUI services-inventory and
+  device-topology, Bevy device-topology and engine-utilization).
+
+The table now carries **31 anchored + 6 `pending`** rows (per frontend: gpui 7,
+iced 8, tui 11, bevy 5 anchored). Every other source-complete cell keeps its G2
+finding until a real test is anchored; the batches are a bounded delivery,
+never a blanket `Ready` claim.
 
 ## Unified interaction matrix
 
