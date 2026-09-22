@@ -52,30 +52,32 @@ fn sample_process(pid: u32, name: &str, user: &str, cmdline: &str) -> ProcessIte
 }
 
 fn sample_hardware() -> HardwareInfo {
-    let mut hw = HardwareInfo::default();
-    hw.os_name = Some("Linux".to_owned());
-    hw.os_version = Some("6.8.0-generic".to_owned());
-    hw.kernel_version = Some("6.8.0".to_owned());
-    hw.hostname = Some("secret-workstation".to_owned());
-    hw.architecture = Some("x86_64".to_owned());
-    hw.cpu_brand = Some("Test Processor 8-Core".to_owned());
-    hw.cpu_cores = Some(8);
-    hw.sockets = Some(1);
-    hw.base_freq_mhz = Some(3600);
-    hw.total_memory_mb = Some(16384);
-    hw
+    HardwareInfo {
+        os_name: Some("Linux".to_owned()),
+        os_version: Some("6.8.0-generic".to_owned()),
+        kernel_version: Some("6.8.0".to_owned()),
+        hostname: Some("secret-workstation".to_owned()),
+        architecture: Some("x86_64".to_owned()),
+        cpu_brand: Some("Test Processor 8-Core".to_owned()),
+        cpu_cores: Some(8),
+        sockets: Some(1),
+        base_freq_mhz: Some(3600),
+        total_memory_mb: Some(16384),
+        ..HardwareInfo::default()
+    }
 }
 
 fn sample_snapshot() -> SystemSnapshot {
-    let mut snap = SystemSnapshot::default();
-    snap.timestamp_ms = 1_700_000_000_000;
-    snap.uptime_secs = 3600;
-    snap.telemetry_sources = vec![SourceStatus {
-        provider: ProviderId::borrowed("procfs"),
-        outcome: SourceOutcome::Available,
-        item_count: 1,
-    }];
-    snap
+    SystemSnapshot {
+        timestamp_ms: 1_700_000_000_000,
+        uptime_secs: 3600,
+        telemetry_sources: vec![SourceStatus {
+            provider: ProviderId::borrowed("procfs"),
+            outcome: SourceOutcome::Available,
+            item_count: 1,
+        }],
+        ..SystemSnapshot::default()
+    }
 }
 
 fn sample_capabilities() -> TestCapabilities {
@@ -167,9 +169,11 @@ fn diagnostic_bundle_plan_redacts_usernames_paths_and_ips() {
     let snap = sample_snapshot();
     let caps = sample_capabilities();
 
-    let mut config = Config::default();
-    config.skin = "/opt/secret_developer/custom_theme".to_owned();
-    config.mono_font = "192.168.10.25".to_owned();
+    let config = Config {
+        skin: "/opt/secret_developer/custom_theme".to_owned(),
+        mono_font: "192.168.10.25".to_owned(),
+        ..Config::default()
+    };
 
     let proc = sample_process(
         4242,

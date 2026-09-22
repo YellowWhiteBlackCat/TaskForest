@@ -1,5 +1,5 @@
 use super::formatting::{
-    environment_preview_lines, format_env_entry, format_open_file_row, open_files_preview_lines,
+    environment_preview_lines, format_open_file_row, open_files_preview_lines,
 };
 use super::formatting::{
     format_capability_line, format_capability_row, format_engine_cycles, format_engine_time,
