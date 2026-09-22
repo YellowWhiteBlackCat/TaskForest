@@ -11,6 +11,18 @@
 [profile.default]
 test-threads = 4
 
+# The `taskmanager-platform-linux` `throughput` target is a `harness = false`
+# bench, not a libtest test binary: it prints its own `RESULT<TAB>name<TAB>ns`
+# trend lines for scripts/quality/bench-gate.sh and cannot answer nextest's
+# `--list` protocol, which aborts `cargo nextest list/run --all-targets` with
+# "creating test list failed". It is a `cargo bench` target, never a nextest
+# test target, so exclude it here at the repository level: the filter is a
+# binary-level predicate, which nextest evaluates before listing the binary,
+# and every command-line filterset (e.g. CI's explicit `-E`) is intersected
+# with it rather than replacing it. `--ignore-default-filter` remains the
+# explicit opt-out.
+default-filter = 'not binary_id(taskmanager-platform-linux::bench/throughput)'
+
 [profile.ci]
 # Stop scheduling work after the first failing test. This keeps PR and local
 # standard feedback bounded; acceptance matrices that need a complete receipt
