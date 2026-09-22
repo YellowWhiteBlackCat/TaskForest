@@ -721,7 +721,7 @@ pub fn health_score_summary(score: &SystemHealthScore) -> String {
     )
 }
 
-/// Render the process executable/argv[0] mismatch warning using the shared
+/// Render the process executable/`argv[0]` mismatch warning using the shared
 /// application comparison. It is intentionally an optional line: no warning
 /// is emitted unless both physical path and command line were observed.
 #[must_use]
