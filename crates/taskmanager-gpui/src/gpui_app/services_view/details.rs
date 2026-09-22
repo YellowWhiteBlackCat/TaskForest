@@ -317,6 +317,18 @@ pub fn render_details(
         })
 }
 
+/// Attach the stream-line frame selector in test builds; production builds keep
+/// the row untouched so the index capture stays warning-free without the feature.
+#[cfg(any(test, feature = "test-support"))]
+fn with_log_line_selector(row: Div, index: usize) -> Div {
+    row.debug_selector(move || format!("tm-svc-log-line:{index}"))
+}
+
+#[cfg(not(any(test, feature = "test-support")))]
+fn with_log_line_selector(row: Div, _index: usize) -> Div {
+    row
+}
+
 pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div {
     let panel = CardSurface::new(theme.palette())
         .padding(tokens::SPACE_8)
@@ -353,8 +365,7 @@ pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div
                         .child(line);
                     // One selector per painted stream line: a frame test can
                     // count the rows that survived the shared level filter.
-                    #[cfg(any(test, feature = "test-support"))]
-                    let row = row.debug_selector(move || format!("tm-svc-log-line:{index}"));
+                    let row = with_log_line_selector(row, index);
                     row
                 })),
         ),
