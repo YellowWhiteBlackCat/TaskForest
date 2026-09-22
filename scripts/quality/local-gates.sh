@@ -531,9 +531,24 @@ if maybe capture-isolation; then
     fi
 fi
 
+if maybe parity-declaration-self; then
+    # Declared surface decisions must not contradict the crate's own
+    # implementation; the self-test proves this guard is not a rubber stamp.
+    run_stage parity-declaration-self quick run_py scripts/quality/test_parity_declaration_consistency.py
+fi
+if maybe parity-declaration; then
+    run_stage parity-declaration quick run_py scripts/quality/parity_declaration_consistency.py
+fi
+
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 
 # ---- standard --------------------------------------------------------
+if maybe module-map-self; then
+    run_stage module-map-self standard run_py scripts/quality/module_map_guard.py --self-test
+fi
+if maybe module-map; then
+    run_stage module-map standard run_py scripts/quality/module_map_guard.py
+fi
 if maybe ui-route; then
     # This diff-only route is intentionally first: a UI change without the
     # required headless/capture mode should fail before compiling the workspace.

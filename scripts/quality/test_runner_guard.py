@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Enforce the repository's nextest and four-job test-runner policy."""
+"""Enforce the repository's nextest and four-job test-runner policy.
+
+The guard rejects real test invocations, not prose mentions. It inspects only
+executable contexts: script-like files (shell, Makefile, justfile, PKGBUILD and
+CI/TOML/YAML configuration) in full minus their comment lines, and Bash/Sh/
+Console/Shell (or untagged) fenced code blocks inside Markdown and Rust
+sources. Inline code spans, fences in other languages, prose, and comment lines
+are mentions and are ignored.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +22,9 @@ from pathlib import Path
 GUARD_PATH = "scripts/quality/test_runner_guard.py"
 COMMAND_SUFFIXES = {".bash", ".md", ".rs", ".sh", ".toml", ".yaml", ".yml"}
 COMMAND_FILENAMES = {"Makefile", "PKGBUILD", "justfile"}
+FENCE_MARKERS = ("```", "~~~")
+SCRIPT_FENCE_LANGUAGES = {"", "bash", "sh", "console", "shell"}
+CONFIG_COMMENT_PREFIXES = ("#", "//")
 CARGO_GLOBAL = (
     r"(?:\s+(?:\+\S+|--locked|--frozen|--offline|--quiet|--verbose|"
     r"--color(?:=|\s+)\S+|--config(?:=|\s+)\S+|-Z\s+\S+))*"
@@ -58,72 +69,131 @@ def repository_files(root: Path) -> list[Path]:
     ]
 
 
-def logical_lines(source: str) -> list[tuple[int, str]]:
-    """Join shell/Rust-doc continuation lines while retaining the start line."""
+def numbered_lines(source: str) -> list[tuple[int, str]]:
+    """Pair each source line with its 1-based number so findings keep real lines."""
 
-    records: list[tuple[int, str]] = []
+    return list(enumerate(source.splitlines(), start=1))
+
+
+def logical_lines(records: list[tuple[int, str]]) -> list[tuple[int, str]]:
+    """Join shell/Rust-doc continuation lines while retaining the start line.
+
+    Input records already carry the file's original line numbers; joining never
+    renumbers a finding to the position it happens to occupy once comment lines
+    have been removed.
+    """
+
+    joined: list[tuple[int, str]] = []
     pending: list[str] = []
     start = 1
-    for number, line in enumerate(source.splitlines(), start=1):
+    for number, line in records:
         if not pending:
             start = number
         pending.append(line)
         if not line.rstrip().endswith("\\"):
-            records.append((start, " ".join(pending)))
+            joined.append((start, " ".join(pending)))
             pending = []
     if pending:
-        records.append((start, " ".join(pending)))
-    return records
+        joined.append((start, " ".join(pending)))
+    return joined
 
 
-def mask_outside_backticks(source: str) -> str:
-    """Keep Rust/doc inline code and preserve original line numbers."""
+def fence_language(stripped: str) -> tuple[str, str] | None:
+    """Classify a fence line as ``(marker, language)`` or ``None``.
 
-    masked: list[str] = []
-    in_code = False
-    for character in source:
-        if character == "`":
-            in_code = not in_code
-            masked.append(character)
-        elif character == "\n":
-            masked.append(character)
-        else:
-            masked.append(character if in_code else " ")
-    return "".join(masked)
+    A longer run of the marker character yields an empty language so it can be
+    recognized as a closing or informational fence without a shell tag.
+    """
+
+    for marker in FENCE_MARKERS:
+        if stripped.startswith(marker):
+            rest = stripped[len(marker) :].strip()
+            if not rest:
+                return marker, ""
+            token = rest.split()[0]
+            if set(token) == {marker[0]}:
+                return marker, ""
+            return marker, token.lower()
+    return None
 
 
-def markdown_code(source: str) -> str:
-    """Keep fenced and inline Markdown code while preserving line numbers."""
+def fence_closes(stripped: str, marker: str) -> bool:
+    """Return whether ``stripped`` closes a fence opened with ``marker``."""
 
+    if not stripped.startswith(marker):
+        return False
+    return set(stripped[len(marker) :].strip()) <= {marker[0]}
+
+
+def strip_rust_comment(line: str) -> str:
+    """Blank a leading Rust comment marker while keeping line numbers."""
+
+    leading = line[: len(line) - len(line.lstrip())]
+    stripped = line.lstrip()
+    for marker in ("///", "//!", "//"):
+        if stripped.startswith(marker):
+            return f"{leading}{' ' * len(marker)}{stripped[len(marker) :]}"
+    if stripped.startswith("* "):
+        return f"{leading} {stripped[1:]}"
+    return line
+
+
+def markdown_code(source: str, line_view=None) -> str:
+    """Keep only lines inside executable fenced code blocks.
+
+    ``line_view`` optionally blanks a host-language comment marker (Rust) so
+    fences and commands written in doc comments stay visible. Fences tagged
+    with a language other than Bash/Sh/Console/Shell are treated as
+    non-executable and masked in full.
+    """
+
+    view = line_view or (lambda line: line)
     output: list[str] = []
-    in_fence = False
-    for line in source.splitlines(keepends=True):
-        stripped = line.lstrip()
-        if stripped.startswith("```") or stripped.startswith("~~~"):
-            in_fence = not in_fence
-            output.append("\n" if line.endswith("\n") else "")
-        elif in_fence:
-            output.append(line)
+    fence_marker: str | None = None
+    executable = False
+    for line in source.splitlines():
+        seen = view(line)
+        stripped = seen.lstrip()
+        if fence_marker is None:
+            output.append("")
+            fence = fence_language(stripped)
+            if fence is not None:
+                fence_marker, language = fence
+                executable = language in SCRIPT_FENCE_LANGUAGES
+            continue
+        if fence_closes(stripped, fence_marker):
+            fence_marker = None
+            executable = False
+            output.append("")
+        elif executable and not stripped.startswith("#"):
+            output.append(seen)
         else:
-            output.append(mask_outside_backticks(line))
-    return "".join(output)
+            output.append("")
+    return "\n".join(output)
 
 
-def command_source(path: str, source: str) -> str:
-    """Return only command-bearing text for a tracked file."""
+def command_source(path: str, source: str) -> list[tuple[int, str]]:
+    """Return numbered command-bearing lines for a tracked file.
+
+    Each record keeps the file's original 1-based line number, so a finding
+    still points at the real line after comment lines are removed instead of
+    being renumbered by the surviving text.
+    """
 
     if path == GUARD_PATH:
-        return ""
+        return []
     file_path = Path(path)
     if file_path.suffix not in COMMAND_SUFFIXES and file_path.name not in COMMAND_FILENAMES:
-        return ""
+        return []
     if file_path.suffix == ".md":
-        return markdown_code(source)
+        return numbered_lines(markdown_code(source))
     if file_path.suffix == ".rs":
-        return mask_outside_backticks(source)
-    return "\n".join(
-        line for line in source.splitlines() if not line.lstrip().startswith(("#", "//"))
-    )
+        return numbered_lines(markdown_code(source, strip_rust_comment))
+    return [
+        (number, line)
+        for number, line in numbered_lines(source)
+        if not line.lstrip().startswith(CONFIG_COMMENT_PREFIXES)
+    ]
 
 
 def command_segments(line: str) -> list[tuple[re.Match[str], str]]:
@@ -142,9 +212,12 @@ def command_segments(line: str) -> list[tuple[re.Match[str], str]]:
     return segments
 
 
-def validate_text(path: str, source: str) -> list[Finding]:
+def validate_text(
+    path: str, source: str | list[tuple[int, str]]
+) -> list[Finding]:
+    records = numbered_lines(source) if isinstance(source, str) else source
     findings: list[Finding] = []
-    for line_number, line in logical_lines(source):
+    for line_number, line in logical_lines(records):
         for match, tail in command_segments(line):
             command = match.group(0)
             if DIRECT_TEST.fullmatch(command):
@@ -205,6 +278,9 @@ def validate(root: Path) -> list[Finding]:
 
 
 def self_test() -> None:
+    def scan(name: str, source: str) -> list[Finding]:
+        return validate_text(name, command_source(name, source))
+
     compliant = """
 cargo nextest run --locked --workspace -j 4
 cargo llvm-cov nextest --workspace --profile ci --test-threads=4
@@ -239,6 +315,81 @@ cargo test --locked --doc --workspace -j 4
         "sample",
         "cargo nextest run --workspace \\\n+--features test-support -j 4",
     )
+
+    # Prose and inline code spans are mentions, never invocations.
+    assert not scan(
+        "guide.md",
+        "# Guide\n"
+        "Bare cargo test is rejected; write `cargo test` never.\n"
+        "Also `cargo nextest run --workspace` misses its job count.\n",
+    )
+    assert not scan("lib.rs", "//! Use `cargo test` never.\n")
+
+    # A real bare cargo test inside a bash fence is still rejected.
+    assert [item.code for item in scan("guide.md", "```bash\ncargo test -p package\n```\n")] == [
+        "TEST001"
+    ]
+
+    # A comment line inside a bash fence is only a mention.
+    assert not scan(
+        "guide.md",
+        "```bash\n# cargo test is forbidden\ncargo nextest run -j 4\n```\n",
+    )
+
+    # Non-executable fences and Rust doc-comment fences are handled by tag.
+    assert not scan("guide.md", '```rust\nfn main() { let _ = "cargo test"; }\n```\n')
+    assert [
+        item.code
+        for item in scan("lib.rs", "//! ```bash\n//! cargo test\n//! ```\n")
+    ] == ["TEST001"]
+    assert not scan("lib.rs", "//! ```bash\n//! # cargo test\n//! ```\n")
+
+    # Doctest whitelist and the mandatory job count survive context filtering.
+    assert not scan("guide.md", "```sh\ncargo test --locked --doc --workspace -j 4\n```\n")
+    assert [item.code for item in scan("guide.md", "```sh\ncargo test --doc --workspace\n```\n")] == [
+        "TEST002"
+    ]
+    assert [
+        item.code
+        for item in scan("guide.md", "```console\ncargo nextest run --workspace\n```\n")
+    ] == ["TEST003"]
+
+    # Script-like files are executable in full, minus their comment lines.
+    assert not scan("run.sh", "#!/bin/sh\n# cargo test -p package\ncargo nextest run -j 4\n")
+    assert [item.code for item in scan("run.sh", "cargo test -p package\n")] == ["TEST001"]
+    assert not scan("policy.toml", "# cargo test -p package\n")
+    assert [item.code for item in scan("policy.toml", "command = \"cargo test -p package\"\n")] == [
+        "TEST001"
+    ]
+
+    # Findings keep the file's real line even when comment lines are removed.
+    assert [
+        (item.code, item.line)
+        for item in scan(
+            "run.sh",
+            "#!/bin/sh\n"
+            "# cargo test -p package\n"
+            "# another mention\n"
+            "cargo test -p package\n",
+        )
+    ] == [("TEST001", 4)]
+    assert [
+        (item.code, item.line)
+        for item in scan("policy.toml", "# mention\ncommand = \"cargo nextest run\"\n")
+    ] == [("TEST003", 2)]
+    assert [
+        (item.code, item.line)
+        for item in scan("guide.md", "prose\n```bash\ncargo test -p package\n```\n")
+    ] == [("TEST001", 3)]
+    # A continuation reports the start line of the joined command.
+    assert [
+        (item.code, item.line)
+        for item in scan(
+            "run.sh",
+            "# header\ncargo nextest run --workspace \\\n  --features test-support\n",
+        )
+    ] == [("TEST003", 2)]
+
     print("test-runner-guard self-test: PASS")
 
 
