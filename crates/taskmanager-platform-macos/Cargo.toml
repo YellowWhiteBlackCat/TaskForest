@@ -48,6 +48,11 @@ serde_json = "1.0"
 # need tray-icon's Linux GTK/libappindicator path.
 [target.'cfg(target_os = "macos")'.dependencies]
 tray-icon = { version = "0.24", default-features = false }
+# Main-thread detection for the tray spawn guard: `muda`/`tray-icon` assert the
+# application main thread, and `objc2::MainThreadMarker::new()` is the safe
+# check that turns a wrong-thread spawn into a typed `TrayFailure::WrongThread`
+# instead of a panic. Same `objc2` line the tray stack already resolves.
+objc2 = { version = "0.6", default-features = false, features = ["std"] }
 
 [dev-dependencies]
 taskmanager-platform-conformance = { path = "../taskmanager-platform-conformance" }

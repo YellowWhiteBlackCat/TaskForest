@@ -9808,6 +9808,7 @@ dependencies = [
 name = "taskmanager-platform-macos"
 version = "0.2.0"
 dependencies = [
+ "objc2 0.6.4",
  "open",
  "plist",
  "serde_json",
