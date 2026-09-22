@@ -92,8 +92,9 @@ fn the_unsupported_feature_set_is_pinned() {
 /// batch (W14-A: `gpu.engine-utilization`, `memory.breakdown-rss-pss`,
 /// `storage.device-topology`, `services.inventory`,
 /// `security.posix-capabilities`, `security.sandbox-detection`,
-/// `hardware.heterogeneous-cores`, `hardware.core-frequency` where this shape
-/// proves the delivered surface) land in `scripts/parity/feature_evidence.tsv`:
+/// `hardware.heterogeneous-cores`, `hardware.core-frequency`) plus the third
+/// batch (W15-A: `storage.smart-health`, `power.battery-inventory`,
+/// `services.log-stream`) land in `scripts/parity/feature_evidence.tsv`:
 /// every anchored `(feature, frontend)` cell folds to `Ready` on the platform
 /// axis whose static source surface is complete and carries the hand-declared
 /// nextest anchor. G2 is not relaxed: a source-complete delivery cell without a
@@ -196,7 +197,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        8,
+        11,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

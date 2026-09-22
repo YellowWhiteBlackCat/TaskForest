@@ -119,7 +119,10 @@ fn the_unsupported_feature_set_is_pinned() {
 /// nextest anchor. G2 is not relaxed: a source-complete delivery cell without a
 /// committed anchor is still refused, so the only open rule stays the evidence
 /// closure over the un-anchored remainder. The committed anchored census for
-/// this shape is pinned below; `Ready` itself stays host-derived.
+/// this shape is pinned below; `Ready` itself stays host-derived. The third
+/// survey (W15-A) added no anchor for this shape and recorded its remaining
+/// near-misses (log stream, namespace audit) as explicit `pending` gaps in the
+/// same table.
 #[test]
 fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() {
     let declaration = feature_coverage_declaration();

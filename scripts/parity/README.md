@@ -118,11 +118,27 @@ Anchored batches (2026-09-22):
   where no test proves the shape's delivered surface, and four further
   surveyed near-misses are recorded as `pending` (GPUI services-inventory and
   device-topology, Bevy device-topology and engine-utilization).
+- Third batch (W15-A): six further cells whose whole `Requires` capability set
+  is `Present` on the Linux source lane and whose delivered surface a real
+  frame/panel test proves - `storage.smart-health` (iced/tui, SMART
+  temperature + endurance + power-on rows), `storage.iops-queue-latency`
+  (tui, IOPS + latency rows), `power.battery-inventory` (iced/tui, charge +
+  power + voltage + cycle rows with honest absence), and `services.log-stream`
+  (iced, the panel's own resolved stream lines plus the level-filter control
+  reaching the shared query). Each anchor was re-read clause by clause against
+  the feature's `delivery_definition`; the clauses that stay unasserted are
+  named in the `pending` notes of the same survey (SMART spare/unsafe
+  shutdowns, the queue-depth row, battery health, thermal-zone source
+  traversal, the process-details fault and huge-page counters, the GPUI
+  battery/SMART/log surfaces, and the Bevy namespace audit). The survey added
+  `pending` rows only where a real near-miss exists; a feature with no test
+  touching its surface stays without a row.
 
-The table now carries **31 anchored + 6 `pending`** rows (per frontend: gpui 7,
-iced 8, tui 11, bevy 5 anchored). Every other source-complete cell keeps its G2
+The table now carries **37 anchored + 24 `pending`** rows (per frontend: gpui 7,
+iced 11, tui 14, bevy 5 anchored). Every other source-complete cell keeps its G2
 finding until a real test is anchored; the batches are a bounded delivery,
-never a blanket `Ready` claim.
+never a blanket `Ready` claim. A `pending` row is a survey record, not a
+delivery claim, and it never becomes an anchor.
 
 ## Unified interaction matrix
 

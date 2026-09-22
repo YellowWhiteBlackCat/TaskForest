@@ -42,6 +42,20 @@
 # `delivery_definition`) and checked by membership in `cargo nextest list`.
 # A frontend with no test proving the shape's delivered surface stays
 # unanchored; a surveyed near-miss is recorded below as an explicit gap.
+
+# Third anchored batch (2026-09-22, W15-A): six further cells whose whole
+# `Requires` capability set is `Present` on the Linux source lane and whose
+# delivered surface a real frame/panel test proves -
+# `storage.smart-health` (iced/tui), `storage.iops-queue-latency` (tui),
+# `power.battery-inventory` (iced/tui), and `services.log-stream` (iced).
+# Every anchor was hand-verified clause by clause against that feature's
+# `delivery_definition`: the receipt names the clauses each anchor proves and
+# the clauses that stay unasserted.  The same survey re-read the remaining
+# target features and records each real near-miss as an explicit `pending`
+# row (swap-throughput rates, the remaining IOPS/queue/latency rows, the GPUI
+# SMART/battery/log surfaces, the thermal-zone source traversal, the
+# process-details fault and huge-page counters, and the Bevy namespace audit);
+# a feature with no test touching its surface at all stays without a row.
 feature_id	frontend	test_id	status	note
 handles.enumeration	gpui	gpui_app::process_insights::view::open_files::tests::populated_open_files_render_with_unreadable_marker	anchored	-
 handles.enumeration	iced	ui::insights::tests::open_file_row_marks_an_unreadable_target_not_blank	anchored	-
@@ -80,3 +94,27 @@ services.inventory	gpui	-	pending	no GPUI test asserts the inventory rows' typed
 storage.device-topology	gpui	-	pending	no GPUI test asserts the painted partition rows; the disk-page layout case mounts two partition children but asserts panel geometry, and the partition_stats tests prove usage formatting only
 storage.device-topology	bevy	-	pending	no Bevy test asserts the disk block's partition rows; only the device-block list and joined fact lines are covered
 gpu.engine-utilization	bevy	-	pending	no Bevy test asserts the rendered per-engine utilization rows; the performance tests cover device blocks and aggregate GPU presence only
+storage.smart-health	iced	ui::tests::devices::disk_summary_projects_real_rates_active_time_smart_and_partition_space	anchored	-
+storage.smart-health	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
+storage.iops-queue-latency	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
+power.battery-inventory	iced	ui::tests::battery::battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_honest	anchored	-
+power.battery-inventory	tui	ui::tests::device_render::battery_detail_section_renders_capacity_status_rate_and_voltage	anchored	-
+services.log-stream	iced	app::tests::service_details::service_details_merged_log_panel_folds_its_own_stream	anchored	-
+storage.smart-health	gpui	-	pending	no GPUI test asserts the SMART readout family; the disk_stats tests cover the power-on row and the temperature trend only, so availability/endurance/spare/unsafe-shutdowns stay unproven
+storage.swap-throughput	gpui	-	pending	no GPUI test seeds or asserts the swap-in/swap-out throughput rows; the composition-card test folds swap occupancy (used/total) only
+storage.swap-throughput	iced	-	pending	no Iced test seeds or asserts the swap-in/swap-out throughput rows; the memory-stats row-set test pins the row family without them
+storage.swap-throughput	tui	-	pending	no TUI test seeds or asserts the swap-in/swap-out throughput rows; the memory-stats test renders every other measured fact
+storage.iops-queue-latency	gpui	-	pending	the only GPUI IOPS assertion is a first-sample dash; no test renders a real IOPS/queue-depth/latency value
+storage.iops-queue-latency	iced	-	pending	the disk-summary test pins the IOPS/Response/Avg-queue rows as dashes; no test renders a real value for any of the three
+power.battery-inventory	gpui	-	pending	no GPUI product test asserts charge/voltage/cycles; the perf battery_stats test proves health + estimates only, and the system_view battery_detail_rows tests fold a test-tree-only row helper no product code renders
+power.thermal-zones	gpui	-	pending	the readout test proves the CPU temperature source qualifier ("ACPI thermal zone"); no test traverses the sensor inventory and names each reading
+power.thermal-zones	iced	-	pending	the thermal-panel test asserts only that the panel appears when temperatures exist; no reading or source label is asserted
+power.thermal-zones	tui	-	pending	the fan test asserts a same-device temperature value ("54.5 °C"); the painted source label and any thermal-zone traversal are unasserted
+services.log-stream	gpui	-	pending	the details-state tests prove the typed log-state projection; no test asserts the painted stream rows or a level-filtered fold
+services.log-stream	tui	-	pending	the panel-key tests drive the shared feed state machine; no test asserts the rendered stream rows
+services.log-stream	bevy	-	pending	no single Bevy test proves the painted stream rows with a level filter applied: the panel tests cover the shell visible-entry fold, the control chords, and the export path separately
+security.namespace-audit	bevy	-	pending	the isolation-summary test covers kind/container/sandboxed only; no test sets or asserts the namespace audit entries
+memory.page-faults	iced	-	pending	the details parity test pins the PageFaults row to the VM value, which is the shared dash for its fixture; no test observes the counters
+memory.page-faults	tui	-	pending	the properties parity test pins the PageFaults row to the VM value, which is the shared dash for its fixture; no test observes the counters
+memory.transparent-huge-pages	iced	-	pending	the details parity test pins the AnonHugePages row to the VM value, which is the shared dash for its fixture; no test observes the charge
+memory.transparent-huge-pages	tui	-	pending	the properties parity test pins the AnonHugePages row to the VM value, which is the shared dash for its fixture; no test observes the charge
