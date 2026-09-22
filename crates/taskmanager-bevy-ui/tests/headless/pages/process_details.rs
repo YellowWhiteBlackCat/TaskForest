@@ -246,6 +246,124 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
 }
 
 #[test]
+fn observed_page_fault_and_huge_page_counters_reach_the_overview_rows() {
+    let mut process = ProcessItem::new(77, "faulty");
+    process.minor_page_faults = Some(1_234);
+    process.major_page_faults = Some(7);
+    let mut scalars = *process.scalar_observations();
+    scalars.memory_bytes = ScalarObservation::available(256 * 1024 * 1024, 1);
+    // `shell_with` pins RSS to 256 MiB, so 64 MiB is 25.0% RSS.
+    scalars.memory_anon_huge_pages_bytes = ScalarObservation::available(64 * 1024 * 1024, 1);
+    process.apply_scalar_observations(scalars);
+
+    let view = projection(&shell_with(process));
+    let value = |label: &'static str| {
+        view.overview
+            .iter()
+            .find(|row| row.label == taskmanager_application::i18n::t(label))
+            .map(|row| row.value.as_str())
+    };
+    assert_eq!(
+        value("proc.page_faults"),
+        Some("1234 (I/O: 7)"),
+        "the overview row must carry the observed fault counters"
+    );
+    assert_eq!(
+        value("proc.anon_huge_pages"),
+        Some("64.0 MiB (25.0% RSS)"),
+        "the overview row must carry the observed huge-page charge"
+    );
+}
+
+#[test]
+fn isolation_summary_renders_the_linux_namespace_audit() {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::failure::FailureKind;
+    use taskmanager_core::core::process_telemetry::{
+        IsolationKind, LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry,
+        NamespaceAuditStatus, ProcessIsolation,
+    };
+
+    let isolated = |inode: u64| NamespaceAuditStatus::Isolated {
+        inode,
+        host_inode: 4_026_531_836,
+    };
+    let audit = LinuxNamespaceAudit::from_entries(
+        DeviceState::healthy(1),
+        vec![
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Pid,
+                status: isolated(4_026_533_000),
+            },
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Mount,
+                status: NamespaceAuditStatus::Host {
+                    inode: 4_026_531_841,
+                },
+            },
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Network,
+                status: isolated(4_026_532_100),
+            },
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Ipc,
+                status: NamespaceAuditStatus::Unavailable(FailureKind::PermissionDenied),
+            },
+        ],
+    );
+
+    let isolation = ProcessIsolation {
+        state: DeviceState::healthy(1),
+        kind: Some(IsolationKind::Docker),
+        container_id: Some("c-abc123".into()),
+        namespaces: Some(audit.clone()),
+        ..ProcessIsolation::default()
+    };
+    let summary = super::isolation_summary(&isolation);
+    for expected in [
+        format!(
+            "{} {}",
+            LinuxNamespaceKind::Pid.as_str(),
+            t("proc_insights.namespace_isolated")
+        ),
+        format!(
+            "{} {}",
+            LinuxNamespaceKind::Mount.as_str(),
+            t("proc_insights.namespace_host")
+        ),
+        format!(
+            "{} {}",
+            LinuxNamespaceKind::Network.as_str(),
+            t("proc_insights.namespace_isolated")
+        ),
+        format!(
+            "{} {}",
+            LinuxNamespaceKind::Ipc.as_str(),
+            taskmanager_shell::presentation::MISSING_VALUE
+        ),
+        format!("2 {}", t("proc_insights.namespace_isolated_count")),
+    ] {
+        assert!(
+            summary.contains(&expected),
+            "the namespace audit must paint {expected:?}: {summary}"
+        );
+    }
+    assert_eq!(audit.isolated_count(), 2);
+    assert!(
+        summary.starts_with("Docker · c-abc123"),
+        "the typed container identity still leads the security summary: {summary}"
+    );
+
+    // No audit observed: the namespace segment stays absent rather than
+    // claiming an empty (host-like) audit.
+    let without = ProcessIsolation {
+        state: DeviceState::healthy(1),
+        ..ProcessIsolation::default()
+    };
+    assert!(!super::isolation_summary(&without).contains(t("proc_insights.namespaces")));
+}
+
+#[test]
 fn threads_summary_empty_and_populated_with_gap_honesty() {
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::process_telemetry::{

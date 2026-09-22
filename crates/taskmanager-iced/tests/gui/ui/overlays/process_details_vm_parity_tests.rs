@@ -64,6 +64,50 @@ fn vm_value(field: ProcessDetailsField) -> String {
 }
 
 #[test]
+fn observed_fault_and_huge_page_counters_reach_the_rendered_rows() {
+    use taskmanager_core::core::metrics::ScalarObservation;
+
+    // The parity fixture leaves both counter families unobserved, so the rows
+    // pinned the shared dash. Observe them explicitly: the renderer's row must
+    // carry the real counters, not a placeholder.
+    let mut item = fixture();
+    item.minor_page_faults = Some(1_234);
+    item.major_page_faults = Some(7);
+    let mut observations = *item.scalar_observations();
+    // RSS is 100 MiB in `fixture()`; 64 MiB is therefore 64.0% RSS.
+    observations.memory_anon_huge_pages_bytes = ScalarObservation::available(64 * 1024 * 1024, 42);
+    item.apply_scalar_observations(observations);
+
+    let vm = details_vm(&item, &local_time_rules());
+    assert_eq!(
+        vm_text(&vm, ProcessDetailsField::PageFaults),
+        "1234 (I/O: 7)"
+    );
+    assert_eq!(
+        vm_text(&vm, ProcessDetailsField::AnonHugePages),
+        "64.0 MiB (64.0% RSS)"
+    );
+
+    // The renderer's row fold carries the same observed counters (the output
+    // is what `property_pairs` hands the properties/overview panels).
+    let pairs = property_pairs(&item, &local_time_rules());
+    let value = |field: ProcessDetailsField| {
+        pairs
+            .iter()
+            .find(|(f, _, _)| *f == field)
+            .map(|(_, _, value)| value.as_str())
+    };
+    assert_eq!(
+        value(ProcessDetailsField::PageFaults),
+        Some("1234 (I/O: 7)")
+    );
+    assert_eq!(
+        value(ProcessDetailsField::AnonHugePages),
+        Some("64.0 MiB (64.0% RSS)")
+    );
+}
+
+#[test]
 fn property_pairs_mirror_the_neutral_vm() {
     let pairs = property_pairs(&fixture(), &local_time_rules());
     assert_eq!(pairs.len(), 24);

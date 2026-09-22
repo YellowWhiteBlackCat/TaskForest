@@ -242,6 +242,9 @@ pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
         rate(disk.current_read_bytes_per_sec()),
         rate(disk.current_write_bytes_per_sec()),
     ];
+    if let Some(iops) = disk.current_iops() {
+        parts.push(format!("{} {iops}", t("disk.iops")));
+    }
     if let Some(ms) = disk.current_response_time_ms() {
         parts.push(format!("{ms:.1} ms"));
     }
@@ -250,6 +253,12 @@ pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
     }
     if let Some(ms) = disk.current_service_time_ms() {
         parts.push(format!("{} {ms:.1} ms", t("disk.service_time")));
+    }
+    if let Some(temperature) = disk.smart_temperature_c.filter(|value| value.is_finite()) {
+        parts.push(format!(
+            "{} {temperature:.0}\u{b0}C",
+            t("common.temperature")
+        ));
     }
     for (index, temperature) in disk.smart_temperature_sensors_c.iter().enumerate() {
         if temperature.is_finite() {
@@ -261,13 +270,39 @@ pub(super) fn disk_caption(disk: &DiskMetrics) -> String {
             ));
         }
     }
+    if let Some(pct) = disk.smart_percent_used.filter(|value| value.is_finite()) {
+        parts.push(format!("{} {pct:.0}%", t("disk.endurance_used")));
+    }
     if let Some(spare) = disk.smart_available_spare_pct {
         // The warning affordance is a semantic bitmap sibling in the scene;
         // keep this dynamic text free of decoration codepoints (the tofu law).
         parts.push(format!("{} {spare:.0}%", t("disk.available_spare")));
     }
+    if let Some(hours) = disk.smart_power_on_hours {
+        let days = hours / 24;
+        parts.push(
+            t("disk.power_on_format")
+                .replace("{hours}", &hours.to_string())
+                .replace("{days}", &days.to_string()),
+        );
+    }
     if let Some(count) = disk.smart_unsafe_shutdowns {
         parts.push(format!("{} {count}", t("disk.unsafe_shutdowns")));
+    }
+    // Reported availability is an existence fact, not a measurement: when the
+    // provider reports a usable SMART state but no concrete field, the shared
+    // status fold still speaks (Iced parity), and nothing is fabricated when
+    // the section is honestly hidden.
+    if taskmanager_shell::presentation::smart_section_visible(disk)
+        && !taskmanager_shell::presentation::has_smart_fields(disk)
+    {
+        parts.push(format!(
+            "{} {}",
+            t("disk.smart_status"),
+            t(taskmanager_shell::presentation::device_status_i18n_key(
+                taskmanager_shell::presentation::effective_smart_status(disk)
+            )),
+        ));
     }
     if disk.current_read_merges_per_sec().is_some() || disk.current_write_merges_per_sec().is_some()
     {

@@ -329,6 +329,49 @@ fn partial_projection_keeps_missing_domains_on_dashes() {
     assert_eq!(section_keys(shell, Section::MemorySegments).len(), 2);
 }
 
+#[test]
+fn memory_summary_renders_the_observed_swap_throughput_rates() {
+    const MIB: u64 = 1024 * 1024;
+    const KIB: u64 = 1024;
+    let mut folded = Folded::new();
+    let at = 1_000;
+    // The kernel swap counters are two-sample rates; install the observed
+    // reads through the same typed observation group the provider applies.
+    let memory = MemoryMetrics::from_observations(
+        MemoryScalarObservations {
+            total_bytes: ScalarObservation::available(16 * GIB, at),
+            used_bytes: ScalarObservation::available(4 * GIB, at),
+            swap_in_bytes_per_sec: ScalarObservation::available(2 * MIB, at),
+            swap_out_bytes_per_sec: ScalarObservation::available(512 * KIB, at),
+            ..MemoryScalarObservations::default()
+        },
+        MemoryMetrics::default().optional_observations().clone(),
+    );
+    let cpu = cpu_metrics(20.0, &[], at);
+    folded.apply(
+        vec![cpu_outcome(1, at, cpu.clone())],
+        projection(1, cpu, memory, Vec::new()),
+    );
+
+    assert_eq!(
+        summary_value(&folded.shell, SummaryField::Memory),
+        format!(
+            "4.0 GiB / 16.0 GiB · 25.0% · {} 2.0 MiB/s · {} 512.0 KiB/s",
+            t("mem.swap_in_rate"),
+            t("mem.swap_out_rate"),
+        ),
+        "the painted memory summary must carry both observed swap rates"
+    );
+
+    // A cold window keeps both rate segments absent instead of a fabricated
+    // 0 B/s.
+    let cold = super::metrics::memory_summary(Some(&MemoryMetrics::default()));
+    assert!(
+        !cold.contains(t("mem.swap_in_rate")) && !cold.contains(t("mem.swap_out_rate")),
+        "an unobserved swap rate must not become a zero segment: {cold}"
+    );
+}
+
 // ---- curve wiring: two-sample warm rule + shared polyline projection ----
 
 #[test]
@@ -474,7 +517,7 @@ fn host_batch(sequence: u64, usage: f32, nics: Vec<NetworkMetrics>) -> PlatformE
     }
 }
 
-fn dyn_text_value(world: &mut World, field: &DynField) -> Option<String> {
+pub(super) fn dyn_text_value(world: &mut World, field: &DynField) -> Option<String> {
     let mut texts = world.query::<(&DynText, &Text)>();
     texts
         .iter(world)
@@ -482,7 +525,7 @@ fn dyn_text_value(world: &mut World, field: &DynField) -> Option<String> {
         .map(|(_, text)| text.0.clone())
 }
 
-fn block_keys(world: &mut World, section: Section) -> Vec<String> {
+pub(super) fn block_keys(world: &mut World, section: Section) -> Vec<String> {
     let mut blocks = world.query::<&DynBlock>();
     let mut keys: Vec<String> = blocks
         .iter(world)

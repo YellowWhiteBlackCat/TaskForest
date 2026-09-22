@@ -832,3 +832,7 @@ fn sync_blocks(
 #[cfg(test)]
 #[path = "../../tests/headless/pages/performance.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "../../tests/headless/pages/performance_device_rows.rs"]
+mod device_rows_tests;

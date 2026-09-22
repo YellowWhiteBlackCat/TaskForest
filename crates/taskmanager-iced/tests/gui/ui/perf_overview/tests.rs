@@ -182,6 +182,47 @@ mod memory_stats_tests {
     }
 
     #[test]
+    fn swap_throughput_rows_render_the_observed_system_rates() {
+        taskmanager_test_support::pin_english();
+        const KIB: u64 = 1024;
+
+        // The kernel swap counters are a two-sample rate, so the fixture
+        // installs the observed per-second reads through the same canonical
+        // scalar group the provider applies.
+        let mut memory = MemoryMetricsFixtureBuilder::new()
+            .current_total_bytes(16 * GIB)
+            .current_swap_total_bytes(8 * GIB)
+            .current_swap_used_bytes(GIB)
+            .build();
+        let mut scalar = *memory.scalar_observations();
+        scalar.swap_in_bytes_per_sec = ScalarObservation::available(2 * MIB, 2);
+        scalar.swap_out_bytes_per_sec = ScalarObservation::available(512 * KIB, 2);
+        memory.apply_observations(scalar, memory.optional_observations().clone());
+
+        let memory_rows = memory_stats_rows(&memory, true, true);
+        let rows = flat(&memory_rows);
+        assert!(
+            rows.contains(&("Swap in", "2.0 MiB/s")),
+            "the observed swap-in rate must render in the shared row set: {rows:?}"
+        );
+        assert!(
+            rows.contains(&("Swap out", "512.0 KiB/s")),
+            "the observed swap-out rate must render in the shared row set: {rows:?}"
+        );
+
+        // A first sample has no rate yet: both rows stay absent instead of a
+        // fabricated 0 B/s, so a cold window reads as unobserved.
+        let cold_rows_source = memory_stats_rows(&MemoryMetrics::default(), true, true);
+        let cold_rows = flat(&cold_rows_source);
+        assert!(
+            !cold_rows
+                .iter()
+                .any(|(label, _)| *label == "Swap in" || *label == "Swap out"),
+            "an unobserved swap rate must not become a zero row: {cold_rows:?}"
+        );
+    }
+
+    #[test]
     fn signed_rate_respects_the_unit_preferences() {
         taskmanager_test_support::pin_english();
         assert_eq!(
