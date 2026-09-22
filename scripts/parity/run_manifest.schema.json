@@ -1,0 +1,606 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:taskforest:parity:run-manifest:v1",
+  "title": "TaskForest cross-frontend run manifest",
+  "description": "P4/P6 run-evidence transport. The document root is the aggregated cross-frontend run manifest written by scripts/quality/cross_frontend_manifest.py; $defs/frontend_run_segment is the per-frontend input segment each frontend run writes and the aggregator folds in. Declaration data (scripts/parity/cross_frontend_manifest.tsv, scripts/parity/cross_frontend_matrix.tsv) stays the single committed authority; this schema only describes the generated run receipts and must never become a second declaration surface. Anchors are declared by hand and checked against cargo nextest discovery; run segments are produced by the accept driver (S5), never derived by scanning Rust source. Fingerprint rule: source_manifest_sha256 is the sha256 of the frontend-scoped source manifest produced by scripts/frontend_source_manifest.py; a frontend whose declared digest does not match the current one is recorded SKIP, never PASS. This schema is normative; the standard-library aggregator carries the executable mirror of its field sets and asserts that mirror against this file in --self-test.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "record_kind",
+    "generated_at",
+    "run_id",
+    "declaration_manifest",
+    "fingerprint_policy",
+    "frontends",
+    "coverage",
+    "overall_status",
+    "findings"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "description": "Version of this contract. A breaking field change increments it and updates the aggregator in the same change."
+    },
+    "record_kind": {
+      "const": "cross_frontend_run_manifest",
+      "description": "Discriminator so a consumer can tell the aggregate from a per-frontend segment."
+    },
+    "generated_at": {
+      "$ref": "#/$defs/generated_at"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Stable id of the aggregation run; also names the target/cross-frontend-evidence/<run_id>/ directory."
+    },
+    "declaration_manifest": {
+      "$ref": "#/$defs/declaration_manifest"
+    },
+    "fingerprint_policy": {
+      "$ref": "#/$defs/fingerprint_policy"
+    },
+    "frontends": {
+      "type": "object",
+      "minProperties": 1,
+      "description": "One record per frontend axis id, present or absent in this run.",
+      "propertyNames": {
+        "enum": ["gpui", "iced", "tui", "bevy"]
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/frontend_record"
+      }
+    },
+    "coverage": {
+      "$ref": "#/$defs/coverage"
+    },
+    "overall_status": {
+      "$ref": "#/$defs/status"
+    },
+    "findings": {
+      "type": "array",
+      "description": "Ordered verification findings. fail and skip findings both block --verify; note findings are informational.",
+      "items": {
+        "$ref": "#/$defs/finding"
+      }
+    }
+  },
+  "$defs": {
+    "generated_at": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$",
+      "description": "UTC timestamp in the resolver's `%Y-%m-%dT%H:%M:%SZ` shape."
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "Lowercase hex sha256 digest."
+    },
+    "sha256_or_null": {
+      "description": "null is an honest 'no fingerprint available' marker; it resolves to SKIP, never to PASS.",
+      "oneOf": [
+        {
+          "$ref": "#/$defs/sha256"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "frontend_id": {
+      "enum": ["gpui", "iced", "tui", "bevy"],
+      "description": "Frontend axis id. This is an axis identifier, not a semantic vocabulary; the declaration manifest remains the authority for which subjects each frontend declares."
+    },
+    "status": {
+      "enum": ["pass", "fail", "skip"],
+      "description": "pass = every check ran and matched; fail = a declared cell or run record contradicted itself; skip = evidence was not verifiable (for example a fingerprint mismatch) and must never be read as pass."
+    },
+    "severity": {
+      "enum": ["fail", "skip", "note"]
+    },
+    "outcome": {
+      "enum": ["ok", "pass", "fail", "error", "skipped"],
+      "description": "Cell outcome. `ok` and `pass` are the coverable outcomes (behavior and visual respectively); the rest never cover a declared cell."
+    },
+    "record_result": {
+      "enum": ["ok", "pass", "fail", "error", "skipped"],
+      "description": "Result of a discovery or test-run command record."
+    },
+    "fingerprint_state": {
+      "enum": ["match", "mismatch", "missing", "unverified", "absent"],
+      "description": "match = declared digest equals the current one; mismatch = different; missing = the segment declared null; unverified = no current fingerprint was supplied; absent = no segment ran for this frontend."
+    },
+    "worktree_state": {
+      "enum": ["clean", "dirty", "unknown"]
+    },
+    "counts": {
+      "type": "object",
+      "description": "Free-form integer counters owned by the producing command (for example discovered_tests).",
+      "additionalProperties": {
+        "type": "integer",
+        "minimum": 0
+      }
+    },
+    "io_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["command", "result", "counts"],
+      "description": "One discovery or run invocation: the exact command, its result, and its counters.",
+      "properties": {
+        "command": {
+          "type": "string",
+          "minLength": 1
+        },
+        "result": {
+          "$ref": "#/$defs/record_result"
+        },
+        "counts": {
+          "$ref": "#/$defs/counts"
+        }
+      }
+    },
+    "declaration_manifest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "sha256", "declared_cells", "expected_cells", "pending_cells"],
+      "description": "The committed declaration list this aggregate was checked against, with the digest a consumer can use to detect a stale aggregate.",
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "kind": {
+          "enum": ["interaction_matrix", "facet_manifest"]
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "declared_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_cells": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Declared rows that must produce exactly one coverable run cell (anchored interaction rows; behavior/visual facet rows)."
+        },
+        "pending_cells": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "fingerprint_policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["algorithm", "authority", "match_rule", "mismatch_policy"],
+      "description": "Mechanical freshness rule. A consumer that reads only overall_status can still tell what a skip meant from this block.",
+      "properties": {
+        "algorithm": {
+          "const": "sha256"
+        },
+        "authority": {
+          "const": "scripts/frontend_source_manifest.py",
+          "description": "The single producer of the frontend-scoped source manifest whose digest is the fingerprint."
+        },
+        "match_rule": {
+          "type": "string",
+          "minLength": 1,
+          "description": "How to compare: sha256 of the current frontend source manifest versus the segment's source_manifest_sha256."
+        },
+        "mismatch_policy": {
+          "const": "skip",
+          "description": "A mismatch, a null digest, or a missing current fingerprint makes the frontend SKIP; it never becomes PASS."
+        }
+      }
+    },
+    "frontend_counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "declared_cells",
+        "expected_cells",
+        "observed_cells",
+        "covered_cells",
+        "uncovered_cells",
+        "duplicate_cells",
+        "undeclared_cells",
+        "failed_cells",
+        "pending_cells"
+      ],
+      "properties": {
+        "declared_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "observed_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "covered_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "uncovered_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "duplicate_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "undeclared_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "pending_cells": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "segment_cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["outcome"],
+      "description": "One observed cell in a per-frontend segment. Identity: case_id (interaction row) or subject_id (facet row); a visual capture cell may instead carry scenario. Anchors are hand-declared; a segment must not emit cells for tests nobody declared.",
+      "properties": {
+        "subject_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_tag": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Reference to the Rust ContractTag enum id; this schema does not define the vocabulary."
+        },
+        "test_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "nextest test path the run executed; must not be derived from source text."
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "receipt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "$ref": "#/$defs/outcome"
+        }
+      }
+    },
+    "observed_cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["cell_key", "outcome"],
+      "description": "A segment cell normalized by the aggregator: cell_key is the declaration-side key (interaction:<case_id> | visual:<scenario> | <subject_kind>:<subject_id>).",
+      "properties": {
+        "cell_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_kind": {
+          "type": "string",
+          "minLength": 1
+        },
+        "case_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "subject_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "scenario": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contract_tag": {
+          "type": "string",
+          "minLength": 1
+        },
+        "test_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "receipt": {
+          "type": "string",
+          "minLength": 1
+        },
+        "outcome": {
+          "$ref": "#/$defs/outcome"
+        }
+      }
+    },
+    "frontend_record": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "present",
+        "overall_status",
+        "fingerprint",
+        "source_manifest_sha256",
+        "current_source_manifest_sha256",
+        "run_id",
+        "discovery",
+        "run",
+        "counts",
+        "cells",
+        "receipts"
+      ],
+      "description": "Aggregated record for one frontend. present=false means no segment ran; the discovery/run records are null and every count is zero.",
+      "properties": {
+        "present": {
+          "type": "boolean"
+        },
+        "overall_status": {
+          "$ref": "#/$defs/status"
+        },
+        "fingerprint": {
+          "$ref": "#/$defs/fingerprint_state"
+        },
+        "source_manifest_sha256": {
+          "$ref": "#/$defs/sha256_or_null"
+        },
+        "current_source_manifest_sha256": {
+          "$ref": "#/$defs/sha256_or_null"
+        },
+        "run_id": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "discovery": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/io_record"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "run": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/io_record"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "counts": {
+          "$ref": "#/$defs/frontend_counts"
+        },
+        "cells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/observed_cell"
+          }
+        },
+        "receipts": {
+          "type": "array",
+          "description": "Paths of the native receipts this segment folded in; local relative paths only.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "coverage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "expected_frontends",
+        "present_frontends",
+        "verified_frontends",
+        "skipped_frontends",
+        "absent_frontends",
+        "declared_cells",
+        "expected_cells",
+        "covered_cells"
+      ],
+      "description": "The honesty surface of the aggregate: a four-frontend claim requires all four ids under verified_frontends, never just overall_status=pass.",
+      "properties": {
+        "expected_frontends": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frontend_id"
+          }
+        },
+        "present_frontends": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frontend_id"
+          }
+        },
+        "verified_frontends": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frontend_id"
+          }
+        },
+        "skipped_frontends": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frontend_id"
+          }
+        },
+        "absent_frontends": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/frontend_id"
+          }
+        },
+        "declared_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "expected_cells": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "covered_cells": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "code", "message"],
+      "description": "A verification finding. code is a stable snake_case id; message names the frontend and cell when there is one.",
+      "properties": {
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "code": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "message": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frontend": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/frontend_id"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cell": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "frontend_run_segment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "schema_version",
+        "record_kind",
+        "frontend",
+        "run_id",
+        "generated_at",
+        "source_manifest_sha256",
+        "discovery",
+        "run",
+        "cells",
+        "overall_status"
+      ],
+      "description": "Per-frontend input segment. The S5 accept driver writes exactly one segment per frontend per run (folding its gui/lib targets); the aggregator rejects a duplicate frontend segment. A segment without a fingerprint may declare source_manifest_sha256=null, which aggregates to SKIP instead of PASS.",
+      "properties": {
+        "schema_version": {
+          "const": 1
+        },
+        "record_kind": {
+          "const": "frontend_run_segment"
+        },
+        "frontend": {
+          "$ref": "#/$defs/frontend_id"
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generated_at": {
+          "$ref": "#/$defs/generated_at"
+        },
+        "git_head": {
+          "type": "string",
+          "minLength": 1
+        },
+        "worktree": {
+          "$ref": "#/$defs/worktree_state"
+        },
+        "rust": {
+          "type": "string",
+          "minLength": 1
+        },
+        "source_manifest_sha256": {
+          "$ref": "#/$defs/sha256_or_null"
+        },
+        "source_manifest_path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "discovery": {
+          "$ref": "#/$defs/io_record"
+        },
+        "run": {
+          "$ref": "#/$defs/io_record"
+        },
+        "cells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/segment_cell"
+          }
+        },
+        "receipts": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "overall_status": {
+          "$ref": "#/$defs/status"
+        }
+      }
+    }
+  }
+}

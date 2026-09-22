@@ -17,7 +17,8 @@
 #   contract_tag       first `paths` token (the row's primary contract tag); the
 #                      resolver checks this equality.  The vocabulary authority is the
 #                      Rust ContractTag enum; never copy the tag set into TSV/Python/bash.
-#                      Bevy rows expose path tokens the enum does not fold yet: S5 work.
+#                      Bevy path tokens are folded into that enum (D5); the enum's
+#                      conformance test validates this file's tag and path columns.
 #   platform           RESERVED P5 axis; empty = frontend axis, opaque here.
 # Anchors are declared by hand (transcribed from the per-frontend matrices on
 # 2026-09-22) and verified by set membership against `cargo nextest list`; test ids
@@ -183,7 +184,7 @@ interaction	mc02-tui-disk-absent-honesty	tui	P0-MC-02	lib	ui::tests::device_rend
 interaction	mc02-tui-smart-gate	tui	P0-MC-02	lib	runtime::tests::smart_self_test::t_on_a_smart_capable_disk_arms_the_shared_confirmation_with_the_frozen_identity	success|cancel	-	success	
 interaction	mc02-tui-scan-cancel	tui	P0-MC-02	lib	runtime::tests::directory_usage::d_while_scanning_yields_directory_usage_cancel_for_the_active_scan_id	cancel	-	cancel	
 interaction	mc02-tui-directory-usage	tui	P0-MC-02	lib	ui::tests::directory_usage_render::directory_usage_renders_measured_entries_status_and_totals_when_projected	success	-	success	
-interaction	mc02-tui-hotplug	tui	P0-MC-02	lib	pending	failure|lifecycle|recovery	-	failure	
+interaction	mc02-tui-hotplug	tui	P0-MC-02	lib	identity_tests::disk_hot_unplug_falls_back_to_the_first_still_backed_resource	failure|lifecycle|recovery	-	failure	
 interaction	mc03-tui-tree-toggle	tui	P0-MC-03	lib	runtime::tests::group_view::enter_and_right_toggle_the_category_header	success|pointer|toggle	-	success	
 interaction	mc03-tui-tree-collapse	tui	P0-MC-03	lib	process_view::tests::collapsing_a_process_node_hides_its_recursive_subtree	success|toggle	-	success	
 interaction	mc03-tui-app-aggregate	tui	P0-MC-03	lib	process_view::tests::application_aggregate_is_pidless_but_process_children_keep_identity	success|pointer	-	success	
@@ -215,4 +216,4 @@ interaction	mc07-tui-focus-tab	tui	P0-MC-07	lib	runtime::tests::focus_ring::tab_
 interaction	mc07-tui-focus-isolation	tui	P0-MC-07	lib	runtime::tests::keys_navigation::exclusive_input_scopes_swallow_table_navigation_before_content_systems	success|focus|isolation	-	success	
 interaction	mc07-tui-compact-matrix	tui	P0-MC-07	lib	ui::tests::acceptance_size_matrix::below_the_floor_every_page_degrades_to_the_honest_too_small_screen	responsive|failure	-	responsive	
 interaction	mc07-tui-skins	tui	P0-MC-07	lib	theme::tests::every_skin_variant_resolves_a_terminal_palette	success	-	success	
-interaction	mc07-tui-capture-visual	tui	P0-MC-07	lib	pending	evidence	-	evidence	
+interaction	mc07-tui-capture-visual	tui	P0-MC-07	lib	runtime::seam::tests::capture_marker_records_the_typed_demo_frame_identity	evidence	-	evidence	

@@ -17,8 +17,9 @@
 #              (failure attribution per layer; `--only nextest-core` gives a
 #              bottom-up dev loop) + doctests + rustdoc + the nvidia fallback
 #              matrix + release/package smoke + the diff-scoped P4
-#              `parity-evidence` anchor resolver + (with --with-gui) the GPUI
-#              interaction matrix and fresh capture receipt route.
+#              `parity-evidence` anchor resolver (facet manifest + unified
+#              interaction matrix) + (with --with-gui) the GPUI interaction
+#              matrix and fresh capture receipt route.
 #   extended   the expensive pass: llvm-cov with per-crate floors, mutation
 #              testing of the core/application diff, Miri on the three
 #              Linux-audited unsafe crates, fuzz-target build (+ runs on demand),
@@ -577,9 +578,22 @@ if maybe parity-evidence; then
     # When it does evaluate, dangling anchors fail closed while `pending` cells
     # are only counted and reported.  Out of scope the resolver prints
     # "PASS ... (skipped)" and the stage is green without discovering anything.
+    #
+    # Since W11-C the stage resolves both declaration sources: the facet
+    # manifest and the unified S4 interaction matrix, so a renamed or deleted
+    # interaction test is dangling here too.  `--requirements` keeps the
+    # per-frontend P0-MC coverage report visible in the stage output/JSON
+    # without failing on an uncovered (frontend, requirement) pair -- today
+    # Bevy is 0/8 and the facet matcher is not a second vocabulary.  The
+    # deferred hard gate is `--require-requirement-coverage`; release condition
+    # is the Bevy `p0_id` mapping landing (decision register D1, option A),
+    # after which this line adds the flag in the same change that fills the
+    # mapping.
     if scope_skip parity-evidence "merge-owner evidence surface" standard; then
         run_stage parity-evidence standard timeout --kill-after=30s 900s python3 scripts/parity/resolve_frontend_evidence.py \
             --nextest --scope auto \
+            --interaction-matrix scripts/parity/cross_frontend_matrix.tsv \
+            --requirements scripts/interaction_requirements.tsv \
             --report-json target/cross-frontend-evidence/parity-evidence/manifest-validation.json
     fi
 fi

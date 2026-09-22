@@ -32,11 +32,12 @@ against real test discovery.
   diff-scope when no evidence-relevant path changed (fail-closed on a failed
   diff probe).
 
-The `contract_tag` vocabulary itself is the Rust
+The contract vocabulary itself is the Rust
 [`ContractTag`](../../crates/taskmanager-ui-contract/src/conformance.rs) enum.
-Its conformance test reads `cross_frontend_manifest.tsv` and fails on any
-unknown tag, so the tag set has exactly one authority (Rust) and the manifest
-only references its ids.
+Its conformance test reads `cross_frontend_manifest.tsv` (every `contract_tag`)
+and `cross_frontend_matrix.tsv` (every `contract_tag` and every `paths` token)
+and fails on any unknown id, so the vocabulary has exactly one authority (Rust)
+and both committed declarations only reference its ids.
 
 ## Manifest columns
 
@@ -77,13 +78,20 @@ source.
 | `contract_tag` | the row's primary contract tag: it must equal the first `paths` token. Opaque to the resolver, whose only check is that matrix-internal equality; the vocabulary authority stays the Rust `ContractTag` enum. |
 | `platform` | **reserved P5 axis**, same discipline as the manifest: empty in every committed row and opaque to the resolver. |
 
-The TUI block (47 rows: 43 anchored + 4 `pending`) is the D2 deliverable. TUI
+The TUI block (47 rows: 45 anchored + 2 `pending`) is the D2 deliverable. TUI
 has no stable case-prefix convention and no per-frontend matrix, so every row
 names its test explicitly; the `pending` rows record honest gaps that could not
-be anchored to a discoverable test (`mc02-tui-hotplug`, `mc03-tui-column-drag`,
-`mc05-tui-chart-hover`, `mc07-tui-capture-visual`). All 47 rows declare a
-`P0-MC-*` id; together with GPUI/Iced they cover all eight requirements on
-three frontends. Bevy still carries `-` (see "Bevy `p0_id`" below).
+be anchored to a discoverable test (`mc03-tui-column-drag`,
+`mc05-tui-chart-hover`). Both are pointer-modality cases the terminal shape does
+not port: the TUI capability registry declares `ColumnDragResize` and `Tooltip`
+unsupported ("no pointer-driven column-edge drag surface", "no hover surface"),
+and the runtime deliberately drops drag/move events as unmodeled. The other two
+D2 gaps were closed by real tests, not relabelled: `mc02-tui-hotplug` anchors
+the storage-family fail-closed fallback and `mc07-tui-capture-visual` anchors
+the supervised capture frame's typed marker (see "Known S4/S5 residuals"). All
+47 rows declare a `P0-MC-*` id; together with GPUI/Iced they cover all eight
+requirements on three frontends. Bevy still carries `-` (see "Bevy `p0_id`"
+below).
 
 Anchor-source recognition in the resolver (`--interaction-matrix PATH`):
 
@@ -99,10 +107,43 @@ Anchor-source recognition in the resolver (`--interaction-matrix PATH`):
 - anchored rows missing from discovery are `dangling` (R4) and fail the run;
   the dangling entry names the frontend, case id, requirement id and test id.
 
-Consumption is opt-in: `scripts/quality/local-gates.sh` still calls the resolver
-without `--interaction-matrix`, so the unified matrix changes no gate until the
-S5 driver wiring lands (see the private convergence plan). The old matrices stay
-authoritative for the accept scripts until then.
+Consumption in the gate is wired since W11-C: `scripts/quality/local-gates.sh`
+`standard` calls the resolver with `--interaction-matrix
+scripts/parity/cross_frontend_matrix.tsv`, so the unified matrix is a second
+fail-closed declaration source in the `parity-evidence` stage (a renamed or
+deleted interaction anchor is `dangling`). The old per-frontend matrices stay
+authoritative for the accept scripts until the S5 retirement wave moves those
+callers; the gate no longer waits for that wave to check the unified list.
+
+### Transition semantics before S5 (D3/D4)
+
+Two unified-matrix conventions are declared here as the accepted **transition
+semantics** for the window before the S5 hard cutover (the private convergence
+plan owns the schedule). This section documents the current default; it does
+not change the resolver's flags, defaults, or checks.
+
+- **`contract_tag = paths[0]` (D4).** A row's `contract_tag` is its primary
+  contract tag and must equal the first `paths` token. The resolver checks only
+  that matrix-internal equality; it never defines, validates, or copies the tag
+  vocabulary. The single authority stays the Rust `ContractTag` enum, so the
+  rule adds no second address for tags. It is accepted as the primary-label rule
+  for the transition window. The nine Bevy path tokens were folded into the enum
+  by the D5 change, and the enum's conformance test validates this file's
+  `contract_tag` and `paths` columns, so every id the rule compares is now
+  Rust-owned. A review that wants a different priority (for example "channel
+  first") must decide before S5 deletes the compatibility views; the equality
+  rule survives into S5.
+- **GPUI stable case-prefix channel (D3).** A GPUI row may declare
+  `test_name = -`; its anchor then resolves through the prefix `<case_id>` with
+  `-` normalized to `_`, plus `_case_`, matched against the function name of any
+  discovered test. The channel is open only to frontends listed in
+  `CASE_PREFIX_CHANNELS` (currently GPUI alone) and mirrors the legacy GPUI
+  validator's guarantee, so the unified matrix is never weaker than the
+  per-frontend gate it will replace. It cannot see a rename that preserves the
+  prefix. The owner may instead backfill an explicit `test_name` in the 39 GPUI
+  rows; that costs one hand-verified discovery pass and must never be filled by
+  scanning Rust source. Either way the resolver semantics stay the same; the
+  choice is recorded as an owner decision in the private register (D3).
 
 ### Requirement coverage (`--requirements`, `--require-requirement-coverage`)
 
@@ -121,6 +162,14 @@ resolver
 Without either flag `p0_id` stays opaque and the coverage block is `null`, so
 existing callers are unaffected. This mechanism is what the two Bevy `p0_id`
 options below would use; it does not decide the mapping.
+
+The `parity-evidence` gate stage passes `--requirements` and deliberately omits
+`--require-requirement-coverage`. So the stage records the per-frontend coverage
+report and rejects an unknown `p0_id`, but an uncovered `(frontend, requirement)`
+pair does not fail the run while Bevy is 0/8. Release condition: when the Bevy
+`p0_id` mapping lands (D1 option A), the same change that fills the mapping adds
+`--require-requirement-coverage` to the stage and the requirement axis becomes a
+fail-closed 8/8 x 4 check.
 
 ### Bevy `p0_id` (D1 open decision)
 
@@ -152,15 +201,23 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
 
 - Bevy rows have no `p0_id` mapping (kept `-`; see D1 above) and no capture
   scenarios.
-- Nine Bevy path tokens (`confirmation`, `history`, `identity`, `layout`,
-  `navigation`, `projection`, `render`, `route`, `selection`) are not folded
-  into the Rust `ContractTag` enum yet; the enum currently folds only the
-  GPUI/Iced path set. The unified matrix exposes this as an S4/S5 divergence
-  instead of copying a fourth vocabulary; extending the authority is a
-  `crates/**` change outside this wave.
-- TUI capture is a single supervised frame (`scripts/capture-tui.sh`) with no
-  scenario table, so TUI rows declare `capture_scenarios = -` and the
-  capture-readiness case is `pending`.
+- **Resolved in W12-A (D5):** the nine Bevy path tokens (`confirmation`,
+  `history`, `identity`, `layout`, `navigation`, `projection`, `render`,
+  `route`, `selection`) are folded into the Rust `ContractTag` enum, and the
+  enum's conformance test validates this matrix's `contract_tag` and `paths`
+  columns. No vocabulary is copied into TSV, Python, or bash.
+- **Resolved in W12-A (D2):** `mc02-tui-hotplug` is anchored to a real
+  storage-family hot-unplug reconcile test and `mc07-tui-capture-visual` to the
+  supervised capture frame's typed marker test. The two remaining TUI `pending`
+  cases are the pointer-modality gaps the terminal shape does not port
+  (`mc03-tui-column-drag`, `mc05-tui-chart-hover`); the capability registry owns
+  the absence reasons and neither case can be promoted without a real ported
+  surface. Owner decision (D2): accept the two gaps, or open a UI-parity line
+  that ports a keyboard equivalent and gets its own case id (a keyboard sample
+  cursor is not "hover").
+- TUI capture stays a single supervised frame (`scripts/capture-tui.sh`) with no
+  scenario table, so TUI rows declare `capture_scenarios = -`; the anchored
+  marker test proves the frame-marker contract, not a per-scenario matrix.
 
 ## Discipline
 
@@ -179,11 +236,11 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   fail-closed check), not a second vocabulary.
 - `contract_tag` is a stable id of the Rust `ContractTag` enum
   (`crates/taskmanager-ui-contract/src/conformance.rs`), the single authority.
-  The enum's conformance test reads this manifest and rejects an unknown tag;
-  the resolver treats the field as opaque. Never copy the tag set into TSV,
-  Python, or bash. The unified matrix's `contract_tag`/`paths` values reference
-  that same vocabulary; the Bevy tokens that are not folded into the enum yet
-  are listed as an S4 residual above and must be folded in Rust, never here.
+  The enum's conformance test reads this manifest and the unified matrix and
+  rejects an unknown `contract_tag` or `paths` token; the resolver treats the
+  field as opaque. Never copy the tag set into TSV, Python, or bash. The unified
+  matrix's `contract_tag`/`paths` values reference that same vocabulary,
+  including the Bevy tokens folded in by W12-A.
 - `platform` is reserved and empty: the field is not allowed to become a second
   axis vocabulary in TSV/Python/bash. When P5 lands it gets its own single
   authority, and this resolver keeps treating it as opaque.
@@ -205,9 +262,13 @@ crates/*/feature_coverage*                    # feature-coverage declarations + 
 
 Out of scope, the run reports `status: PASS (skipped)` and spawns no cargo. In
 scope, `dangling` anchors fail closed and `pending` cells are only
-counted/reported. The stage currently consumes only the facet manifest; passing
-`--interaction-matrix` is the S5 driver wiring step and is deliberately not
-enabled here.
+counted/reported. Since W11-C the stage consumes **both** declaration sources in
+one resolver pass: the facet manifest and the unified interaction matrix
+(`--interaction-matrix scripts/parity/cross_frontend_matrix.tsv`), plus the
+requirement vocabulary (`--requirements scripts/interaction_requirements.tsv`)
+as a report-only coverage input. `--require-requirement-coverage` is the
+deferred hard gate; its release condition is the Bevy `p0_id` mapping landing
+(D1), at which point the stage adds the flag in the same change.
 
 Known boundary: an anchored test deleted or renamed *without* touching the
 paths above stays invisible until one of them changes. That is the deliberate
@@ -218,8 +279,9 @@ decision, not a silent default.
 ## Usage
 
 ```bash
-# Contract-tag authority: validates every manifest contract_tag against the
-# Rust `ContractTag` enum (single source).  Also runs the ALL/from_id tests:
+# Contract-tag authority: validates every manifest `contract_tag` and every
+# unified-matrix `contract_tag`/`paths` token against the Rust `ContractTag`
+# enum (single source).  Also runs the ALL/from_id tests:
 LANG=C cargo nextest run -p taskmanager-ui-contract -j 4
 
 # Self-test (no cargo):
@@ -232,7 +294,7 @@ python3 scripts/parity/resolve_frontend_evidence.py \
   --discovery tui=discovery/tui.json \
   --discovery bevy=discovery/bevy.json
 
-# Also resolve the unified interaction matrix (S4/W10-B; opt-in):
+# Also resolve the unified interaction matrix (S4/W10-B; the gate now passes it):
 python3 scripts/parity/resolve_frontend_evidence.py \
   --discovery gpui=discovery/gpui.json \
   --discovery iced=discovery/iced.json \
@@ -251,8 +313,11 @@ python3 scripts/parity/resolve_frontend_evidence.py \
 # Drive cargo directly (--locked, CARGO_BUILD_JOBS=4):
 python3 scripts/parity/resolve_frontend_evidence.py --nextest
 
-# Local gate entry: skip when the diff cannot move an anchor, pin the report:
+# Local gate entry (the exact parity-evidence stage): skip when the diff cannot
+# move an anchor, resolve both declaration sources, pin the report:
 python3 scripts/parity/resolve_frontend_evidence.py --nextest --scope auto \
+  --interaction-matrix scripts/parity/cross_frontend_matrix.tsv \
+  --requirements scripts/interaction_requirements.tsv \
   --report-json target/cross-frontend-evidence/parity-evidence/manifest-validation.json
 ```
 
