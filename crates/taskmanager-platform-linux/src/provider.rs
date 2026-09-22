@@ -196,6 +196,13 @@ const REGISTERED_CAPABILITY_SOURCES: &[(CapabilityId, PlatformSource)] = &[
         PlatformSource::Present,
     ),
     (CapabilityId::TELEMETRY_CPU_MSR, PlatformSource::Present),
+    // The cumulative `thermal_throttle` trigger counters: the sysfs read is
+    // real and unprivileged, and it is the same read that fills the periodic
+    // CPU projection's per-package counters.
+    (
+        CapabilityId::TELEMETRY_CPU_THROTTLE,
+        PlatformSource::Present,
+    ),
     (CapabilityId::ACCELERATOR_NPU, PlatformSource::Present),
     (CapabilityId::HARDWARE_INVENTORY, PlatformSource::Present),
     (CapabilityId::CONTAINERS, PlatformSource::Present),

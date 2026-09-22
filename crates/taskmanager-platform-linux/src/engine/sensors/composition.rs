@@ -5,15 +5,11 @@
 //! diagnostics, while a partial child scan can never confirm device absence.
 
 use super::*;
-use taskmanager_core::core::sensors::ThermalThrottleSnapshot;
 use taskmanager_platform_contract::DeviceDiscovery;
-
-const CPU_THROTTLE_PROVIDER: ProviderId = ProviderId::borrowed("linux.sensor.cpu-thermal-throttle");
 
 pub(super) fn collect_sensor_center_source_from_roots(
     hwmon_root: &Path,
     thermal_root: &Path,
-    cpu_root: &Path,
     iio_root: &Path,
     now_ms: u64,
 ) -> DeviceSourceSnapshot<SensorCenterSnapshot> {
@@ -23,19 +19,16 @@ pub(super) fn collect_sensor_center_source_from_roots(
         &thermal::mirrored_zone_devices(hwmon_root),
         now_ms,
     );
-    let throttle = trend::collect_thermal_throttle_from(cpu_root, now_ms);
     let iio = iio::collect_iio_source_from(iio_root, now_ms);
-    combine_sensor_sources(hwmon, thermal, throttle, iio, now_ms)
+    combine_sensor_sources(hwmon, thermal, iio, now_ms)
 }
 
 fn combine_sensor_sources(
     hwmon: DeviceSourceSnapshot<SensorCenterSnapshot>,
     thermal: thermal::ThermalSourceSnapshot,
-    throttle: ThermalThrottleSnapshot,
     iio: DeviceSourceSnapshot<SensorCenterSnapshot>,
     now_ms: u64,
 ) -> DeviceSourceSnapshot<SensorCenterSnapshot> {
-    let throttle_source = throttle_source_status(&throttle);
     let all_readings = hwmon
         .value
         .readings
@@ -68,7 +61,6 @@ fn combine_sensor_sources(
         has_permission_failure,
         has_any_reading,
         &thermal,
-        &throttle,
     );
     let thermal::ThermalSourceSnapshot {
         readings: thermal_readings,
@@ -85,7 +77,6 @@ fn combine_sensor_sources(
     enrichments.extend(hwmon.enrichments);
     enrichments.extend(thermal_enrichments);
     enrichments.extend(iio.enrichments);
-    enrichments.push(throttle_source);
 
     let discovery = match discovery_outcome {
         SourceOutcome::Available => DeviceDiscovery::Available(discovered_devices),
@@ -104,7 +95,6 @@ fn combine_sensor_sources(
             thermal_control: ThermalControlSnapshot {
                 zones,
                 cooling_devices,
-                throttle,
             },
             device_lifecycles: Default::default(),
         },
@@ -112,31 +102,6 @@ fn combine_sensor_sources(
         discovery,
         enrichments,
     )
-}
-
-fn throttle_source_status(throttle: &ThermalThrottleSnapshot) -> SourceStatus {
-    let fields = [
-        throttle.core_events_observation().availability(),
-        throttle.package_events_observation().availability(),
-    ];
-    let current = fields
-        .iter()
-        .filter(|availability| availability.is_current())
-        .count();
-    let failure = fields
-        .into_iter()
-        .filter_map(taskmanager_core::ScalarAvailability::failure)
-        .max_by_key(|failure| failure_priority(*failure));
-    SourceStatus {
-        provider: CPU_THROTTLE_PROVIDER,
-        outcome: match (current, failure) {
-            (2, None) => SourceOutcome::Available,
-            (0, Some(failure)) => SourceOutcome::Unavailable(failure),
-            (_, Some(failure)) => SourceOutcome::Partial(failure),
-            _ => SourceOutcome::Unavailable(FailureKind::ProviderFault),
-        },
-        item_count: current,
-    }
 }
 
 fn aggregate_discovery_outcome(sources: &[SourceStatus], discovered_count: usize) -> SourceOutcome {
@@ -161,7 +126,6 @@ pub(super) fn sensor_center_status(
     has_permission_failure: bool,
     has_any_reading: bool,
     thermal: &thermal::ThermalSourceSnapshot,
-    throttle: &ThermalThrottleSnapshot,
 ) -> DeviceStatus {
     if matches!(discovery, SourceOutcome::Empty) {
         return DeviceStatus::Healthy;
@@ -179,14 +143,7 @@ pub(super) fn sensor_center_status(
             || device.current_state.availability().is_current()
             || device.maximum_state.availability().is_current()
             || device.activity.availability().is_current()
-    }) || throttle
-        .core_events_observation()
-        .availability()
-        .is_current()
-        || throttle
-            .package_events_observation()
-            .availability()
-            .is_current();
+    });
     if has_current_control || has_current_reading {
         DeviceStatus::Healthy
     } else if has_permission_failure {

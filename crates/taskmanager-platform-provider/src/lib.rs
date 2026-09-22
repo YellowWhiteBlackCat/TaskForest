@@ -44,8 +44,8 @@ pub use storage::{
     SmartSelfTestObservationProvider,
 };
 pub use system::{
-    ContainerRollupProvider, CpuTelemetryProvider, GpuEngineRowsProvider, GpuTelemetryProvider,
-    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider, MsrReadoutProvider,
-    NetworkTelemetryProvider, NpuInventoryProvider, RaplPowerProvider, SmbiosMemoryProvider,
-    StorageTelemetryProvider,
+    ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider, GpuEngineRowsProvider,
+    GpuTelemetryProvider, HardwareInventoryProvider, HostTelemetryProvider,
+    MemoryTelemetryProvider, MsrReadoutProvider, NetworkTelemetryProvider, NpuInventoryProvider,
+    RaplPowerProvider, SmbiosMemoryProvider, StorageTelemetryProvider,
 };

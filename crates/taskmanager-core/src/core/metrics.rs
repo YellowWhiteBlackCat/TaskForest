@@ -3,6 +3,7 @@
 mod availability;
 mod counter;
 mod cpu;
+mod cpu_throttle;
 mod disk;
 mod gpu;
 mod gpu_engine_rows;
@@ -24,6 +25,10 @@ pub use cpu::{
     CpuFrequencySource, CpuIdleState, CpuInterruptSnapshot, CpuMetrics, CpuPackageMetrics,
     CpuPerformancePolicy, CpuScalarObservations, CpuTemperatureSource, MAX_TRACKED_LOGICAL_CPUS,
     cpu_usage_pct_observation,
+};
+pub use cpu_throttle::{
+    CpuThrottleCounterSample, CpuThrottleFailure, CpuThrottlePackageCounters, CpuThrottleSnapshot,
+    aggregate_package_throttle_counters,
 };
 pub use disk::{
     DiskMetrics, DiskPartition, DiskPartitionScalarObservations, DiskScalarObservations,

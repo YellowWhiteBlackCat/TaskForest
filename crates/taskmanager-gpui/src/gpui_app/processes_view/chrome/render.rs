@@ -236,7 +236,7 @@ pub fn render_processes(
                 query,
             )
         };
-        div()
+        let empty = div()
             .w(content_width)
             .h_full()
             .flex()
@@ -246,8 +246,14 @@ pub fn render_processes(
             .text_size(taskmanager_ui::theme_binding::absolute(
                 ui_size.body_font_size(),
             ))
-            .child(message)
-            .into_any_element()
+            .child(message);
+        // Positive empty-state marker: the test harness keeps debug bounds
+        // across frames, so "row selector absent" cannot prove a later frame
+        // filtered the rows — this selector can only appear in the frame that
+        // actually painted the empty body.
+        #[cfg(any(test, feature = "test-support"))]
+        let empty = empty.debug_selector(|| "tm-procs-empty-body".to_string());
+        empty.into_any_element()
     } else {
         let rows_owned = rows.clone();
         // Row-internal keyboard navigation and shift-click range extension

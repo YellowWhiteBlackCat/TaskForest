@@ -78,7 +78,8 @@ fn acquire_linux(
         .build()
     {
         Ok(connection) => Ok(InstanceRole::Primary(Box::new(LinuxInstanceGuard {
-            _connection: connection,
+            connection,
+            name,
         }))),
         Err(zbus::Error::NameTaken) => {
             // Secondary: ask the existing instance to show its window.
@@ -111,10 +112,22 @@ fn notify_primary(bus_name: &str) {
 }
 
 /// Holds the primary's bus-name ownership alive. The connection is never
-/// read directly; its lifetime is the point (dropping it releases the name).
+/// read directly; dropping it releases the name.
 #[cfg(target_os = "linux")]
 struct LinuxInstanceGuard {
-    _connection: zbus::blocking::Connection,
+    connection: zbus::blocking::Connection,
+    name: String,
+}
+
+/// Release the well-known name synchronously on drop so an immediate relaunch
+/// becomes the primary deterministically instead of racing the bus' connection
+/// teardown. The call inherits the connection's method timeout, so a wedged bus
+/// cannot hang shutdown.
+#[cfg(target_os = "linux")]
+impl Drop for LinuxInstanceGuard {
+    fn drop(&mut self) {
+        let _ = self.connection.release_name(self.name.as_str());
+    }
 }
 
 #[cfg(target_os = "linux")]

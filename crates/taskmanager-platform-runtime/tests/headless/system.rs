@@ -2,10 +2,10 @@ use std::thread;
 use std::time::Duration;
 
 use taskmanager_application::{
-    ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, MemoryTelemetryRequest,
-    MsrReadoutEvent, MsrReadoutRequest, PlatformEvent, RaplPowerEvent, RaplPowerRequest,
-    SmbiosMemoryEvent, SmbiosMemoryRequest, StorageTelemetryRequest, SystemTelemetryDomainEvent,
-    SystemTelemetryRevision,
+    ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleEvent,
+    CpuThrottleRequest, MemoryTelemetryRequest, MsrReadoutEvent, MsrReadoutRequest, PlatformEvent,
+    RaplPowerEvent, RaplPowerRequest, SmbiosMemoryEvent, SmbiosMemoryRequest,
+    StorageTelemetryRequest, SystemTelemetryDomainEvent, SystemTelemetryRevision,
 };
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::{
@@ -549,4 +549,85 @@ fn msr_readout_lane_emits_update_event_for_a_refresh_request() {
         thread::sleep(Duration::from_millis(2));
     }
     panic!("no MsrReadout update event arrived from the live lane");
+}
+
+/// Drive one real `CpuThrottleRequest::Refresh` through the typed port: the
+/// lane must run the executor closure once and publish exactly one correlated
+/// `CpuThrottleEvent::Update` carrying the provider's snapshot. A counter the
+/// host does not expose stays absent on its row; the lane never invents a
+/// zero.
+#[test]
+fn cpu_throttle_lane_emits_update_event_for_a_refresh_request() {
+    let mut bindings = system_bindings();
+    bindings.system.cpu_throttle =
+        ProviderBinding::present(ProviderId::borrowed("fixture.system.cpu-throttle"));
+    let runtime = crate::ChannelRuntime::new(bindings, RuntimeConfig::new(fixed_clock));
+    let crate::ChannelRuntime {
+        handle,
+        publisher,
+        lanes,
+        ..
+    } = runtime;
+    let workers = crate::WorkerRuntime::default();
+    spawn_system_lanes(
+        &workers,
+        lanes.system.try_complete().expect("complete system lanes"),
+        SystemExecutors::new(
+            SystemObservationExecutors::new(
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+                |_| Err(ProviderFailure::Unsupported),
+            ),
+            SystemAuxiliaryExecutors::new(|| Err(ProviderFailure::Unsupported)).with_cpu_throttle(
+                || {
+                    Ok(taskmanager_core::CpuThrottleSnapshot::success(vec![
+                        taskmanager_core::CpuThrottlePackageCounters {
+                            package_id: 1,
+                            package_throttle_count: Some(7),
+                            core_throttle_count: None,
+                        },
+                    ]))
+                },
+            ),
+        ),
+        publisher,
+        fixed_clock,
+    )
+    .expect("system workers start");
+
+    handle
+        .facets()
+        .system()
+        .cpu_throttle()
+        .expect("cpu-throttle port is wired when the binding is present")
+        .try_submit(RequestEnvelope {
+            id: RequestId::new(11).expect("request id"),
+            capability: CapabilityId::TELEMETRY_CPU_THROTTLE,
+            submitted_at_ms: 1,
+            payload: CpuThrottleRequest::Refresh,
+        })
+        .expect("cpu-throttle refresh accepted by the lane");
+
+    for _ in 0..100 {
+        if let Some(event) = handle.events().try_recv().expect("event port") {
+            match event.outcome {
+                Ok(PlatformEvent::CpuThrottle(CpuThrottleEvent::Update(snapshot))) => {
+                    assert!(snapshot.is_success());
+                    assert_eq!(snapshot.packages.len(), 1);
+                    assert_eq!(snapshot.packages[0].package_id, 1);
+                    assert_eq!(snapshot.packages[0].package_throttle_count, Some(7));
+                    assert_eq!(snapshot.packages[0].core_throttle_count, None);
+                    return;
+                }
+                Ok(other) => panic!("expected a CpuThrottle event, got {other:?}"),
+                Err(failure) => panic!("cpu-throttle lane reported a failure: {failure:?}"),
+            }
+        }
+        thread::sleep(Duration::from_millis(2));
+    }
+    panic!("no CpuThrottle update event arrived from the live lane");
 }

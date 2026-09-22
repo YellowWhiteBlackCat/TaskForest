@@ -1,5 +1,4 @@
 use super::*;
-use taskmanager_core::core::sensors::ThermalThrottleSnapshot;
 
 #[cfg(target_os = "linux")]
 fn empty_thermal_source() -> thermal::ThermalSourceSnapshot {
@@ -21,7 +20,6 @@ fn empty_thermal_source() -> thermal::ThermalSourceSnapshot {
 #[test]
 fn sensor_center_status_preserves_discovery_and_current_data_truth() {
     let thermal = empty_thermal_source();
-    let throttle = ThermalThrottleSnapshot::default();
     for (discovery, current, denied, any, expected) in [
         (
             SourceOutcome::Empty,
@@ -60,7 +58,7 @@ fn sensor_center_status_preserves_discovery_and_current_data_truth() {
         ),
     ] {
         assert_eq!(
-            composition::sensor_center_status(discovery, current, denied, any, &thermal, &throttle,),
+            composition::sensor_center_status(discovery, current, denied, any, &thermal,),
             expected
         );
     }
@@ -81,7 +79,6 @@ fn combined_sysfs_inventory_adds_unmirrored_thermal_zones_once() {
     ));
     let hwmon_root = root.join("class/hwmon");
     let thermal_root = root.join("class/thermal");
-    let cpu_root = root.join("devices/system/cpu");
     std::fs::create_dir_all(&hwmon_root).expect("hwmon root");
     std::fs::create_dir_all(&thermal_root).expect("thermal root");
 
@@ -115,15 +112,9 @@ fn combined_sysfs_inventory_adds_unmirrored_thermal_zones_once() {
     std::fs::write(cooling.join("max_state"), "1\n").expect("cooling maximum state");
     symlink(&cooling, thermal_root.join("cooling_device2")).expect("cooling link");
 
-    let throttle = cpu_root.join("cpu0/thermal_throttle");
-    std::fs::create_dir_all(&throttle).expect("CPU throttle root");
-    std::fs::write(throttle.join("core_throttle_count"), "3\n").expect("core throttle count");
-    std::fs::write(throttle.join("package_throttle_count"), "7\n").expect("package throttle count");
-
     let source = composition::collect_sensor_center_source_from_roots(
         &hwmon_root,
         &thermal_root,
-        &cpu_root,
         Path::new("/nonexistent-iio-root"),
         700,
     );
@@ -159,18 +150,6 @@ fn combined_sysfs_inventory_adds_unmirrored_thermal_zones_once() {
     }));
     assert_eq!(source.value.thermal_control.zones.len(), 2);
     assert_eq!(source.value.thermal_control.cooling_devices.len(), 1);
-    assert_eq!(
-        source.value.thermal_control.throttle.current_core_events(),
-        Some(3)
-    );
-    assert_eq!(
-        source
-            .value
-            .thermal_control
-            .throttle
-            .current_package_events(),
-        Some(7)
-    );
     assert!(source.value.thermal_control.zones.iter().any(|zone| {
         source
             .value
@@ -205,15 +184,12 @@ fn live_sensor_source_receipt_preserves_typed_truth() {
         .iter()
         .map(|zone| zone.trip_points.points.len())
         .sum::<usize>();
-    let throttle = &source.value.thermal_control.throttle;
 
     eprintln!(
-        "live Linux sensor receipt: inventory={:?}, devices={}, thermal={:?}, thermal_readings={thermal_readings}, zones={zones}, cooling={cooling}, trips={trip_points}, throttle_core={:?}, throttle_package={:?}",
+        "live Linux sensor receipt: inventory={:?}, devices={}, thermal={:?}, thermal_readings={thermal_readings}, zones={zones}, cooling={cooling}, trips={trip_points}",
         source.discovery().outcome,
         source.discovered_devices().len(),
         thermal_discovery.outcome,
-        throttle.core_events_observation().availability(),
-        throttle.package_events_observation().availability(),
     );
     assert_eq!(source.discovery().provider, SYSFS_INVENTORY_PROVIDER);
     assert!(source.value.readings.iter().all(|reading| {

@@ -4,17 +4,17 @@ use std::sync::Arc;
 
 use crossbeam_channel::Receiver;
 use taskmanager_application::{
-    ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsEvent,
-    GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryEvent, HardwareInventoryRequest,
-    HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest, NetworkTelemetryRequest,
-    NpuInventoryEvent, NpuInventoryRequest, PlatformEvent, RaplPowerRequest, SmbiosMemoryRequest,
-    StorageTelemetryRequest, SystemTelemetryDomainEvent,
+    ContainerRollupEvent, ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest,
+    GpuEngineRowsEvent, GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryEvent,
+    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
+    NetworkTelemetryRequest, NpuInventoryRequest, PlatformEvent, RaplPowerRequest,
+    SmbiosMemoryRequest, StorageTelemetryRequest, SystemTelemetryDomainEvent,
 };
 use taskmanager_core::{
-    ContainerRollup, CpuTelemetryObservation, GpuEngineRowsSnapshot, GpuTelemetryObservation,
-    HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation, MsrReadoutSnapshot,
-    NetworkTelemetryObservation, NpuInventorySnapshot, RaplPowerSnapshot, SmbiosMemorySnapshot,
-    StorageTelemetryObservation,
+    ContainerRollup, CpuTelemetryObservation, CpuThrottleSnapshot, GpuEngineRowsSnapshot,
+    GpuTelemetryObservation, HardwareInfo, HostRuntimeObservation, MemoryTelemetryObservation,
+    MsrReadoutSnapshot, NetworkTelemetryObservation, NpuInventorySnapshot, RaplPowerSnapshot,
+    SmbiosMemorySnapshot, StorageTelemetryObservation,
 };
 use taskmanager_platform_contract::{CapabilityId, CompositeSourceSnapshot, ProviderFailure};
 
@@ -52,6 +52,8 @@ type SmbiosMemoryExecutor =
 type RaplPowerExecutor = dyn FnMut() -> Result<RaplPowerSnapshot, ProviderFailure> + Send + 'static;
 type MsrReadoutExecutor =
     dyn FnMut() -> Result<MsrReadoutSnapshot, ProviderFailure> + Send + 'static;
+type CpuThrottleExecutor =
+    dyn FnMut() -> Result<CpuThrottleSnapshot, ProviderFailure> + Send + 'static;
 
 /// Six blocking observations that execute on physically independent lanes.
 pub struct SystemObservationExecutors {
@@ -107,6 +109,7 @@ pub struct SystemAuxiliaryExecutors {
     smbios_memory: Option<Box<SmbiosMemoryExecutor>>,
     rapl_power: Option<Box<RaplPowerExecutor>>,
     msr_readout: Option<Box<MsrReadoutExecutor>>,
+    cpu_throttle: Option<Box<CpuThrottleExecutor>>,
 }
 
 impl SystemAuxiliaryExecutors {
@@ -124,6 +127,7 @@ impl SystemAuxiliaryExecutors {
             smbios_memory: None,
             rapl_power: None,
             msr_readout: None,
+            cpu_throttle: None,
         }
     }
 
@@ -184,6 +188,17 @@ impl SystemAuxiliaryExecutors {
         M: FnMut() -> Result<MsrReadoutSnapshot, ProviderFailure> + Send + 'static,
     {
         self.msr_readout = Some(Box::new(msr_readout));
+        self
+    }
+
+    /// Attach the optional CPU thermal-throttle counter executor (mirrors the
+    /// optional binding; absence means the capability is honestly unavailable).
+    #[must_use]
+    pub fn with_cpu_throttle<C>(mut self, cpu_throttle: C) -> Self
+    where
+        C: FnMut() -> Result<CpuThrottleSnapshot, ProviderFailure> + Send + 'static,
+    {
+        self.cpu_throttle = Some(Box::new(cpu_throttle));
         self
     }
 }
@@ -248,6 +263,7 @@ pub struct PendingSystemAuxiliaryLanes {
     pub smbios_memory_rx: Option<Receiver<Queued<SmbiosMemoryRequest>>>,
     pub rapl_power_rx: Option<Receiver<Queued<RaplPowerRequest>>>,
     pub msr_readout_rx: Option<Receiver<Queued<MsrReadoutRequest>>>,
+    pub cpu_throttle_rx: Option<Receiver<Queued<CpuThrottleRequest>>>,
 }
 
 impl PendingSystemAuxiliaryLanes {
@@ -259,6 +275,7 @@ impl PendingSystemAuxiliaryLanes {
         smbios_memory_rx: Option<Receiver<Queued<SmbiosMemoryRequest>>>,
         rapl_power_rx: Option<Receiver<Queued<RaplPowerRequest>>>,
         msr_readout_rx: Option<Receiver<Queued<MsrReadoutRequest>>>,
+        cpu_throttle_rx: Option<Receiver<Queued<CpuThrottleRequest>>>,
     ) -> Self {
         Self {
             hardware_inventory_rx,
@@ -267,6 +284,7 @@ impl PendingSystemAuxiliaryLanes {
             smbios_memory_rx,
             rapl_power_rx,
             msr_readout_rx,
+            cpu_throttle_rx,
         }
     }
 }
@@ -352,6 +370,7 @@ impl PendingSystemRuntimeLanes {
                     smbios_memory_rx,
                     rapl_power_rx,
                     msr_readout_rx,
+                    cpu_throttle_rx,
                 },
         } = self
         else {
@@ -374,6 +393,7 @@ impl PendingSystemRuntimeLanes {
                 smbios_memory: smbios_memory_rx,
                 rapl_power: rapl_power_rx,
                 msr_readout: msr_readout_rx,
+                cpu_throttle: cpu_throttle_rx,
             },
         })
     }
@@ -401,6 +421,7 @@ struct SystemAuxiliaryLanes {
     smbios_memory: Option<Receiver<Queued<SmbiosMemoryRequest>>>,
     rapl_power: Option<Receiver<Queued<RaplPowerRequest>>>,
     msr_readout: Option<Receiver<Queued<MsrReadoutRequest>>>,
+    cpu_throttle: Option<Receiver<Queued<CpuThrottleRequest>>>,
 }
 
 /// Attach every system operation to its own typed worker.
@@ -430,6 +451,7 @@ pub fn spawn_system_lanes(
                 smbios_memory,
                 rapl_power,
                 msr_readout,
+                cpu_throttle,
             },
     } = lanes;
     let SystemExecutors {
@@ -451,6 +473,7 @@ pub fn spawn_system_lanes(
                 smbios_memory: execute_smbios_memory,
                 rapl_power: execute_rapl_power,
                 msr_readout: execute_msr_readout,
+                cpu_throttle: execute_cpu_throttle,
             },
     } = executors;
 
@@ -549,7 +572,13 @@ pub fn spawn_system_lanes(
         spawn_gpu_engine_rows_lane(workers, receiver, events.clone(), execute)?;
     }
     if let (Some(receiver), Some(execute)) = (npu_inventory, execute_npu_inventory) {
-        spawn_npu_inventory_lane(workers, receiver, events.clone(), execute, clock_ms)?;
+        snapshot_lanes::spawn_npu_inventory_lane(
+            workers,
+            receiver,
+            events.clone(),
+            execute,
+            clock_ms,
+        )?;
     }
     if let (Some(receiver), Some(execute)) = (smbios_memory, execute_smbios_memory) {
         snapshot_lanes::spawn_smbios_memory_lane(workers, receiver, events.clone(), execute)?;
@@ -560,6 +589,9 @@ pub fn spawn_system_lanes(
     if let (Some(receiver), Some(execute)) = (msr_readout, execute_msr_readout) {
         snapshot_lanes::spawn_msr_readout_lane(workers, receiver, events.clone(), execute)?;
     }
+    if let (Some(receiver), Some(execute)) = (cpu_throttle, execute_cpu_throttle) {
+        snapshot_lanes::spawn_cpu_throttle_lane(workers, receiver, events.clone(), execute)?;
+    }
     spawn_lazy_observation_lane(
         workers,
         hardware_inventory,
@@ -567,74 +599,6 @@ pub fn spawn_system_lanes(
         move |HardwareInventoryRequest::Refresh| execute_hardware_inventory(),
         |snapshot| {
             PlatformEvent::HardwareInventory(HardwareInventoryEvent::Snapshot(Box::new(snapshot)))
-        },
-    )
-}
-
-/// Spawn the NPU accelerator inventory lane: one bounded executor call per
-/// queued request, answered with exactly one correlated publication -- a
-/// sorted device list on success (an empty list is the honest no-NPU host), a
-/// typed failure snapshot otherwise. Health is recorded per answer so the
-/// catalog reflects the latest enumeration outcome.
-fn spawn_npu_inventory_lane(
-    workers: &WorkerRuntime,
-    receiver: Receiver<Queued<NpuInventoryRequest>>,
-    publisher: Arc<RuntimeEventPublisher>,
-    execute: Box<NpuInventoryExecutor>,
-    clock_ms: fn() -> u64,
-) -> Result<(), WorkerSpawnError> {
-    let lane = CapabilityId::ACCELERATOR_NPU.to_string();
-    spawn_or_register_lane(
-        workers,
-        Some(CapabilityId::ACCELERATOR_NPU),
-        receiver,
-        publisher,
-        execute,
-        move |receiver, execute, publisher, shutdown, idle_timeout| {
-            let _lane_exit = crate::delivery::LaneExitGuard::new(publisher.lane_exit_counter());
-            let panic_notes = publisher.panic_ledger();
-            while let Some(queued) = recv_or_shutdown_with_idle(&receiver, &shutdown, idle_timeout)
-            {
-                let observed_at_ms = clock_ms();
-                let (snapshot, health) = match crate::delivery::execute_isolated(
-                    &panic_notes,
-                    crate::delivery::ProviderPanicContext {
-                        lane: lane.clone(),
-                        capability: queued.capability.clone(),
-                        request_id: queued.request_id,
-                    },
-                    || {
-                        let mut execute = execute
-                            .lock()
-                            .unwrap_or_else(std::sync::PoisonError::into_inner);
-                        execute(observed_at_ms)
-                    },
-                ) {
-                    Ok(snapshot) => (snapshot, CapabilityHealth::Available),
-                    Err(failure) => (
-                        NpuInventorySnapshot::failed(
-                            failure.kind(),
-                            format!("provider failure: {failure:?}"),
-                            observed_at_ms,
-                        ),
-                        CapabilityHealth::Unavailable(failure),
-                    ),
-                };
-                let event = PlatformEvent::NpuInventory(NpuInventoryEvent::Update(snapshot));
-                if crate::delivery::shutdown_requested(&shutdown)
-                    || publisher
-                        .publish_health(
-                            queued.request_id,
-                            queued.capability,
-                            queued.provider,
-                            event,
-                            health,
-                        )
-                        .is_stop()
-                {
-                    break;
-                }
-            }
         },
     )
 }

@@ -17,15 +17,16 @@
 //! G-20 history ring). See `adr/018-windows-telemetry-safety.md`.
 
 use taskmanager_application::{
-    ContainerRollupRequest, CpuTelemetryRequest, DesktopNotificationRequest, GpuEngineRowsRequest,
-    GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
-    MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, ProcessAffinityControlRequest,
-    ProcessAffinityRequest, ProcessControlRequest, ProcessEnvironmentRequest, ProcessGpuRequest,
-    ProcessIsolationRequest, ProcessListRequest, ProcessNetworkEscalationRequest,
-    ProcessNetworkRequest, ProcessOpenFilesRequest, ProcessResourceControlRequest,
-    ProcessResourcesRequest, ProcessThreadsRequest, RaplPowerRequest, SessionControlRequest,
-    SessionInventoryRequest, SetupScriptRequest, SmbiosMemoryRequest, StartupControlRequest,
-    StartupEvidenceRequest, StartupInventoryRequest, StorageTelemetryRequest,
+    ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, DesktopNotificationRequest,
+    GpuEngineRowsRequest, GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest,
+    MemoryTelemetryRequest, MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest,
+    ProcessAffinityControlRequest, ProcessAffinityRequest, ProcessControlRequest,
+    ProcessEnvironmentRequest, ProcessGpuRequest, ProcessIsolationRequest, ProcessListRequest,
+    ProcessNetworkEscalationRequest, ProcessNetworkRequest, ProcessOpenFilesRequest,
+    ProcessResourceControlRequest, ProcessResourcesRequest, ProcessThreadsRequest,
+    RaplPowerRequest, SessionControlRequest, SessionInventoryRequest, SetupScriptRequest,
+    SmbiosMemoryRequest, StartupControlRequest, StartupEvidenceRequest, StartupInventoryRequest,
+    StorageTelemetryRequest,
 };
 use taskmanager_core::ProviderId;
 use taskmanager_platform_contract::{
@@ -85,9 +86,9 @@ pub use sensor::WinSensorProviders;
 pub use service::WinServiceProviders;
 pub use storage::WinStorageProviders;
 pub use system::{
-    PendingMsrReadoutProvider, PendingRaplPowerProvider, PendingSmbiosMemoryProvider,
-    WinGpuEngineRowsProvider, WinNpuInventoryProvider, WinSystemAuxiliaryProviders,
-    WinSystemObservationProviders, WinSystemProviders,
+    PendingCpuThrottleProvider, PendingMsrReadoutProvider, PendingRaplPowerProvider,
+    PendingSmbiosMemoryProvider, WinGpuEngineRowsProvider, WinNpuInventoryProvider,
+    WinSystemAuxiliaryProviders, WinSystemObservationProviders, WinSystemProviders,
 };
 
 const HOST_TELEMETRY_PROVIDER: ProviderId = ProviderId::borrowed("windows.system.host");
@@ -101,6 +102,8 @@ const NPU_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("windows.acceler
 const SMBIOS_MEMORY_PROVIDER: ProviderId = ProviderId::borrowed("windows.telemetry.memory.smbios");
 const RAPL_POWER_PROVIDER: ProviderId = ProviderId::borrowed("windows.telemetry.cpu.package-power");
 const MSR_READOUT_PROVIDER: ProviderId = ProviderId::borrowed("windows.telemetry.cpu.msr");
+const CPU_THROTTLE_PROVIDER: ProviderId =
+    ProviderId::borrowed("windows.telemetry.cpu.throttle-pending");
 const HARDWARE_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("windows.hardware.inventory");
 const CONTAINER_ROLLUP_PROVIDER: ProviderId = ProviderId::borrowed("windows.containers.wsl");
 const PROCESS_LIST_PROVIDER: ProviderId = ProviderId::borrowed("windows.process.list");
@@ -289,6 +292,7 @@ const REGISTERED_CAPABILITY_SOURCES: &[(CapabilityId, PlatformSource)] = &[
     (CapabilityId::TELEMETRY_MEMORY_SMBIOS, absent()),
     (CapabilityId::TELEMETRY_CPU_PACKAGE_POWER, absent()),
     (CapabilityId::TELEMETRY_CPU_MSR, absent()),
+    (CapabilityId::TELEMETRY_CPU_THROTTLE, absent()),
 ];
 
 /// The typed honest absence for a registered-pending lane.
@@ -361,6 +365,10 @@ pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {
                 ProviderRegistration::<MsrReadoutRequest, _>::new(
                     MSR_READOUT_PROVIDER.clone(),
                     PendingMsrReadoutProvider,
+                ),
+                ProviderRegistration::<CpuThrottleRequest, _>::new(
+                    CPU_THROTTLE_PROVIDER.clone(),
+                    PendingCpuThrottleProvider,
                 ),
             ),
         ),

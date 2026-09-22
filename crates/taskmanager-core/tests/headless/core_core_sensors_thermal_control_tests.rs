@@ -47,12 +47,28 @@ fn old_sensor_snapshot_defaults_the_new_control_sidecar() {
 
     assert!(decoded.thermal_control.zones.is_empty());
     assert!(decoded.thermal_control.cooling_devices.is_empty());
-    assert_eq!(
-        decoded
-            .thermal_control
-            .throttle
-            .core_events_observation()
-            .availability(),
-        ScalarAvailability::Unknown
-    );
+}
+
+#[test]
+fn a_published_sensor_snapshot_with_a_retired_throttle_sidecar_still_decodes() {
+    // The throttle counters moved to the CPU projection and the
+    // `telemetry.cpu.throttle` lane; the retired sidecar is an unknown field
+    // for this decoder and must not make a published payload fail to decode.
+    let decoded: super::super::SensorCenterSnapshot = serde_json::from_str(
+        r#"{
+                "state":{"status":"healthy","last_success_ms":10},
+                "timestamp_ms":10,
+                "readings":[],
+                "thermal_control":{
+                    "zones":[],
+                    "cooling_devices":[],
+                    "throttle":{"timestamp_ms":10,"core_events":7,"package_events":null}
+                },
+                "device_lifecycles":{}
+            }"#,
+    )
+    .expect("sensor snapshot carrying the retired throttle sidecar");
+
+    assert!(decoded.thermal_control.zones.is_empty());
+    assert!(decoded.thermal_control.cooling_devices.is_empty());
 }

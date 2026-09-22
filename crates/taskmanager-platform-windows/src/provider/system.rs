@@ -11,10 +11,10 @@
 //! `provider::system::wsl`) — never a shell and never an interpreter.
 
 use taskmanager_application::{
-    ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
-    NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest, SmbiosMemoryRequest,
-    StorageTelemetryRequest,
+    ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, GpuEngineRowsRequest,
+    GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
+    MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest,
+    SmbiosMemoryRequest, StorageTelemetryRequest,
 };
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::{
@@ -25,10 +25,10 @@ use taskmanager_core::{
 };
 use taskmanager_platform_contract::ProviderFailure;
 use taskmanager_platform_provider::{
-    ContainerRollupProvider, CpuTelemetryProvider, GpuEngineRowsProvider, GpuTelemetryProvider,
-    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider, MsrReadoutProvider,
-    NetworkTelemetryProvider, NpuInventoryProvider, RaplPowerProvider, SmbiosMemoryProvider,
-    StorageTelemetryProvider,
+    ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider, GpuEngineRowsProvider,
+    GpuTelemetryProvider, HardwareInventoryProvider, HostTelemetryProvider,
+    MemoryTelemetryProvider, MsrReadoutProvider, NetworkTelemetryProvider, NpuInventoryProvider,
+    RaplPowerProvider, SmbiosMemoryProvider, StorageTelemetryProvider,
 };
 use taskmanager_platform_runtime::{
     ProviderRegistration, SystemExecutors, SystemObservationExecutors, SystemProviderBindings,
@@ -38,6 +38,7 @@ use taskmanager_platform_runtime::{
 mod auxiliary;
 mod cpu_freq;
 mod cpu_info;
+mod cpu_throttle;
 mod disk;
 mod gpu;
 mod hardware_inventory;
@@ -51,6 +52,7 @@ mod wsl;
 
 pub use auxiliary::WinSystemAuxiliaryProviders;
 pub use cpu_freq::WinCpuTelemetryProvider;
+pub use cpu_throttle::PendingCpuThrottleProvider;
 pub use disk::WinStorageTelemetryProvider;
 pub use gpu::WinGpuTelemetryProvider;
 pub use hardware_inventory::WinHardwareInventoryProvider;
@@ -509,6 +511,8 @@ type SmbiosMemoryRegistration =
     ProviderRegistration<SmbiosMemoryRequest, Box<dyn SmbiosMemoryProvider>>;
 type RaplPowerRegistration = ProviderRegistration<RaplPowerRequest, Box<dyn RaplPowerProvider>>;
 type MsrReadoutRegistration = ProviderRegistration<MsrReadoutRequest, Box<dyn MsrReadoutProvider>>;
+type CpuThrottleRegistration =
+    ProviderRegistration<CpuThrottleRequest, Box<dyn CpuThrottleProvider>>;
 
 /// Per-engine GPU utilization rows (capability `telemetry.gpu.engines`) from
 /// the unprivileged PDH `\GPU Engine(*)` counters — no helper crossing on
@@ -697,6 +701,7 @@ impl WinSystemProviders {
         .with_smbios_memory(&self.auxiliary.smbios_memory)
         .with_rapl_power(&self.auxiliary.rapl_power)
         .with_msr_readout(&self.auxiliary.msr_readout)
+        .with_cpu_throttle(&self.auxiliary.cpu_throttle)
     }
 
     pub(crate) fn into_runtime(self) -> SystemExecutors {

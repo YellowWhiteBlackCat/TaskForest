@@ -79,7 +79,8 @@ pub use kernel_log::{KernelLogEntry, KernelLogPriority};
 pub use metrics::{
     CounterDelta, CpuFrequencySource, CpuIdleState, CpuInterruptSnapshot, CpuMetrics,
     CpuPackageMetrics, CpuPerformancePolicy, CpuScalarObservations, CpuTelemetryObservation,
-    CpuTemperatureSource, CumulativeCounter, DiskMetrics, DiskPartition,
+    CpuTemperatureSource, CpuThrottleCounterSample, CpuThrottleFailure, CpuThrottlePackageCounters,
+    CpuThrottleSnapshot, CumulativeCounter, DiskMetrics, DiskPartition,
     DiskPartitionScalarObservations, DiskScalarObservations, DmiIdentityFacts, GpuEngine,
     GpuEngineKind, GpuEngineMetric, GpuEngineMetricPoint, GpuEngineRowsFailure,
     GpuEngineRowsSnapshot, GpuGraphicsApi, GpuMetricField, GpuMetricProvenance, GpuMetrics,
@@ -95,7 +96,7 @@ pub use metrics::{
     SmartAvailability, SmbiosMemoryFailure, SmbiosMemorySnapshot, SmbiosModuleRow,
     StorageTelemetryObservation, SystemLoadAverage, SystemObservationState, SystemPressureSnapshot,
     SystemSnapshot, SystemTelemetryDomains, VirtualMemoryCommitObservations,
-    cpu_usage_pct_observation,
+    aggregate_package_throttle_counters, cpu_usage_pct_observation,
 };
 pub use npu::{
     NpuDevice, NpuEngineKind, NpuEngineUsage, NpuInventoryFailure, NpuInventorySnapshot,
@@ -138,8 +139,8 @@ pub use sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorLifecycleTracker, SensorMagnitude,
     SensorMeasurementObservation, SensorModelError, SensorQuantity, SensorReading, SensorScale,
     SensorUnit, ThermalControlSnapshot, ThermalCoolingActivity, ThermalCoolingDeviceStatus,
-    ThermalCoolingKind, ThermalPolicy, ThermalThrottleSnapshot, ThermalTripKind, ThermalTripPoint,
-    ThermalTripPointSet, ThermalZoneMode, ThermalZoneStatus, refresh_sensor_center_state,
+    ThermalCoolingKind, ThermalPolicy, ThermalTripKind, ThermalTripPoint, ThermalTripPointSet,
+    ThermalZoneMode, ThermalZoneStatus, refresh_sensor_center_state,
 };
 pub use services::{
     DirectedServiceEdge, ServiceAction, ServiceCycle, ServiceDeps, ServiceDiagnostics,

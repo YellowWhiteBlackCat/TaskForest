@@ -8,8 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::core::{DeviceGeneration, DeviceId, FailureKind, ScalarAvailability, ScalarObservation};
 
-use super::ThermalThrottleSnapshot;
-
 /// Whether a thermal zone currently participates in kernel/OS thermal policy.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "value", rename_all = "snake_case")]
@@ -201,10 +199,6 @@ pub struct ThermalCoolingDeviceStatus {
 pub struct ThermalControlSnapshot {
     pub zones: Vec<ThermalZoneStatus>,
     pub cooling_devices: Vec<ThermalCoolingDeviceStatus>,
-    /// Cumulative CPU/package events when the platform exposes them.
-    ///
-    /// Historical non-zero counts do not prove current throttling.
-    pub throttle: ThermalThrottleSnapshot,
 }
 
 #[cfg(test)]

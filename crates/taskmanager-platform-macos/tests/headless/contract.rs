@@ -46,8 +46,8 @@ const DRAIN_DEADLINE: Duration = Duration::from_secs(5);
 const DRAIN_POLL: Duration = Duration::from_millis(5);
 
 /// Every standard capability with the provider identity the macOS adapter
-/// must attribute to it. The 42 entries are the complete product surface:
-/// 38 always-required lanes plus the four optional facets (directory usage
+/// must attribute to it. The 43 entries are the complete product surface:
+/// 38 always-required lanes plus the five optional facets (directory usage
 /// real; open-files / desktop-notify / first-run-setup registered-pending
 /// with typed `Unsupported` outcomes, G-05).
 const STANDARD_SURFACE: &[(&str, &str)] = &[
@@ -116,6 +116,10 @@ const STANDARD_SURFACE: &[(&str, &str)] = &[
         "macos.telemetry.cpu.package-power",
     ),
     ("telemetry.cpu.msr", "macos.telemetry.cpu.msr"),
+    (
+        "telemetry.cpu.throttle",
+        "macos.telemetry.cpu.throttle-pending",
+    ),
 ];
 
 /// Capabilities with NO safe macOS source: they must complete with a typed
@@ -128,6 +132,10 @@ const PENDING_CAPABILITIES: &[&str] = &[
     "telemetry.memory.smbios",
     "telemetry.cpu.package_power",
     "telemetry.cpu.msr",
+    // The cumulative Linux `thermal_throttle` counters have no macOS source
+    // with the same semantics (IOKit speed-limit/thermal-pressure
+    // notifications are instantaneous); the lane stays registered-pending.
+    "telemetry.cpu.throttle",
     "containers.rollup",
     // macOS does not currently expose an authoritative process start token
     // through the safe provider boundary. Target mutation/read/reveal must
@@ -376,6 +384,7 @@ fn assert_complete_facets(facets: &PlatformFacets) {
     assert!(facets.system().smbios_memory().is_some());
     assert!(facets.system().rapl_power().is_some());
     assert!(facets.system().msr_readout().is_some());
+    assert!(facets.system().cpu_throttle().is_some());
     assert!(facets.system().containers().is_some());
     assert!(facets.process().list().is_some());
     assert!(facets.process().control().is_some());

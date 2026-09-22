@@ -5,16 +5,16 @@
 //! inventory).
 
 use taskmanager_application::{
-    ContainerRollupRequest, CpuTelemetryRequest, GpuEngineRowsRequest, GpuTelemetryRequest,
-    HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest, MsrReadoutRequest,
-    NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest, SmbiosMemoryRequest,
-    StorageTelemetryRequest,
+    ContainerRollupRequest, CpuTelemetryRequest, CpuThrottleRequest, GpuEngineRowsRequest,
+    GpuTelemetryRequest, HardwareInventoryRequest, HostTelemetryRequest, MemoryTelemetryRequest,
+    MsrReadoutRequest, NetworkTelemetryRequest, NpuInventoryRequest, RaplPowerRequest,
+    SmbiosMemoryRequest, StorageTelemetryRequest,
 };
 use taskmanager_platform_provider::{
-    ContainerRollupProvider, CpuTelemetryProvider, GpuEngineRowsProvider, GpuTelemetryProvider,
-    HardwareInventoryProvider, HostTelemetryProvider, MemoryTelemetryProvider, MsrReadoutProvider,
-    NetworkTelemetryProvider, NpuInventoryProvider, RaplPowerProvider, SmbiosMemoryProvider,
-    StorageTelemetryProvider,
+    ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider, GpuEngineRowsProvider,
+    GpuTelemetryProvider, HardwareInventoryProvider, HostTelemetryProvider,
+    MemoryTelemetryProvider, MsrReadoutProvider, NetworkTelemetryProvider, NpuInventoryProvider,
+    RaplPowerProvider, SmbiosMemoryProvider, StorageTelemetryProvider,
 };
 use taskmanager_platform_runtime::{
     ProviderRegistration, SystemAuxiliaryExecutors, SystemExecutors, SystemObservationExecutors,
@@ -42,6 +42,8 @@ type SmbiosMemoryRegistration =
     ProviderRegistration<SmbiosMemoryRequest, Box<dyn SmbiosMemoryProvider>>;
 type RaplPowerRegistration = ProviderRegistration<RaplPowerRequest, Box<dyn RaplPowerProvider>>;
 type MsrReadoutRegistration = ProviderRegistration<MsrReadoutRequest, Box<dyn MsrReadoutProvider>>;
+type CpuThrottleRegistration =
+    ProviderRegistration<CpuThrottleRequest, Box<dyn CpuThrottleProvider>>;
 
 /// Seven independently scheduled Linux observation providers.
 pub struct SystemObservationProviders {
@@ -127,18 +129,20 @@ pub struct SystemAuxiliaryProviders {
     smbios_memory: SmbiosMemoryRegistration,
     rapl_power: RaplPowerRegistration,
     msr_readout: MsrReadoutRegistration,
+    cpu_throttle: CpuThrottleRegistration,
 }
 
 impl SystemAuxiliaryProviders {
     #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new<P, E, N, S, R, M>(
+    pub fn new<P, E, N, S, R, M, C>(
         hardware_inventory: ProviderRegistration<HardwareInventoryRequest, P>,
         gpu_engine_rows: ProviderRegistration<GpuEngineRowsRequest, E>,
         npu_inventory: ProviderRegistration<NpuInventoryRequest, N>,
         smbios_memory: ProviderRegistration<SmbiosMemoryRequest, S>,
         rapl_power: ProviderRegistration<RaplPowerRequest, R>,
         msr_readout: ProviderRegistration<MsrReadoutRequest, M>,
+        cpu_throttle: ProviderRegistration<CpuThrottleRequest, C>,
     ) -> Self
     where
         P: HardwareInventoryProvider,
@@ -147,6 +151,7 @@ impl SystemAuxiliaryProviders {
         S: SmbiosMemoryProvider,
         R: RaplPowerProvider,
         M: MsrReadoutProvider,
+        C: CpuThrottleProvider,
     {
         Self {
             hardware_inventory: hardware_inventory
@@ -161,6 +166,8 @@ impl SystemAuxiliaryProviders {
                 .map_provider(|provider| Box::new(provider) as Box<dyn RaplPowerProvider>),
             msr_readout: msr_readout
                 .map_provider(|provider| Box::new(provider) as Box<dyn MsrReadoutProvider>),
+            cpu_throttle: cpu_throttle
+                .map_provider(|provider| Box::new(provider) as Box<dyn CpuThrottleProvider>),
         }
     }
 
@@ -172,6 +179,7 @@ impl SystemAuxiliaryProviders {
             smbios_memory,
             rapl_power,
             msr_readout,
+            cpu_throttle,
         } = self;
         let mut hardware_inventory = hardware_inventory.into_provider();
         let mut gpu_engine_rows = gpu_engine_rows.into_provider();
@@ -179,6 +187,7 @@ impl SystemAuxiliaryProviders {
         let mut smbios_memory = smbios_memory.into_provider();
         let mut rapl_power = rapl_power.into_provider();
         let mut msr_readout = msr_readout.into_provider();
+        let mut cpu_throttle = cpu_throttle.into_provider();
         SystemAuxiliaryExecutors::new(move || hardware_inventory.refresh())
             .with_gpu_engine_rows(move |request| {
                 gpu_engine_rows.read_engine_rows(&request.device_id)
@@ -187,6 +196,7 @@ impl SystemAuxiliaryProviders {
             .with_smbios_memory(move || smbios_memory.read_memory_smbios())
             .with_rapl_power(move || rapl_power.read_package_power())
             .with_msr_readout(move || msr_readout.read_msr_readouts())
+            .with_cpu_throttle(move || cpu_throttle.read_cpu_throttle())
     }
 }
 
@@ -224,6 +234,7 @@ impl SystemProviders {
         .with_smbios_memory(&self.auxiliary.smbios_memory)
         .with_rapl_power(&self.auxiliary.rapl_power)
         .with_msr_readout(&self.auxiliary.msr_readout)
+        .with_cpu_throttle(&self.auxiliary.cpu_throttle)
     }
 
     pub(crate) fn into_runtime(self) -> SystemExecutors {

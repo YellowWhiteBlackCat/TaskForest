@@ -24,6 +24,7 @@ fn opaque_target_tracking(
         .map(taskmanager_platform_contract::RequestTracking::Target)
 }
 
+mod cpu_throttle;
 mod directory_usage;
 mod environment;
 mod gpu_engine_rows;
@@ -39,6 +40,7 @@ mod smbios_memory;
 mod storage;
 mod system;
 
+pub use cpu_throttle::*;
 pub use directory_usage::*;
 pub use environment::*;
 pub use gpu_engine_rows::*;
@@ -79,6 +81,7 @@ pub enum PlatformEvent {
     SmbiosMemory(SmbiosMemoryEvent),
     RaplPower(RaplPowerEvent),
     MsrReadout(MsrReadoutEvent),
+    CpuThrottle(CpuThrottleEvent),
 }
 
 pub(crate) trait PlatformEventVisitor {
@@ -103,6 +106,7 @@ pub(crate) trait PlatformEventVisitor {
     fn visit_smbios_memory(&mut self, event: SmbiosMemoryEvent);
     fn visit_rapl_power(&mut self, event: RaplPowerEvent);
     fn visit_msr_readout(&mut self, event: MsrReadoutEvent);
+    fn visit_cpu_throttle(&mut self, event: CpuThrottleEvent);
 }
 
 impl PlatformEvent {
@@ -137,6 +141,7 @@ impl PlatformEvent {
             Self::SmbiosMemory(event) => event.accepts_capability(capability),
             Self::RaplPower(event) => event.accepts_capability(capability),
             Self::MsrReadout(event) => event.accepts_capability(capability),
+            Self::CpuThrottle(event) => event.accepts_capability(capability),
         }
     }
 
@@ -169,6 +174,7 @@ impl PlatformEvent {
             Self::SmbiosMemory(event) => visitor.visit_smbios_memory(event),
             Self::RaplPower(event) => visitor.visit_rapl_power(event),
             Self::MsrReadout(event) => visitor.visit_msr_readout(event),
+            Self::CpuThrottle(event) => visitor.visit_cpu_throttle(event),
         }
     }
 }

@@ -8,6 +8,7 @@ use std::path::Path;
 const PROVIDER_TRAITS: &[&str] = &[
     "CommandLaunchProvider",
     "CpuTelemetryProvider",
+    "CpuThrottleProvider",
     "DesktopAppearanceProvider",
     "FilesystemHealthProvider",
     "GpuTelemetryProvider",

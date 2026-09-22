@@ -108,8 +108,6 @@ pub use engine::runtime_evidence::{
     linux_provider_capability_receipt_json,
 };
 #[cfg(feature = "test-support")]
-pub use engine::sensors::trend::{collect_thermal_throttle, collect_thermal_throttle_from};
-#[cfg(feature = "test-support")]
 pub use engine::sensors::{collect_sensor_center, collect_sensor_center_from};
 #[cfg(feature = "test-support")]
 pub use engine::services::{

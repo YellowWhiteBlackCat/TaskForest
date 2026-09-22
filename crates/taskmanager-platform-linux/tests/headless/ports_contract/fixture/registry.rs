@@ -61,6 +61,10 @@ pub fn fake_registry(provider: FakeProvider) -> LinuxProviderRegistry {
                     ProviderId::borrowed("fixture.system.msr-readout"),
                     provider.clone(),
                 ),
+                ProviderRegistration::new(
+                    ProviderId::borrowed("fixture.system.cpu-throttle"),
+                    provider.clone(),
+                ),
             ),
         ),
         ProcessProviders::new(
