@@ -10,6 +10,10 @@ discovery payloads and proves the resolver is not a rubber stamp:
 * deleting a referenced test (discovery no longer lists it) turns the run red;
 * a target/frontend ownership mismatch is rejected;
 * malformed declarations fail loudly instead of being skipped;
+* the unified interaction matrix is consumed as a second declaration source:
+  exact `test_name` anchors and GPUI's stable case-prefix channel both resolve
+  against discovery, deleting either anchor is `dangling`, and malformed matrix
+  rows are rejected;
 * the `--scope auto` diff-scope only skips when no evidence-relevant path
   changed, evaluates fail-closed when the git probe fails, and never treats a
   skipped diff as a resolved anchor set.
@@ -36,6 +40,7 @@ resolver = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(resolver)
 
 HEADER = "\t".join(resolver.MANIFEST_FIELDS)
+INTERACTION_HEADER = "\t".join(resolver.INTERACTION_FIELDS)
 
 CHECKS = 0
 FAILURES: list[str] = []
@@ -81,6 +86,39 @@ def write_manifest(path: Path, rows: list[str]) -> Path:
     return path
 
 
+def interaction_row(
+    case_id: str,
+    frontend: str,
+    *,
+    p0_id: str = "P0-MC-00",
+    target: str = "lib",
+    test_name: str = "-",
+    paths: str = "success",
+    capture_scenarios: str = "-",
+    contract_tag: str | None = None,
+    subject_kind: str = "interaction",
+    platform: str = "",
+) -> str:
+    """One unified-matrix row; contract_tag defaults to the first paths token."""
+    return "\t".join([
+        subject_kind,
+        case_id,
+        frontend,
+        p0_id,
+        target,
+        test_name,
+        paths,
+        capture_scenarios,
+        contract_tag if contract_tag is not None else paths.split("|", 1)[0],
+        platform,
+    ])
+
+
+def write_interaction_matrix(path: Path, rows: list[str]) -> Path:
+    path.write_text("\n".join([INTERACTION_HEADER, *rows]) + "\n", encoding="utf-8")
+    return path
+
+
 def write_json_discovery(path: Path, names: list[str]) -> Path:
     payload = {
         "rust-suites": {
@@ -102,9 +140,11 @@ def namespace(
     *,
     scope: str = "all",
     base: str | None = None,
+    interaction_matrix: Path | None = None,
 ) -> argparse.Namespace:
     return argparse.Namespace(
         manifest=str(manifest),
+        interaction_matrix=str(interaction_matrix) if interaction_matrix else None,
         discovery=[f"{frontend}={path}" for frontend, path in discovery.items()],
         capture_scenarios=[],
         nextest=False,
@@ -150,6 +190,75 @@ def base_discovery(tmp: Path) -> dict[str, Path]:
         "tui": write_json_discovery(tmp / "tui.json", ["suite::tui_ok"]),
         "bevy": write_json_discovery(tmp / "bevy.json", ["suite::bevy_ok"]),
     }
+
+
+INTERACTION_GPUI_TEST = "gpui_behavior::nav_chrome::mc00_page_sweep_case_strip_renders_tabs"
+INTERACTION_ICED_TEST = "ui::tests::pages::page_sweep_covers_pages"
+INTERACTION_BEVY_TEST = "pages::process_tree::tests::collapse_hides_descendants"
+
+INTERACTION_ROWS = [
+    interaction_row("mc00-page-sweep", "gpui", target="gui", paths="success|responsive"),
+    interaction_row(
+        "mc00-nav-keyboard",
+        "iced",
+        test_name=INTERACTION_ICED_TEST,
+        paths="success|keyboard",
+    ),
+    interaction_row(
+        "bev-tree-collapse",
+        "bevy",
+        p0_id="-",
+        test_name=INTERACTION_BEVY_TEST,
+        paths="keyboard|lifecycle|success",
+    ),
+]
+
+
+def interaction_discovery(tmp: Path) -> dict[str, Path]:
+    """Discovery carrying both the facet anchors and the interaction anchors."""
+    return {
+        "gpui": write_json_discovery(
+            tmp / "gpui.json", ["suite::alpha_ok", INTERACTION_GPUI_TEST]
+        ),
+        "iced": write_json_discovery(
+            tmp / "iced.json", ["suite::beta_ok", INTERACTION_ICED_TEST]
+        ),
+        "tui": write_json_discovery(tmp / "tui.json", ["suite::tui_ok"]),
+        "bevy": write_json_discovery(
+            tmp / "bevy.json", ["suite::bevy_ok", INTERACTION_BEVY_TEST]
+        ),
+    }
+
+
+def run_interaction(
+    tmp: Path,
+    rows: list[str],
+    discovery: dict[str, Path],
+    *,
+    manifest_rows: list[str] | None = None,
+):
+    manifest = write_manifest(tmp / "manifest.tsv", manifest_rows or BASE_ROWS)
+    matrix = write_interaction_matrix(tmp / "interaction.tsv", rows)
+    return resolver.resolve(
+        namespace(manifest, discovery, tmp, interaction_matrix=matrix)
+    )
+
+
+def check_interaction_error(rows: list[str], label: str) -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        manifest = write_manifest(tmp / "manifest.tsv", BASE_ROWS)
+        matrix = write_interaction_matrix(tmp / "interaction.tsv", rows)
+        try:
+            resolver.resolve(
+                namespace(
+                    manifest, base_discovery(tmp), tmp, interaction_matrix=matrix
+                )
+            )
+        except resolver.ResolveError:
+            check(True, label)
+        else:
+            check(False, label)
 
 
 def test_legal_anchor_passes(tmp: Path) -> None:
@@ -252,6 +361,7 @@ def test_missing_discovery_errors(tmp: Path) -> None:
 # EVIDENCE_SCOPE_PATTERNS (the test is the conscious-change guard).
 SCOPE_IN_PATH = [
     "scripts/parity/cross_frontend_manifest.tsv",
+    "scripts/parity/cross_frontend_matrix.tsv",
     "scripts/parity/resolve_frontend_evidence.py",
     "crates/taskmanager-ui-contract/src/conformance.rs",
     "crates/taskmanager-ui-contract/src/feature_coverage.rs",
@@ -334,6 +444,11 @@ def test_auto_scope_short_circuit(tmp: Path) -> None:
             "an out-of-scope run resolves nothing and discovers nothing",
         )
         check(
+            report["counts"]["interaction_cells"] == 0
+            and report["interaction_matrix"]["cases"] == 0,
+            "an out-of-scope run carries the empty interaction schema",
+        )
+        check(
             report["scope"]["relevant"] is False
             and report["scope"]["base"] == "BASE",
             "an out-of-scope run records the scope decision",
@@ -405,6 +520,157 @@ def test_platform_column_is_reserved(tmp: Path) -> None:
     )
 
 
+def test_interaction_matrix_resolves(tmp: Path) -> None:
+    report = run_interaction(tmp, INTERACTION_ROWS, interaction_discovery(tmp))
+    check(report["status"] == "pass", "a consistent interaction matrix passes")
+    check(report["counts"]["interaction_cells"] == 3, "interaction cells counted")
+    check(report["counts"]["interaction_anchored"] == 3, "interaction anchors counted")
+    check(report["counts"]["interaction_dangling"] == 0, "no interaction dangling")
+    check(report["counts"]["dangling"] == 0, "interaction cells add no dangling")
+    check(
+        report["counts"]["cells"] == 4 and report["counts"]["pending"] == 1,
+        "facet grid counts stay independent of the interaction matrix",
+    )
+    check(
+        report["interaction_matrix"]["cases"] == 3
+        and report["interaction_matrix"]["path"].endswith("interaction.tsv"),
+        "the report records the interaction matrix source",
+    )
+    check(
+        report["interaction_matrix"]["anchored"] == 3
+        and report["interaction_matrix"]["dangling"] == 0,
+        "the interaction block mirrors anchored/dangling counts",
+    )
+
+
+def test_interaction_matrix_dangling(tmp: Path) -> None:
+    discovery = interaction_discovery(tmp)
+    # Deleting the referenced iced test turns the exact-anchor cell dangling.
+    write_json_discovery(discovery["iced"], ["suite::beta_ok"])
+    # Deleting the GPUI case-prefix test turns the prefix-channel cell dangling.
+    write_json_discovery(discovery["gpui"], ["suite::alpha_ok"])
+    report = run_interaction(tmp, INTERACTION_ROWS, discovery)
+    check(report["status"] == "fail", "deleting an interaction anchor fails the run")
+    check(
+        report["counts"]["interaction_dangling"] == 2,
+        "both interaction channels report dangling",
+    )
+    by_subject = {item["subject_id"]: item for item in report["dangling"]}
+    check(
+        by_subject["mc00-nav-keyboard"]["test_id"] == INTERACTION_ICED_TEST
+        and by_subject["mc00-nav-keyboard"]["frontend"] == "iced"
+        and by_subject["mc00-nav-keyboard"]["subject_kind"] == "interaction",
+        "the exact-anchor cell reports its intercepted test id and frontend",
+    )
+    check(
+        by_subject["mc00-page-sweep"]["channel"] == "case-prefix"
+        and by_subject["mc00-page-sweep"]["test_id"] == "mc00_page_sweep_case_*",
+        "the GPUI row reports the stable case-prefix channel",
+    )
+    check(
+        report["counts"]["dangling"] == 2,
+        "interaction dangling feeds the shared dangling count",
+    )
+    check(
+        report["counts"]["interaction_anchored"] == 3,
+        "dangling cells are still counted as anchored declarations",
+    )
+
+
+def test_interaction_matrix_malformed() -> None:
+    check_interaction_error(
+        [interaction_row("case-a", "gpui", subject_kind="facet")],
+        "unknown interaction subject_kind is rejected",
+    )
+    check_interaction_error(
+        [interaction_row("case-a", "gtk")],
+        "unknown interaction frontend is rejected",
+    )
+    check_interaction_error(
+        [interaction_row("case-a", "gpui", target="bin")],
+        "unknown interaction target is rejected",
+    )
+    check_interaction_error(
+        [interaction_row("case-a", "iced")],
+        "an implicit anchor channel is rejected for a frontend without one",
+    )
+    check_interaction_error(
+        [
+            interaction_row(
+                "case-a", "gpui", paths="success|failure", contract_tag="failure"
+            )
+        ],
+        "contract_tag must be the first paths token",
+    )
+    check_interaction_error(
+        [interaction_row("case-a", "gpui"), interaction_row("case-a", "gpui")],
+        "duplicate (frontend, case_id) matrix cells are rejected",
+    )
+    check_interaction_error(
+        [interaction_row("case-a", "gpui", paths="")],
+        "an empty paths declaration is rejected",
+    )
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        manifest = write_manifest(tmp / "manifest.tsv", BASE_ROWS)
+        discovery = base_discovery(tmp)
+        try:
+            resolver.resolve(
+                namespace(
+                    manifest, discovery, tmp, interaction_matrix=tmp / "missing.tsv"
+                )
+            )
+        except resolver.ResolveError:
+            check(True, "a missing interaction matrix is a fatal usage error")
+        else:
+            check(False, "a missing interaction matrix is a fatal usage error")
+
+        bad = tmp / "bad.tsv"
+        bad.write_text("case_id\tfrontend\ttest_name\ncase-a\tgpui\t-\n", encoding="utf-8")
+        try:
+            resolver.resolve(
+                namespace(manifest, discovery, tmp, interaction_matrix=bad)
+            )
+        except resolver.ResolveError:
+            check(True, "an unexpected interaction matrix header is rejected")
+        else:
+            check(False, "an unexpected interaction matrix header is rejected")
+
+
+def test_interaction_frontend_needs_discovery(tmp: Path) -> None:
+    manifest = write_manifest(
+        tmp / "manifest.tsv",
+        [manifest_row("alpha", "gpui", anchor="suite::alpha_ok")],
+    )
+    matrix = write_interaction_matrix(
+        tmp / "interaction.tsv",
+        [interaction_row("case-a", "iced", test_name="suite::beta_ok")],
+    )
+    discovery = {"gpui": write_json_discovery(tmp / "gpui.json", ["suite::alpha_ok"])}
+    try:
+        resolver.resolve(
+            namespace(manifest, discovery, tmp, interaction_matrix=matrix)
+        )
+    except resolver.ResolveError:
+        check(True, "an interaction-only frontend still requires discovery")
+    else:
+        check(False, "an interaction-only frontend still requires discovery")
+
+
+def test_interaction_matrix_absent_leaves_report_unchanged(tmp: Path) -> None:
+    report = run(tmp, BASE_ROWS, base_discovery(tmp))
+    check(
+        report["interaction_matrix"]
+        == {"path": None, "cases": 0, "anchored": 0, "dangling": 0},
+        "without --interaction-matrix the report stays interaction-empty",
+    )
+    check(
+        report["counts"]["interaction_cells"] == 0
+        and report["counts"]["interaction_dangling"] == 0,
+        "without --interaction-matrix no interaction count moves",
+    )
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
@@ -419,6 +685,11 @@ def main() -> int:
         test_auto_scope_short_circuit(tmp)
         test_auto_scope_relevant_runs(tmp)
         test_platform_column_is_reserved(tmp)
+        test_interaction_matrix_resolves(tmp)
+        test_interaction_matrix_dangling(tmp)
+        test_interaction_matrix_malformed()
+        test_interaction_frontend_needs_discovery(tmp)
+        test_interaction_matrix_absent_leaves_report_unchanged(tmp)
 
     if FAILURES:
         print(f"\nself-test: FAIL ({len(FAILURES)}/{CHECKS} checks failed)")

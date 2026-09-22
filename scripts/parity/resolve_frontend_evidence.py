@@ -7,8 +7,10 @@ reads the committed declaration manifest and checks that every declared
 
 Contract
 --------
-* Reads committed declaration data (the manifest) and environment discovery
-  (`cargo nextest list --message-format json`, or the plain `--list` text).
+* Reads committed declaration data (the manifest and, with
+  `--interaction-matrix`, the unified interaction matrix) and environment
+  discovery (`cargo nextest list --message-format json`, or the plain `--list`
+  text).
 * Never reads production Rust source; it only does set membership between a
   declared test id and the discovered test ids.  This keeps the repository
   discipline "tests prove behavior, never source text".
@@ -25,6 +27,28 @@ Contract
 * `platform` is the reserved P5 axis (empty field = frontend axis).  Like
   `contract_tag` it is an opaque field here: the resolver requires the column
   and accepts an empty value, it does not define the vocabulary.
+
+Interaction matrix (`--interaction-matrix PATH`)
+-----------------------------------------------
+The unified `cross_frontend_matrix.tsv` carries interaction-case declarations
+that used to live in three per-frontend matrices.  This resolver consumes it as
+a second declaration source: one row per `(frontend, case_id)`:
+
+* `subject_kind` must be `interaction` (new subject type; the resolver reports
+  interaction entries with `subject_kind="interaction"` and never mixes them
+  into the manifest's `facet` grid counts).
+* `case_id` / `frontend` / `p0_id` / `target` (gui|lib) / `paths` /
+  `capture_scenarios` keep their matrix semantics.
+* `contract_tag` must equal the first `paths` token (the row's primary contract
+  tag).  The vocabulary authority stays the Rust `ContractTag` enum; this
+  resolver only checks the matrix-internal equality and never defines tags.
+* `platform` stays the same reserved, opaque column as in the manifest.
+* Anchor source recognition: a row with an explicit `test_name` resolves by
+  exact nextest membership (iced/bevy rows).  A row whose `test_name` is `-`
+  uses the owning frontend's stable case-prefix channel instead (GPUI:
+  `<case_id>` with `-` normalized to `_`, plus `_case_`); the resolver accepts
+  that channel only for the frontends in `CASE_PREFIX_CHANNELS`.  Either way a
+  missing anchor is `dangling` (R4) and fails the run.
 
 Scopes
 ------
@@ -80,6 +104,43 @@ MANIFEST_FIELDS = (
 # non-ready statuses (a rule owned by the structural gate), and `platform` is
 # the reserved axis above.
 OPTIONAL_FIELDS = ("reason", "platform")
+
+# Unified interaction matrix (`--interaction-matrix`).  One row per
+# `(frontend, case_id)`.  The column set is the matrix schema plus the
+# manifest's `contract_tag`/`platform` semantics; the resolver treats
+# `contract_tag` as an opaque id and only checks the declared
+# `contract_tag == first paths token` equality.
+INTERACTION_FIELDS = (
+    "subject_kind",
+    "case_id",
+    "frontend",
+    "p0_id",
+    "target",
+    "test_name",
+    "paths",
+    "capture_scenarios",
+    "contract_tag",
+    "platform",
+)
+
+# The only subject_kind the unified matrix may declare today.  Reserved future
+# kinds (for example `requirement`) must be added deliberately, together with
+# their resolution rule, not silently accepted.
+INTERACTION_SUBJECT_KIND = "interaction"
+
+# Matrix `target` vocabulary.  It selects which nextest binary the anchor
+# belongs to in the owning frontend, mirroring the per-frontend validators.
+INTERACTION_TARGETS = {"gui", "lib"}
+
+# Frontends whose matrix rows are allowed to leave `test_name` empty and declare
+# the stable case-prefix channel instead of an explicit test id.  Any other
+# frontend must name its test: a silent prefix convention there would be
+# unverifiable.
+CASE_PREFIX_CHANNELS = {"gpui"}
+
+# The unified matrix keeps `p0_id` and `capture_scenarios` as declared data.
+# `-` is the committed "no value" marker; `platform` may be empty (reserved).
+INTERACTION_DASH_FIELDS = ("p0_id", "capture_scenarios")
 
 EVIDENCE_KINDS = {"behavior", "visual", "none", "pending"}
 STATUSES = {"ready", "partial", "missing", "unsupported", "pending"}
@@ -299,6 +360,78 @@ def read_manifest(path: Path) -> list[dict[str, str]]:
     return rows
 
 
+def read_interaction_matrix(path: Path) -> list[dict[str, str]]:
+    """Read the unified interaction matrix (`--interaction-matrix`).
+
+    Structural rules only: the schema, the `interaction` subject kind, the
+    frontend/target vocabulary the resolver can actually resolve against, the
+    `contract_tag == first paths token` matrix-internal equality, and the
+    per-frontend `(frontend, case_id)` key.  No contract-tag vocabulary and no
+    capture-scenario resolution happen here; those stay with the Rust authority
+    and the per-frontend capture validators.
+    """
+    if not path.is_file():
+        raise ResolveError(f"interaction matrix not found: {path}")
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        data_lines = [
+            line for line in handle
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+    reader = csv.DictReader(data_lines, delimiter="\t")
+    if tuple(reader.fieldnames or ()) != INTERACTION_FIELDS:
+        raise ResolveError(
+            f"{path}: expected fields {INTERACTION_FIELDS}, got {reader.fieldnames}"
+        )
+    rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for lineno, row in enumerate(reader, start=2):
+        if any(value is None for value in row.values()):
+            raise ResolveError(f"{path}:{lineno}: malformed row (wrong field count)")
+        missing = [
+            field for field in INTERACTION_FIELDS
+            if row[field].strip() == ""
+            and field not in INTERACTION_DASH_FIELDS
+            and field != "platform"
+        ]
+        if missing:
+            raise ResolveError(f"{path}:{lineno}: empty field(s): {', '.join(missing)}")
+        if row["subject_kind"].strip() != INTERACTION_SUBJECT_KIND:
+            raise ResolveError(
+                f"{path}:{lineno}: unknown subject_kind {row['subject_kind']!r} "
+                f"(the unified matrix only declares {INTERACTION_SUBJECT_KIND!r})"
+            )
+        if row["frontend"].strip() not in FRONTEND_PACKAGES:
+            raise ResolveError(
+                f"{path}:{lineno}: unknown frontend {row['frontend']!r}"
+            )
+        if row["target"].strip() not in INTERACTION_TARGETS:
+            raise ResolveError(f"{path}:{lineno}: unknown target {row['target']!r}")
+        test_name = row["test_name"].strip()
+        if test_name == "-" and row["frontend"].strip() not in CASE_PREFIX_CHANNELS:
+            raise ResolveError(
+                f"{path}:{lineno}: frontend {row['frontend']!r} has no stable "
+                "case-prefix channel; test_name must name its anchor"
+            )
+        paths = [token for token in row["paths"].split("|") if token]
+        if not paths:
+            raise ResolveError(f"{path}:{lineno}: empty paths declaration")
+        if row["contract_tag"].strip() != paths[0]:
+            raise ResolveError(
+                f"{path}:{lineno}: contract_tag {row['contract_tag']!r} is not the "
+                f"first paths token {paths[0]!r}"
+            )
+        key = (row["frontend"].strip(), row["case_id"].strip())
+        if key in seen:
+            raise ResolveError(
+                f"{path}:{lineno}: duplicate (frontend, case_id) cell: {key[0]}/{key[1]}"
+            )
+        seen.add(key)
+        rows.append(row)
+    if not rows:
+        raise ResolveError(f"{path}: interaction matrix has no data rows")
+    return rows
+
+
 def parse_json_discovery(text: str) -> set[str]:
     try:
         payload = json.loads(text)
@@ -427,7 +560,11 @@ def split_pairs(values: list[str], label: str) -> dict[str, Path]:
     return result
 
 
-def skipped_report(manifest_path: Path, decision: ScopeDecision) -> dict:
+def skipped_report(
+    manifest_path: Path,
+    decision: ScopeDecision,
+    interaction_path: Path | None = None,
+) -> dict:
     """Report for an `--scope auto` run whose diff cannot move an anchor.
 
     Shaped like a resolved report so every consumer can read one schema; no
@@ -442,9 +579,18 @@ def skipped_report(manifest_path: Path, decision: ScopeDecision) -> dict:
         "dangling": 0,
         "invalid": 0,
         "visual_unverified": 0,
+        "interaction_cells": 0,
+        "interaction_anchored": 0,
+        "interaction_dangling": 0,
     }
     return {
         "manifest": str(manifest_path),
+        "interaction_matrix": {
+            "path": str(interaction_path) if interaction_path else None,
+            "cases": 0,
+            "anchored": 0,
+            "dangling": 0,
+        },
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "status": "pass",
         "skipped": True,
@@ -465,9 +611,17 @@ def resolve(args: argparse.Namespace) -> dict:
         manifest_path = repo / manifest_path
     rows = read_manifest(manifest_path)
 
+    interaction_path = getattr(args, "interaction_matrix", None)
+    interaction_path = Path(interaction_path) if interaction_path else None
+    if interaction_path is not None and not interaction_path.is_absolute():
+        interaction_path = repo / interaction_path
+    interaction_rows = (
+        read_interaction_matrix(interaction_path) if interaction_path else []
+    )
+
     decision = scope_decision_for_run(args, repo)
     if not decision.relevant:
-        return skipped_report(manifest_path, decision)
+        return skipped_report(manifest_path, decision, interaction_path)
 
     provided = split_pairs(args.discovery, "discovery")
     unknown = sorted(set(provided) - set(FRONTEND_PACKAGES))
@@ -476,7 +630,10 @@ def resolve(args: argparse.Namespace) -> dict:
 
     scenarios = split_pairs(args.capture_scenarios, "capture-scenarios")
 
-    required_frontends = sorted({row["frontend"] for row in rows})
+    required_frontends = sorted(
+        {row["frontend"] for row in rows}
+        | {row["frontend"] for row in interaction_rows}
+    )
     badly_named = sorted(set(required_frontends) - set(FRONTEND_PACKAGES))
     if badly_named:
         raise ResolveError(f"manifest uses unknown frontend(s): {', '.join(badly_named)}")
@@ -580,9 +737,54 @@ def resolve(args: argparse.Namespace) -> dict:
         else:  # none
             none += 1
 
+    # Unified interaction matrix: each row is an `interaction` subject whose
+    # anchor resolves against the owning frontend's discovery.  Rows with an
+    # explicit test_name use exact membership; rows on a frontend with the
+    # stable case-prefix channel resolve through `<case_id>_case_*`.
+    interaction_cells = interaction_anchored = interaction_dangling = 0
+    for row in interaction_rows:
+        interaction_cells += 1
+        interaction_anchored += 1
+        frontend = row["frontend"]
+        test_name = row["test_name"]
+        if test_name == "-":
+            prefix = f"{row['case_id'].replace('-', '_')}_case_"
+            if not any(
+                name.rsplit("::", 1)[-1].startswith(prefix)
+                for name in discovered[frontend]
+            ):
+                interaction_dangling += 1
+                dangling.append({
+                    "reason": (
+                        "no discovered test advertises the stable case prefix "
+                        "(R4, case-prefix channel)"
+                    ),
+                    "subject_kind": INTERACTION_SUBJECT_KIND,
+                    "subject_id": row["case_id"],
+                    "frontend": frontend,
+                    "test_id": f"{prefix}*",
+                    "channel": "case-prefix",
+                })
+        elif test_name not in discovered[frontend]:
+            interaction_dangling += 1
+            dangling.append({
+                "reason": "anchor not discovered by cargo nextest list (R4)",
+                "subject_kind": INTERACTION_SUBJECT_KIND,
+                "subject_id": row["case_id"],
+                "frontend": frontend,
+                "test_id": test_name,
+                "channel": "test-name",
+            })
+
     status = "pass" if not dangling and not invalid else "fail"
     return {
         "manifest": str(manifest_path),
+        "interaction_matrix": {
+            "path": str(interaction_path) if interaction_path else None,
+            "cases": interaction_cells,
+            "anchored": interaction_anchored,
+            "dangling": interaction_dangling,
+        },
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "status": status,
         "skipped": False,
@@ -596,6 +798,9 @@ def resolve(args: argparse.Namespace) -> dict:
             "dangling": len(dangling),
             "invalid": len(invalid),
             "visual_unverified": len(visual_unverified),
+            "interaction_cells": interaction_cells,
+            "interaction_anchored": interaction_anchored,
+            "interaction_dangling": interaction_dangling,
         },
         "frontends": {
             frontend: {
@@ -621,6 +826,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--manifest",
         default="scripts/parity/cross_frontend_manifest.tsv",
         help="committed declaration manifest (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--interaction-matrix",
+        default=None,
+        metavar="PATH",
+        help=(
+            "unified interaction matrix (S4) to resolve as a second declaration "
+            "source; each row's anchor is checked against the owning frontend's "
+            "discovery"
+        ),
     )
     parser.add_argument(
         "--discovery",
@@ -692,12 +907,22 @@ def format_summary(report: dict) -> str:
     if report.get("skipped"):
         lines.append("          no test discovery was run; nothing to resolve")
         return "\n".join(lines)
+    interaction = report.get("interaction_matrix") or {}
+    # `counts.dangling` is the shared total (manifest + interaction matrix); the
+    # facet line shows the manifest share so the two sources stay readable.
+    interaction_dangling = int(interaction.get("dangling") or 0)
+    facet_dangling = counts.get("dangling", 0) - interaction_dangling
     lines.append(
         (
-            "cells:    {cells} total | {anchored_behavior} behavior anchors | "
-            "{pending} pending | {none} none | {dangling} dangling | {invalid} invalid"
-        ).format(**counts)
+            "cells:    {cells} manifest cells | {anchored_behavior} behavior anchors | "
+            "{pending} pending | {none} none | {facet_dangling} dangling | {invalid} invalid"
+        ).format(facet_dangling=facet_dangling, **counts)
     )
+    if interaction.get("cases"):
+        lines.append(
+            "matrix:   {cases} interaction cases | {anchored} anchored | "
+            "{dangling} dangling  ({path})".format(**interaction)
+        )
     for frontend, info in report["frontends"].items():
         lines.append(
             f"  {frontend:5s} discovered {info['discovered_tests']} tests  ({info['discovery_source']})"

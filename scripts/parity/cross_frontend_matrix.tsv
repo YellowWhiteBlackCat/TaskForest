@@ -1,0 +1,171 @@
+# Unified cross-frontend interaction matrix (S4).  Committed declaration data only.
+# The three per-frontend matrices in scripts/ remain as compatibility views until S5
+# retires them; this file is the single unified list (one row per (frontend, case_id)).
+# Columns:
+#   subject_kind       `interaction` (schema discriminator; reserved for future
+#                      `requirement` rows)
+#   case_id            stable case id from the owning frontend's matrix
+#   frontend           gpui | iced | tui | bevy
+#   p0_id              public requirement id (scripts/interaction_requirements.tsv);
+#                      `-` where no requirement mapping is declared yet (Bevy rows)
+#   target             gui | lib (matrix semantics preserved)
+#   test_name          nextest test path; `-` when the frontend declares the stable
+#                      case-prefix channel instead (GPUI: `<case_id>_case_*` with
+#                      `-` normalized to `_`)
+#   paths              ordered behavior/contract paths (matrix semantics preserved)
+#   capture_scenarios  `-` or `|`-joined capture scenario names
+#   contract_tag       first `paths` token (the row's primary contract tag); the
+#                      resolver checks this equality.  The vocabulary authority is the
+#                      Rust ContractTag enum; never copy the tag set into TSV/Python/bash.
+#                      Bevy rows expose path tokens the enum does not fold yet: S5 work.
+#   platform           RESERVED P5 axis; empty = frontend axis, opaque here.
+# Anchors are declared by hand (transcribed from the per-frontend matrices on
+# 2026-09-22) and verified by set membership against `cargo nextest list`; test ids
+# are never derived by scanning Rust source.
+subject_kind	case_id	frontend	p0_id	target	test_name	paths	capture_scenarios	contract_tag	platform
+interaction	mc00-page-sweep	gpui	P0-MC-00	gui	-	success|responsive	cpu-gnome-light|processes|services|system	success	
+interaction	mc00-nav-pointer	gpui	P0-MC-00	gui	-	success|pointer	-	success	
+interaction	mc00-nav-complete-pointer	gpui	P0-MC-00	gui	-	success|pointer|cancel	settings	success	
+interaction	mc00-nav-keyboard	gpui	P0-MC-00	gui	-	success|keyboard	keyboard-focus	success	
+interaction	mc01-dynamic-history	gpui	P0-MC-01	lib	-	success|provider-gap	battery-performance|fan-performance	success	
+interaction	mc01-generation-recovery	gpui	P0-MC-01	lib	-	success|provider-gap|recovery	battery-performance|fan-performance	success	
+interaction	mc01-dynamic-readout	gpui	P0-MC-01	lib	-	success	battery-performance|fan-performance	success	
+interaction	mc02-partition	gpui	P0-MC-02	lib	-	success|failure|responsive	partition-disk-usage|partition-disk-usage-compact	success	
+interaction	mc02-partition-recovery	gpui	P0-MC-02	lib	-	success|failure|recovery|responsive	partition-disk-usage|partition-disk-usage-compact|device-disconnected	success	
+interaction	mc02-hotplug	gpui	P0-MC-02	lib	-	success|failure|lifecycle|recovery|responsive	device-disconnected	success	
+interaction	mc03-apps-doubleclick	gpui	P0-MC-03	lib	-	success|pointer|toggle	apps-group-expanded|apps-group-expanded-compact	success	
+interaction	mc03-apps-search	gpui	P0-MC-03	gui	-	success|keyboard|focus	keyboard-focus	success	
+interaction	mc03-app-icon	gpui	P0-MC-03	lib	-	success|failure	apps-identity-matrix|apps-identity-matrix-compact	success	
+interaction	mc03-swap-truth	gpui	P0-MC-03	lib	-	success|failure	apps-zero-gray	success	
+interaction	mc04-gpu-layout	gpui	P0-MC-04	lib	-	success|failure|responsive	gpu|gpu-compact	success	
+interaction	mc04-gpu-metric-families	gpui	P0-MC-04	lib	-	success|failure|responsive	gpu|gpu-compact	success	
+interaction	mc04-gpu-metric-track	gpui	P0-MC-04	lib	-	success|provider-gap	gpu	success	
+interaction	mc04-gpu-metric-generation	gpui	P0-MC-04	lib	-	success|lifecycle|failure	gpu	success	
+interaction	mc04-gpu-panel	gpui	P0-MC-04	lib	-	success|failure	intel-gpu-telemetry	success	
+interaction	mc04-gpu-unavailable	gpui	P0-MC-04	lib	-	failure	intel-gpu-telemetry	failure	
+interaction	mc04-npu-current	gpui	P0-MC-04	lib	-	success|failure|responsive	system-npu|system-npu-compact	success	
+interaction	mc05-units	gpui	P0-MC-05	gui	-	success|pointer|isolation	settings|compact-settings	success	
+interaction	mc05-sidebar-edit	gpui	P0-MC-05	gui	-	success|pointer	sidebar-edit	success	
+interaction	mc05-sidebar-order	gpui	P0-MC-05	gui	-	success|pointer|responsive	-	success	
+interaction	mc05-sidebar-keyboard	gpui	P0-MC-05	gui	-	success|keyboard	sidebar-hidden|sidebar-hidden-compact	success	
+interaction	mc05-color-isolation	gpui	P0-MC-05	gui	-	success|isolation	settings-windows-dark	success	
+interaction	mc05-switch-isolation	gpui	P0-MC-05	gui	-	success|isolation	settings-switch-focus	success	
+interaction	mc05-density	gpui	P0-MC-05	gui	-	success|responsive	compact-processes	success	
+interaction	mc06-ctrl-pause	gpui	P0-MC-06	gui	-	success|keyboard|lifecycle	telemetry-paused|telemetry-paused-compact	success	
+interaction	mc06-pause-shortcut	gpui	P0-MC-06	gui	-	success|keyboard	telemetry-paused	success	
+interaction	mc06-system-about	gpui	P0-MC-06	gui	-	success|keyboard|cancel	system-about|system-about-compact	success	
+interaction	mc06-about	gpui	P0-MC-06	gui	-	success|pointer|cancel	about|about-compact	success	
+interaction	mc06-first-run	gpui	P0-MC-06	gui	-	success|failure|cancel|pointer	first-run|first-run-compact	success	
+interaction	mc06-modal-cancel	gpui	P0-MC-06	gui	-	cancel|failure	-	cancel	
+interaction	mc06-modal-focus	gpui	P0-MC-06	gui	-	focus|keyboard|cancel	keyboard-focus	focus	
+interaction	mc07-focus-modality	gpui	P0-MC-07	gui	-	success|focus|keyboard|pointer|isolation	keyboard-focus|settings-switch-focus	success	
+interaction	mc07-compact-matrix	gpui	P0-MC-07	lib	-	responsive|failure	compact-performance|compact-processes|compact-settings	responsive	
+interaction	mc07-skins	gpui	P0-MC-07	lib	-	responsive	cpu-gnome-light|cpu-windows-dark|cpu-macos-light|cpu-kde-dark	responsive	
+interaction	mc07-capture-readiness	gpui	P0-MC-07	lib	-	evidence|failure	about|about-compact	evidence	
+interaction	mc00-page-sweep	iced	P0-MC-00	lib	ui::tests::pages::pages_cover_the_six_shared_pages	success|responsive	cpu|applications|services|system	success	
+interaction	mc00-nav-pointer	iced	P0-MC-00	lib	app::tests::visual_navigation::page_navigation_persists_the_remember_last_token	success|pointer|lifecycle	-	success	
+interaction	mc00-nav-keyboard	iced	P0-MC-00	lib	app::alerts::tests::alt_eight_opens_the_alerts_route	success|keyboard	-	success	
+interaction	mc00-nav-keyboard-normalization	iced	P0-MC-00	lib	keys::tests::alt_digit_chords_select_pages	success|keyboard	-	success	
+interaction	mc00-nav-keyboard-precedence	iced	P0-MC-00	lib	app::alerts::tests::alt_eight_does_not_open_the_route_beneath_a_modal	keyboard|failure|cancel	-	keyboard	
+interaction	mc01-battery-fan-windows	iced	P0-MC-01	lib	ui::tests::perf_device_graphs::battery_and_fan_per_device_windows_resolve_and_render	success|provider-gap	battery|fan	success	
+interaction	mc01-battery-readout	iced	P0-MC-01	lib	ui::tests::battery::battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_honest	success|failure	battery	success	
+interaction	mc01-dynamic-indices	iced	P0-MC-01	lib	ui::tests::devices::performance_rail_keeps_dynamic_device_indices_like_gpui	success|lifecycle|responsive	cpu	success	
+interaction	mc01-series-epochs	iced	P0-MC-01	lib	app::projection_caches::tests::dual_device_series_is_reused_per_epoch_and_never_crosses_keys	success|recovery	battery|fan	success	
+interaction	mc02-disk-summary	iced	P0-MC-02	lib	ui::tests::devices::disk_summary_projects_real_rates_active_time_smart_and_partition_space	success	disk	success	
+interaction	mc02-disk-states	iced	P0-MC-02	lib	ui::tests::devices::disk_section_state_distinguishes_loading_empty_and_ready	success|failure|recovery	disk|disk-compact	success	
+interaction	mc02-smart-dialog	iced	P0-MC-02	lib	app::tests_parity::disk_smart_dialog_is_a_real_local_view	success|cancel	-	success	
+interaction	mc02-scan-cancel	iced	P0-MC-02	lib	ui::directory_usage::tests::an_active_scan_of_this_disk_toggles_to_cancel_by_scan_id	cancel	disk	cancel	
+interaction	mc03-tree-activation	iced	P0-MC-03	lib	app::tests::activate_tree_node_toggles_subtree_and_selects_parent	success|pointer|toggle	applications	success	
+interaction	mc03-app-aggregate	iced	P0-MC-03	lib	app::tests::application_aggregate_selection_stays_pidless	success|pointer|toggle	applications	success	
+interaction	mc03-row-click-modifiers	iced	P0-MC-03	lib	app::tests::row_click_branches_on_live_modifier_state	success|pointer	applications	success	
+interaction	mc03-search-focus	iced	P0-MC-03	lib	app::tests::selection_keys_do_not_steal_focus_from_the_search_field_or_empty_table	keyboard|focus|failure	-	keyboard	
+interaction	mc03-column-drag	iced	P0-MC-03	lib	app::update::columns::tests::drag_session_derives_width_from_pointer_deltas	success|pointer	applications-compact	success	
+interaction	mc03-icons	iced	P0-MC-03	lib	icons::tests::every_semantic_icon_has_an_iced_asset_handle	success|failure	-	success	
+interaction	mc03-swap-truth	iced	P0-MC-03	lib	ui::tests::pages::apps_resource_projection_preserves_typed_pss_swap_and_measured_zero	success|failure	applications	success	
+interaction	mc04-gpu-layout	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact	success|responsive	gpu|gpu-compact	success	
+interaction	mc04-gpu-unavailable	iced	P0-MC-04	lib	ui::tests::devices::gpu_summary_keeps_honest_dashes_for_unavailable_fields	failure	gpu	failure	
+interaction	mc04-gpu-metric-projection	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_projection_defaults_to_utilization_and_gates_families	success	gpu	success	
+interaction	mc04-gpu-metric-select	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_selects_through_the_shared_gate	success|toggle	gpu	success	
+interaction	mc04-gpu-metric-unavailable	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_selected_unavailable_stays_explicit	failure	gpu	failure	
+interaction	mc04-gpu-metric-generation	iced	P0-MC-04	lib	ui::perf_devices::tests::gpu_chart_metric_generation_change_resets_to_the_default	lifecycle	gpu	lifecycle	
+interaction	mc04-engine-failures	iced	P0-MC-04	lib	ui::perf_devices::tests::engine_rows_failure_keys_cover_every_typed_kind	failure	gpu	failure	
+interaction	mc04-npu	iced	P0-MC-04	lib	ui::tests::pages::npu_view_model_keeps_all_current_facts_and_marks_missing_values	success|failure|responsive	system|system-compact	success	
+interaction	mc05-unit-matrix	iced	P0-MC-05	lib	ui::tests::pages::unit_matrix_preference_switches_bytes_bits_and_base	success	-	success	
+interaction	mc05-rate-units	iced	P0-MC-05	lib	ui::tests::devices_visibility::rate_text_pref_honors_bytes_bits_and_base_ladders	success	network	success	
+interaction	mc05-sidebar-keyboard	iced	P0-MC-05	lib	app::tests::visual_navigation::f9_toggles_the_performance_sidebar	success|keyboard	gpu	success	
+interaction	mc05-device-visibility	iced	P0-MC-05	lib	ui::tests::devices_visibility::device_visibility_preferences_filter_the_selector_rail	success|toggle	-	success	
+interaction	mc05-graph-hover	iced	P0-MC-05	lib	perf_chart::tests::hover_state_tracks_cursor_motion_and_clears_on_cursor_left	success|pointer	cpu	success	
+interaction	mc05-hover-index	iced	P0-MC-05	lib	perf_chart::tests::hovered_index_maps_cursor_x_to_the_nearest_sample	success|pointer|failure	-	success	
+interaction	mc05-chart-slot-hover	iced	P0-MC-05	lib	ui::device_chart::device_chart_tests::multi_chart_hover_tracks_the_capacity_slot_grid	success|pointer	gpu	success	
+interaction	mc05-history-recovery	iced	P0-MC-05	lib	app::history_replay::tests::loading_and_failed_refresh_keep_the_labelled_last_good_graph_projection	failure|recovery	-	failure	
+interaction	mc05-density	iced	P0-MC-05	lib	theme::tests::row_padding_maps_the_shared_density_tokens	success|responsive	-	success	
+interaction	mc05-settings-round-trip	iced	P0-MC-05	lib	app::tests_parity::settings_change_round_trips_through_the_store_and_rebuilds_the_theme	success|isolation	-	success	
+interaction	mc05-config-isolation	iced	P0-MC-05	lib	app::tests::visual_navigation::demo_instances_use_isolated_throwaway_config_paths	isolation	-	isolation	
+interaction	mc05-config-rollback	iced	P0-MC-05	lib	app::tests_parity::settings_and_appearance::rejected_config_submission_rolls_renderer_preferences_back_to_canonical	failure|recovery	-	failure	
+interaction	mc06-hold-ctrl-pause	iced	P0-MC-06	lib	app::tests::holding_ctrl_pauses_and_releasing_resumes_telemetry_refresh	success|keyboard|lifecycle	-	success	
+interaction	mc06-pause-shortcut	iced	P0-MC-06	lib	app::tests::ctrl_space_toggles_the_manual_telemetry_pause_through_the_keyboard_lane	success|keyboard	-	success	
+interaction	mc06-local-modals	iced	P0-MC-06	lib	app::tests_parity::local_modals_open_close_and_swallow_quit_keys	success|keyboard|cancel	-	success	
+interaction	mc06-about-copy	iced	P0-MC-06	lib	ui::about::tests::copy_about_details_message_records_the_footer_feedback	success|cancel	-	success	
+interaction	mc06-first-run-failure	iced	P0-MC-06	lib	app::update::first_run::tests::request_action_without_a_platform_folds_the_typed_failure_and_stays_shown	success|failure|cancel	-	success	
+interaction	mc06-modal-focus-restore	iced	P0-MC-06	lib	app::tests::modal_opening_captures_a_renderer_trigger_and_dismissal_clears_it	focus|cancel	-	focus	
+interaction	mc06-modal-focus-scope	iced	P0-MC-06	lib	app::tests::modal_focus_commands_enter_and_remain_inside_the_modal_scope	focus|keyboard	-	focus	
+interaction	mc06-service-cancel	iced	P0-MC-06	lib	app::tests::settings_and_service_control_tests::service_control_cancel_dismisses_without_submitting	cancel	-	cancel	
+interaction	mc07-focus-visible	iced	P0-MC-07	lib	theme::tests::focus_ring_consumes_the_shared_ring_token_and_follows_focus_visible	success|focus	-	success	
+interaction	mc07-focus-isolation	iced	P0-MC-07	lib	app::tests::table_focus_is_renderer_local_but_selection_stays_in_the_shell	success|focus|isolation	-	success	
+interaction	mc07-responsive-thresholds	iced	P0-MC-07	lib	ui::responsive::responsive_tests::shared_thresholds_flip_exactly_at_the_gpui_boundaries	success|responsive	cpu-compact|applications-compact	success	
+interaction	mc07-compact-mirror	iced	P0-MC-07	lib	app::tests::compact_breakpoint_mirrors_gpui_responsive_policy	success|responsive	-	success	
+interaction	mc07-virtual-window	iced	P0-MC-07	lib	ui::tests::views::applications_row_materialization_is_bounded_to_the_virtual_window	success|responsive	applications-compact	success	
+interaction	mc07-skins	iced	P0-MC-07	lib	theme::tests::every_skin_variant_resolves_an_iced_theme	success|responsive	-	success	
+interaction	mc07-capture-readiness	iced	P0-MC-07	lib	capture::tests::marker_line_has_typed_capture_identity	evidence|success	-	evidence	
+interaction	bev-route-keyboard	bevy	-	lib	app::tests::keypress_moves_the_route_and_remounts_one_page_under_the_slot	keyboard|route|success	-	keyboard	
+interaction	bev-route-programmatic	bevy	-	lib	app::tests::programmatic_transition_remounts_through_the_observer_chain	route|lifecycle|success	-	route	
+interaction	bev-route-history	bevy	-	lib	app::tests::shared_page_chords_route_chord_for_chord_like_the_tui	keyboard|route|history	-	keyboard	
+interaction	bev-input-router	bevy	-	lib	input_contract::tests::bevy_page_keys_use_the_shared_router_and_reject_wrong_chords	keyboard|focus|failure	-	keyboard	
+interaction	bev-input-ime	bevy	-	lib	input_contract::tests::focus_traversal_and_process_shortcuts_honor_scope_and_text_input	focus|keyboard|success	-	focus	
+interaction	bev-input-semantic	bevy	-	lib	input_contract::tests::semantic_addresses_are_stable_across_rebuilds	focus|accessibility|lifecycle	-	focus	
+interaction	bev-tree-projection	bevy	-	lib	pages::process_tree::tests::projection_keeps_category_aggregate_and_process_identities_distinct	projection|identity|success	-	projection	
+interaction	bev-tree-collapse	bevy	-	lib	pages::process_tree::tests::process_collapse_hides_only_descendants	keyboard|lifecycle|success	-	keyboard	
+interaction	bev-chart-gaps	bevy	-	lib	widgets::chart::tests::unavailable_samples_break_the_line_instead_of_becoming_zero	projection|failure|success	-	projection	
+interaction	bev-chart-segments	bevy	-	lib	widgets::chart::tests::segment_layout_aims_each_rectangle_from_start_to_end	projection|render|success	-	projection	
+interaction	bev-history-once	bevy	-	lib	pages::history::tests::the_disabled_page_states_itself_exactly_once	projection|failure|lifecycle	-	projection	
+interaction	bev-system-chord	bevy	-	lib	app::tests::every_shared_page_chord_routes_and_system_is_formal	keyboard|route|success	-	keyboard	
+interaction	bev-system-mount	bevy	-	lib	pages::system::tests::the_mounted_page_paints_the_host_once_and_survives_refolds	projection|identity|lifecycle	-	projection	
+interaction	bev-system-facts	bevy	-	lib	pages::system::tests::host_facts_project_with_shared_labels_and_honest_dashes	projection|failure|success	-	projection	
+interaction	bev-svc-menu-arm	bevy	-	lib	pages::services::services_menu_tests::enter_opens_the_menu_and_confirm_arms_the_shared_gate	keyboard|confirmation|success	-	keyboard	
+interaction	bev-svc-menu-cancel	bevy	-	lib	pages::services::services_menu_tests::escape_cancels_the_menu_without_arming_anything	keyboard|confirmation|failure	-	keyboard	
+interaction	bev-svc-menu-closed	bevy	-	lib	pages::services::services_menu_tests::a_closed_menu_consumes_nothing	keyboard|lifecycle|success	-	keyboard	
+interaction	bev-startup-menu	bevy	-	lib	pages::startup::inventory_menu_tests::the_startup_menu_freezes_enable_and_disable_verbs	keyboard|confirmation|success	-	keyboard	
+interaction	bev-sessions-menu	bevy	-	lib	pages::startup::inventory_menu_tests::the_sessions_menu_freezes_disconnect_and_lock_verbs	keyboard|confirmation|success	-	keyboard	
+interaction	bev-menu-cancel	bevy	-	lib	pages::startup::inventory_menu_tests::menus_close_without_arming_on_escape	keyboard|confirmation|failure	-	keyboard	
+interaction	bev-chart-bound	bevy	-	lib	widgets::chart::tests::constant_and_all_unavailable_windows_stay_honest_and_bounded	projection|responsive|success	-	projection	
+interaction	bev-control-disabled	bevy	-	lib	pages::processes::menu::tests::the_menu_projects_unavailable_process_control_as_disabled	confirmation|failure|success	-	confirmation	
+interaction	bev-history-identity	bevy	-	lib	pages::history::tests::stable_typed_identity_joins_three_metrics_without_collapsing_provenance	projection|identity|success	-	projection	
+interaction	bev-history-stale	bevy	-	lib	pages::history::tests::stale_last_good_rows_keep_their_source_window_and_error_is_not_hidden	failure|recovery|success	-	failure	
+interaction	bev-history-empty	bevy	-	lib	pages::history::tests::empty_collecting_and_error_without_last_good_are_distinct_states	failure|lifecycle|success	-	failure	
+interaction	bev-window-drain	bevy	-	lib	window::tests::drain_reaches_the_summary_line_and_initial_refresh_is_one_shot	lifecycle|projection|success	-	lifecycle	
+interaction	bev-input-delete-gate	bevy	-	lib	input::tests::delete_arms_the_shared_gate_and_y_confirms_to_the_end_task_effect	keyboard|confirmation|success	-	keyboard	
+interaction	bev-input-arrows-seam	bevy	-	lib	input::tests::arrows_move_the_shell_cursor_and_the_details_seam_follows	keyboard|navigation|success	-	keyboard	
+interaction	bev-input-search-owner	bevy	-	lib	input::tests::search_typing_folds_into_the_shell_query_and_p_cannot_steal_the_route	keyboard|focus|success	-	keyboard	
+interaction	bev-input-gate-priority	bevy	-	lib	input::tests::navigation_chords_are_swallowed_while_a_gate_is_armed	keyboard|confirmation|lifecycle	-	keyboard	
+interaction	bev-input-escape-dismiss	bevy	-	lib	input::tests::escape_dismisses_the_gate_without_an_effect	keyboard|confirmation|failure	-	keyboard	
+interaction	bev-input-quit-once	bevy	-	lib	input::tests::quit_reason_forwards_app_exit_exactly_once	lifecycle|success	-	lifecycle	
+interaction	bev-confirm-loop	bevy	-	lib	confirmation::tests::delete_arms_the_modal_and_confirm_completes_the_submission_loop	confirmation|success	-	confirmation	
+interaction	bev-confirm-dismiss	bevy	-	lib	confirmation::tests::dismiss_never_submits_and_confirm_reports_through_the_feedback_line	confirmation|failure|success	-	confirmation	
+interaction	bev-confirm-echo	bevy	-	lib	confirmation::tests::the_armed_view_echoes_the_frozen_target	confirmation|identity	-	confirmation	
+interaction	bev-a11y-row-identity	bevy	-	lib	semantic::tests::rows_keep_stable_identity_while_selected_state_follows_the_cursor	accessibility|identity|navigation	-	accessibility	
+interaction	bev-a11y-values	bevy	-	lib	semantic::tests::unavailable_shares_are_announced_unavailable_and_real_values_are_announced	accessibility|failure|success	-	accessibility	
+interaction	bev-a11y-modal-dismiss	bevy	-	lib	semantic::tests::arming_the_gate_surfaces_a_modal_an_at_user_can_dismiss	accessibility|confirmation|success	-	accessibility	
+interaction	bev-table-wheel	bevy	-	lib	pages::processes::tests::wheel_scrolls_map_to_signed_rows_by_unit	projection|navigation|success	-	projection	
+interaction	bev-table-search-display	bevy	-	lib	pages::processes::tests::the_search_input_displays_the_shell_query	projection|focus|success	-	projection	
+interaction	bev-icon-plates	bevy	-	lib	visual_parity_tests::every_drawn_icon_resolves_to_a_correctly_sized_bitmap	identity|render|success	-	identity	
+interaction	bev-icon-stamp	bevy	-	lib	visual_parity_tests::icon_plates_build_and_stamp_onto_spawned_scenes	render|lifecycle|success	-	render	
+interaction	bev-nav-vocabulary	bevy	-	lib	visual_parity_tests::the_nav_tab_set_is_the_shared_page_vocabulary_onto_shared_icons	route|identity|success	-	route	
+interaction	bev-tofu-law	bevy	-	lib	visual_parity_tests::source_carries_no_decoration_codepoints_in_code_position	render|identity|failure	-	render	
+interaction	bev-bounded-lines	bevy	-	lib	visual_parity_tests::bounded_fact_lines_carry_the_single_line_contract	render|layout|success	-	render	
+interaction	bev-sort-indicator	bevy	-	lib	widgets::table::tests::the_sort_indicator_rests_on_exactly_one_column_with_a_typed_direction	projection|render|success	-	projection	
+interaction	bev-log-open-selected	bevy	-	lib	pages::services::service_logs_tests::the_open_affordance_targets_the_selected_service_and_submits_one_follow	render|selection|success	-	render	
+interaction	bev-log-feed-dedup	bevy	-	lib	pages::services::service_logs_tests::folded_snapshots_grow_visible_entries_without_cursor_duplicates	projection|render|success	-	projection	
+interaction	bev-log-status-typed	bevy	-	lib	pages::services::service_logs_tests::the_status_caption_is_a_typed_provider_decision	failure|projection|success	-	failure	
+interaction	bev-log-chord-map	bevy	-	lib	pages::services::service_logs_tests::the_chord_mapping_is_total_and_exclusive	keyboard|render|success	-	keyboard	
+interaction	bev-log-controls-move-state	bevy	-	lib	pages::services::service_logs_tests::panel_controls_actually_move_the_log_state_and_a_stopped_feed_stays_quiet	keyboard|lifecycle|success	-	keyboard	
+interaction	bev-log-repaint-gate	bevy	-	lib	pages::services::service_logs_tests::the_repaint_gate_fires_only_when_a_rendered_fact_moves	render|lifecycle|success	-	render	
