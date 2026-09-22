@@ -165,8 +165,25 @@
 # dash when the observation is absent.  The same batch's sibling honesty test
 # (`memory_stats_rows_render_honest_dashes_when_unavailable`) covers the
 # never-observed demo case.  With this row the sixth batch carries seven
-# anchors; the only remaining surveyed gap in the table is the TUI
-# `power.thermal-zones` cell.
+# anchors.
+#
+# Closing follow-up (2026-09-22, W20 tail): the last surveyed gap - the TUI
+# `power.thermal-zones` cell - was converted to anchored after the TUI line
+# landed the Fan page's SYSTEM thermal-zone group (the perf fan projection's
+# `thermal_zone_lines`: every shared `Temperature` reading, each named by its
+# own source label, an unread channel kept as the shared dash and never a
+# fabricated `0.0 °C`).  The anchor is the painted Fan-page traversal test:
+# one row per temperature reading - including a foreign-device zone the
+# device-level fan context cannot reach - each named by the reading's own
+# label, the unread zone kept as a named dash, and the frame asserted to carry
+# no fabricated `0.0 °C`.  Its sibling tests prove the whole-group admission
+# (a partial zone group is never painted) and the fanless reachability of the
+# same surface; those are supporting evidence, not the anchor.  The committed
+# table now carries 66 anchored rows and no surveyed gap.  The fold itself is
+# unchanged: an anchor attaches only where the feature's whole `Requires` set
+# is `Present` on the platform axis, so this table documents evidence and
+# never forces a `Ready` cell; a future surveyed near-miss must again be
+# committed as an explicit `pending` row.
 feature_id	frontend	test_id	status	note
 handles.enumeration	gpui	gpui_app::process_insights::view::open_files::tests::populated_open_files_render_with_unreadable_marker	anchored	-
 handles.enumeration	iced	ui::insights::tests::open_file_row_marks_an_unreadable_target_not_blank	anchored	-
@@ -213,7 +230,7 @@ storage.swap-throughput	tui	ui::tests::memory_selector_parity::memory_stats_rows
 storage.iops-queue-latency	gpui	gpui_app::perf_views::disk_stats::tests::disk_stats_render_the_observed_iops_latency_and_queue_depth	anchored	-
 power.battery-inventory	gpui	gpui_app::perf_views::dynamic_stats::tests::battery_stats_render_charge_power_voltage_health_and_cycles_with_honest_absence	anchored	-
 power.thermal-zones	gpui	gpui_app::system_health_view::stats::tests::sensor_rows_traverse_every_thermal_zone_reading_and_name_its_source	anchored	-
-power.thermal-zones	tui	-	pending	the fan test asserts a same-device temperature value ("54.5 °C"); the painted source label and any thermal-zone traversal are unasserted
+power.thermal-zones	tui	ui::tests::fan_thermal_render::fan_panel_traverses_every_thermal_zone_reading_and_names_its_source	anchored	-
 services.log-stream	gpui	gpui_app::services_view::log_stream_tests::service_details_paints_the_stream_rows_and_the_level_filter_drops_lower_rows	anchored	-
 memory.page-faults	tui	runtime::tests::process_properties::overview_renders_observed_page_fault_counters	anchored	-
 memory.page-faults	iced	ui::overlays::process_details::vm_parity_tests::observed_fault_and_huge_page_counters_reach_the_rendered_rows	anchored	-

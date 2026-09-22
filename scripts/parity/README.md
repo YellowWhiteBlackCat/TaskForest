@@ -219,16 +219,23 @@ Anchored batches (2026-09-22):
   painted-frame test (`Swap in 2.0 MiB/s` and `Swap out 512.0 KiB/s` on one
   frame through the canonical memory scalar group; a `TimedOut` observation
   keeps both labelled rows on the shared dash, with an explicit
-  no-fabricated-`0 B/s` assertion), leaving the TUI `power.thermal-zones` cell
-  as the table's only surveyed gap.
+  no-fabricated-`0 B/s` assertion). The closing follow-up (W20 tail) then
+  converted the table's last surveyed gap: the TUI `power.thermal-zones` cell
+  is anchored on the Fan page's SYSTEM traversal after the TUI line landed
+  `thermal_zone_lines` - one painted row per shared temperature reading,
+  including a foreign-device zone the device-level fan context cannot reach,
+  each named by the reading's own source label, with an unread channel kept
+  as the named shared dash and the frame asserted to carry no fabricated
+  `0.0 °C`. Its sibling tests (whole-group admission, fanless reachability)
+  are supporting evidence, not the anchor.
 
-The table now carries **65 anchored + 1 `pending`** rows (per frontend: gpui 15,
-iced 17, tui 18, bevy 15 anchored; pending: tui 1). No `pending`
-row remains on a shape whose delivered surface a real test proves.
-Every other source-complete cell keeps its G2 finding until a real test is
-anchored; the batches are a bounded delivery, never a blanket `Ready` claim. A
-`pending` row is a survey record, not a delivery claim, and it never becomes an
-anchor.
+The table now carries **66 anchored + 0 `pending`** rows (per frontend: gpui 15,
+iced 17, tui 19, bevy 15 anchored; no surveyed gap). Every registered cell is
+committed evidence; a new near-miss must again be recorded as an explicit
+`pending` row. Every other source-complete cell keeps its G2 finding until a
+real test is anchored; the batches are a bounded delivery, never a blanket
+`Ready` claim. A `pending` row is a survey record, not a delivery claim, and it
+never becomes an anchor.
 
 ## Unified interaction matrix
 
@@ -420,9 +427,18 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   heavy work). The application target, the scenario row and the matrix row land
   in one change, because the marker validator fails closed on any scenario name
   the application does not emit (`expected one target marker for 'health'`).
-  Until that targeted run lands on a quiet host or CI, the health-modal pixel
-  receipt is a recorded gap: the `power.thermal-zones` pixel cell is a SKIP and
-  the headless anchor above remains its delivered evidence.
+  The targeted run landed 2026-09-22 on a quiet host (clean worktree at
+  `b7686a6b8a2a`): `TM_ICED_CAPTURE_SCENARIOS=health-modal bash
+  scripts/capture-iced.sh` produced
+  `target/iced-evidence/runs/0c738200-7a81-4ab7-95e0-67ec4a688bed/health-modal/image.png`
+  (1368x888, 84052 B) with the matrix validator PASS and the recorded source
+  manifest hash `c83fd5ce3f41973eb0593bb1f50d522e48ee0dd807e361c4b7caa226316f2dee`
+  (recomputed identical from the worktree; the receipt satisfies the iced
+  component of `ui-evidence-route.sh --require-capture`). The frame shows the
+  `Thermal Zone Sensors` title, readable `Package` (51.0 °C) and `acpitz`
+  (57.0 °C) rows, and the honest `nvme` dash, with the alert panel below them
+  in frame, so the `power.thermal-zones` pixel cell is no longer a SKIP; the
+  headless anchor above remains the always-run evidence.
 
 ## Discipline
 

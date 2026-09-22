@@ -626,10 +626,14 @@ fn the_committed_feature_evidence_table_is_structurally_clean() {
 /// evidence families, the swap-in/out throughput rates, the IOPS/queue/latency
 /// fold, and the painted service-log stream under its level filter. A
 /// follow-up in the same batch converted the TUI `storage.swap-throughput`
-/// cell after the TUI line landed its painted swap-rate test, leaving the TUI
-/// `power.thermal-zones` cell as the table's only surveyed gap. The
+/// cell after the TUI line landed its painted swap-rate test. The closing
+/// follow-up (W20 tail) converted the table's last surveyed gap - the TUI
+/// `power.thermal-zones` cell - after the TUI Fan page landed its SYSTEM
+/// thermal-zone traversal (one row per shared temperature reading, each named
+/// by its own source label, an unread channel kept as the shared dash). The
 /// per-frontend anchored counts and the surveyed pending gaps are pinned, so
-/// growing either batch must move this pin in the same change.
+/// growing either batch - or recording a new near-miss as `pending` again -
+/// must move this pin in the same change.
 #[test]
 fn the_first_anchor_batch_is_a_conscious_census() {
     let table = PLATFORM_GATE_POLICY.feature_evidence();
@@ -650,13 +654,13 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        65,
+        66,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
         (FrontendShape::Gpui, 15usize),
         (FrontendShape::Iced, 17),
-        (FrontendShape::Tui, 18),
+        (FrontendShape::Tui, 19),
         (FrontendShape::Bevy, 15),
     ] {
         assert_eq!(
@@ -669,24 +673,24 @@ fn the_first_anchor_batch_is_a_conscious_census() {
             frontend.name()
         );
     }
+    // The survey is closed: every registered cell carries a committed anchor.
+    // This is a census, never a relaxation - a new surveyed near-miss must be
+    // committed as an explicit `pending` row again, and the pending shape
+    // stays covered by the parser counterexamples and the synthetic
+    // evidence-closure witness below.
     assert_eq!(
         table.pending_count(),
-        1,
+        0,
         "the surveyed pending-gap census moved"
     );
-    for row in table.rows().iter().filter(|row| !row.is_anchored()) {
-        assert!(
-            !row.note.is_empty(),
-            "{}: a pending row records its gap",
-            row.feature.id()
-        );
-    }
 }
 
 /// The evidence closure attaches the committed anchor only where the static
 /// source commitment is complete: an undeclared/absent lane keeps
 /// [`NO_EVIDENCE`], a pending row never becomes an anchor, and a complete lane
-/// returns the committed test id.
+/// returns the committed test id. The pending counterexample is built on a
+/// synthetic table because the committed table is fully anchored today; the
+/// rule under test belongs to the fold, not to the current census.
 #[test]
 fn the_evidence_closure_requires_a_complete_source_commitment() {
     let table = PLATFORM_GATE_POLICY.feature_evidence();
@@ -722,17 +726,27 @@ fn the_evidence_closure_requires_a_complete_source_commitment() {
         );
     }
 
-    let pending_feature = FeatureId::ThermalZoneSensors;
-    // The GPUI `storage.smart-health` pair carried this witness until the
-    // sixth batch (W18-A) anchored it. The witness is deliberately the TUI
-    // thermal-zone gap: any change that anchors this cell must re-pick the
-    // witness in the same change, exactly as this batch did.
-    let pending_frontend = FrontendShape::Tui;
+    // A `pending` row is an explicit gap, never an anchor - even when the
+    // feature's whole `Requires` set is `Present`. The committed table has no
+    // pending row left (the survey is closed), so the witness is a synthetic
+    // table with the same shape: without it, deleting the rule would leave the
+    // committed table green.
+    let pending_table = FeatureEvidenceTable::parse(concat!(
+        "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
+        "storage.smart-health\tbevy\t-\tpending\tno Bevy SMART evidence test\n",
+    ));
     assert!(
-        table
+        pending_table.findings().is_empty(),
+        "{:?}",
+        pending_table.findings()
+    );
+    let pending_feature = FeatureId::DiskSmartHealth;
+    let pending_frontend = FrontendShape::Bevy;
+    assert!(
+        pending_table
             .pending_note(pending_feature, pending_frontend)
             .is_some(),
-        "the surveyed gap is committed"
+        "the synthetic witness is a surveyed gap"
     );
     let mut pending_sources = PlatformCapabilitySurface::new();
     for capability in pending_feature.platform_binding().capabilities() {
@@ -742,9 +756,13 @@ fn the_evidence_closure_requires_a_complete_source_commitment() {
             PlatformSource::Present,
         );
     }
-    let closure = PLATFORM_GATE_POLICY.evidence_closure(&pending_sources);
     assert_eq!(
-        closure(pending_feature, pending_frontend, PlatformAxis::Linux),
+        pending_table.ledger_anchor(
+            &pending_sources,
+            pending_feature,
+            pending_frontend,
+            PlatformAxis::Linux,
+        ),
         NO_EVIDENCE,
         "a pending row is an explicit gap, never an anchor"
     );

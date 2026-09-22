@@ -110,7 +110,10 @@ fn the_terminal_difference_set_is_pinned() {
 /// completes the `storage.iops-queue-latency` clauses) plus the sixth batch
 /// (W18-A: `storage.swap-throughput`, the painted `Swap in 2.0 MiB/s` /
 /// `Swap out 512.0 KiB/s` rows with their labelled shared dash when the
-/// observation is unavailable) land in
+/// observation is unavailable) plus the closing follow-up (W20 tail:
+/// `power.thermal-zones`, the Fan page's SYSTEM traversal - one row per
+/// shared temperature reading, each named by its own source label, an unread
+/// channel kept as the named shared dash) land in
 /// `scripts/parity/feature_evidence.tsv`:
 /// every anchored `(feature, frontend)` cell folds to `Ready` on the platform
 /// axis whose static source surface is complete and carries the hand-declared
@@ -214,7 +217,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        18,
+        19,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger
