@@ -92,8 +92,8 @@
 //! ## Coverage status / TODO
 //!
 //! This is the extensible skeleton, not the finished 225-item mapping. `ALL`
-//! registers 45 representative items across the 15 blueprint areas, of which
-//! ten are Wave 3 / Wave 4 deliverables. The remaining blueprint items are a
+//! registers 75 representative items - five per blueprint area - of which ten
+//! are Wave 3 / Wave 4 deliverables. The remaining blueprint items are a
 //! deliberate TODO: they must be added to [`FeatureId`] (with a per-frontend
 //! decision and a semantic specification) rather than claimed as covered. A
 //! gate that never sees a feature cannot protect it.
@@ -279,6 +279,10 @@ pub enum FeatureId {
     ProcessPriorityMapping,
     /// Blueprint item 4: interactive CPU affinity bitmask editing.
     ProcessAffinityMask,
+    /// Blueprint item 5: cascade process-tree control (tree kill).
+    ProcessTreeKill,
+    /// Blueprint item 14: full process ancestry lineage.
+    ProcessAncestorLineage,
     // -- Area 2: memory forensics ------------------------------------------
     /// Blueprint item 16: RSS/PSS/USS and virtual memory breakdown.
     MemoryBreakdownRssPss,
@@ -286,6 +290,10 @@ pub enum FeatureId {
     MemoryVmaMap,
     /// Blueprint item 27: long-term memory leak trend prediction.
     MemoryLeakTrend,
+    /// Blueprint item 19: minor/major page-fault accounting.
+    MemoryPageFaults,
+    /// Blueprint item 23: anonymous transparent huge-page accounting.
+    MemoryTransparentHugePages,
     // -- Area 3: handles and descriptors -----------------------------------
     /// Blueprint item 31: structured FD / handle enumeration.
     HandleEnumeration,
@@ -293,6 +301,10 @@ pub enum FeatureId {
     HandleTypeClassification,
     /// Blueprint item 34: deleted-but-held (ghost) file detection.
     DeletedFileHandleWatch,
+    /// Blueprint item 35: descriptor-limit saturation (RLIMIT_NOFILE).
+    HandleFdLimitSaturation,
+    /// Blueprint item 39: reverse lookup of handles by path.
+    HandleReversePathSearch,
     // -- Area 4: thread topology -------------------------------------------
     /// Blueprint item 46: per-thread topology and resource statistics.
     ThreadTopologyEnumeration,
@@ -300,6 +312,10 @@ pub enum FeatureId {
     ThreadRunqueueLatency,
     /// Blueprint item 47: voluntary / involuntary context switch rates.
     ThreadContextSwitchRates,
+    /// Blueprint item 48: uninterruptible-sleep (D-state) diagnosis.
+    ThreadUninterruptibleSleepDiagnosis,
+    /// Blueprint item 49: kernel wait-channel classification.
+    ThreadWaitChannelClassification,
     // -- Area 5: network and sockets ---------------------------------------
     /// Blueprint item 61: per-process Rx/Tx throughput telemetry.
     ProcessNetworkThroughput,
@@ -307,6 +323,10 @@ pub enum FeatureId {
     SocketInventory,
     /// Blueprint item 64: listening-port topology and conflict warnings.
     ListeningPortTopology,
+    /// Blueprint item 65: per-socket round-trip-time telemetry.
+    SocketRttMetrics,
+    /// Blueprint item 66: socket send/receive queue backlog.
+    SocketQueueBacklog,
     // -- Area 6: storage and filesystem I/O --------------------------------
     /// Blueprint item 76: logical vs physical I/O accounting.
     ProcessLogicalPhysicalIo,
@@ -314,6 +334,10 @@ pub enum FeatureId {
     DiskDeviceTopology,
     /// Blueprint item 78: per-disk IOPS, queue depth and latency.
     DiskIopsQueueLatency,
+    /// Blueprint item 82: NVMe/SATA SMART health and wear readouts.
+    DiskSmartHealth,
+    /// Blueprint item 85: system swap-in/swap-out throughput.
+    SwapThroughputRate,
     // -- Area 7: hardware topology and NUMA --------------------------------
     /// Blueprint item 91: socket -> NUMA -> core -> thread topology tree.
     HardwareTopologyTree,
@@ -321,6 +345,10 @@ pub enum FeatureId {
     CpuCacheTopology,
     /// Blueprint item 94: NUMA node memory distribution and locality.
     NumaMemoryDistribution,
+    /// Blueprint item 92: performance/efficiency core-class breakdown.
+    CpuHeterogeneousCoreClass,
+    /// Blueprint item 98: per-core clock frequency readout.
+    CpuCoreFrequency,
     // -- Area 8: accelerator telemetry -------------------------------------
     /// Blueprint item 106: dGPU / iGPU adapter enumeration.
     GpuAdapterEnumeration,
@@ -328,6 +356,10 @@ pub enum FeatureId {
     NpuTelemetry,
     /// Blueprint item 108: per-engine GPU utilization breakdown.
     GpuEngineUtilization,
+    /// Blueprint item 109: GPU memory usage readout.
+    GpuMemoryReadout,
+    /// Blueprint item 110: per-process GPU attribution.
+    ProcessGpuAttribution,
     // -- Area 9: power and thermal -----------------------------------------
     /// Blueprint item 121: Intel/AMD RAPL hardware power draw.
     RaplPowerDraw,
@@ -335,6 +367,10 @@ pub enum FeatureId {
     ThermalZoneSensors,
     /// Blueprint item 127: CPU C-state residency analysis.
     CpuCStateAnalysis,
+    /// Blueprint item 123: battery charge/power/health inventory.
+    BatteryPowerInventory,
+    /// Blueprint item 126: CPU thermal-throttle (PROCHOT) events.
+    ThermalThrottleEvents,
     // -- Area 10: security isolation ---------------------------------------
     /// Blueprint item 136 / Wave 3 task 1: Linux namespace audit.
     LinuxNamespaceAudit,
@@ -342,6 +378,10 @@ pub enum FeatureId {
     PosixCapabilitiesAudit,
     /// Blueprint item 140: seccomp syscall filter audit.
     SeccompFilterAudit,
+    /// Blueprint item 137: container/sandbox environment identification.
+    SandboxEnvironmentDetection,
+    /// Blueprint item 149: executable/argv0 masquerading detection.
+    ProcessMasqueradingDetection,
     // -- Area 11: services and init ----------------------------------------
     /// Blueprint item 157 / Wave 3 task 3: systemd dependency DAG.
     SystemdDependencyDag,
@@ -349,6 +389,10 @@ pub enum FeatureId {
     ServiceLogStream,
     /// Blueprint item 158: service failure root-cause diagnosis.
     ServiceFailureDiagnosis,
+    /// Blueprint item 151: service unit inventory and status.
+    ServiceInventoryStatus,
+    /// Blueprint item 155: typed service lifecycle control.
+    ServiceLifecycleControl,
     // -- Area 12: pressure and saturation ----------------------------------
     /// Blueprint item 166 / Wave 3 task 5: PSI multi-window telemetry.
     PsiMultiWindowTelemetry,
@@ -356,6 +400,10 @@ pub enum FeatureId {
     MemoryThrashingHealthScore,
     /// Blueprint item 177: USE-methodology bottleneck attribution.
     UseBottleneckAttribution,
+    /// Blueprint item 169: logical-processor-normalized load average.
+    PressureLoadAverageNormalized,
+    /// Blueprint item 178: unresponsive foreground application detection.
+    UnresponsiveAppDetection,
     // -- Area 13: IPC and D-Bus --------------------------------------------
     /// Blueprint item 181 / Wave 4 task 7: D-Bus service topology.
     DbusServiceTopology,
@@ -363,6 +411,10 @@ pub enum FeatureId {
     DbusIntrospection,
     /// Blueprint item 190 / Wave 4 task 8: pipe deadlock diagnosis.
     PipeDeadlockDiagnosis,
+    /// Blueprint item 184: POSIX / System V shared-memory segment inventory.
+    SharedMemorySegments,
+    /// Blueprint item 188: Unix-domain-socket peer topology.
+    UdsPeerTopology,
     // -- Area 14: dynamic tracing ------------------------------------------
     /// Blueprint item 196 / Wave 4 task 9: hardware PMU counter abstraction.
     PmuCounterAbstraction,
@@ -370,6 +422,10 @@ pub enum FeatureId {
     SyscallDistributionProfiling,
     /// Blueprint item 198: slow syscall trap.
     SlowSyscallTrap,
+    /// Blueprint item 202: process fork/exec/exit event trace.
+    ProcessEventTrace,
+    /// Blueprint item 203: CPU stack-sampling flame graph.
+    CpuFlameGraph,
     // -- Area 15: history and time travel ----------------------------------
     /// Blueprint item 211 / Wave 4 task 10: multi-resolution ring buffer.
     MultiResolutionRingBuffer,
@@ -377,6 +433,10 @@ pub enum FeatureId {
     MultiFormatExport,
     /// Blueprint item 212: interactive time-travel scrubber.
     TimeTravelScrubber,
+    /// Blueprint item 218: percentile aggregate analytics (P50/P90/P99).
+    TelemetryPercentileAggregation,
+    /// Blueprint item 223: chart image export (SVG/PNG).
+    HistoryChartImageExport,
 }
 
 impl FeatureId {
@@ -387,48 +447,78 @@ impl FeatureId {
         Self::ProcessSchedulerPolicy,
         Self::ProcessPriorityMapping,
         Self::ProcessAffinityMask,
+        Self::ProcessTreeKill,
+        Self::ProcessAncestorLineage,
         Self::MemoryBreakdownRssPss,
         Self::MemoryVmaMap,
         Self::MemoryLeakTrend,
+        Self::MemoryPageFaults,
+        Self::MemoryTransparentHugePages,
         Self::HandleEnumeration,
         Self::HandleTypeClassification,
         Self::DeletedFileHandleWatch,
+        Self::HandleFdLimitSaturation,
+        Self::HandleReversePathSearch,
         Self::ThreadTopologyEnumeration,
         Self::ThreadRunqueueLatency,
         Self::ThreadContextSwitchRates,
+        Self::ThreadUninterruptibleSleepDiagnosis,
+        Self::ThreadWaitChannelClassification,
         Self::ProcessNetworkThroughput,
         Self::SocketInventory,
         Self::ListeningPortTopology,
+        Self::SocketRttMetrics,
+        Self::SocketQueueBacklog,
         Self::ProcessLogicalPhysicalIo,
         Self::DiskDeviceTopology,
         Self::DiskIopsQueueLatency,
+        Self::DiskSmartHealth,
+        Self::SwapThroughputRate,
         Self::HardwareTopologyTree,
         Self::CpuCacheTopology,
         Self::NumaMemoryDistribution,
+        Self::CpuHeterogeneousCoreClass,
+        Self::CpuCoreFrequency,
         Self::GpuAdapterEnumeration,
         Self::NpuTelemetry,
         Self::GpuEngineUtilization,
+        Self::GpuMemoryReadout,
+        Self::ProcessGpuAttribution,
         Self::RaplPowerDraw,
         Self::ThermalZoneSensors,
         Self::CpuCStateAnalysis,
+        Self::BatteryPowerInventory,
+        Self::ThermalThrottleEvents,
         Self::LinuxNamespaceAudit,
         Self::PosixCapabilitiesAudit,
         Self::SeccompFilterAudit,
+        Self::SandboxEnvironmentDetection,
+        Self::ProcessMasqueradingDetection,
         Self::SystemdDependencyDag,
         Self::ServiceLogStream,
         Self::ServiceFailureDiagnosis,
+        Self::ServiceInventoryStatus,
+        Self::ServiceLifecycleControl,
         Self::PsiMultiWindowTelemetry,
         Self::MemoryThrashingHealthScore,
         Self::UseBottleneckAttribution,
+        Self::PressureLoadAverageNormalized,
+        Self::UnresponsiveAppDetection,
         Self::DbusServiceTopology,
         Self::DbusIntrospection,
         Self::PipeDeadlockDiagnosis,
+        Self::SharedMemorySegments,
+        Self::UdsPeerTopology,
         Self::PmuCounterAbstraction,
         Self::SyscallDistributionProfiling,
         Self::SlowSyscallTrap,
+        Self::ProcessEventTrace,
+        Self::CpuFlameGraph,
         Self::MultiResolutionRingBuffer,
         Self::MultiFormatExport,
         Self::TimeTravelScrubber,
+        Self::TelemetryPercentileAggregation,
+        Self::HistoryChartImageExport,
     ];
 
     /// Stable machine name for gates and diagnostics.
@@ -438,48 +528,78 @@ impl FeatureId {
             Self::ProcessSchedulerPolicy => "process.scheduler-policy",
             Self::ProcessPriorityMapping => "process.priority-mapping",
             Self::ProcessAffinityMask => "process.affinity-mask",
+            Self::ProcessTreeKill => "process.tree-kill",
+            Self::ProcessAncestorLineage => "process.ancestor-lineage",
             Self::MemoryBreakdownRssPss => "memory.breakdown-rss-pss",
             Self::MemoryVmaMap => "memory.vma-map",
             Self::MemoryLeakTrend => "memory.leak-trend",
+            Self::MemoryPageFaults => "memory.page-faults",
+            Self::MemoryTransparentHugePages => "memory.transparent-huge-pages",
             Self::HandleEnumeration => "handles.enumeration",
             Self::HandleTypeClassification => "handles.type-classification",
             Self::DeletedFileHandleWatch => "handles.deleted-file-watch",
+            Self::HandleFdLimitSaturation => "handles.fd-limit-saturation",
+            Self::HandleReversePathSearch => "handles.reverse-path-search",
             Self::ThreadTopologyEnumeration => "threads.topology",
             Self::ThreadRunqueueLatency => "threads.runqueue-latency",
             Self::ThreadContextSwitchRates => "threads.context-switch-rates",
+            Self::ThreadUninterruptibleSleepDiagnosis => "threads.uninterruptible-sleep",
+            Self::ThreadWaitChannelClassification => "threads.wait-channel-classification",
             Self::ProcessNetworkThroughput => "network.process-throughput",
             Self::SocketInventory => "network.socket-inventory",
             Self::ListeningPortTopology => "network.listening-port-topology",
+            Self::SocketRttMetrics => "network.socket-rtt",
+            Self::SocketQueueBacklog => "network.socket-queue-backlog",
             Self::ProcessLogicalPhysicalIo => "storage.process-logical-physical-io",
             Self::DiskDeviceTopology => "storage.device-topology",
             Self::DiskIopsQueueLatency => "storage.iops-queue-latency",
+            Self::DiskSmartHealth => "storage.smart-health",
+            Self::SwapThroughputRate => "storage.swap-throughput",
             Self::HardwareTopologyTree => "hardware.topology-tree",
             Self::CpuCacheTopology => "hardware.cpu-cache-topology",
             Self::NumaMemoryDistribution => "hardware.numa-memory-distribution",
+            Self::CpuHeterogeneousCoreClass => "hardware.heterogeneous-cores",
+            Self::CpuCoreFrequency => "hardware.core-frequency",
             Self::GpuAdapterEnumeration => "gpu.adapter-enumeration",
             Self::NpuTelemetry => "accelerator.npu-telemetry",
             Self::GpuEngineUtilization => "gpu.engine-utilization",
+            Self::GpuMemoryReadout => "gpu.memory-usage",
+            Self::ProcessGpuAttribution => "gpu.process-attribution",
             Self::RaplPowerDraw => "power.rapl-draw",
             Self::ThermalZoneSensors => "power.thermal-zones",
             Self::CpuCStateAnalysis => "power.cstate-analysis",
+            Self::BatteryPowerInventory => "power.battery-inventory",
+            Self::ThermalThrottleEvents => "power.thermal-throttle-events",
             Self::LinuxNamespaceAudit => "security.namespace-audit",
             Self::PosixCapabilitiesAudit => "security.posix-capabilities",
             Self::SeccompFilterAudit => "security.seccomp-filter",
+            Self::SandboxEnvironmentDetection => "security.sandbox-detection",
+            Self::ProcessMasqueradingDetection => "security.masquerading-detection",
             Self::SystemdDependencyDag => "services.dependency-dag",
             Self::ServiceLogStream => "services.log-stream",
             Self::ServiceFailureDiagnosis => "services.failure-diagnosis",
+            Self::ServiceInventoryStatus => "services.inventory",
+            Self::ServiceLifecycleControl => "services.lifecycle-control",
             Self::PsiMultiWindowTelemetry => "pressure.psi-multi-window",
             Self::MemoryThrashingHealthScore => "pressure.memory-thrashing-health",
             Self::UseBottleneckAttribution => "pressure.use-attribution",
+            Self::PressureLoadAverageNormalized => "pressure.load-average-normalized",
+            Self::UnresponsiveAppDetection => "pressure.unresponsive-apps",
             Self::DbusServiceTopology => "ipc.dbus-service-topology",
             Self::DbusIntrospection => "ipc.dbus-introspection",
             Self::PipeDeadlockDiagnosis => "ipc.pipe-deadlock",
+            Self::SharedMemorySegments => "ipc.shared-memory-segments",
+            Self::UdsPeerTopology => "ipc.uds-peer-topology",
             Self::PmuCounterAbstraction => "tracing.pmu-counters",
             Self::SyscallDistributionProfiling => "tracing.syscall-distribution",
             Self::SlowSyscallTrap => "tracing.slow-syscall-trap",
+            Self::ProcessEventTrace => "tracing.process-event-trace",
+            Self::CpuFlameGraph => "tracing.cpu-flame-graph",
             Self::MultiResolutionRingBuffer => "history.multi-resolution-ring",
             Self::MultiFormatExport => "history.multi-format-export",
             Self::TimeTravelScrubber => "history.time-travel-scrubber",
+            Self::TelemetryPercentileAggregation => "history.percentile-aggregation",
+            Self::HistoryChartImageExport => "history.chart-image-export",
         }
     }
 
@@ -489,49 +609,79 @@ impl FeatureId {
         match self {
             Self::ProcessSchedulerPolicy
             | Self::ProcessPriorityMapping
-            | Self::ProcessAffinityMask => FeatureArea::ProcessLifecycle,
-            Self::MemoryBreakdownRssPss | Self::MemoryVmaMap | Self::MemoryLeakTrend => {
-                FeatureArea::MemoryForensics
-            }
+            | Self::ProcessAffinityMask
+            | Self::ProcessTreeKill
+            | Self::ProcessAncestorLineage => FeatureArea::ProcessLifecycle,
+            Self::MemoryBreakdownRssPss
+            | Self::MemoryVmaMap
+            | Self::MemoryLeakTrend
+            | Self::MemoryPageFaults
+            | Self::MemoryTransparentHugePages => FeatureArea::MemoryForensics,
             Self::HandleEnumeration
             | Self::HandleTypeClassification
-            | Self::DeletedFileHandleWatch => FeatureArea::HandleDescriptorAudit,
+            | Self::DeletedFileHandleWatch
+            | Self::HandleFdLimitSaturation
+            | Self::HandleReversePathSearch => FeatureArea::HandleDescriptorAudit,
             Self::ThreadTopologyEnumeration
             | Self::ThreadRunqueueLatency
-            | Self::ThreadContextSwitchRates => FeatureArea::ThreadTopology,
+            | Self::ThreadContextSwitchRates
+            | Self::ThreadUninterruptibleSleepDiagnosis
+            | Self::ThreadWaitChannelClassification => FeatureArea::ThreadTopology,
             Self::ProcessNetworkThroughput
             | Self::SocketInventory
-            | Self::ListeningPortTopology => FeatureArea::NetworkSockets,
+            | Self::ListeningPortTopology
+            | Self::SocketRttMetrics
+            | Self::SocketQueueBacklog => FeatureArea::NetworkSockets,
             Self::ProcessLogicalPhysicalIo
             | Self::DiskDeviceTopology
-            | Self::DiskIopsQueueLatency => FeatureArea::StorageFilesystemIo,
-            Self::HardwareTopologyTree | Self::CpuCacheTopology | Self::NumaMemoryDistribution => {
-                FeatureArea::HardwareTopologyNuma
-            }
-            Self::GpuAdapterEnumeration | Self::NpuTelemetry | Self::GpuEngineUtilization => {
-                FeatureArea::AcceleratorTelemetry
-            }
-            Self::RaplPowerDraw | Self::ThermalZoneSensors | Self::CpuCStateAnalysis => {
-                FeatureArea::PowerThermal
-            }
-            Self::LinuxNamespaceAudit | Self::PosixCapabilitiesAudit | Self::SeccompFilterAudit => {
-                FeatureArea::SecurityIsolation
-            }
-            Self::SystemdDependencyDag | Self::ServiceLogStream | Self::ServiceFailureDiagnosis => {
-                FeatureArea::ServicesInit
-            }
+            | Self::DiskIopsQueueLatency
+            | Self::DiskSmartHealth
+            | Self::SwapThroughputRate => FeatureArea::StorageFilesystemIo,
+            Self::HardwareTopologyTree
+            | Self::CpuCacheTopology
+            | Self::NumaMemoryDistribution
+            | Self::CpuHeterogeneousCoreClass
+            | Self::CpuCoreFrequency => FeatureArea::HardwareTopologyNuma,
+            Self::GpuAdapterEnumeration
+            | Self::NpuTelemetry
+            | Self::GpuEngineUtilization
+            | Self::GpuMemoryReadout
+            | Self::ProcessGpuAttribution => FeatureArea::AcceleratorTelemetry,
+            Self::RaplPowerDraw
+            | Self::ThermalZoneSensors
+            | Self::CpuCStateAnalysis
+            | Self::BatteryPowerInventory
+            | Self::ThermalThrottleEvents => FeatureArea::PowerThermal,
+            Self::LinuxNamespaceAudit
+            | Self::PosixCapabilitiesAudit
+            | Self::SeccompFilterAudit
+            | Self::SandboxEnvironmentDetection
+            | Self::ProcessMasqueradingDetection => FeatureArea::SecurityIsolation,
+            Self::SystemdDependencyDag
+            | Self::ServiceLogStream
+            | Self::ServiceFailureDiagnosis
+            | Self::ServiceInventoryStatus
+            | Self::ServiceLifecycleControl => FeatureArea::ServicesInit,
             Self::PsiMultiWindowTelemetry
             | Self::MemoryThrashingHealthScore
-            | Self::UseBottleneckAttribution => FeatureArea::PressureSaturation,
-            Self::DbusServiceTopology | Self::DbusIntrospection | Self::PipeDeadlockDiagnosis => {
-                FeatureArea::IpcDbus
-            }
+            | Self::UseBottleneckAttribution
+            | Self::PressureLoadAverageNormalized
+            | Self::UnresponsiveAppDetection => FeatureArea::PressureSaturation,
+            Self::DbusServiceTopology
+            | Self::DbusIntrospection
+            | Self::PipeDeadlockDiagnosis
+            | Self::SharedMemorySegments
+            | Self::UdsPeerTopology => FeatureArea::IpcDbus,
             Self::PmuCounterAbstraction
             | Self::SyscallDistributionProfiling
-            | Self::SlowSyscallTrap => FeatureArea::DynamicTracing,
+            | Self::SlowSyscallTrap
+            | Self::ProcessEventTrace
+            | Self::CpuFlameGraph => FeatureArea::DynamicTracing,
             Self::MultiResolutionRingBuffer
             | Self::MultiFormatExport
-            | Self::TimeTravelScrubber => FeatureArea::HistoryTimeTravel,
+            | Self::TimeTravelScrubber
+            | Self::TelemetryPercentileAggregation
+            | Self::HistoryChartImageExport => FeatureArea::HistoryTimeTravel,
         }
     }
 

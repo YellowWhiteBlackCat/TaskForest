@@ -50,50 +50,80 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         FeatureId::ProcessSchedulerPolicy
         | FeatureId::ProcessPriorityMapping
         | FeatureId::ProcessAffinityMask
+        | FeatureId::ProcessTreeKill
         | FeatureId::MemoryBreakdownRssPss
+        | FeatureId::MemoryPageFaults
+        | FeatureId::MemoryTransparentHugePages
         | FeatureId::HandleEnumeration
         | FeatureId::HandleTypeClassification
         | FeatureId::DeletedFileHandleWatch
         | FeatureId::ThreadTopologyEnumeration
         | FeatureId::ThreadRunqueueLatency
+        | FeatureId::ThreadUninterruptibleSleepDiagnosis
+        | FeatureId::ThreadWaitChannelClassification
         | FeatureId::ProcessNetworkThroughput
         | FeatureId::SocketInventory
+        | FeatureId::SocketRttMetrics
         | FeatureId::ProcessLogicalPhysicalIo
         | FeatureId::DiskDeviceTopology
         | FeatureId::DiskIopsQueueLatency
+        | FeatureId::DiskSmartHealth
+        | FeatureId::SwapThroughputRate
         | FeatureId::HardwareTopologyTree
         | FeatureId::CpuCacheTopology
+        | FeatureId::CpuHeterogeneousCoreClass
+        | FeatureId::CpuCoreFrequency
         | FeatureId::GpuAdapterEnumeration
         | FeatureId::NpuTelemetry
         | FeatureId::GpuEngineUtilization
+        | FeatureId::GpuMemoryReadout
         | FeatureId::RaplPowerDraw
         | FeatureId::ThermalZoneSensors
         | FeatureId::CpuCStateAnalysis
+        | FeatureId::BatteryPowerInventory
         | FeatureId::LinuxNamespaceAudit
         | FeatureId::PosixCapabilitiesAudit
         | FeatureId::SeccompFilterAudit
+        | FeatureId::SandboxEnvironmentDetection
+        | FeatureId::ProcessMasqueradingDetection
         | FeatureId::SystemdDependencyDag
         | FeatureId::ServiceLogStream
         | FeatureId::ServiceFailureDiagnosis
+        | FeatureId::ServiceInventoryStatus
+        | FeatureId::ServiceLifecycleControl
         | FeatureId::PsiMultiWindowTelemetry
         | FeatureId::MemoryThrashingHealthScore
+        | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
         | FeatureId::MultiFormatExport => Reference,
 
         // -- roadmap items the reference surface has not delivered yet -----
-        FeatureId::MemoryVmaMap
+        FeatureId::ProcessAncestorLineage
+        | FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend
+        | FeatureId::HandleFdLimitSaturation
+        | FeatureId::HandleReversePathSearch
         | FeatureId::ThreadContextSwitchRates
         | FeatureId::ListeningPortTopology
+        | FeatureId::SocketQueueBacklog
         | FeatureId::NumaMemoryDistribution
+        | FeatureId::ProcessGpuAttribution
+        | FeatureId::ThermalThrottleEvents
         | FeatureId::UseBottleneckAttribution
+        | FeatureId::UnresponsiveAppDetection
         | FeatureId::DbusServiceTopology
         | FeatureId::DbusIntrospection
         | FeatureId::PipeDeadlockDiagnosis
+        | FeatureId::SharedMemorySegments
+        | FeatureId::UdsPeerTopology
         | FeatureId::PmuCounterAbstraction
         | FeatureId::SyscallDistributionProfiling
         | FeatureId::SlowSyscallTrap
-        | FeatureId::TimeTravelScrubber => Unsupported {
+        | FeatureId::ProcessEventTrace
+        | FeatureId::CpuFlameGraph
+        | FeatureId::TimeTravelScrubber
+        | FeatureId::TelemetryPercentileAggregation
+        | FeatureId::HistoryChartImageExport => Unsupported {
             reason: REFERENCE_UNDELIVERED,
         },
     }

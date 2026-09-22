@@ -49,29 +49,43 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         FeatureId::ProcessSchedulerPolicy
         | FeatureId::ProcessPriorityMapping
         | FeatureId::ProcessAffinityMask
+        | FeatureId::ProcessTreeKill
         | FeatureId::MemoryBreakdownRssPss
+        | FeatureId::MemoryPageFaults
+        | FeatureId::MemoryTransparentHugePages
         | FeatureId::HandleEnumeration
         | FeatureId::HandleTypeClassification
         | FeatureId::ThreadTopologyEnumeration
         | FeatureId::ThreadRunqueueLatency
+        | FeatureId::ThreadUninterruptibleSleepDiagnosis
+        | FeatureId::ThreadWaitChannelClassification
         | FeatureId::ProcessNetworkThroughput
         | FeatureId::SocketInventory
+        | FeatureId::SocketRttMetrics
         | FeatureId::ProcessLogicalPhysicalIo
         | FeatureId::DiskDeviceTopology
         | FeatureId::DiskIopsQueueLatency
+        | FeatureId::DiskSmartHealth
+        | FeatureId::SwapThroughputRate
         | FeatureId::HardwareTopologyTree
         | FeatureId::GpuAdapterEnumeration
         | FeatureId::NpuTelemetry
         | FeatureId::GpuEngineUtilization
+        | FeatureId::GpuMemoryReadout
         | FeatureId::CpuCStateAnalysis
         | FeatureId::LinuxNamespaceAudit
         | FeatureId::PosixCapabilitiesAudit
         | FeatureId::SeccompFilterAudit
+        | FeatureId::SandboxEnvironmentDetection
+        | FeatureId::ProcessMasqueradingDetection
         | FeatureId::SystemdDependencyDag
         | FeatureId::ServiceLogStream
         | FeatureId::ServiceFailureDiagnosis
+        | FeatureId::ServiceInventoryStatus
+        | FeatureId::ServiceLifecycleControl
         | FeatureId::PsiMultiWindowTelemetry
         | FeatureId::MemoryThrashingHealthScore
+        | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer => Ported,
 
         // -- deliberate scene reduction -----------------------------------
@@ -79,15 +93,50 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
             reason: "Bevy surfaces the CPU temperature readout without the \
                      thermal-zone source distinction",
         },
+        FeatureId::BatteryPowerInventory => Divergent {
+            reason: "the Bevy battery block renders charge and power without \
+                     the voltage/health/cycle detail",
+        },
 
         // -- typed absences -----------------------------------------------
         FeatureId::DeletedFileHandleWatch => Unsupported {
             reason: "the Bevy open-file summary renders fd/kind/target but does \
                      not surface deleted-but-held descriptors",
         },
+        FeatureId::HandleFdLimitSaturation => Unsupported {
+            reason: "the Bevy open-file summary renders descriptors without the \
+                     RLIMIT_NOFILE saturation context",
+        },
+        FeatureId::HandleReversePathSearch => Unsupported {
+            reason: "no system-wide handle search surface is wired in the Bevy \
+                     shape",
+        },
+        FeatureId::SocketQueueBacklog => Unsupported {
+            reason: "the Bevy connection summary renders state without \
+                     send/receive queue depth",
+        },
+        FeatureId::CpuHeterogeneousCoreClass => Unsupported {
+            reason: "no heterogeneous core-class breakdown is wired in the Bevy \
+                     performance surface",
+        },
+        FeatureId::CpuCoreFrequency => Unsupported {
+            reason: "no per-core clock frequency readout is wired in the Bevy \
+                     performance surface",
+        },
+        FeatureId::ProcessGpuAttribution => Unsupported {
+            reason: "no per-process GPU attribution is wired in the Bevy shape",
+        },
         FeatureId::RaplPowerDraw => Unsupported {
             reason: "no RAPL package-power readout is wired in the Bevy \
                      performance surface",
+        },
+        FeatureId::ThermalThrottleEvents => Unsupported {
+            reason: "no CPU thermal-throttle/PROCHOT event readout is wired in \
+                     the Bevy performance surface",
+        },
+        FeatureId::ProcessAncestorLineage => Unsupported {
+            reason: "the Bevy process surface renders the tree without an \
+                     ancestor lineage chain",
         },
         FeatureId::MultiFormatExport => Unsupported {
             reason: "no structured multi-format export engine is wired in the \
@@ -103,13 +152,20 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::ListeningPortTopology
         | FeatureId::NumaMemoryDistribution
         | FeatureId::UseBottleneckAttribution
+        | FeatureId::UnresponsiveAppDetection
         | FeatureId::DbusServiceTopology
         | FeatureId::DbusIntrospection
         | FeatureId::PipeDeadlockDiagnosis
+        | FeatureId::SharedMemorySegments
+        | FeatureId::UdsPeerTopology
         | FeatureId::PmuCounterAbstraction
         | FeatureId::SyscallDistributionProfiling
         | FeatureId::SlowSyscallTrap
-        | FeatureId::TimeTravelScrubber => Unsupported {
+        | FeatureId::ProcessEventTrace
+        | FeatureId::CpuFlameGraph
+        | FeatureId::TimeTravelScrubber
+        | FeatureId::TelemetryPercentileAggregation
+        | FeatureId::HistoryChartImageExport => Unsupported {
             reason: "no Bevy surface renders this shared projection facet yet",
         },
     }

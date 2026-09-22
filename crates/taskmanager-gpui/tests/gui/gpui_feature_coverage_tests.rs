@@ -70,19 +70,32 @@ fn the_reference_undelivered_set_is_pinned() {
     assert_eq!(
         unsupported,
         [
+            "process.ancestor-lineage",
             "memory.vma-map",
             "memory.leak-trend",
+            "handles.fd-limit-saturation",
+            "handles.reverse-path-search",
             "threads.context-switch-rates",
             "network.listening-port-topology",
+            "network.socket-queue-backlog",
             "hardware.numa-memory-distribution",
+            "gpu.process-attribution",
+            "power.thermal-throttle-events",
             "pressure.use-attribution",
+            "pressure.unresponsive-apps",
             "ipc.dbus-service-topology",
             "ipc.dbus-introspection",
             "ipc.pipe-deadlock",
+            "ipc.shared-memory-segments",
+            "ipc.uds-peer-topology",
             "tracing.pmu-counters",
             "tracing.syscall-distribution",
             "tracing.slow-syscall-trap",
+            "tracing.process-event-trace",
+            "tracing.cpu-flame-graph",
             "history.time-travel-scrubber",
+            "history.percentile-aggregation",
+            "history.chart-image-export",
         ]
     );
 }

@@ -30,8 +30,9 @@ fn declaration_is_total_and_every_absence_is_registered() {
 
 /// The unsupported set is exactly the features this shape does not render; a
 /// new absence cannot appear silently and an unsupported cell always carries
-/// a non-empty reason. The one deliberate reduction (thermal temperature
-/// without the source distinction) is pinned too.
+/// a non-empty reason. The deliberate reductions (thermal temperature without
+/// the source distinction, battery charge/power without the voltage/health/
+/// cycle detail) are pinned too.
 #[test]
 fn the_unsupported_feature_set_is_pinned() {
     let declaration = feature_coverage_declaration();
@@ -45,7 +46,10 @@ fn the_unsupported_feature_set_is_pinned() {
             _ => None,
         })
         .collect();
-    assert_eq!(divergent, ["power.thermal-zones"]);
+    assert_eq!(
+        divergent,
+        ["power.thermal-zones", "power.battery-inventory"]
+    );
 
     let unsupported: Vec<&str> = declaration
         .entries
@@ -60,23 +64,38 @@ fn the_unsupported_feature_set_is_pinned() {
     assert_eq!(
         unsupported,
         [
+            "process.ancestor-lineage",
             "memory.vma-map",
             "memory.leak-trend",
             "handles.deleted-file-watch",
+            "handles.fd-limit-saturation",
+            "handles.reverse-path-search",
             "threads.context-switch-rates",
             "network.listening-port-topology",
+            "network.socket-queue-backlog",
             "hardware.cpu-cache-topology",
             "hardware.numa-memory-distribution",
+            "hardware.heterogeneous-cores",
+            "hardware.core-frequency",
+            "gpu.process-attribution",
             "power.rapl-draw",
+            "power.thermal-throttle-events",
             "pressure.use-attribution",
+            "pressure.unresponsive-apps",
             "ipc.dbus-service-topology",
             "ipc.dbus-introspection",
             "ipc.pipe-deadlock",
+            "ipc.shared-memory-segments",
+            "ipc.uds-peer-topology",
             "tracing.pmu-counters",
             "tracing.syscall-distribution",
             "tracing.slow-syscall-trap",
+            "tracing.process-event-trace",
+            "tracing.cpu-flame-graph",
             "history.multi-format-export",
             "history.time-travel-scrubber",
+            "history.percentile-aggregation",
+            "history.chart-image-export",
         ]
     );
 }

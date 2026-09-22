@@ -49,50 +49,97 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         FeatureId::ProcessSchedulerPolicy
         | FeatureId::ProcessPriorityMapping
         | FeatureId::ProcessAffinityMask
+        | FeatureId::ProcessTreeKill
         | FeatureId::MemoryBreakdownRssPss
+        | FeatureId::MemoryPageFaults
+        | FeatureId::MemoryTransparentHugePages
         | FeatureId::HandleEnumeration
         | FeatureId::HandleTypeClassification
         | FeatureId::DeletedFileHandleWatch
         | FeatureId::ThreadTopologyEnumeration
         | FeatureId::ThreadRunqueueLatency
+        | FeatureId::ThreadUninterruptibleSleepDiagnosis
+        | FeatureId::ThreadWaitChannelClassification
         | FeatureId::ProcessNetworkThroughput
         | FeatureId::SocketInventory
+        | FeatureId::SocketRttMetrics
         | FeatureId::ProcessLogicalPhysicalIo
         | FeatureId::DiskDeviceTopology
         | FeatureId::DiskIopsQueueLatency
+        | FeatureId::DiskSmartHealth
+        | FeatureId::SwapThroughputRate
         | FeatureId::HardwareTopologyTree
         | FeatureId::CpuCacheTopology
+        | FeatureId::CpuHeterogeneousCoreClass
+        | FeatureId::CpuCoreFrequency
         | FeatureId::GpuAdapterEnumeration
         | FeatureId::NpuTelemetry
         | FeatureId::GpuEngineUtilization
+        | FeatureId::GpuMemoryReadout
         | FeatureId::RaplPowerDraw
         | FeatureId::ThermalZoneSensors
         | FeatureId::CpuCStateAnalysis
+        | FeatureId::BatteryPowerInventory
         | FeatureId::LinuxNamespaceAudit
         | FeatureId::PosixCapabilitiesAudit
         | FeatureId::SeccompFilterAudit
+        | FeatureId::SandboxEnvironmentDetection
+        | FeatureId::ProcessMasqueradingDetection
         | FeatureId::SystemdDependencyDag
         | FeatureId::ServiceLogStream
         | FeatureId::ServiceFailureDiagnosis
+        | FeatureId::ServiceInventoryStatus
+        | FeatureId::ServiceLifecycleControl
         | FeatureId::PsiMultiWindowTelemetry
         | FeatureId::MemoryThrashingHealthScore
+        | FeatureId::PressureLoadAverageNormalized
         | FeatureId::MultiResolutionRingBuffer
         | FeatureId::MultiFormatExport => Ported,
 
         // -- typed absences -----------------------------------------------
+        FeatureId::HandleFdLimitSaturation => Unsupported {
+            reason: "the terminal open-file panel renders descriptors without \
+                     the RLIMIT_NOFILE saturation context",
+        },
+        FeatureId::HandleReversePathSearch => Unsupported {
+            reason: "no system-wide handle search surface is wired in the \
+                     terminal",
+        },
+        FeatureId::SocketQueueBacklog => Unsupported {
+            reason: "the terminal connection rows render state without \
+                     send/receive queue depth",
+        },
+        FeatureId::ProcessGpuAttribution => Unsupported {
+            reason: "no per-process GPU attribution is wired in the terminal",
+        },
+        FeatureId::ThermalThrottleEvents => Unsupported {
+            reason: "no CPU thermal-throttle/PROCHOT event readout is wired in \
+                     the terminal",
+        },
+        FeatureId::ProcessAncestorLineage => Unsupported {
+            reason: "the terminal process surface renders the tree without an \
+                     ancestor lineage chain",
+        },
         FeatureId::MemoryVmaMap
         | FeatureId::MemoryLeakTrend
         | FeatureId::ThreadContextSwitchRates
         | FeatureId::ListeningPortTopology
         | FeatureId::NumaMemoryDistribution
         | FeatureId::UseBottleneckAttribution
+        | FeatureId::UnresponsiveAppDetection
         | FeatureId::DbusServiceTopology
         | FeatureId::DbusIntrospection
         | FeatureId::PipeDeadlockDiagnosis
+        | FeatureId::SharedMemorySegments
+        | FeatureId::UdsPeerTopology
         | FeatureId::PmuCounterAbstraction
         | FeatureId::SyscallDistributionProfiling
         | FeatureId::SlowSyscallTrap
-        | FeatureId::TimeTravelScrubber => Unsupported {
+        | FeatureId::ProcessEventTrace
+        | FeatureId::CpuFlameGraph
+        | FeatureId::TimeTravelScrubber
+        | FeatureId::TelemetryPercentileAggregation
+        | FeatureId::HistoryChartImageExport => Unsupported {
             reason: "no terminal surface renders this shared projection facet yet",
         },
     }

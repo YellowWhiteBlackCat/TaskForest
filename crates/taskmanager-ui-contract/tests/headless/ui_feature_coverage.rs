@@ -29,7 +29,7 @@ fn full_declaration(
 /// a conscious registry change.
 #[test]
 fn all_covers_features_exactly_once() {
-    assert_eq!(FeatureId::ALL.len(), 45);
+    assert_eq!(FeatureId::ALL.len(), 75);
     let mut ids: Vec<_> = FeatureId::ALL.iter().map(|feature| feature.id()).collect();
     let count = ids.len();
     ids.sort_unstable();
@@ -41,6 +41,7 @@ fn all_covers_features_exactly_once() {
             .all(|feature| !feature.id().is_empty()),
         "every feature names a stable machine id"
     );
+    assert_eq!(FeatureId::ALL.len(), FeatureArea::ALL.len() * 5);
 }
 
 /// Every feature carries one explicit, non-empty, toolkit-neutral semantic
@@ -59,10 +60,11 @@ fn every_feature_has_explicit_toolkit_neutral_semantic_specification() {
     }
 }
 
-/// Every feature files under a known blueprint area, every area has at least
-/// one registered representative, and the areas themselves are total and
-/// unique. (The 225-item completeness TODO grows the per-area feature count;
-/// it never empties an area.)
+/// Every feature files under a known blueprint area, every area carries
+/// exactly five registered representatives, and the areas themselves are total
+/// and unique. (The 225-item completeness TODO grows the per-area feature
+/// count toward the blueprint's 15; it never empties an area or lets one area
+/// run ahead of the pinned registry shape.)
 #[test]
 fn feature_areas_are_well_formed_and_total() {
     assert_eq!(FeatureArea::ALL.len(), 15);
@@ -84,9 +86,14 @@ fn feature_areas_are_well_formed_and_total() {
         );
     }
     for area in FeatureArea::ALL {
-        assert!(
-            FeatureId::ALL.iter().any(|feature| feature.area() == *area),
-            "area {} needs at least one registered representative",
+        let representatives = FeatureId::ALL
+            .iter()
+            .filter(|feature| feature.area() == *area)
+            .count();
+        assert_eq!(
+            representatives,
+            5,
+            "area {} must register exactly five representatives",
             area.id()
         );
     }
@@ -129,6 +136,128 @@ fn feature_area_classification_is_correct() {
         FeatureId::TimeTravelScrubber.area(),
         FeatureArea::HistoryTimeTravel
     );
+}
+
+/// The bounded parity expansion is pinned per area: the 30 newly registered
+/// features keep their blueprint area assignment and stay `Blueprint225`
+/// (never re-tagged as a Wave deliverable), so a re-filing or a silent drop
+/// cannot slip through unnoticed.
+#[test]
+fn bounded_expansion_features_keep_their_blueprint_areas() {
+    let expansion: [(FeatureArea, &[FeatureId]); 15] = [
+        (
+            FeatureArea::ProcessLifecycle,
+            &[
+                FeatureId::ProcessTreeKill,
+                FeatureId::ProcessAncestorLineage,
+            ],
+        ),
+        (
+            FeatureArea::MemoryForensics,
+            &[
+                FeatureId::MemoryPageFaults,
+                FeatureId::MemoryTransparentHugePages,
+            ],
+        ),
+        (
+            FeatureArea::HandleDescriptorAudit,
+            &[
+                FeatureId::HandleFdLimitSaturation,
+                FeatureId::HandleReversePathSearch,
+            ],
+        ),
+        (
+            FeatureArea::ThreadTopology,
+            &[
+                FeatureId::ThreadUninterruptibleSleepDiagnosis,
+                FeatureId::ThreadWaitChannelClassification,
+            ],
+        ),
+        (
+            FeatureArea::NetworkSockets,
+            &[FeatureId::SocketRttMetrics, FeatureId::SocketQueueBacklog],
+        ),
+        (
+            FeatureArea::StorageFilesystemIo,
+            &[FeatureId::DiskSmartHealth, FeatureId::SwapThroughputRate],
+        ),
+        (
+            FeatureArea::HardwareTopologyNuma,
+            &[
+                FeatureId::CpuHeterogeneousCoreClass,
+                FeatureId::CpuCoreFrequency,
+            ],
+        ),
+        (
+            FeatureArea::AcceleratorTelemetry,
+            &[
+                FeatureId::GpuMemoryReadout,
+                FeatureId::ProcessGpuAttribution,
+            ],
+        ),
+        (
+            FeatureArea::PowerThermal,
+            &[
+                FeatureId::BatteryPowerInventory,
+                FeatureId::ThermalThrottleEvents,
+            ],
+        ),
+        (
+            FeatureArea::SecurityIsolation,
+            &[
+                FeatureId::SandboxEnvironmentDetection,
+                FeatureId::ProcessMasqueradingDetection,
+            ],
+        ),
+        (
+            FeatureArea::ServicesInit,
+            &[
+                FeatureId::ServiceInventoryStatus,
+                FeatureId::ServiceLifecycleControl,
+            ],
+        ),
+        (
+            FeatureArea::PressureSaturation,
+            &[
+                FeatureId::PressureLoadAverageNormalized,
+                FeatureId::UnresponsiveAppDetection,
+            ],
+        ),
+        (
+            FeatureArea::IpcDbus,
+            &[FeatureId::SharedMemorySegments, FeatureId::UdsPeerTopology],
+        ),
+        (
+            FeatureArea::DynamicTracing,
+            &[FeatureId::ProcessEventTrace, FeatureId::CpuFlameGraph],
+        ),
+        (
+            FeatureArea::HistoryTimeTravel,
+            &[
+                FeatureId::TelemetryPercentileAggregation,
+                FeatureId::HistoryChartImageExport,
+            ],
+        ),
+    ];
+    let mut registered = 0usize;
+    for (area, features) in expansion {
+        for feature in features {
+            registered += 1;
+            assert_eq!(feature.area(), area, "{}", feature.id());
+            assert_eq!(
+                feature.origin(),
+                FeatureOrigin::Blueprint225,
+                "{} is an area item, never a wave deliverable",
+                feature.id()
+            );
+            assert!(
+                FeatureId::ALL.contains(feature),
+                "{} must stay registered",
+                feature.id()
+            );
+        }
+    }
+    assert_eq!(registered, 30);
 }
 
 /// All 10 Wave 3 / Wave 4 core deliverables are registered and tagged in the

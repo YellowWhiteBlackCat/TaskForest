@@ -89,11 +89,11 @@ fn report_covers_every_feature_and_platform_exactly_once() {
     }
 }
 
-/// Four frontend declarations fold into the full 540-cell matrix with unique
+/// Four frontend declarations fold into the full 900-cell matrix with unique
 /// keys - the G1 exhaustiveness shape, without copying any frontend truth into
 /// this crate.
 #[test]
-fn four_declarations_fold_into_five_hundred_forty_unique_cells() {
+fn four_declarations_fold_into_nine_hundred_unique_cells() {
     let sources = surface_with_all_required_present();
     let declarations: Vec<_> = FrontendShape::ALL
         .iter()
@@ -454,9 +454,9 @@ fn an_empty_surface_yields_no_ready_cells() {
         }
     }
     assert_eq!(ready, 0, "no undeclared source may ever fold to Ready");
-    assert_eq!(unsupported, 28 * PlatformAxis::ALL.len());
-    assert_eq!(unregistered, 11 * PlatformAxis::ALL.len());
-    assert_eq!(not_applicable, 6 * PlatformAxis::ALL.len());
+    assert_eq!(unsupported, 53 * PlatformAxis::ALL.len());
+    assert_eq!(unregistered, 14 * PlatformAxis::ALL.len());
+    assert_eq!(not_applicable, 8 * PlatformAxis::ALL.len());
 }
 
 /// `Ready` is the static source commitment: it needs a declared entry plus a
