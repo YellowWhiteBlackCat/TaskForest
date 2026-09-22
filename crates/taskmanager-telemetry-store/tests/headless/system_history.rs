@@ -6,10 +6,11 @@ use taskmanager_core::{
     CpuTelemetryObservation, DeviceGeneration, DeviceId, DeviceLifecycle, DevicePresence,
     DeviceState, DeviceStatus, DiskMetrics, FailureKind, GpuEngine, GpuEngineKind, GpuMetrics,
     GpuScalarObservations, GpuTelemetryObservation, HostRuntimeFacts, HostRuntimeObservation,
-    MemoryMetrics, MemoryScalarObservations, MemoryTelemetryObservation, NetworkScalarObservations,
-    NetworkTelemetryObservation, PowerSupplySnapshot, ScalarObservation, ScalarObservationGroup,
-    ScalarObservationSlot, SensorCenterSnapshot, SensorDescriptor, SensorMagnitude,
-    SensorMeasurementObservation, SensorReading, SensorScale, StorageTelemetryObservation,
+    MemoryMetrics, MemoryScalarObservations, MemoryTelemetryObservation, NetworkAdapterType,
+    NetworkScalarObservations, NetworkTelemetryObservation, PowerSupplySnapshot, ScalarObservation,
+    ScalarObservationGroup, ScalarObservationSlot, SensorCenterSnapshot, SensorDescriptor,
+    SensorMagnitude, SensorMeasurementObservation, SensorReading, SensorScale,
+    StorageTelemetryObservation,
 };
 
 use super::*;

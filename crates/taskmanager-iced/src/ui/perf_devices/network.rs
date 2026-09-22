@@ -134,6 +134,37 @@ pub(crate) fn network_summary_lines(
                 .map(|value| format!("{:.0}%", value.round())),
         ));
     }
+    if let Some(mtu) = observed.mtu_bytes {
+        rows.push(StatRow::text(t("net.mtu"), Some(format!("{mtu} B"))));
+    }
+    if let Some(queue) = observed.tx_queue_len {
+        rows.push(StatRow::text(t("net.tx_queue"), Some(queue.to_string())));
+    }
+    let pair = |left: Option<u64>, right: Option<u64>| {
+        format!(
+            "{} / {}",
+            left.map_or_else(|| "—".to_owned(), |value| value.to_string()),
+            right.map_or_else(|| "—".to_owned(), |value| value.to_string()),
+        )
+    };
+    if observed.rx_drops.is_some() || observed.tx_drops.is_some() {
+        rows.push(StatRow::text(
+            t("net.drops"),
+            Some(pair(observed.rx_drops, observed.tx_drops)),
+        ));
+    }
+    if observed.rx_errors.is_some() || observed.tx_errors.is_some() {
+        rows.push(StatRow::text(
+            t("net.errors"),
+            Some(pair(observed.rx_errors, observed.tx_errors)),
+        ));
+    }
+    if observed.rx_overruns.is_some() || observed.tx_overruns.is_some() {
+        rows.push(StatRow::text(
+            t("net.overruns"),
+            Some(pair(observed.rx_overruns, observed.tx_overruns)),
+        ));
+    }
     if let Some(driver) = nic.driver.as_deref().filter(|text| !text.is_empty()) {
         rows.push(StatRow::text(t("common.driver"), Some(driver.to_string())));
     }
@@ -142,6 +173,20 @@ pub(crate) fn network_summary_lines(
             t("common.adapter"),
             Some(adapter.to_string()),
         ));
+    }
+    if let Some(master) = nic
+        .master_interface
+        .as_deref()
+        .filter(|text| !text.is_empty())
+    {
+        rows.push(StatRow::text(t("net.master"), Some(master.to_owned())));
+    }
+    if let Some(peer) = nic
+        .peer_interface
+        .as_deref()
+        .filter(|text| !text.is_empty())
+    {
+        rows.push(StatRow::text(t("net.peer"), Some(peer.to_owned())));
     }
 
     if is_wireless {
@@ -163,6 +208,9 @@ pub(crate) fn network_summary_lines(
         }
         if let Some(channel) = observed.channel {
             details.push(format!("{} {channel}", t("net.channel")));
+        }
+        if let Some(width) = observed.channel_width_mhz {
+            details.push(format!("{} {width} MHz", t("net.channel_width")));
         }
         if let Some(frequency) = observed.frequency_mhz {
             details.push(format!("{} {frequency} MHz", t("net.frequency")));

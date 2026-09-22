@@ -9,6 +9,11 @@ layer-shell 并存合同见 [HOST_ARCHITECTURE.md](HOST_ARCHITECTURE.md)。这�
 TaskForest 是 Linux、Windows、macOS 三平台系统监视器。平台能力不同，但共享相同的
 领域语义：数据存在、真实零、缺失、暂时失败、权限不足和不支持必须可区分。
 
+显示服务器体系严格规范为：**Linux (Wayland) + Windows (Win32) + macOS (Cocoa/Metal)**。
+Linux 上三大图形前端（GPUI、Iced、Bevy-UI）一律仅支持 Wayland，不支持也不链接 X11，
+X11 crate 已被彻底排除在生产依赖闭包之外；纯文本终端产品 `taskforest-t`（Ratatui）
+作为跨全终端环境（含无头控制台、SSH、容器）的通用基石。
+
 四个前端是四个独立产品：GPUI、Iced、Ratatui 和 Bevy 各自是一个产品 crate 加一个
 二进制（ADR-051），消费同一应用投影。四端全部纳入官方发布流水线矩阵，享有同等的
 领域语义、配置持久化与安装包分发地位，不拥有独立业务事实。
@@ -147,8 +152,11 @@ application-owned command/reducer/projection。`taskmanager-app-host` 与
    saved-view 传输协议、shell 选择字段的写入口）、`control_semantic_parity`
    （tier label 折叠）。
 4. **语义平价律**：同一投影、同一控制命令在四端三平台渲染与执行的语义必须相同——
-   标签、缺失性、行序、行为后果；像素与交互手势允许不同，语义不同即缺陷。守门：
-   `dual_track_policy_parity`、`renderer_fold_boundary`、`control_semantic_parity`。
+   标签、缺失性、行序、行为后果；像素与交互手势允许不同，语义不同即缺陷。这里「语义相同」
+   指 typed **结果语义**（真实值或 typed 原因）相同，不指事实可用性相同；某平台没有合格来源
+   或原生实现时，该 feature 必须以 typed 原因呈现缺席（能力级真实词为 `CapabilityStatus` 的
+   `Unsupported`/`PermissionRequired`/`RequiresEscalation`/`MissingDependency`/`TemporarilyUnavailable`；`PermissionDenied` 属失败原因轴），而非伪装成可用或静默消失。
+   缺席身份由产品期望面（`CapabilityId::EXPECTED_SURFACE`）声明，并由 catalog 兜底 typed 缺席 descriptor 机械保证（ADR-053）；守门：`dual_track_policy_parity`、`renderer_fold_boundary`、`control_semantic_parity`。
 5. **折叠律**：渲染入口只回放数据层折叠（"一次折叠，四端渲染"），渲染模块不得重算
    数据折叠。
 

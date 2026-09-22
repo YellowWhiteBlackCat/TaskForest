@@ -12,7 +12,6 @@ use super::{
     SystemSurfacePresentation, VerticalSpace, layout_profile, nav_rail_width, vertical_space,
 };
 use crate::app::Message;
-use crate::ui::performance::compact_toolbar_columns;
 use iced::Size;
 
 fn frame(width: f32, height: f32) -> Size {
@@ -269,26 +268,6 @@ fn chrome_presentation_matches_the_pre_port_single_row_breakpoint() {
 }
 
 #[test]
-fn wrapped_toolbar_columns_match_the_pre_port_chunk_breakpoint() {
-    // The oracle is the pre-port performance.rs expression: three columns
-    // below 560px, five from 560px up.
-    let mut width = 320.0;
-    while width <= 1400.0 {
-        let expected = if width < 560.0 { 3 } else { 5 };
-        assert_eq!(
-            compact_toolbar_columns(width),
-            expected,
-            "toolbar chunk flip must stay exact at {width}"
-        );
-        width += 1.0;
-    }
-    for width in [559.0, 559.999, 560.0, 560.001] {
-        let expected = if width < 560.0 { 3 } else { 5 };
-        assert_eq!(compact_toolbar_columns(width), expected);
-    }
-}
-
-#[test]
 fn device_navigation_follows_the_frame_budget_slot_authority() {
     // The pre-port compact flag (820px width OR 540px height) is RETIRED: the
     // one authority is the typed slot allocation from the real tracked
@@ -336,4 +315,384 @@ fn root_view_renders_on_both_sides_of_the_chrome_boundary() {
         let _ = app.update(Message::WindowResized(frame(width, 780.0)));
         let _ = crate::ui::view(&app);
     }
+}
+
+/// Elastic Layout Playbook: Headless assertions for table columns under
+/// narrow viewports (e.g. 720x480) and wide-short viewports (e.g. 2048x540).
+/// Verifies contract width floors, label integrity in multiple languages,
+/// numeric cell alignments, non-hideable identity columns, positive table width
+/// allocations, and virtual-list bounds.
+#[test]
+fn elastic_layout_playbook_table_columns_under_narrow_and_wide_short_viewports() {
+    use super::super::applications::{
+        application_row_height, apps_columns, apps_table_width, column_alignment, column_hideable,
+        column_width, localized_sort_column_label,
+    };
+    use super::super::virtual_list::VirtualWindow;
+    use taskmanager_application::i18n::{Language, set_language};
+    use taskmanager_shell::SortCol;
+
+    let viewports = [
+        // Narrow viewports
+        (720.0, 480.0, true),
+        (800.0, 480.0, true),
+        (640.0, 480.0, true),
+        (480.0, 800.0, true),
+        // Wide-short viewports
+        (2048.0, 540.0, true),
+        (1600.0, 480.0, true),
+        (1280.0, 420.0, true),
+        (1920.0, 500.0, true),
+        // Standard viewports
+        (1280.0, 720.0, false),
+        (1920.0, 1080.0, false),
+    ];
+
+    for (width, height, is_compact) in viewports {
+        let size = frame(width, height);
+        assert_eq!(
+            crate::app::viewport_compact(size),
+            is_compact,
+            "viewport_compact must match expected compact contract for {width}x{height}"
+        );
+
+        // Density row heights must respect the compact contract
+        let row_height = application_row_height(is_compact);
+        if is_compact {
+            assert_eq!(row_height, 24.0, "compact density must keep 24px row floor");
+        } else {
+            assert_eq!(
+                row_height, 32.0,
+                "standard density must keep 32px row floor"
+            );
+        }
+
+        // Virtual window bounds for sticky table rows:
+        // Window slice [start, end) must be bounded, non-empty for populated data,
+        // and end must never exceed total rows or overflow viewport.
+        let total_rows = 200;
+        let viewport_height = height - 140.0; // Subtract header strips and chrome
+        let window = VirtualWindow::for_sticky_rows(total_rows, 0.0, viewport_height, row_height);
+        assert!(
+            window.start <= window.end,
+            "window start <= end at {width}x{height}"
+        );
+        assert!(
+            window.end <= total_rows,
+            "window end <= total_rows at {width}x{height}"
+        );
+        let materialized_count = window.end - window.start;
+        let max_visible = (viewport_height / row_height).ceil() as usize
+            + 2 * super::super::virtual_list::OVERSCAN_ROWS
+            + 1;
+        assert!(
+            materialized_count <= max_visible,
+            "materialized rows ({materialized_count}) must be bounded by viewport capacity ({max_visible}) at {width}x{height}"
+        );
+    }
+
+    // Every table column must maintain a positive contract width floor and valid presentation
+    for swap_visible in [false, true] {
+        let cols = apps_columns(swap_visible);
+        let expected_count = if swap_visible { 16 } else { 15 };
+        assert_eq!(cols.len(), expected_count);
+
+        for (col, width) in &cols {
+            assert!(
+                *width > 0.0,
+                "column {col:?} width must be positive: {width}"
+            );
+            assert_eq!(
+                *width,
+                column_width(*col),
+                "column {col:?} width must match contract_spec default"
+            );
+
+            // Numeric contract columns right-align; text columns left-align
+            let align = column_alignment(*col);
+            match col {
+                SortCol::Pid
+                | SortCol::Threads
+                | SortCol::Cpu
+                | SortCol::Memory
+                | SortCol::Swap
+                | SortCol::Pss
+                | SortCol::DiskRead
+                | SortCol::DiskWrite
+                | SortCol::Network
+                | SortCol::CpuTime
+                | SortCol::Fds
+                | SortCol::Nice => {
+                    assert_eq!(
+                        align,
+                        iced::alignment::Horizontal::Right,
+                        "column {col:?} must right-align"
+                    );
+                }
+                SortCol::Name | SortCol::User | SortCol::StartTime | SortCol::State => {
+                    assert_eq!(
+                        align,
+                        iced::alignment::Horizontal::Left,
+                        "column {col:?} must left-align"
+                    );
+                }
+            }
+
+            // Identity column Name is mandatory and can never be hidden
+            if *col == SortCol::Name {
+                assert!(!column_hideable(*col), "Name column must never be hideable");
+            } else {
+                assert!(
+                    column_hideable(*col),
+                    "Column {col:?} should be hideable in column chooser"
+                );
+            }
+        }
+
+        // Check localized column labels across both supported languages
+        for lang in [Language::En, Language::Zh] {
+            set_language(lang);
+            for (col, _) in &cols {
+                let label = localized_sort_column_label(*col);
+                assert!(
+                    !label.trim().is_empty(),
+                    "column {col:?} label must not be empty in {lang:?}"
+                );
+            }
+        }
+        set_language(Language::En);
+
+        // Table width must account for all columns, the sparkline cell, gutters, and outer padding
+        let hidden = std::collections::HashSet::new();
+        let total_table_width = apps_table_width(swap_visible, &hidden);
+        let base_columns_width: f32 = cols.iter().map(|(_, w)| *w).sum();
+        assert!(
+            total_table_width > base_columns_width,
+            "table width ({total_table_width}) must exceed sum of columns ({base_columns_width}) to accommodate sparkline, gutters, and padding"
+        );
+    }
+}
+
+/// Elastic Layout Playbook: Headless assertions for header strips, ribbon,
+/// and action toolbar convergence under narrow viewports (e.g. 720x480),
+/// wide-short viewports (e.g. 2048x540), and desktop viewports.
+#[test]
+fn elastic_layout_playbook_header_strips_and_ribbon_toolbar_convergence() {
+    use crate::saved_views::{PresetsRibbonState, presets_ribbon};
+    use taskmanager_application::AppPage;
+
+    // 1. Root chrome single-row convergence at wide viewports (>= 1320px width and non-compact height)
+    let wide_viewport = frame(1440.0, 900.0);
+    assert!(!crate::app::viewport_compact(wide_viewport));
+    let wide_budget = PageLayoutBudget::for_viewport(wide_viewport);
+    assert_eq!(wide_budget.chrome, ChromePresentation::SingleRow);
+    assert!(!wide_budget.chrome.is_wrapped());
+
+    // At narrow viewports (e.g. 720x480) and wide-short viewports (e.g. 2048x540):
+    // Root chrome presentation must wrap onto dedicated bounded strips so actions don't push off-screen.
+    let narrow_viewport = frame(720.0, 480.0);
+    assert!(crate::app::viewport_compact(narrow_viewport));
+    let narrow_budget = PageLayoutBudget::for_viewport(narrow_viewport);
+    assert_eq!(narrow_budget.chrome, ChromePresentation::Wrapped);
+    assert!(narrow_budget.chrome.is_wrapped());
+
+    let wide_short_viewport = frame(2048.0, 540.0);
+    assert!(crate::app::viewport_compact(wide_short_viewport));
+    let ws_budget = PageLayoutBudget::for_viewport(wide_short_viewport);
+    assert_eq!(ws_budget.vertical_space, VerticalSpace::Constrained);
+
+    // 2. Presets Ribbon convergence:
+    // In compact viewports (narrow 720x480 or wide-short 2048x540), presets_ribbon must converge
+    // to a single horizontal scrollable strip of bounded height 32.0 px, preventing it from
+    // breaking into multiple vertical lines that consume the process table viewport.
+    let theme = taskmanager_theme::Theme::dark();
+    let presets = vec![
+        crate::saved_views::SavedViewPreset::built_in(
+            1,
+            "saved_views.preset_default",
+            taskmanager_shell::ProcessStatusFilter::All,
+            taskmanager_shell::SortCol::Cpu,
+            false,
+        ),
+        crate::saved_views::SavedViewPreset::built_in(
+            2,
+            "saved_views.preset_running",
+            taskmanager_shell::ProcessStatusFilter::Running,
+            taskmanager_shell::SortCol::Memory,
+            false,
+        ),
+    ];
+
+    let compact_ribbon_state = PresetsRibbonState {
+        filter: taskmanager_shell::ProcessStatusFilter::All,
+        sort: taskmanager_shell::SortCol::Cpu,
+        ascending: false,
+        feedback: None,
+        compact: true,
+    };
+    let _compact_ribbon = presets_ribbon(&theme, &presets, compact_ribbon_state);
+
+    let desktop_ribbon_state = PresetsRibbonState {
+        compact: false,
+        ..compact_ribbon_state
+    };
+    let _desktop_ribbon = presets_ribbon(&theme, &presets, desktop_ribbon_state);
+
+    // 3. Applications action bar and page rendering under narrow and wide-short viewports:
+    for (width, height) in [
+        (720.0, 480.0),
+        (2048.0, 540.0),
+        (1600.0, 480.0),
+        (1440.0, 900.0),
+    ] {
+        let mut app = crate::IcedApp::demo();
+        let _ = app.update(Message::WindowResized(frame(width, height)));
+        let _ = app.update(Message::SelectPage(AppPage::Applications));
+        // Verify the entire applications page renders without panic or overflow
+        let view = crate::ui::view(&app);
+        let _ = view;
+    }
+}
+
+/// Elastic Layout Playbook: Headless assertions for statistics rails and detail
+/// slot allocation under narrow viewports (e.g. 720x480) and wide-short
+/// viewports (e.g. 2048x540). Asserts bounded text projection, slot floors,
+/// stacked details degradation, and bottom/right edge protection.
+#[test]
+fn elastic_layout_playbook_stats_rails_and_detail_slots_under_narrow_and_wide_short() {
+    use super::super::perf_layout::{bounded_heading, bounded_stat_text};
+    use super::{
+        PERFORMANCE_MAIN_MIN_WIDTH, PERFORMANCE_SIDEBAR_MIN_WIDTH, PERFORMANCE_STATS_MAX_WIDTH,
+        PERFORMANCE_STATS_MIN_WIDTH, PERFORMANCE_STATS_STACK_HEIGHT,
+        PerformanceDetailsPresentation, PerformanceVerticalRunway,
+    };
+
+    assert_eq!(super::PERFORMANCE_RUNWAY_CORE_FLOOR, 380.0);
+
+    // 1. Narrow viewport (720x480):
+    // Device navigation collapses to Strip (width 0), stats rail is pinned or stacked with clamped width,
+    // and vertical runway degrades to Floor (aggregate only), protecting bottom and right edges.
+    let narrow_budget = PerformancePageBudget::for_perf_frame(frame(720.0, 480.0), true);
+    assert_eq!(
+        narrow_budget.device_navigation,
+        DeviceNavigationPresentation::Strip,
+        "720px width cannot hold sidebar alongside stats and main floor; collapses to strip"
+    );
+    assert_eq!(narrow_budget.sidebar_width, 0.0);
+    assert!(
+        narrow_budget.stats_width >= PERFORMANCE_STATS_MIN_WIDTH
+            && narrow_budget.stats_width <= PERFORMANCE_STATS_MAX_WIDTH,
+        "stats width must be clamped within [MIN, MAX]: {}",
+        narrow_budget.stats_width
+    );
+    assert!(
+        narrow_budget.main_width >= 320.0,
+        "main viewport must preserve its 320px UltraCompact floor: {}",
+        narrow_budget.main_width
+    );
+    // Invariant: total slot footprint must not exceed workspace width
+    let total_horizontal = narrow_budget.sidebar_width
+        + narrow_budget.stats_width
+        + narrow_budget.main_width
+        + narrow_budget.main_trailing_inset;
+    assert!(
+        total_horizontal <= narrow_budget.workspace_width + 0.001,
+        "horizontal slots ({total_horizontal}) must not exceed workspace width ({})",
+        narrow_budget.workspace_width
+    );
+    // Vertical runway degradation: 480 - 128 = 352 < 380 core floor -> Floor rung
+    assert_eq!(narrow_budget.vertical, PerformanceVerticalRunway::Floor);
+    assert_eq!(
+        narrow_budget.chart_inventory,
+        PerformanceChartInventory::AggregateOnly,
+        "height below core runway floor admits only aggregate chart to protect bottom edge"
+    );
+
+    // 2. Stacked details fallback under very narrow width (e.g. 480x800):
+    // When width cannot carry main + pinned stats side-by-side, stats moves to Stacked below
+    // the main viewport (fixed 220px height) instead of starving the primary graph horizontally.
+    let stacked_budget = PerformancePageBudget::for_perf_frame(frame(480.0, 800.0), true);
+    assert_eq!(
+        stacked_budget.device_navigation,
+        DeviceNavigationPresentation::Strip
+    );
+    assert_eq!(
+        stacked_budget.details,
+        PerformanceDetailsPresentation::Stacked,
+        "narrow 480px width must stack statistics below the main chart"
+    );
+    assert_eq!(PERFORMANCE_STATS_STACK_HEIGHT, 220.0);
+
+    // 3. Wide-short viewport (2048x540):
+    // Width is generous (admitting Sidebar and Pinned stats), but height is constrained (540 - 128 = 412).
+    // Core runway is carried, but full chart inventory is collapsed to AggregateOnly to protect bottom edge.
+    let wide_short_budget = PerformancePageBudget::for_perf_frame(frame(2048.0, 540.0), true);
+    assert_eq!(
+        wide_short_budget.device_navigation,
+        DeviceNavigationPresentation::Sidebar,
+        "wide-short window retains sidebar navigation"
+    );
+    assert_eq!(
+        wide_short_budget.sidebar_width,
+        PERFORMANCE_SIDEBAR_MIN_WIDTH
+    );
+    assert_eq!(
+        wide_short_budget.details,
+        PerformanceDetailsPresentation::Pinned,
+        "wide-short window retains pinned statistics rail"
+    );
+    assert_eq!(wide_short_budget.stats_width, PERFORMANCE_STATS_MAX_WIDTH);
+    assert!(
+        wide_short_budget.main_width >= PERFORMANCE_MAIN_MIN_WIDTH,
+        "main viewport must exceed standard min width: {}",
+        wide_short_budget.main_width
+    );
+    let ws_total_horizontal = wide_short_budget.sidebar_width
+        + wide_short_budget.stats_width
+        + wide_short_budget.main_width
+        + wide_short_budget.main_trailing_inset;
+    assert!(
+        ws_total_horizontal <= wide_short_budget.workspace_width + 0.001,
+        "horizontal slots ({ws_total_horizontal}) must not overflow workspace ({})",
+        wide_short_budget.workspace_width
+    );
+    // Vertical runway: 540 - 128 = 412 >= 380 (Core) but < 650 (Charts) -> Core rung, AggregateOnly
+    assert_eq!(wide_short_budget.vertical, PerformanceVerticalRunway::Core);
+    assert_eq!(
+        wide_short_budget.chart_inventory,
+        PerformanceChartInventory::AggregateOnly,
+        "constrained vertical height must collapse secondary charts to AggregateOnly"
+    );
+
+    // 4. Bounded text projections in stats rail:
+    // Long device identities and composite telemetry readouts must be bounded with ellipsis
+    // so intrinsic text never pushes labels, borders, or the window edge.
+    let long_device = "Intel(R) Core(TM) Ultra 9 185H @ 5.10GHz Engineering Sample v2";
+    let bounded_dev = bounded_heading(long_device, 18);
+    assert!(
+        bounded_dev.ends_with('…'),
+        "long heading must truncate with ellipsis: {bounded_dev}"
+    );
+    assert!(
+        bounded_dev.chars().count() <= 18,
+        "heading must not exceed max chars"
+    );
+
+    let short_device = "AMD Ryzen 9";
+    assert_eq!(bounded_heading(short_device, 18), "AMD Ryzen 9");
+
+    let composite_stat = "Interrupts 9999999 · Core0 95% · Core1 80% · Core2 75% · Core3 60%";
+    let bounded_stat = bounded_stat_text(composite_stat, false, false);
+    assert_eq!(
+        bounded_stat.chars().count(),
+        20,
+        "composite stat must clamp to 20 chars"
+    );
+    assert!(
+        bounded_stat.ends_with('…'),
+        "truncated stat must end with ellipsis"
+    );
+
+    let short_stat = "Base frequency";
+    assert_eq!(bounded_stat_text(short_stat, false, true), "Base frequency");
 }

@@ -131,7 +131,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev libxkbcommon-x11-dev mold
+          libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: clippy
@@ -141,7 +141,13 @@ jobs:
       # `test-support` is DEV-only: gpui's upstream test-support hard-wires
       # X11, so it is enabled for test targets but never for the release build
       # below (strict Wayland product policy).
-      - run: cargo clippy --locked --workspace --all-targets --features test-support -- -D warnings
+      #
+      # The trailing `-W` flags mirror the local standard gate's clippy stage
+      # (scripts/quality/local-gates.sh) and are what activate clippy.toml's
+      # workspace structural ratchets: both lints are allow-by-default
+      # (restriction / pedantic), so `-D warnings` alone never enables them.
+      # Keep this command identical to the local gate.
+      - run: cargo clippy --locked --workspace --all-targets --features test-support -- -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
 
   test:
     name: Linux (workspace tests + doctests)
@@ -160,13 +166,18 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev libxkbcommon-x11-dev mold
+          libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
         with:
           cache-workspace-crates: true
       - run: cargo nextest run --locked --workspace --all-targets --features test-support --profile ci -j 4 -E 'not binary(throughput)'
+      # Keep an explicit package-filtered product gate in addition to the
+      # broad workspace run: all four frontend products must be discovered and
+      # pass their own headless suites before this job can merge.
+      - name: Four frontend product nextest gate
+        run: timeout --kill-after=30s 3600s bash scripts/quality/four-frontends-nextest.sh
       # nextest does not execute doctests on stable Rust.
       - run: cargo test --locked --doc --workspace -j 4
       # The GPUI product advertises --demo; keep its actual composition path
@@ -185,7 +196,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev libxkbcommon-x11-dev mold
+          libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
@@ -217,7 +228,7 @@ jobs:
         run: >-
           sudo apt-get update &&
           sudo apt-get install -y --no-install-recommends
-          libxkbcommon-dev libxkbcommon-x11-dev mold
+          libxkbcommon-dev mold
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2

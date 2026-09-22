@@ -8,6 +8,7 @@
 use std::net::IpAddr;
 
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 
 mod error;
 
@@ -47,6 +48,9 @@ impl RedactionSummary {
 pub struct DiagnosticPreviewFile {
     pub name: String,
     pub bytes: usize,
+    /// SHA-256 of the sanitized file contents. This is an integrity receipt,
+    /// never a hash of the pre-redaction material.
+    pub sha256: String,
     /// A bounded excerpt of already-sanitized text.
     pub excerpt: String,
 }
@@ -56,6 +60,10 @@ pub struct DiagnosticPreview {
     pub files: Vec<DiagnosticPreviewFile>,
     pub total_bytes: usize,
     pub redactions: RedactionSummary,
+    /// SHA-256 over the ordered `(logical name, sanitized contents)` manifest.
+    /// It lets a recipient verify that the exported sanitized files match the
+    /// preview without ever retaining the original private sources.
+    pub manifest_sha256: String,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -88,6 +96,7 @@ impl DiagnosticBundlePlan {
         let mut previews = Vec::with_capacity(sources.len());
         let mut total_bytes = 0usize;
         let mut redactions = RedactionSummary::default();
+        let mut manifest = Sha256::new();
 
         for source in sources {
             validate_source_name(&source.name)?;
@@ -99,6 +108,11 @@ impl DiagnosticBundlePlan {
             }
             let (contents, source_redactions) = redact_text(&source.contents, &usernames);
             let bytes = contents.len();
+            let sha256 = sha256_hex(contents.as_bytes());
+            manifest.update(source.name.as_bytes());
+            manifest.update([0]);
+            manifest.update(contents.as_bytes());
+            manifest.update([0]);
             total_bytes = total_bytes.saturating_add(bytes);
             redactions.add_assign(source_redactions);
             let mut excerpt: String = contents.chars().take(PREVIEW_CHARS).collect();
@@ -108,6 +122,7 @@ impl DiagnosticBundlePlan {
             previews.push(DiagnosticPreviewFile {
                 name: source.name.clone(),
                 bytes,
+                sha256,
                 excerpt,
             });
             files.push(SanitizedDiagnosticFile {
@@ -123,6 +138,7 @@ impl DiagnosticBundlePlan {
                 files: previews,
                 total_bytes,
                 redactions,
+                manifest_sha256: hex_digest(manifest.finalize()),
             },
         })
     }
@@ -154,6 +170,18 @@ impl DiagnosticBundlePlan {
     ) -> Result<Vec<u8>, DiagnosticBundleError> {
         encode(self).map_err(DiagnosticBundleError::encode)
     }
+}
+
+fn sha256_hex(contents: &[u8]) -> String {
+    hex_digest(Sha256::digest(contents))
+}
+
+fn hex_digest(digest: impl AsRef<[u8]>) -> String {
+    digest
+        .as_ref()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect()
 }
 
 fn validate_source_name(name: &str) -> Result<(), DiagnosticBundleError> {

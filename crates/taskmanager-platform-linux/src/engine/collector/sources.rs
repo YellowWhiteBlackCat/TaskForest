@@ -103,8 +103,10 @@ pub(super) fn parse_diskstats_observation(text: &str) -> DiskstatsObservation {
                 parts[2].to_string(),
                 DiskStatsState {
                     reads_completed: parts[3].parse::<u64>().ok()?,
+                    reads_merged: parts[4].parse::<u64>().ok()?,
                     sectors_read: parts[5].parse::<u64>().ok()?,
                     writes_completed: parts[7].parse::<u64>().ok()?,
+                    writes_merged: parts[8].parse::<u64>().ok()?,
                     sectors_written: parts[9].parse::<u64>().ok()?,
                     io_time_ms: parts[12].parse::<u64>().ok()?,
                     weighted_time_ms: parts[13].parse::<u64>().ok()?,
@@ -163,10 +165,14 @@ pub(super) fn apply_smart(d: &mut DiskMetrics, s: &taskmanager_core::core::smart
     d.smart_provider.clone_from(&s.provider);
     d.smart_failure = s.failure;
     d.smart_temperature_c = s.temperature_c;
+    d.smart_temperature_sensors_c = s.temperature_sensors_c.clone();
     d.smart_critical_warning = s.critical_warning;
     d.smart_temp_critical_c = s.temp_critical_c;
     d.smart_percent_used = s.percent_used;
+    d.smart_available_spare_pct = s.available_spare_pct;
+    d.smart_available_spare_threshold_pct = s.available_spare_threshold_pct;
     d.smart_power_on_hours = s.power_on_hours;
+    d.smart_unsafe_shutdowns = s.unsafe_shutdowns;
 }
 
 // ── macOS / Windows stubs ────────────────────────────────────────────────────

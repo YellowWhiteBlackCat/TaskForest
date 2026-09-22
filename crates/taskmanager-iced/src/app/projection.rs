@@ -156,6 +156,18 @@ impl IcedApp {
             PerfDevice::Gpu(index) => snapshot
                 .and_then(|snapshot| snapshot.gpu.get(index))
                 .map(|gpu| gpu.brand.clone()),
+            PerfDevice::Npu(index) => self
+                .shell
+                .projection()
+                .npu_inventory
+                .as_ref()
+                .and_then(|npu| npu.devices.get(index))
+                .map(|device| {
+                    device
+                        .brand
+                        .clone()
+                        .unwrap_or_else(|| device.device_id.to_string())
+                }),
             PerfDevice::Battery(index) => self
                 .shell
                 .projection()
@@ -279,6 +291,7 @@ impl IcedApp {
                     .as_ref()
                     .and_then(|fans| fans.get(index))
                     .map(|fan| self.cached_fan_series(fan.id())),
+                PerfDevice::Npu(_) => None,
             })
             .collect()
     }

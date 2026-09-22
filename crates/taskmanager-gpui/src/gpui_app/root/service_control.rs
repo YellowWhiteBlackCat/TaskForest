@@ -100,6 +100,7 @@ impl ServiceControlConfirmation {
                     ServiceAction::Start | ServiceAction::Enable => {
                         i18n::t("svc.confirm_stop_message")
                     }
+                    ServiceAction::ReloadDaemon => i18n::t("svc.reload_daemon_message"),
                 };
                 template.replace("{name}", display_name)
             }
@@ -122,6 +123,7 @@ impl ServiceControlConfirmation {
                 ServiceAction::Disable => i18n::t("common.disable"),
                 ServiceAction::Start => i18n::t("svc.start"),
                 ServiceAction::Enable => i18n::t("common.enable"),
+                ServiceAction::ReloadDaemon => i18n::t("svc.reload_daemon"),
             },
             Self::Startup { enabled, .. } => {
                 if *enabled {

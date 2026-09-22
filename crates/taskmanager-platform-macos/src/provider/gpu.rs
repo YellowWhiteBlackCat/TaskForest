@@ -3,10 +3,10 @@
 //! `system_profiler SPDisplaysDataType -json` (run through the bounded command
 //! runner) is the same safe source `MacHardwareInventoryProvider` uses for
 //! model/chip facts. It publishes GPU identity (brand) and, for discrete
-//! adapters, total VRAM. Live dynamic scalars (utilization, temperature, power,
-//! frequency, fan) have NO safe macOS source — Metal/IOKit are unsafe and
-//! sysinfo exposes no GPU accessor — so they stay honestly absent (None
-//! options, no scalar observation) rather than fabricated zeros (ADR-019).
+//! adapters, total VRAM. A bounded `ioreg -r -c IOAccelerator -l` sample adds
+//! overall device utilization when it can be unambiguously matched to a
+//! single discovered adapter; temperature, power, frequency and fan remain
+//! absent when the registry does not expose them (ADR-019).
 
 use std::time::Duration;
 
@@ -21,6 +21,7 @@ use taskmanager_platform_provider::GpuTelemetryProvider;
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
 const GPU_TELEMETRY_PROVIDER: ProviderId = ProviderId::borrowed("macos.telemetry.gpu");
+const GPU_IOREG_PROVIDER: ProviderId = ProviderId::borrowed("macos.telemetry.gpu.ioreg");
 
 fn unavailable_source(provider: ProviderId, failure: FailureKind) -> SourceStatus {
     SourceStatus {
@@ -40,15 +41,17 @@ pub struct MacGpuTelemetryProvider;
 
 impl GpuTelemetryProvider for MacGpuTelemetryProvider {
     fn refresh(&mut self, observed_at_ms: u64) -> Result<GpuTelemetryObservation, ProviderFailure> {
-        Ok(gpu_observation_from_profiler(
+        Ok(gpu_observation_from_profiler_with_dynamic(
             system_profiler_gpus(),
+            collect_ioreg_gpu_utilization(),
             observed_at_ms,
         ))
     }
 }
 
-fn gpu_observation_from_profiler(
+fn gpu_observation_from_profiler_with_dynamic(
     profiler_result: Result<Vec<MacGpuAdapter>, FailureKind>,
+    dynamic_result: Result<Option<f32>, FailureKind>,
     observed_at_ms: u64,
 ) -> GpuTelemetryObservation {
     let mut adapters = match profiler_result {
@@ -76,6 +79,11 @@ fn gpu_observation_from_profiler(
         );
     }
     adapters.sort_by(|left, right| left.identity.cmp(&right.identity));
+    let adapter_count = adapters.len();
+    let (dynamic_utilization, dynamic_failure) = match dynamic_result {
+        Ok(value) => (value, None),
+        Err(failure) => (None, Some(failure)),
+    };
     let mut identities = std::collections::HashSet::<String>::new();
     let mut identity_partial = false;
     let mut gpus = Vec::with_capacity(adapters.len());
@@ -98,6 +106,15 @@ fn gpu_observation_from_profiler(
         row.device_generation = DeviceGeneration::INITIAL;
         row.device_state = DeviceState::healthy(observed_at_ms);
         let mut observations = GpuScalarObservations::default();
+        if adapter_count == 1
+            && let Some(value) = dynamic_utilization
+        {
+            observations.utilization_pct = ScalarObservation::available(value, observed_at_ms);
+            provenance.push(GpuMetricProvenance {
+                field: GpuMetricField::Utilization,
+                provider: GPU_IOREG_PROVIDER,
+            });
+        }
         if let Some(vram_bytes) = adapter.vram_total_bytes {
             observations.memory_total_bytes =
                 ScalarObservation::available(vram_bytes, observed_at_ms);
@@ -122,6 +139,8 @@ fn gpu_observation_from_profiler(
         provider: GPU_TELEMETRY_PROVIDER,
         outcome: if identity_partial {
             SourceOutcome::Partial(FailureKind::Unsupported)
+        } else if let Some(failure) = dynamic_failure {
+            SourceOutcome::Partial(failure)
         } else {
             SourceOutcome::Available
         },
@@ -225,6 +244,96 @@ fn system_profiler_gpus() -> Result<Vec<MacGpuAdapter>, FailureKind> {
         });
     };
     parse_system_profiler_gpus(&output.stdout)
+}
+
+/// Read the overall GPU busy percentage from the public diagnostic view of
+/// the macOS IORegistry. The command is bounded and the value is only
+/// promoted when exactly one usable device percentage is present; multiple
+/// adapters are left unassigned rather than paired by enumeration order.
+fn collect_ioreg_gpu_utilization() -> Result<Option<f32>, FailureKind> {
+    #[cfg(target_os = "macos")]
+    {
+        let mut command = std::process::Command::new("ioreg");
+        command.args(["-r", "-c", "IOAccelerator", "-d", "2", "-l"]);
+        let output = match run_with_timeout(&mut command, Duration::from_secs(2)) {
+            Ok(output) => output,
+            Err(BoundedCommandError::Spawn(error))
+                if error.kind() == std::io::ErrorKind::NotFound =>
+            {
+                return Err(FailureKind::MissingDependency);
+            }
+            Err(BoundedCommandError::Spawn(error))
+                if error.kind() == std::io::ErrorKind::PermissionDenied =>
+            {
+                return Err(FailureKind::PermissionDenied);
+            }
+            Err(BoundedCommandError::TimedOut | BoundedCommandError::ReaderTimedOut) => {
+                return Err(FailureKind::TimedOut);
+            }
+            Err(_) => return Err(FailureKind::ProviderFault),
+        };
+        if !output.status.success() {
+            return Err(FailureKind::TemporarilyUnavailable);
+        }
+        let values = parse_ioreg_gpu_utilizations(&String::from_utf8_lossy(&output.stdout));
+        if values.len() == 1 {
+            Ok(Some(values[0]))
+        } else {
+            Ok(None)
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        Ok(None)
+    }
+}
+
+/// Extract overall utilization fields from ioreg's property-dictionary text.
+/// `Device Utilization %` is preferred; older Intel drivers may only expose
+/// `GPU Activity(%)`. Every returned value is finite and bounded.
+#[cfg(any(target_os = "macos", test))]
+pub(crate) fn parse_ioreg_gpu_utilizations(output: &str) -> Vec<f32> {
+    let primary = parse_ioreg_key_values(output, "\"Device Utilization %\"");
+    if !primary.is_empty() {
+        return primary;
+    }
+    parse_ioreg_key_values(output, "\"GPU Activity(%)\"")
+        .into_iter()
+        .chain(parse_ioreg_key_values(output, "\"Renderer Utilization %\""))
+        .collect()
+}
+
+#[cfg(any(target_os = "macos", test))]
+fn parse_ioreg_key_values(output: &str, key: &str) -> Vec<f32> {
+    let mut values = Vec::new();
+    for line in output.lines() {
+        if !line.contains(key) {
+            continue;
+        }
+        let Some((_, raw)) = line
+            .split_once(key)
+            .and_then(|(_, tail)| tail.split_once('='))
+        else {
+            continue;
+        };
+        let token = raw
+            .trim()
+            .trim_start_matches('=')
+            .trim()
+            .split([',', '}'])
+            .next()
+            .unwrap_or_default()
+            .split_whitespace()
+            .next()
+            .unwrap_or_default();
+        let Ok(value) = token.parse::<f32>() else {
+            continue;
+        };
+        if value.is_finite() && (0.0..=100.0).contains(&value) {
+            values.push(value);
+        }
+    }
+    values
 }
 
 fn parse_system_profiler_gpus(output: &[u8]) -> Result<Vec<MacGpuAdapter>, FailureKind> {

@@ -89,6 +89,11 @@ impl PlatformClient {
         self.handle.capabilities()
     }
 
+    #[must_use]
+    pub fn system_telemetry_projection(&self) -> Option<crate::ProjectedSystemTelemetry> {
+        self.system_telemetry_projection.snapshot()
+    }
+
     pub fn request_refresh(
         &mut self,
         request: crate::RefreshRequest,

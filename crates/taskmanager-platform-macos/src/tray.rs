@@ -68,6 +68,12 @@ fn spawn_tray_macos(
     spec: TraySpec,
     events: Sender<TrayEvent>,
 ) -> Result<Box<dyn TrayController>, TrayFailure> {
+    // `muda`/`tray-icon` assert the application main thread at construction;
+    // refuse a wrong-thread spawn with the typed state instead of letting the
+    // native stack panic (ADR-032: the seam degrades gracefully, never aborts).
+    if objc2::MainThreadMarker::new().is_none() {
+        return Err(TrayFailure::WrongThread);
+    }
     let native = NativeTray::new(&spec)?;
     MAC_TRAY.with(|slot| {
         *slot.borrow_mut() = Some(native);

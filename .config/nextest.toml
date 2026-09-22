@@ -11,6 +11,34 @@
 [profile.default]
 test-threads = 4
 
+# The `taskmanager-platform-linux` `throughput` target is a `harness = false`
+# bench, not a libtest test binary: it prints its own `RESULT<TAB>name<TAB>ns`
+# trend lines for scripts/quality/bench-gate.sh and cannot answer nextest's
+# `--list` protocol, which aborts `cargo nextest list/run --all-targets` with
+# "creating test list failed". It is a `cargo bench` target, never a nextest
+# test target, so exclude it here at the repository level: the filter is a
+# binary-level predicate, which nextest evaluates before listing the binary,
+# and every command-line filterset (e.g. CI's explicit `-E`) is intersected
+# with it rather than replacing it. `--ignore-default-filter` remains the
+# explicit opt-out.
+#
+# Where the bench actually runs (it was never a nextest target, before or
+# after this filter): the local `extended` tier owns performance trends —
+#   bash scripts/quality/local-gates.sh extended
+#     -> `benches` stage -> scripts/quality/bench-gate.sh
+#       -> cargo bench -p taskmanager-platform-linux --bench throughput
+#            --features test-support   (under an external deadline)
+# bench-gate.sh fails when the binary emits no RESULT rows or a measurement
+# regresses >2x against its local trend file, so the bench stays a live gate.
+# CI deliberately carries only the cheap tiers (quota note at the top of
+# .github/workflows/ci.yml): the extended tier runs where the machine is, so
+# this exclusion changes which runner lists the target, never whether the
+# bench is executed. Cross-check while editing: with `--ignore-default-filter`
+# the same `--all-targets` invocation still aborts with "creating test list
+# failed", which is the exact failure this filter fixes; keep the filter
+# scoped to this binary id so a later rename cannot silently widen it.
+default-filter = 'not binary_id(taskmanager-platform-linux::bench/throughput)'
+
 [profile.ci]
 # Stop scheduling work after the first failing test. This keeps PR and local
 # standard feedback bounded; acceptance matrices that need a complete receipt

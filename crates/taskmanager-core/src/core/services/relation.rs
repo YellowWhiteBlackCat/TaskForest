@@ -1,10 +1,33 @@
-//! Platform-neutral service relationship metadata.
+//! Platform-neutral service relationship metadata and dependency edge definitions.
+//!
+//! Provides typed definitions for service relationships (`Requires`, `Wants`,
+//! `Before`, `After`, etc.), directional edge semantics, and graph algorithms
+//! for cycle detection across service ordering and requirement networks.
 
 use std::fmt;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::core::ServiceId;
+
+mod algorithms;
+pub use algorithms::{
+    detect_directed_cycles, detect_ordering_cycles, detect_requirement_cycles, is_ordering_acyclic,
+    is_requirement_acyclic,
+};
+
+/// Category of service relationship edge for graph analysis and cycle detection.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ServiceEdgeCategory {
+    /// Start/stop sequencing constraint (`Before`, `After`).
+    Ordering,
+    /// Activation dependency constraint (`Requires`, `Wants`, `Requisite`, `BindsTo`, `PartOf`, `WantedBy`, `RequiredBy`, `UpheldBy`).
+    Requirement,
+    /// Mutual exclusion constraint (`Conflicts`).
+    Conflict,
+    /// Unclassified or provider-specific relation.
+    Other,
+}
 
 /// A relationship from the selected service to another service target.
 ///
@@ -66,6 +89,155 @@ impl ServiceRelationKind {
             Self::Unknown(name) => name,
         }
     }
+
+    /// Classification of this relationship kind into its structural graph role.
+    #[must_use]
+    pub fn category(&self) -> ServiceEdgeCategory {
+        match self {
+            Self::Before | Self::After => ServiceEdgeCategory::Ordering,
+            Self::Requires
+            | Self::Wants
+            | Self::Requisite
+            | Self::BindsTo
+            | Self::PartOf
+            | Self::WantedBy
+            | Self::RequiredBy
+            | Self::UpheldBy => ServiceEdgeCategory::Requirement,
+            Self::Conflicts => ServiceEdgeCategory::Conflict,
+            Self::Unknown(_) => ServiceEdgeCategory::Other,
+        }
+    }
+
+    /// Whether this relationship specifies an execution/startup ordering constraint (`Before`, `After`).
+    #[must_use]
+    pub fn is_ordering(&self) -> bool {
+        matches!(self, Self::Before | Self::After)
+    }
+
+    /// Whether this relationship specifies an activation requirement (`Requires`, `Wants`, etc.).
+    #[must_use]
+    pub fn is_requirement(&self) -> bool {
+        matches!(
+            self,
+            Self::Requires
+                | Self::Wants
+                | Self::Requisite
+                | Self::BindsTo
+                | Self::PartOf
+                | Self::WantedBy
+                | Self::RequiredBy
+                | Self::UpheldBy
+        )
+    }
+
+    /// Whether this relationship is a strict constraint that cannot be ignored.
+    ///
+    /// Ordering constraints (`Before`, `After`) and hard requirements (`Requires`,
+    /// `Requisite`, `BindsTo`, `RequiredBy`) are strict. `Wants` and `WantedBy`
+    /// are advisory/weak.
+    #[must_use]
+    pub fn is_strict(&self) -> bool {
+        match self {
+            Self::Before
+            | Self::After
+            | Self::Requires
+            | Self::Requisite
+            | Self::BindsTo
+            | Self::RequiredBy => true,
+            Self::Wants
+            | Self::WantedBy
+            | Self::PartOf
+            | Self::UpheldBy
+            | Self::Conflicts
+            | Self::Unknown(_) => false,
+        }
+    }
+
+    /// Whether this relationship is weak/advisory (`Wants`, `WantedBy`).
+    #[must_use]
+    pub fn is_weak(&self) -> bool {
+        matches!(self, Self::Wants | Self::WantedBy)
+    }
+
+    /// Whether this relationship is `Before`.
+    #[must_use]
+    pub fn is_before(&self) -> bool {
+        matches!(self, Self::Before)
+    }
+
+    /// Whether this relationship is `After`.
+    #[must_use]
+    pub fn is_after(&self) -> bool {
+        matches!(self, Self::After)
+    }
+
+    /// Whether this relationship is `Requires`.
+    #[must_use]
+    pub fn is_requires(&self) -> bool {
+        matches!(self, Self::Requires)
+    }
+
+    /// Whether this relationship is `Wants`.
+    #[must_use]
+    pub fn is_wants(&self) -> bool {
+        matches!(self, Self::Wants)
+    }
+
+    /// Dual/reciprocal relationship on the opposite endpoint, if defined.
+    ///
+    /// For instance, `A Before B` corresponds to `B After A`, and `A Requires B`
+    /// corresponds to `B RequiredBy A`.
+    #[must_use]
+    pub fn inverse(&self) -> Option<Self> {
+        match self {
+            Self::Before => Some(Self::After),
+            Self::After => Some(Self::Before),
+            Self::Requires => Some(Self::RequiredBy),
+            Self::RequiredBy => Some(Self::Requires),
+            Self::Wants => Some(Self::WantedBy),
+            Self::WantedBy => Some(Self::Wants),
+            Self::Conflicts => Some(Self::Conflicts),
+            Self::Requisite | Self::BindsTo | Self::PartOf | Self::UpheldBy | Self::Unknown(_) => {
+                None
+            }
+        }
+    }
+
+    /// Determine the directed start-order precedence `(earlier, later)` where `earlier`
+    /// must start before `later`.
+    ///
+    /// Returns `None` if this relation is not an ordering constraint (`Before` / `After`).
+    #[must_use]
+    pub fn ordering_precedence<'a>(
+        &self,
+        origin: &'a ServiceId,
+        target: &'a ServiceId,
+    ) -> Option<(&'a ServiceId, &'a ServiceId)> {
+        match self {
+            Self::Before => Some((origin, target)),
+            Self::After => Some((target, origin)),
+            _ => None,
+        }
+    }
+
+    /// Determine the directed requirement dependency `(dependent, prerequisite)`
+    /// where `dependent` requires or wants `prerequisite` to be activated.
+    ///
+    /// Returns `None` if this relation is not a requirement constraint.
+    #[must_use]
+    pub fn requirement_dependency<'a>(
+        &self,
+        origin: &'a ServiceId,
+        target: &'a ServiceId,
+    ) -> Option<(&'a ServiceId, &'a ServiceId)> {
+        match self {
+            Self::Requires | Self::Wants | Self::Requisite | Self::BindsTo | Self::PartOf => {
+                Some((origin, target))
+            }
+            Self::RequiredBy | Self::WantedBy | Self::UpheldBy => Some((target, origin)),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for ServiceRelationKind {
@@ -105,6 +277,173 @@ impl ServiceRelationEdge {
             kind,
             target: target.into(),
         }
+    }
+
+    /// Construct an ordering edge asserting that the origin service starts before `target`.
+    #[must_use]
+    pub fn before(target: impl Into<ServiceId>) -> Self {
+        Self::new(ServiceRelationKind::Before, target)
+    }
+
+    /// Construct an ordering edge asserting that the origin service starts after `target`.
+    #[must_use]
+    pub fn after(target: impl Into<ServiceId>) -> Self {
+        Self::new(ServiceRelationKind::After, target)
+    }
+
+    /// Construct a strict activation requirement edge on `target`.
+    #[must_use]
+    pub fn requires(target: impl Into<ServiceId>) -> Self {
+        Self::new(ServiceRelationKind::Requires, target)
+    }
+
+    /// Construct an advisory/weak requirement edge on `target`.
+    #[must_use]
+    pub fn wants(target: impl Into<ServiceId>) -> Self {
+        Self::new(ServiceRelationKind::Wants, target)
+    }
+
+    #[must_use]
+    pub const fn kind(&self) -> &ServiceRelationKind {
+        &self.kind
+    }
+
+    #[must_use]
+    pub const fn target(&self) -> &ServiceId {
+        &self.target
+    }
+
+    #[must_use]
+    pub fn is_ordering(&self) -> bool {
+        self.kind.is_ordering()
+    }
+
+    #[must_use]
+    pub fn is_requirement(&self) -> bool {
+        self.kind.is_requirement()
+    }
+
+    #[must_use]
+    pub fn is_strict(&self) -> bool {
+        self.kind.is_strict()
+    }
+
+    #[must_use]
+    pub fn is_weak(&self) -> bool {
+        self.kind.is_weak()
+    }
+
+    #[must_use]
+    pub fn is_before(&self) -> bool {
+        self.kind.is_before()
+    }
+
+    #[must_use]
+    pub fn is_after(&self) -> bool {
+        self.kind.is_after()
+    }
+
+    #[must_use]
+    pub fn is_requires(&self) -> bool {
+        self.kind.is_requires()
+    }
+
+    #[must_use]
+    pub fn is_wants(&self) -> bool {
+        self.kind.is_wants()
+    }
+
+    /// Compute directed start-order precedence `(earlier, later)` where `earlier`
+    /// must start before `later`. Returns `None` if this edge is not an ordering constraint.
+    #[must_use]
+    pub fn ordering_precedence<'a>(
+        &'a self,
+        origin: &'a ServiceId,
+    ) -> Option<(&'a ServiceId, &'a ServiceId)> {
+        self.kind.ordering_precedence(origin, &self.target)
+    }
+
+    /// Compute directed activation requirement dependency `(dependent, prerequisite)`
+    /// where `dependent` requires or wants `prerequisite`. Returns `None` if this edge
+    /// is not a requirement constraint.
+    #[must_use]
+    pub fn requirement_dependency<'a>(
+        &'a self,
+        origin: &'a ServiceId,
+    ) -> Option<(&'a ServiceId, &'a ServiceId)> {
+        self.kind.requirement_dependency(origin, &self.target)
+    }
+
+    /// Convert this edge into a canonical directed ordering edge, oriented so `source` precedes `target`.
+    #[must_use]
+    pub fn to_directed_ordering_edge(&self, origin: &ServiceId) -> Option<DirectedServiceEdge> {
+        self.ordering_precedence(origin)
+            .map(|(src, tgt)| DirectedServiceEdge::new(src.clone(), tgt.clone(), self.kind.clone()))
+    }
+
+    /// Convert this edge into a canonical directed requirement edge, oriented so `source` depends on `target`.
+    #[must_use]
+    pub fn to_directed_requirement_edge(&self, origin: &ServiceId) -> Option<DirectedServiceEdge> {
+        self.requirement_dependency(origin)
+            .map(|(src, tgt)| DirectedServiceEdge::new(src.clone(), tgt.clone(), self.kind.clone()))
+    }
+
+    /// Compute the reciprocal relation on `target` pointing back to `origin`, if an inverse exists.
+    #[must_use]
+    pub fn reciprocal(&self, origin: &ServiceId) -> Option<(ServiceId, Self)> {
+        self.kind
+            .inverse()
+            .map(|inv| (self.target.clone(), Self::new(inv, origin.clone())))
+    }
+}
+
+/// A canonical directed edge between two services for graph traversal and cycle detection.
+///
+/// In an ordering graph, `source` must precede `target` in execution/start sequence.
+/// In a requirement graph, `source` depends on `target` being activated.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct DirectedServiceEdge {
+    pub source: ServiceId,
+    pub target: ServiceId,
+    pub kind: ServiceRelationKind,
+}
+
+impl DirectedServiceEdge {
+    #[must_use]
+    pub fn new(
+        source: impl Into<ServiceId>,
+        target: impl Into<ServiceId>,
+        kind: ServiceRelationKind,
+    ) -> Self {
+        Self {
+            source: source.into(),
+            target: target.into(),
+            kind,
+        }
+    }
+
+    /// Whether this directed edge represents an execution ordering precedence constraint.
+    #[must_use]
+    pub fn is_ordering(&self) -> bool {
+        self.kind.is_ordering()
+    }
+
+    /// Whether this directed edge represents an activation requirement dependency.
+    #[must_use]
+    pub fn is_requirement(&self) -> bool {
+        self.kind.is_requirement()
+    }
+
+    /// Whether this directed edge expresses a strict requirement or ordering constraint.
+    #[must_use]
+    pub fn is_strict(&self) -> bool {
+        self.kind.is_strict()
+    }
+
+    /// Whether this directed edge is a self-loop (`source == target`).
+    #[must_use]
+    pub fn is_self_loop(&self) -> bool {
+        self.source == self.target
     }
 }
 
@@ -172,6 +511,50 @@ impl ServiceRelationGraph {
         self.edges.len()
     }
 
+    /// Whether an exact edge with the given kind and target exists in this graph.
+    #[must_use]
+    pub fn contains_edge(&self, kind: &ServiceRelationKind, target: &ServiceId) -> bool {
+        self.edges
+            .iter()
+            .any(|e| &e.kind == kind && &e.target == target)
+    }
+
+    /// Check if this service contains both `Before` and `After` relationships to the same target,
+    /// which constitutes an immediate contradiction / 2-node ordering cycle.
+    #[must_use]
+    pub fn has_immediate_ordering_cycle(&self, target: &ServiceId) -> bool {
+        self.contains_edge(&ServiceRelationKind::Before, target)
+            && self.contains_edge(&ServiceRelationKind::After, target)
+    }
+
+    /// Check if this service defines any ordering or requirement dependency on itself.
+    #[must_use]
+    pub fn has_self_cycle(&self, origin: &ServiceId) -> bool {
+        self.edges
+            .iter()
+            .any(|e| &e.target == origin && (e.is_ordering() || e.is_requirement()))
+    }
+
+    /// Canonical directed ordering edges induced by this service's relationships.
+    pub fn directed_ordering_edges<'a>(
+        &'a self,
+        origin: &'a ServiceId,
+    ) -> impl Iterator<Item = DirectedServiceEdge> + 'a {
+        self.edges
+            .iter()
+            .filter_map(move |edge| edge.to_directed_ordering_edge(origin))
+    }
+
+    /// Canonical directed requirement edges induced by this service's relationships.
+    pub fn directed_requirement_edges<'a>(
+        &'a self,
+        origin: &'a ServiceId,
+    ) -> impl Iterator<Item = DirectedServiceEdge> + 'a {
+        self.edges
+            .iter()
+            .filter_map(move |edge| edge.to_directed_requirement_edge(origin))
+    }
+
     pub(super) fn joined_targets(&self, kind: &ServiceRelationKind) -> String {
         self.targets(kind)
             .map(ServiceId::as_str)
@@ -226,6 +609,79 @@ impl ServiceDeps {
         targets: impl IntoIterator<Item = ServiceId>,
     ) {
         self.relations.replace_targets(kind, targets);
+    }
+
+    /// Check if this service contains both `Before` and `After` relationships to the same target.
+    #[must_use]
+    pub fn has_immediate_ordering_cycle(&self, target: &ServiceId) -> bool {
+        self.relations.has_immediate_ordering_cycle(target)
+    }
+
+    /// Check if this service defines an ordering or requirement dependency on itself.
+    #[must_use]
+    pub fn has_self_cycle(&self, origin: &ServiceId) -> bool {
+        self.relations.has_self_cycle(origin)
+    }
+
+    /// Canonical directed ordering edges induced by this service's relationships.
+    pub fn directed_ordering_edges<'a>(
+        &'a self,
+        origin: &'a ServiceId,
+    ) -> impl Iterator<Item = DirectedServiceEdge> + 'a {
+        self.relations.directed_ordering_edges(origin)
+    }
+
+    /// Canonical directed requirement edges induced by this service's relationships.
+    pub fn directed_requirement_edges<'a>(
+        &'a self,
+        origin: &'a ServiceId,
+    ) -> impl Iterator<Item = DirectedServiceEdge> + 'a {
+        self.relations.directed_requirement_edges(origin)
+    }
+}
+
+/// A detected cycle in a service dependency or ordering graph.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+pub struct ServiceCycle {
+    /// Sequence of service IDs forming the closed loop.
+    /// The first and last elements are identical, e.g. `[A, B, C, A]`.
+    pub path: Vec<ServiceId>,
+}
+
+impl ServiceCycle {
+    #[must_use]
+    pub fn new(path: Vec<ServiceId>) -> Self {
+        Self { path }
+    }
+
+    /// Number of edges (steps) in the cycle.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.path.len().saturating_sub(1)
+    }
+
+    /// Whether the cycle has no edges.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Check if a service participates in this cycle.
+    #[must_use]
+    pub fn contains(&self, id: &ServiceId) -> bool {
+        self.path.iter().any(|s| s == id)
+    }
+}
+
+impl fmt::Display for ServiceCycle {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let formatted = self
+            .path
+            .iter()
+            .map(ServiceId::as_str)
+            .collect::<Vec<_>>()
+            .join(" -> ");
+        write!(f, "{formatted}")
     }
 }
 

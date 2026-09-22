@@ -76,6 +76,15 @@ fn socket_link_parser_is_strict() {
     assert_eq!(parse_socket_inode("socket:[bad]"), None);
 }
 
+#[test]
+fn parses_ss_tcp_info_by_inode_and_ignores_unusable_rtt_values() {
+    let text = "ESTAB 0 0 127.0.0.1:10 192.0.2.1:443 timer:(keepalive,1sec,0) uid:1000 ino:424242 sk:1\n\trto:201 rtt:12.5/1.2 ato:40\nESTAB 0 0 127.0.0.1:11 192.0.2.2:443 uid:1000 ino:7 sk:2\n\trto:201 rtt:-1/0\nESTAB 0 0 127.0.0.1:12 192.0.2.3:443 uid:1000 ino:8 sk:3\n\tcubic wscale:7\n";
+    let rtts = parse_ss_tcp_info(text);
+    assert_eq!(rtts.get(&424_242), Some(&12.5));
+    assert!(!rtts.contains_key(&7));
+    assert!(!rtts.contains_key(&8));
+}
+
 #[cfg(target_os = "linux")]
 #[test]
 fn provider_filters_namespace_table_to_process_owned_inodes() {
@@ -302,4 +311,13 @@ fn rate_tracker_prunes_exited_pids_against_the_live_set() {
         "a pruned pid must re-seed (first-sighting gap), not inherit its old baseline"
     );
     assert_eq!(reseeded.traffic_state, DeviceState::healthy(2_000));
+}
+
+#[test]
+fn tcp_connection_counter_parser_preserves_short_lived_connection_evidence() {
+    let text = "Tcp: RtoAlgorithm RtoMin RtoMax MaxConn ActiveOpens PassiveOpens\nTcp: 1 200 120000 - 17 23\n";
+    let counters = parse_tcp_connection_counters(text).expect("paired Tcp rows");
+    assert_eq!(counters.active_opens, Some(17));
+    assert_eq!(counters.passive_opens, Some(23));
+    assert_eq!(counters.retransmitted_segments, None);
 }

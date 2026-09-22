@@ -21,7 +21,7 @@ use bevy::ecs::lifecycle::Add;
 use bevy::ecs::observer::{Observer, On};
 use bevy::ecs::query::With;
 use bevy::ecs::system::{Commands, NonSendMut, Query, Res};
-use bevy::scene::{CommandsSceneExt, Scene, bsn, on};
+use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Overflow, UiRect, Val, percent,
     px,
@@ -42,7 +42,7 @@ use taskmanager_shell::presentation::MISSING_VALUE;
 use super::super::processes;
 use crate::app::{FrontendTrack, PageContext, SharedRuntimeHandle, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, space_2, space_8, space_24};
+use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_24};
 use crate::window::{Role, TextRole, WindowPalette};
 
 const OVERVIEW_FIELDS: &[(ProcessDetailsField, &str)] = &[
@@ -51,7 +51,18 @@ const OVERVIEW_FIELDS: &[(ProcessDetailsField, &str)] = &[
     (ProcessDetailsField::Status, "common.status"),
     (ProcessDetailsField::Cpu, "common.cpu"),
     (ProcessDetailsField::Memory, "common.memory"),
+    (ProcessDetailsField::Pss, "proc.pss"),
+    (ProcessDetailsField::Uss, "proc.uss"),
+    (ProcessDetailsField::AnonHugePages, "proc.anon_huge_pages"),
+    (ProcessDetailsField::SchedPolicy, "proc.sched_policy"),
+    (ProcessDetailsField::OomScore, "proc.oom_score"),
+    (ProcessDetailsField::PageFaults, "proc.page_faults"),
     (ProcessDetailsField::Threads, "common.threads"),
+    (ProcessDetailsField::NetworkRate, "common.network"),
+    (
+        ProcessDetailsField::CancelledWriteBytes,
+        "proc.cancelled_write",
+    ),
     (ProcessDetailsField::Fds, "proc.fds"),
 ];
 
@@ -120,13 +131,19 @@ pub(crate) fn projection(shell: &ShellApp) -> ProcessDetailsProjection {
         process,
         &taskmanager_core::core::units::UnitPreferences::default(),
     );
-    let overview = OVERVIEW_FIELDS
+    let mut overview: Vec<DetailRow> = OVERVIEW_FIELDS
         .iter()
         .map(|(field, label)| DetailRow {
             label: t(label).to_owned(),
             value: detail_value(&vm, *field).text_or(MISSING_VALUE).to_owned(),
         })
         .collect();
+    if let Some(summary) = taskmanager_shell::presentation::command_identity_summary(process) {
+        overview.push(DetailRow {
+            label: t("proc_insights.command_identity").to_owned(),
+            value: summary,
+        });
+    }
     let selected = ProcessDetailsSelection {
         identity: ProcessLiveKey::from_process(process),
         pid: process.pid,
@@ -412,6 +429,7 @@ pub(crate) fn panel_scene(context: &PageContext<'_>) -> impl Scene + use<> {
         ScrollArea
         on(bootstrap_details_page)
         ProcessDetailsRoot
+        super::ProcessDetailsContainer
         Children [
             ( { details_content_scene(&projection(context.shell), palette) } ),
         ]
@@ -496,11 +514,26 @@ fn detail_row_scene(row: &DetailRow) -> impl Scene + use<> {
         Node {
             width: percent(100),
             flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(space_2()),
+            align_items: AlignItems::Center,
+            column_gap: Val::Px(space_4()),
         }
         Children [
-            ( Node { width: px(92.0) } Children [ ( Text(label) TextRole(Role::Caption) ) ] ),
-            ( Text(value) TextRole(Role::Body) ),
+            (
+                Node {
+                    width: px(130.0),
+                    min_width: px(130.0),
+                    overflow: Overflow::clip_x(),
+                }
+                Children [ ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ) ]
+            ),
+            (
+                Node {
+                    min_width: px(0.0),
+                    flex_shrink: 1.0,
+                    overflow: Overflow::clip_x(),
+                }
+                Children [ ( Text(value) TextRole(Role::Body) template_value(no_wrap_text()) ) ]
+            ),
         ]
     }
 }

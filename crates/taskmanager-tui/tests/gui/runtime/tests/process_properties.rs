@@ -81,6 +81,68 @@ fn enter_opens_properties_modal_showing_process_identity() {
 }
 
 #[test]
+fn overview_renders_observed_page_fault_counters() {
+    let mut app = app_on_processes();
+    // The demo rows carry no page-fault counters, so this test writes the two
+    // typed `ProcessItem` counters the Linux provider fills from
+    // `/proc/<pid>/stat` (minflt/majflt) before the modal freezes its target.
+    taskmanager_shell::fixture::edit_processes(&mut app.shell, |processes| {
+        let process = processes
+            .as_mut()
+            .and_then(|processes| processes.iter_mut().find(|process| process.pid == 4201))
+            .expect("demo process fixture");
+        process.minor_page_faults = Some(1_234_567);
+        process.major_page_faults = Some(42);
+    });
+    // The fixture edit resets the shell cursor; re-resolve the canonical
+    // Applications cursor so the modal opens on the counted row.
+    app.reconcile_applications_cursor();
+
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Enter,
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(app.process_properties().is_some(), "Enter opens the modal");
+
+    let text = frame_text(&app, 140, 48);
+    let row = text
+        .lines()
+        .find(|line| line.contains("Page faults"))
+        .unwrap_or_else(|| panic!("the page-fault row must render:\n{text}"));
+    assert!(
+        row.contains("1234567 (I/O: 42)"),
+        "one row must paint the observed minor and major counters: {row:?}"
+    );
+
+    // A row without observed counters keeps the shared dash on the same row —
+    // never a fabricated 0 / 0 pair.
+    let mut cold = app_on_processes();
+    let _ = handle_key(
+        &mut cold,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Enter,
+            KeyModifiers::NONE,
+        ),
+    );
+    let cold_text = frame_text(&cold, 140, 48);
+    let cold_row = cold_text
+        .lines()
+        .find(|line| line.contains("Page faults"))
+        .unwrap_or_else(|| panic!("the page-fault row must render:\n{cold_text}"));
+    assert!(
+        cold_row.contains('—'),
+        "an unobserved counter pair must render the honest dash: {cold_row:?}"
+    );
+    assert!(
+        !cold_row.contains("0 (I/O: 0)"),
+        "an unobserved counter pair must never read as measured zeros: {cold_row:?}"
+    );
+}
+
+#[test]
 fn trigger_does_nothing_when_no_process_is_selected() {
     // A fresh shell has no processes at all; on the Applications page Enter must
     // not open the modal (honest no-op, never a fabricated empty target).
@@ -267,6 +329,9 @@ fn insights_tab_renders_thread_list_when_projection_is_present() {
                     state: ThreadState::Running,
                     cpu_time_secs: Some(2.0),
                     cpu_percent: Some(37.5),
+                    wchan: None,
+                    run_queue_wait_ns: None,
+                    wait_kind: None,
                 }],
             },
         },

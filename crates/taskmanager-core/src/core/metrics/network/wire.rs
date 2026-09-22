@@ -40,6 +40,22 @@ struct NetworkMetricsWire {
     is_wireless: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     link_speed_mbps: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    mtu_bytes: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tx_queue_len: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rx_drops: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tx_drops: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rx_errors: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tx_errors: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    rx_overruns: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    tx_overruns: Option<u64>,
     /// Presence matters: explicit `Other` is typed truth and must beat a
     /// conflicting legacy `is_wireless=true`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -58,6 +74,10 @@ struct NetworkMetricsWire {
     driver: Option<Arc<str>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     adapter: Option<Arc<str>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    master_interface: Option<Arc<str>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    peer_interface: Option<Arc<str>>,
 }
 
 impl Serialize for NetworkMetrics {
@@ -81,6 +101,14 @@ impl Serialize for NetworkMetrics {
             mac_addr: self.mac_addr.clone(),
             is_wireless: adapter_type.map(|kind| kind == NetworkAdapterType::WiFi),
             link_speed_mbps: self.current_link_speed_mbps(),
+            mtu_bytes: self.current_mtu_bytes(),
+            tx_queue_len: self.current_tx_queue_len(),
+            rx_drops: self.current_rx_drops(),
+            tx_drops: self.current_tx_drops(),
+            rx_errors: self.current_rx_errors(),
+            tx_errors: self.current_tx_errors(),
+            rx_overruns: self.current_rx_overruns(),
+            tx_overruns: self.current_tx_overruns(),
             adapter_type,
             utilization_pct: self.current_utilization_pct(),
             scalar_observations: self.scalar_observations,
@@ -89,6 +117,8 @@ impl Serialize for NetworkMetrics {
             wireless_observations: self.wireless_observations.clone(),
             driver: self.driver.clone(),
             adapter: self.adapter.clone(),
+            master_interface: self.master_interface.clone(),
+            peer_interface: self.peer_interface.clone(),
         }
         .serialize(serializer)
     }
@@ -126,6 +156,14 @@ impl<'de> Deserialize<'de> for NetworkMetrics {
                 &mut scalar_observations.link_speed_mbps,
                 wire.link_speed_mbps,
             );
+            hydrate_unknown(&mut scalar_observations.mtu_bytes, wire.mtu_bytes);
+            hydrate_unknown(&mut scalar_observations.tx_queue_len, wire.tx_queue_len);
+            hydrate_unknown(&mut scalar_observations.rx_drops, wire.rx_drops);
+            hydrate_unknown(&mut scalar_observations.tx_drops, wire.tx_drops);
+            hydrate_unknown(&mut scalar_observations.rx_errors, wire.rx_errors);
+            hydrate_unknown(&mut scalar_observations.tx_errors, wire.tx_errors);
+            hydrate_unknown(&mut scalar_observations.rx_overruns, wire.rx_overruns);
+            hydrate_unknown(&mut scalar_observations.tx_overruns, wire.tx_overruns);
         }
 
         let mut wireless_observations = wire.wireless_observations;
@@ -154,6 +192,8 @@ impl<'de> Deserialize<'de> for NetworkMetrics {
             wireless_observations,
             driver: wire.driver,
             adapter: wire.adapter,
+            master_interface: wire.master_interface,
+            peer_interface: wire.peer_interface,
         })
     }
 }

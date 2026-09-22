@@ -28,6 +28,9 @@ use taskmanager_application::{
     StartupEvidenceRequest, StartupInventoryRequest, StorageTelemetryRequest,
 };
 use taskmanager_core::ProviderId;
+use taskmanager_platform_contract::{
+    CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
+};
 use taskmanager_platform_runtime::ProviderRegistration;
 
 use self::environment::{
@@ -194,6 +197,111 @@ impl WindowsProviderRegistry {
             power,
         }
     }
+}
+
+/// Layer B of the three-axis parity ledger: the capability identities this
+/// adapter registers a provider for, with the honest static source of each.
+///
+/// The list is declared AT the registration site and must stay in step with
+/// [`windows_provider_registry`]: `Present` means the registered provider
+/// really serves the capability, and `Absent(Unsupported)` marks a
+/// registered-pending provider that can only answer a typed absence (the
+/// Windows lib doc's typed-Unsupported set, enumerated in the contract test's
+/// `PENDING_CAPABILITIES`). The matching proof is
+/// `capability_surface_matches_the_live_catalog_and_the_pending_census`, which
+/// compares this declaration with the live runtime catalog in both directions.
+const REGISTERED_CAPABILITY_SOURCES: &[(CapabilityId, PlatformSource)] = &[
+    // -- system telemetry, hardware inventory, accelerators ------------------
+    (CapabilityId::TELEMETRY_HOST, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_CPU, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_MEMORY, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_STORAGE, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_NETWORK, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_GPU, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_GPU_ENGINES, PlatformSource::Present),
+    (CapabilityId::ACCELERATOR_NPU, PlatformSource::Present),
+    (CapabilityId::HARDWARE_INVENTORY, PlatformSource::Present),
+    (CapabilityId::CONTAINERS, PlatformSource::Present),
+    (CapabilityId::SENSORS, PlatformSource::Present),
+    (CapabilityId::POWER_SUPPLIES, PlatformSource::Present),
+    // -- process observation and control -------------------------------------
+    (CapabilityId::PROCESS_LIST, PlatformSource::Present),
+    (CapabilityId::PROCESS_CONTROL, PlatformSource::Present),
+    (
+        CapabilityId::PROCESS_INSIGHTS_NETWORK,
+        PlatformSource::Present,
+    ),
+    (CapabilityId::PROCESS_INSIGHTS_GPU, PlatformSource::Present),
+    (
+        CapabilityId::PROCESS_INSIGHTS_RESOURCES,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_INSIGHTS_ISOLATION,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_INSIGHTS_THREADS,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_INSIGHTS_OPEN_FILES,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_INSIGHTS_ENVIRONMENT,
+        PlatformSource::Present,
+    ),
+    (CapabilityId::PROCESS_AFFINITY, PlatformSource::Present),
+    (
+        CapabilityId::PROCESS_AFFINITY_CONTROL,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_RESOURCE_CONTROL,
+        PlatformSource::Present,
+    ),
+    // -- services, startup, sessions ----------------------------------------
+    (CapabilityId::SERVICES, PlatformSource::Present),
+    (CapabilityId::SERVICE_DEPENDENCIES, PlatformSource::Present),
+    (CapabilityId::SERVICE_CONTROL, PlatformSource::Present),
+    (CapabilityId::SERVICE_LOGS, PlatformSource::Present),
+    (CapabilityId::SERVICE_LOG_STREAM, PlatformSource::Present),
+    (CapabilityId::STARTUP, PlatformSource::Present),
+    (CapabilityId::STARTUP_EVIDENCE, PlatformSource::Present),
+    (CapabilityId::STARTUP_CONTROL, PlatformSource::Present),
+    (CapabilityId::SESSIONS, PlatformSource::Present),
+    (CapabilityId::SESSION_CONTROL, PlatformSource::Present),
+    // -- shell integration ---------------------------------------------------
+    (CapabilityId::COMMAND_LAUNCH, PlatformSource::Present),
+    (CapabilityId::RESOURCE_REVEAL, PlatformSource::Present),
+    (CapabilityId::URL_OPEN, PlatformSource::Present),
+    (CapabilityId::DESKTOP_APPEARANCE, PlatformSource::Present),
+    (CapabilityId::DESKTOP_NOTIFY, PlatformSource::Present),
+    // -- storage ------------------------------------------------------------
+    (CapabilityId::STORAGE_HEALTH, PlatformSource::Present),
+    (CapabilityId::SMART, PlatformSource::Present),
+    (CapabilityId::SMART_CONTROL, PlatformSource::Present),
+    (CapabilityId::DIRECTORY_USAGE, PlatformSource::Present),
+    // -- registered-pending lanes: typed absence only -----------------------
+    (CapabilityId::PROCESS_NETWORK_ESCALATION, absent()),
+    (CapabilityId::FIRST_RUN_SETUP, absent()),
+    (CapabilityId::TELEMETRY_MEMORY_SMBIOS, absent()),
+    (CapabilityId::TELEMETRY_CPU_PACKAGE_POWER, absent()),
+    (CapabilityId::TELEMETRY_CPU_MSR, absent()),
+];
+
+/// The typed honest absence for a registered-pending lane.
+const fn absent() -> PlatformSource {
+    PlatformSource::Absent(CapabilityStatus::Unsupported)
+}
+
+/// The Windows layer-B capability surface: the lanes above keep their declared
+/// source, and every other product-expected identity answers
+/// `Absent(Unsupported)` because this adapter registers no source for it.
+#[must_use]
+pub fn capability_surface() -> PlatformCapabilitySurface {
+    PlatformCapabilitySurface::declaring(PlatformAxis::Windows, REGISTERED_CAPABILITY_SOURCES)
 }
 
 pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {

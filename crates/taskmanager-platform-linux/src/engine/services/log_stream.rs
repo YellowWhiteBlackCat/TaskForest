@@ -142,6 +142,9 @@ pub(crate) fn fetch(
         }
         let unit = target.native();
         let mut command = Command::new("journalctl");
+        if target.user_scope() {
+            command.arg("--user");
+        }
         command.args([
             "--unit",
             unit,

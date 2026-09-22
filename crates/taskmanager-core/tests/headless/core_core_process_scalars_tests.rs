@@ -1,4 +1,15 @@
 use super::*;
+use crate::ProcessStatusKind;
+
+#[test]
+fn linux_uninterruptible_state_is_not_collapsed_into_ordinary_sleep() {
+    let mut process = ProcessItem::new(7, "blocked");
+    process.status = "UninterruptibleDiskSleep".into();
+    assert_eq!(process.status_kind(), ProcessStatusKind::Uninterruptible);
+    assert!(process.status_kind().is_uninterruptible());
+    process.status = "Sleeping".into();
+    assert_eq!(process.status_kind(), ProcessStatusKind::Sleeping);
+}
 use crate::core::ScalarAvailability;
 
 fn process_wire(pid: u32, observations: ProcessScalarObservations) -> serde_json::Value {
@@ -75,11 +86,15 @@ fn explicit_unavailability_never_falls_back_to_legacy_numbers() {
             cpu_percentage: ScalarObservation::unavailable(failure),
             memory_bytes: ScalarObservation::unavailable(failure),
             memory_pss_bytes: ScalarObservation::unavailable(failure),
+            memory_uss_bytes: ScalarObservation::unavailable(failure),
+            memory_anon_huge_pages_bytes: ScalarObservation::unavailable(failure),
             swap_bytes: ScalarObservation::unavailable(failure),
             disk_read_bytes_total: ScalarObservation::unavailable(failure),
             disk_write_bytes_total: ScalarObservation::unavailable(failure),
             disk_read_bytes_per_sec: ScalarObservation::unavailable(failure),
             disk_write_bytes_per_sec: ScalarObservation::unavailable(failure),
+            network_rx_bytes_per_sec: ScalarObservation::unavailable(failure),
+            network_tx_bytes_per_sec: ScalarObservation::unavailable(failure),
             threads: ScalarObservation::unavailable(failure),
             start_time_secs: ScalarObservation::unavailable(failure),
             cpu_time_secs: ScalarObservation::unavailable(failure),

@@ -38,6 +38,7 @@ crates/*/README.md       crate 自述：Role / Boundary / Module map /
 | 改配置 / saved-view / 启动流程 | [STATE_OWNERSHIP](STATE_OWNERSHIP.md)、[application README](../crates/taskmanager-application/README.md) | 036 040 |
 | 改打包 / 安装 / 发布 | [RELEASE](RELEASE.md)、[SYSTEM_INSTALL_MANIFEST](SYSTEM_INSTALL_MANIFEST.md)、[PRODUCT_IDENTITY](PRODUCT_IDENTITY.md) | 006 029 044 045 051 |
 | 新增前端 / 改产品组合 | [ARCH](ARCH.md) §2/§6、[taskmanager-cli README](../crates/taskmanager-cli/README.md)、对应前端 README | 051 |
+| 四端语义对等与验收 | [ARCH.md](ARCH.md)、[QUALITY_GATES.md](QUALITY_GATES.md) | 004 016 027 051 |
 | 新增测试 / 改测试布局 | [TEST_LAYOUT](TEST_LAYOUT.md)、[STANDARDS](STANDARDS.md) §3 | — |
 | 改文档 / 流程 / 门禁 | 本页、[QUALITY_GATES](QUALITY_GATES.md) | — |
 
@@ -60,7 +61,7 @@ crates/*/README.md       crate 自述：Role / Boundary / Module map /
 | Wire 与领域事实边界 | [WIRE_DOMAIN_BOUNDARIES.md](WIRE_DOMAIN_BOUNDARIES.md) |
 | UI 组件 | [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md) |
 | 弹性布局流程 | [ELASTIC_LAYOUT_PLAYBOOK.md](ELASTIC_LAYOUT_PLAYBOOK.md) |
-| 前端章程 | [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md) |
+| 前端章程与专有指南 | [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md)、[UI_GUIDE_GPUI.md](UI_GUIDE_GPUI.md)、[UI_GUIDE_ICED.md](UI_GUIDE_ICED.md)、[UI_GUIDE_BEVY_UI.md](UI_GUIDE_BEVY_UI.md)、[UI_GUIDE_TUI.md](UI_GUIDE_TUI.md) |
 | 术语表 | [GLOSSARY.md](GLOSSARY.md) |
 | 产品和桌面身份 | [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md) |
 | 安装文件边界 | [SYSTEM_INSTALL_MANIFEST.md](SYSTEM_INSTALL_MANIFEST.md) |

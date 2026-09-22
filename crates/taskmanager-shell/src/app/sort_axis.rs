@@ -48,6 +48,7 @@ pub const fn sort_axis(column: SortCol) -> ProcessSortAxis {
         SortCol::CpuTime => ProcessSortAxis::CpuTime,
         SortCol::DiskRead => ProcessSortAxis::DiskRead,
         SortCol::DiskWrite => ProcessSortAxis::DiskWrite,
+        SortCol::Network => ProcessSortAxis::Network,
         SortCol::StartTime => ProcessSortAxis::StartTime,
         SortCol::Fds => ProcessSortAxis::Fds,
         SortCol::Nice => ProcessSortAxis::Nice,
@@ -81,6 +82,7 @@ pub const fn aggregate_sort_key(column: SortCol) -> ProcessSortKey {
         SortCol::User
         | SortCol::State
         | SortCol::Threads
+        | SortCol::Network
         | SortCol::StartTime
         | SortCol::Fds
         | SortCol::Nice => ProcessSortKey::Name,

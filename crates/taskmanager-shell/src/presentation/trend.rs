@@ -27,11 +27,12 @@ pub enum TrendSeries {
     CpuFrequencyMhz,
     CpuPowerW,
     DiskActiveTimePct,
+    NpuUsagePercent,
 }
 
 impl TrendSeries {
     /// Every series exactly once, in the canonical slot order.
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 10] = [
         Self::CpuUsagePercent,
         Self::MemoryUsagePercent,
         Self::DiskBytesPerSec,
@@ -41,6 +42,7 @@ impl TrendSeries {
         Self::CpuFrequencyMhz,
         Self::CpuPowerW,
         Self::DiskActiveTimePct,
+        Self::NpuUsagePercent,
     ];
 
     /// The storage slot this selector reads.
@@ -56,6 +58,7 @@ impl TrendSeries {
             Self::CpuFrequencyMhz => 6,
             Self::CpuPowerW => 7,
             Self::DiskActiveTimePct => 8,
+            Self::NpuUsagePercent => 9,
         }
     }
 
@@ -70,6 +73,7 @@ impl TrendSeries {
             Self::CpuFrequencyMhz => MetricSeries::CpuFrequencyMhz,
             Self::CpuPowerW => MetricSeries::CpuPowerW,
             Self::DiskActiveTimePct => MetricSeries::DiskActiveTimePct,
+            Self::NpuUsagePercent => MetricSeries::NpuUsagePercent,
         }
     }
 }

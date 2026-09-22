@@ -78,7 +78,7 @@ fn open_driven(
 }
 
 #[test]
-fn the_menu_spec_names_the_five_shared_verbs() {
+fn the_menu_spec_names_the_six_shared_verbs() {
     let shell = shelved_shell(&[service_item(
         "NetworkManager.service",
         "NetworkManager",
@@ -101,8 +101,9 @@ fn the_menu_spec_names_the_five_shared_verbs() {
             t("svc.restart"),
             t("svc.enable"),
             t("svc.disable"),
+            t("svc.reload_daemon"),
         ],
-        "the menu offers exactly the shared verbs in TUI order"
+        "the menu offers exactly the shared verbs and daemon reload in order"
     );
     assert!(spec.items.iter().all(|item| item.enabled));
 }

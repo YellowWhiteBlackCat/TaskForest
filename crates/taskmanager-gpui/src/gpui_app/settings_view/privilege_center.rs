@@ -297,9 +297,12 @@ fn msr_state(
 
 fn capability_state(status: Option<CapabilityStatus>) -> Option<PrivilegeRowState> {
     match status? {
-        CapabilityStatus::Available | CapabilityStatus::PermissionRequired => {
-            Some(PrivilegeRowState::NeedsAuthorization)
-        }
+        // `RequiresEscalation` is the escalatable state; `PermissionRequired`
+        // is a permission gate. Both need one explicit authorization decision,
+        // so both expose the same affordance in this center.
+        CapabilityStatus::Available
+        | CapabilityStatus::PermissionRequired
+        | CapabilityStatus::RequiresEscalation => Some(PrivilegeRowState::NeedsAuthorization),
         CapabilityStatus::Degraded(kind) => Some(state_from_failure(kind)),
         CapabilityStatus::Unsupported => Some(PrivilegeRowState::Unsupported),
         CapabilityStatus::MissingDependency

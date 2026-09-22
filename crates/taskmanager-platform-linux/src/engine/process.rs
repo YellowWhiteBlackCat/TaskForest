@@ -240,6 +240,8 @@ impl ProcessManager {
         let mut process_fds = FieldSourceSummary::default();
         let mut process_memory = FieldSourceSummary::default();
         let mut process_memory_pss = FieldSourceSummary::default();
+        let mut process_memory_uss = FieldSourceSummary::default();
+        let mut process_memory_anon_huge_pages = FieldSourceSummary::default();
         let mut process_swap = FieldSourceSummary::default();
         let mut process_io = FieldSourceSummary::default();
         let mut process_rates = FieldSourceSummary::default();
@@ -252,8 +254,17 @@ impl ProcessManager {
             let status = match process.status() {
                 ProcessStatus::Run => "Running",
                 ProcessStatus::Sleep => "Sleeping",
+                ProcessStatus::Idle => "Idle",
+                ProcessStatus::UninterruptibleDiskSleep => "UninterruptibleDiskSleep",
                 ProcessStatus::Stop => "Stopped",
+                ProcessStatus::Tracing => "Tracing",
                 ProcessStatus::Zombie => "Zombie",
+                ProcessStatus::Dead => "Dead",
+                ProcessStatus::Wakekill => "Wakekill",
+                ProcessStatus::Waking => "Waking",
+                ProcessStatus::Parked => "Parked",
+                ProcessStatus::LockBlocked => "LockBlocked",
+                ProcessStatus::Suspended => "Suspended",
                 _ => "Other",
             }
             .to_owned();
@@ -311,6 +322,16 @@ impl ProcessManager {
                 Ok(value) => taskmanager_core::ScalarObservation::available(value, observed_at_ms),
                 Err(failure) => taskmanager_core::ScalarObservation::unavailable(failure),
             };
+            scalar_observations.memory_uss_bytes = match memory_observation.uss {
+                Ok(value) => taskmanager_core::ScalarObservation::available(value, observed_at_ms),
+                Err(failure) => taskmanager_core::ScalarObservation::unavailable(failure),
+            };
+            scalar_observations.memory_anon_huge_pages_bytes = match memory_observation
+                .anon_huge_pages
+            {
+                Ok(value) => taskmanager_core::ScalarObservation::available(value, observed_at_ms),
+                Err(failure) => taskmanager_core::ScalarObservation::unavailable(failure),
+            };
             scalar_observations.swap_bytes = match memory_observation.swap {
                 Ok(value) => taskmanager_core::ScalarObservation::available(value, observed_at_ms),
                 Err(failure) => taskmanager_core::ScalarObservation::unavailable(failure),
@@ -342,6 +363,8 @@ impl ProcessManager {
             process_fds.record(evidence.fds);
             process_memory.record(evidence.memory);
             process_memory_pss.record(memory_observation.pss_outcome);
+            process_memory_uss.record(memory_observation.uss_outcome);
+            process_memory_anon_huge_pages.record(memory_observation.anon_huge_pages_outcome);
             process_swap.record(memory_observation.swap_outcome);
             process_io.record(evidence.io);
             process_rates.record(evidence.rates);
@@ -353,6 +376,11 @@ impl ProcessManager {
             item.parent_pid = process.parent().map(|parent| parent.as_u32());
             item.cmdline = cmdline;
             item.status = status;
+            item.scheduling_policy = evidence.policy;
+            item.oom_score = evidence.oom_score;
+            item.minor_page_faults = evidence.minflt;
+            item.major_page_faults = evidence.majflt;
+            item.cancelled_write_bytes = evidence.cancelled_write_bytes;
             item.apply_metadata_observations(metadata_observations);
             item.apply_application_identity(application_identity);
             item.apply_scalar_observations(scalar_observations);
@@ -409,6 +437,16 @@ impl ProcessManager {
                 PROCESS_MEMORY_PSS_PROVIDER,
                 process_memory_pss.outcome(item_count),
                 process_memory_pss.successes,
+            ),
+            source_status(
+                PROCESS_MEMORY_USS_PROVIDER,
+                process_memory_uss.outcome(item_count),
+                process_memory_uss.successes,
+            ),
+            source_status(
+                PROCESS_MEMORY_ANON_HUGE_PAGES_PROVIDER,
+                process_memory_anon_huge_pages.outcome(item_count),
+                process_memory_anon_huge_pages.successes,
             ),
             source_status(
                 PROCESS_SWAP_PROVIDER,
@@ -484,6 +522,10 @@ const PROCESS_MEMORY_PROVIDER: ProviderId =
     ProviderId::borrowed("linux.process.procfs.status-memory");
 const PROCESS_MEMORY_PSS_PROVIDER: ProviderId =
     ProviderId::borrowed("linux.process.procfs.memory-pss");
+const PROCESS_MEMORY_USS_PROVIDER: ProviderId =
+    ProviderId::borrowed("linux.process.procfs.memory-uss");
+const PROCESS_MEMORY_ANON_HUGE_PAGES_PROVIDER: ProviderId =
+    ProviderId::borrowed("linux.process.procfs.memory-anon-huge-pages");
 const PROCESS_SWAP_PROVIDER: ProviderId = ProviderId::borrowed("linux.process.procfs.swap");
 const PROCESS_IO_PROVIDER: ProviderId = ProviderId::borrowed("linux.process.procfs.io");
 const PROCESS_RATE_PROVIDER: ProviderId = ProviderId::borrowed("linux.process.procfs.rates");

@@ -21,6 +21,16 @@ pub struct ProcessScalarObservations {
     /// from `memory_bytes`, whose legacy meaning remains resident set size.
     #[serde(default)]
     pub memory_pss_bytes: ScalarObservation<u64>,
+    /// Unique set size (private memory not shared with any other process).
+    #[serde(default)]
+    pub memory_uss_bytes: ScalarObservation<u64>,
+    /// Anonymous transparent huge pages charged to this process.
+    ///
+    /// This is sourced from Linux `smaps_rollup` when the kernel exposes it;
+    /// it is independent from RSS/PSS/USS so an unavailable THP counter never
+    /// changes the meaning of the other memory values.
+    #[serde(default)]
+    pub memory_anon_huge_pages_bytes: ScalarObservation<u64>,
     /// Swap charged to this process. It is not part of either RSS or PSS.
     #[serde(default)]
     pub swap_bytes: ScalarObservation<u64>,
@@ -28,6 +38,10 @@ pub struct ProcessScalarObservations {
     pub disk_write_bytes_total: ScalarObservation<u64>,
     pub disk_read_bytes_per_sec: ScalarObservation<u64>,
     pub disk_write_bytes_per_sec: ScalarObservation<u64>,
+    #[serde(default)]
+    pub network_rx_bytes_per_sec: ScalarObservation<u64>,
+    #[serde(default)]
+    pub network_tx_bytes_per_sec: ScalarObservation<u64>,
     pub threads: ScalarObservation<u32>,
     pub start_time_secs: ScalarObservation<u64>,
     pub cpu_time_secs: ScalarObservation<u64>,
@@ -45,11 +59,17 @@ impl ProcessScalarObservations {
             cpu_percentage: self.cpu_percentage.transition_failure(failure),
             memory_bytes: self.memory_bytes.transition_failure(failure),
             memory_pss_bytes: self.memory_pss_bytes.transition_failure(failure),
+            memory_uss_bytes: self.memory_uss_bytes.transition_failure(failure),
+            memory_anon_huge_pages_bytes: self
+                .memory_anon_huge_pages_bytes
+                .transition_failure(failure),
             swap_bytes: self.swap_bytes.transition_failure(failure),
             disk_read_bytes_total: self.disk_read_bytes_total.transition_failure(failure),
             disk_write_bytes_total: self.disk_write_bytes_total.transition_failure(failure),
             disk_read_bytes_per_sec: self.disk_read_bytes_per_sec.transition_failure(failure),
             disk_write_bytes_per_sec: self.disk_write_bytes_per_sec.transition_failure(failure),
+            network_rx_bytes_per_sec: self.network_rx_bytes_per_sec.transition_failure(failure),
+            network_tx_bytes_per_sec: self.network_tx_bytes_per_sec.transition_failure(failure),
             threads: self.threads.transition_failure(failure),
             start_time_secs: self.start_time_secs.transition_failure(failure),
             cpu_time_secs: self.cpu_time_secs.transition_failure(failure),
@@ -69,6 +89,12 @@ impl ProcessScalarObservations {
             memory_pss_bytes: self
                 .memory_pss_bytes
                 .retain_previous(previous.memory_pss_bytes),
+            memory_uss_bytes: self
+                .memory_uss_bytes
+                .retain_previous(previous.memory_uss_bytes),
+            memory_anon_huge_pages_bytes: self
+                .memory_anon_huge_pages_bytes
+                .retain_previous(previous.memory_anon_huge_pages_bytes),
             swap_bytes: self.swap_bytes.retain_previous(previous.swap_bytes),
             disk_read_bytes_total: self
                 .disk_read_bytes_total
@@ -82,6 +108,12 @@ impl ProcessScalarObservations {
             disk_write_bytes_per_sec: self
                 .disk_write_bytes_per_sec
                 .retain_previous(previous.disk_write_bytes_per_sec),
+            network_rx_bytes_per_sec: self
+                .network_rx_bytes_per_sec
+                .retain_previous(previous.network_rx_bytes_per_sec),
+            network_tx_bytes_per_sec: self
+                .network_tx_bytes_per_sec
+                .retain_previous(previous.network_tx_bytes_per_sec),
             threads: self.threads.retain_previous(previous.threads),
             start_time_secs: self
                 .start_time_secs
@@ -147,6 +179,25 @@ impl ProcessItem {
             .copied()
     }
 
+    /// Current unique set size (USS), representing private memory unshared with
+    /// any other process.
+    #[must_use]
+    pub const fn current_memory_uss_bytes(&self) -> Option<u64> {
+        self.scalar_observations
+            .memory_uss_bytes
+            .current_value()
+            .copied()
+    }
+
+    /// Current anonymous transparent huge-page charge, in bytes.
+    #[must_use]
+    pub const fn current_memory_anon_huge_pages_bytes(&self) -> Option<u64> {
+        self.scalar_observations
+            .memory_anon_huge_pages_bytes
+            .current_value()
+            .copied()
+    }
+
     /// Current per-process swap. Swap is a separate resource and must not be
     /// folded into the Apps memory value.
     #[must_use]
@@ -184,6 +235,35 @@ impl ProcessItem {
             .disk_write_bytes_per_sec
             .current_value()
             .copied()
+    }
+
+    #[must_use]
+    pub const fn current_network_rx_bytes_per_sec(&self) -> Option<u64> {
+        self.scalar_observations
+            .network_rx_bytes_per_sec
+            .current_value()
+            .copied()
+    }
+
+    #[must_use]
+    pub const fn current_network_tx_bytes_per_sec(&self) -> Option<u64> {
+        self.scalar_observations
+            .network_tx_bytes_per_sec
+            .current_value()
+            .copied()
+    }
+
+    #[must_use]
+    pub fn current_network_bytes_per_sec(&self) -> Option<u64> {
+        match (
+            self.current_network_rx_bytes_per_sec(),
+            self.current_network_tx_bytes_per_sec(),
+        ) {
+            (Some(rx), Some(tx)) => Some(rx.saturating_add(tx)),
+            (Some(rx), None) => Some(rx),
+            (None, Some(tx)) => Some(tx),
+            (None, None) => None,
+        }
     }
 
     #[must_use]

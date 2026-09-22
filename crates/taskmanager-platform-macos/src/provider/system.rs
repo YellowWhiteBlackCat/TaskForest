@@ -148,6 +148,8 @@ impl HostTelemetryProvider for MacHostTelemetryProvider {
             uptime_secs: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
             processes: ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
             threads: ScalarObservation::unavailable(FailureKind::Unsupported),
+            pressure: ScalarObservation::unavailable(FailureKind::Unsupported),
+            load_average: ScalarObservation::unavailable(FailureKind::Unsupported),
         };
         if uptime_secs > 0 {
             facts.uptime_secs = ScalarObservation::available(uptime_secs, observed_at_ms);
@@ -328,6 +330,8 @@ impl MemoryTelemetryProvider for MacMemoryTelemetryProvider {
                 Some(rate) => ScalarObservation::available(rate, observed_at_ms),
                 None => ScalarObservation::unavailable(FailureKind::Unsupported),
             },
+            swap_in_bytes_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
+            swap_out_bytes_per_sec: ScalarObservation::unavailable(FailureKind::Unsupported),
         };
         let metrics = MemoryMetrics::from_observations(
             scalar_observations,

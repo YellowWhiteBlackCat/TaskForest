@@ -25,6 +25,7 @@ pub(super) struct ProcessCellData {
     pub(super) cpu_time: String,
     pub(super) disk_read: Option<u64>,
     pub(super) disk_write: Option<u64>,
+    pub(super) network: Option<u64>,
 }
 
 pub(super) fn process_cell_data(
@@ -50,6 +51,7 @@ pub(super) fn process_cell_data(
         cpu_time: optional_cpu_time_seconds(process.current_cpu_time_secs()),
         disk_read: process.current_disk_read_bytes_per_sec(),
         disk_write: process.current_disk_write_bytes_per_sec(),
+        network: process.current_network_bytes_per_sec(),
     }
 }
 

@@ -50,6 +50,8 @@ mod detail_scroll_render;
 mod device_history_render;
 #[path = "tests/device_render.rs"]
 mod device_render;
+#[path = "tests/device_system.rs"]
+mod device_system;
 #[path = "tests/directory_usage_render.rs"]
 mod directory_usage_render;
 #[path = "tests/focus_control.rs"]

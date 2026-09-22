@@ -106,6 +106,8 @@ pub enum PaletteLocalAction {
     RequestSmartSelfTest,
     /// Browse dependencies for the selected service on the Services page.
     BrowseServiceDependencies,
+    ExportDiagnosticReport,
+    OpenProcessAffinity,
 }
 
 /// The typed direct-dispatch lane: what a TUI-local command DOES when its
@@ -120,6 +122,7 @@ pub(crate) enum TuiDirectAction {
     ToggleHealth,
     ToggleContainers,
     ExportSnapshot,
+    ExportDiagnosticReport,
     /// Digits `1`-`7` select the Performance resource the digit names.
     SelectPerfResource,
     /// `Enter` opens the selected row's action menu / properties.
@@ -217,7 +220,7 @@ pub(crate) struct TuiLocalCommand {
 
 /// The complete TUI-local binding registry.  The direct key router resolves
 /// every chord here — declaration and execution are one authority.
-pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 17] = [
+pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 18] = [
     TuiLocalCommand {
         binding: taskmanager_shell::LocalBinding {
             shortcut: "p",
@@ -271,6 +274,17 @@ pub(crate) const TUI_LOCAL_COMMANDS: [TuiLocalCommand; 17] = [
         direct: &[TuiDirectArm {
             scope: TuiDirectScope::Anywhere,
             action: TuiDirectAction::ExportSnapshot,
+        }],
+    },
+    TuiLocalCommand {
+        binding: taskmanager_shell::LocalBinding {
+            shortcut: "X",
+            label: "Export diagnostic report",
+        },
+        palette_action: Some(PaletteLocalAction::ExportDiagnosticReport),
+        direct: &[TuiDirectArm {
+            scope: TuiDirectScope::Anywhere,
+            action: TuiDirectAction::ExportDiagnosticReport,
         }],
     },
     TuiLocalCommand {
@@ -517,6 +531,12 @@ impl TuiApp {
             });
         }
         rows.push(CommandPaletteRow {
+            shortcut: "a",
+            label: "Process affinity (Applications)",
+            action: None,
+            local_action: Some(PaletteLocalAction::OpenProcessAffinity),
+        });
+        rows.push(CommandPaletteRow {
             shortcut: "F1",
             label: "Toggle keyboard reference",
             action: None,
@@ -692,6 +712,14 @@ impl TuiApp {
             Some(PaletteLocalAction::ToggleHealth) => self.toggle_health(),
             Some(PaletteLocalAction::ToggleContainers) => self.toggle_containers(),
             Some(PaletteLocalAction::ExportSnapshot) => self.export_snapshot(),
+            Some(PaletteLocalAction::ExportDiagnosticReport) => {
+                let _ = self.export_diagnostic_report();
+            }
+            Some(PaletteLocalAction::OpenProcessAffinity)
+                if self.page() == AppPage::Applications =>
+            {
+                let _ = self.open_process_affinity();
+            }
             Some(PaletteLocalAction::ToggleColumnMenu) => self.toggle_column_menu(),
             Some(PaletteLocalAction::ToggleProcessMenu) => {
                 let _ = self.open_process_menu();
@@ -745,7 +773,8 @@ impl TuiApp {
             | Some(PaletteLocalAction::ToggleDirectoryScan)
             | Some(PaletteLocalAction::ToggleGpuChartMetric)
             | Some(PaletteLocalAction::RequestSmartSelfTest)
-            | Some(PaletteLocalAction::BrowseServiceDependencies) => {}
+            | Some(PaletteLocalAction::BrowseServiceDependencies)
+            | Some(PaletteLocalAction::OpenProcessAffinity) => {}
         }
     }
 }

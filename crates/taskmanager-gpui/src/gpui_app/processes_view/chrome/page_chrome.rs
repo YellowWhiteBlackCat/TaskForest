@@ -25,6 +25,8 @@ pub(super) struct ProcessOverviewProps<'a> {
     pub theme: &'a Theme,
     pub application_count: usize,
     pub process_count: usize,
+    pub uninterruptible_count: Option<usize>,
+    pub anomaly_summary: Option<String>,
     pub search_input: &'a Entity<TextInputState>,
     pub presentation: ProcessChromePresentation,
     pub ui_size: UiSize,
@@ -35,6 +37,8 @@ pub(super) fn process_overview(props: ProcessOverviewProps<'_>) -> Div {
         theme,
         application_count,
         process_count,
+        uninterruptible_count,
+        anomaly_summary,
         search_input,
         presentation,
         ui_size,
@@ -71,10 +75,18 @@ pub(super) fn process_overview(props: ProcessOverviewProps<'_>) -> Div {
                     ui_size.header_font_size(),
                 ))
                 .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-                .child(
-                    i18n::t("proc.processes_running_subtitle")
-                        .replace("{count}", &process_count.to_string()),
-                ),
+                .child({
+                    let subtitle = i18n::t("proc.processes_running_subtitle")
+                        .replace("{count}", &process_count.to_string());
+                    let subtitle = uninterruptible_count
+                        .filter(|count| *count > 0)
+                        .map_or(subtitle.clone(), |count| {
+                            format!("{subtitle} · {} {count}", i18n::t("proc.d_state"))
+                        });
+                    anomaly_summary.map_or(subtitle.clone(), |summary| {
+                        format!("{subtitle} · {summary}")
+                    })
+                }),
         ),
         ProcessOverviewPresentation::TitleAndSearch => identity,
     };

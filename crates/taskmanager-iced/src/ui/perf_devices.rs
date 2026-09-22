@@ -15,6 +15,9 @@ use taskmanager_shell::presentation::{
 pub(crate) mod battery;
 pub(crate) use battery::battery_section;
 
+pub(crate) mod npu;
+pub(crate) use npu::npu_section;
+
 pub(crate) mod disk;
 pub(crate) use disk::*;
 

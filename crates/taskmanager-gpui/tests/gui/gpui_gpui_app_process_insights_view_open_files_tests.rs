@@ -23,11 +23,13 @@ fn populated_open_files() -> ProcessOpenFiles {
                 fd: 0,
                 kind: OpenFileKind::File,
                 target: Some("/dev/null".into()),
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 3,
                 kind: OpenFileKind::Socket,
                 target: Some("socket:[4242]".into()),
+                deleted: false,
             },
             // Readlink failed (privileged fd on a non-root reader): the row
             // is kept with a typed None target rather than dropped.
@@ -35,6 +37,7 @@ fn populated_open_files() -> ProcessOpenFiles {
                 fd: 9,
                 kind: OpenFileKind::Other,
                 target: None,
+                deleted: false,
             },
         ],
     }
@@ -100,6 +103,7 @@ fn oversized_fd_list_renders_through_the_capped_path(cx: &mut TestAppContext) {
                 fd: i as u32,
                 kind: OpenFileKind::File,
                 target: Some(format!("/tmp/session-{i}.lock")),
+                deleted: false,
             })
             .collect(),
     };

@@ -194,6 +194,14 @@ struct DiskMetricsWire {
     active_time_pct: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     response_time_ms: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    average_queue_depth: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    service_time_ms: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    read_merges_per_sec: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    write_merges_per_sec: Option<u64>,
     #[serde(default)]
     partitions: Vec<DiskPartition>,
     #[serde(default)]
@@ -214,6 +222,8 @@ struct DiskMetricsWire {
     smart_failure: Option<SmartProviderFailureKind>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     smart_temperature_c: Option<f32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    smart_temperature_sensors_c: Vec<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     smart_critical_warning: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -221,7 +231,13 @@ struct DiskMetricsWire {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     smart_percent_used: Option<f32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    smart_available_spare_pct: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    smart_available_spare_threshold_pct: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     smart_power_on_hours: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    smart_unsafe_shutdowns: Option<u64>,
 }
 
 impl Serialize for DiskPartition {
@@ -301,6 +317,10 @@ impl Serialize for DiskMetrics {
             iops: self.current_iops(),
             active_time_pct: self.current_active_time_pct(),
             response_time_ms: self.current_response_time_ms(),
+            average_queue_depth: self.current_average_queue_depth(),
+            service_time_ms: self.current_service_time_ms(),
+            read_merges_per_sec: self.current_read_merges_per_sec(),
+            write_merges_per_sec: self.current_write_merges_per_sec(),
             partitions: self.partitions.clone(),
             scalar_observations: self.scalar_observations,
             removable: self.media_removable,
@@ -311,10 +331,14 @@ impl Serialize for DiskMetrics {
             smart_provider: self.smart_provider.clone(),
             smart_failure: self.smart_failure,
             smart_temperature_c: self.smart_temperature_c,
+            smart_temperature_sensors_c: self.smart_temperature_sensors_c.clone(),
             smart_critical_warning: self.smart_critical_warning,
             smart_temp_critical_c: self.smart_temp_critical_c,
             smart_percent_used: self.smart_percent_used,
+            smart_available_spare_pct: self.smart_available_spare_pct,
+            smart_available_spare_threshold_pct: self.smart_available_spare_threshold_pct,
             smart_power_on_hours: self.smart_power_on_hours,
+            smart_unsafe_shutdowns: self.smart_unsafe_shutdowns,
         }
         .serialize(serializer)
     }
@@ -360,6 +384,22 @@ impl<'de> Deserialize<'de> for DiskMetrics {
                 &mut observations.response_time_ms,
                 wire.response_time_ms,
             );
+            hydrate_nonnegative_finite_unknown(
+                &mut observations.average_queue_depth,
+                wire.average_queue_depth,
+            );
+            hydrate_nonnegative_finite_unknown(
+                &mut observations.service_time_ms,
+                wire.service_time_ms,
+            );
+            hydrate_unknown(
+                &mut observations.read_merges_per_sec,
+                wire.read_merges_per_sec,
+            );
+            hydrate_unknown(
+                &mut observations.write_merges_per_sec,
+                wire.write_merges_per_sec,
+            );
         }
 
         let media_removable = wire.media_removable.or_else(|| {
@@ -391,10 +431,14 @@ impl<'de> Deserialize<'de> for DiskMetrics {
             smart_provider: wire.smart_provider,
             smart_failure: wire.smart_failure,
             smart_temperature_c: wire.smart_temperature_c,
+            smart_temperature_sensors_c: wire.smart_temperature_sensors_c,
             smart_critical_warning: wire.smart_critical_warning,
             smart_temp_critical_c: wire.smart_temp_critical_c,
             smart_percent_used: wire.smart_percent_used,
+            smart_available_spare_pct: wire.smart_available_spare_pct,
+            smart_available_spare_threshold_pct: wire.smart_available_spare_threshold_pct,
             smart_power_on_hours: wire.smart_power_on_hours,
+            smart_unsafe_shutdowns: wire.smart_unsafe_shutdowns,
         })
     }
 }
@@ -415,6 +459,16 @@ fn hydrate_positive_finite_unknown(observation: &mut ScalarObservation<f32>, val
     hydrate_unknown(
         observation,
         value.filter(|value| *value > 0.0 && value.is_finite()),
+    );
+}
+
+fn hydrate_nonnegative_finite_unknown(
+    observation: &mut ScalarObservation<f32>,
+    value: Option<f32>,
+) {
+    hydrate_unknown(
+        observation,
+        value.filter(|value| value.is_finite() && *value >= 0.0),
     );
 }
 

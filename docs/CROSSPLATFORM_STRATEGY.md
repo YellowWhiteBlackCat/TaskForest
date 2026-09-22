@@ -4,6 +4,22 @@
 OS 特性留在 adapter；没有合格来源的能力保持 typed `Unsupported`，不以临时脚本或假数字
 扩大支持面。
 
+## 平权口径
+
+**平权的两根轴是分开的。** 前端轴：GPUI、Iced、TUI、Bevy 必须对同一 intent/feature 提供
+同一语义入口。平台轴：Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，
+或 `Unsupported` / `PermissionRequired` / `RequiresEscalation` / `MissingDependency` /
+`TemporarilyUnavailable`（`platform-contract::CapabilityStatus` 的真实变体名）；`PermissionDenied`
+属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴。**平台 typed 降级是产品
+承诺的一部分，不是平权缺口**：平台 `Unsupported` 不算 parity 失败，前端缺入口才是。「四端全量
+一碗水端平」仅指**发行物与前端语义**，不表示三个平台具备相同的系统级能力，更不是「跨平台功能
+对等」。
+
+承诺边界（不得越过）：
+
+- 可以说：四端发行物同权；四端对同一 feature 的语义入口一致；平台缺口一律 typed 且可见。
+- 不可以说：四端「功能对等」；某 Linux-only 能力「跨平台可用」；缺口以 `0`/空值/占位按钮表示。
+
 ## 安全选择顺序
 
 1. 复用成熟 safe crate 或标准 API，并把结果转换为 typed domain facts。
@@ -19,7 +35,7 @@ Windows 生产、测试和开发辅助代码均禁止 PowerShell、CMD 或其他
 
 | 平台 | 事实源与组合 | 当前原则 |
 |---|---|---|
-| Linux | `/proc`、`/sys`、systemd/OpenRC、SMART、hwmon、DRM、NVML、审计 boundary | 参考实机面；权限和硬件差异必须 typed、可恢复 |
+| Linux | `/proc`、`/sys`、systemd/OpenRC、SMART、hwmon、DRM、NVML、审计 boundary | 参考实机面；权限和硬件差异必须 typed、可恢复；图形前端仅支持 Wayland，不再提供 X11 原生表面 |
 | macOS | `sysinfo`、`starship-battery`、plist、安全系统命令和原生 composition | 能编译不等于实机完成；缺 receipt 保持 contract/Unsupported |
 | Windows | `sysinfo`、`raw-cpuid`、`starship-battery`、安全 registry/service crate、ADR-031 boundary | safe/native-first；缺合格 seam 不实现 PDH/WMI/命令解释器旁路 |
 
@@ -29,6 +45,10 @@ Windows 生产、测试和开发辅助代码均禁止 PowerShell、CMD 或其他
   command、history 或 UI 语义。
 - provider unavailable、权限失败、驱动缺失和 confirmed absent 必须分开；一个字段失败不
   能让同一设备或其他平台条目消失。
+- 产品期望面（`CapabilityId::EXPECTED_SURFACE`）是"每个平台都必须作答"的能力身份全集，
+  是产品事实而非平台能力声明：未注册期望能力由 runtime catalog 兜底发布 typed 缺席
+  descriptor（`Unsupported`、无 provider 归属），真实注册只替换自身条目，"无条目"不是
+  合法产品答案。具体机制与不可逆性见 [ADR-053](../adr/053-product-expected-capability-surface.md)。
 - 稳定 identity、generation、last-success 和 recovery 由 runtime/application 管理；热插拔、
   重排、counter rollback 和 PID reuse 都必须断开旧 baseline。
 - 标准二进制在运行时发现 Intel、AMD、NVIDIA、NVMe、ATA、Wi-Fi 等能力；硬件 vendor 不是

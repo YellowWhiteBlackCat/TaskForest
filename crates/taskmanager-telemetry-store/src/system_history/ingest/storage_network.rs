@@ -259,23 +259,28 @@ impl CorrelatedSystemTelemetryIngestor {
                         ) && observation.device_lifecycles().is_empty())
                         .then_some(0);
                     }
-                    metrics.iter().try_fold(0_u64, |total, network| {
-                        total
-                            .checked_add(
-                                network
-                                    .scalar_observations()
-                                    .rx_bytes_per_sec
-                                    .current_value()
-                                    .copied()?,
-                            )?
-                            .checked_add(
-                                network
-                                    .scalar_observations()
-                                    .tx_bytes_per_sec
-                                    .current_value()
-                                    .copied()?,
-                            )
-                    })
+                    metrics
+                        .iter()
+                        .filter(|network| {
+                            network.adapter_type() != taskmanager_core::NetworkAdapterType::Loopback
+                        })
+                        .try_fold(0_u64, |total, network| {
+                            total
+                                .checked_add(
+                                    network
+                                        .scalar_observations()
+                                        .rx_bytes_per_sec
+                                        .current_value()
+                                        .copied()?,
+                                )?
+                                .checked_add(
+                                    network
+                                        .scalar_observations()
+                                        .tx_bytes_per_sec
+                                        .current_value()
+                                        .copied()?,
+                                )
+                        })
                 });
                 self.inner
                     .network_rate_total

@@ -23,7 +23,7 @@ use super::perf_overview_data::{
     cpu_live_rail_rows, cpu_metric_facts, cpu_spec_rail_rows,
 };
 use super::render_centered_state;
-use super::{kv, perf_core_grid, perf_memory};
+use super::{perf_core_grid, perf_memory};
 use crate::PerfDevice;
 use crate::TuiApp;
 use crate::TuiTheme;
@@ -42,6 +42,7 @@ pub(super) fn render_perf_overview(
         PerfDevice::Disk
         | PerfDevice::Network
         | PerfDevice::Gpu
+        | PerfDevice::Npu
         | PerfDevice::Battery
         | PerfDevice::Fan => {}
     }
@@ -114,13 +115,11 @@ const CPU_TITLE_HEIGHT: u16 = 2;
 /// page keeps the historical facts + graph shape and the header tab remains
 /// the page identity (honest degradation on the minimum frame).
 const CPU_TITLE_MIN_CONTENT_HEIGHT: u16 = 10;
-/// Right-rail column width. Sized so the widest localized spec label
-/// (zh "低功耗能效核（LP-E 核）", 23 cells) plus a typical count, and the
-/// longest realistic single-token driver value ("Cpufreq driver" + 12 =
-/// 30 cells), stay on one line inside the bordered panel (30 inner cells
-/// proved wrap-critical: the word wrapper breaks exact-fit rows), with the
-/// padded 18-cell [`kv`] label grid preserved.
-const CPU_RAIL_WIDTH: u16 = 34;
+/// Right-rail column width. The rail uses a fixed 18-cell label slot and a
+/// bounded value slot, so long diagnostics are ellipsized as whole rows rather
+/// than word-wrapped into a partial line at the viewport floor.
+const CPU_RAIL_WIDTH: u16 = 42;
+const CPU_RAIL_LABEL_WIDTH: usize = 18;
 /// Minimum main-column width kept when the rail is shown: below it the
 /// utilization chart loses its axis labels and the per-core grid its cells,
 /// so the whole rail column is omitted instead.
@@ -151,23 +150,20 @@ fn render_cpu_overview(
     }
 
     // The pinned details rail (live counters + spec sheet) is a full-height
-    // column beside the main column. It degrades honestly: whenever the
-    // body cannot afford both columns (width) or the rail's complete row
-    // set (height), the rail is omitted entirely — it never overlaps the
-    // facts, the graph or the per-core grid, and it never renders as a
-    // half-clipped sliver.
-    let rail_rows = cpu_rail_rows(snapshot, hardware);
-    let rail_height = u16::try_from(rail_rows.len() + 2).unwrap_or(u16::MAX); // + panel borders
-    let rail_width =
-        if body.width >= CPU_RAIL_WIDTH + CPU_RAIL_MIN_MAIN_WIDTH && body.height >= rail_height {
-            CPU_RAIL_WIDTH
-        } else {
-            0
-        };
+    // column beside the main column. It degrades honestly by width: when the
+    // body cannot afford both columns the whole rail is omitted. Its content
+    // has an independent line viewport, so a short terminal can reach every
+    // accepted row without overlapping the facts, graph, or core grid.
+    let rail_rows = cpu_rail_rows(snapshot, hardware, Some(app.shell.rapl_power_state()));
+    let rail_width = if body.width >= CPU_RAIL_WIDTH + CPU_RAIL_MIN_MAIN_WIDTH && body.height >= 8 {
+        CPU_RAIL_WIDTH
+    } else {
+        0
+    };
     let [main, rail] =
         Layout::horizontal([Constraint::Min(0), Constraint::Length(rail_width)]).areas(body);
     if rail_width > 0 {
-        render_cpu_rail(frame, theme, rail, &rail_rows);
+        render_cpu_rail(frame, theme, rail, &rail_rows, app.cpu_detail_scroll);
     }
 
     let facts = cpu_metric_facts(&snapshot.cpu);
@@ -195,8 +191,12 @@ fn render_cpu_overview(
 }
 
 /// The ordered rail rows: live system counters, then the static spec sheet.
-fn cpu_rail_rows(snapshot: &SystemSnapshot, hardware: Option<&HardwareInfo>) -> Vec<CpuRailRow> {
-    let mut rows = cpu_live_rail_rows(snapshot);
+fn cpu_rail_rows(
+    snapshot: &SystemSnapshot,
+    hardware: Option<&HardwareInfo>,
+    rapl_state: Option<&taskmanager_application::RaplPowerState>,
+) -> Vec<CpuRailRow> {
+    let mut rows = cpu_live_rail_rows(snapshot, rapl_state);
     rows.extend(cpu_spec_rail_rows(&snapshot.cpu, hardware));
     rows
 }
@@ -222,17 +222,53 @@ fn render_cpu_title(frame: &mut Frame<'_>, theme: TuiTheme, area: Rect, snapshot
 /// The pinned details column: a bordered "Details" panel of `label value`
 /// rows in the System page's row language (the same [`kv`] geometry), so
 /// one fact reads identically on both surfaces.
-fn render_cpu_rail(frame: &mut Frame<'_>, theme: TuiTheme, area: Rect, rows: &[CpuRailRow]) {
-    let lines: Vec<Line<'_>> = rows
+fn render_cpu_rail(
+    frame: &mut Frame<'_>,
+    theme: TuiTheme,
+    area: Rect,
+    rows: &[CpuRailRow],
+    scroll: usize,
+) {
+    let inner_width = usize::from(area.width.saturating_sub(2));
+    let available = area.height.saturating_sub(2);
+    let lines: Vec<Line<'static>> = rows
         .iter()
-        .map(|row| kv(&row.label, row.value.clone(), theme))
+        .map(|row| cpu_rail_line(row, inner_width, theme))
         .collect();
+    let content_lines = super::process_details::wrapped_content_height(&lines, inner_width as u16);
+    let (effective_scroll, max_scroll) =
+        super::process_details::clamped_scroll(content_lines, available, scroll);
+    let title = if max_scroll > 0 {
+        format!(
+            "{} · Ctrl↑↓",
+            taskmanager_application::i18n::t("common.details")
+        )
+    } else {
+        taskmanager_application::i18n::t("common.details").to_owned()
+    };
     frame.render_widget(
         Paragraph::new(lines)
-            .block(panel(t("common.details"), theme))
-            .wrap(Wrap { trim: true }),
+            .block(panel(&title, theme))
+            .wrap(Wrap { trim: true })
+            .scroll((effective_scroll as u16, 0)),
         area,
     );
+}
+
+/// Render one CPU rail row inside the measured value slot. The general
+/// [`kv`] helper intentionally preserves long values for wider System/About
+/// surfaces; this rail has a hard width budget and must never wrap a row into
+/// its next fact. The shared cell-aware truncator preserves CJK/grapheme
+/// boundaries and leaves a visible ellipsis when evidence is abbreviated.
+fn cpu_rail_line(row: &CpuRailRow, inner_width: usize, theme: TuiTheme) -> Line<'static> {
+    let label = super::text::truncate_cells(&row.label, CPU_RAIL_LABEL_WIDTH);
+    let label = super::text::pad_cells(&label, CPU_RAIL_LABEL_WIDTH);
+    let value_width = inner_width.saturating_sub(CPU_RAIL_LABEL_WIDTH + 1);
+    let value = super::text::truncate_cells(&row.value, value_width);
+    Line::from(vec![
+        Span::styled(format!("{label} "), Style::new().fg(theme.dim)),
+        Span::styled(value, Style::new().fg(theme.color(Color::White))),
+    ])
 }
 
 /// Typed responsive composition for the CPU chart region. The main history is

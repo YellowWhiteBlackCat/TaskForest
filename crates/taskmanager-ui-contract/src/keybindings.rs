@@ -103,9 +103,16 @@ pub struct FrontendBindingDeclaration {
     pub entries: Vec<BindingEntry>,
 }
 
-/// The coverage outcome for one command.
+/// The binding-coverage outcome for one command.
+///
+/// This is the command-binding declaration axis. It is deliberately named for
+/// its own subject so it can never be confused with the platform availability
+/// axis (`taskmanager-platform-contract::CapabilityStatus`) or with the other
+/// two declaration axes ([`crate::CapabilityCoverageStatus`] for components and
+/// [`crate::FeatureCoverageStatus`] for product features). Each coverage
+/// outcome now names what it covers.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CoverageStatus {
+pub enum BindingCoverageStatus {
     /// Wired in this shape with the declared key token.
     Bound(&'static str),
     /// Explicitly declared not offered in this shape.
@@ -118,7 +125,7 @@ pub enum CoverageStatus {
     Unknown,
 }
 
-impl CoverageStatus {
+impl BindingCoverageStatus {
     /// Whether the command carries an explicit decision — the only statuses
     /// a no-drift declaration may show.
     #[must_use]
@@ -135,17 +142,19 @@ impl CoverageStatus {
 
 /// The coverage matrix for one declaration against the full contract command
 /// set, in canonical [`CommandId::ALL`] order; declared commands outside the
-/// known set follow in declaration order as [`CoverageStatus::Unknown`].
+/// known set follow in declaration order as [`BindingCoverageStatus::Unknown`].
 #[must_use]
 pub fn coverage_report(
     declaration: &FrontendBindingDeclaration,
-) -> Vec<(CommandId, CoverageStatus)> {
+) -> Vec<(CommandId, BindingCoverageStatus)> {
     coverage_report_over(declaration, &CommandId::ALL)
 }
 
 /// The drift findings alone — the one-call gate payload.
 #[must_use]
-pub fn drift_findings(report: &[(CommandId, CoverageStatus)]) -> Vec<(CommandId, CoverageStatus)> {
+pub fn drift_findings(
+    report: &[(CommandId, BindingCoverageStatus)],
+) -> Vec<(CommandId, BindingCoverageStatus)> {
     report
         .iter()
         .copied()
@@ -159,10 +168,10 @@ pub fn drift_findings(report: &[(CommandId, CoverageStatus)]) -> Vec<(CommandId,
 fn coverage_report_over(
     declaration: &FrontendBindingDeclaration,
     known: &[CommandId],
-) -> Vec<(CommandId, CoverageStatus)> {
-    let mut report: Vec<(CommandId, CoverageStatus)> = known
+) -> Vec<(CommandId, BindingCoverageStatus)> {
+    let mut report: Vec<(CommandId, BindingCoverageStatus)> = known
         .iter()
-        .map(|command| (*command, CoverageStatus::Missing))
+        .map(|command| (*command, BindingCoverageStatus::Missing))
         .collect();
     for entry in &declaration.entries {
         match report
@@ -170,16 +179,16 @@ fn coverage_report_over(
             .find(|(command, _)| *command == entry.command)
         {
             Some((_, status)) => {
-                if status.is_explicit() || matches!(status, CoverageStatus::Duplicated) {
-                    *status = CoverageStatus::Duplicated;
+                if status.is_explicit() || matches!(status, BindingCoverageStatus::Duplicated) {
+                    *status = BindingCoverageStatus::Duplicated;
                 } else {
                     *status = match entry.binding {
-                        Binding::Key(token) => CoverageStatus::Bound(token),
-                        Binding::Unbound => CoverageStatus::DeliberatelyUnbound,
+                        Binding::Key(token) => BindingCoverageStatus::Bound(token),
+                        Binding::Unbound => BindingCoverageStatus::DeliberatelyUnbound,
                     };
                 }
             }
-            None => report.push((entry.command, CoverageStatus::Unknown)),
+            None => report.push((entry.command, BindingCoverageStatus::Unknown)),
         }
     }
     report

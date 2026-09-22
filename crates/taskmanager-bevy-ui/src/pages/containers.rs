@@ -9,21 +9,35 @@
 
 use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
+use bevy::ecs::observer::On;
+use bevy::ecs::system::{Res, ResMut};
 use bevy::scene::{Scene, bsn, template_value};
 use bevy::ui::prelude::{
     AlignItems, BorderRadius, FlexDirection, JustifyContent, Node, Overflow, UiRect, Val, percent,
     px,
 };
 use bevy::ui::widget::Text;
+use bevy::ui_widgets::ScrollArea;
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::metrics::ScalarAvailability;
 use taskmanager_core::core::process_telemetry::{ContainerRollup, ContainerSummary};
 use taskmanager_shell::presentation::{bytes, missing_value};
 
-use crate::app::{Page, PageContext};
+use crate::app::{Page, PageContext, PageMount, Route};
+use crate::drain::ShellProjectionFolded;
 use crate::palette::{UiPalette, no_wrap_text, space_2, space_8, space_24};
 use crate::window::{Role, TextRole};
+
+pub(crate) fn containers_fold_observer(
+    _fold: On<ShellProjectionFolded>,
+    route: Res<Route>,
+    mut mount: ResMut<PageMount>,
+) {
+    if route.page == Page::Containers {
+        mount.requested = true;
+    }
+}
 
 /// Alias for [`ContainerSummary`] for caller parity.
 #[allow(dead_code)]
@@ -183,10 +197,12 @@ fn table_scene(containers: &[ContainerSummary], palette: &UiPalette) -> Box<dyn 
     Box::new(bsn! {
         Node {
             width: percent(100),
-            height: Val::Auto,
+            flex_grow: 1.0,
+            overflow: Overflow::scroll_y(),
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_2()),
         }
+        ScrollArea
         Children [
             ( { header } ),
             { rows },

@@ -62,7 +62,7 @@ impl TuiApp {
     /// identity columns and stay always-visible). This is the single source the
     /// column menu renders, so the renderer and the menu can never disagree.
     #[must_use]
-    pub const fn toggleable_columns() -> [SortCol; 13] {
+    pub const fn toggleable_columns() -> [SortCol; 14] {
         [
             SortCol::Cpu,
             SortCol::Memory,
@@ -77,6 +77,7 @@ impl TuiApp {
             SortCol::CpuTime,
             SortCol::DiskRead,
             SortCol::DiskWrite,
+            SortCol::Network,
         ]
     }
 
@@ -155,7 +156,7 @@ impl TuiApp {
     /// visible columns, so hiding columns narrows the cycle (the shared shell
     /// `cycle_sort_column` would walk the full base cycle regardless of what
     /// the terminal can show). Single source for the visible sort cycle.
-    const SORT_CYCLE: [SortCol; 15] = [
+    const SORT_CYCLE: [SortCol; 16] = [
         SortCol::Pid,
         SortCol::Name,
         SortCol::Cpu,
@@ -168,6 +169,7 @@ impl TuiApp {
         SortCol::CpuTime,
         SortCol::DiskRead,
         SortCol::DiskWrite,
+        SortCol::Network,
         SortCol::StartTime,
         SortCol::Fds,
         SortCol::Nice,

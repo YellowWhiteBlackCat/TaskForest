@@ -14,6 +14,7 @@
 //! smartctl shell-outs degrade to honest MissingDependency failures), which
 //! makes the contract proof repeatable on every gate.
 
+use std::collections::BTreeSet;
 use std::time::{Duration, Instant};
 
 use taskmanager_application::{
@@ -34,10 +35,12 @@ use taskmanager_core::core::services::ServiceAction;
 use taskmanager_core::core::session::SessionControlAction;
 use taskmanager_core::core::setup::SetupScriptAction;
 use taskmanager_core::core::target::{ServiceId, SessionId};
+use taskmanager_platform_conformance::assert_capability_surface_matches_catalog;
 use taskmanager_platform_contract::{
-    CapabilityId, CapabilitySnapshot, CapabilityStatus, OperationFailure, RetryDisposition,
+    CapabilityId, CapabilitySnapshot, CapabilityStatus, OperationFailure, PlatformAxis,
+    PlatformSource, RetryDisposition,
 };
-use taskmanager_platform_macos::MacOsPlatformRuntime;
+use taskmanager_platform_macos::{MacOsPlatformRuntime, capability_surface};
 
 const DRAIN_DEADLINE: Duration = Duration::from_secs(5);
 const DRAIN_POLL: Duration = Duration::from_millis(5);
@@ -140,6 +143,10 @@ const PENDING_CAPABILITIES: &[&str] = &[
     "process.affinity",
     "process.affinity.control",
     "process.resource.control",
+    // The per-process byte-accounting escalation chain (AF_PACKET /
+    // SCM_RIGHTS) is Linux-only; the registered provider answers the typed
+    // `Unsupported` outcome like every other pending lane.
+    "process.network.escalation",
     "services.dependencies",
     "services.logs.stream",
     "sessions.control",
@@ -311,14 +318,18 @@ fn assert_honest_failure(failure: &OperationFailure) {
 
 fn assert_standard_descriptors(snapshot: &CapabilitySnapshot) {
     assert_eq!(
-        snapshot.iter().count(),
+        snapshot.registered().count(),
         STANDARD_SURFACE.len(),
-        "the second OS adapter must expose exactly the standard product surface"
+        "the second OS adapter must register exactly the standard product surface"
     );
     for (capability, provider) in STANDARD_SURFACE {
         let descriptor = snapshot
             .get(&CapabilityId::borrowed(capability))
             .unwrap_or_else(|| panic!("missing capability descriptor {capability}"));
+        assert!(
+            CapabilityId::borrowed(capability).is_expected(),
+            "{capability} must be part of the product-expected surface"
+        );
         assert_eq!(
             descriptor.status,
             CapabilityStatus::TemporarilyUnavailable,
@@ -330,6 +341,27 @@ fn assert_standard_descriptors(snapshot: &CapabilitySnapshot) {
             "{capability} must be owned by its macos.* provider"
         );
         assert!(descriptor.last_success_at_ms.is_none());
+    }
+
+    // Every product capability this adapter does not register answers with its
+    // typed absence: no silent omission, no fabricated provider, no fabricated
+    // success.
+    for descriptor in snapshot.typed_absences() {
+        assert!(
+            descriptor.id.is_expected(),
+            "an unregistered capability must still be product-expected: {}",
+            descriptor.id
+        );
+        assert_eq!(descriptor.status, CapabilityStatus::Unsupported);
+        assert!(descriptor.providers.is_empty());
+        assert_eq!(descriptor.observed_at_ms, 0);
+        assert!(descriptor.last_success_at_ms.is_none());
+    }
+    for expected in CapabilityId::EXPECTED_SURFACE {
+        assert!(
+            snapshot.get(&expected).is_some(),
+            "the product surface must stay addressable: {expected}"
+        );
     }
 }
 
@@ -730,5 +762,51 @@ fn event_port_stays_idle_and_live_before_any_submission() {
     assert!(
         matches!(handle.events().try_recv(), Ok(None)),
         "an idle second-OS adapter must not emit fabricated events"
+    );
+}
+
+/// The macOS layer-B declaration is the live catalog's registration face, and
+/// the lanes it declares with an absence are exactly this contract's
+/// registered-pending census: the declaration is co-located with the real
+/// provider registration and cross-checked against both independent facts.
+#[test]
+fn capability_surface_matches_the_live_catalog_and_the_pending_census() {
+    let handle = MacOsPlatformRuntime::spawn().expect("complete macOS composition");
+    let snapshot = handle.capabilities().snapshot();
+    let surface = capability_surface();
+
+    assert_eq!(
+        assert_capability_surface_matches_catalog(
+            &snapshot,
+            &surface,
+            PlatformAxis::Macos,
+            "macos.",
+        ),
+        Ok(())
+    );
+    assert_eq!(snapshot.registered().count(), STANDARD_SURFACE.len());
+    assert_eq!(
+        surface.present_count(PlatformAxis::Macos),
+        STANDARD_SURFACE.len() - PENDING_CAPABILITIES.len(),
+        "the declared-present set is the registered face minus the pending census"
+    );
+
+    let mut declared_pending: BTreeSet<&str> = BTreeSet::new();
+    for descriptor in snapshot.registered() {
+        let declared = surface.source(PlatformAxis::Macos, &descriptor.id);
+        assert_ne!(
+            declared,
+            PlatformSource::Undeclared,
+            "{} is registered but silently undeclared",
+            descriptor.id
+        );
+        if declared != PlatformSource::Present {
+            declared_pending.insert(descriptor.id.as_str());
+        }
+    }
+    let expected_pending: BTreeSet<&str> = PENDING_CAPABILITIES.iter().copied().collect();
+    assert_eq!(
+        declared_pending, expected_pending,
+        "the layer-B absence declarations and the registered-pending census must agree"
     );
 }

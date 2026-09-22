@@ -119,13 +119,33 @@ Verify shell behavior independently of a compositor.
 ## Module map
 
 ```text
-src/app.rs                    SystemProjectionStore: one instance per frontend track
-src/app/batch_fold/           event folding: failure seed → domain systems → revision
-│                             → alert watermark → feedback
-src/app/direct_track/         process inventory, sorting, selection
-src/app/request_sessions.rs   per-track typed request-session instances
-src/app/lifecycle.rs          ShellLifecycleState (quit and feedback)
-src/app/effects.rs (+ effect_dispatch.rs)   effect generation and dispatch
-src/app/confirmation_gates.rs  process_control.rs  process_requests.rs
+src/app.rs                          SystemProjectionStore: one instance per frontend track
+src/app/batch_fold/                 event folding: failure seed → domain systems → revision
+│                                   → alert watermark → feedback
+src/app/direct_track/               process inventory, sorting, selection (GPUI track)
+src/app/process_rows/               cacheable category/tree structure and row identity
+src/app/request_sessions.rs         per-track typed request-session instances
+src/app/lifecycle.rs                ShellLifecycleState (quit and feedback)
+src/app/effects.rs  effect_dispatch.rs     effect generation and dispatch
+src/app/confirmation_gates.rs       dangerous-action confirmation gates
+src/app/process_control.rs  process_requests.rs  process action and request handling
 src/app/frame.rs  input_mode.rs  selection.rs  search_input.rs
+src/app/sorting.rs  sort_axis.rs    sort state and axis definitions
+src/app/inventory_source.rs         inventory source selection
+src/app/gpu_chart_metric.rs         GPU chart metric session state
+src/app/npu_inventory.rs            NPU device inventory projection
+src/app/platform_feedback.rs        platform-fold side-effect reducer
+src/app/service_log.rs              service log feed lifecycle
+src/app/session_control.rs          session control state
+src/app/system_telemetry.rs         system telemetry fold
+src/app/on_demand.rs  local_keys.rs  row_summary.rs
+src/presentation.rs                 renderer-neutral presentation helpers
+├── telemetry.rs  trend.rs  network.rs  storage.rs  process.rs
+├── gpu_chart_metric.rs  gpu_engine_rows.rs  service_exit.rs  constants.rs
+src/viewmodel.rs                    product-first view-model projections
+src/history.rs                      correlated outcomes → telemetry store mapping
+src/input_dispatch.rs  keys.rs      keyboard dispatch and key definitions
+src/process_filter.rs               process filter predicates
+src/memory.rs                       memory presentation helpers
+src/fixture/ (cpu_topology inventory)  deterministic demo/capture/test seam
 ```

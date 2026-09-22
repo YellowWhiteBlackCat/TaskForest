@@ -114,7 +114,17 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
         .px(taskmanager_ui::theme_binding::definite_length(
             match presentation {
                 NavigationPresentation::IconOnly => tokens::SPACE_8,
-                NavigationPresentation::Labeled => tokens::SPACE_14,
+                NavigationPresentation::Labeled => {
+                    if horizontal {
+                        // The horizontal strip has eight tabs plus three
+                        // fixed controls. Keep the label-bearing buttons
+                        // readable at the standard 1180px capture width;
+                        // the vertical rail retains its roomier inset.
+                        tokens::SPACE_4
+                    } else {
+                        tokens::SPACE_14
+                    }
+                }
             },
         ))
         .py(taskmanager_ui::theme_binding::definite_length(
@@ -186,7 +196,11 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
             |tab| tab.justify_center(),
         )
         .gap(taskmanager_ui::theme_binding::definite_length(
-            tokens::SPACE_6,
+            if horizontal {
+                tokens::SPACE_4
+            } else {
+                tokens::SPACE_6
+            },
         ))
         // Elastic shrink: the tab is a flex child of the nav strip's tabs row.
         // min_w(0) overrides flex's default min-width:auto (= the content's
@@ -204,7 +218,13 @@ pub fn tab(props: TabProps<'_>, cx: &mut Context<RootView>) -> impl IntoElement 
             taskmanager_ui::theme_binding::font_weight(tokens::FONT_WEIGHT_NORMAL)
         })
         .text_color(taskmanager_ui::theme_binding::hsla(fg))
-        .child(taskmanager_ui::icons_binding::icon(icon).size(px(18.0)))
+        .child(
+            taskmanager_ui::icons_binding::icon(icon).size(px(if horizontal {
+                16.0
+            } else {
+                18.0
+            })),
+        )
         // Label wraps min_w(0)+truncate so it shrinks/ellipses inside the tab's
         // flex row instead of forcing the tab to its natural text width. Text
         // styling is inherited from the tab div above. A hover tooltip (the full

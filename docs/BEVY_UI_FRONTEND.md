@@ -1,5 +1,7 @@
 # Bevy UI 第四前端章程
 
+> **Role**: Architecture — decisions, constraints, layer boundaries. For widget/rendering patterns see [UI_GUIDE_BEVY_UI.md](UI_GUIDE_BEVY_UI.md).
+
 `taskmanager-bevy-ui` 是第四个前端：以 Bevy 0.19 的官方两件套 `bevy_ui` +
 `bevy_ui_widgets` 渲染同一份中立 shell 投影。本文是它当前的公开事实权威；
 跨前端组件契约归 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)，
@@ -10,8 +12,7 @@
 - 与 GPUI/Iced/TUI 同级的产品表面：只消费中立层投影，不读 OS 数据源，不拥有
   独立业务事实。成熟度低于 GPUI；页面功能覆盖、性能页深度、系统页和托盘仍
   是公开的已知边界，不在文档中虚构。
-- 以 `TaskForestB` 登记于 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)，是受支持的
-  源码构建形态（独立二进制 `taskforest-b`），不进入发行包矩阵。
+- 以 `TaskForestB` 登记于 [PRODUCT_IDENTITY.md](PRODUCT_IDENTITY.md)，现已完全纳入官方发布流水线矩阵，享有同等的领域语义、配置持久化与安装包分发地位（提供 DEB、RPM、MSI 官方安装包）。
 - 产品组件（进程表、图表、确认面）由自有 theme tokens + `ui-contract` 定义
   语义；Bevy 官方 Feathers 皮肤体系不采用——theme tokens 是唯一皮肤权威。
 
@@ -34,7 +35,7 @@
   `scripts/quality/bevy_bsn_guard.py` 机械强制。
 - 两个 World 永不合并：平台 client 经 app-host `OnceLock` 缓存每进程一次；
   窗口重建复用句柄，绝不重开 runtime。
-- Linux 窗口仅 Wayland；X11 会话由现有三个前端承载。
+- Linux 窗口仅支持 Wayland；X11 已被全面废弃，非 Wayland 或纯终端环境由 TaskForest-T 承载。
 
 ## 数据接缝
 

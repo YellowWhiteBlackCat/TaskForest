@@ -76,8 +76,10 @@ fn probe_rapl_crossing() -> EscalationAvailability {
 fn capability_status_from_availability(availability: EscalationAvailability) -> CapabilityStatus {
     match availability {
         EscalationAvailability::Available => CapabilityStatus::Available,
+        // Escalation is available for exactly this feature: the capability is
+        // escalatable, a distinct state from a plain permission gate.
         EscalationAvailability::RequiresEscalation(EscalationFeature::PackagePowerRapl) => {
-            CapabilityStatus::PermissionRequired
+            CapabilityStatus::RequiresEscalation
         }
         EscalationAvailability::RequiresEscalation(_) => CapabilityStatus::TemporarilyUnavailable,
         EscalationAvailability::Denied { reason } => match reason {

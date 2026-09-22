@@ -18,6 +18,7 @@ pub enum PerfDevice {
     Disk(usize),
     Network(usize),
     Gpu(usize),
+    Npu(usize),
     /// Stored-energy power supplies (batteries / UPS). Reads
     /// `SystemProjectionStore.power_supplies`; an honest "no battery" state renders when
     /// no power supply has been observed.
@@ -31,12 +32,13 @@ impl PerfDevice {
     /// Every selectable Performance resource, in tab order. The selector row,
     /// the focus-target registry and the tests iterate this so no variant can
     /// be silently dropped (the anti-报菜名 enumeration rule).
-    pub const ALL: [Self; 7] = [
+    pub const ALL: [Self; 8] = [
         Self::Cpu,
         Self::Memory,
         Self::Disk(0),
         Self::Network(0),
         Self::Gpu(0),
+        Self::Npu(0),
         Self::Battery(0),
         Self::Fan(0),
     ];
@@ -49,6 +51,7 @@ impl PerfDevice {
             Self::Disk(_) => "disk",
             Self::Network(_) => "network",
             Self::Gpu(_) => "gpu",
+            Self::Npu(_) => "npu",
             Self::Battery(_) => "battery",
             Self::Fan(_) => "fan",
         }
@@ -63,6 +66,7 @@ impl PerfDevice {
             Self::Disk(index)
             | Self::Network(index)
             | Self::Gpu(index)
+            | Self::Npu(index)
             | Self::Battery(index)
             | Self::Fan(index) => Some(index),
         }

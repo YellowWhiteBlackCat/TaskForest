@@ -7,6 +7,7 @@ use iced::widget::{column, container, row, scrollable, text};
 use iced::{Element, Length};
 use taskmanager_core::core::alerts::AlertMetric;
 use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::sensors::SensorCenterSnapshot;
 use taskmanager_theme::tokens;
 
 use crate::app::Message;
@@ -14,7 +15,9 @@ use crate::i18n::{self, Key};
 use crate::theme;
 
 use super::overlays::{metric_label, modal_overlay, suggestion_text};
-use taskmanager_shell::presentation::{bytes, missing_value};
+use taskmanager_shell::presentation::{
+    bytes, health_score_for_snapshot, health_score_summary, missing_value,
+};
 
 mod projection;
 
@@ -71,6 +74,11 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
     {
         modal_panels.push(sensor_panel);
     }
+    if let Some(sensors) = shell.projection().sensors.as_ref()
+        && let Some(zone_panel) = thermal_zone_sensor_panel(sensors, theme_snapshot)
+    {
+        modal_panels.push(zone_panel);
+    }
     modal_panels.push(alert_panel);
 
     modal_overlay(
@@ -101,6 +109,14 @@ pub(super) struct HealthRow {
 pub(super) fn health_rows(snapshot: &SystemSnapshot) -> Vec<HealthRow> {
     let observed = projection::HealthObservation::from(snapshot);
     let mut rows = Vec::new();
+
+    if let Some(score) = health_score_for_snapshot(snapshot) {
+        rows.push(HealthRow {
+            label: taskmanager_application::i18n::t("system.health_score").to_owned(),
+            value: health_score_summary(&score),
+            healthy: score.score >= 80,
+        });
+    }
 
     let cpu_usage = observed.cpu_usage_pct;
     // The clock piece goes through the source-aware readout so a BogoMIPS-only
@@ -357,6 +373,53 @@ pub(crate) fn sensors_and_thermal_panel<'a>(
             column(items).spacing(6).into(),
         ))
     }
+}
+
+/// The thermal-zone surface: one row per shared `SensorCenterSnapshot`
+/// temperature reading, named by the reading's own source label (GPUI
+/// health-page parity over the same projection). A failed/unread zone keeps its
+/// row with the shared dash — never a fabricated `0.0 °C`. `None` when the
+/// snapshot carries no temperature channel at all.
+pub(super) fn thermal_zone_sensor_panel<'a>(
+    sensors: &SensorCenterSnapshot,
+    theme_snapshot: &'a taskmanager_theme::Theme,
+) -> Option<Element<'a, Message, iced::Theme, iced::Renderer>> {
+    let rows = projection::thermal_zone_rows(sensors);
+    if rows.is_empty() {
+        return None;
+    }
+    Some(panel(
+        theme_snapshot,
+        "Thermal Zone Sensors",
+        column(
+            rows.into_iter()
+                .map(|row| thermal_zone_row(theme_snapshot, row))
+                .collect::<Vec<_>>(),
+        )
+        .spacing(1)
+        .into(),
+    ))
+}
+
+/// One thermal-zone row: the reading's own source label owns the bounded left
+/// slot, the value the elastic right slot. A present measurement keeps the
+/// normal foreground; a typed absence takes the status tint so an unread zone
+/// cannot read as a real temperature.
+fn thermal_zone_row<'a>(
+    theme_snapshot: &'a taskmanager_theme::Theme,
+    row: projection::ThermalZoneRow,
+) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let value = text(row.value).width(Length::Fill);
+    let value = if row.present {
+        value
+    } else {
+        value.color(theme::status_color(theme_snapshot, false))
+    };
+    row![text(row.label).width(Length::Fixed(150.0)), value]
+        .spacing(8)
+        .padding(4)
+        .width(Length::Fill)
+        .into()
 }
 
 #[cfg(test)]

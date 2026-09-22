@@ -79,8 +79,9 @@ async fn apps_wheel_keeps_horizontal_and_vertical_axes_independent(cx: &mut Test
         .expect("the Apps fixture must render a header row");
 
     let (h_before, v_before) = offset_pair(&view, cx);
+    let hit_body = point(body.origin.x + px(100.0), body.center().y);
     vcx.simulate_event(wheel(
-        body.center(),
+        hit_body,
         point(px(0.0), px(-80.0)),
         Modifiers::none(),
     ));
@@ -98,8 +99,9 @@ async fn apps_wheel_keeps_horizontal_and_vertical_axes_independent(cx: &mut Test
     let body = vcx
         .debug_bounds("tm-proc-row-root:0")
         .expect("the body row remains rendered after vertical scrolling");
+    let hit_body_h = point(body.origin.x + px(100.0), body.center().y);
     vcx.simulate_event(wheel(
-        body.center(),
+        hit_body_h,
         point(px(-80.0), px(0.0)),
         Modifiers::none(),
     ));
@@ -118,8 +120,9 @@ async fn apps_wheel_keeps_horizontal_and_vertical_axes_independent(cx: &mut Test
         .debug_bounds("tm-procs-header-scroll")
         .expect("the pinned header must remain in the horizontal viewport");
     let (_, v_before_header) = offset_pair(&view, cx);
+    let hit_header = point(header.origin.x + px(100.0), header.center().y);
     vcx.simulate_event(wheel(
-        header.center(),
+        hit_header,
         point(px(0.0), px(-40.0)),
         Modifiers::none(),
     ));
@@ -138,8 +141,9 @@ async fn apps_wheel_keeps_horizontal_and_vertical_axes_independent(cx: &mut Test
         .debug_bounds("tm-proc-row-root:0")
         .expect("the body row must remain available for Shift-wheel");
     let (_, v_before_shift) = offset_pair(&view, cx);
+    let hit_shift = point(body.origin.x + px(100.0), body.center().y);
     vcx.simulate_event(wheel(
-        body.center(),
+        hit_shift,
         point(px(-40.0), px(0.0)),
         Modifiers {
             shift: true,

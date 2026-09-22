@@ -16,8 +16,10 @@
 #              nextest workspace split into core/logic/gui/perf layers
 #              (failure attribution per layer; `--only nextest-core` gives a
 #              bottom-up dev loop) + doctests + rustdoc + the nvidia fallback
-#              matrix + release/package smoke + (with --with-gui) the GPUI
-#              interaction matrix and fresh capture receipt route.
+#              matrix + release/package smoke + the diff-scoped P4
+#              `parity-evidence` anchor resolver (facet manifest + unified
+#              interaction matrix) + (with --with-gui) the GPUI interaction
+#              matrix and fresh capture receipt route.
 #   extended   the expensive pass: llvm-cov with per-crate floors, mutation
 #              testing of the core/application diff, Miri on the three
 #              Linux-audited unsafe crates, fuzz-target build (+ runs on demand),
@@ -531,9 +533,34 @@ if maybe capture-isolation; then
     fi
 fi
 
+if maybe parity-declaration-self; then
+    # Declared surface decisions must not contradict the crate's own
+    # implementation; the self-test proves this guard is not a rubber stamp.
+    run_stage parity-declaration-self quick run_py scripts/quality/test_parity_declaration_consistency.py
+fi
+if maybe parity-declaration; then
+    run_stage parity-declaration quick run_py scripts/quality/parity_declaration_consistency.py
+fi
+if maybe clippy-parity-self; then
+    # CI's `lint` job and this script's clippy stage must not drift apart
+    # again: the self-test proves the comparator goes red on a dropped `-W`
+    # ratchet, ignores flag order/whitespace, and fails closed on a stage it
+    # cannot parse.
+    run_stage clippy-parity-self quick run_py scripts/quality/clippy_command_parity_guard.py --self-test
+fi
+if maybe clippy-parity; then
+    run_stage clippy-parity quick run_py scripts/quality/clippy_command_parity_guard.py
+fi
+
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 
 # ---- standard --------------------------------------------------------
+if maybe module-map-self; then
+    run_stage module-map-self standard run_py scripts/quality/module_map_guard.py --self-test
+fi
+if maybe module-map; then
+    run_stage module-map standard run_py scripts/quality/module_map_guard.py
+fi
 if maybe ui-route; then
     # This diff-only route is intentionally first: a UI change without the
     # required headless/capture mode should fail before compiling the workspace.
@@ -550,6 +577,34 @@ if [[ "$with_gui" == "1" ]]; then
         # Capture acceptance is also cheap to reject early because it only
         # checks the freshness of receipts; the capture itself remains explicit.
         run_stage ui-capture-route standard bash scripts/quality/ui-evidence-route.sh --with-gui --require-capture
+    fi
+fi
+if maybe parity-evidence; then
+    # P4 Layer B: every declared behavior anchor must still be discoverable by
+    # `cargo nextest list`.  Discovery compiles test binaries, so this stage is
+    # diff-scoped like ui-route: `--scope auto` short-circuits (no cargo) when
+    # the diff since the merge-base with origin/main (else HEAD~1) touches no
+    # evidence-relevant path, and a failed diff probe evaluates fail-closed.
+    # When it does evaluate, dangling anchors fail closed while `pending` cells
+    # are only counted and reported.  Out of scope the resolver prints
+    # "PASS ... (skipped)" and the stage is green without discovering anything.
+    #
+    # Since W11-C the stage resolves both declaration sources: the facet
+    # manifest and the unified S4 interaction matrix, so a renamed or deleted
+    # interaction test is dangling here too.  `--requirements` keeps the
+    # per-frontend P0-MC coverage report visible in the stage output/JSON
+    # without failing on an uncovered (frontend, requirement) pair -- today
+    # Bevy is 0/8 and the facet matcher is not a second vocabulary.  The
+    # deferred hard gate is `--require-requirement-coverage`; release condition
+    # is the Bevy `p0_id` mapping landing (decision register D1, option A),
+    # after which this line adds the flag in the same change that fills the
+    # mapping.
+    if scope_skip parity-evidence "merge-owner evidence surface" standard; then
+        run_stage parity-evidence standard timeout --kill-after=30s 900s python3 scripts/parity/resolve_frontend_evidence.py \
+            --nextest --scope auto \
+            --interaction-matrix scripts/parity/cross_frontend_matrix.tsv \
+            --requirements scripts/interaction_requirements.tsv \
+            --report-json target/cross-frontend-evidence/parity-evidence/manifest-validation.json
     fi
 fi
 if maybe deny; then
@@ -607,6 +662,9 @@ if maybe nextest-perf; then
     if scope_skip nextest-perf "root acceptance layer" standard; then
         run_stage nextest-perf standard cargo nextest run "${LOCK_ARGS[@]}" -p taskmanager-gates --test performance -j 4 --profile ci
     fi
+fi
+if maybe four-frontends-nextest; then
+    run_stage four-frontends-nextest standard bash scripts/quality/four-frontends-nextest.sh
 fi
 if maybe live-smoke; then
     if scope_skip live-smoke "root acceptance layer" standard; then

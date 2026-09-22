@@ -324,5 +324,6 @@ fn service_action_label(action: ServiceAction) -> &'static str {
         ServiceAction::Restart => i18n::t("svc.restart"),
         ServiceAction::Enable => i18n::t("common.enable"),
         ServiceAction::Disable => i18n::t("common.disable"),
+        ServiceAction::ReloadDaemon => i18n::t("svc.reload_daemon"),
     }
 }

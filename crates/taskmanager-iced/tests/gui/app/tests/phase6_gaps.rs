@@ -145,11 +145,39 @@ fn test_system_spec_export_formatting() {
         ..Default::default()
     };
 
-    let export = crate::ui::system_table::format_system_spec_export(Some(&hw), Some(&snap), None);
+    let export =
+        crate::ui::system_table::format_system_spec_export(Some(&hw), Some(&snap), None, None);
     assert!(export.contains("# System Specifications"));
     assert!(export.contains("AMD Ryzen 9 7950X"));
     assert!(export.contains("6.10.0"));
     assert!(export.contains("120"));
+}
+
+#[test]
+fn test_system_spec_export_includes_smbios_slots_when_present() {
+    use taskmanager_application::i18n::{Language, set_language};
+    use taskmanager_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
+    set_language(Language::En);
+    let smbios = SmbiosMemorySnapshot {
+        slots_total: 2,
+        slots_used: 1,
+        modules: vec![SmbiosModuleRow {
+            slot: 0,
+            size_mb: Some(16384),
+            configured_speed_mts: Some(4800),
+            manufacturer: Some("Crucial".into()),
+            part_number: Some("CT16G48C40U5".into()),
+            locator: Some("DIMM0".into()),
+            memory_type: Some("DDR5".into()),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let export =
+        crate::ui::system_table::format_system_spec_export(None, None, None, Some(&smbios));
+    assert!(export.contains("Memory slots"));
+    assert!(export.contains("DIMM0"));
+    assert!(export.contains("16.0 GiB"));
 }
 
 #[test]

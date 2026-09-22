@@ -99,6 +99,7 @@ fn local_and_opaque_endpoints_never_require_dummy_ip_addresses() {
         remote: ConnectionEndpoint::Unspecified,
         state: ConnectionState::Listen,
         provider_key: Some(44.into()),
+        rtt_ms: None,
     };
     let local_json = serde_json::to_value(&local).expect("local connection should serialize");
     assert_eq!(local_json["protocol"], "local");
@@ -127,6 +128,7 @@ fn local_and_opaque_endpoints_never_require_dummy_ip_addresses() {
             "namespace".into(),
             "channel-7".into(),
         ])),
+        rtt_ms: None,
     };
     let opaque_json = serde_json::to_value(&opaque).expect("opaque connection should serialize");
     assert_eq!(opaque_json["protocol"], "native-stream");
@@ -200,4 +202,134 @@ fn neutral_resource_group_api_preserves_legacy_snapshot_keys() {
         Some(LimitValue::Value(20))
     );
     assert_eq!(decoded.current_process_count(), Some(2));
+}
+
+#[test]
+fn thread_wait_kind_distinguishes_lock_io_run_queue_and_unknown_waits() {
+    assert_eq!(
+        ThreadWaitKind::from_observation(ThreadState::Sleep, Some("futex_wait_queue_me"), Some(0),),
+        Some(ThreadWaitKind::KernelLock)
+    );
+    assert_eq!(
+        ThreadWaitKind::from_observation(
+            ThreadState::UninterruptibleSleep,
+            Some("io_schedule"),
+            Some(0),
+        ),
+        Some(ThreadWaitKind::UninterruptibleIo)
+    );
+    assert_eq!(
+        ThreadWaitKind::from_observation(ThreadState::Running, None, Some(4_000_000)),
+        Some(ThreadWaitKind::RunQueue)
+    );
+    assert_eq!(
+        ThreadWaitKind::from_observation(ThreadState::Sleep, Some("poll_schedule"), Some(0)),
+        Some(ThreadWaitKind::Other)
+    );
+    assert_eq!(
+        ThreadWaitKind::from_observation(ThreadState::Running, None, None),
+        None
+    );
+    assert_eq!(ThreadWaitKind::KernelLock.as_str(), "lock");
+    assert_eq!(ThreadWaitKind::UninterruptibleIo.as_str(), "io");
+}
+
+#[test]
+fn capability_masks_decode_in_kernel_order_and_classify_risk() {
+    let mask = (1_u64 << LinuxCapability::SysAdmin as u8)
+        | (1_u64 << LinuxCapability::SysPtrace as u8)
+        | (1_u64 << LinuxCapability::NetRaw as u8);
+    let decoded = LinuxCapability::decode_mask(mask);
+    assert_eq!(
+        decoded,
+        vec![
+            LinuxCapability::NetRaw,
+            LinuxCapability::SysPtrace,
+            LinuxCapability::SysAdmin,
+        ]
+    );
+    let capabilities = ProcessCapabilities::from_masks(
+        DeviceState::healthy(10),
+        Some(0),
+        Some(mask),
+        Some(mask),
+        Some(mask),
+        Some(0),
+    );
+    assert_eq!(capabilities.risk_level(), CapabilityRiskLevel::Critical);
+    assert_eq!(
+        capabilities
+            .critical_effective_capabilities()
+            .expect("effective mask"),
+        vec![LinuxCapability::SysPtrace, LinuxCapability::SysAdmin]
+    );
+    assert_eq!(
+        ProcessCapabilities::default().risk_level(),
+        CapabilityRiskLevel::Unknown
+    );
+}
+
+#[test]
+fn privilege_escape_warning_requires_proven_isolation_capability_and_writable_root() {
+    let capabilities = ProcessCapabilities::from_masks(
+        DeviceState::healthy(10),
+        Some(0),
+        Some(1_u64 << LinuxCapability::SysAdmin as u8),
+        Some(1_u64 << LinuxCapability::SysAdmin as u8),
+        Some(1_u64 << LinuxCapability::SysAdmin as u8),
+        Some(0),
+    );
+    let namespaces = LinuxNamespaceAudit::from_entries(
+        DeviceState::healthy(10),
+        vec![NamespaceAuditEntry {
+            kind: LinuxNamespaceKind::Mount,
+            status: NamespaceAuditStatus::Isolated {
+                inode: 11,
+                host_inode: 12,
+            },
+        }],
+    );
+    let isolation = ProcessIsolation {
+        capabilities: Some(capabilities),
+        namespaces: Some(namespaces),
+        rootfs_read_only: Some(false),
+        ..Default::default()
+    };
+    assert!(isolation.has_privilege_escape_risk());
+    assert!(
+        !ProcessIsolation {
+            rootfs_read_only: Some(true),
+            ..isolation
+        }
+        .has_privilege_escape_risk()
+    );
+}
+
+#[test]
+fn namespace_inode_parser_and_audit_order_are_deterministic() {
+    assert_eq!(
+        parse_namespace_inode("net:[4026531993]"),
+        Some(4_026_531_993)
+    );
+    assert_eq!(parse_namespace_inode("mnt:[7]"), Some(7));
+    assert_eq!(parse_namespace_inode("not-a-namespace"), None);
+    let audit = LinuxNamespaceAudit::from_entries(
+        DeviceState::healthy(10),
+        vec![
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Network,
+                status: NamespaceAuditStatus::Isolated {
+                    inode: 11,
+                    host_inode: 12,
+                },
+            },
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Pid,
+                status: NamespaceAuditStatus::Host { inode: 13 },
+            },
+        ],
+    );
+    assert_eq!(audit.entries[0].kind, LinuxNamespaceKind::Pid);
+    assert_eq!(audit.isolated_count(), 1);
+    assert!(audit.is_container_like());
 }

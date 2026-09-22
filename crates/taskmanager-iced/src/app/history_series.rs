@@ -100,6 +100,7 @@ impl HistorySeriesCache {
             TrendSeries::CpuFrequencyMhz => 6,
             TrendSeries::CpuPowerW => 7,
             TrendSeries::DiskActiveTimePct => 8,
+            TrendSeries::NpuUsagePercent => 9,
         }
     }
 

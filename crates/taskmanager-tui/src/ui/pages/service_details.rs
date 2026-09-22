@@ -85,6 +85,11 @@ pub(super) fn render(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area:
         ),
         fact_line(theme, t("svc.sub_state"), honest_value(&service.sub_state)),
     ];
+    for (label, value) in
+        taskmanager_shell::presentation::service_diagnostics_rows(service.diagnostics())
+    {
+        lines.push(fact_line(theme, &label, value));
+    }
     for (kind, key) in [
         (ServiceRelationKind::Requires, "svc.requires"),
         (ServiceRelationKind::Wants, "svc.wants"),
@@ -148,7 +153,7 @@ fn relation_value(dependencies: &ServiceDeps, kind: &ServiceRelationKind) -> Str
     }
 }
 
-fn fact_line<'a>(theme: TuiTheme, label: &'a str, value: String) -> Line<'a> {
+fn fact_line(theme: TuiTheme, label: &str, value: String) -> Line<'static> {
     Line::from(vec![
         Span::styled(
             format!("{} ", text::pad_cells(label, LABEL_CELLS)),

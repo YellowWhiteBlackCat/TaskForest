@@ -53,12 +53,14 @@ pub(super) fn core_cell_readout(cpu: Option<&CpuMetrics>, core_index: usize) -> 
     .join(" · ")
 }
 
-/// The number of labelled memory-stats rows this snapshot carries: the six
+/// The number of labelled memory-stats rows this snapshot carries: the eight
 /// fixed rows stay labelled with an honest dash when their fact is
 /// unavailable, while the Buffers row keeps the gpui conditional-row
-/// semantics (only when the host reports the counter).
+/// semantics (only when the host reports the counter). Keep this count in
+/// lockstep with [`memory_stats_rows`], otherwise the lower rows are clipped
+/// from the terminal frame when optional swap rates are absent.
 pub(super) fn memory_stats_row_count(memory: &MemoryMetrics) -> u16 {
-    6 + u16::from(memory.current_buffers_bytes().is_some())
+    8 + u16::from(memory.current_buffers_bytes().is_some())
 }
 
 /// The labelled memory-stats row set (`perf_views/memory_stats.rs` parity):
@@ -92,6 +94,12 @@ pub(super) fn memory_stats_rows(
         .map_or_else(missing_value, |rate| {
             signed_memory_rate_readout(rate, use_bytes, use_base2)
         });
+    let swap_in_rate = memory
+        .current_swap_in_bytes_per_sec()
+        .map_or_else(missing_value, |rate| format!("{}/s", readout(rate)));
+    let swap_out_rate = memory
+        .current_swap_out_bytes_per_sec()
+        .map_or_else(missing_value, |rate| format!("{}/s", readout(rate)));
 
     let mut rows: Vec<(String, String)> = vec![
         (
@@ -115,6 +123,8 @@ pub(super) fn memory_stats_rows(
         (t("mem.slots").to_string(), slots),
         (t("mem.committed").to_string(), committed),
         (t("mem.usage_rate").to_string(), usage_rate),
+        (t("mem.swap_in_rate").to_string(), swap_in_rate),
+        (t("mem.swap_out_rate").to_string(), swap_out_rate),
     ];
     if let Some(buffers) = memory.current_buffers_bytes() {
         rows.push((t("mem.buffers").to_string(), readout(buffers)));
@@ -215,12 +225,18 @@ pub(super) struct DiskData {
     pub(super) write: String,
     pub(super) active: String,
     pub(super) response_iops: Option<(String, String)>,
+    pub(super) queue_service: Option<(String, String)>,
+    pub(super) merged_requests: Option<(String, String)>,
     pub(super) capacity_free: Option<(String, String)>,
 }
 
 pub(super) fn disk_data(disk: &DiskMetrics, use_bytes: bool, use_base2: bool) -> DiskData {
     let response = disk.current_response_time_ms();
     let iops = disk.current_iops();
+    let queue_depth = disk.current_average_queue_depth();
+    let service_time = disk.current_service_time_ms();
+    let read_merges = disk.current_read_merges_per_sec();
+    let write_merges = disk.current_write_merges_per_sec();
     let capacity = disk.current_capacity_bytes();
     let free = disk.current_available_bytes();
     DiskData {
@@ -231,6 +247,18 @@ pub(super) fn disk_data(disk: &DiskMetrics, use_bytes: bool, use_base2: bool) ->
             (
                 response.map_or_else(missing_value, |ms| format!("{ms:.2} ms")),
                 iops.map_or_else(missing_value, |value| value.to_string()),
+            )
+        }),
+        queue_service: (queue_depth.is_some() || service_time.is_some()).then(|| {
+            (
+                queue_depth.map_or_else(missing_value, |value| format!("{value:.2}")),
+                service_time.map_or_else(missing_value, |value| format!("{value:.2} ms")),
+            )
+        }),
+        merged_requests: (read_merges.is_some() || write_merges.is_some()).then(|| {
+            (
+                read_merges.map_or_else(missing_value, |value| value.to_string()),
+                write_merges.map_or_else(missing_value, |value| value.to_string()),
             )
         }),
         capacity_free: (capacity.is_some() || free.is_some())
@@ -287,6 +315,10 @@ pub(super) struct GpuData {
     pub(super) max_clock: String,
     pub(super) idle_residency: String,
     pub(super) power: Option<String>,
+    pub(super) fan_rpm: Option<String>,
+    pub(super) fan_pwm: Option<String>,
+    pub(super) memory_bus_width: Option<String>,
+    pub(super) power_limit: Option<String>,
     pub(super) throttle_reason: Option<String>,
     pub(super) vram: Vec<VramData>,
 }
@@ -332,6 +364,19 @@ pub(super) fn gpu_data(gpu: &GpuMetrics) -> GpuData {
         max_clock: observed_frequency(gpu.current_max_frequency_mhz()),
         idle_residency: observed_percentage(gpu.current_idle_residency_pct()),
         power: gpu.current_power_w().map(|watts| format!("{watts:.1} W")),
+        fan_rpm: gpu.current_fan_speed_rpm().map(|rpm| format!("{rpm} RPM")),
+        fan_pwm: gpu
+            .current_fan_speed_pct()
+            .filter(|value| value.is_finite())
+            .map(|pct| format!("{pct:.0}%")),
+        memory_bus_width: gpu
+            .memory_bus_width_bits
+            .filter(|width| *width > 0)
+            .map(|width| format!("{width} bit")),
+        power_limit: gpu
+            .power_limit_w
+            .filter(|value| value.is_finite() && *value > 0.0)
+            .map(|value| format!("{value:.1} W")),
         throttle_reason: gpu
             .current_throttle_reason_text()
             .filter(|reason| !reason.is_empty()),
@@ -368,6 +413,11 @@ pub(super) struct NetworkData {
     pub(super) tx: String,
     pub(super) utilization: String,
     pub(super) link: String,
+    pub(super) mtu: String,
+    pub(super) tx_queue: String,
+    pub(super) drops: Option<String>,
+    pub(super) errors: Option<String>,
+    pub(super) overruns: Option<String>,
     pub(super) connection: String,
     pub(super) totals: Option<(String, String)>,
     pub(super) wireless: Option<WirelessData>,
@@ -387,6 +437,9 @@ pub(super) fn network_data(
         }
         if let Some(channel) = network.current_channel() {
             details.push(format!("{} {channel}", t("net.channel")));
+        }
+        if let Some(width) = network.current_channel_width_mhz() {
+            details.push(format!("{} {width} MHz", t("net.channel_width")));
         }
         if let Some(frequency) = network.current_frequency_mhz() {
             details.push(format!("{} {frequency} MHz", t("net.frequency")));
@@ -416,6 +469,15 @@ pub(super) fn network_data(
         link: network
             .current_link_speed_mbps()
             .map_or_else(missing_value, |mbps| format!("{mbps} Mbps")),
+        mtu: network
+            .current_mtu_bytes()
+            .map_or_else(missing_value, |bytes| format!("{bytes} B")),
+        tx_queue: network
+            .current_tx_queue_len()
+            .map_or_else(missing_value, |length| length.to_string()),
+        drops: paired_counters(network.current_rx_drops(), network.current_tx_drops()),
+        errors: paired_counters(network.current_rx_errors(), network.current_tx_errors()),
+        overruns: paired_counters(network.current_rx_overruns(), network.current_tx_overruns()),
         connection: network
             .current_link_up()
             .map_or_else(missing_value, |established| {
@@ -433,4 +495,14 @@ pub(super) fn network_data(
         }),
         wireless,
     }
+}
+
+fn paired_counters(left: Option<u64>, right: Option<u64>) -> Option<String> {
+    (left.is_some() || right.is_some()).then(|| {
+        format!(
+            "{} / {}",
+            left.map_or_else(missing_value, |value| value.to_string()),
+            right.map_or_else(missing_value, |value| value.to_string()),
+        )
+    })
 }

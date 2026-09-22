@@ -7,6 +7,59 @@
 //! surface decision. Adding a new intent requires updating the exhaustive
 //! frontend mappings, so a new product feature cannot silently disappear from
 //! one shape.
+//!
+//! ## "求同存异" Standards Governance: Cross-Frontend Parity & Divergence Baselines
+//!
+//! Under the TaskForest strategic charter, all four frontends share one typed
+//! product contract. The sixteen [`ProductIntent`] variants represent invariant
+//! user intents owned by the shared application or shell layers.
+//!
+//! While the GPUI frontend serves as the reference surface ([`SurfaceDecision::Reference`]),
+//! parallel frontends (TUI, Iced, Bevy) are first-class product surfaces. When an
+//! intent is fulfilled through a toolkit-native paradigm rather than copying the
+//! reference surface, the frontend declares [`SurfaceDecision::AcceptedDifference`].
+//!
+//! These accepted differences are intentional design assets backed by explicit
+//! quality baselines:
+//!
+//! - **TUI Quality Baselines**:
+//!   - *Braille Sparkline 8-dot resolution*: High-frequency telemetry (CPU/memory curves)
+//!     renders via Unicode Braille patterns (U+2800..U+28FF, 2x4 = 8 dots per cell)
+//!     achieving 4x vertical and 2x horizontal resolution within a single terminal row.
+//!   - *Linear metric cycling*: Complex multi-card telemetry (e.g. GPU engines, encoders,
+//!     decoders, and memory) is explored via keyboard cycling (`performance.gpu.metric-cycle`)
+//!     rather than crowded multi-pane splits.
+//!   - *Footer activity line*: Operation receipts, copy confirmations, and non-blocking
+//!     warnings render in the single-line footer (`footer.activity-line`), eliminating
+//!     floating toast occlusion in character cells.
+//!   - *Modal blocks*: Dialogs and confirmations use centered `Clear` + `Block` with
+//!     absolute Escape exit priority.
+//!   - *Honest scalar availability*: Unavailable metrics render placeholder dashes,
+//!     never fabricated zeros.
+//! - **Iced Quality Baselines**:
+//!   - *Pure functional Elm architecture (TEA)*: State flows unidirectionally through
+//!     immutable model transitions (`view(&self) -> Element<Message>`), eliminating
+//!     imperative widget state leaks.
+//!   - *Virtual list with lazy caching*: Large tables use `VirtualWindow` to materialize
+//!     only visible rows into immutable widget trees, preserving smooth 60 FPS scrolling.
+//!   - *Single-row compact ribbons*: View presets and toolbar actions collapse into a
+//!     32px horizontal glide rail, keeping at least 7-9 rows of table data visible in
+//!     compact 720x480 viewports.
+//!   - *Bottom activity line*: Transient feedback routes to the window footer line rather
+//!     than floating toast overlays.
+//! - **Bevy UI Quality Baselines**:
+//!   - *Pure data-driven ECS scene graph*: 100% `bsn!` declarative scene tree where all
+//!     surfaces are reactive entities governed by components and observer events.
+//!   - *Picking transparency*: Button children carry `Pickable::IGNORE` so pointer
+//!     activations cleanly reach parent button entities.
+//!   - *Responsive flex slot distribution*: Columns and layouts adapt through flexbox
+//!     weights rather than pointer drag handles, ensuring layout resilience across
+//!     varied viewport ratios.
+//!   - *Dedicated status bar*: Transient notifications route to a dedicated status entity.
+//! - **GPUI Quality Baselines (Reference Surface)**:
+//!   - GPU-accelerated retained canvas with rem-scaled relative layout budgets
+//!     (`taskmanager_theme::UiSize`), floating toast stacks, pointer-drag column
+//!     resizing, and multi-family GPU inspection panels.
 
 use crate::keybindings::FrontendShape;
 use taskmanager_platform_contract::CapabilityId;
@@ -225,6 +278,13 @@ pub enum SurfaceDecision {
     /// The shape uses a local surface over the shared intent contract.
     Local { route: &'static str },
     /// The same intent is met through a deliberately different surface.
+    ///
+    /// This represents the "求同存异" governance model: the underlying typed
+    /// intent, owner layer, lifecycle discipline, and platform safety guarantees
+    /// remain 100% identical, while the visual and interaction presentation is
+    /// fulfilled through a toolkit-native quality baseline (e.g. TUI Braille
+    /// Sparkline 8-dot resolution and footer activity line, Iced TEA single-row
+    /// compact ribbons and pure virtual lists, Bevy pure ECS declarative scenes).
     AcceptedDifference {
         route: &'static str,
         reason: &'static str,

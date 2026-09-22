@@ -142,6 +142,18 @@ pub(super) fn memory_page_stats(memory: &MemoryMetrics, units: UnitPreferences) 
             Some(formatting::format_signed_memory_rate_mib(units, rate)),
         ));
     }
+    if let Some(rate) = memory.current_swap_in_bytes_per_sec() {
+        rows.push(StatRow::text(
+            i18n::t("mem.swap_in_rate"),
+            Some(units.format_quantity(rate, QuantityFamily::Memory, true)),
+        ));
+    }
+    if let Some(rate) = memory.current_swap_out_bytes_per_sec() {
+        rows.push(StatRow::text(
+            i18n::t("mem.swap_out_rate"),
+            Some(units.format_quantity(rate, QuantityFamily::Memory, true)),
+        ));
+    }
     let swap_total = memory.current_swap_total_bytes();
     MemoryPageStats {
         rows,

@@ -17,6 +17,7 @@ pub mod failure;
 pub mod hardware;
 pub mod history;
 pub mod identity;
+pub mod kernel_log;
 pub mod metrics;
 pub mod npu;
 pub mod power;
@@ -74,9 +75,11 @@ pub use history::{
     HistoryRecordSink, HistorySeriesKey, HistoryWindow, PeakSummary, count_clock_jumps,
 };
 pub use identity::{DeviceGeneration, DeviceId, ProviderId};
+pub use kernel_log::{KernelLogEntry, KernelLogPriority};
 pub use metrics::{
-    CounterDelta, CpuFrequencySource, CpuMetrics, CpuPerformancePolicy, CpuScalarObservations,
-    CpuTelemetryObservation, CpuTemperatureSource, CumulativeCounter, DiskMetrics, DiskPartition,
+    CounterDelta, CpuFrequencySource, CpuIdleState, CpuInterruptSnapshot, CpuMetrics,
+    CpuPackageMetrics, CpuPerformancePolicy, CpuScalarObservations, CpuTelemetryObservation,
+    CpuTemperatureSource, CumulativeCounter, DiskMetrics, DiskPartition,
     DiskPartitionScalarObservations, DiskScalarObservations, DmiIdentityFacts, GpuEngine,
     GpuEngineKind, GpuEngineMetric, GpuEngineMetricPoint, GpuEngineRowsFailure,
     GpuEngineRowsSnapshot, GpuGraphicsApi, GpuMetricField, GpuMetricProvenance, GpuMetrics,
@@ -86,10 +89,11 @@ pub use metrics::{
     MemoryOptionalObservations, MemoryScalarObservations, MemoryTelemetryObservation,
     MsrPackageReadout, MsrReadoutFailure, MsrReadoutSnapshot, NetworkAdapterType, NetworkMetrics,
     NetworkScalarObservations, NetworkTelemetryObservation, NetworkWirelessObservations,
-    ObservationWireError, OptionalObservation, OptionalObservationState, ProviderRuntimeState,
-    RaplPackageRow, RaplPowerFailure, RaplPowerSnapshot, ScalarAvailability, ScalarObservation,
-    ScalarObservationGroup, ScalarObservationSlot, SmartAvailability, SmbiosMemoryFailure,
-    SmbiosMemorySnapshot, SmbiosModuleRow, StorageTelemetryObservation, SystemObservationState,
+    ObservationWireError, OptionalObservation, OptionalObservationState, PressureWindow,
+    ProviderRuntimeState, RaplPackageRow, RaplPowerFailure, RaplPowerSnapshot, ResourcePressure,
+    ScalarAvailability, ScalarObservation, ScalarObservationGroup, ScalarObservationSlot,
+    SmartAvailability, SmbiosMemoryFailure, SmbiosMemorySnapshot, SmbiosModuleRow,
+    StorageTelemetryObservation, SystemLoadAverage, SystemObservationState, SystemPressureSnapshot,
     SystemSnapshot, SystemTelemetryDomains, VirtualMemoryCommitObservations,
     cpu_usage_pct_observation,
 };
@@ -102,27 +106,33 @@ pub use power::{
     PowerSupplySnapshot,
 };
 pub use process::{
-    ApplicationIconAsset, ApplicationIconFormat, FlatTreeNode, FrozenProcessIdentity,
-    MAX_APPLICATION_ICON_BYTES, PriorityTier, ProcessApplicationIdentity, ProcessBatchAction,
+    ApplicationIconAsset, ApplicationIconFormat, FD_PRESSURE_THRESHOLD, FlatTreeNode,
+    FrozenProcessIdentity, MAX_APPLICATION_ICON_BYTES, MEMORY_GROWTH_MIN_SAMPLES, PriorityTier,
+    ProcessAnomaly, ProcessAnomalyKind, ProcessApplicationIdentity, ProcessBatchAction,
     ProcessBatchIntent, ProcessBatchResult, ProcessBatchTargetResult, ProcessCategory,
     ProcessGroupScope, ProcessHistorySample, ProcessHistorySnapshot, ProcessHistoryStore,
-    ProcessItem, ProcessLiveKey, ProcessMetadataAvailability, ProcessMetadataFailure,
-    ProcessMetadataObservation, ProcessMetadataObservations, ProcessNode, ProcessOwner,
-    ProcessOwnerIdentity, ProcessScalarObservations, ProcessSignal, ProcessSortKey,
-    application_group_name, build_process_tree, compare_process_items, execute_process_batch_with,
-    flatten_tree_visible, fuzzy_filter_processes, fuzzy_match, normalize_app_name,
-    process_category, sort_nodes, sort_processes,
+    ProcessItem, ProcessLiveKey, ProcessMemoryBreakdown, ProcessMetadataAvailability,
+    ProcessMetadataFailure, ProcessMetadataObservation, ProcessMetadataObservations, ProcessNode,
+    ProcessOwner, ProcessOwnerIdentity, ProcessScalarObservations, ProcessSchedulingPolicy,
+    ProcessSignal, ProcessSortKey, ProcessStatusKind, ZOMBIE_STORM_THRESHOLD,
+    application_group_name, build_process_tree, compare_process_items, detect_process_anomalies,
+    execute_process_batch_with, flatten_tree_visible, fuzzy_filter_processes, fuzzy_match,
+    normalize_app_name, process_category, sort_nodes, sort_processes,
 };
 pub use process_telemetry::{
-    ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey, ConnectionState,
-    ConnectionTransport, ContainerRollup, ContainerSummary, IsolationKind, LimitValue,
-    MAX_ENVIRONMENT_BYTES, MAX_ENVIRONMENT_ENTRIES, OpenFileEntry, OpenFileKind, ProcessConnection,
-    ProcessEnvironment, ProcessEnvironmentEntry, ProcessGpuDevice, ProcessGpuEngineUsage,
+    CapabilityRiskLevel, ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey,
+    ConnectionState, ConnectionTransport, ContainerRollup, ContainerSummary, GpuEngineClass,
+    IsolationKind, LimitValue, LinuxCapability, LinuxNamespaceAudit, LinuxNamespaceKind,
+    MAX_ENVIRONMENT_BYTES, MAX_ENVIRONMENT_ENTRIES, NamespaceAuditEntry, NamespaceAuditStatus,
+    NetworkConnectionCounters, OpenFileEntry, OpenFileItem, OpenFileKind, ProcessCapabilities,
+    ProcessConnection, ProcessEnvironment, ProcessEnvironmentEntry, ProcessGpuDevice,
+    ProcessGpuEngineClass, ProcessGpuEngineKind, ProcessGpuEngineType, ProcessGpuEngineUsage,
     ProcessGpuEngines, ProcessGpuSnapshot, ProcessIdentity, ProcessInsightSnapshot,
     ProcessIsolation, ProcessNetworkSnapshot, ProcessOpenFiles, ProcessResourceObservations,
     ProcessResourceSnapshot, ProcessTelemetrySnapshot, ProcessThreadInfo, ProcessThreads,
     ResourceGroupCpuLimit, ResourceGroupLimitRequest, ResourceGroupMembership,
     ResourceLastObservation, ResourceLimit, ResourceLimitKind, ResourceObservation, ThreadState,
+    ThreadWaitKind, parse_namespace_inode,
 };
 pub use sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorLifecycleTracker, SensorMagnitude,
@@ -132,12 +142,15 @@ pub use sensors::{
     ThermalTripPointSet, ThermalZoneMode, ThermalZoneStatus, refresh_sensor_center_state,
 };
 pub use services::{
-    ServiceAction, ServiceDeps, ServiceItem, ServiceLogAvailability, ServiceLogEntries,
-    ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed, ServiceLogLevel,
-    ServiceLogLevelFilter, ServiceLogLines, ServiceLogProviderState, ServiceLogQuery,
-    ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd, ServiceLogStreamSnapshot,
-    ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationEdge, ServiceRelationGraph,
-    ServiceRelationKind, ServiceStatus,
+    DirectedServiceEdge, ServiceAction, ServiceCycle, ServiceDeps, ServiceDiagnostics,
+    ServiceEdgeCategory, ServiceFailureCause, ServiceItem, ServiceLogAvailability,
+    ServiceLogEntries, ServiceLogEntry, ServiceLogErrorKind, ServiceLogFailure, ServiceLogFeed,
+    ServiceLogLevel, ServiceLogLevelFilter, ServiceLogLines, ServiceLogProviderState,
+    ServiceLogQuery, ServiceLogSnapshot, ServiceLogState, ServiceLogStreamEnd,
+    ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter, ServiceRelationEdge,
+    ServiceRelationGraph, ServiceRelationKind, ServiceStatus, detect_directed_cycles,
+    detect_ordering_cycles, detect_requirement_cycles, is_ordering_acyclic, is_requirement_acyclic,
+    service_exit_status_label,
 };
 pub use session::{SessionControlAction, SessionItem};
 pub use setup::{SetupScriptAction, SetupScriptEvent, SetupScriptInfo};
@@ -156,8 +169,18 @@ pub use storage::{
     StorageConnection, StorageDeviceKind, StorageDeviceTarget, StorageIdentityStability,
     StorageInterconnect, StorageProtocol,
 };
-pub use storage_health::{FilesystemHealth, FilesystemHealthSnapshot, FilesystemHealthStatus};
-pub use system_health::{SmartSelfTestIntent, SmartSelfTestObservation, SystemHealthSnapshot};
+pub use storage_health::{
+    DEFAULT_INODE_USAGE_CRITICAL_PERCENT, DEFAULT_INODE_USAGE_WARNING_PERCENT,
+    DEFAULT_NVME_SPARE_CRITICAL_PERCENT, DEFAULT_NVME_SPARE_WARNING_PERCENT,
+    DEFAULT_NVME_WEAR_CRITICAL_PERCENT, DEFAULT_NVME_WEAR_WARNING_PERCENT,
+    DEFAULT_STORAGE_ALERT_HYSTERESIS_PERCENT, FilesystemBackingKind, FilesystemHealth,
+    FilesystemHealthSnapshot, FilesystemHealthStatus, inode_usage_percent, is_nvme_spare_critical,
+    is_nvme_spare_warning, is_nvme_wear_critical, is_nvme_wear_warning,
+};
+pub use system_health::{
+    HealthDeduction, HealthDeductionKind, HealthScoreInput, SmartSelfTestIntent,
+    SmartSelfTestObservation, SystemHealthScore, SystemHealthSnapshot,
+};
 pub use target::{ServiceId, SessionId, StorageDeviceKey};
 pub use time::{
     LocalDateTime, LocalTimeOffset, LocalTimeRules, LocalTimeRulesCacheKey, LocalTimeRulesChange,

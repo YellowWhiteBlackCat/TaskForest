@@ -19,7 +19,7 @@ use taskmanager_shell::ShellApp;
 use taskmanager_shell::fixture;
 use taskmanager_theme::Theme;
 
-use super::{content, paint_system, system_fact_rows};
+use super::{clean_memory_size, content, paint_system, system_fact_rows, system_summary_model};
 use crate::app::FrontendTrack;
 use crate::drain::ShellProjectionFolded;
 use crate::pages::history::HistoryProjectionResource;
@@ -60,7 +60,7 @@ fn shell_with_hardware(hardware: Option<HardwareInfo>) -> ShellApp {
 
 #[test]
 fn host_facts_project_with_shared_labels_and_honest_dashes() {
-    let rows = system_fact_rows(Some(&fixture_hardware()));
+    let rows = system_fact_rows(Some(&fixture_hardware()), None, None);
     let value_of = |label: &str| {
         rows.iter()
             .find(|row| row.label == label)
@@ -75,13 +75,18 @@ fn host_facts_project_with_shared_labels_and_honest_dashes() {
     );
     assert_eq!(value_of(t("system.field.cpu")), "Intel Core Ultra 7");
     assert_eq!(value_of(t("system.field.cores")), "22");
+    assert_eq!(
+        value_of(t("system.section.memory")),
+        "32.0 GiB",
+        "memory size must be cleanly formatted"
+    );
 
     // A platform that supplied NO desktop fact renders the shared dash —
     // never an empty string that looks like a value, never a guess.
     let mut sparse = fixture_hardware();
     sparse.desktop_environment = None;
     sparse.desktop_environment_version = None;
-    let sparse_rows = system_fact_rows(Some(&sparse));
+    let sparse_rows = system_fact_rows(Some(&sparse), None, None);
     let desktop = sparse_rows
         .iter()
         .find(|row| row.label == t("system.desktop_environment"))
@@ -95,7 +100,7 @@ fn host_facts_project_with_shared_labels_and_honest_dashes() {
 
 #[test]
 fn a_missing_inventory_states_waiting_and_states_no_facts() {
-    let rows = system_fact_rows(None);
+    let rows = system_fact_rows(None, None, None);
     assert!(rows.is_empty(), "no hardware, no fabricated fact rows");
 }
 
@@ -141,11 +146,10 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
 
     let world = app.world_mut();
     let mut texts = world.query::<&Text>();
-    let hostname = t("system.hostname");
     let mut label_seen = 0;
     let mut value_seen = 0;
     for text in texts.iter(world) {
-        if text.0 == hostname {
+        if text.0 == "Hostname" || text.0 == "主机名" || text.0 == t("system.hostname") {
             label_seen += 1;
         }
         if text.0 == "taskforest-workstation" {
@@ -167,4 +171,102 @@ fn the_mounted_page_paints_the_host_once_and_survives_refolds() {
         .filter(|text| text.0 == "taskforest-workstation")
         .count();
     assert_eq!(value_seen, 1, "a refold repaints in place, never doubles");
+
+    // The four KPI summary cards (CPU, Memory, Processes, Active Alerts) are painted
+    let all_texts: Vec<String> = texts.iter(world).map(|t| t.0.clone()).collect();
+    assert!(
+        all_texts.iter().any(|s| s == t("common.cpu")),
+        "CPU summary card is mounted"
+    );
+    assert!(
+        all_texts.iter().any(|s| s == t("common.memory")),
+        "Memory summary card is mounted"
+    );
+    assert!(
+        all_texts.iter().any(|s| s == t("dashboard.processes")),
+        "Processes summary card is mounted"
+    );
+    assert!(
+        all_texts.iter().any(|s| s == t("dashboard.active_alerts")),
+        "Active Alerts summary card is mounted"
+    );
+}
+
+#[test]
+fn system_fact_rows_include_smbios_slots_and_npu_when_provided() {
+    use taskmanager_core::core::metrics::{SmbiosMemorySnapshot, SmbiosModuleRow};
+    use taskmanager_core::core::npu::{NpuDevice, NpuInventorySnapshot};
+
+    let smbios = SmbiosMemorySnapshot {
+        slots_total: 4,
+        slots_used: 2,
+        modules: vec![SmbiosModuleRow {
+            slot: 0,
+            size_mb: Some(16384),
+            configured_speed_mts: Some(6000),
+            manufacturer: Some("Corsair".into()),
+            part_number: Some("CMK32GX5M2B6000C30".into()),
+            locator: Some("DIMM_A2".into()),
+            memory_type: Some("DDR5".into()),
+            ..Default::default()
+        }],
+        ..Default::default()
+    };
+    let npu = NpuInventorySnapshot::discovered(
+        vec![NpuDevice {
+            device_id: "npu0".into(),
+            brand: Some("Intel AI Boost".into()),
+            ..Default::default()
+        }],
+        1,
+    );
+
+    let rows = system_fact_rows(Some(&fixture_hardware()), Some(&smbios), Some(&npu));
+    let has_slot_header = rows.iter().any(|r| r.label == t("system.memory_slots"));
+    assert!(has_slot_header, "memory slots summary must be present");
+    let has_dimm = rows.iter().any(|r| r.label == "DIMM_A2");
+    assert!(has_dimm, "DIMM_A2 module must be present");
+    let has_npu = rows.iter().any(|r| r.label.contains("npu0"));
+    assert!(has_npu, "NPU device must be present");
+}
+
+#[test]
+fn clean_memory_size_formats_cleanly() {
+    assert_eq!(clean_memory_size(32768), "32.0 GiB");
+    assert_eq!(clean_memory_size(16384), "16.0 GiB");
+    assert_eq!(clean_memory_size(8192), "8.0 GiB");
+    assert_eq!(clean_memory_size(1024), "1.0 GiB");
+    assert_eq!(clean_memory_size(512), "512.0 MiB");
+}
+
+#[test]
+fn system_summary_model_mirrors_gpui_and_iced_parity() {
+    let projection = taskmanager_shell::SystemProjectionStore::default();
+    let model = system_summary_model(&projection);
+    assert_eq!(
+        model.cpu,
+        taskmanager_shell::presentation::MISSING_VALUE,
+        "an unobserved CPU renders the dash"
+    );
+    assert_eq!(
+        model.memory,
+        taskmanager_shell::presentation::MISSING_VALUE,
+        "an unobserved memory renders the dash"
+    );
+    assert_eq!(model.processes, None, "no inventory means no process count");
+    assert_eq!(model.active_alerts, 0, "an empty alert mirror is zero");
+
+    // Live shell from demo fixture
+    let demo = crate::demo_fixture::demo_shell();
+    let demo_model = system_summary_model(demo.projection());
+    assert_ne!(
+        demo_model.cpu,
+        taskmanager_shell::presentation::MISSING_VALUE,
+        "demo shell provides observed CPU percentage"
+    );
+    assert_ne!(
+        demo_model.memory,
+        taskmanager_shell::presentation::MISSING_VALUE,
+        "demo shell provides observed memory percentage"
+    );
 }

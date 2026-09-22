@@ -122,6 +122,16 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
                 Some(version.to_owned()),
             ));
         }
+        if let Some(version) = api
+            .mesa_version
+            .as_deref()
+            .filter(|value| !value.is_empty())
+        {
+            rows.push(StatRow::text(
+                t("gpu.mesa_version"),
+                Some(version.to_owned()),
+            ));
+        }
     }
 
     for (label, used, total) in [
@@ -155,6 +165,24 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
         ));
     }
 
+    if let Some(width) = gpu.memory_bus_width_bits.filter(|width| *width > 0) {
+        rows.push(StatRow::text(
+            t("gpu.memory_bus_width"),
+            Some(format!("{width} bit")),
+        ));
+    }
+    if let Some(bandwidth) = gpu
+        .memory_bandwidth_gbps
+        .filter(|value| value.is_finite() && *value > 0.0)
+    {
+        rows.push(StatRow::text(
+            t("gpu.memory_bandwidth"),
+            Some(format!("{bandwidth:.1} GB/s")),
+        ));
+    }
+    if let Some(depth) = gpu.queue_depth {
+        rows.push(StatRow::text(t("gpu.queue_depth"), Some(depth.to_string())));
+    }
     if let Some(mhz) = observed.frequency_mhz {
         rows.push(StatRow::text(t("common.clock"), Some(format!("{mhz} MHz"))));
     }
@@ -182,6 +210,24 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
             Some(format!("{watts:.1} W")),
         ));
     }
+    if let Some(limit) = gpu
+        .power_limit_w
+        .filter(|value| value.is_finite() && *value > 0.0)
+    {
+        rows.push(StatRow::text(
+            t("gpu.power_limit"),
+            Some(format!("{limit:.1} W")),
+        ));
+    }
+    if let Some(rpm) = gpu.current_fan_speed_rpm() {
+        rows.push(StatRow::text(t("fan.rpm"), Some(format!("{rpm} RPM"))));
+    }
+    if let Some(pct) = gpu
+        .current_fan_speed_pct()
+        .filter(|value| value.is_finite())
+    {
+        rows.push(StatRow::text(t("fan.pwm"), Some(format!("{pct:.0}%"))));
+    }
     if let Some(driver) = gpu.driver.as_deref() {
         rows.push(StatRow::text(t("common.driver"), Some(driver.to_string())));
     }
@@ -194,6 +240,16 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
     {
         rows.push(StatRow::text(
             t("gpu.driver_version"),
+            Some(version.to_owned()),
+        ));
+    }
+    if let Some(version) = gpu
+        .vbios_version
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        rows.push(StatRow::text(
+            t("gpu.vbios_version"),
             Some(version.to_owned()),
         ));
     }
@@ -216,6 +272,12 @@ pub(crate) fn gpu_summary_lines(gpu: &GpuMetrics) -> Vec<StatRow> {
         .filter(|slot| !slot.trim().is_empty())
     {
         rows.push(StatRow::text(t("gpu.pci_slot"), Some(slot.to_owned())));
+    }
+    if let Some(connected) = gpu.display_connected {
+        rows.push(StatRow::text(
+            t("gpu.display_output"),
+            Some(t(if connected { "common.yes" } else { "common.no" }).to_owned()),
+        ));
     }
     rows
 }

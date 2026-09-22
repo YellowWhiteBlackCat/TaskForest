@@ -444,6 +444,7 @@ fn mc04_npu_current_case_graphics_section_projects_complete_current_npu_facts_wi
             memory: NpuMemoryReport {
                 dedicated_total_bytes: ScalarObservation::available(0, 10),
                 shared_total_bytes: ScalarObservation::available(1024 * 1024 * 1024, 10),
+                sram_total_bytes: ScalarObservation::available(32 * 1024 * 1024, 10),
             },
             ..Default::default()
         }],

@@ -84,14 +84,30 @@ core wire concern.
 ## Module map
 
 ```text
-src/engine/collector/
-├── domains/                   host, cpu, memory, network, gpu collection orchestration
-├── compute/                   cpu_sources, memory_sources (DMI, udev)
-└── disks/                     inventory, mounts, sysfs, SMART, rates
-src/backend/                   environment, integration, power, process, sensor,
-                               service, storage, system control providers
-src/config.rs                  Linux composition configuration
-src/window_capture.rs          current-window PNG provider and bounded validation
+src/engine.rs                          collection engine root
+├── collector/                         domain collection orchestration
+├── hardware/                          hardware inventory and topology
+├── nvml.rs                            NVIDIA NVML GPU telemetry
+├── power.rs                           power/RAPL collection
+├── process/                           per-process telemetry collection
+├── sensors/                           thermal/fan sensor collection
+├── services/                          systemd service collection
+├── smart/                             SMART disk health collection
+├── startup/                           startup-item collection
+├── runtime_evidence/                  runtime evidence capture
+├── desktop_appearance.rs              desktop theme detection
+├── session.rs  storage_health.rs  storage_target.rs
+src/provider.rs                        capability provider implementations
+├── process.rs  process_target.rs      process control and targeting
+├── environment.rs  integration.rs     environment and integration providers
+├── power.rs  rapl_power.rs            power and RAPL providers
+├── sensor.rs  service.rs  storage.rs  system.rs
+├── gpu_engine_rows.rs  npu_inventory.rs  msr_readout.rs  smbios_memory.rs
+├── directory_usage.rs  source_status.rs
+src/backend.rs                         environment, integration, power, process, sensor,
+│                                      service, storage, system control backends
+src/platform_handle/                   native platform handle with polkit bindings
+src/config.rs  instance.rs  local_time.rs  tray.rs  window_capture.rs
 ```
 
 Control paths go through taskmanager-escalation (polkit) or udisks2 (eject, MC !493).

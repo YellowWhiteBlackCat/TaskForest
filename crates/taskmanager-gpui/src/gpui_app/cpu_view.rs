@@ -30,7 +30,7 @@ pub(crate) struct EscalationReadouts {
 // genuinely shares its formats.
 pub(super) use details_panel::{cpu_identity_rows, heterogeneous_core_rows, sockets_row};
 
-use gpui::{Div, InteractiveElement, IntoElement, ParentElement, Styled, div, px};
+use gpui::{Div, InteractiveElement, IntoElement, ParentElement, ScrollHandle, Styled, div, px};
 use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_telemetry_store::TelemetryStore;
 
@@ -135,6 +135,10 @@ pub(crate) struct CpuViewProps<'a> {
     /// Shared MSR-readout request session + lane capability for the details
     /// panel's MSR subsection.
     pub msr_readouts: MsrReadoutsInputs<'a>,
+    /// Scroll state for the complete CPU details projection. It is separate
+    /// from the page/chart viewport so the graph and device selector remain
+    /// stable while a user inspects lower topology rows.
+    pub details_scroll: &'a ScrollHandle,
 }
 
 pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryCache) -> Div {
@@ -150,6 +154,7 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
         units,
         package_power,
         msr_readouts,
+        details_scroll,
     } = props;
     let package_model = package_power::package_power_model(&package_power);
     let msr_model = msr_readouts::msr_readouts_model(&msr_readouts);
@@ -221,7 +226,7 @@ pub(crate) fn render_cpu(props: CpuViewProps<'_>, core_history: &mut CpuHistoryC
             &stats.details,
             units,
             &escalation,
-            layout.content_height,
+            details_scroll,
         ),
         stats_footer: None,
         hover_slot,

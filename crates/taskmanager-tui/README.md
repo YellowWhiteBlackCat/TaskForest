@@ -105,10 +105,28 @@ boundaries are defined in `../../docs/ARCH.md` and
 ## Module map
 
 ```text
-src/main.rs → surface.rs  terminal.rs   terminal host (TestBackend covers reference
-│                                      sizes and the 54×16 minimum)
-src/runtime/                   keys, modals, navigation, semantic mapping, seam
-src/ui/                        page rendering
-src/command_palette/           command palette (surface_protocol.rs)
-src/bindings.rs  capabilities.rs  functional.rs   keys, capabilities, CORE-04 declarations
+src/main.rs → surface.rs  terminal.rs        terminal host and surface authority
+src/runtime/                                  event loop runtime
+│   └── keys.rs  modals.rs  navigation.rs  semantic.rs  seam.rs
+src/ui.rs                                     page rendering root
+│   ├── pages/                                page dispatch
+│   ├── perf_overview.rs  perf_data.rs        performance overview
+│   ├── perf_core_grid.rs  perf_gpu.rs  perf_memory.rs  perf_disks.rs
+│   ├── perf_networks.rs  perf_battery.rs  perf_fan.rs  perf_npu.rs
+│   ├── perf_selector_instances.rs  perf_overview_data.rs
+│   ├── process_table.rs  process_data.rs  process_details/  process_menu.rs
+│   ├── process_properties.rs
+│   ├── health.rs  health_data.rs  alerts.rs
+│   ├── app_history.rs  boot_timeline.rs
+│   ├── about.rs  about_data.rs  settings.rs  help.rs  containers.rs
+│   ├── service_dependencies_modal.rs  service_menu.rs  session_menu.rs
+│   ├── startup_menu.rs  batch_menu.rs  column_menu.rs  affinity_modal.rs
+│   ├── confirmations.rs  header.rs  footer.rs  frame_plan.rs
+│   ├── sparkline.rs  highlight.rs  table_hit.rs  text.rs  units.rs
+src/command_palette/  (+ surface_protocol.rs) command palette
+src/bindings.rs  capabilities.rs  functional.rs  keys, capabilities, CORE-04
+src/clipboard.rs  column_prefs.rs  preferences.rs  selection.rs  selectors.rs
+src/demo.rs  diagnostic_report.rs  snapshot_export.rs
+src/history_runtime.rs  menus.rs  process_view.rs
+src/service_log.rs  startup_control.rs  theme.rs
 ```

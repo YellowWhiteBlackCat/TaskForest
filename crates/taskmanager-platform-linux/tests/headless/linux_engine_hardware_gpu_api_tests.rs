@@ -1,4 +1,4 @@
-use super::{parse_opengl_version, parse_vulkan_version};
+use super::{parse_mesa_version, parse_opengl_version, parse_vulkan_version};
 
 #[test]
 fn parses_the_canonical_opengl_version_without_driver_suffix() {
@@ -28,4 +28,17 @@ fn malformed_graphics_api_versions_are_omitted() {
         None
     );
     assert_eq!(parse_vulkan_version("apiVersion = 0.0"), None);
+}
+
+#[test]
+fn parses_mesa_userspace_version_without_confusing_opengl_version() {
+    let output = "OpenGL version string: 4.6 (Compatibility Profile) Mesa 25.1.4-arch1.2\n";
+    assert_eq!(
+        parse_mesa_version(output).as_deref(),
+        Some("25.1.4-arch1.2")
+    );
+    assert_eq!(
+        parse_mesa_version("OpenGL version string: 4.6 vendor"),
+        None
+    );
 }

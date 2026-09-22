@@ -79,7 +79,7 @@ fn silent_omission_is_drift() {
         capability_drift(&report),
         vec![(
             *ComponentCapability::ALL.last().expect("non-empty ALL"),
-            CapabilityStatus::Missing
+            CapabilityCoverageStatus::Missing
         )]
     );
     assert_eq!(
@@ -102,7 +102,7 @@ fn duplicated_declaration_is_drift() {
     let drift = capability_drift(&capability_report(&declaration));
     assert_eq!(drift.len(), 1);
     assert_eq!(drift[0].0, first.capability);
-    assert_eq!(drift[0].1, CapabilityStatus::Duplicated);
+    assert_eq!(drift[0].1, CapabilityCoverageStatus::Duplicated);
     assert_eq!(
         capability_findings(&declaration),
         vec![CapabilityFinding {
@@ -180,6 +180,32 @@ fn deliberate_differences_carry_non_empty_explanations() {
                 kind: CapabilityFindingKind::EmptyExplanation,
             }],
             "support {empty:?} must carry its explanation"
+        );
+    }
+}
+
+/// Every component capability has an explicit, toolkit-neutral semantic
+/// specification defining user-facing behavior, interaction semantics,
+/// and invariant expectations.
+#[test]
+fn every_capability_has_explicit_toolkit_neutral_semantic_specification() {
+    for capability in ComponentCapability::ALL {
+        let spec = capability.semantic_spec();
+        assert_eq!(spec.capability, *capability);
+        assert!(
+            !spec.user_facing_behavior.is_empty(),
+            "capability {} must define user-facing behavior",
+            capability.id()
+        );
+        assert!(
+            !spec.keyboard_pointer_semantics.is_empty(),
+            "capability {} must define keyboard/pointer semantics",
+            capability.id()
+        );
+        assert!(
+            !spec.invariant_expectations.is_empty(),
+            "capability {} must define invariant expectations",
+            capability.id()
         );
     }
 }

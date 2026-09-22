@@ -31,12 +31,17 @@ pub(super) fn probe_graphics_api() -> Option<GpuGraphicsApi> {
 
     #[cfg(not(any(test, feature = "test-support")))]
     {
-        let opengl_version = probe_command("glxinfo", &["-B"], parse_opengl_version);
+        let glxinfo = probe_command_text("glxinfo", &["-B"]);
+        let opengl_version = glxinfo.as_deref().and_then(parse_opengl_version);
+        let mesa_version = glxinfo.as_deref().and_then(parse_mesa_version);
         let vulkan_version = probe_command("vulkaninfo", &["--summary"], parse_vulkan_version);
-        (opengl_version.is_some() || vulkan_version.is_some()).then_some(GpuGraphicsApi {
-            opengl_version,
-            vulkan_version,
-        })
+        (opengl_version.is_some() || vulkan_version.is_some() || mesa_version.is_some()).then_some(
+            GpuGraphicsApi {
+                opengl_version,
+                vulkan_version,
+                mesa_version,
+            },
+        )
     }
 }
 
@@ -46,13 +51,23 @@ fn probe_command(
     args: &[&str],
     parse: impl Fn(&str) -> Option<String>,
 ) -> Option<String> {
+    probe_command_text(program, args).and_then(|text| parse(&text))
+}
+
+#[cfg(not(any(test, feature = "test-support")))]
+fn probe_command_text(program: &str, args: &[&str]) -> Option<String> {
     let mut command = Command::new(program);
     command.args(args);
     let output = run_with_timeout(&mut command, GRAPHICS_API_PROBE_TIMEOUT).ok()?;
-    output.status.success().then(|| {
-        parse(&String::from_utf8_lossy(&output.stdout))
-            .or_else(|| parse(&String::from_utf8_lossy(&output.stderr)))
-    })?
+    if !output.status.success() {
+        return None;
+    }
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    if !output.stderr.is_empty() {
+        text.push('\n');
+        text.push_str(&String::from_utf8_lossy(&output.stderr));
+    }
+    Some(text)
 }
 
 /// Parse the canonical OpenGL version line from `glxinfo -B`.
@@ -62,6 +77,20 @@ fn parse_opengl_version(output: &str) -> Option<String> {
             .strip_prefix("OpenGL version string:")
             .or_else(|| line.strip_prefix("OpenGL core profile version string:"))?;
         parse_version_token(value)
+    })
+}
+
+/// Parse Mesa's userspace release from the same bounded `glxinfo -B` output
+/// as the OpenGL version. The token is kept verbatim after validation so a
+/// distro build suffix remains visible instead of being silently discarded.
+fn parse_mesa_version(output: &str) -> Option<String> {
+    output.lines().find_map(|line| {
+        let (_, rest) = line.split_once(" Mesa ")?;
+        let token = rest.split_whitespace().next()?.trim();
+        let mut parts = token.split(['.', '-']);
+        let major = parts.next()?.parse::<u32>().ok()?;
+        let minor = parts.next()?.parse::<u32>().ok()?;
+        (major > 0 || minor > 0).then(|| token.to_owned())
     })
 }
 

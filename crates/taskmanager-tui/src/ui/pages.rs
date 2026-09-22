@@ -17,7 +17,7 @@ use crate::{TuiApp, TuiTheme};
 
 mod service_details;
 mod service_log;
-mod system_data;
+pub(crate) mod system_data;
 
 fn source_title(notice: SourceNotice) -> &'static str {
     match notice {
@@ -250,6 +250,12 @@ pub(super) fn render_services(
     // header click picks a column), so the selection index always maps to the
     // same visible order the Iced frontend renders.
     let sorted_services = app.sorted_services();
+    let cycle_members = app
+        .projection()
+        .services
+        .as_deref()
+        .map(taskmanager_shell::service_cycle_members)
+        .unwrap_or_default();
     let state_message = source_state_message(
         app.projection().services_source.as_deref(),
         t("empty.no_services_reported"),
@@ -288,9 +294,18 @@ pub(super) fn render_services(
                 "Failed" => theme.danger,
                 _ => theme.dim,
             };
+            let status = if cycle_members.contains(&service.id) {
+                format!("{} · {}", service.status.as_str(), t("svc.cycle"))
+            } else {
+                service.status.as_str().to_owned()
+            };
             Row::new([
                 Cell::from(service.name.as_str()),
-                Cell::from(service.status.as_str()).style(Style::new().fg(color)),
+                Cell::from(status).style(Style::new().fg(if cycle_members.contains(&service.id) {
+                    theme.warn
+                } else {
+                    color
+                })),
                 Cell::from(service.description.as_str()),
             ])
         },
@@ -347,10 +362,15 @@ impl SystemFactViewport {
 }
 
 pub(super) fn render_system(frame: &mut Frame<'_>, app: &TuiApp, theme: TuiTheme, area: Rect) {
+    let smbios_snapshot = match app.shell.smbios_memory_state() {
+        taskmanager_application::SmbiosMemoryState::Ready(ready) => Some(&ready.snapshot),
+        _ => None,
+    };
     let sections = system_data::system_sections(
         app.projection().hardware.as_ref(),
         app.projection().snapshot.as_ref(),
         app.projection().npu_inventory.as_ref(),
+        smbios_snapshot,
     );
     let mut lines = Vec::new();
     for section in &sections {

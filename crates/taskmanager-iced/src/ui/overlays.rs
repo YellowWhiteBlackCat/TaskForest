@@ -222,6 +222,15 @@ fn smart_rows(disk: &taskmanager_core::core::metrics::DiskMetrics) -> Vec<(Strin
         };
         rows.push((t("disk.endurance_used").to_owned(), value));
     }
+    if let Some(spare) = disk.smart_available_spare_pct {
+        let threshold = disk.smart_available_spare_threshold_pct.unwrap_or(10.0);
+        let value = if spare <= threshold {
+            format!("{spare:.0}% ⚠ (warning ≤ {threshold:.0}%)")
+        } else {
+            format!("{spare:.0}%")
+        };
+        rows.push((t("disk.available_spare").to_owned(), value));
+    }
     if let Some(hours) = disk.smart_power_on_hours {
         rows.push((
             t("disk.power_on_hours").to_owned(),
@@ -231,6 +240,9 @@ fn smart_rows(disk: &taskmanager_core::core::metrics::DiskMetrics) -> Vec<(Strin
                 hours / 24
             ),
         ));
+    }
+    if let Some(count) = disk.smart_unsafe_shutdowns {
+        rows.push((t("disk.unsafe_shutdowns").to_owned(), count.to_string()));
     }
     if disk.smart_critical_warning == Some(true) {
         rows.push((

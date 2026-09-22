@@ -10,8 +10,20 @@ fn interface(name: &str, mac: &str, link_speed: ScalarObservation<u64>) -> Sysfs
         mac_addr: Some(Arc::from(mac)),
         link_speed,
         link_up: ScalarObservation::available(true, 10),
+        mtu_bytes: ScalarObservation::available(1500, 10),
+        tx_queue_len: ScalarObservation::available(0, 10),
+        rx_drops: ScalarObservation::available(0, 10),
+        tx_drops: ScalarObservation::available(0, 10),
+        rx_errors: ScalarObservation::available(0, 10),
+        tx_errors: ScalarObservation::available(0, 10),
+        rx_overruns: ScalarObservation::available(0, 10),
+        tx_overruns: ScalarObservation::available(0, 10),
         driver: None,
         adapter: None,
+        master_interface: None,
+        peer_interface: None,
+        ifindex: None,
+        iflink: None,
     }
 }
 

@@ -1,5 +1,6 @@
 //! Behavior tests for the Bevy selected-process details projection.
 
+use taskmanager_application::i18n::t;
 use taskmanager_application::process_details_vm::ProcessDetailsField;
 use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::process::ProcessItem;
@@ -114,10 +115,11 @@ fn resources_summary_exposes_memory_cpu_pids_and_cgroup_locator() {
     );
 
     let summary = super::resources_summary(&snapshot);
-    assert_eq!(
-        summary,
-        "256.0 MiB / 1.0 GiB · CPU 150% · 7 / 64 Processes · /system.slice/worker.scope"
+    let expected = format!(
+        "256.0 MiB / 1.0 GiB (25%) · CPU 150% · 7 / 64 {} (11%) · /system.slice/worker.scope",
+        t("proc_insights.pids")
     );
+    assert_eq!(summary, expected);
 }
 
 #[test]
@@ -143,7 +145,8 @@ fn resources_summary_handles_unlimited_quotas_and_limits() {
     );
 
     let summary = super::resources_summary(&snapshot);
-    assert_eq!(summary, "512.0 MiB / ∞ · CPU ∞ · 3 / ∞ Processes");
+    let expected = format!("512.0 MiB / ∞ · CPU ∞ · 3 / ∞ {}", t("proc_insights.pids"));
+    assert_eq!(summary, expected);
 }
 
 #[test]
@@ -166,7 +169,8 @@ fn resources_summary_partial_observations_never_fabricate_missing_values() {
     );
 
     let summary = super::resources_summary(&snapshot);
-    assert_eq!(summary, "12 Processes");
+    let expected = format!("12 {}", t("proc_insights.pids"));
+    assert_eq!(summary, expected);
 }
 
 #[test]
@@ -174,14 +178,19 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
     use taskmanager_core::core::device_state::DeviceState;
     use taskmanager_core::core::process_telemetry::{IsolationKind, ProcessIsolation};
 
+    let host_process = t("proc_insights.host_process");
+    let not_sandboxed = "not sandboxed";
+    let sandboxed = t("proc_insights.sandboxed");
+
     // Host process without sandboxed fact
     let host = ProcessIsolation {
         state: DeviceState::healthy(1),
         kind: None,
         container_id: None,
         sandboxed: None,
+        ..ProcessIsolation::default()
     };
-    assert_eq!(super::isolation_summary(&host), "Host process");
+    assert_eq!(super::isolation_summary(&host), host_process);
 
     // Host process explicitly not sandboxed
     let host_not_sandboxed = ProcessIsolation {
@@ -189,10 +198,11 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         kind: None,
         container_id: None,
         sandboxed: Some(false),
+        ..ProcessIsolation::default()
     };
     assert_eq!(
         super::isolation_summary(&host_not_sandboxed),
-        "Host process · not sandboxed"
+        format!("{host_process} · {not_sandboxed}")
     );
 
     // Host process sandboxed
@@ -201,10 +211,11 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         kind: None,
         container_id: None,
         sandboxed: Some(true),
+        ..ProcessIsolation::default()
     };
     assert_eq!(
         super::isolation_summary(&host_sandboxed),
-        "Host process · Sandboxed"
+        format!("{host_process} · {sandboxed}")
     );
 
     // Container with container ID and sandboxed true
@@ -213,10 +224,11 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         kind: Some(IsolationKind::Docker),
         container_id: Some("c-abcdef123".into()),
         sandboxed: Some(true),
+        ..ProcessIsolation::default()
     };
     assert_eq!(
         super::isolation_summary(&docker_sandboxed),
-        "Docker · c-abcdef123 · Sandboxed"
+        format!("Docker · c-abcdef123 · {sandboxed}")
     );
 
     // Container with container ID and sandboxed false
@@ -225,11 +237,130 @@ fn isolation_summary_exposes_sandboxed_and_container_dimensions() {
         kind: Some(IsolationKind::Flatpak),
         container_id: Some("org.example.App".into()),
         sandboxed: Some(false),
+        ..ProcessIsolation::default()
     };
     assert_eq!(
         super::isolation_summary(&flatpak_not_sandboxed),
         "Flatpak · org.example.App · not sandboxed"
     );
+}
+
+#[test]
+fn observed_page_fault_and_huge_page_counters_reach_the_overview_rows() {
+    let mut process = ProcessItem::new(77, "faulty");
+    process.minor_page_faults = Some(1_234);
+    process.major_page_faults = Some(7);
+    let mut scalars = *process.scalar_observations();
+    scalars.memory_bytes = ScalarObservation::available(256 * 1024 * 1024, 1);
+    // `shell_with` pins RSS to 256 MiB, so 64 MiB is 25.0% RSS.
+    scalars.memory_anon_huge_pages_bytes = ScalarObservation::available(64 * 1024 * 1024, 1);
+    process.apply_scalar_observations(scalars);
+
+    let view = projection(&shell_with(process));
+    let value = |label: &'static str| {
+        view.overview
+            .iter()
+            .find(|row| row.label == taskmanager_application::i18n::t(label))
+            .map(|row| row.value.as_str())
+    };
+    assert_eq!(
+        value("proc.page_faults"),
+        Some("1234 (I/O: 7)"),
+        "the overview row must carry the observed fault counters"
+    );
+    assert_eq!(
+        value("proc.anon_huge_pages"),
+        Some("64.0 MiB (25.0% RSS)"),
+        "the overview row must carry the observed huge-page charge"
+    );
+}
+
+#[test]
+fn isolation_summary_renders_the_linux_namespace_audit() {
+    use taskmanager_core::core::device_state::DeviceState;
+    use taskmanager_core::core::failure::FailureKind;
+    use taskmanager_core::core::process_telemetry::{
+        IsolationKind, LinuxNamespaceAudit, LinuxNamespaceKind, NamespaceAuditEntry,
+        NamespaceAuditStatus, ProcessIsolation,
+    };
+
+    let isolated = |inode: u64| NamespaceAuditStatus::Isolated {
+        inode,
+        host_inode: 4_026_531_836,
+    };
+    let audit = LinuxNamespaceAudit::from_entries(
+        DeviceState::healthy(1),
+        vec![
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Pid,
+                status: isolated(4_026_533_000),
+            },
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Mount,
+                status: NamespaceAuditStatus::Host {
+                    inode: 4_026_531_841,
+                },
+            },
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Network,
+                status: isolated(4_026_532_100),
+            },
+            NamespaceAuditEntry {
+                kind: LinuxNamespaceKind::Ipc,
+                status: NamespaceAuditStatus::Unavailable(FailureKind::PermissionDenied),
+            },
+        ],
+    );
+
+    let isolation = ProcessIsolation {
+        state: DeviceState::healthy(1),
+        kind: Some(IsolationKind::Docker),
+        container_id: Some("c-abc123".into()),
+        namespaces: Some(audit.clone()),
+        ..ProcessIsolation::default()
+    };
+    let summary = super::isolation_summary(&isolation);
+    for expected in [
+        format!(
+            "{} {}",
+            LinuxNamespaceKind::Pid.as_str(),
+            t("proc_insights.namespace_isolated")
+        ),
+        format!(
+            "{} {}",
+            LinuxNamespaceKind::Mount.as_str(),
+            t("proc_insights.namespace_host")
+        ),
+        format!(
+            "{} {}",
+            LinuxNamespaceKind::Network.as_str(),
+            t("proc_insights.namespace_isolated")
+        ),
+        format!(
+            "{} {}",
+            LinuxNamespaceKind::Ipc.as_str(),
+            taskmanager_shell::presentation::MISSING_VALUE
+        ),
+        format!("2 {}", t("proc_insights.namespace_isolated_count")),
+    ] {
+        assert!(
+            summary.contains(&expected),
+            "the namespace audit must paint {expected:?}: {summary}"
+        );
+    }
+    assert_eq!(audit.isolated_count(), 2);
+    assert!(
+        summary.starts_with("Docker · c-abc123"),
+        "the typed container identity still leads the security summary: {summary}"
+    );
+
+    // No audit observed: the namespace segment stays absent rather than
+    // claiming an empty (host-like) audit.
+    let without = ProcessIsolation {
+        state: DeviceState::healthy(1),
+        ..ProcessIsolation::default()
+    };
+    assert!(!super::isolation_summary(&without).contains(t("proc_insights.namespaces")));
 }
 
 #[test]
@@ -254,6 +385,9 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
                 state: ThreadState::Running,
                 cpu_time_secs: Some(2.5),
                 cpu_percent: Some(25.0),
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             ProcessThreadInfo {
                 tid: 102,
@@ -261,6 +395,9 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
                 state: ThreadState::Sleep,
                 cpu_time_secs: None,
                 cpu_percent: None,
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             ProcessThreadInfo {
                 tid: 103,
@@ -268,6 +405,9 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
                 state: ThreadState::UninterruptibleSleep,
                 cpu_time_secs: Some(0.1),
                 cpu_percent: None,
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
             ProcessThreadInfo {
                 tid: 104,
@@ -275,6 +415,9 @@ fn threads_summary_empty_and_populated_with_gap_honesty() {
                 state: ThreadState::Idle,
                 cpu_time_secs: None,
                 cpu_percent: Some(1.0),
+                wchan: None,
+                run_queue_wait_ns: None,
+                wait_kind: None,
             },
         ],
     };
@@ -309,21 +452,25 @@ fn open_files_summary_empty_unreadable_and_populated() {
                 fd: 0,
                 kind: OpenFileKind::File,
                 target: Some("/dev/null".into()),
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 1,
                 kind: OpenFileKind::Socket,
                 target: None, // unreadable readlink
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 2,
                 kind: OpenFileKind::Pipe,
                 target: Some("pipe:[12345]".into()),
+                deleted: false,
             },
             OpenFileEntry {
                 fd: 3,
                 kind: OpenFileKind::File,
                 target: Some("/var/log/app.log".into()),
+                deleted: false,
             },
         ],
         unreadable_count: 1,
@@ -338,15 +485,15 @@ fn open_files_summary_empty_unreadable_and_populated() {
             taskmanager_application::i18n::t("proc_insights.unreadable")
         )
     );
-    assert_eq!(lines[1], "0 -> /dev/null");
+    assert_eq!(lines[1], "0 [file] -> /dev/null");
     assert_eq!(
         lines[2],
         format!(
-            "1 -> {}",
+            "1 [socket] -> {}",
             taskmanager_application::i18n::t("proc_insights.unreadable")
         )
     );
-    assert_eq!(lines[3], "2 -> pipe:[12345]");
+    assert_eq!(lines[3], "2 [pipe] -> pipe:[12345]");
     assert_eq!(lines[4], "…");
     assert_eq!(lines.len(), 5);
 }
@@ -377,6 +524,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
                 )),
                 state: taskmanager_core::core::process_telemetry::ConnectionState::Established,
                 provider_key: None,
+                rtt_ms: None,
             },
             ProcessConnection {
                 transport: ConnectionTransport::Local,
@@ -387,6 +535,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
                 remote: ConnectionEndpoint::Unspecified,
                 state: taskmanager_core::core::process_telemetry::ConnectionState::Established,
                 provider_key: None,
+                rtt_ms: None,
             },
         ],
         rx_bytes_per_sec: Some(1024 * 1024),
@@ -394,13 +543,20 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
         traffic_state: DeviceState::healthy(1000),
         traffic_failure: None,
         traffic_provider: None,
+        connection_counters: None,
     };
 
     let summary = super::network_summary(&normal);
     let lines: Vec<&str> = summary.lines().collect();
     assert_eq!(lines[0], "2 · RX 1.0 MiB/s · TX 512.0 KiB/s");
-    assert_eq!(lines[1], "TCP 127.0.0.1:8080 -> 127.0.0.1:45678");
-    assert_eq!(lines[2], "UNIX /run/user/1000/bus -> —");
+    assert_eq!(
+        lines[1],
+        "TCP [ESTABLISHED · LOOPBACK] 127.0.0.1:8080 -> 127.0.0.1:45678"
+    );
+    assert_eq!(
+        lines[2],
+        "UNIX [ESTABLISHED · LOOPBACK] /run/user/1000/bus -> —"
+    );
     assert_eq!(lines.len(), 3);
 
     // Escalation-requiring snapshot
@@ -412,6 +568,7 @@ fn network_summary_formats_rates_endpoints_and_escalation() {
         traffic_state: DeviceState::healthy(1000),
         traffic_failure: Some(FailureKind::RequiresEscalation),
         traffic_provider: None,
+        connection_counters: None,
     };
 
     let esc_summary = super::network_summary(&escalating);

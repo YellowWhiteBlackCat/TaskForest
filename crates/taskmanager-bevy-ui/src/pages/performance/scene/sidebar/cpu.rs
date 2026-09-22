@@ -3,6 +3,7 @@
 use super::super::blocks::section_scene;
 use super::super::chart::curve_card_scene;
 use super::*;
+use crate::pages::performance::{DeviceCategoryKind, DeviceViewCategory};
 
 fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
     bsn! {
@@ -35,15 +36,17 @@ fn cpu_header_scene(shell: &ShellApp) -> impl Scene + use<> {
 }
 
 fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + use<> {
-    let metrics: Vec<Box<dyn Scene>> = [
+    let compact_metrics: Vec<Box<dyn Scene>> = [
         (t("common.utilization"), CpuField::Usage),
         (t("cpu.frequency"), CpuField::Frequency),
         (t("common.temperature"), CpuField::Temperature),
         (t("common.power"), CpuField::Power),
+        (t("perf.stall"), CpuField::Pressure),
+        (t("system.load_normalized"), CpuField::Load),
     ]
     .into_iter()
     .map(|(label, field)| {
-        Box::new(cpu_metric_cell_scene(
+        Box::new(super::cpu_metric_cell_scene(
             label.to_owned(),
             cpu_field_text(shell, field),
             field,
@@ -51,6 +54,27 @@ fn cpu_metric_strip_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene +
         )) as Box<dyn Scene>
     })
     .collect();
+    // Composite diagnostics are deliberately full-width rows. Treating a
+    // topology or power-policy sentence as a shrinkable peer of a scalar
+    // made flex allocate it a tiny intrinsic slot and let the text paint
+    // through the panel edge in the real Niri capture.
+    let detail_metrics: Vec<Box<dyn Scene>> = [
+        (t("cpu.topology"), CpuField::Topology),
+        (t("cpu.idle_states"), CpuField::IdleStates),
+        (t("cpu.power_limits"), CpuField::PowerLimits),
+        (t("cpu.interrupts"), CpuField::Interrupts),
+    ]
+    .into_iter()
+    .map(|(label, field)| {
+        Box::new(super::cpu_metric_full_row_scene(
+            label.to_owned(),
+            cpu_field_text(shell, field),
+            field,
+        )) as Box<dyn Scene>
+    })
+    .collect();
+    let mut metrics = compact_metrics;
+    metrics.extend(detail_metrics);
     bsn! {
         Node {
             width: percent(100),
@@ -172,12 +196,20 @@ fn cpu_core_grid_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scene + us
             { rows },
         ]
     };
-    graph_card_scene(
+    let graph = graph_card_scene(
         t("common.cores").to_owned(),
         t("cpu.utilization_by_core").to_owned(),
         Box::new(body),
         palette,
-    )
+    );
+    bsn! {
+        Node {
+            width: percent(100),
+            display: Display::Flex,
+        }
+        PerformanceOptionalCoreGrid
+        Children [ ( { graph } ) ]
+    }
 }
 
 fn device_pill_scene(
@@ -213,7 +245,7 @@ pub(super) fn device_button_scene(
     row: Box<dyn Scene>,
 ) -> impl Scene + use<> {
     bsn! {
-        ( { row } PerformanceDeviceButton(target) on(device_button_activated) )
+        ( { row } Button PerformanceDeviceButton(target) on(device_button_activated) )
     }
 }
 
@@ -283,6 +315,87 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
         .iter()
         .map(|&curve| Box::new(curve_card_scene(curve, shell, palette)) as Box<dyn Scene>)
         .collect();
+
+    let cpu_container = bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(space_4()),
+            display: Display::Flex,
+        }
+        DeviceViewCategory(DeviceCategoryKind::Cpu)
+        Children [
+            ( cpu_header_scene(shell) ),
+            ( cpu_metric_strip_scene(shell, palette) ),
+            ( cpu_core_grid_scene(shell, palette) ),
+        ]
+    };
+
+    let memory_container = bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(space_4()),
+            display: Display::None,
+        }
+        DeviceViewCategory(DeviceCategoryKind::Memory)
+        Children [
+            ( section_scene(Section::MemorySegments, shell, palette) ),
+        ]
+    };
+
+    let disk_container = bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(space_4()),
+            display: Display::None,
+        }
+        DeviceViewCategory(DeviceCategoryKind::Disk)
+        Children [
+            ( section_scene(Section::Disk, shell, palette) ),
+        ]
+    };
+
+    let network_container = bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(space_4()),
+            display: Display::None,
+        }
+        DeviceViewCategory(DeviceCategoryKind::Network)
+        Children [
+            ( section_scene(Section::Network, shell, palette) ),
+        ]
+    };
+
+    let gpu_container = bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(space_4()),
+            display: Display::None,
+        }
+        DeviceViewCategory(DeviceCategoryKind::Gpu)
+        Children [
+            ( section_scene(Section::Gpu, shell, palette) ),
+        ]
+    };
+
+    let battery_container = bsn! {
+        Node {
+            width: percent(100),
+            flex_direction: FlexDirection::Column,
+            row_gap: Val::Px(space_4()),
+            display: Display::None,
+        }
+        DeviceViewCategory(DeviceCategoryKind::Battery)
+        Children [
+            ( section_scene(Section::Battery, shell, palette) ),
+        ]
+    };
+
     bsn! {
         Node {
             width: percent(100),
@@ -293,13 +406,9 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_4()),
             padding: UiRect::vertical(Val::Px(space_4())),
-            overflow: Overflow::scroll_y(),
         }
-        ScrollArea
         Children [
             ( compact_device_pills_scene(shell, palette) ),
-            ( cpu_header_scene(shell) ),
-            ( cpu_metric_strip_scene(shell, palette) ),
             ( metric_selector_scene(shell, palette) ),
             (
                 Node {
@@ -311,10 +420,12 @@ pub(crate) fn cpu_main_scene(shell: &ShellApp, palette: &UiPalette) -> impl Scen
                     { cards },
                 ]
             ),
-            ( cpu_core_grid_scene(shell, palette) ),
-            ( section_scene(Section::MemorySegments, shell, palette) ),
-            ( section_scene(Section::Gpu, shell, palette) ),
-            ( section_scene(Section::Network, shell, palette) ),
+            ( { cpu_container } ),
+            ( { memory_container } ),
+            ( { disk_container } ),
+            ( { network_container } ),
+            ( { gpu_container } ),
+            ( { battery_container } ),
         ]
     }
 }

@@ -1,4 +1,5 @@
 use super::*;
+use taskmanager_core::core::metrics::MemoryMetrics;
 
 mod graph_summary_tests {
     use super::*;
@@ -181,11 +182,61 @@ mod memory_stats_tests {
     }
 
     #[test]
+    fn swap_throughput_rows_render_the_observed_system_rates() {
+        taskmanager_test_support::pin_english();
+        const KIB: u64 = 1024;
+
+        // The kernel swap counters are a two-sample rate, so the fixture
+        // installs the observed per-second reads through the same canonical
+        // scalar group the provider applies.
+        let mut memory = MemoryMetricsFixtureBuilder::new()
+            .current_total_bytes(16 * GIB)
+            .current_swap_total_bytes(8 * GIB)
+            .current_swap_used_bytes(GIB)
+            .build();
+        let mut scalar = *memory.scalar_observations();
+        scalar.swap_in_bytes_per_sec = ScalarObservation::available(2 * MIB, 2);
+        scalar.swap_out_bytes_per_sec = ScalarObservation::available(512 * KIB, 2);
+        memory.apply_observations(scalar, memory.optional_observations().clone());
+
+        let memory_rows = memory_stats_rows(&memory, true, true);
+        let rows = flat(&memory_rows);
+        assert!(
+            rows.contains(&("Swap in", "2.0 MiB/s")),
+            "the observed swap-in rate must render in the shared row set: {rows:?}"
+        );
+        assert!(
+            rows.contains(&("Swap out", "512.0 KiB/s")),
+            "the observed swap-out rate must render in the shared row set: {rows:?}"
+        );
+
+        // A first sample has no rate yet: both rows stay absent instead of a
+        // fabricated 0 B/s, so a cold window reads as unobserved.
+        let cold_rows_source = memory_stats_rows(&MemoryMetrics::default(), true, true);
+        let cold_rows = flat(&cold_rows_source);
+        assert!(
+            !cold_rows
+                .iter()
+                .any(|(label, _)| *label == "Swap in" || *label == "Swap out"),
+            "an unobserved swap rate must not become a zero row: {cold_rows:?}"
+        );
+    }
+
+    #[test]
     fn signed_rate_respects_the_unit_preferences() {
         taskmanager_test_support::pin_english();
-        assert_eq!(signed_memory_rate_text(1.5, true, true), "+1.5 MiB/s");
-        assert_eq!(signed_memory_rate_text(-0.5, true, true), "−512.0 KiB/s");
-        assert_eq!(signed_memory_rate_text(1.5, false, true), "+12.0 Mib/s");
+        assert_eq!(
+            stats::signed_memory_rate_text(1.5, true, true),
+            "+1.5 MiB/s"
+        );
+        assert_eq!(
+            stats::signed_memory_rate_text(-0.5, true, true),
+            "−512.0 KiB/s"
+        );
+        assert_eq!(
+            stats::signed_memory_rate_text(1.5, false, true),
+            "+12.0 Mib/s"
+        );
     }
 }
 
@@ -216,6 +267,11 @@ mod cpu_frequency_source_tests {
             frequency_mhz: Some(3_500),
             temperature_c: Some(54.0),
             power_w: Some(18.2),
+            pressure: Some(
+                taskmanager_core::core::metrics::ResourcePressure::some_only(
+                    taskmanager_core::core::metrics::PressureWindow::new(0.5, 0.4, 0.3, 0),
+                ),
+            ),
         }));
         assert_eq!(
             metrics
@@ -231,6 +287,10 @@ mod cpu_frequency_source_tests {
                 ("Speed".to_string(), "3500 MHz".to_string()),
                 ("Temperature".to_string(), "54 °C".to_string()),
                 ("Power".to_string(), "18.2 W".to_string()),
+                (
+                    "Stall".to_string(),
+                    "some 10s 0.5% · 60s 0.4% · 5m 0.3%".to_string(),
+                ),
             ]
         );
         assert_eq!(
@@ -262,6 +322,7 @@ mod cpu_frequency_source_tests {
             frequency_mhz: Some(2_400),
             temperature_c: None,
             power_w: None,
+            pressure: None,
         }));
         assert_eq!(
             projected.map(|metric| metric.kind),
@@ -270,6 +331,7 @@ mod cpu_frequency_source_tests {
                 projection::CpuHeadlineKind::Frequency,
                 projection::CpuHeadlineKind::Temperature,
                 projection::CpuHeadlineKind::Power,
+                projection::CpuHeadlineKind::Pressure,
             ],
             "headline readouts must keep the fixed Iced presentation order"
         );

@@ -7,10 +7,9 @@ use std::time::Duration;
 use taskmanager_platform_contract::ProviderFailure;
 
 use super::log_fetch::permission_denied;
+use super::parsing::parse_systemctl_show_deps_for_scope;
 use super::target::resolve_active_service_target;
-use super::{
-    InitSystem, SERVICE_COMMAND_TIMEOUT, ServiceDeps, ServiceManager, parse_systemctl_show_deps,
-};
+use super::{InitSystem, SERVICE_COMMAND_TIMEOUT, ServiceDeps, ServiceManager};
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
 
 const SYSTEMD_DEPENDENCY_PROPERTIES: &str =
@@ -47,7 +46,12 @@ impl ServiceManager {
         {
             let target = resolve_active_service_target(target)?;
             let mut runner = NativeDependencyCommandRunner;
-            Self::fetch_deps_with(target.init(), target.native(), &mut runner)
+            Self::fetch_deps_with_scope(
+                target.init(),
+                target.native(),
+                target.user_scope(),
+                &mut runner,
+            )
         }
         #[cfg(not(target_os = "linux"))]
         {
@@ -56,9 +60,10 @@ impl ServiceManager {
         }
     }
 
-    fn fetch_deps_with(
+    fn fetch_deps_with_scope(
         init: InitSystem,
         name: &str,
+        user_scope: bool,
         runner: &mut impl DependencyCommandRunner,
     ) -> Result<ServiceDeps, ProviderFailure> {
         if init != InitSystem::Systemd {
@@ -68,13 +73,16 @@ impl ServiceManager {
         if !name.ends_with(".service") {
             return Err(ProviderFailure::Rejected);
         }
-        match runner.run(
-            "systemctl",
-            &["show", "-p", SYSTEMD_DEPENDENCY_PROPERTIES, "--", name],
-        ) {
-            DependencyCommandResult::Success(output) => {
-                Ok(parse_systemctl_show_deps(output.as_str()))
-            }
+        let mut args = Vec::with_capacity(6);
+        if user_scope {
+            args.push("--user");
+        }
+        args.extend(["show", "-p", SYSTEMD_DEPENDENCY_PROPERTIES, "--", name]);
+        match runner.run("systemctl", &args) {
+            DependencyCommandResult::Success(output) => Ok(parse_systemctl_show_deps_for_scope(
+                output.as_str(),
+                user_scope,
+            )),
             DependencyCommandResult::Failure(error) => Err(error),
         }
     }

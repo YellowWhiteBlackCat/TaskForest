@@ -21,9 +21,9 @@ use taskmanager_shell::SortCol;
 /// FDs → Nice) with no duplicates and no missing variants — the "Choose columns"
 /// picker iterates this, so a missing/duplicate entry would break the picker.
 #[test]
-fn sortcol_all_has_fourteen_columns_in_canonical_order_no_dups() {
+fn sortcol_all_has_sixteen_columns_in_canonical_order_no_dups() {
     let all = columns();
-    assert_eq!(all.len(), 14, "expected exactly 14 sortable columns");
+    assert_eq!(all.len(), 16, "expected exactly 16 sortable columns");
     // Canonical order.
     assert_eq!(
         all,
@@ -37,8 +37,10 @@ fn sortcol_all_has_fourteen_columns_in_canonical_order_no_dups() {
             SortCol::Cpu,
             SortCol::Memory,
             SortCol::Swap,
+            SortCol::Pss,
             SortCol::DiskRead,
             SortCol::DiskWrite,
+            SortCol::Network,
             SortCol::CpuTime,
             SortCol::Fds,
             SortCol::Nice,
@@ -69,8 +71,10 @@ fn sortcol_header_labels_match_header_render() {
         (SortCol::Cpu, "CPU"),
         (SortCol::Memory, "Memory"),
         (SortCol::Swap, "Swap"),
+        (SortCol::Pss, "PSS"),
         (SortCol::DiskRead, "Disk read"),
         (SortCol::DiskWrite, "Disk write"),
+        (SortCol::Network, "Network"),
         (SortCol::CpuTime, "CPU time"),
         (SortCol::Fds, "FDs"),
         (SortCol::Nice, "Nice"),
@@ -100,7 +104,7 @@ fn sortcol_only_name_is_not_hideable() {
 }
 
 /// `is_numeric`: the numeric columns (right-aligned, monospace) are exactly
-/// Pid / Threads / CPU / Memory / Swap / Disk read / Disk write / CPU time / FDs / Nice.
+/// Pid / Threads / CPU / Memory / Swap / Pss / Disk read / Disk write / Network / CPU time / FDs / Nice.
 /// The text columns (Name / User / Start / Status) are left-aligned in the UI font.
 #[test]
 fn sortcol_numeric_columns_classified_correctly() {
@@ -110,8 +114,10 @@ fn sortcol_numeric_columns_classified_correctly() {
         SortCol::Cpu,
         SortCol::Memory,
         SortCol::Swap,
+        SortCol::Pss,
         SortCol::DiskRead,
         SortCol::DiskWrite,
+        SortCol::Network,
         SortCol::CpuTime,
         SortCol::Fds,
         SortCol::Nice,

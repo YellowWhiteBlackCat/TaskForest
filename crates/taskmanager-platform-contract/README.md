@@ -47,12 +47,28 @@ Physical-device producers use the constrained `DeviceDiscovery` constructor so
 IDs, discovery outcome, and item count are derived together; it is the only
 public construction route. `RequiresEscalation` survives
 provider-to-operation mapping as its own outcome rather than becoming a generic
-permission denial.
+permission denial. `ProviderFailure::capability_status` is the sole
+failure→capability-status projection: the runtime catalog and the conformance
+scenarios delegate to it, and a caller holding the core `FailureKind` vocabulary
+reaches the same function through the lossless `from_kind` conversion.
+
+`platform_surface.rs` owns the static per-platform registration declaration the
+three-axis parity ledger folds against: `Present`, a typed
+`Absent(CapabilityStatus)` restricted to the four absence projections, or the
+forbidden silent `Undeclared`. It is a declaration, never a runtime status;
+runtime availability stays with the catalog snapshot and platform conformance.
+`PlatformCapabilitySurface::declaring` is the layer-B constructor adapters use
+next to their real route/provider registration: it takes the lanes the adapter
+registers with their honest source and pads every other product-expected
+identity with the unsupported absence, so the declaration covers the complete
+expected face and `Undeclared` never hides a missing lane.
 
 ## Module map
 
 ```text
 src/capability.rs                 capability/request/outcome vocabulary
+src/platform.rs                   platform axis identity (linux/windows/macos)
+src/platform_surface.rs           static per-platform registration surface
 src/port.rs  scheduler.rs         port and scheduling vocabulary
 src/envelope.rs                   typed event envelope (EventSequence)
 src/failure.rs                    unified failure vocabulary

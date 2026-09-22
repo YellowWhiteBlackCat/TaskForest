@@ -124,6 +124,9 @@ fn wireless_signal_renders_quality_only_from_an_observed_dbm() {
 /// block, and the summed Throughput summary stays beneath the pair.
 #[test]
 fn network_direction_rows_share_one_scale_and_keep_the_summed_summary() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
     taskmanager_test_support::pin_english();
     let mut shell = taskmanager_shell::ShellApp::new();
     // rx varies 1→3 MiB/s while tx stays pinned at 3 MiB/s.
@@ -185,6 +188,9 @@ fn network_direction_rows_share_one_scale_and_keep_the_summed_summary() {
 /// facts, not an up/down fold.
 #[test]
 fn network_status_row_expresses_degraded_health_beyond_the_link_verdict() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
     taskmanager_test_support::pin_english();
     let mut stale = wireless_network(None);
     stale.device_state = DeviceState {

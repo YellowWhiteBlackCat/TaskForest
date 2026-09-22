@@ -95,6 +95,8 @@ pub enum CliMode {
     /// write `capture.png` + metadata + a manifest line into `out`, then exit.
     /// Other platforms/products report that the mode is not supported.
     CaptureWindow { out: std::path::PathBuf },
+    /// Export a complete privacy-safe diagnostic bundle as JSON to `path`.
+    ExportDiagnosticBundle { path: std::path::PathBuf },
     /// Print the help text and exit 0.
     Help,
 }
@@ -108,6 +110,8 @@ pub enum CliArgError {
     MissingApplicationId,
     /// `--capture-window` was supplied without an output directory.
     MissingCaptureOutput,
+    /// `--export-diagnostic-bundle` was supplied without an output path.
+    MissingDiagnosticBundleOutput,
     /// The requested application ID cannot be used as a desktop application ID.
     InvalidApplicationId,
     /// `--snapshot` received a non-numeric dimension.
@@ -121,6 +125,7 @@ impl CliArgError {
             Self::UnknownArgument => "unknown_argument",
             Self::MissingApplicationId => "missing_application_id",
             Self::MissingCaptureOutput => "missing_capture_output",
+            Self::MissingDiagnosticBundleOutput => "missing_diagnostic_bundle_output",
             Self::InvalidApplicationId => "invalid_application_id",
             Self::InvalidDimension(_) => "invalid_snapshot_dimension",
         }
@@ -131,13 +136,16 @@ impl fmt::Display for CliArgError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnknownArgument => formatter.write_str(
-                "unknown argument; use --app-id/-a, --demo, --json, --suggest-thresholds, --gpu-engines, --memory-smbios, --package-power, --msr, --snapshot, --capture-window, --help (or no flag to launch the GUI)",
+                "unknown argument; use --app-id/-a, --demo, --json, --suggest-thresholds, --gpu-engines, --memory-smbios, --package-power, --msr, --snapshot, --capture-window, --export-diagnostic-bundle, --help (or no flag to launch the GUI)",
             ),
             Self::MissingApplicationId => {
                 formatter.write_str("--app-id/-a requires an application ID")
             }
             Self::MissingCaptureOutput => {
                 formatter.write_str("--capture-window requires an output directory")
+            }
+            Self::MissingDiagnosticBundleOutput => {
+                formatter.write_str("--export-diagnostic-bundle requires an output path")
             }
             Self::InvalidDimension(dimension) => {
                 formatter.write_str("invalid snapshot dimension: ")?;
@@ -239,6 +247,57 @@ where
             }
             Ok(CliMode::CaptureWindow {
                 out: std::path::PathBuf::from(value),
+            })
+        }
+        Some("--export-diagnostic-bundle") => {
+            let value = args
+                .next()
+                .ok_or(CliArgError::MissingDiagnosticBundleOutput)?;
+            if value.is_empty() {
+                return Err(CliArgError::MissingDiagnosticBundleOutput);
+            }
+            if args.next().is_some() {
+                return Err(CliArgError::UnknownArgument);
+            }
+            Ok(CliMode::ExportDiagnosticBundle {
+                path: std::path::PathBuf::from(value),
+            })
+        }
+        Some(value) if value.starts_with("--export-diagnostic-bundle=") => {
+            let value = value
+                .trim_start_matches("--export-diagnostic-bundle=")
+                .to_owned();
+            if value.is_empty() {
+                return Err(CliArgError::MissingDiagnosticBundleOutput);
+            }
+            if args.next().is_some() {
+                return Err(CliArgError::UnknownArgument);
+            }
+            Ok(CliMode::ExportDiagnosticBundle {
+                path: std::path::PathBuf::from(value),
+            })
+        }
+        Some("--diagnostic-bundle") => {
+            let path = match args.next() {
+                Some(p) if !p.starts_with('-') => std::path::PathBuf::from(p),
+                Some(_) => return Err(CliArgError::UnknownArgument),
+                None => std::path::PathBuf::from("taskforest-diagnostic-bundle.json"),
+            };
+            if args.next().is_some() {
+                return Err(CliArgError::UnknownArgument);
+            }
+            Ok(CliMode::ExportDiagnosticBundle { path })
+        }
+        Some(value) if value.starts_with("--diagnostic-bundle=") => {
+            let value = value.trim_start_matches("--diagnostic-bundle=").to_owned();
+            if value.is_empty() {
+                return Err(CliArgError::MissingDiagnosticBundleOutput);
+            }
+            if args.next().is_some() {
+                return Err(CliArgError::UnknownArgument);
+            }
+            Ok(CliMode::ExportDiagnosticBundle {
+                path: std::path::PathBuf::from(value),
             })
         }
         Some("--help") | Some("-h") => match args.next() {
@@ -571,6 +630,49 @@ pub fn run_suggest_thresholds_with(client: PlatformClient) -> io::Result<()> {
     Ok(())
 }
 
+/// Collect and export a complete diagnostic bundle against an already-spawned
+/// platform client to `path`.
+///
+/// If `path` is `"-"`, prints the sanitized bundle JSON to stdout.
+/// Otherwise, writes the bundle to `path` using transactional atomic writes.
+pub fn run_export_diagnostic_bundle_with(
+    client: &mut PlatformClient,
+    path: &std::path::Path,
+    config: Option<&taskmanager_core::config::Config>,
+) -> io::Result<std::path::PathBuf> {
+    let bundle = taskmanager_application::collect_diagnostic_bundle_from_client(
+        client,
+        config,
+        DEFAULT_COLLECTION_TIMEOUT,
+    )
+    .map_err(|err| io::Error::other(format!("--export-diagnostic-bundle: {err}")))?;
+
+    if path == std::path::Path::new("-") {
+        let plan = bundle
+            .to_plan([])
+            .map_err(|err| io::Error::other(format!("--export-diagnostic-bundle: {err}")))?;
+        let encoded = plan
+            .encoded()
+            .map_err(|err| io::Error::other(format!("--export-diagnostic-bundle: {err}")))?;
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        handle.write_all(&encoded)?;
+        handle.write_all(b"\n")?;
+        Ok(std::path::PathBuf::from("-"))
+    } else {
+        let exported = taskmanager_application::export_diagnostic_bundle(&bundle, path)
+            .map_err(|err| io::Error::other(format!("--export-diagnostic-bundle: {err}")))?;
+        let stdout = io::stdout();
+        let mut handle = stdout.lock();
+        writeln!(
+            handle,
+            "Diagnostic bundle written to {}",
+            exported.display()
+        )?;
+        Ok(exported)
+    }
+}
+
 /// Write the help text to `writer`. Used for both `--help` (stdout) and the
 /// usage-on-error path (stderr). The shape-owned modes (`--snapshot`,
 /// `--capture-window`) are listed only for the products that carry them; the
@@ -661,6 +763,11 @@ pub fn print_help_to(
             "                             evidence mode: writes capture.png + metadata, then exits)"
         )?;
     }
+    writeln!(writer, "  {binary} --export-diagnostic-bundle PATH")?;
+    writeln!(
+        writer,
+        "                             export a sanitized system diagnostic bundle to PATH as JSON"
+    )?;
     writeln!(writer, "  {binary} --help, -h      show this help")?;
     writeln!(writer)?;
     writeln!(

@@ -15,6 +15,7 @@ use crate::engine::collector::compute::collect_memory;
 pub(crate) struct LinuxMemoryTelemetryCollector {
     system: System,
     previous_used: Option<(u64, Instant)>,
+    previous_swap_activity: Option<super::super::compute::SwapActivitySample>,
     last_value: Option<(MemoryMetrics, u64)>,
 }
 
@@ -24,6 +25,7 @@ impl LinuxMemoryTelemetryCollector {
         Self {
             system: System::new(),
             previous_used: None,
+            previous_swap_activity: None,
             last_value: None,
         }
     }
@@ -44,7 +46,13 @@ impl LinuxSystemDomainCollector for LinuxMemoryTelemetryCollector {
 
     fn observe(&mut self, now: Instant, now_ms: u64) -> Self::Observation {
         self.system.refresh_memory();
-        let mut snapshot = collect_memory(&self.system, &mut self.previous_used, now, now_ms);
+        let mut snapshot = collect_memory(
+            &self.system,
+            &mut self.previous_used,
+            &mut self.previous_swap_activity,
+            now,
+            now_ms,
+        );
         if let Some((previous, _)) = &self.last_value {
             snapshot.value.retain_previous_observations(previous);
         }

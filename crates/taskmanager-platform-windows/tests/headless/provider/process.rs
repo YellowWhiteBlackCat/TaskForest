@@ -123,6 +123,7 @@ fn open_files_projection_maps_kinds_keeps_unreadable_and_sorts_by_fd() {
             fd: 0x30,
             kind: OpenFileKind::Other,
             target: None,
+            deleted: false,
         }
     );
     assert_eq!(value.entries[1].kind, OpenFileKind::Pipe);

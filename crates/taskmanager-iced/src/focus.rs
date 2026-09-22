@@ -44,6 +44,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::ProcessColumnWiden(column) => {
             format!("iced-process-column-widen-{}", column.label())
         }
+        FocusTarget::ProcessColumnsReset => "iced-process-columns-reset".to_owned(),
         FocusTarget::ProcessColumnsClose => "iced-process-columns-close".to_owned(),
         FocusTarget::ServicesSearch => "iced-services-search".to_owned(),
         FocusTarget::SourceRetry(request) => {
@@ -54,6 +55,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::EndTask => "iced-end-task".to_owned(),
         FocusTarget::OpenProcessLocation => "iced-open-process-location".to_owned(),
         FocusTarget::SearchProcessOnline => "iced-search-process-online".to_owned(),
+        FocusTarget::ProcessEfficiencyMode => "iced-process-efficiency-mode".to_owned(),
         FocusTarget::ProcessAffinityOpen => "iced-process-affinity-open".to_owned(),
         FocusTarget::ProcessAffinityCpu(cpu) => format!("iced-process-affinity-cpu-{cpu}"),
         FocusTarget::ProcessAffinityApply => "iced-process-affinity-apply".to_owned(),
@@ -69,12 +71,17 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::ProcessMenuKill => "iced-process-menu-kill".to_owned(),
         FocusTarget::ProcessMenuSuspend => "iced-process-menu-suspend".to_owned(),
         FocusTarget::ProcessMenuResume => "iced-process-menu-resume".to_owned(),
+        FocusTarget::ProcessMenuPriorityHigh => "iced-process-menu-priority-high".to_owned(),
+        FocusTarget::ProcessMenuPriorityNormal => "iced-process-menu-priority-normal".to_owned(),
+        FocusTarget::ProcessMenuPriorityLow => "iced-process-menu-priority-low".to_owned(),
+        FocusTarget::ProcessMenuEfficiencyMode => "iced-process-menu-efficiency-mode".to_owned(),
         FocusTarget::ProcessMenuSignalHangup => "iced-process-menu-signal-hangup".to_owned(),
         FocusTarget::ProcessMenuSignalInterrupt => "iced-process-menu-signal-interrupt".to_owned(),
         FocusTarget::ProcessMenuSignalUser1 => "iced-process-menu-signal-user1".to_owned(),
         FocusTarget::ProcessMenuSignalUser2 => "iced-process-menu-signal-user2".to_owned(),
         FocusTarget::ProcessMenuOpenLocation => "iced-process-menu-open-location".to_owned(),
         FocusTarget::ProcessMenuSearchOnline => "iced-process-menu-search-online".to_owned(),
+        FocusTarget::ProcessMenuAffinity => "iced-process-menu-affinity".to_owned(),
         FocusTarget::ProcessMenuProperties => "iced-process-menu-properties".to_owned(),
         FocusTarget::ProcessMenuCopyName => "iced-process-menu-copy-name".to_owned(),
         FocusTarget::ProcessMenuCopyPid => "iced-process-menu-copy-pid".to_owned(),
@@ -116,6 +123,7 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         }
         FocusTarget::StartupMenuClose => "iced-startup-menu-close".to_owned(),
         FocusTarget::ConfirmStartupControl => "iced-confirm-startup-control".to_owned(),
+        FocusTarget::CancelStartupControl => "iced-cancel-startup-control".to_owned(),
         FocusTarget::SettingsChoice { section, index } => {
             format!("iced-settings-choice-{section}-{index}")
         }
@@ -158,6 +166,9 @@ pub(crate) fn focus_id(target: FocusTarget) -> String {
         FocusTarget::HistoryReplayToggle => "iced-history-replay-toggle".to_owned(),
         FocusTarget::HistoryReplayWindow(w) => format!("iced-history-replay-window-{w:?}"),
         FocusTarget::HistoryReplayRefresh => "iced-history-replay-refresh".to_owned(),
+        FocusTarget::ResourceHistoryWindow(w) => {
+            format!("iced-resource-history-window-{}", w.id())
+        }
         FocusTarget::AlertCenterClear => "iced-alert-center-clear".to_owned(),
         FocusTarget::AlertCenterExport => "iced-alert-center-export".to_owned(),
         FocusTarget::ProcessMenuCopyTsv => "iced-process-menu-copy-tsv".to_owned(),

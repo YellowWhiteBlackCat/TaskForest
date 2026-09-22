@@ -6,6 +6,8 @@ mod accessibility;
 mod capabilities;
 mod columns;
 mod command;
+mod conformance;
+mod feature_coverage;
 mod focus;
 mod functional;
 mod icon;
@@ -24,12 +26,24 @@ pub use accessibility::{
     SemanticSnapshotError, SemanticSort, SemanticState,
 };
 pub use capabilities::{
-    CapabilityEntry, CapabilityFinding, CapabilityFindingKind, CapabilityStatus, CapabilitySupport,
-    ComponentCapability, FrontendCapabilityDeclaration, capability_drift, capability_findings,
-    capability_report,
+    CapabilityCoverageStatus, CapabilityEntry, CapabilityFinding, CapabilityFindingKind,
+    CapabilitySemanticSpec, CapabilitySupport, ComponentCapability, FrontendCapabilityDeclaration,
+    capability_drift, capability_findings, capability_report,
 };
 pub use columns::{PROCESS_COLUMNS, ProcessColumnSpec, find};
 pub use command::{CommandDescriptor, descriptor};
+pub use conformance::ContractTag;
+pub use feature_coverage::{
+    FEATURE_INDEPENDENT_CAPABILITIES, FeatureArea, FeatureCoverageDeclaration,
+    FeatureCoverageEntry, FeatureCoverageFinding, FeatureCoverageFindingKind,
+    FeatureCoverageStatus, FeatureId, FeatureOrigin, FeaturePlatformCell, FeaturePlatformLedger,
+    FeaturePlatformStatus, FeatureSemanticSpec, MISSING_DECLARATION_REASON,
+    MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PLATFORM_GATE_BASELINE, PLATFORM_GATE_POLICY,
+    PartialCause, PlatformBinding, PlatformGateBaseline, PlatformGateFinding, PlatformGatePolicy,
+    PlatformGateRule, PlatformUnavailability, classify, feature_coverage_drift,
+    feature_coverage_findings, feature_coverage_report, feature_platform_cell_findings,
+    feature_platform_gate_findings, feature_platform_report,
+};
 pub use focus::{FocusCycle, FocusCycleStep, FocusRestoreToken, FocusTarget, ModalFocusPolicy};
 pub use functional::{
     ContractLayer, FrontendFunctionalDeclaration, FunctionalEntry, FunctionalFinding,
@@ -39,7 +53,7 @@ pub use functional::{
 };
 pub use icon::IconId;
 pub use keybindings::{
-    Binding, BindingEntry, CoverageStatus, FrontendBindingDeclaration, FrontendShape,
+    Binding, BindingCoverageStatus, BindingEntry, FrontendBindingDeclaration, FrontendShape,
     coverage_report, drift_findings,
 };
 pub use message::MessageKey;

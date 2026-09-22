@@ -18,6 +18,24 @@ pub struct ProjectedProcessResources<'a> {
     pub resource_group: Option<&'a str>,
 }
 
+impl ProjectedProcessResources<'_> {
+    /// Current memory consumption as a percentage of the finite memory limit.
+    /// Unlimited limits and missing measurements remain `None`.
+    #[must_use]
+    pub fn memory_usage_percent(&self) -> Option<f32> {
+        self.memory_limit
+            .and_then(|limit| limit.usage_percent(self.memory_usage_bytes))
+    }
+
+    /// Current process-count consumption as a percentage of the finite PID
+    /// limit. A measured zero remains a real `0.0%`.
+    #[must_use]
+    pub fn process_usage_percent(&self) -> Option<f32> {
+        self.process_limit
+            .and_then(|limit| limit.usage_percent(self.process_count))
+    }
+}
+
 /// Fold typed resource observations into the immutable facts renderers need.
 #[must_use]
 pub fn project_process_resources(

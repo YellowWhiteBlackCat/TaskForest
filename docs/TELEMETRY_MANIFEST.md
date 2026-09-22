@@ -1,7 +1,7 @@
 # 跨平台信息采集与数据源全景清单 (Telemetry Manifest)
 
 > **定位**：全仓唯一权威的跨平台底层数据源清单（Single Source of Truth）。
-> **约束**：业务层保持 `#![forbid(unsafe_code)]`；原生 ABI 仅允许存在于受 ADR 独立审计的边界 crate 中；坚持 100% 诚实遥测，不支持即为 `Unsupported`，缺失即为 `Unavailable`，严禁伪造零值或推断虚假状态。
+> **约束**：业务层保持 `#![forbid(unsafe_code)]`；原生 ABI 仅允许存在于受 ADR 独立审计的边界 crate 中；坚持 100% 诚实遥测，能力级降级以 `platform-contract::CapabilityStatus` 的真实变体名承载（不支持即 `Unsupported`，暂不可用即 `TemporarilyUnavailable`），失败原因级以 `taskmanager-core::FailureKind` 承载，严禁伪造零值或推断虚假状态。
 
 ---
 
@@ -12,7 +12,7 @@
    - 首选 **(A) 社区成熟且已审计的 Safe Rust 库**（如 `sysinfo`、`raw-cpuid`、`starship-battery`、`smbioslib`、`notify-rust`、`windows-registry`、`windows-service`）；
    - 必备极小原生 ABI 走 **(B) 独立最小审计边界 crate**（Linux 的 `perf-ioctl`、`afpacket`、`fd-bridge`；Windows 的 `taskmanager-windows-api`；严格做到 `#![deny(unsafe_op_in_unsafe_fn)]` 与 `// SAFETY:` 逐块注释，零 handle/pointer 穿透）；
    - 固定的辅助兼容工具走 **(C) 有界受限 Shell-out**（仅限 `smartctl`、`explorer /select` 等，固定参数、硬超时、stdout/stderr 单流与两流合计均为 4 MiB 上限并保证 kill/wait/reader 回收，**禁止作为遥测核心路径**，Windows 生产与测试严格禁用 PowerShell/CMD 解释器进行遥测）；
-   - 无合格 Safe 来源或涉及不可控全局框架的指标，如实返回 **`Unsupported` / `Unavailable`**。
+   - 无合格 Safe 来源或涉及不可控全局框架的指标，如实返回 **`Unsupported` / `TemporarilyUnavailable`**（均为 `CapabilityStatus` 真实变体名）。
 3. **零伪造与显式降级 (Zero Fabrication & Honest Fallback)**：
    - 硬件供应商扩展（如 NVIDIA NVML）采用动态加载；当 NVML 缺失时，Windows 自动降级为 DXGI 1.4 原生显存与共享内存采集，Linux 降级为 sysfs/drm；
    - 绝不使用"空字符串"、"0% 占用"或"0 MB 显存"掩盖未支持或未采集到的指标。
@@ -43,11 +43,11 @@ Linux 软件包版本查询按发行版选择有界来源：pacman、dpkg、apk 
 | 遥测能力 / 指标项 | Linux 采集源与机制 | Windows 采集源与机制 | macOS 采集源与机制 | 权限与安全边界 |
 |---|---|---|---|---|
 | **CPU 全局与每核占用率** | • `/proc/stat` (CPU 时间片差值计算) | • `sysinfo::System::cpus()` (`GetSystemTimes` 差值) | • `sysinfo::System::cpus()` (`host_cpu_load_info`) | **User** (Safe Rust；共享 core gate 拒绝非有限、负数与 `>=100.5%` 的幻觉值，`100..100.5` 仅饱和到 `100%`) |
-| **实时频率 (Live Frequency)** | • `/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq` | • PDH `% Processor Performance` × 每核基频（Task Manager 算法，基频来自 `PROCESSOR_POWER_INFORMATION.MaxMhz`）<br>• 降级：`Processor Frequency` 计数器 / `CallNtPowerInformation.CurrentMhz` (sysinfo) | • `sysinfo::Cpu::frequency()` (或标量 `Unavailable`) | **User** (Safe Rust) |
+| **实时频率 (Live Frequency)** | • `/sys/devices/system/cpu/cpu*/cpufreq/scaling_cur_freq` | • PDH `% Processor Performance` × 每核基频（Task Manager 算法，基频来自 `PROCESSOR_POWER_INFORMATION.MaxMhz`）<br>• 降级：`Processor Frequency` 计数器 / `CallNtPowerInformation.CurrentMhz` (sysinfo) | • `sysinfo::Cpu::frequency()` (或标量级 `ScalarAvailability::Unavailable`) | **User** (Safe Rust) |
 | **标称基频与睿频上限 (Base / Max Freq)** | • cpufreq policy `base_frequency`（取可见核心类型的最高静态基频）；缺失时才回退 CPUID 0x16 | • 基频：`PROCESSOR_POWER_INFORMATION.MaxMhz`（按核心类型取最高）；缺失时回退 CPUID 0x16<br>• 睿频上限：CPUID 0x16 → SMBIOS Type 4 `Max Speed`（CPUID 0x16 为 0 的混合 CPU 必需） | • `sysctl hw.cpufrequency` | **User** (Safe Rust) |
 | **CPU 架构、型号与物理/逻辑核数** | • `/proc/cpuinfo`<br>• `/sys/devices/system/cpu/topology/*` | • `sysinfo::Cpu::brand()`<br>• 逻辑核/物理核由 `sysinfo` 识别 | • `sysinfo::Cpu::brand()`<br>• `sysctl hw.physicalcpu/logicalcpu` | **User** (Safe Rust) |
 | **CPU 插槽数 (Sockets) 与 L1/L2/L3 缓存** | • `/sys/devices/system/cpu/cpu*/cache/index*/*` | • `taskmanager-windows-api::processor_topology()` (`GetLogicalProcessorInformationEx(RelationProcessorPackage/RelationCache)`) | • `sysctl hw.l1icachesize / hw.l2cachesize / hw.l3cachesize` | **User** (Windows 走 ADR-031 原生拓扑解析) |
-| **CPU 温度与封装功耗 (RAPL)** | • `/sys/class/hwmon/hwmon*` 温度按 `coretemp`/`k10temp`/`zenpower` 精确芯片优先；其后只接受带 `Tctl`/`Tdie`/`Package`/`APU`/`CPU` 语义且排除 `edge`/`junction`/`mem`/`vrm` 的 labeled hwmon；最后才用 ACPI thermal zone，并以 `CpuTemperatureSource` 保留来源<br>• `perf_event_open` (RAPL energy-pkg，经 `taskmanager-perf-ioctl` ADR-022) | • 温度/功耗暂无无侵入 Safe API，保持 typed `Unsupported`（绝不拉起管理员 WMI/OHM 后台服务） | • `powermetrics` (经提权 helper) 或标量 `Unavailable` | **Linux**: 温度来源按 tier 诚实降级；RAPL 需 CAP_PERFMON 或特权 Helper；**Windows/macOS**: 诚实缺口 |
+| **CPU 温度与封装功耗 (RAPL)** | • `/sys/class/hwmon/hwmon*` 温度按 `coretemp`/`k10temp`/`zenpower` 精确芯片优先；其后只接受带 `Tctl`/`Tdie`/`Package`/`APU`/`CPU` 语义且排除 `edge`/`junction`/`mem`/`vrm` 的 labeled hwmon；最后才用 ACPI thermal zone，并以 `CpuTemperatureSource` 保留来源<br>• `perf_event_open` (RAPL energy-pkg，经 `taskmanager-perf-ioctl` ADR-022) | • 温度/功耗暂无无侵入 Safe API，保持 typed `Unsupported`（绝不拉起管理员 WMI/OHM 后台服务） | • `powermetrics` (经提权 helper) 或标量级 `ScalarAvailability::Unavailable` | **Linux**: 温度来源按 tier 诚实降级；RAPL 需 CAP_PERFMON 或特权 Helper；**Windows/macOS**: 诚实缺口 |
 
 ---
 
@@ -57,7 +57,7 @@ Linux 软件包版本查询按发行版选择有界来源：pacman、dpkg、apk 
 |---|---|---|---|---|
 | **物理内存总量、已用、可用 (Total / Used / Available)** | • `/proc/meminfo` (`MemTotal`, `MemFree`, `MemAvailable`, `Buffers`, `Cached`, `SReclaimable`, `Zfs`) | • `sysinfo::System::total_memory()`<br>• `sysinfo::System::used_memory()`<br>• `sysinfo::System::available_memory()` (`GlobalMemoryStatusEx`) | • `sysinfo::System`<br>• `vm_stat` (wire/active/inactive/free/compressed) | **User** (Safe Rust；ZFS ARC 缺失时保持 typed absence，不改写为零) |
 | **交换分区 (Swap / Pagefile)** | • `/proc/meminfo` (`SwapTotal`, `SwapFree`) | • `sysinfo::System::total_swap()`<br>• `sysinfo::System::used_swap()` | • `sysctl vm.swapusage` | **User** (Safe Rust) |
-| **ZFS ARC 与压缩交换细节** | • `/proc/meminfo` `Zfs` 作为可回收 ARC 层<br>• `/sys/block/zram*/mm_stat` 的 `orig_data_size`、`compr_data_size`、`mem_used_total`（逐 zram 汇总）<br>• `/proc/swaps` zram used 与 `/sys/module/zswap/parameters/enabled` | • 无 Linux ZFS/zram 对等来源；保持对应 typed facts 缺省 | • 无 Linux ZFS/zram 对等来源；保持对应 typed facts 缺省 | **User** (无 ZFS/zram 为 Empty/Unavailable；缺少旧内核 `mm_stat` 不伪造零；压缩比仅在两端事实同时 current 时推导) |
+| **ZFS ARC 与压缩交换细节** | • `/proc/meminfo` `Zfs` 作为可回收 ARC 层<br>• `/sys/block/zram*/mm_stat` 的 `orig_data_size`、`compr_data_size`、`mem_used_total`（逐 zram 汇总）<br>• `/proc/swaps` zram used 与 `/sys/module/zswap/parameters/enabled` | • 无 Linux ZFS/zram 对等来源；保持对应 typed facts 缺省 | • 无 Linux ZFS/zram 对等来源；保持对应 typed facts 缺省 | **User** (无 ZFS/zram 为 Empty/`ScalarAvailability::Unavailable`；缺少旧内核 `mm_stat` 不伪造零；压缩比仅在两端事实同时 current 时推导) |
 
 zram 深度事实的三条出口使用同一 typed 真值（`optional_observations.compression`）：
 swap 读出（`/proc/swaps` used 口径）、压缩深度（orig→compr + 守卫压缩比）、以及 store 实占
@@ -99,8 +99,8 @@ swap 读出（`/proc/swaps` used 口径）、压缩深度（orig→compr + 守�
 | **NVIDIA 独显完整遥测**<br>• 利用率、核心频率、显存总量/用量、温度、风扇、功耗、驱动版本 | • `nvml-wrapper` (动态加载 `libnvidia-ml.so`) | • `nvml-wrapper` (动态加载 `nvml.dll`) | • macOS 现代架构不支持 NVIDIA 显卡 (typed `Unsupported`) | **User** (动态加载，未安装驱动时平滑降级) |
 | **PCI 图形设备原始身份与 marketing SKU** | • `/sys/class/drm/card*/device/{vendor,device,subsystem_*,modalias}`、PCI slot、driver；有界只读 `pci.ids` 将 vendor/device 映射为 marketing name（例如 Arc B390），未命中不猜 | • DXGI adapter LUID/描述由 Windows 原生 provider 提供 | • IOKit/系统显示 provider 待接入 | **User** (Safe Rust；原始 ID 与 marketing name 分字段，数据库缺失保持 `None`) |
 | **运行时图形 API 版本**<br>• OpenGL、Vulkan physical-device API version | • 可选固定 argv 的 `glxinfo -B` / `vulkaninfo --summary`，每个进程仅有界探测一次；只有唯一可见 DRM GPU 时才绑定到该 GPU，输出只保留版本 token | • 当前保持 typed 缺省；DXGI 不等价于 OpenGL/Vulkan capability，待原生 loader/query seam | • 当前保持 typed 缺省；Metal 不等价于 OpenGL/Vulkan capability | **User** (工具缺失、无显示上下文、超时、解析失败或多 GPU 无法精确归属均省略；不从 driver 名推断) |
-| **AMD / Intel / 集成显卡通用显存与设备识别** | • `/sys/class/drm/card*` (`device/vendor`, `device/device`, `mem_info_vram_total/used`, `mem_info_gtt_total/used`) | • **DXGI 1.4 原生降级**：`taskmanager-windows-api::enumerate_gpu_adapters()` (`CreateDXGIFactory1` + `IDXGIAdapter3::QueryVideoMemoryInfo`)<br>• **共享显存实时用量走 PDH** `\GPU Adapter Memory(*)\Shared Usage`（WDDM 2.0+，与任务管理器同源；DXGI NON_LOCAL 在 Intel/AMD 驱动上不可靠时不再伪造 0，未观测保持缺省）<br>• 获取专用显存/共享显存总容量与实时用量 | • `system_profiler SPDisplaysDataType` (获取显卡名称与 VRAM 容量；命令/JSON 失败为 typed unavailable，只有成功返回空数组才是 `Empty`) | **User** (Windows 走 ADR-031 极简 COM 接口封装，纯 Safe 结构体输出) |
-| **GPU 引擎细分利用率 (3D / Copy / Video)** | • `/sys/class/drm/card*/engine/*` (Intel/AMD PMU) | • `taskmanager-windows-api::query_gpu_engine_utilization()`（PDH `GPU Engine`，只按 DXGI adapter LUID 精确归属；未匹配保持 unavailable，不复制 sibling、不伪造 0） | • typed `Unsupported` | **Linux/Windows**: 部分支持；**Mac**: 诚实缺口 |
+| **AMD / Intel / 集成显卡通用显存与设备识别** | • `/sys/class/drm/card*` (`device/vendor`, `device/device`, `mem_info_vram_total/used`, `mem_info_gtt_total/used`) | • **DXGI 1.4 原生降级**：`taskmanager-windows-api::enumerate_gpu_adapters()` (`CreateDXGIFactory1` + `IDXGIAdapter3::QueryVideoMemoryInfo`)<br>• **共享显存实时用量走 PDH** `\GPU Adapter Memory(*)\Shared Usage`（WDDM 2.0+，与任务管理器同源；DXGI NON_LOCAL 在 Intel/AMD 驱动上不可靠时不再伪造 0，未观测保持缺省）<br>• 获取专用显存/共享显存总容量与实时用量 | • `system_profiler SPDisplaysDataType` (获取显卡名称与 VRAM 容量；命令/JSON 失败为来源级 `SourceOutcome::Unavailable(FailureKind)`，只有成功返回空数组才是 `SourceOutcome::Empty`) | **User** (Windows 走 ADR-031 极简 COM 接口封装，纯 Safe 结构体输出) |
+| **GPU 引擎细分利用率 (3D / Copy / Video)** | • `/sys/class/drm/card*/engine/*` (Intel/AMD PMU) | • `taskmanager-windows-api::query_gpu_engine_utilization()`（PDH `GPU Engine`，只按 DXGI adapter LUID 精确归属；未匹配保持 `ScalarAvailability::Unavailable`，不复制 sibling、不伪造 0） | • typed `Unsupported` | **Linux/Windows**: 部分支持；**Mac**: 诚实缺口 |
 | **NPU/AI 加速器设备发现与利用率**<br>(capability `accelerator.npu`) | • `/sys/class/accel/*` (Linux 6.3+ DRM Accel：设备 id、绑定驱动；利用率/内存 typed `Unsupported` 直至内核接口稳定) | • registered-pending `windows.accelerator.npu`：typed `Unsupported`（MCDM 原生接口尚无足够小的可审计 safe 边界） | • registered-pending `macos.accelerator.npu`：typed `Unsupported`（ANE 需 powermetrics/IORegistry 缝，未接入） | **User**（sysfs 只读；空设备列表=诚实无 NPU，非失败） |
 | **CPU 指令集特性向量**<br>(`CpuInstructionFeature`，canonical ALL 枚举) | • `/proc/cpuinfo` `flags:`/`Features:` 行（单映射表，含 avx_vnni/amx_*/sve） | • `raw-cpuid` safe 特性叶子（SSE4.x/AVX2/AVX-512F/VNNI/AMX/SHA 等，canonical 序输出） | • 有界 `sysctl -n hw.optional.*` 子进程（仅 4 键映射，无键=不猜） | **User**（无特权读；未报告的特性不出现，绝不猜测） |
 
@@ -112,7 +112,7 @@ swap 读出（`/proc/swaps` used 口径）、压缩深度（orig→compr + 守�
 |---|---|---|---|---|
 | **进程清单与基础指标**<br>• PID、PPID、进程名、命令行、状态、CPU 占用、内存用量、启动时间 | • `/proc/[pid]/stat`<br>• `/proc/[pid]/cmdline`<br>• `/proc/[pid]/statm` | • `sysinfo::System::processes()` (`SystemProcessInformation` / `NtQuerySystemInformation`) | • `sysinfo::System::processes()` (`proc_pidinfo` / `sysctl`) | **User** (Safe Rust) |
 | **进程高精度创建时间与防 PID 复用令牌** | • `/proc/[pid]/stat` `starttime` (jiffies) | • `taskmanager-windows-api::process_creation_time_100ns(pid)` (`GetProcessTimes` 100ns 粒度内核时间戳) | • 当前 safe adapter 仅有 `sysinfo` 秒级清单时间，不具备精确授权 token；target read/control/reveal 因此 typed `Unsupported`，直至最小 `proc_pidinfo` 边界落地 | **User** (任何 target read/write 均先后复核 provider-issued exact token；拿不到即 fail closed) |
-| **进程磁盘 I/O 速率** | • `/proc/[pid]/io` (`read_bytes`, `write_bytes` 差值) | • `sysinfo::Process::disk_usage()` delta 差值计算 | • `sysinfo::Process::disk_usage()` 累计计数差值；首样本/gap/回滚保持 typed unavailable | **User** (稳定身份绑定 baseline，首样本不伪造 0) |
+| **进程磁盘 I/O 速率** | • `/proc/[pid]/io` (`read_bytes`, `write_bytes` 差值) | • `sysinfo::Process::disk_usage()` delta 差值计算 | • `sysinfo::Process::disk_usage()` 累计计数差值；首样本/gap/回滚保持标量级 `ScalarAvailability::Unavailable(FailureKind)` | **User** (稳定身份绑定 baseline，首样本不伪造 0) |
 | **进程优先级 / nice 值** | • `/proc/[pid]/stat` (nice 字段) | • `taskmanager-windows-api::process_priority(pid)` (`GetPriorityClass` 映射为标准 nice 区间) | • `getpriority(PRIO_PROCESS, pid)` | **User** (Windows 走 ADR-031 映射) |
 | **进程管理员提权状态 (Is Elevated)** | • `/proc/[pid]/status` (`Uid` / `CapEff`) | • `taskmanager-windows-api::process_is_elevated(pid)` (`OpenProcessToken` + `GetTokenInformation(TokenElevation)`) | • `proc_pidinfo` (`pbi_uid == 0`) | **User** (Windows 走 ADR-031 Token 查询) |
 | **进程级显存用量 (Process VRAM)** | • `nvml-wrapper` (NVIDIA 进程级显存表) | • `nvml-wrapper` (NVIDIA 进程级显存表，WDDM 模式下驱动限制时返回 `NOT_AVAILABLE`) | • typed `Unsupported` | **User** (Safe Rust) |
@@ -165,6 +165,12 @@ swap 读出（`/proc/swaps` used 口径）、压缩深度（orig→compr + 守�
 本清单只定义数据源、权限和安全边界，不保存易漂移的覆盖比例、测试数量或现场回执。
 能力是否已注册、可用、部分可用或 `Unsupported`，以 platform contract/provider catalog、
 对应 crate README 和实现验证共同判定；本清单不承载现场数据、评分或待办事项。
+
+产品期望面（`CapabilityId::EXPECTED_SURFACE`）声明"每个平台都必须作答"的能力身份全集：
+runtime catalog 对每个期望身份先发布 typed 缺席 descriptor（`Unsupported`、无 provider
+归属），平台真实注册只替换自身条目，因此不存在"未注册即无条目"的静默缺席
+（[ADR-053](../adr/053-product-expected-capability-surface.md)）。本清单某平台没有合格
+来源的能力，运行时以该 typed 缺席作答；不在期望面内的 vendor/诊断身份不受此承诺约束。
 
 ---
 

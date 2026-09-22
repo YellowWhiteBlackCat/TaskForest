@@ -1,6 +1,8 @@
 //! Pure system-health observation projection.
 
 use taskmanager_core::core::metrics::SystemSnapshot;
+use taskmanager_core::core::sensors::{SensorCenterSnapshot, SensorQuantity};
+use taskmanager_shell::presentation::{missing_value, temperature_c_precise};
 
 pub(super) struct HealthObservation {
     pub cpu_usage_pct: Option<f32>,
@@ -27,6 +29,41 @@ impl From<&SystemSnapshot> for HealthObservation {
             swap_total_bytes: snapshot.memory.current_swap_total_bytes(),
         }
     }
+}
+
+/// One folded thermal-zone row: the shared reading's own source label plus its
+/// formatted current measurement. `present` is false for a channel whose read
+/// failed or has not landed yet, which keeps the row a typed absence instead of
+/// a fabricated `0.0 °C`.
+#[derive(Debug)]
+pub(super) struct ThermalZoneRow {
+    pub label: String,
+    pub value: String,
+    pub present: bool,
+}
+
+/// Fold the shared sensor center's temperature readings: exactly one row per
+/// thermal zone in projection order, each named by the reading's own source
+/// label — the same traversal semantics as the GPUI health-page sensor section
+/// (`sensor_rows(..., Temperature, ...)`) over the same shared `SensorReading`
+/// facts. An unread/failed zone keeps its row with the shared dash (never
+/// `0.0 °C`), and the °C spelling stays the shared presentation helper.
+#[must_use]
+pub(super) fn thermal_zone_rows(sensors: &SensorCenterSnapshot) -> Vec<ThermalZoneRow> {
+    sensors
+        .readings
+        .iter()
+        .filter(|reading| reading.quantity() == &SensorQuantity::Temperature)
+        .map(|reading| {
+            let current = reading.current_number();
+            ThermalZoneRow {
+                label: reading.label().to_owned(),
+                value: current
+                    .map_or_else(missing_value, |value| temperature_c_precise(value as f32)),
+                present: current.is_some(),
+            }
+        })
+        .collect()
 }
 
 #[must_use]

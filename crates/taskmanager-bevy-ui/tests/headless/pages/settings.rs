@@ -256,17 +256,17 @@ fn settings_page_projects_the_live_authorities_into_rows() {
         .iter(world)
         .map(|text| text.0.clone())
         .collect::<Vec<String>>();
-    for expected in [
-        "Settings",
-        "Theme",
-        "Language",
-        "Refresh interval",
-        "History capacity",
-        "Telemetry updates",
+    for (en, zh) in [
+        ("Settings", "设置"),
+        ("Theme", "主题"),
+        ("Language", "语言"),
+        ("Refresh interval", "刷新间隔"),
+        ("History capacity", "历史容量"),
+        ("Telemetry updates", "遥测更新"),
     ] {
         assert!(
-            texts.iter().any(|text| text == expected),
-            "the {expected} row renders: {texts:?}"
+            texts.iter().any(|text| text == en || text == zh),
+            "the {en}/{zh} row renders: {texts:?}"
         );
     }
     assert!(

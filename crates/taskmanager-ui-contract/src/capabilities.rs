@@ -5,15 +5,15 @@
 //! deliberately unbound in every frontend shape; this module extends the
 //! same anti-silence fold to component and surface CAPABILITIES. For every
 //! capability in [`ComponentCapability::ALL`], every frontend must declare
-//! one explicit [`CapabilitySupport`] decision — a silent omission is
+//! one explicit [`CapabilitySupport`] decision - a silent omission is
 //! drift, not a choice. Deliberate differences must carry a reason
 //! ([`CapabilitySupport::Divergent`] / [`CapabilitySupport::Unsupported`]);
 //! comments claiming parity do not count.
 //!
 //! ## The reference shape (GPUI-05)
 //!
-//! `taskmanager-ui` — the GPUI component layer built directly on gpui
-//! (gpui 0.2.2 ships none of these components; they are hand-built there) —
+//! `taskmanager-ui` - the GPUI component layer built directly on gpui
+//! (gpui 0.2.2 ships none of these components; they are hand-built there) -
 //! is the SEMANTIC REFERENCE SOURCE for the parallel component layers
 //! (Iced, TUI, Bevy). Each capability names its reference component through
 //! [`ComponentCapability::reference_path`], and only the GPUI shape may
@@ -22,19 +22,102 @@
 //! that must diverge declares [`CapabilitySupport::Divergent`] with the
 //! driver. When porting work uncovers a gap or a bug in the reference, the
 //! resolution is a write-back: fix `taskmanager-ui` (and this contract if
-//! the vocabulary itself is wrong) FIRST, then port the fix — a silent
+//! the vocabulary itself is wrong) FIRST, then port the fix - a silent
 //! per-frontend fork of a reference semantic is exactly what this registry
 //! exists to make impossible. Because the GPUI declaration must cover every
 //! capability with `Reference`/`Native`, the vocabulary can only grow when
 //! the reference layer grows.
 //!
+//! ## "求同存异" Governance: The Four-Frontend Parity Model
+//!
+//! TaskForest enforces a strict "求同存异" (seek common ground while
+//! preserving differences) governance model across its four frontends:
+//!
+//! - Common ground ("求同"): Every frontend consumes the same typed domain
+//!   facts from `core`, the same user commands ([`crate::command::descriptor`]),
+//!   the same keybinding matrix ([`crate::keybindings`]), the same typed column
+//!   contract ([`crate::columns::PROCESS_COLUMNS`]), and the same product
+//!   intents ([`crate::functional::ProductIntent`]).
+//! - Preserved differences ("存异"): Each frontend is an independent, first-class
+//!   product shape with its own native toolkit paradigms. Toolkit-native
+//!   divergences are intentional design assets that leverage platform strengths,
+//!   never secondary compromises or incomplete ports.
+//!
+//! ## Accepted Difference and Divergence Quality Baselines
+//!
+//! When a frontend declares [`CapabilitySupport::Divergent`],
+//! [`CapabilitySupport::Native`], or [`CapabilitySupport::Unsupported`], that
+//! decision must be backed by a well-defined quality baseline:
+//!
+//! 1. **GPUI (TaskForest-G, reference shape)**:
+//!    GPU-accelerated retained canvas with rem-scaled relative layout budgets
+//!    ([`taskmanager_theme::UiSize`]), full floating modal/context-menu/toast
+//!    stacks, live pointer-drag column resizing, and multi-pane hardware
+//!    telemetry.
+//! 2. **TUI (TaskForest-T, character grid and keyboard-first asset)**:
+//!    Discrete character cell grid with zero dynamic memory allocations in the
+//!    hot render loop (~18MB resident footprint).
+//!    - *Braille Sparkline*: Uses Unicode Braille patterns (U+2800..U+28FF, 2x4 = 8-dot
+//!      resolution per cell) to deliver 4x vertical and 2x horizontal resolution
+//!      for historical telemetry curves in a single row.
+//!    - *Keyboard-first navigation & footer activity line*: Replaces pointer hover
+//!      and floating toasts with keyboard shortcuts and a dedicated non-overlapping
+//!      `footer.activity-line`.
+//!    - *Centered modal blocks*: Clear-scrim centered frames with absolute Escape
+//!      priority.
+//!    - *Honest scalar availability*: Unavailable metrics render placeholder dashes,
+//!      never fabricated zeros.
+//! 3. **Iced (TaskForest-I, pure functional Elm architecture asset)**:
+//!    Strict The Elm Architecture (TEA) `Model -> Update -> View` with immutable
+//!    state transitions and async task isolation.
+//!    - *Pure functional virtual list*: `VirtualWindow` with `lazy` caching
+//!      materializes only visible rows into immutable widget trees without
+//!      imperative leaks.
+//!    - *Single-row compact ribbons*: View presets and toolbar actions collapse into
+//!      a 32px horizontal glide rail, preserving at least 7-9 rows of table data
+//!      in compact 720x480 viewports.
+//!    - *Footer activity line*: Operation feedback routes to the window footer,
+//!      maintaining a calm, uncrowded interface.
+//! 4. **Bevy UI (TaskForest-B, pure data-driven ECS asset)**:
+//!    Bevy 0.19 entity-component-system graph with 100% `bsn!` declarative
+//!    scene composition.
+//!    - *Pure declarative scene tree*: UI nodes are reactive entities governed by
+//!      components and observer systems (`commands.trigger(...)`).
+//!    - *Picking transparency*: Child text and icon entities inside buttons carry
+//!      `Pickable::IGNORE`, ensuring reliable pointer event dispatch to parent buttons.
+//!    - *Responsive flex slot distribution*: Column layouts adapt via declarative
+//!      flex slots rather than pointer-drag handles, guaranteeing scene stability.
+//!    - *Dedicated status bar*: Feedback is channeled through an engine status entity.
+//!
 //! ## Honesty boundary
 //!
-//! This registry proves DECLARATION discipline — no silence, no
+//! This registry proves DECLARATION discipline - no silence, no
 //! unexplained divergence, no reference-less capability. It does NOT prove
 //! behavioral equivalence: each cell is backed by the shape's own behavior
 //! tests and evidence route (CORE-06), and a `Ported` cell claims the
 //! intent to match, never the match itself.
+//!
+//! ## Delivered-surface vocabulary (intentionally asymmetric)
+//!
+//! This registry is the DELIVERED-SURFACE vocabulary. A capability is admitted
+//! only because at least one shape really ships it, and the reference shape
+//! (GPUI, whose `taskmanager-ui` layer owns the semantics) must own every
+//! entry. The gate therefore rejects a reference shape that declares
+//! [`CapabilitySupport::Ported`], `Divergent`, or `Unsupported`
+//! ([`CapabilityFindingKind::ReferenceShapeCannotDefer`]): the reference layer
+//! cannot defer itself, and the vocabulary grows only when that layer grows.
+//!
+//! [`crate::feature_coverage`] is deliberately NOT symmetric. It is the full
+//! ROADMAP coverage matrix, so its reference shape MAY declare
+//! [`CapabilitySupport::Unsupported`] for a feature the reference surface has
+//! not delivered yet; only the porting decisions (`Ported`/`Divergent`/
+//! `Native`) are rejected there
+//! ([`crate::FeatureCoverageFindingKind::ReferenceShapeCannotPort`]). Do not
+//! "fix" the difference: allowing reference `Unsupported` here, or forbidding
+//! it there, would erase either the delivered-surface guarantee or the honest
+//! roadmap gap. The asymmetry is a contract and is pinned by a test in
+//! `tests/headless/ui_feature_coverage.rs`
+//! (`capability_and_feature_registries_are_deliberately_asymmetric`).
 
 use crate::keybindings::FrontendShape;
 
@@ -48,52 +131,259 @@ impl FrontendShape {
     }
 }
 
+/// Explicit, toolkit-neutral semantic specification for a component capability.
+///
+/// Rather than merely pointing to a GPUI reference source path, this contract
+/// defines the required user-facing behavior, keyboard/pointer semantics, and
+/// invariant expectations that every frontend implementation or accepted
+/// divergence must satisfy.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct CapabilitySemanticSpec {
+    /// The capability described by this specification.
+    pub capability: ComponentCapability,
+    /// What the user experiences and sees when interacting with this component.
+    pub user_facing_behavior: &'static str,
+    /// Required keyboard navigation, focus traversal, and pointer interaction rules.
+    pub keyboard_pointer_semantics: &'static str,
+    /// Invariant expectations (e.g. side-effect-free cancel, bounds safety, focus containment).
+    pub invariant_expectations: &'static str,
+}
+
 /// One component/surface capability the product offers through its
-/// frontends. The set starts from what at least one shape really ships —
+/// frontends. The set starts from what at least one shape really ships -
 /// the gate forbids silence, not absence, so capabilities join this list
 /// only when a shape actually implements (or needs to refuse) them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum ComponentCapability {
-    /// A modal layer-stacked dialog with scrim and focus containment.
+    /// A modal layer-stacked dialog with backdrop scrim and focus containment.
+    ///
+    /// - **User-facing behavior**: A focused dialog surface layered above the
+    ///   application viewport with a dimming scrim, blocking pointer and keyboard
+    ///   interaction with background content until confirmed or dismissed.
+    /// - **Interaction semantics**: Tab/Shift+Tab cycle focus strictly within
+    ///   the modal; Escape or clicking the scrim triggers cancellation; initial
+    ///   focus lands on the primary or designated default control on mount.
+    /// - **Invariant expectations**: Dismissal or cancellation produces zero
+    ///   destructive side effects; focus cannot leak to background surfaces while
+    ///   mounted; restores focus to the triggering element on close.
     ModalOverlay,
-    /// A menu of actions for a targeted object (pointer context menu or its
-    /// keyboard equivalent).
+
+    /// A contextual action menu anchored to a targeted object.
+    ///
+    /// - **User-facing behavior**: A transient menu displaying operations
+    ///   available for a specific row, device, or selection (e.g. End Task,
+    ///   affinity, priority).
+    /// - **Interaction semantics**: Triggered via pointer secondary click (right-click)
+    ///   or keyboard ContextMenu / Shift+F10 on a focused item; Up/Down arrow keys
+    ///   traverse items; Enter/Space activates; Escape dismisses.
+    /// - **Invariant expectations**: Closes on outside click, item activation,
+    ///   or window blur; actions apply strictly to the entity identity captured
+    ///   at invocation; bounds are clamped within the viewport.
     ContextMenu,
-    /// A menu surface anchored to a control (e.g. a table-column menu).
+
+    /// A dropdown action or selection menu anchored to a control affordance.
+    ///
+    /// - **User-facing behavior**: A transient popover menu anchored to a button
+    ///   or header (e.g. table column visibility menu, filter preset picker).
+    /// - **Interaction semantics**: Triggered via pointer click or Space/Enter on
+    ///   the anchor; Up/Down arrow navigation; Space/Enter selects or toggles;
+    ///   Escape dismisses and returns focus to the anchor.
+    /// - **Invariant expectations**: Closes on outside click or focus loss;
+    ///   toggles update state atomically; multi-select menus remain open across
+    ///   individual item toggles.
     DropdownMenu,
-    /// Hover-anchored transient explanation surface.
+
+    /// A lightweight transient explanation surface anchored to an element.
+    ///
+    /// - **User-facing behavior**: A floating badge revealing descriptive text,
+    ///   keyboard shortcut hints, or status explanations on inspection.
+    /// - **Interaction semantics**: Appears on pointer hover after a brief dwell
+    ///   time or immediately on keyboard focus; dismisses immediately on pointer
+    ///   exit, pointer click, or Escape.
+    /// - **Invariant expectations**: Strictly non-interactive and read-only;
+    ///   never captures focus; never occludes anchor controls in a way that
+    ///   obstructs interaction; terminal shapes without pointer hover route hints
+    ///   to the footer line instead.
     Tooltip,
-    /// Floating transient notification.
+
+    /// A non-modal transient notification surface.
+    ///
+    /// - **User-facing behavior**: A floating notification banner presenting
+    ///   asynchronous operation receipts, copy confirmations, or non-blocking warnings.
+    /// - **Interaction semantics**: Auto-dismisses after a fixed display duration;
+    ///   optional dismiss button; does not intercept or steal active typing focus.
+    /// - **Invariant expectations**: Never steals input focus; dismissal is
+    ///   side-effect free; terminal and compact frontends may channel feedback
+    ///   through a dedicated footer activity line.
     Toast,
-    /// Single-line editable text field.
+
+    /// A single-line editable text input field.
+    ///
+    /// - **User-facing behavior**: An interactive text entry box with visible
+    ///   caret, selection highlighting, placeholder text, and text manipulation.
+    /// - **Interaction semantics**: Pointer click positions caret; Left/Right arrow
+    ///   moves by character (Ctrl/Alt by word); Home/End jumps to line boundaries;
+    ///   Backspace/Delete removes text; Enter commits; Escape cancels or blurs.
+    /// - **Invariant expectations**: Preserves buffer across view re-renders until
+    ///   committed; caret respects UTF-8 character boundaries; disabled state
+    ///   rejects all modifications without throwing errors.
     TextInput,
-    /// Type-to-filter query field.
+
+    /// A specialized type-to-filter query input.
+    ///
+    /// - **User-facing behavior**: A dedicated filter field equipped with search icon,
+    ///   clear button, match feedback, and instant list filtering.
+    /// - **Interaction semantics**: Fast keyboard access via global slash (/) or
+    ///   Ctrl+F; typing immediately filters active projection; Escape clears query
+    ///   or restores focus to the filtered list.
+    /// - **Invariant expectations**: Filtering never blocks the UI thread; an
+    ///   empty query immediately restores the full projection; preserves row
+    ///   selection when the selected item satisfies the new query.
     SearchInput,
-    /// Read-only selectable/copyable text.
+
+    /// Read-only continuous text selection and copy surface.
+    ///
+    /// - **User-facing behavior**: Visual text selection highlighting across
+    ///   detail readouts, scalar values, or log streams, enabling clipboard export.
+    /// - **Interaction semantics**: Pointer drag selects character ranges;
+    ///   double-click selects words; triple-click selects whole lines/blocks;
+    ///   Ctrl/Cmd+C copies selection to the system clipboard; Linux middle-click
+    ///   synchronizes with the primary selection.
+    /// - **Invariant expectations**: At most one active text selection per window;
+    ///   read-only text is never mutable; table row selection and column resize
+    ///   take arbitration precedence over cell text dragging.
     TextSelection,
-    /// Two-state toggle control.
+
+    /// A two-state binary toggle control.
+    ///
+    /// - **User-facing behavior**: An interactive switch indicating immediate
+    ///   boolean state (e.g. alert rule enabled/disabled).
+    /// - **Interaction semantics**: Pointer click or Space/Enter toggles state;
+    ///   animated thumb transition; Tab moves focus in and out.
+    /// - **Invariant expectations**: State changes dispatch typed application
+    ///   intents immediately; disabled switches reject toggles and show disabled
+    ///   styling; ON/OFF states remain unambiguous across all high-contrast themes.
     Switch,
-    /// Analog/bounded-step range control.
+
+    /// A bounded continuous or discrete numeric range control.
+    ///
+    /// - **User-facing behavior**: A slider track with filled range and draggable
+    ///   thumb representing numeric settings (e.g. refresh interval, threshold).
+    /// - **Interaction semantics**: Pointer drag on thumb or click on track;
+    ///   Left/Down decreases by step; Right/Up increases by step; Home/End jumps
+    ///   to min/max boundaries.
+    /// - **Invariant expectations**: Values are strictly clamped within [min, max];
+    ///   step granularity is enforced; terminal frontends without pointer analog
+    ///   axis project this as discrete selectable option lists.
     Slider,
-    /// Multi-state check control.
+
+    /// A two-state or tri-state boolean selection control.
+    ///
+    /// - **User-facing behavior**: A labeled checkbox box supporting checked,
+    ///   unchecked, and optional indeterminate states (e.g. column visibility).
+    /// - **Interaction semantics**: Pointer click on box or label, or keyboard
+    ///   Space key, toggles selection state; Tab traverses focus.
+    /// - **Invariant expectations**: Clicking the text label activates the box;
+    ///   indeterminate state visually distinguishes partial group selection;
+    ///   keyboard and pointer triggers yield identical transitions.
     Checkbox,
-    /// Single-choice control over an enumerated set.
+
+    /// A single-choice selection control over an enumerated set.
+    ///
+    /// - **User-facing behavior**: A compact button displaying the current choice
+    ///   which expands into an option list upon activation (e.g. skin, theme mode).
+    /// - **Interaction semantics**: Pointer click or Space/Enter opens option menu;
+    ///   Up/Down arrows navigate options; Enter commits choice; Escape cancels;
+    ///   Tab moves to next control.
+    /// - **Invariant expectations**: The currently selected option is always
+    ///   prominently marked; selecting the active option is an idempotent no-op;
+    ///   popover lists scroll cleanly when exceeding viewport bounds.
     Select,
-    /// Compact exclusive choice group (tabs-like).
+
+    /// A compact exclusive choice group.
+    ///
+    /// - **User-facing behavior**: A horizontal ribbon of mutually exclusive tabs
+    ///   or pill buttons (e.g. page navigation tabs, device category selector).
+    /// - **Interaction semantics**: Pointer click activates segment; Left/Right
+    ///   arrows navigate between segments; number shortcuts (1..7) jump directly
+    ///   to corresponding tabs.
+    /// - **Invariant expectations**: Exactly one segment is active at any time;
+    ///   active segment has high-contrast visual distinction; switching tabs
+    ///   preserves background data models without corruption.
     SegmentedControl,
-    /// Typed-column table with sticky header, row identity and selection.
+
+    /// A multi-column tabular data grid with header, sorting, and row selection.
+    ///
+    /// - **User-facing behavior**: Structured data table presenting rows and typed
+    ///   columns with sticky header, sort direction arrows, and selection highlights.
+    /// - **Interaction semantics**: Up/Down arrows traverse rows; Home/End jumps to
+    ///   extremes; PageUp/PageDown moves by page; pointer click selects row;
+    ///   header click toggles column sort (asc/desc/none); Enter/double-click
+    ///   triggers default row action.
+    /// - **Invariant expectations**: Columns adhere strictly to the shared
+    ///   `PROCESS_COLUMNS` contract; row identity is stable (`ProcessRowId`);
+    ///   sorting and filtering never alter underlying process identities;
+    ///   sticky header stays pinned during vertical scroll.
     Table,
-    /// Pointer-driven resize of a resizable table column through its trailing
-    /// edge. Width persistence and page-specific column identity remain
-    /// frontend-owned concerns.
+
+    /// Pointer-driven interactive column width resizing.
+    ///
+    /// - **User-facing behavior**: Draggable divider handles at the trailing edge
+    ///   of table column header cells allowing dynamic width adjustments.
+    /// - **Interaction semantics**: Pointer hover over trailing border shows
+    ///   resize cursor (<->); mousedown starts live drag session; mouseup commits
+    ///   final width; double-click auto-fits to content.
+    /// - **Invariant expectations**: Column width is bounded within `[min_width, max_width]`;
+    ///   adjacent columns adapt gracefully; frontends without pointer dragging
+    ///   (such as TUI) manage widths via fixed profiles or auto-fit allocations.
     ColumnDragResize,
-    /// Bounded window rendering over a large list.
+
+    /// Bounded-window virtualized list rendering over large collections.
+    ///
+    /// - **User-facing behavior**: Smoothly scrolling list capable of handling
+    ///   thousands of rows without latency, dropped frames, or visual tearing.
+    /// - **Interaction semantics**: Responds smoothly to mouse wheel, trackpad scroll,
+    ///   scrollbar thumb dragging, and keyboard navigation (Up/Down, PageUp/PageDown).
+    /// - **Invariant expectations**: Only visible rows plus a bounded overscan
+    ///   buffer are materialized into layout nodes (O(visible) resource bound);
+    ///   selection and focus states remain consistent across virtualization bounds.
     VirtualList,
-    /// Recursive expand/collapse structure.
+
+    /// A hierarchical expandable and collapsible tree structure.
+    ///
+    /// - **User-facing behavior**: Nested tree nodes with disclosure chevrons,
+    ///   visual indentation guides, and parent-child aggregation (e.g. application
+    ///   process groups).
+    /// - **Interaction semantics**: Pointer click on disclosure chevron or Space
+    ///   key toggles node expansion; Left arrow collapses open node or jumps to
+    ///   parent; Right arrow expands closed node or jumps to first child.
+    /// - **Invariant expectations**: Expanding or collapsing preserves child
+    ///   selection states; summary parent rows aggregate child metrics truthfully
+    ///   without fabricating zero values for unavailable child metrics.
     Tree,
-    /// Scroll affordance bound to a tracked viewport.
+
+    /// A visual scroll affordance bound to a tracked viewport.
+    ///
+    /// - **User-facing behavior**: A draggable scrollbar thumb running along a
+    ///   track indicating current scroll position and visible ratio.
+    /// - **Interaction semantics**: Pointer drag on thumb scrolls content proportionally;
+    ///   track click jumps by page; hover highlights thumb; fades when inactive
+    ///   per theme motion settings.
+    /// - **Invariant expectations**: Thumb height reflects `viewport_extent / content_extent`
+    ///   clamped to a visible minimum; never occludes interactive content along
+    ///   the viewport margin; key-driven terminal frontends may omit pointer rail.
     Scrollbar,
-    /// Input-modality-aware focus indication (keyboard-visible ring).
+
+    /// Modality-aware high-contrast keyboard focus indication.
+    ///
+    /// - **User-facing behavior**: A distinct, high-contrast focus ring surrounding
+    ///   the active control when navigating via keyboard.
+    /// - **Interaction semantics**: Becomes visible immediately upon keyboard navigation
+    ///   (Tab, Shift+Tab, arrow keys); suppressed on mouse clicks until next keyboard
+    ///   interaction.
+    /// - **Invariant expectations**: Focus ring meets accessibility contrast requirements;
+    ///   is never clipped by parent container overflow; clears cleanly when window
+    ///   loses focus or target unmounts.
     FocusVisible,
 }
 
@@ -178,6 +468,129 @@ impl ComponentCapability {
             Self::FocusVisible => "focus.rs",
         }
     }
+
+    /// Returns the explicit, toolkit-neutral semantic specification for this
+    /// capability, defining the required user-facing behavior, interaction
+    /// semantics, and invariant expectations.
+    #[must_use]
+    pub const fn semantic_spec(self) -> CapabilitySemanticSpec {
+        match self {
+            Self::ModalOverlay => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Modal layer-stacked dialog surface with backdrop scrim blocking interaction with underlying views",
+                keyboard_pointer_semantics: "Tab and Shift+Tab cycle focus strictly within modal bounds; Escape or scrim click requests dismissal; autofocuses primary or initial control on mount",
+                invariant_expectations: "Dismissal, cancellation, or Escape produces zero destructive side effects; focus cannot escape to underlying layers while mounted; restores focus to trigger on close",
+            },
+            Self::ContextMenu => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Transient contextual menu displaying operations available for a targeted object or selection",
+                keyboard_pointer_semantics: "Triggered via pointer secondary click or keyboard context menu key / Shift+F10 on focused row; Up/Down arrow keys traverse items; Enter/Space activates item; Escape closes",
+                invariant_expectations: "Closes on outside click, item activation, or window blur; actions apply strictly to snapshot identity captured at menu invocation; clamped within viewport bounds",
+            },
+            Self::DropdownMenu => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Transient popover menu anchored to a specific control affordance for option selection or column visibility toggles",
+                keyboard_pointer_semantics: "Triggered via pointer click or Space/Enter on anchor; Up/Down arrow navigation; Space/Enter selects or toggles item; Escape closes and restores focus to anchor",
+                invariant_expectations: "Closes on outside click or focus loss; updates state atomically; does not close on item toggle if multi-selection is enabled",
+            },
+            Self::Tooltip => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Lightweight transient explanation bubble revealing contextual label, shortcut hint, or status detail on inspection",
+                keyboard_pointer_semantics: "Appears on pointer hover after dwell delay or on keyboard focus; dismisses immediately on pointer exit, pointer click, or Escape",
+                invariant_expectations: "Strictly non-interactive and read-only; never captures or traps keyboard/pointer focus; never blocks interaction with underlying anchor control; terminal shapes route hints to footer line",
+            },
+            Self::Toast => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Non-modal transient notification banner displaying operation feedback, copy receipts, or non-blocking warnings",
+                keyboard_pointer_semantics: "Auto-dismisses after fixed timeout; optional dismiss button accessible via keyboard or click; does not intercept active input focus",
+                invariant_expectations: "Never steals input focus; dismissal is side-effect free; terminal and compact frontends may channel feedback through a dedicated footer activity line",
+            },
+            Self::TextInput => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Single-line editable text input field with visible caret, selection highlighting, and text manipulation",
+                keyboard_pointer_semantics: "Pointer click positions caret; Left/Right moves caret; Home/End jumps to line boundaries; Backspace/Delete removes characters; Enter commits; Escape cancels or unfocuses",
+                invariant_expectations: "Preserves buffer until committed or canceled; caret respects UTF-8 character boundaries; disabled state rejects modifications without mutation",
+            },
+            Self::SearchInput => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Specialized type-to-filter query input with search icon, clear button, match feedback, and instant list filtering",
+                keyboard_pointer_semantics: "Fast keyboard access via slash (/) or Ctrl+F; typing immediately filters active projection; Escape clears query or restores focus to filtered list",
+                invariant_expectations: "Filtering never blocks UI thread; empty query restores full projection; preserves active row selection when matched item remains in view",
+            },
+            Self::TextSelection => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Continuous text selection highlighting across read-only data, detail labels, or log streams enabling clipboard export",
+                keyboard_pointer_semantics: "Pointer drag selects character ranges; double-click selects words; triple-click selects whole lines/blocks; Ctrl/Cmd+C copies selection; Linux middle-click syncs selection",
+                invariant_expectations: "At most one active text selection per window; read-only text is never mutable; table row selection and column resize take arbitration precedence",
+            },
+            Self::Switch => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Two-state binary toggle control indicating immediate boolean state",
+                keyboard_pointer_semantics: "Pointer click or Space/Enter toggles boolean state; animated thumb transition; Tab navigates focus",
+                invariant_expectations: "State changes dispatch typed application intents immediately; disabled state prevents toggle; visually distinct ON and OFF presentation across all themes",
+            },
+            Self::Slider => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Bounded continuous or discrete step numeric range control with track, fill, and draggable thumb",
+                keyboard_pointer_semantics: "Pointer drag on thumb or click on track; Left/Down decreases by step; Right/Up increases by step; Home/End jumps to min/max bounds",
+                invariant_expectations: "Values clamped strictly within [min, max]; step granularity enforced; terminal frontends without pointer analog axis project as discrete selectable option lists",
+            },
+            Self::Checkbox => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Two-state or tri-state selection control with box indicator and label",
+                keyboard_pointer_semantics: "Pointer click on box or label, or keyboard Space key, toggles selection state; Tab traverses focus",
+                invariant_expectations: "Clicking label toggles checkbox; indeterminate state visually distinct from checked/unchecked; identical state transitions across pointer and keyboard",
+            },
+            Self::Select => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Single-choice picker over an enumerated set of options",
+                keyboard_pointer_semantics: "Pointer click or Space/Enter opens popover list; Up/Down arrow keys highlight options; Enter commits selection; Escape cancels; Tab moves focus",
+                invariant_expectations: "Current selection clearly displayed; selecting active choice is a no-op; popover list is bounded and scrollable when option count exceeds viewport",
+            },
+            Self::SegmentedControl => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Compact horizontal ribbon of mutually exclusive tabs or pill buttons",
+                keyboard_pointer_semantics: "Pointer click on segment; Left/Right arrow keys traverse segments; direct digit shortcuts (1..7) activate corresponding segment",
+                invariant_expectations: "Exactly one segment active at any time; active segment has high-contrast visual distinction; switching tabs preserves background data models without corruption",
+            },
+            Self::Table => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Multi-column tabular data grid with sticky header, typed column cells, sorting indicator, and row selection",
+                keyboard_pointer_semantics: "Up/Down arrows navigate rows; Home/End jumps to extremes; PageUp/PageDown scrolls pages; pointer click selects row; header click sorts; Enter/double-click triggers default row action",
+                invariant_expectations: "Columns adhere strictly to shared PROCESS_COLUMNS contract; row identity is stable; sorting and filtering never alter underlying process identities; sticky header pins during scroll",
+            },
+            Self::ColumnDragResize => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Draggable divider handles at trailing edge of table column header cells allowing dynamic width adjustments",
+                keyboard_pointer_semantics: "Pointer hover over trailing border shows horizontal resize cursor; mousedown starts live drag session; mouseup commits final width; double-click auto-fits content",
+                invariant_expectations: "Column width clamped to [min_width, max_width]; adjacent columns adapt or shift gracefully; frontends without pointer dragging manage widths via fixed profiles or auto-fit allocations",
+            },
+            Self::VirtualList => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "High-performance virtualized list rendering over large collections with smooth scrolling",
+                keyboard_pointer_semantics: "Responds smoothly to pointer wheel, trackpad scroll, scrollbar thumb dragging, and keyboard navigation (Up/Down, PageUp/PageDown, Home/End)",
+                invariant_expectations: "Materializes only visible rows plus bounded overscan buffer (O(visible) resource bound); zero frame stutter; selection and focus remain valid across virtualization bounds",
+            },
+            Self::Tree => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Hierarchical expandable and collapsible tree structure with nested nodes, disclosure chevrons, and parent-child aggregation",
+                keyboard_pointer_semantics: "Pointer click on disclosure chevron or Space toggles expand/collapse; Left arrow collapses node or jumps to parent; Right arrow expands or jumps to first child",
+                invariant_expectations: "Expanding or collapsing preserves child selection states; summary parent rows aggregate child metrics truthfully without fabricating zero values for unavailable child metrics",
+            },
+            Self::Scrollbar => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Visual scroll affordance indicating viewport position and extent within scrollable region, with draggable thumb and track",
+                keyboard_pointer_semantics: "Pointer drag on thumb scrolls content proportionally; track click jumps by page; hover highlights thumb; fades when inactive per theme motion settings",
+                invariant_expectations: "Thumb size accurately reflects visible ratio (viewport_extent / content_extent) clamped to readable minimum; never occludes interactive content; key-driven terminal frontends may omit pointer rail",
+            },
+            Self::FocusVisible => CapabilitySemanticSpec {
+                capability: self,
+                user_facing_behavior: "Modality-aware high-contrast visual focus indicator around active interactive control during keyboard navigation",
+                keyboard_pointer_semantics: "Appears immediately on keyboard traversal (Tab, Shift+Tab, arrow keys); suppressed during mouse/pointer clicks until next keyboard interaction",
+                invariant_expectations: "Focus ring meets accessibility contrast requirements; never clipped by parent overflow; cleared cleanly when window loses focus or target unmounts",
+            },
+        }
+    }
 }
 
 /// One frontend's support decision for a capability.
@@ -228,9 +641,18 @@ pub struct FrontendCapabilityDeclaration {
     pub entries: Vec<CapabilityEntry>,
 }
 
-/// The coverage outcome for one capability.
+/// The DECLARATION-DRIFT outcome for one capability.
+///
+/// This is the frontend declaration axis, not the platform availability axis:
+/// it reports whether a frontend declared a capability explicitly
+/// (`Declared`), or silently omitted/duplicated/over-declared it. It is
+/// deliberately NOT named `CapabilityStatus`, which is owned by
+/// `taskmanager-platform-contract` and describes runtime availability. The
+/// self-describing name also keeps it distinct from the sibling coverage axes
+/// ([`crate::BindingCoverageStatus`] for command bindings and
+/// [`crate::FeatureCoverageStatus`] for product features).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CapabilityStatus {
+pub enum CapabilityCoverageStatus {
     /// An explicit support decision.
     Declared(CapabilitySupport),
     /// Contract-known but absent from the declaration — a silent omission.
@@ -241,7 +663,7 @@ pub enum CapabilityStatus {
     Unknown,
 }
 
-impl CapabilityStatus {
+impl CapabilityCoverageStatus {
     /// Whether the capability carries an explicit decision — the only
     /// status a no-drift declaration may show.
     #[must_use]
@@ -261,15 +683,15 @@ impl CapabilityStatus {
 #[must_use]
 pub fn capability_report(
     declaration: &FrontendCapabilityDeclaration,
-) -> Vec<(ComponentCapability, CapabilityStatus)> {
+) -> Vec<(ComponentCapability, CapabilityCoverageStatus)> {
     capability_report_over(declaration, ComponentCapability::ALL)
 }
 
 /// The drift findings alone.
 #[must_use]
 pub fn capability_drift(
-    report: &[(ComponentCapability, CapabilityStatus)],
-) -> Vec<(ComponentCapability, CapabilityStatus)> {
+    report: &[(ComponentCapability, CapabilityCoverageStatus)],
+) -> Vec<(ComponentCapability, CapabilityCoverageStatus)> {
     report
         .iter()
         .copied()
@@ -311,11 +733,11 @@ pub struct CapabilityFinding {
 /// empty result is the only passing state.
 #[must_use]
 pub fn capability_findings(declaration: &FrontendCapabilityDeclaration) -> Vec<CapabilityFinding> {
-    let drift_kind = |status: CapabilityStatus| match status {
-        CapabilityStatus::Missing => Some(CapabilityFindingKind::Missing),
-        CapabilityStatus::Duplicated => Some(CapabilityFindingKind::Duplicated),
-        CapabilityStatus::Unknown => Some(CapabilityFindingKind::Unknown),
-        CapabilityStatus::Declared(_) => None,
+    let drift_kind = |status: CapabilityCoverageStatus| match status {
+        CapabilityCoverageStatus::Missing => Some(CapabilityFindingKind::Missing),
+        CapabilityCoverageStatus::Duplicated => Some(CapabilityFindingKind::Duplicated),
+        CapabilityCoverageStatus::Unknown => Some(CapabilityFindingKind::Unknown),
+        CapabilityCoverageStatus::Declared(_) => None,
     };
     let mut findings: Vec<CapabilityFinding> = capability_report(declaration)
         .into_iter()
@@ -328,7 +750,7 @@ pub fn capability_findings(declaration: &FrontendCapabilityDeclaration) -> Vec<C
         })
         .collect();
     for (capability, status) in capability_report(declaration) {
-        let CapabilityStatus::Declared(support) = status else {
+        let CapabilityCoverageStatus::Declared(support) = status else {
             continue;
         };
         let kind = if support == CapabilitySupport::Reference
@@ -368,10 +790,10 @@ pub fn capability_findings(declaration: &FrontendCapabilityDeclaration) -> Vec<C
 fn capability_report_over(
     declaration: &FrontendCapabilityDeclaration,
     known: &[ComponentCapability],
-) -> Vec<(ComponentCapability, CapabilityStatus)> {
-    let mut report: Vec<(ComponentCapability, CapabilityStatus)> = known
+) -> Vec<(ComponentCapability, CapabilityCoverageStatus)> {
+    let mut report: Vec<(ComponentCapability, CapabilityCoverageStatus)> = known
         .iter()
-        .map(|capability| (*capability, CapabilityStatus::Missing))
+        .map(|capability| (*capability, CapabilityCoverageStatus::Missing))
         .collect();
     for entry in &declaration.entries {
         match report
@@ -379,13 +801,13 @@ fn capability_report_over(
             .find(|(capability, _)| *capability == entry.capability)
         {
             Some((_, status)) => {
-                if status.is_explicit() || matches!(status, CapabilityStatus::Duplicated) {
-                    *status = CapabilityStatus::Duplicated;
+                if status.is_explicit() || matches!(status, CapabilityCoverageStatus::Duplicated) {
+                    *status = CapabilityCoverageStatus::Duplicated;
                 } else {
-                    *status = CapabilityStatus::Declared(entry.support);
+                    *status = CapabilityCoverageStatus::Declared(entry.support);
                 }
             }
-            None => report.push((entry.capability, CapabilityStatus::Unknown)),
+            None => report.push((entry.capability, CapabilityCoverageStatus::Unknown)),
         }
     }
     report

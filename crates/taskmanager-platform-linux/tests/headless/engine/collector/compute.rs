@@ -294,8 +294,15 @@ fn cpu_observation_always_carries_all_granular_sources() {
 fn memory_observation_always_carries_all_granular_sources() {
     let system = System::new_all();
     let mut previous_used = None;
+    let mut previous_swap_activity = None;
     let first_at = Instant::now();
-    let observation = collect_memory(&system, &mut previous_used, first_at, 100);
+    let observation = collect_memory(
+        &system,
+        &mut previous_used,
+        &mut previous_swap_activity,
+        first_at,
+        100,
+    );
     let providers: Vec<&str> = observation
         .sources
         .iter()
@@ -349,6 +356,7 @@ fn memory_observation_always_carries_all_granular_sources() {
     let second = collect_memory(
         &system,
         &mut previous_used,
+        &mut previous_swap_activity,
         first_at + std::time::Duration::from_secs(1),
         200,
     );
@@ -365,4 +373,168 @@ fn memory_observation_always_carries_all_granular_sources() {
             .last_success_ms(),
         Some(200)
     );
+}
+
+#[test]
+fn swap_activity_parser_requires_both_cumulative_counters() {
+    assert_eq!(
+        parse_swap_activity("pswpin 12\npswpout 34\n"),
+        Some((12, 34))
+    );
+    assert_eq!(parse_swap_activity("pswpin 12\n"), None);
+    assert_eq!(parse_swap_activity("pswpin nope\npswpout 34\n"), None);
+}
+
+#[test]
+fn package_probe_keeps_numa_chiplet_smt_and_throttle_facts_typed() {
+    let root = crate::test_support::repo_temp_dir().join(format!(
+        "taskmanager-cpu-package-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos()
+    ));
+    let cpu_root = root.join("cpu");
+    let node_root = root.join("node");
+    for cpu in [0_u32, 1] {
+        let topology = cpu_root.join(format!("cpu{cpu}/topology"));
+        let cpufreq = cpu_root.join(format!("cpu{cpu}/cpufreq"));
+        let throttle = cpu_root.join(format!("cpu{cpu}/thermal_throttle"));
+        std::fs::create_dir_all(&topology).expect("topology fixture");
+        std::fs::create_dir_all(&cpufreq).expect("cpufreq fixture");
+        std::fs::create_dir_all(&throttle).expect("throttle fixture");
+        std::fs::write(topology.join("physical_package_id"), "0\n").expect("package id");
+        std::fs::write(topology.join("core_id"), format!("{cpu}\n")).expect("core id");
+        std::fs::write(topology.join("thread_siblings_list"), "0-1\n").expect("siblings");
+        std::fs::write(topology.join("die_id"), format!("{}\n", cpu / 2)).expect("die id");
+        std::fs::write(
+            cpufreq.join("scaling_cur_freq"),
+            format!("{}\n", 2_000_000 + cpu * 100_000),
+        )
+        .expect("frequency");
+        std::fs::write(throttle.join("package_throttle_count"), "7\n").expect("package throttle");
+        std::fs::write(
+            throttle.join("core_throttle_count"),
+            format!("{}\n", cpu + 1),
+        )
+        .expect("core throttle");
+    }
+    let node = node_root.join("node0");
+    std::fs::create_dir_all(&node).expect("node fixture");
+    std::fs::write(node.join("cpulist"), "0-1\n").expect("node cpulist");
+    std::fs::write(node.join("meminfo"), "Node 0 MemTotal:       4096 kB\n").expect("node meminfo");
+    std::fs::write(node.join("numastat"), "numa_hit 90\nnuma_miss 10\n").expect("node numastat");
+
+    let packages =
+        super::cpu_sources::diagnostics::observe_cpu_packages_at(&cpu_root, &node_root, 2);
+    assert_eq!(packages.len(), 1);
+    let package = &packages[0];
+    assert_eq!(package.package_id, 0);
+    assert_eq!(package.logical_core_ids, [0, 1]);
+    assert_eq!(package.physical_core_count, Some(2));
+    assert_eq!(package.smt_threads_per_core, Some(2));
+    assert_eq!(package.smt_sibling_groups, [vec![0, 1]]);
+    assert_eq!(package.chiplet_ids, [0]);
+    assert_eq!(package.numa_node_ids, [0]);
+    assert_eq!(package.local_memory_bytes, Some(4_194_304));
+    assert_eq!(package.package_throttle_count, Some(7));
+    assert_eq!(package.core_throttle_count, Some(3));
+    assert_eq!(package.frequency_mhz, Some(2_050));
+    assert_eq!(package.numa_hit_ratio_pct, Some(90.0));
+
+    std::fs::remove_dir_all(root).expect("fixture cleanup");
+}
+
+#[test]
+fn cpuidle_probe_preserves_cumulative_counters_and_disabled_state() {
+    let root = crate::test_support::repo_temp_dir().join(format!(
+        "taskmanager-cpu-idle-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos()
+    ));
+    let state = root.join("cpu0/cpuidle/state6");
+    std::fs::create_dir_all(&state).expect("cpuidle fixture");
+    std::fs::write(state.join("name"), "C6\n").expect("state name");
+    std::fs::write(state.join("desc"), "Deep sleep\n").expect("state description");
+    std::fs::write(state.join("time"), "123456\n").expect("residency");
+    std::fs::write(state.join("usage"), "42\n").expect("usage");
+    std::fs::write(state.join("latency"), "80\n").expect("latency");
+    std::fs::write(state.join("disable"), "1\n").expect("disabled");
+
+    let states = super::cpu_sources::diagnostics::observe_cpu_idle_states_at(&root);
+    assert_eq!(states.len(), 1);
+    assert_eq!(states[0].name, "C6");
+    assert_eq!(states[0].description.as_deref(), Some("Deep sleep"));
+    assert_eq!(states[0].residency_us, Some(123_456));
+    assert_eq!(states[0].usage_count, Some(42));
+    assert_eq!(states[0].latency_us, Some(80));
+    assert_eq!(states[0].disabled, Some(true));
+
+    std::fs::remove_dir_all(root).expect("fixture cleanup");
+}
+
+#[test]
+fn power_limit_probe_maps_named_long_short_constraints_and_tau() {
+    let root = crate::test_support::repo_temp_dir().join(format!(
+        "taskmanager-cpu-powercap-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .expect("clock should be after epoch")
+            .as_nanos()
+    ));
+    let package = root.join("intel-rapl:0");
+    std::fs::create_dir_all(&package).expect("powercap fixture");
+    std::fs::write(package.join("constraint_0_name"), "long_term\n").expect("long name");
+    std::fs::write(package.join("constraint_0_power_limit_uw"), "15000000\n").expect("long limit");
+    std::fs::write(package.join("constraint_0_time_window_us"), "28000000\n").expect("tau");
+    std::fs::write(package.join("constraint_1_name"), "short_term\n").expect("short name");
+    std::fs::write(package.join("constraint_1_power_limit_uw"), "45000000\n").expect("short limit");
+
+    let (pl1, pl2, tau) = super::cpu_sources::diagnostics::observe_power_limits_at(&root);
+    assert_eq!(pl1, Some(15.0));
+    assert_eq!(pl2, Some(45.0));
+    assert_eq!(tau, Some(28_000));
+
+    // A peak constraint preceding PL2 is not evidence of a long-term limit.
+    std::fs::write(package.join("constraint_0_name"), "peak_power\n").expect("peak name");
+    assert_eq!(
+        super::cpu_sources::diagnostics::observe_power_limits_at(&root),
+        (None, Some(45.0), None)
+    );
+    std::fs::remove_file(package.join("constraint_1_name")).expect("missing name");
+    assert_eq!(
+        super::cpu_sources::diagnostics::observe_power_limits_at(&root),
+        (None, None, None)
+    );
+    // Swapped indices still follow names, and measured zero stays distinct
+    // from a missing or malformed limit.
+    std::fs::write(package.join("constraint_0_name"), "short_term\n").expect("short name");
+    std::fs::write(package.join("constraint_1_name"), "long_term\n").expect("long name");
+    std::fs::write(package.join("constraint_1_power_limit_uw"), "0\n").expect("zero limit");
+    assert_eq!(
+        super::cpu_sources::diagnostics::observe_power_limits_at(&root),
+        (Some(0.0), Some(15.0), None)
+    );
+    std::fs::write(package.join("constraint_1_power_limit_uw"), "invalid\n")
+        .expect("malformed limit");
+    assert_eq!(
+        super::cpu_sources::diagnostics::observe_power_limits_at(&root),
+        (None, Some(15.0), None)
+    );
+
+    std::fs::remove_dir_all(root).expect("fixture cleanup");
+}
+
+#[test]
+fn interrupt_parser_keeps_per_cpu_distribution_and_skips_malformed_rows() {
+    let text = "           CPU0       CPU1\n  1:       10         20  IO-APIC\n  2:        3          4  timer\nNMI:        99         99  non-row\n  bad:      nope        1\n";
+    let snapshot =
+        super::cpu_sources::diagnostics::parse_interrupts(text, 2).expect("interrupt rows");
+    assert_eq!(snapshot.per_logical_cpu, [112, 123]);
+    assert_eq!(snapshot.total, Some(235));
 }

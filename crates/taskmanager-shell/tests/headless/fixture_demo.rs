@@ -40,7 +40,7 @@ fn direct_demo_contains_the_shared_product_projection() {
     assert!(track.visible_processes().len() >= 2);
     assert_eq!(
         projection.capability_status(&CapabilityId::TELEMETRY_GPU_ENGINES),
-        Some(CapabilityStatus::PermissionRequired)
+        Some(CapabilityStatus::RequiresEscalation)
     );
 }
 

@@ -602,7 +602,12 @@ fn duplicate_catalog_routes_keep_one_descriptor_and_first_provider_authority() {
     ];
     let catalog = RuntimeCapabilityCatalog::new(&routes, fixed_clock);
     let snapshot = catalog.snapshot();
-    assert_eq!(snapshot.iter().count(), 1);
+    let registered: Vec<_> = snapshot.registered().collect();
+    assert_eq!(
+        registered.len(),
+        1,
+        "duplicate routes must register one descriptor, not two"
+    );
     assert_eq!(
         snapshot
             .get(&CapabilityId::TELEMETRY_CPU)

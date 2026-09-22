@@ -54,6 +54,9 @@ en4: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
         Some(&IfaceLink {
             speed_mbps: Some(1000),
             up: true,
+            mtu_bytes: Some(1500),
+            ipv4_addr: Some("192.168.1.10".into()),
+            ipv6_addr: Some("fe80::1".into()),
         }),
     );
     assert_eq!(
@@ -61,6 +64,8 @@ en4: flags=8863<UP,BROADCAST,SMART,RUNNING,SIMPLEX,MULTICAST> mtu 1500
         Some(&IfaceLink {
             speed_mbps: None,
             up: false,
+            mtu_bytes: Some(1500),
+            ..Default::default()
         }),
     );
 }

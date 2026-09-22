@@ -2,8 +2,8 @@ use super::*;
 use std::collections::HashSet;
 
 #[test]
-fn the_inventory_covers_exactly_fourteen_columns() {
-    assert_eq!(PROCESS_COLUMNS.len(), 14);
+fn the_inventory_covers_exactly_sixteen_columns() {
+    assert_eq!(PROCESS_COLUMNS.len(), 16);
     assert_eq!(
         PROCESS_COLUMNS.first().map(|spec| spec.id),
         Some("Name"),

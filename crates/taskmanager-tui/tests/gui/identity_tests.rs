@@ -167,6 +167,41 @@ fn gpu_hot_unplug_falls_back_to_the_first_still_backed_resource() {
 }
 
 #[test]
+fn disk_hot_unplug_falls_back_to_the_first_still_backed_resource() {
+    let mut app = TuiApp::from_shell(taskmanager_shell::fixture::demo_app());
+    app.select_perf_device(PerfDevice::Disk);
+    assert!(app.visible_perf_devices().contains(&PerfDevice::Disk));
+
+    // The storage family leaves the projection (hot-unplug); the next wave
+    // folds through the TUI's production batch entry.
+    fixture::edit_snapshot(&mut app.shell, |snapshot| {
+        if let Some(snapshot) = snapshot.as_mut() {
+            snapshot.disks.clear();
+        }
+    });
+    app.apply_platform_batch(PlatformEventBatch::default());
+
+    assert!(
+        !app.visible_perf_devices().contains(&PerfDevice::Disk),
+        "fixture must have removed the storage family from the projection"
+    );
+    assert_ne!(
+        app.perf_device,
+        PerfDevice::Disk,
+        "the vanished storage family must not stay selected into the next paint"
+    );
+    let visible = app.visible_perf_devices();
+    assert!(
+        !visible.is_empty(),
+        "the fixture must leave at least one backed resource to fall back to"
+    );
+    assert_eq!(
+        app.perf_device, visible[0],
+        "the fallback must be the first resource the projection still backs"
+    );
+}
+
+#[test]
 fn an_unrelated_batch_never_moves_a_backed_device_selection() {
     let mut app = TuiApp::from_shell(taskmanager_shell::fixture::demo_app());
     app.select_perf_device(PerfDevice::Gpu);

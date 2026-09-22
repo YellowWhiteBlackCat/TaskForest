@@ -92,6 +92,7 @@ const fn initial_sort_direction(column: SortCol) -> SortDir {
         | SortCol::CpuTime
         | SortCol::DiskRead
         | SortCol::DiskWrite
+        | SortCol::Network
         | SortCol::StartTime
         | SortCol::Fds
         | SortCol::Nice => SortDir::Desc,

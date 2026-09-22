@@ -61,12 +61,18 @@ fn cell_text(process: &ProcessItem, column: &str) -> String {
         "Swap" => process
             .current_swap_bytes()
             .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
+        "MemoryPss" => process
+            .current_memory_pss_bytes()
+            .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
         "DiskRead" => process
             .current_disk_read_bytes_per_sec()
             .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
         "DiskWrite" => process
             .current_disk_write_bytes_per_sec()
             .map_or_else(|| MISSING_VALUE.to_owned(), bytes),
+        "Network" => process
+            .current_network_bytes_per_sec()
+            .map_or_else(|| MISSING_VALUE.to_owned(), |v| format!("{}/s", bytes(v))),
         "CPUTime" => optional_cpu_time_seconds(process.current_cpu_time_secs()),
         "FDs" => process
             .current_fds()

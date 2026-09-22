@@ -10,9 +10,20 @@
 | Bevy | TaskForestB | `io.github.YellowWhiteBlackCat.TaskForestB` |
 | TUI | TaskForest | 终端进程，无桌面 app id |
 
-GPUI 是当前发行包形态。Iced、TUI 与 Bevy 支持源码构建；Bevy 走独立二进制
-`taskforest-b`（由 `scripts/build-frontend-binaries.sh` 构建），成熟度口径见
-[BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md)，不进入发行包矩阵。
+GPUI、Iced、TUI 与 Bevy 四大前端均已全部纳入官方发行包矩阵，享有平等的安装包分发地位
+（提供 DEB、RPM、MSI 官方安装包）。各端独立二进制分别为 `taskforest-g`、`taskforest-i`、
+`taskforest-t`、`taskforest-b`。
+
+"四端平权"仅指四端发行物与前端语义同权，不含"跨平台功能对等"，也不表示三个平台具备
+相同的系统级能力。平台能力一律以 typed 结果呈现——要么是可用值，要么是 typed 不可用
+（`Unsupported` / `PermissionRequired` / `RequiresEscalation` / `MissingDependency` /
+`TemporarilyUnavailable`，均为 `platform-contract::CapabilityStatus` 的真实变体名；
+`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴）；
+未注册的期望身份以 typed 缺席呈现——`Unsupported`、无 provider 归属，不以"无条目"静默
+消失（`CapabilityId::EXPECTED_SURFACE`，机制见
+[ADR-053](../adr/053-product-expected-capability-surface.md)）。平台按 typed 原因诚实降级
+是产品承诺的一部分，typed 缺席不视为落空，也不得用空值、静态占位或未接线按钮伪装为
+已实现功能。
 
 ## 程序与兼容名称
 
@@ -29,7 +40,7 @@ Linux 发行包安装的主桌面可执行文件是 `taskforest-g`；兼容 CLI 
 TaskForest-<UI>-<版本>-<平台>.<格式>
 ```
 
-- `<UI>`：发行包前端的单字母后缀（GPUI 为 `G`；Iced 若进入发行包为 `I`）；
+- `<UI>`：发行包前端的单字母后缀（GPUI 为 `G`；Iced 为 `I`；TUI 为 `T`；Bevy 为 `B`）；
 - `<版本>`：完整 Cargo 版本；预发布后缀统一连写为 `rcN`（如 `0.1.0-rc5`，不带点），
   与 git tag（`v0.1.0-rc5`）逐字一致；
 - `<平台>`：统一为 `x64` / `arm64`，与 DEB `Architecture`（`amd64`/`arm64`）和

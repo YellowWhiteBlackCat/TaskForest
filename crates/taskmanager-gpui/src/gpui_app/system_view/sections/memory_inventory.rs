@@ -61,10 +61,15 @@ pub(crate) fn memory_inventory_model(
         SmbiosMemoryState::Failed(failed) => model_from_failure(failure_kind(&failed.failure)),
         SmbiosMemoryState::Closed => match inputs.capability {
             // The runtime catalog proves an escalation-backed lane exists:
-            // offer the one explicit authorization entry.
-            Some(CapabilityStatus::Available | CapabilityStatus::PermissionRequired) => {
-                MemoryInventoryModel::AuthorizationRequired
-            }
+            // offer the one explicit authorization entry. `RequiresEscalation`
+            // is the escalatable state (the per-feature OS-native prompt can
+            // grant it); `PermissionRequired` is a permission gate with no
+            // escalation offer. Both still require one explicit decision.
+            Some(
+                CapabilityStatus::Available
+                | CapabilityStatus::PermissionRequired
+                | CapabilityStatus::RequiresEscalation,
+            ) => MemoryInventoryModel::AuthorizationRequired,
             Some(CapabilityStatus::MissingDependency) => {
                 MemoryInventoryModel::Unavailable("system.memory_inventory_helper")
             }

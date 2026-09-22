@@ -29,6 +29,7 @@ pub(super) fn panel(
         ServiceAction::Restart,
         ServiceAction::Enable,
         ServiceAction::Disable,
+        ServiceAction::ReloadDaemon,
     ];
     let buttons: Vec<Element<'static, Message, iced::Theme, iced::Renderer>> = actions
         .into_iter()
@@ -74,5 +75,6 @@ fn service_action_key(action: ServiceAction) -> &'static str {
         ServiceAction::Restart => "svc.restart",
         ServiceAction::Enable => "svc.enable",
         ServiceAction::Disable => "svc.disable",
+        ServiceAction::ReloadDaemon => "svc.reload_daemon",
     }
 }

@@ -76,6 +76,11 @@ fn the_menu_offers_the_shared_control_verbs_and_the_neutral_priority_tiers() {
             t("proc.high"),
             t("proc.normal"),
             t("proc.low"),
+            t("proc.efficiency_mode"),
+            t("proc.open_location"),
+            t("proc.search_online"),
+            t("proc.affinity"),
+            t("dialog.properties"),
         ],
         "the menu offers the shared verbs plus the three neutral tiers, in order"
     );

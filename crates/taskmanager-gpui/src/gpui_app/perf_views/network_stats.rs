@@ -99,6 +99,51 @@ pub(super) fn network_stats(
                 .map(|value| format!("{value:.0}%")),
         ));
     }
+    if let Some(mtu) = n.current_mtu_bytes() {
+        stats.push(StatRow::text(i18n::t("net.mtu"), Some(format!("{mtu} B"))));
+    }
+    if let Some(queue) = n.current_tx_queue_len() {
+        stats.push(StatRow::text(
+            i18n::t("net.tx_queue"),
+            Some(queue.to_string()),
+        ));
+    }
+    if n.current_rx_drops().is_some() || n.current_tx_drops().is_some() {
+        stats.push(StatRow::text(
+            i18n::t("net.drops"),
+            Some(format!(
+                "{} / {}",
+                n.current_rx_drops()
+                    .map_or_else(|| "—".into(), |v| v.to_string()),
+                n.current_tx_drops()
+                    .map_or_else(|| "—".into(), |v| v.to_string()),
+            )),
+        ));
+    }
+    if n.current_rx_errors().is_some() || n.current_tx_errors().is_some() {
+        stats.push(StatRow::text(
+            i18n::t("net.errors"),
+            Some(format!(
+                "{} / {}",
+                n.current_rx_errors()
+                    .map_or_else(|| "—".into(), |v| v.to_string()),
+                n.current_tx_errors()
+                    .map_or_else(|| "—".into(), |v| v.to_string()),
+            )),
+        ));
+    }
+    if n.current_rx_overruns().is_some() || n.current_tx_overruns().is_some() {
+        stats.push(StatRow::text(
+            i18n::t("net.overruns"),
+            Some(format!(
+                "{} / {}",
+                n.current_rx_overruns()
+                    .map_or_else(|| "—".into(), |v| v.to_string()),
+                n.current_tx_overruns()
+                    .map_or_else(|| "—".into(), |v| v.to_string()),
+            )),
+        ));
+    }
     // Optional native driver/model facts. Values arrive through the immutable
     // `NetworkMetrics` read model; render performs no native I/O.
     if let Some(driver) = n.driver.as_deref() {
@@ -112,6 +157,23 @@ pub(super) fn network_stats(
             i18n::t("common.adapter"),
             Some(adapter.to_owned()),
         ));
+    }
+    if let Some(master) = n
+        .master_interface
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        stats.push(StatRow::text(
+            i18n::t("net.master"),
+            Some(master.to_owned()),
+        ));
+    }
+    if let Some(peer) = n
+        .peer_interface
+        .as_deref()
+        .filter(|value| !value.is_empty())
+    {
+        stats.push(StatRow::text(i18n::t("net.peer"), Some(peer.to_owned())));
     }
     // ── Wireless signal level (dBm; only for associated wireless links) ──
     if let Some(sig) = n.current_signal_dbm() {
@@ -131,6 +193,9 @@ pub(super) fn network_stats(
         }
         if let Some(channel) = n.current_channel() {
             details.push(format!("{} {channel}", i18n::t("net.channel")));
+        }
+        if let Some(width) = n.current_channel_width_mhz() {
+            details.push(format!("{} {width} MHz", i18n::t("net.channel_width")));
         }
         if let Some(frequency) = n.current_frequency_mhz() {
             details.push(format!("{} {frequency} MHz", i18n::t("net.frequency")));

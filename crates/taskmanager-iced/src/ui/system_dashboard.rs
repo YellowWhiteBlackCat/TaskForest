@@ -4,10 +4,8 @@
 //! summary cards, the history-window selector, and the events center from the
 //! existing shell projection and is self-sufficient headless (the System page
 //! wiring lives in `ui::system_table`, owned by a parallel workflow). The
-//! window vocabulary is the shared `taskmanager_core::core::history::HistoryWindow`
-//! (1h / 24h / 7d) — the shell exposes no GPUI-style `TimelineSelection`
-//! type, so the segment maps the window selection through that typed shell
-//! enum only. Honesty contract: an unobserved fact renders the shared dash,
+//! window vocabulary aligns to GPUI's resource history window options
+//! (1m / 5m / 15m / 60m). Honesty contract: an unobserved fact renders the shared dash,
 //! never a fabricated zero, and the events center lists the shell's live
 //! active-alert mirror — no persisted event history exists in the shell, so
 //! none is invented.
@@ -16,7 +14,10 @@ use iced::Length;
 use iced::widget::{column, row, text};
 use taskmanager_application::i18n::t;
 use taskmanager_core::core::alerts::AlertSeverity;
-use taskmanager_core::core::history::HistoryWindow;
+
+pub use super::system_table::ResourceHistoryWindow;
+#[allow(dead_code)]
+pub type HistoryWindow = ResourceHistoryWindow;
 
 use crate::app::alerts::active_alert_lines;
 use crate::app::{FocusTarget, Message};
@@ -37,17 +38,12 @@ pub(crate) use super::system_dashboard_model::{DashboardSummaryModel, summary_mo
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SystemDashboardMessage {
     /// Select the history window the segment summarizes.
-    SelectWindow(HistoryWindow),
+    SelectWindow(ResourceHistoryWindow),
 }
 
-/// The localized label for one history window (the same shared catalog keys
-/// the Performance page's replay window pills use).
-pub(crate) fn history_window_label(window: HistoryWindow) -> &'static str {
-    t(match window {
-        HistoryWindow::OneHour => "perf.replay.window.1h",
-        HistoryWindow::TwentyFourHours => "perf.replay.window.24h",
-        HistoryWindow::SevenDays => "perf.replay.window.7d",
-    })
+/// The label for one history window (1m, 5m, 15m, 60m), matching GPUI copy.
+pub(crate) fn history_window_label(window: ResourceHistoryWindow) -> &'static str {
+    window.label()
 }
 
 /// Render the System-page dashboard segment from the current app projection.
@@ -56,7 +52,7 @@ pub(crate) fn history_window_label(window: HistoryWindow) -> &'static str {
 /// [`SystemDashboardMessage::SelectWindow`] for that lane.
 pub(crate) fn render_system_dashboard(
     app: &crate::IcedApp,
-    selected_window: HistoryWindow,
+    selected_window: ResourceHistoryWindow,
 ) -> IcedElement<'_> {
     let theme_snapshot = app.theme();
     let model = summary_model(app.shell.projection());
@@ -121,16 +117,13 @@ fn summary_card<'a>(
 /// selected window wearing the active pill.
 fn window_card<'a>(
     theme_snapshot: &'a taskmanager_theme::Theme,
-    selected_window: HistoryWindow,
+    selected_window: ResourceHistoryWindow,
 ) -> IcedElement<'a> {
     let mut pills = row![].spacing(f32::from(tokens::SPACE_4));
-    for window in HistoryWindow::ALL {
-        // The focus registry is a parallel workflow's file; the window pills
-        // reuse the replay window target — the two selectors are never
-        // rendered simultaneously (Performance page vs System segment).
+    for window in ResourceHistoryWindow::ALL {
         pills = pills.push(focus::choice_pill(
             theme_snapshot,
-            FocusTarget::HistoryReplayWindow(window),
+            FocusTarget::ResourceHistoryWindow(window),
             history_window_label(window).to_owned(),
             window == selected_window,
             Message::SystemDashboard(SystemDashboardMessage::SelectWindow(window)),

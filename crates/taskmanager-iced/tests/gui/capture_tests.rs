@@ -39,7 +39,9 @@ fn device_markers_cover_every_performance_selector() {
     let names: Vec<_> = devices.into_iter().map(device_name).collect();
     assert_eq!(
         names,
-        ["cpu", "memory", "disk", "network", "gpu", "battery", "fan"]
+        [
+            "cpu", "memory", "disk", "network", "gpu", "npu", "battery", "fan"
+        ]
     );
     assert_eq!(
         device_marker_line(crate::app::PerfDevice::Gpu(0)),

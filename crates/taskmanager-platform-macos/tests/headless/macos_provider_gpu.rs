@@ -1,5 +1,12 @@
 use super::*;
 
+fn gpu_observation_from_profiler(
+    profiler_result: Result<Vec<MacGpuAdapter>, FailureKind>,
+    observed_at_ms: u64,
+) -> GpuTelemetryObservation {
+    super::gpu_observation_from_profiler_with_dynamic(profiler_result, Ok(None), observed_at_ms)
+}
+
 #[test]
 fn profiler_failure_is_unavailable_and_preserves_cause() {
     let observation = gpu_observation_from_profiler(Err(FailureKind::MissingDependency), 1);
@@ -98,6 +105,35 @@ fn gpu_adapter_json_apple_silicon_has_no_vram() {
     assert!(!adapter.identity_is_authoritative);
     assert_eq!(adapter.brand, "Apple M1 Pro");
     assert_eq!(adapter.vram_total_bytes, None);
+}
+
+#[test]
+fn ioreg_gpu_utilization_parser_keeps_only_bounded_device_values() {
+    let output = r#"
+        "PerformanceStatistics" = {"Device Utilization %"=37,"GPU Activity(%)"=41}
+        "PerformanceStatistics" = {"Device Utilization %"=101}
+    "#;
+    assert_eq!(parse_ioreg_gpu_utilizations(output), vec![37.0]);
+    assert_eq!(
+        parse_ioreg_gpu_utilizations("\"GPU Activity(%)\"=41"),
+        vec![41.0]
+    );
+}
+
+#[test]
+fn one_ioreg_value_is_promoted_to_the_single_matching_gpu() {
+    let adapter = MacGpuAdapter {
+        identity: "spdisplays_device-id=0x7340".into(),
+        identity_is_authoritative: true,
+        brand: "AMD Radeon Pro 5500 XT".into(),
+        vram_total_bytes: None,
+    };
+    let observation =
+        gpu_observation_from_profiler_with_dynamic(Ok(vec![adapter]), Ok(Some(37.0)), 42);
+    assert_eq!(
+        observation.current_value().expect("current GPU")[0].current_utilization_pct(),
+        Some(37.0)
+    );
 }
 
 #[test]

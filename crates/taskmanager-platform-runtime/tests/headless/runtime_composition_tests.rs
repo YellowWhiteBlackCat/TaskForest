@@ -272,13 +272,20 @@ fn complete_routes_are_total_and_catalog_attribution_is_unique() {
 
     let runtime = ChannelRuntime::new(complete_bindings(), RuntimeConfig::new(fixed_clock));
     let snapshot = runtime.handle.capabilities().snapshot();
+    let registered: Vec<_> = snapshot.registered().collect();
     assert_eq!(
-        snapshot.iter().count(),
+        registered.len(),
         routes.len(),
-        "catalog descriptors must match the typed route table"
+        "catalog registrations must match the typed route table"
     );
+    for expected in CapabilityId::EXPECTED_SURFACE {
+        assert!(
+            snapshot.get(&expected).is_some(),
+            "every product capability must be addressable, absent or not: {expected}"
+        );
+    }
     let mut catalog_capabilities = std::collections::BTreeSet::new();
-    for descriptor in snapshot.iter() {
+    for descriptor in registered {
         assert!(
             catalog_capabilities.insert(descriptor.id.clone()),
             "duplicate catalog descriptor {}",
@@ -287,7 +294,7 @@ fn complete_routes_are_total_and_catalog_attribution_is_unique() {
         assert_eq!(
             descriptor.providers.len(),
             1,
-            "each capability must be attributed to exactly one provider"
+            "each registered capability must be attributed to exactly one provider"
         );
     }
 }

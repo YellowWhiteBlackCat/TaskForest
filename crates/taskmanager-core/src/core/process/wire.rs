@@ -7,7 +7,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use super::{
     ProcessApplicationIdentity, ProcessItem, ProcessMetadataAvailability,
     ProcessMetadataObservation, ProcessMetadataObservations, ProcessOwner, ProcessOwnerIdentity,
-    ProcessScalarObservations,
+    ProcessScalarObservations, ProcessSchedulingPolicy,
 };
 use crate::core::{ScalarAvailability, ScalarObservation};
 
@@ -30,6 +30,8 @@ struct ProcessItemWire {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     disk_write_bytes: Option<u64>,
     status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    scheduling_policy: Option<ProcessSchedulingPolicy>,
     #[serde(default)]
     user: String,
     #[serde(default)]
@@ -48,6 +50,14 @@ struct ProcessItemWire {
     fds: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     nice: Option<i32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    oom_score: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    minor_page_faults: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    major_page_faults: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    cancelled_write_bytes: Option<u64>,
     #[serde(default)]
     scalar_observations: ProcessScalarObservations,
     #[serde(
@@ -124,6 +134,7 @@ impl Serialize for ProcessItem {
             disk_read_bytes: self.current_disk_read_bytes_per_sec(),
             disk_write_bytes: self.current_disk_write_bytes_per_sec(),
             status: self.status.clone(),
+            scheduling_policy: self.scheduling_policy,
             user: self.current_user().unwrap_or_default(),
             exe_path: self.current_exe_path().map(PathBuf::from),
             metadata_observations: self.metadata_observations.clone(),
@@ -133,6 +144,10 @@ impl Serialize for ProcessItem {
             cpu_time_secs: self.current_cpu_time_secs(),
             fds: self.current_fds(),
             nice: self.current_nice(),
+            oom_score: self.oom_score,
+            minor_page_faults: self.minor_page_faults,
+            major_page_faults: self.major_page_faults,
+            cancelled_write_bytes: self.cancelled_write_bytes,
             scalar_observations: self.scalar_observations,
             cpu_history: self.cpu_history.clone(),
             mem_history: self.mem_history.clone(),
@@ -183,6 +198,11 @@ impl<'de> Deserialize<'de> for ProcessItem {
             name: wire.name,
             cmdline: wire.cmdline,
             status: wire.status,
+            scheduling_policy: wire.scheduling_policy,
+            oom_score: wire.oom_score,
+            minor_page_faults: wire.minor_page_faults,
+            major_page_faults: wire.major_page_faults,
+            cancelled_write_bytes: wire.cancelled_write_bytes,
             metadata_observations,
             application_identity: wire.application_identity,
             scalar_observations,

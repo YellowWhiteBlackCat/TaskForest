@@ -29,7 +29,7 @@ mod window_presentation;
 #[cfg(target_os = "windows")]
 pub mod capture;
 
-pub use gpui_app::{RootView, init};
+pub use gpui_app::{RootView, feature_coverage_declaration, init};
 pub use run::run;
 
 #[cfg(test)]

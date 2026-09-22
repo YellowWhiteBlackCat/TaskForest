@@ -65,7 +65,7 @@ impl IcedApp {
             alerts_page: alerts::AlertsPageState::default(),
             first_run: crate::ui::first_run::FirstRunUiState::default(),
             first_run_requests: std::collections::HashMap::new(),
-            system_dashboard_window: taskmanager_core::core::history::HistoryWindow::OneHour,
+            system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
             history_runtime: super::history_replay::IcedHistoryRuntime::new(history_replay_client),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
             window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
@@ -137,7 +137,7 @@ impl IcedApp {
             // wait for and none is fabricated).
             first_run: crate::ui::first_run::FirstRunUiState::default(),
             first_run_requests: std::collections::HashMap::new(),
-            system_dashboard_window: taskmanager_core::core::history::HistoryWindow::OneHour,
+            system_dashboard_window: crate::ui::system_table::ResourceHistoryWindow::default(),
             history_runtime: super::history_replay::IcedHistoryRuntime::new(None),
             snapshot_export: super::snapshot_export::IcedSnapshotExportRuntime::default(),
             window_capture: super::window_capture::IcedWindowCaptureRuntime::default(),
@@ -203,9 +203,9 @@ impl IcedApp {
     }
 }
 
-/// Apply one fixed capture target and its page-local facts. System capture is
-/// the only route that receives the synthetic NPU inventory; ordinary demos
-/// and every other evidence page keep the real unobserved state.
+/// Apply one fixed capture target and its page-local facts. System and NPU
+/// captures receive a deterministic NPU inventory; other targets preserve
+/// the unobserved state.
 fn apply_capture_target(app: &mut IcedApp, target: &str) {
     if target == "service-details" {
         app.shell.application.active_page = taskmanager_application::AppPage::Services;
@@ -216,6 +216,9 @@ fn apply_capture_target(app: &mut IcedApp, target: &str) {
             seed_capture_npu_fixture(app);
         }
     } else if let Some(device) = capture_device_from_name(target) {
+        if matches!(device, PerfDevice::Npu(_)) {
+            seed_capture_npu_fixture(app);
+        }
         app.performance.selected_device = device;
     }
 }
@@ -243,6 +246,10 @@ fn seed_capture_npu_fixture(app: &mut IcedApp) {
                     taskmanager_core::core::metrics::ScalarObservation::available(0, observed_at_ms),
                 shared_total_bytes: taskmanager_core::core::metrics::ScalarObservation::unavailable(
                     taskmanager_core::core::failure::FailureKind::Unsupported,
+                ),
+                sram_total_bytes: taskmanager_core::core::metrics::ScalarObservation::available(
+                    32 * 1024 * 1024,
+                    observed_at_ms,
                 ),
             },
             ..Default::default()
@@ -645,6 +652,7 @@ fn capture_device_from_name(name: &str) -> Option<PerfDevice> {
         "disk" => Some(PerfDevice::Disk(0)),
         "network" => Some(PerfDevice::Network(0)),
         "gpu" => Some(PerfDevice::Gpu(0)),
+        "npu" => Some(PerfDevice::Npu(0)),
         "battery" => Some(PerfDevice::Battery(0)),
         "fan" => Some(PerfDevice::Fan(0)),
         _ => None,

@@ -125,6 +125,146 @@ fn process_row_menu_reuses_shared_identity_safe_actions() {
     assert_eq!(app.shell.selected, 1);
 }
 
+/// Complete coverage for process context actions and popover state:
+/// EndTask, Kill, Suspend, Resume, Priority tiers (High/Normal/Low),
+/// EfficiencyMode, Affinity, OpenFileLocation, and SearchOnline.
+#[test]
+fn process_action_menu_popover_provides_complete_action_coverage() {
+    use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
+
+    let mut app = IcedApp::demo();
+    let _ = app.update(Message::SelectPage(AppPage::Applications));
+    let identity = app
+        .shell
+        .visible_processes()
+        .get(1)
+        .and_then(|process| ProcessLiveKey::from_process(process))
+        .expect("the demo process row must have a live identity");
+
+    // 1. EndTask
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
+    assert_eq!(app.process_menu_identity(), Some(identity));
+    let _ = crate::ui::view(&app); // Popover renders cleanly over the row
+    let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::EndTask));
+    assert!(app.process_menu_identity().is_none());
+    assert!(app.shell.pending_end().is_some());
+    let _ = app.update(Message::DismissOverlay);
+    assert!(app.shell.pending_end().is_none());
+
+    // 2. Kill
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
+    let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::Kill));
+    assert!(app.process_menu_identity().is_none());
+    assert_eq!(
+        app.shell.pending_batch().map(|intent| intent.action),
+        Some(ProcessBatchAction::Kill)
+    );
+    let _ = app.update(Message::DismissOverlay);
+
+    // 3. Suspend
+    app.shell.clear_feedback_notice();
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
+    let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::Suspend));
+    assert!(app.process_menu_identity().is_none());
+    assert!(
+        app.shell.feedback_text().contains("Demo mode"),
+        "Suspend action routes platform effect: {}",
+        app.shell.feedback_text()
+    );
+
+    // 4. Resume
+    app.shell.clear_feedback_notice();
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
+    let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::Resume));
+    assert!(app.process_menu_identity().is_none());
+    assert!(
+        app.shell.feedback_text().contains("Demo mode"),
+        "Resume action routes platform effect: {}",
+        app.shell.feedback_text()
+    );
+
+    // 5. Priority tiers: High, Normal, Low
+    for tier in PriorityTier::ALL {
+        app.shell.clear_feedback_notice();
+        let _ = app.update(Message::OpenProcessRowMenu { identity });
+        let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::Priority(
+            tier,
+        )));
+        assert!(app.process_menu_identity().is_none());
+        assert!(
+            app.shell.feedback_text().contains("Demo mode"),
+            "priority tier {tier:?} must route platform effect: {}",
+            app.shell.feedback_text()
+        );
+    }
+
+    // 6. EfficiencyMode
+    app.shell.clear_feedback_notice();
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
+    let _ = app.update(Message::ProcessMenuAction(
+        ProcessMenuAction::EfficiencyMode,
+    ));
+    assert!(app.process_menu_identity().is_none());
+    assert!(
+        app.shell.feedback_text().contains("Demo mode"),
+        "EfficiencyMode routes platform effect: {}",
+        app.shell.feedback_text()
+    );
+
+    // 7. Affinity
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
+    let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::Affinity));
+    assert!(app.process_menu_identity().is_none());
+    assert!(app.affinity_open(), "affinity modal must open");
+    let _ = crate::ui::view(&app); // Affinity modal view renders cleanly
+    let _ = app.update(Message::DismissOverlay);
+    assert!(!app.affinity_open(), "dismiss closes affinity modal");
+
+    // 8. OpenFileLocation / OpenLocation
+    assert_eq!(
+        ProcessMenuAction::OpenFileLocation,
+        ProcessMenuAction::OpenLocation
+    );
+    app.shell.clear_feedback_notice();
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
+    let direct_location = app.process_location_effect();
+    assert!(
+        matches!(
+            direct_location,
+            Some(taskmanager_application::PlatformEffect::RevealResource(_))
+        ),
+        "process_location_effect produces RevealResource effect"
+    );
+    let _ = app.update(Message::ProcessMenuAction(
+        ProcessMenuAction::OpenFileLocation,
+    ));
+    assert!(app.process_menu_identity().is_none());
+    assert!(
+        app.shell.feedback_text().contains("Demo mode"),
+        "OpenFileLocation routes to platform effect: {}",
+        app.shell.feedback_text()
+    );
+
+    // 9. SearchOnline
+    app.shell.clear_feedback_notice();
+    let _ = app.update(Message::OpenProcessRowMenu { identity });
+    let direct_search = app.process_search_effect();
+    assert!(
+        matches!(
+            direct_search,
+            Some(taskmanager_application::PlatformEffect::OpenUrl(_))
+        ),
+        "process_search_effect produces OpenUrl effect"
+    );
+    let _ = app.update(Message::ProcessMenuAction(ProcessMenuAction::SearchOnline));
+    assert!(app.process_menu_identity().is_none());
+    assert!(
+        app.shell.feedback_text().contains("Demo mode"),
+        "SearchOnline routes to platform effect: {}",
+        app.shell.feedback_text()
+    );
+}
+
 #[test]
 fn applications_column_menu_changes_only_the_iced_table_projection() {
     let mut app = IcedApp::demo();

@@ -72,6 +72,69 @@ impl ThreadState {
     }
 }
 
+/// Best-effort classification of the kernel wait observed for a thread.
+///
+/// Linux exposes a wait-channel symbol and scheduler run-queue delay, but it
+/// does not expose a portable "time blocked on this futex" counter through
+/// the unprivileged procfs API. Keeping the class and measured run-queue
+/// duration separate prevents a scheduler wait from being misreported as a
+/// futex duration while still making D-state and lock-shaped wait channels
+/// visible to all frontends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ThreadWaitKind {
+    /// The wait channel names a futex/semaphore/mutex-style kernel lock.
+    KernelLock,
+    /// The thread is in uninterruptible sleep, commonly waiting for I/O.
+    UninterruptibleIo,
+    /// The scheduler reported non-zero time waiting on a run queue.
+    RunQueue,
+    /// A provider supplied a wait channel that cannot be classified further.
+    Other,
+}
+
+impl ThreadWaitKind {
+    /// Infer a display class from the scheduler state, wait channel and
+    /// measured run-queue delay. `None` means there is no wait evidence.
+    #[must_use]
+    pub fn from_observation(
+        state: ThreadState,
+        wchan: Option<&str>,
+        run_queue_wait_ns: Option<u64>,
+    ) -> Option<Self> {
+        if matches!(state, ThreadState::UninterruptibleSleep) {
+            return Some(Self::UninterruptibleIo);
+        }
+        if wchan.is_some_and(is_kernel_lock_wait_channel) {
+            return Some(Self::KernelLock);
+        }
+        if run_queue_wait_ns.is_some_and(|wait| wait > 0) {
+            return Some(Self::RunQueue);
+        }
+        wchan
+            .filter(|value| !value.is_empty() && *value != "0")
+            .map(|_| Self::Other)
+    }
+
+    /// Stable compact label for terminal and dense desktop readouts.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::KernelLock => "lock",
+            Self::UninterruptibleIo => "io",
+            Self::RunQueue => "runq",
+            Self::Other => "wait",
+        }
+    }
+}
+
+fn is_kernel_lock_wait_channel(value: &str) -> bool {
+    let value = value.to_ascii_lowercase();
+    ["futex", "mutex", "semaphore", "sem_wait", "rwsem", "lock"]
+        .iter()
+        .any(|needle| value.contains(needle))
+}
+
 /// One thread of a process.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ProcessThreadInfo {
@@ -92,6 +155,17 @@ pub struct ProcessThreadInfo {
     /// as a believable zero.
     #[serde(default)]
     pub cpu_percent: Option<f32>,
+    /// Kernel wait channel symbol (e.g. `futex_wait_queue_me`, `ep_poll`, `do_select`).
+    #[serde(default)]
+    pub wchan: Option<String>,
+    /// Scheduler run-queue delay from `/proc/<pid>/task/<tid>/schedstat`, in
+    /// nanoseconds. This is not a futex/D-state sleep duration; the wait kind
+    /// records that distinction explicitly.
+    #[serde(default)]
+    pub run_queue_wait_ns: Option<u64>,
+    /// Typed classification of the observed wait channel/state.
+    #[serde(default)]
+    pub wait_kind: Option<ThreadWaitKind>,
 }
 
 /// The per-thread facet.

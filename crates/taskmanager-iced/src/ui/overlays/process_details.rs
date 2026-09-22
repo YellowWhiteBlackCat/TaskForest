@@ -167,6 +167,13 @@ fn command_rows_with_local_time(
     );
     let cmdline = vm_text(&vm, ProcessDetailsField::Cmdline);
     push_property(&mut rows, t("prop.command_line"), Some(cmdline.as_str()));
+    if let Some(summary) = taskmanager_shell::presentation::command_identity_summary(process) {
+        push_property(
+            &mut rows,
+            t("proc_insights.command_identity"),
+            Some(summary.as_str()),
+        );
+    }
     rows
 }
 
@@ -306,29 +313,38 @@ fn environment_section<'a>(
             let mut rows: Vec<Element<'a, Message, iced::Theme, iced::Renderer>> = visible
                 .iter()
                 .map(|entry| {
-                    row![
-                        text(entry.key.clone())
-                            .width(Length::Fixed(220.0))
-                            .size(f32::from(tokens::FONT_12)),
-                        text(entry.value.clone())
-                            .width(Length::Fill)
-                            .size(f32::from(tokens::FONT_12))
-                            .color(muted),
-                        focus::dynamic_button(
-                            theme_snapshot,
-                            crate::app::FocusTarget::AboutCopyDetails,
-                            t("common.copy").to_string(),
-                            Message::CopyTextToClipboard {
-                                label: format!("Environment {}", entry.key),
-                                text: format!("{}={}", entry.key, entry.value),
-                            },
-                            false,
-                        ),
-                    ]
-                    .spacing(8)
-                    .padding(2)
-                    .width(Length::Fill)
-                    .into()
+                    {
+                        let value = taskmanager_application::process_details_vm::render_environment_value(
+                            &entry.key,
+                            &entry.value,
+                        );
+                        row![
+                            text(entry.key.clone())
+                                .width(Length::Fixed(220.0))
+                                .size(f32::from(tokens::FONT_12)),
+                            text(value)
+                                .width(Length::Fill)
+                                .size(f32::from(tokens::FONT_12))
+                                .color(muted),
+                            focus::dynamic_button(
+                                theme_snapshot,
+                                crate::app::FocusTarget::AboutCopyDetails,
+                                t("common.copy").to_string(),
+                                Message::CopyTextToClipboard {
+                                    label: format!("Environment {}", entry.key),
+                                    text: taskmanager_application::process_details_vm::render_environment_variable(
+                                        &entry.key,
+                                        &entry.value,
+                                    ),
+                                },
+                                false,
+                            ),
+                        ]
+                        .spacing(8)
+                        .padding(2)
+                        .width(Length::Fill)
+                        .into()
+                    }
                 })
                 .collect();
             if visible.is_empty() && !environment.entries.is_empty() {
@@ -367,7 +383,12 @@ fn environment_section<'a>(
                         label: "Environment".to_string(),
                         text: visible
                             .iter()
-                            .map(|entry| format!("{}={}", entry.key, entry.value))
+                            .map(|entry| {
+                                taskmanager_application::process_details_vm::render_environment_variable(
+                                    &entry.key,
+                                    &entry.value,
+                                )
+                            })
                             .collect::<Vec<_>>()
                             .join("\n"),
                     },
@@ -601,9 +622,23 @@ fn property_pairs(
     }
     pairs.extend([
         row(ProcessDetailsField::Memory, t("common.memory")),
+        row(ProcessDetailsField::Pss, t("proc.pss")),
+        row(ProcessDetailsField::Uss, t("proc.uss")),
+        row(
+            ProcessDetailsField::AnonHugePages,
+            t("proc.anon_huge_pages"),
+        ),
         row(ProcessDetailsField::Threads, t("common.threads")),
+        row(ProcessDetailsField::NetworkRate, t("common.network")),
+        row(
+            ProcessDetailsField::CancelledWriteBytes,
+            t("proc.cancelled_write"),
+        ),
         row(ProcessDetailsField::Fds, t("proc.fds")),
         row(ProcessDetailsField::Nice, t("proc.nice")),
+        row(ProcessDetailsField::SchedPolicy, t("proc.sched_policy")),
+        row(ProcessDetailsField::OomScore, t("proc.oom_score")),
+        row(ProcessDetailsField::PageFaults, t("proc.page_faults")),
     ]);
     if let DetailValue::Text(_) = detail_value(&vm, ProcessDetailsField::ParentPid) {
         pairs.push(row(ProcessDetailsField::ParentPid, t("prop.parent_pid")));

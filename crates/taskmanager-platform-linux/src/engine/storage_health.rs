@@ -8,7 +8,8 @@ use std::time::Duration;
 
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::storage_health::{
-    FilesystemHealth, FilesystemHealthSnapshot, FilesystemHealthStatus,
+    FilesystemBackingKind, FilesystemHealth, FilesystemHealthSnapshot, FilesystemHealthStatus,
+    inode_usage_percent,
 };
 #[cfg(target_os = "linux")]
 use taskmanager_platform_portable::{BoundedCommandError, run_with_timeout};
@@ -59,6 +60,11 @@ pub fn collect_filesystem_health_from(
             _ => IntegrityObservation::unsupported(),
         };
         filesystem.error_count = integrity.error_count;
+        if let Some((used, total)) = read_inode_counts(&filesystem.mount_point) {
+            filesystem.inode_used = Some(used);
+            filesystem.inode_total = Some(total);
+            filesystem.inode_usage_percent = inode_usage_percent(used, total);
+        }
         filesystem.integrity_state = DeviceState::default().transition(integrity.status, now_ms);
         if filesystem.error_count.is_some_and(|count| count > 0) {
             filesystem.status = FilesystemHealthStatus::ErrorsReported;
@@ -292,6 +298,15 @@ fn permission_denied(stderr: &[u8]) -> bool {
     text.contains("permission denied") || text.contains("operation not permitted")
 }
 
+#[cfg(target_os = "linux")]
+fn read_inode_counts(mount_point: &Path) -> Option<(u64, u64)> {
+    let stats = nix::sys::statvfs::statvfs(mount_point).ok()?;
+    let total = stats.files();
+    let free = stats.files_available();
+    let used = total.checked_sub(free)?;
+    Some((used, total))
+}
+
 pub fn parse_mountinfo(text: &str, now_ms: u64) -> Vec<FilesystemHealth> {
     text.lines()
         .filter_map(|line| {
@@ -309,12 +324,17 @@ pub fn parse_mountinfo(text: &str, now_ms: u64) -> Vec<FilesystemHealth> {
                 .get(1)
                 .filter(|source| **source != "none")
                 .map(|source| PathBuf::from(unescape_mount_field(source)));
+            let backing_kind = classify_backing_kind(&fs_type, source.as_deref());
             Some(FilesystemHealth {
                 mount_point,
                 source,
                 fs_type,
+                backing_kind,
                 read_only,
                 error_count: None,
+                inode_used: None,
+                inode_total: None,
+                inode_usage_percent: None,
                 status: if read_only == Some(true) {
                     FilesystemHealthStatus::ReadOnly
                 } else {
@@ -325,6 +345,20 @@ pub fn parse_mountinfo(text: &str, now_ms: u64) -> Vec<FilesystemHealth> {
             })
         })
         .collect()
+}
+
+fn classify_backing_kind(fs_type: &str, source: Option<&Path>) -> FilesystemBackingKind {
+    match fs_type.to_ascii_lowercase().as_str() {
+        "btrfs" => FilesystemBackingKind::BtrfsSubvolume,
+        "zfs" => FilesystemBackingKind::ZfsDataset,
+        "overlay" | "overlayfs" => FilesystemBackingKind::Overlay,
+        "tmpfs" | "devtmpfs" | "ramfs" => FilesystemBackingKind::Tmpfs,
+        "nfs" | "nfs4" | "cifs" | "smb3" | "sshfs" | "fuse.sshfs" => FilesystemBackingKind::Network,
+        _ if source.is_some_and(|source| source.starts_with("/dev/")) => {
+            FilesystemBackingKind::PhysicalBlock
+        }
+        _ => FilesystemBackingKind::Unknown,
+    }
 }
 
 fn unescape_mount_field(value: &str) -> String {

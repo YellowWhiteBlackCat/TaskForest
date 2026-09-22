@@ -194,6 +194,9 @@ fn record_frame(shell: &mut taskmanager_shell::ShellApp, timestamp_ms: u64, disk
 /// Throughput summary stays beneath the pair.
 #[test]
 fn disk_direction_rows_share_one_scale_and_keep_the_summed_summary() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
     taskmanager_test_support::pin_english();
     let mut shell = taskmanager_shell::ShellApp::new();
     record_frame(&mut shell, 1, rate_disk(Some(1_048_576), Some(3_145_728)));
@@ -232,6 +235,9 @@ fn disk_direction_rows_share_one_scale_and_keep_the_summed_summary() {
 /// their own per-direction gaps, never a fabricated zero block.
 #[test]
 fn disk_direction_rows_render_per_direction_gaps() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
     taskmanager_test_support::pin_english();
     let mut shell = taskmanager_shell::ShellApp::new();
     // Frames 1-2: write-only (read scalar unavailable → NaN gaps). Frames
@@ -274,6 +280,9 @@ fn disk_direction_rows_render_per_direction_gaps() {
 /// collecting placeholder instead of a fabricated flat trend or summary.
 #[test]
 fn disk_active_time_row_trends_its_own_window_with_percent_summary() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
     taskmanager_test_support::pin_english();
     let mut shell = taskmanager_shell::ShellApp::new();
     let active_disk = |active_pct: f32| {
@@ -389,6 +398,9 @@ fn disk_line_texts(disk: &DiskMetrics) -> Vec<String> {
 /// removable: an unresolved probe renders no row, never a fabricated Yes/No.
 #[test]
 fn disk_status_row_expresses_typed_health_and_proven_removability() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
     taskmanager_test_support::pin_english();
 
     // Fixture-known healthy value, plus proven removable media.

@@ -10,6 +10,7 @@ use taskmanager_shell::SortCol;
 
 use super::DetailsSection;
 use super::selectors::PerfDevice;
+use crate::ui::system_table::ResourceHistoryWindow;
 use taskmanager_shell::ProcessStatusFilter;
 
 /// Focus targets that remain local to the Iced adapter.
@@ -38,6 +39,7 @@ pub enum FocusTarget {
     /// One column-menu width stepper (widen) — the keyboard-accessible
     /// sizing path alongside the header-drag edge.
     ProcessColumnWiden(SortCol),
+    ProcessColumnsReset,
     /// Dismiss the Applications column-visibility menu.
     ProcessColumnsClose,
     /// The Services-page filter input.
@@ -54,6 +56,8 @@ pub enum FocusTarget {
     OpenProcessLocation,
     /// The Applications search-online action (routed via platform port).
     SearchProcessOnline,
+    /// Apply/lift process efficiency mode.
+    ProcessEfficiencyMode,
     /// Open the selected process's CPU-affinity editor.
     ProcessAffinityOpen,
     /// Select all logical CPUs in the affinity editor.
@@ -97,12 +101,17 @@ pub enum FocusTarget {
     ProcessMenuKill,
     ProcessMenuSuspend,
     ProcessMenuResume,
+    ProcessMenuPriorityHigh,
+    ProcessMenuPriorityNormal,
+    ProcessMenuPriorityLow,
+    ProcessMenuEfficiencyMode,
     ProcessMenuSignalHangup,
     ProcessMenuSignalInterrupt,
     ProcessMenuSignalUser1,
     ProcessMenuSignalUser2,
     ProcessMenuOpenLocation,
     ProcessMenuSearchOnline,
+    ProcessMenuAffinity,
     ProcessMenuProperties,
     ProcessMenuCopyName,
     ProcessMenuCopyPid,
@@ -171,6 +180,8 @@ pub enum FocusTarget {
     StartupMenuClose,
     /// The confirm button on the gated startup-control confirmation bar.
     ConfirmStartupControl,
+    /// The cancel button on the gated startup-control confirmation bar.
+    CancelStartupControl,
     /// One settings chooser pill; `section` is a stable row name and `index`
     /// the choice position inside it.
     SettingsChoice {
@@ -233,6 +244,8 @@ pub enum FocusTarget {
     HistoryReplayToggle,
     HistoryReplayWindow(taskmanager_core::core::history::HistoryWindow),
     HistoryReplayRefresh,
+    /// Resource history window choice (1m, 5m, 15m, 60m).
+    ResourceHistoryWindow(ResourceHistoryWindow),
     /// Alert center modal controls.
     AlertCenterClear,
     AlertCenterExport,
@@ -264,7 +277,7 @@ pub enum FocusTarget {
 
 impl FocusTarget {
     /// Every focus target that can be registered by the Iced adapter.
-    pub const ALL: [Self; 152] = [
+    pub const ALL: [Self; 165] = [
         Self::ModalClose,
         Self::PageTab(AppPage::Performance),
         Self::PageTab(AppPage::Applications),
@@ -278,6 +291,7 @@ impl FocusTarget {
         Self::ProcessColumnToggle(SortCol::Pid),
         Self::ProcessColumnNarrow(SortCol::Pid),
         Self::ProcessColumnWiden(SortCol::Pid),
+        Self::ProcessColumnsReset,
         Self::ProcessColumnsClose,
         Self::ServicesSearch,
         Self::SourceRetry(RefreshRequest::Services),
@@ -288,6 +302,7 @@ impl FocusTarget {
         Self::EndTask,
         Self::OpenProcessLocation,
         Self::SearchProcessOnline,
+        Self::ProcessEfficiencyMode,
         Self::ProcessAffinityOpen,
         Self::ProcessAffinityCpu(0),
         Self::ProcessAffinityApply,
@@ -304,12 +319,17 @@ impl FocusTarget {
         Self::ProcessMenuKill,
         Self::ProcessMenuSuspend,
         Self::ProcessMenuResume,
+        Self::ProcessMenuPriorityHigh,
+        Self::ProcessMenuPriorityNormal,
+        Self::ProcessMenuPriorityLow,
+        Self::ProcessMenuEfficiencyMode,
         Self::ProcessMenuSignalHangup,
         Self::ProcessMenuSignalInterrupt,
         Self::ProcessMenuSignalUser1,
         Self::ProcessMenuSignalUser2,
         Self::ProcessMenuOpenLocation,
         Self::ProcessMenuSearchOnline,
+        Self::ProcessMenuAffinity,
         Self::ProcessMenuProperties,
         Self::ProcessMenuCopyName,
         Self::ProcessMenuCopyPid,
@@ -353,6 +373,7 @@ impl FocusTarget {
         },
         Self::StartupMenuClose,
         Self::ConfirmStartupControl,
+        Self::CancelStartupControl,
         Self::SettingsChoice {
             section: "skin",
             index: 0,
@@ -362,6 +383,7 @@ impl FocusTarget {
         Self::PerfDeviceTab(PerfDevice::Disk(0)),
         Self::PerfDeviceTab(PerfDevice::Network(0)),
         Self::PerfDeviceTab(PerfDevice::Gpu(0)),
+        Self::PerfDeviceTab(PerfDevice::Npu(0)),
         Self::PerfDeviceTab(PerfDevice::Battery(0)),
         Self::PerfDeviceTab(PerfDevice::Fan(0)),
         Self::ProcessStatusFilterTab(ProcessStatusFilter::All),
@@ -399,6 +421,10 @@ impl FocusTarget {
         Self::HistoryReplayToggle,
         Self::HistoryReplayWindow(taskmanager_core::core::history::HistoryWindow::OneHour),
         Self::HistoryReplayRefresh,
+        Self::ResourceHistoryWindow(ResourceHistoryWindow::OneMinute),
+        Self::ResourceHistoryWindow(ResourceHistoryWindow::FiveMinutes),
+        Self::ResourceHistoryWindow(ResourceHistoryWindow::FifteenMinutes),
+        Self::ResourceHistoryWindow(ResourceHistoryWindow::SixtyMinutes),
         Self::AlertCenterClear,
         Self::AlertCenterExport,
         Self::ProcessMenuCopyTsv,

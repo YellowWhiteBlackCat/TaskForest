@@ -28,6 +28,10 @@ pub enum CpuInstructionFeature {
     AmxInt8,
     /// Intel Advanced Matrix Extensions, BF16 tiles.
     AmxBf16,
+    /// Intel AVX10 vector ISA family. The Linux kernel may expose the
+    /// negotiated level as an `avx10*` flag; the shared contract keeps the
+    /// capability distinct from AVX-512 rather than inferring it from a model.
+    Avx10,
     /// ARM Advanced SIMD.
     Neon,
     /// ARM Scalable Vector Extension.
@@ -50,6 +54,7 @@ impl CpuInstructionFeature {
         Self::Avx512Vnni,
         Self::AmxInt8,
         Self::AmxBf16,
+        Self::Avx10,
         Self::Neon,
         Self::Sve,
     ];
@@ -70,6 +75,7 @@ impl CpuInstructionFeature {
             Self::Avx512Vnni => "AVX-512 VNNI",
             Self::AmxInt8 => "AMX-INT8",
             Self::AmxBf16 => "AMX-BF16",
+            Self::Avx10 => "AVX10",
             Self::Neon => "NEON",
             Self::Sve => "SVE",
         }

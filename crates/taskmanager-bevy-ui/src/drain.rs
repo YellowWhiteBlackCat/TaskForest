@@ -162,6 +162,10 @@ pub(crate) fn capability_summary_line(snapshot: &CapabilitySnapshot) -> String {
         match descriptor.status {
             CapabilityStatus::Available => available += 1,
             CapabilityStatus::PermissionRequired => permission_required += 1,
+            // An escalatable capability is still a pending permission decision;
+            // the operator summary counts it with the permission gates rather
+            // than the non-actionable other states.
+            CapabilityStatus::RequiresEscalation => permission_required += 1,
             CapabilityStatus::Unsupported => unsupported += 1,
             CapabilityStatus::Degraded(_)
             | CapabilityStatus::MissingDependency
@@ -210,8 +214,33 @@ pub(crate) fn drain_system(
     prefs: Option<ResMut<crate::pages::settings::ThemePreferences>>,
     palette: Option<ResMut<WindowPalette>>,
     mut clear: Option<ResMut<bevy::camera::ClearColor>>,
+    mut tray: Option<ResMut<crate::tray::TrayResource>>,
     mut commands: Commands,
 ) {
+    if let Some(tray_res) = tray.as_mut() {
+        tray_res.sync_pause_checkmark(track.shell.paused());
+        for event in tray_res.drain_events() {
+            if let taskmanager_core::core::tray::TrayEvent::MenuActivated { id } = event {
+                if let Some(intent) = crate::tray::resolve_tray_action(id) {
+                    match intent {
+                        crate::tray::TrayIntent::ShowWindow => {}
+                        crate::tray::TrayIntent::TogglePause => {
+                            let _ = track
+                                .shell
+                                .apply_action(taskmanager_application::AppAction::TogglePause);
+                            tray_res.sync_pause_checkmark(track.shell.paused());
+                        }
+                        crate::tray::TrayIntent::Quit => {
+                            track
+                                .shell
+                                .request_quit(taskmanager_shell::QuitReason::Tray);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let mut client = runtime.shared.lock_client();
     if !track.initial_refresh_submitted {
         taskmanager_shell::queue_effect(

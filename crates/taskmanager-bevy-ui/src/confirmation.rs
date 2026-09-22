@@ -212,6 +212,7 @@ pub(crate) fn service_action_label(
         taskmanager_core::core::services::ServiceAction::Restart => t("svc.restart"),
         taskmanager_core::core::services::ServiceAction::Enable => t("svc.enable"),
         taskmanager_core::core::services::ServiceAction::Disable => t("svc.disable"),
+        taskmanager_core::core::services::ServiceAction::ReloadDaemon => t("svc.reload_daemon"),
     }
 }
 
@@ -223,6 +224,7 @@ fn service_action_token(action: taskmanager_core::core::services::ServiceAction)
         taskmanager_core::core::services::ServiceAction::Restart => "restart",
         taskmanager_core::core::services::ServiceAction::Enable => "enable",
         taskmanager_core::core::services::ServiceAction::Disable => "disable",
+        taskmanager_core::core::services::ServiceAction::ReloadDaemon => "reload-daemon",
     }
 }
 

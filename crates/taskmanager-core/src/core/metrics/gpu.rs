@@ -200,11 +200,15 @@ pub enum GpuMetricField {
     Utilization,
     IdleResidency,
     Memory,
+    MemoryBusWidth,
+    MemoryBandwidth,
+    QueueDepth,
     DedicatedVram,
     SharedVram,
     Engines,
     Temperature,
     Power,
+    PowerLimit,
     Fan,
     Frequency,
     Throttle,
@@ -262,6 +266,10 @@ pub struct GpuMetricProvenance {
 pub struct GpuGraphicsApi {
     pub opengl_version: Option<String>,
     pub vulkan_version: Option<String>,
+    /// Mesa userspace version proven by the runtime's OpenGL capability
+    /// probe. A driver name or kernel module version never fills this slot.
+    #[serde(default)]
+    pub mesa_version: Option<String>,
 }
 
 /// Independently fallible provider-neutral GPU scalar measurements.
@@ -388,6 +396,18 @@ pub struct GpuMetrics {
     pub pci_subsystem_device_id: Option<u16>,
     pub pci_slot: Option<String>,
     pub pci_modalias: Option<String>,
+    /// Hardware memory-bus width in bits, when the vendor API proves it.
+    /// Absence is expected for integrated GPUs and drivers without this query.
+    pub memory_bus_width_bits: Option<u32>,
+    /// Effective memory throughput in decimal GB/s when a provider supplies
+    /// both a memory clock and a bus width. This is not PCIe link bandwidth.
+    pub memory_bandwidth_gbps: Option<f32>,
+    /// Current graphics/ring scheduler queue depth when the native driver
+    /// publishes a bounded queue counter. Missing is not equivalent to zero.
+    pub queue_depth: Option<u32>,
+    /// Whether this DRM card owns at least one currently connected display
+    /// connector. `None` means the connector inventory was not readable.
+    pub display_connected: Option<bool>,
     /// Per-engine utilization. Empty means no provider supplied engine facts.
     pub engines: Vec<GpuEngine>,
     /// Typed failure receipt for the current engine capability. `None` with an
@@ -404,6 +424,13 @@ pub struct GpuMetrics {
     /// when a provider proves it. A driver name alone never implies a
     /// version; absence stays `None` instead of a guessed release.
     pub driver_version: Option<String>,
+    /// Enforced board power limit in watts, when the native provider exposes
+    /// the configured TGP/TDP ceiling independently of instantaneous draw.
+    pub power_limit_w: Option<f32>,
+    /// Firmware/VBIOS release exposed by the device's native sysfs or vendor
+    /// provider. Missing firmware metadata remains absent rather than using a
+    /// driver or kernel version as a substitute.
+    pub vbios_version: Option<String>,
     /// Optional runtime graphics API capabilities bound to this GPU.
     pub graphics_api: Option<GpuGraphicsApi>,
 }

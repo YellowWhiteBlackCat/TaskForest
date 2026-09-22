@@ -488,3 +488,103 @@ fn matching_close(source: &str, open: usize) -> usize {
     }
     open
 }
+
+#[test]
+fn packaging_matrix_enforces_complete_parity_across_all_frontends() {
+    let packaging = include_str!("../../.github/workflows/packaging.yml");
+    let build_msi = include_str!("../../packaging/windows/build-msi.sh");
+    let build_rpm = include_str!("../../packaging/rpm/build-rpm.sh");
+
+    // 1. Linux packaging must build and validate all 4 frontends for DEB and RPM
+    for ui in ["G", "I", "T", "B"] {
+        assert!(
+            packaging.contains("TaskForest-${ui}-"),
+            "Packaging workflow must iterate over frontend {ui} for packages"
+        );
+    }
+    assert!(
+        packaging.contains("build-rpm.sh staging"),
+        "Packaging workflow must invoke build-rpm.sh"
+    );
+    assert!(
+        build_rpm.contains("ui=${4:-G}"),
+        "build-rpm.sh must support frontend parameterization"
+    );
+
+    // 2. Windows MSI must build all 4 frontends
+    for ui in ["G", "I", "T", "B"] {
+        assert!(
+            build_msi.contains(&format!("{ui}|")),
+            "build-msi.sh must have configuration mapping for UI frontend {ui}"
+        );
+    }
+    assert!(
+        packaging.contains("-p taskmanager-gpui")
+            && packaging.contains("-p taskmanager-iced")
+            && packaging.contains("-p taskmanager-tui")
+            && packaging.contains("-p taskmanager-bevy-ui"),
+        "Windows packaging must compile all 4 frontend products"
+    );
+
+    // 3. Negative gate for TUI RPM spec: strictly zero graphical dependencies
+    let tui_spec = include_str!("../../packaging/rpm/taskforest-t.spec");
+    assert!(
+        !tui_spec.contains("wayland"),
+        "taskforest-t.spec must not depend on wayland"
+    );
+    assert!(
+        !tui_spec.contains("vulkan"),
+        "taskforest-t.spec must not depend on vulkan"
+    );
+    assert!(
+        !tui_spec.contains("fontconfig"),
+        "taskforest-t.spec must not depend on fontconfig"
+    );
+
+    // 4. Windows packaging upload and WiX shortcut GUID parameterization
+    let wix = include_str!("../../packaging/windows/taskforest.wxs");
+    assert!(
+        wix.contains("$(var.ShortcutGuid)"),
+        "taskforest.wxs must parameterize ShortcutGuid per frontend"
+    );
+    assert!(
+        build_msi.contains("ShortcutGuid=$shortcut_guid"),
+        "build-msi.sh must pass ShortcutGuid to WiX"
+    );
+    assert!(
+        !packaging.contains(
+            "TaskForest-G-*-${{ matrix.arch }}.msi\n            checksums-sha256-windows"
+        ),
+        "packaging.yml must not shadow the Windows MSI glob upload"
+    );
+
+    // 5. RPM specs for secondary frontends must not introduce conflicting polkit helpers
+    for spec in [
+        include_str!("../../packaging/rpm/taskforest-i.spec"),
+        include_str!("../../packaging/rpm/taskforest-t.spec"),
+        include_str!("../../packaging/rpm/taskforest-b.spec"),
+    ] {
+        assert!(
+            !spec.contains("/usr/libexec/taskforest-privilege-helper"),
+            "secondary frontend RPM specs must not package conflicting shared polkit helpers"
+        );
+    }
+}
+
+#[test]
+fn release_documentation_matches_24_package_full_parity_matrix() {
+    let release_doc = include_str!("../../docs/RELEASE.md");
+
+    // 4 frontends (G, I, T, B) × 2 architectures (x64, arm64) × 3 package formats (deb, rpm, msi) = 24
+    for ui in ["G", "I", "T", "B"] {
+        for arch in ["x64", "arm64"] {
+            for ext in ["deb", "rpm", "msi"] {
+                let pattern = format!("TaskForest-{ui}-<ver>-{arch}.{ext}");
+                assert!(
+                    release_doc.contains(&pattern),
+                    "docs/RELEASE.md table must contain release artifact entry {pattern}"
+                );
+            }
+        }
+    }
+}

@@ -167,7 +167,7 @@ pub(super) fn compose_primary_dialogs(
                         .capture_evidence
                         .settings_permission_center_enabled()
                     {
-                        Some(taskmanager_platform_contract::CapabilityStatus::PermissionRequired)
+                        Some(taskmanager_platform_contract::CapabilityStatus::RequiresEscalation)
                     } else {
                         view.projection().capability_status(
                             &taskmanager_platform_contract::CapabilityId::TELEMETRY_GPU_ENGINES,
@@ -178,7 +178,7 @@ pub(super) fn compose_primary_dialogs(
                     smbios_state: view.shell.smbios_memory_state(),
                     smbios_capability: if view.capture_evidence.settings_permission_center_enabled()
                     {
-                        Some(taskmanager_platform_contract::CapabilityStatus::PermissionRequired)
+                        Some(taskmanager_platform_contract::CapabilityStatus::RequiresEscalation)
                     } else {
                         view.projection().capability_status(
                             &taskmanager_platform_contract::CapabilityId::TELEMETRY_MEMORY_SMBIOS,
@@ -186,7 +186,7 @@ pub(super) fn compose_primary_dialogs(
                     },
                     rapl_state: view.shell.rapl_power_state(),
                     rapl_capability: if view.capture_evidence.settings_permission_center_enabled() {
-                        Some(taskmanager_platform_contract::CapabilityStatus::PermissionRequired)
+                        Some(taskmanager_platform_contract::CapabilityStatus::RequiresEscalation)
                     } else {
                         view.projection().capability_status(
                             &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
@@ -194,7 +194,7 @@ pub(super) fn compose_primary_dialogs(
                     },
                     msr_state: view.shell.msr_readout_state(),
                     msr_capability: if view.capture_evidence.settings_permission_center_enabled() {
-                        Some(taskmanager_platform_contract::CapabilityStatus::PermissionRequired)
+                        Some(taskmanager_platform_contract::CapabilityStatus::RequiresEscalation)
                     } else {
                         view.projection().capability_status(
                             &taskmanager_platform_contract::CapabilityId::TELEMETRY_CPU_MSR,

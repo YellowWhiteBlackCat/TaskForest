@@ -196,6 +196,36 @@ fn x_reports_the_snapshot_export_feedback() {
     );
 }
 
+#[test]
+fn capital_x_reports_the_diagnostic_report_export_feedback() {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    let mut app = crate::demo_app();
+    app.shell.clear_feedback_notice();
+    let scratch = crate::ui::test_support::repo_temp_dir().join(format!(
+        "diag-matrix-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&scratch).expect("create scratch dir");
+    app.export_dir = Some(scratch.clone());
+
+    let effect = press_char(&mut app, 'X');
+    assert!(effect.is_none(), "export is a local persistence action");
+    let feedback = app.feedback_notice().expect("export feedback");
+    assert_eq!(
+        feedback.source(),
+        taskmanager_shell::FeedbackSource::Persistence,
+        "the declared X chord must reach the diagnostic export path"
+    );
+
+    let _ = std::fs::remove_dir_all(&scratch);
+}
+
 // ── the row-target Enter ─────────────────────────────────────────────────
 
 #[test]
@@ -587,4 +617,22 @@ fn palette_local_actions_respect_the_declared_scopes() {
         before,
         "the palette metric action is GPU-scoped like the direct key"
     );
+
+    let mut app = crate::demo_app();
+    app.shell.clear_feedback_notice();
+    let scratch = crate::ui::test_support::repo_temp_dir().join(format!(
+        "diag-palette-{}",
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&scratch).expect("create scratch dir");
+    app.export_dir = Some(scratch.clone());
+    app.run_palette_local_action(Some(PaletteLocalAction::ExportDiagnosticReport));
+    assert!(
+        app.feedback_notice().is_some(),
+        "palette export diagnostic report must produce feedback notice"
+    );
+    let _ = std::fs::remove_dir_all(&scratch);
 }

@@ -688,7 +688,7 @@ pub(crate) fn smooth_line_path(points: &[Point]) -> Option<Path> {
                 end.x - (next.x - start.x) * SMOOTH_TENSION,
                 end.y - (next.y - start.y) * SMOOTH_TENSION,
             );
-            builder.bezier_curve_to(end, ctrl_a, ctrl_b);
+            builder.bezier_curve_to(ctrl_a, ctrl_b, end);
         }
     }))
 }
@@ -718,7 +718,7 @@ pub(crate) fn smooth_area_path(points: &[Point], baseline_y: f32) -> Option<Path
                 end.x - (next.x - start.x) * SMOOTH_TENSION,
                 end.y - (next.y - start.y) * SMOOTH_TENSION,
             );
-            builder.bezier_curve_to(end, ctrl_a, ctrl_b);
+            builder.bezier_curve_to(ctrl_a, ctrl_b, end);
         }
         builder.line_to(Point::new(last.x, baseline_y));
         builder.line_to(Point::new(first.x, baseline_y));

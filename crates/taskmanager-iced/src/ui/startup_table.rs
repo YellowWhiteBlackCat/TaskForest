@@ -71,7 +71,7 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
     let (rows, _visible_indices, projection_generation) = app.startup_projection();
     let row_count = rows.len();
     let list_state = startup_list_state(shell);
-    let compact = app.compact_density();
+    let compact = app.compact_density() || app.compact_layout();
     let row_padding = theme::row_padding(compact);
 
     let body: Element<'_, Message, iced::Theme, iced::Renderer> = match list_state {
@@ -261,6 +261,7 @@ pub(super) fn startup_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, i
     if let Some(block) = boot_timeline_block(
         theme_snapshot,
         app.shell.projection().startup_boot_evidence.as_ref(),
+        compact,
     ) {
         page = page.push(block);
     }
@@ -297,7 +298,7 @@ fn startup_confirm_bar<'a>(
     );
     let cancel = focus::button(
         theme_snapshot,
-        FocusTarget::CancelEndTask,
+        FocusTarget::CancelStartupControl,
         t("common.cancel"),
         Message::DismissOverlay,
         false,
@@ -440,7 +441,11 @@ pub(super) fn startup_status_text(row: &StartupRow) -> &'static str {
 pub(super) fn startup_impact_text(row: &StartupRow) -> String {
     match row.impact_evidence {
         StartupImpactEvidence::Measured { duration_ms } => {
-            format!("{} · {duration_ms} ms", t(row.impact.i18n_key()))
+            format!(
+                "{} · {}",
+                t(row.impact.i18n_key()),
+                format_impact_time(duration_ms)
+            )
         }
         StartupImpactEvidence::Unknown { .. } => format!(
             "{} · {}",

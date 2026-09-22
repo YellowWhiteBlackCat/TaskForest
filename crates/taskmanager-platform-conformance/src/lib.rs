@@ -10,12 +10,16 @@
 #![forbid(unsafe_code)]
 
 mod capability;
+mod escalation;
 mod identity;
 mod process;
 mod smoke;
 mod source;
 
-pub use capability::assert_fresh_surface_descriptors;
+pub use capability::{assert_capability_surface_matches_catalog, assert_fresh_surface_descriptors};
+pub use escalation::{
+    admits_escalation, assert_capability_failure_status, projected_capability_status,
+};
 pub use identity::assert_identity_change_is_side_effect_free;
 pub use process::assert_process_rows_consistent;
 pub use smoke::{

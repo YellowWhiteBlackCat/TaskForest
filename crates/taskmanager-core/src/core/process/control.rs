@@ -61,6 +61,8 @@ pub enum ProcessBatchAction {
     Resume,
     /// Apply one neutral scheduling-priority tier to each target.
     SetPriority(PriorityTier),
+    /// Apply or lift modern efficiency mode (EcoQoS / SCHED_IDLE / App Nap).
+    SetEfficiencyMode(bool),
 }
 
 /// Cross-platform semantic process signal.

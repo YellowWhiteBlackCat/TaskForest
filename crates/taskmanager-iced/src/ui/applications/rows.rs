@@ -119,10 +119,19 @@ fn tree_node_row(
     }
 
     let mut elements: Vec<Element<'static, Message, iced::Theme, iced::Renderer>> = vec![
-        text_cell(ctx, cells.pid.clone(), SortCol::Pid),
         iced::widget::container(name_row)
             .width(Length::Fixed(ctx.resolved_column_width(SortCol::Name)))
             .into(),
+        text_cell(ctx, cells.user.clone(), SortCol::User),
+        text_cell(ctx, cells.pid.clone(), SortCol::Pid),
+        zero_tinted_text(
+            ctx,
+            cells.threads.clone(),
+            process.threads_zero,
+            SortCol::Threads,
+        ),
+        text_cell(ctx, cells.start_clock.clone(), SortCol::StartTime),
+        text_cell(ctx, cells.status.clone(), SortCol::State),
         zero_tinted_text(ctx, cells.cpu.clone(), process.cpu_zero, SortCol::Cpu),
         // Per-row CPU-history sparkline: Tree leaves only (a parent row carries
         // no single history) — same gate as the gpui per-row sparkline.
@@ -135,6 +144,7 @@ fn tree_node_row(
                 | taskmanager_shell::ProcessRowId::Application(_) => None,
             }),
             !*has_children,
+            ctx.compact,
         ),
         zero_tinted_text(
             ctx,
@@ -142,7 +152,6 @@ fn tree_node_row(
             process.memory_zero,
             SortCol::Memory,
         ),
-        zero_tinted_text(ctx, cells.pss.clone(), process.pss_zero, SortCol::Pss),
     ];
     if ctx.swap_visible {
         elements.push(zero_tinted_text(
@@ -152,8 +161,12 @@ fn tree_node_row(
             SortCol::Swap,
         ));
     }
-    // Pre-formatted by the projection (`RowCells`); only the zero-tint
-    // booleans are computed here.
+    elements.push(zero_tinted_text(
+        ctx,
+        cells.pss.clone(),
+        process.pss_zero,
+        SortCol::Pss,
+    ));
     elements.push(zero_tinted_text(
         ctx,
         cells.disk_read.clone(),
@@ -168,21 +181,16 @@ fn tree_node_row(
     ));
     elements.push(zero_tinted_text(
         ctx,
+        cells.network.clone(),
+        process.network_zero,
+        SortCol::Network,
+    ));
+    elements.push(zero_tinted_text(
+        ctx,
         cells.cpu_time.clone(),
         process.cpu_time_zero,
         SortCol::CpuTime,
     ));
-    elements.push(zero_tinted_text(
-        ctx,
-        cells.threads.clone(),
-        process.threads_zero,
-        SortCol::Threads,
-    ));
-    elements.push(text_cell(ctx, cells.user.clone(), SortCol::User));
-    // GPUI-parity advanced cells, in lockstep with apps_columns. fds/nice ride
-    // the typed observations: an unavailable value renders the projection's
-    // honest dash and only a measured zero takes the gray-zero tint.
-    elements.push(text_cell(ctx, cells.status.clone(), SortCol::State));
     elements.push(zero_tinted_text(
         ctx,
         cells.fds.clone(),
@@ -194,11 +202,6 @@ fn tree_node_row(
         cells.nice.clone(),
         process.nice_zero,
         SortCol::Nice,
-    ));
-    elements.push(text_cell(
-        ctx,
-        cells.start_clock.clone(),
-        SortCol::StartTime,
     ));
     let elements = visible_column_elements(elements, ctx.swap_visible, &ctx.hidden_columns, false);
     let row_content = container(
@@ -346,28 +349,29 @@ fn column_cell(
 /// one leading cell, so their tag list starts at `Name` (the fused cell is
 /// the identity cell and never hides) — without that shift every trailing
 /// cell would be filtered by its neighbor's hidden state.
-fn visible_column_tags(swap_visible: bool, grouped: bool) -> Vec<Option<SortCol>> {
-    // Grouped aggregate rows fuse Pid+Name into one leading identity cell.
-    let mut columns = if grouped {
-        vec![Some(SortCol::Name), Some(SortCol::Cpu)]
-    } else {
-        vec![Some(SortCol::Pid), Some(SortCol::Name), Some(SortCol::Cpu)]
-    };
-    columns.push(None); // the Trend sparkline cell
-    columns.extend([Some(SortCol::Memory), Some(SortCol::Pss)]);
+fn visible_column_tags(swap_visible: bool, _grouped: bool) -> Vec<Option<SortCol>> {
+    let mut columns = vec![
+        Some(SortCol::Name),
+        Some(SortCol::User),
+        Some(SortCol::Pid),
+        Some(SortCol::Threads),
+        Some(SortCol::StartTime),
+        Some(SortCol::State),
+        Some(SortCol::Cpu),
+        None, // the Trend sparkline cell
+        Some(SortCol::Memory),
+    ];
     if swap_visible {
         columns.push(Some(SortCol::Swap));
     }
     columns.extend([
+        Some(SortCol::Pss),
         Some(SortCol::DiskRead),
         Some(SortCol::DiskWrite),
+        Some(SortCol::Network),
         Some(SortCol::CpuTime),
-        Some(SortCol::Threads),
-        Some(SortCol::User),
-        Some(SortCol::State),
         Some(SortCol::Fds),
         Some(SortCol::Nice),
-        Some(SortCol::StartTime),
     ]);
     columns
 }
@@ -446,11 +450,7 @@ fn group_header_row(
     // The fused leading cell spans Pid+Name while Pid is visible and collapses
     // to the Name extent once Pid is hidden, so the identity column keeps its
     // boundary aligned with the member rows beneath it.
-    let identity_width = if ctx.hidden_columns.contains(&SortCol::Pid) {
-        ctx.resolved_column_width(SortCol::Name)
-    } else {
-        ctx.resolved_column_width(SortCol::Pid) + ctx.resolved_column_width(SortCol::Name)
-    };
+    let identity_width = ctx.resolved_column_width(SortCol::Name);
     let mut cells: Vec<Element<'static, Message, iced::Theme, iced::Renderer>> = vec![
         iced::widget::row![
             text(marker).size(f32::from(tokens::FONT_12)),
@@ -461,6 +461,11 @@ fn group_header_row(
         .align_y(iced::Alignment::Center)
         .width(Length::Fixed(identity_width))
         .into(),
+        text_cell(ctx, user.clone(), SortCol::User),
+        text_cell(ctx, "—".to_string(), SortCol::Pid),
+        zero_tinted_text(ctx, threads.0, threads.1, SortCol::Threads),
+        text_cell(ctx, start_clock.clone(), SortCol::StartTime),
+        text_cell(ctx, status.clone(), SortCol::State),
         zero_tinted_text(ctx, cpu_text, cpu_zero, SortCol::Cpu),
         // Aggregate group headers carry no single CPU history, so the Trend
         // column stays blank — but the same-width cell keeps the column
@@ -475,7 +480,6 @@ fn group_header_row(
             memory == Some(0),
             SortCol::Memory,
         ),
-        zero_tinted_text(ctx, optional_bytes(pss), pss == Some(0), SortCol::Pss),
     ];
     if ctx.swap_visible {
         cells.push(zero_tinted_text(
@@ -485,6 +489,12 @@ fn group_header_row(
             SortCol::Swap,
         ));
     }
+    cells.push(zero_tinted_text(
+        ctx,
+        optional_bytes(pss),
+        pss == Some(0),
+        SortCol::Pss,
+    ));
     cells.push(zero_tinted_text(
         ctx,
         optional_bytes(disk_read),
@@ -499,18 +509,16 @@ fn group_header_row(
     ));
     cells.push(zero_tinted_text(
         ctx,
+        "—".to_string(),
+        false,
+        SortCol::Network,
+    ));
+    cells.push(zero_tinted_text(
+        ctx,
         optional_duration(cpu_time),
         cpu_time == Some(0),
         SortCol::CpuTime,
     ));
-    cells.push(zero_tinted_text(
-        ctx,
-        threads.0,
-        threads.1,
-        SortCol::Threads,
-    ));
-    cells.push(text_cell(ctx, user.clone(), SortCol::User));
-    cells.push(text_cell(ctx, status.clone(), SortCol::State));
     cells.push(zero_tinted_text(ctx, fds.0, fds.1, SortCol::Fds));
     cells.push(zero_tinted_text(
         ctx,
@@ -518,7 +526,6 @@ fn group_header_row(
         *nice == Some(0),
         SortCol::Nice,
     ));
-    cells.push(text_cell(ctx, start_clock.clone(), SortCol::StartTime));
     let cells = visible_column_elements(cells, ctx.swap_visible, &ctx.hidden_columns, true);
     iced::widget::button(container(
         iced::widget::row(cells)
@@ -562,15 +569,17 @@ fn process_sparkline_cell(
     history: &std::rc::Rc<[f32]>,
     identity: Option<ProcessLiveKey>,
     show: bool,
+    compact: bool,
 ) -> Element<'static, Message, iced::Theme, iced::Renderer> {
     if let Some(identity) = identity.filter(|_| show) {
+        let spark_height = if compact { 12.0 } else { PROCESS_SPARK_HEIGHT };
         canvas::Canvas::new(ProcessCpuSparkline::new(
             std::rc::Rc::clone(history),
             crate::theme_binding::color(theme_snapshot.cpu),
             identity,
         ))
         .width(Length::Fixed(PROCESS_SPARK_WIDTH))
-        .height(Length::Fixed(PROCESS_SPARK_HEIGHT))
+        .height(Length::Fixed(spark_height))
         .into()
     } else {
         iced::widget::Space::new()

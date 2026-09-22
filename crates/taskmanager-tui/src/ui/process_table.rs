@@ -98,7 +98,22 @@ pub(super) fn render_processes(
     let sparkline_visible = table_area.width >= SPARKLINE_MIN_AREA_WIDTH;
     // The panel title lists the Applications-page chords; Enter expands a
     // category/application header or opens details on a process row.
-    let panel_title = t("tui.processes_title");
+    let processes = app
+        .projection()
+        .processes
+        .as_ref()
+        .map(|items| items.as_slice());
+    let mut panel_title = t("tui.processes_title").to_owned();
+    for summary in [
+        taskmanager_shell::presentation::uninterruptible_process_summary(processes),
+        taskmanager_shell::presentation::process_anomaly_summary(processes),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        panel_title.push_str(" · ");
+        panel_title.push_str(&summary);
+    }
     // Read the whole Applications projection from the TUI's canonical-row
     // cache through the LAZY indexed accessor: the owned id slice plus an
     // on-demand index resolver, so the frame never materializes the shell's
@@ -175,6 +190,7 @@ pub(super) fn render_processes(
                 (SortCol::CpuTime, 9),
                 (SortCol::DiskRead, 9),
                 (SortCol::DiskWrite, 9),
+                (SortCol::Network, 9),
             ]
             .into_iter()
             .filter(|(candidate, _)| column_visible(*candidate))
@@ -215,7 +231,7 @@ pub(super) fn render_processes(
             WindowedTableProps {
                 theme,
                 panel: bounded,
-                title: panel_title,
+                title: &panel_title,
                 header: process_header(
                     (app.effective_sort_col(), app.process_sort.1),
                     theme,
@@ -400,6 +416,7 @@ fn process_header(
             SortCol::CpuTime,
             SortCol::DiskRead,
             SortCol::DiskWrite,
+            SortCol::Network,
         ]
         .into_iter()
         .filter(|candidate| visible(*candidate)),

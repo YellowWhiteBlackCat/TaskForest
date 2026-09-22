@@ -3,7 +3,7 @@
 use super::*;
 use std::thread;
 use std::time::Instant;
-use taskmanager_core::core::services::ServiceRelationEdge;
+use taskmanager_core::core::services::{ServiceOomCause, ServiceRelationEdge};
 
 #[test]
 fn openrc_status_maps_started_stopped_crashed() {
@@ -341,6 +341,92 @@ fn parse_deps_is_case_sensitive() {
 fn service_deps_default_is_all_empty() {
     let d = ServiceDeps::default();
     assert!(d.relations().is_empty());
+}
+
+#[test]
+fn parse_systemctl_diagnostics_preserves_failure_and_activation_evidence() {
+    let output = [
+        "Id=demo.service",
+        "UnitFileState=enabled",
+        "Result=oom-kill",
+        "ExecMainCode=exited",
+        "ExecMainStatus=78",
+        "OOMKilled=yes",
+        "MemoryMax=1048576",
+        "MemoryCurrent=1048576",
+        "NextElapseUSecRealtime=Mon 2026-09-07 12:00:00 PDT",
+        "NextElapseUSecMonotonic=5s",
+        "NRestarts=3",
+        "StartLimitIntervalUSec=10s",
+        "StartLimitBurst=5",
+        "StartLimitHit=no",
+        "NeedDaemonReload=yes",
+        "TimeoutStartUSec=1min 500ms",
+        "User=taskforest",
+        "Triggers=demo.socket demo.timer",
+        "TriggeredBy=demo.path",
+        "",
+        "Id=other.service",
+        "Result=success",
+    ]
+    .join("\n");
+    let rows = parse_systemctl_show_diagnostics(&output);
+    assert_eq!(rows.len(), 2);
+    let (unit, diagnostics) = &rows[0];
+    assert_eq!(unit, "demo.service");
+    assert_eq!(diagnostics.unit_file_state.as_deref(), Some("enabled"));
+    assert_eq!(diagnostics.exec_main_status, Some(78));
+    assert_eq!(diagnostics.oom_killed, Some(true));
+    assert_eq!(diagnostics.memory_max_bytes, Some(1_048_576));
+    assert_eq!(diagnostics.memory_current_bytes, Some(1_048_576));
+    assert_eq!(diagnostics.oom_cause(), Some(ServiceOomCause::UnitLimit));
+    assert_eq!(
+        diagnostics.next_trigger_realtime.as_deref(),
+        Some("Mon 2026-09-07 12:00:00 PDT")
+    );
+    assert_eq!(diagnostics.next_trigger_monotonic_usec, Some(5_000_000));
+    assert_eq!(diagnostics.restart_count, Some(3));
+    assert_eq!(diagnostics.start_limit_interval_usec, Some(10_000_000));
+    assert_eq!(diagnostics.start_limit_burst, Some(5));
+    assert_eq!(diagnostics.start_limit_hit, Some(false));
+    assert_eq!(diagnostics.daemon_reload_required, Some(true));
+    assert_eq!(diagnostics.timeout_usec, Some(60_500_000));
+    assert_eq!(diagnostics.user.as_deref(), Some("taskforest"));
+    assert!(diagnostics.has_socket_activation());
+    assert!(diagnostics.has_timer_activation());
+    assert_eq!(
+        diagnostics.failure_cause(),
+        Some(taskmanager_core::ServiceFailureCause::OomKilled)
+    );
+}
+
+#[test]
+fn parse_systemctl_inventory_attaches_typed_relations_and_preserves_scope() {
+    let output = [
+        "Id=a.service",
+        "Before=b.service",
+        "Requires=b.service",
+        "",
+        "Id=b.service",
+        "After=a.service",
+    ]
+    .join("\n");
+    let records = parse_systemctl_show_inventory(&output, false);
+    assert_eq!(records.len(), 2);
+    assert!(records[0].2.edges().contains(&ServiceRelationEdge::new(
+        taskmanager_core::ServiceRelationKind::Before,
+        taskmanager_core::ServiceId::new("linux.service.systemd:b.service"),
+    )));
+    assert!(records[0].2.edges().contains(&ServiceRelationEdge::new(
+        taskmanager_core::ServiceRelationKind::Requires,
+        taskmanager_core::ServiceId::new("linux.service.systemd:b.service"),
+    )));
+
+    let user_records = parse_systemctl_show_inventory("Id=a.service\nRequires=b.service\n", true);
+    assert_eq!(
+        user_records[0].2.edges()[0].target.as_str(),
+        "linux.service.systemd-user:b.service"
+    );
 }
 
 #[test]

@@ -249,25 +249,67 @@ pub fn parse_smartctl_json(stdout: &str) -> Option<DiskSmart> {
         .or_else(|| ata_raw_attribute(attributes, &[194, 190]).and_then(serde_json::Value::as_f64))
         .filter(|value| value.is_finite() && (-273.15..=1000.0).contains(value))
         .map(|value| value as f32);
+    let nvme_health = root.get("nvme_smart_health_information_log");
+    let temperature_sensors_c = nvme_health
+        .map(|health| {
+            (1..=8)
+                .filter_map(|index| {
+                    health
+                        .get(format!("temperature_sensor_{index}"))
+                        .and_then(serde_json::Value::as_f64)
+                        .and_then(nvme_temperature_c)
+                })
+                .collect::<Vec<_>>()
+        })
+        .unwrap_or_default();
     let critical_warning = root
         .pointer("/smart_status/passed")
         .and_then(serde_json::Value::as_bool)
-        .map(|passed| !passed);
+        .map(|passed| !passed)
+        .or_else(|| nvme_health_critical_warning(&root).map(|value| value != 0));
     let power_on_hours = root
         .pointer("/power_on_time/hours")
         .and_then(serde_json::Value::as_u64)
+        .or_else(|| {
+            root.pointer("/nvme_smart_health_information_log/power_on_hours")
+                .and_then(serde_json::Value::as_u64)
+        })
         .or_else(|| ata_raw_attribute(attributes, &[9]).and_then(serde_json::Value::as_u64));
     let percent_used = root
         .get("scsi_percentage_used_endurance_indicator")
         .and_then(serde_json::Value::as_f64)
         .filter(|value| value.is_finite() && *value >= 0.0)
+        .map(|value| value as f32)
+        .or_else(|| {
+            nvme_health
+                .and_then(|value| value.get("percentage_used"))
+                .and_then(serde_json::Value::as_f64)
+                .filter(|value| value.is_finite() && *value >= 0.0)
+                .map(|value| value as f32)
+        });
+    let available_spare_pct = nvme_health
+        .and_then(|value| value.get("available_spare"))
+        .and_then(serde_json::Value::as_f64)
+        .filter(|value| value.is_finite() && (0.0..=100.0).contains(value))
         .map(|value| value as f32);
+    let available_spare_threshold_pct = nvme_health
+        .and_then(|value| value.get("available_spare_threshold"))
+        .and_then(serde_json::Value::as_f64)
+        .filter(|value| value.is_finite() && (0.0..=100.0).contains(value))
+        .map(|value| value as f32);
+    let unsafe_shutdowns = nvme_health
+        .and_then(|value| value.get("unsafe_shutdowns"))
+        .and_then(serde_json::Value::as_u64);
     let ata_attributes = parse_ata_attributes(attributes);
 
     if temperature_c.is_none()
         && critical_warning.is_none()
         && percent_used.is_none()
+        && available_spare_pct.is_none()
+        && available_spare_threshold_pct.is_none()
         && power_on_hours.is_none()
+        && unsafe_shutdowns.is_none()
+        && temperature_sensors_c.is_empty()
         && ata_attributes.is_none()
     {
         return None;
@@ -281,11 +323,38 @@ pub fn parse_smartctl_json(stdout: &str) -> Option<DiskSmart> {
         provider: None,
         failure: None,
         temperature_c,
+        temperature_sensors_c,
         critical_warning,
         temp_critical_c: None,
         percent_used,
+        available_spare_pct,
+        available_spare_threshold_pct,
         power_on_hours,
+        unsafe_shutdowns,
         ata_attributes,
+    })
+}
+
+/// smartctl exposes NVMe health temperatures in Kelvin while nvme-cli text
+/// exposes Celsius. Normalize only the documented NVMe numeric range; values
+/// already in Celsius pass through unchanged and implausible values are
+/// dropped rather than displayed as a thermal fact.
+fn nvme_temperature_c(value: f64) -> Option<f32> {
+    let celsius = if value > 200.0 { value - 273.15 } else { value };
+    celsius
+        .is_finite()
+        .then_some(celsius as f32)
+        .filter(|value| (-50.0..=200.0).contains(value))
+}
+
+fn nvme_health_critical_warning(root: &serde_json::Value) -> Option<u64> {
+    let value = root.pointer("/nvme_smart_health_information_log/critical_warning")?;
+    value.as_u64().or_else(|| {
+        value.as_str().and_then(|raw| {
+            raw.strip_prefix("0x")
+                .and_then(|hex| u64::from_str_radix(hex, 16).ok())
+                .or_else(|| raw.parse::<u64>().ok())
+        })
     })
 }
 

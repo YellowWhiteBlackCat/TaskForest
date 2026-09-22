@@ -54,6 +54,7 @@ pub mod instance;
 pub use config::{user_config_path, user_history_dir, user_locale_name};
 pub use local_time::local_time_rules;
 pub use provider::WindowsProviderRegistry;
+pub use provider::capability_surface;
 
 fn wall_clock_ms() -> u64 {
     taskmanager_core::core::time::unix_millis(std::time::SystemTime::now())

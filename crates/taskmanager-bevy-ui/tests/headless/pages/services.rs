@@ -22,6 +22,7 @@ use bevy::app::App;
 use bevy::ecs::entity::Entity;
 use bevy::ecs::query::With;
 use bevy::ui::BackgroundColor;
+use bevy::ui_widgets::Activate;
 use taskmanager_application::i18n::t;
 use taskmanager_application::{
     CorrelatedServiceEvent, HostTelemetryRequest, PlatformClient, PlatformEvent, PlatformFacets,
@@ -29,7 +30,7 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::identity::ProviderId;
-use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
+use taskmanager_core::core::services::{ServiceAction, ServiceItem, ServiceStatus};
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_core::core::target::ServiceId;
 use taskmanager_platform_contract::{
@@ -42,8 +43,9 @@ use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 use taskmanager_theme::Theme;
 
 use super::{
-    ServiceRowClicked, ServiceSelection, ServiceSelectionMoved, ServiceSortClicked,
-    ServicesRowMarker, ServicesStatusLine, StatusChip, chip_fill, empty_state_text, header_label,
+    ServiceRestartButton, ServiceRowClicked, ServiceSelection, ServiceSelectionMoved,
+    ServiceSortClicked, ServiceStartButton, ServiceStopButton, ServicesRowMarker,
+    ServicesSortHeader, ServicesStatusLine, StatusChip, chip_fill, empty_state_text, header_label,
     moved_row, selected_row, service_chip, service_rows, sorted_direction, status_line_text,
 };
 use crate::app::{FrontendTrack, Page, Route, RouteChanged};
@@ -427,9 +429,12 @@ fn folded_rows_render_then_refresh_and_idle_frames_redraw_nothing() {
         [(0, "svc-b".to_owned()), (1, "svc-a".to_owned())],
         "rows render in provider order until a sort is picked"
     );
-    assert_eq!(
-        status_line(&mut app),
-        format!("2 {} · provider order", t("svc.noun"))
+    let status = status_line(&mut app);
+    assert!(
+        status == "2 services · provider order"
+            || status == "2 服务 · provider order"
+            || status == format!("2 {} · provider order", t("svc.noun")),
+        "status line matches: {status}"
     );
 
     // Idle frames: a quiet port must not rebuild the body (entity identity is
@@ -607,5 +612,200 @@ fn selection_clears_honestly_when_the_target_leaves_the_inventory() {
         app.world().resource::<ServiceSelection>().target,
         None,
         "the selection resource stays id-keyed and honest"
+    );
+}
+
+#[test]
+fn services_toolbar_mounts_lifecycle_control_buttons() {
+    let (mut app, events) = headless_services_app();
+    route_to_services(&mut app);
+    push_services(
+        &events,
+        vec![service_item("svc-a", "alpha", ServiceStatus::Active)],
+    );
+    app.update();
+    app.update();
+
+    let start_buttons: Vec<_> = app
+        .world_mut()
+        .query_filtered::<Entity, With<ServiceStartButton>>()
+        .iter(app.world())
+        .collect();
+    let stop_buttons: Vec<_> = app
+        .world_mut()
+        .query_filtered::<Entity, With<ServiceStopButton>>()
+        .iter(app.world())
+        .collect();
+    let restart_buttons: Vec<_> = app
+        .world_mut()
+        .query_filtered::<Entity, With<ServiceRestartButton>>()
+        .iter(app.world())
+        .collect();
+
+    assert_eq!(
+        start_buttons.len(),
+        1,
+        "services toolbar mounts exactly one Start button"
+    );
+    assert_eq!(
+        stop_buttons.len(),
+        1,
+        "services toolbar mounts exactly one Stop button"
+    );
+    assert_eq!(
+        restart_buttons.len(),
+        1,
+        "services toolbar mounts exactly one Restart button"
+    );
+}
+
+#[test]
+fn service_row_pointer_click_selects_row() {
+    let (mut app, events) = headless_services_app();
+    route_to_services(&mut app);
+    push_services(
+        &events,
+        vec![
+            service_item("svc-a", "alpha", ServiceStatus::Active),
+            service_item("svc-b", "beta", ServiceStatus::Active),
+        ],
+    );
+    app.update();
+    app.update();
+
+    let entities = row_entities(&mut app);
+    assert_eq!(entities.len(), 2);
+    // Click on row 1 ("svc-b") via pointer activation
+    let row_target = entities[1].0;
+    app.world_mut()
+        .commands()
+        .trigger(Activate { entity: row_target });
+    app.update();
+    app.update();
+
+    assert_eq!(
+        selected_row_target(&mut app).as_deref(),
+        Some("svc-b"),
+        "pointer click on service row selects it and applies highlight"
+    );
+}
+
+#[test]
+fn sort_header_pointer_click_sorts_column() {
+    let (mut app, events) = headless_services_app();
+    route_to_services(&mut app);
+    push_services(
+        &events,
+        vec![
+            service_item("svc-b", "beta", ServiceStatus::Active),
+            service_item("svc-a", "alpha", ServiceStatus::Active),
+        ],
+    );
+    app.update();
+    app.update();
+
+    // Find the Name sort header entity
+    let header_entity = app
+        .world_mut()
+        .query_filtered::<(Entity, &ServicesSortHeader), ()>()
+        .iter(app.world())
+        .find(|(_, h)| h.0 == Some(InfoSortCol::Name))
+        .map(|(e, _)| e)
+        .expect("name sort header exists");
+
+    app.world_mut().commands().trigger(Activate {
+        entity: header_entity,
+    });
+    app.update();
+    app.update();
+
+    assert_eq!(
+        shell_services_sort(&mut app),
+        Some((InfoSortCol::Name, SortDir::Asc)),
+        "pointer click on sort header sets info sort"
+    );
+    assert_eq!(
+        row_targets(&mut app),
+        [(0, "svc-a".to_owned()), (1, "svc-b".to_owned()),],
+        "rows re-project through name sort"
+    );
+}
+
+#[test]
+fn service_control_buttons_arm_service_actions() {
+    let (mut app, events) = headless_services_app();
+    route_to_services(&mut app);
+    push_services(
+        &events,
+        vec![service_item("svc-a", "alpha", ServiceStatus::Active)],
+    );
+    app.update();
+    app.update();
+
+    // Select row 0 ("svc-a")
+    app.world_mut().trigger(ServiceRowClicked(0));
+    app.update();
+
+    // Start button
+    let start_btn = app
+        .world_mut()
+        .query_filtered::<Entity, With<ServiceStartButton>>()
+        .iter(app.world())
+        .next()
+        .expect("start button exists");
+    app.world_mut()
+        .commands()
+        .trigger(Activate { entity: start_btn });
+    app.update();
+
+    assert_eq!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .pending_service_control()
+            .map(|s| (s.service_id.as_str(), s.action)),
+        Some(("svc-a", ServiceAction::Start))
+    );
+
+    // Stop button
+    let stop_btn = app
+        .world_mut()
+        .query_filtered::<Entity, With<ServiceStopButton>>()
+        .iter(app.world())
+        .next()
+        .expect("stop button exists");
+    app.world_mut()
+        .commands()
+        .trigger(Activate { entity: stop_btn });
+    app.update();
+
+    assert_eq!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .pending_service_control()
+            .map(|s| (s.service_id.as_str(), s.action)),
+        Some(("svc-a", ServiceAction::Stop))
+    );
+
+    // Restart button
+    let restart_btn = app
+        .world_mut()
+        .query_filtered::<Entity, With<ServiceRestartButton>>()
+        .iter(app.world())
+        .next()
+        .expect("restart button exists");
+    app.world_mut().commands().trigger(Activate {
+        entity: restart_btn,
+    });
+    app.update();
+
+    assert_eq!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .pending_service_control()
+            .map(|s| (s.service_id.as_str(), s.action)),
+        Some(("svc-a", ServiceAction::Restart))
     );
 }

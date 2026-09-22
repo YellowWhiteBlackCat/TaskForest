@@ -244,6 +244,63 @@ fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
 }
 
 #[test]
+fn process_details_panel_renders_the_observed_anonymous_huge_page_charge() {
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+    // The demo rows carry no transparent-huge-page observation, so this test
+    // writes the same typed scalar the Linux provider fills from
+    // `/proc/<pid>/smaps` (AnonHugePages) before the frame is drawn. The row
+    // must paint the SHARED projection value, never a fabricated charge.
+    taskmanager_shell::fixture::edit_processes(&mut app.shell, |processes| {
+        let process = processes
+            .as_mut()
+            .and_then(|processes| processes.iter_mut().find(|process| process.pid == 4201))
+            .expect("demo process fixture");
+        let mut observations = *process.scalar_observations();
+        observations.memory_bytes = ScalarObservation::available(100 * 1024 * 1024, 1);
+        observations.memory_anon_huge_pages_bytes =
+            ScalarObservation::available(8 * 1024 * 1024, 1);
+        process.apply_scalar_observations(observations);
+    });
+    // The fixture edit resets the shell cursor; re-resolve the canonical
+    // Applications cursor so the selected process row keeps the details panel.
+    app.reconcile_applications_cursor();
+
+    let text = frame_text(&app, 140, 40);
+
+    let row = text
+        .lines()
+        .find(|line| line.contains("AnonHugePages"))
+        .unwrap_or_else(|| panic!("the memory detail row must render:\n{text}"));
+    assert!(
+        row.contains("8.0 MiB"),
+        "the observed anonymous huge-page charge must paint its real value: {row:?}"
+    );
+    assert!(
+        row.contains("8.0% RSS"),
+        "the charge's share of RSS must paint: {row:?}"
+    );
+
+    // A process whose charge was never observed keeps the shared dash; nothing
+    // in the frame may invent a zero-byte charge.
+    let mut cold = crate::demo_app();
+    let _ = cold.apply_action(AppAction::SelectPage(AppPage::Applications));
+    let cold_text = frame_text(&cold, 140, 40);
+    let cold_row = cold_text
+        .lines()
+        .find(|line| line.contains("AnonHugePages"))
+        .unwrap_or_else(|| panic!("the memory detail row must render:\n{cold_text}"));
+    assert!(
+        cold_row.contains('—'),
+        "an unobserved charge must render the honest dash: {cold_row:?}"
+    );
+    assert!(
+        !cold_row.contains("0 B"),
+        "an unobserved charge must never read as a fabricated 0 B: {cold_row:?}"
+    );
+}
+
+#[test]
 fn process_details_panel_renders_honest_empty_state_without_rows() {
     let mut app = crate::demo_app();
     let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));

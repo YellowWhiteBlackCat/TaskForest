@@ -1,5 +1,5 @@
 use super::*;
-use taskmanager_ui_contract::{CoverageStatus, coverage_report, drift_findings};
+use taskmanager_ui_contract::{BindingCoverageStatus, coverage_report, drift_findings};
 
 /// Contract gate: every command has exactly one explicit entry — no
 /// missing, duplicated, or unknown command.
@@ -20,7 +20,7 @@ fn only_the_explicit_terminal_exemptions_are_deliberately_unbound() {
     let report = coverage_report(&binding_declaration());
     let unbound: Vec<CommandId> = report
         .into_iter()
-        .filter(|(_, status)| *status == CoverageStatus::DeliberatelyUnbound)
+        .filter(|(_, status)| *status == BindingCoverageStatus::DeliberatelyUnbound)
         .map(|(command, _)| command)
         .collect();
     assert_eq!(unbound, DELIBERATELY_UNBOUND.to_vec());

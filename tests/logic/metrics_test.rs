@@ -230,6 +230,8 @@ fn test_system_snapshot_with_gpu() {
         telemetry_sources: vec![],
         provider_states: vec![],
         device_lifecycles: Default::default(),
+        pressure: None,
+        load_average: None,
     };
 
     assert_eq!(snapshot.gpu.len(), 1);

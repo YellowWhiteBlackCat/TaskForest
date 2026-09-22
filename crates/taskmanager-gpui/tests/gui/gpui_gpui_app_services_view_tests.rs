@@ -6,10 +6,10 @@ use taskmanager_core::core::services::{ServiceItem, ServiceStatus};
 use taskmanager_theme::Theme;
 use taskmanager_ui::overlays::popup::MenuItem;
 
-/// The row context menu carries the five service actions (Win11 TM
+/// The row context menu carries the six service actions (Win11 TM
 /// parity), labeled through i18n so the menu reads localized copy.
 #[gpui::test]
-async fn service_row_context_menu_offers_all_five_actions(cx: &mut gpui::TestAppContext) {
+async fn service_row_context_menu_offers_all_six_actions(cx: &mut gpui::TestAppContext) {
     let root = cx.new(|cx| RootView::new(Theme::dark(), cx));
     let items = build_service_menu(root);
     let labels: Vec<String> = items
@@ -27,8 +27,9 @@ async fn service_row_context_menu_offers_all_five_actions(cx: &mut gpui::TestApp
             taskmanager_application::i18n::t("svc.restart").to_string(),
             taskmanager_application::i18n::t("svc.enable").to_string(),
             taskmanager_application::i18n::t("svc.disable").to_string(),
+            taskmanager_application::i18n::t("svc.reload_daemon").to_string(),
         ],
-        "the context menu must list Start/Stop/Restart/Enable/Disable"
+        "the context menu must list lifecycle actions and daemon reload"
     );
     // Every item is interactive (has an activation closure).
     for entry in &items {

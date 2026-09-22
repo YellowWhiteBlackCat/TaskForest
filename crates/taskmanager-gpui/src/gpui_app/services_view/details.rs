@@ -249,6 +249,11 @@ pub fn render_details(
             i18n::t("svc.sub_state"),
             item.sub_state.clone(),
         ))
+        .children(
+            taskmanager_shell::presentation::service_diagnostics_rows(item.diagnostics())
+                .into_iter()
+                .map(|(label, value)| prop_row(theme, &label, value)),
+        )
         .child(prop_row(
             theme,
             i18n::t("svc.requires"),
@@ -332,12 +337,19 @@ pub fn render_service_log_section(theme: &Theme, state: &ServiceLogState) -> Div
                 .gap(taskmanager_ui::theme_binding::definite_length(
                     tokens::SPACE_2,
                 ))
-                .children(
-                    lines
-                        .iter()
-                        .cloned()
-                        .map(|line| div().min_w(px(0.0)).whitespace_normal().child(line)),
-                ),
+                .children(lines.iter().cloned().map(|line| {
+                    let color = match line.trim_start() {
+                        text if text.starts_with("[Error]") => theme.danger,
+                        text if text.starts_with("[Warning]") => theme.warning,
+                        text if text.starts_with("[Debug]") => theme.fg_dim,
+                        _ => theme.fg,
+                    };
+                    div()
+                        .min_w(px(0.0))
+                        .whitespace_normal()
+                        .text_color(taskmanager_ui::theme_binding::hsla(color))
+                        .child(line)
+                })),
         ),
         ServiceLogState::Loading => panel
             .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))

@@ -3,9 +3,11 @@
 #
 # Unlike the GPUI package which replayed the multi-helper PKGBUILD release tree,
 # this script packages the standalone Iced frontend product (`taskforest-i`)
-# along with its desktop entry, AppStream metainfo, icon, and license notices.
-# Polkit helpers are shared across frontends under /usr/libexec/taskforest-* and
-# can be installed via the primary taskforest package or standalone scripts.
+# along with its desktop entry, AppStream metainfo, and license notices. The
+# shared hicolor icon set belongs to taskforest-common, which this package
+# depends on; polkit helpers are shared across frontends under
+# /usr/libexec/taskforest-* and can be installed via the primary taskforest
+# package or standalone scripts.
 #
 # Strict Wayland-only: A Wayland session is required and X11 is not supported.
 # Zero X11 packages, zero X11 dependencies.
@@ -139,22 +141,18 @@ else
 
     desktop_src="$repo/packaging/linux/io.github.YellowWhiteBlackCat.TaskForestI.desktop"
     metainfo_src="$repo/packaging/linux/io.github.YellowWhiteBlackCat.TaskForestI.metainfo.xml"
-    icon_src="$repo/packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg"
 
     [[ -f "$desktop_src" ]] || { echo "build-deb-iced: desktop file missing: $desktop_src" >&2; exit 1; }
     [[ -f "$metainfo_src" ]] || { echo "build-deb-iced: metainfo file missing: $metainfo_src" >&2; exit 1; }
-    [[ -s "$icon_src" ]] || { echo "build-deb-iced: icon file missing or empty: $icon_src" >&2; exit 1; }
 
     mkdir -p "$work/usr/bin" \
         "$work/usr/share/applications" \
         "$work/usr/share/metainfo" \
-        "$work/usr/share/icons/hicolor/scalable/apps" \
         "$work/usr/share/licenses/taskforest-i"
 
     install -m755 "$bin" "$work/usr/bin/taskforest-i"
     install -m644 "$desktop_src" "$work/usr/share/applications/io.github.YellowWhiteBlackCat.TaskForestI.desktop"
     install -m644 "$metainfo_src" "$work/usr/share/metainfo/io.github.YellowWhiteBlackCat.TaskForestI.metainfo.xml"
-    install -m644 "$icon_src" "$work/usr/share/icons/hicolor/scalable/apps/taskforest-taskboard.svg"
 
     if command -v strip >/dev/null 2>&1; then
         strip --strip-unneeded "$work/usr/bin/taskforest-i" 2>/dev/null || \

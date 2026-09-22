@@ -90,6 +90,10 @@ fn collect_from_proc_dir_returns_sorted_threads_or_typed_state() {
         stat_line("main", "S", 10_000, 0),
     )
     .expect("write tid stat");
+    std::fs::write(task_dir.join("99").join("wchan"), "futex_wait_queue_me\n")
+        .expect("write wait channel");
+    std::fs::write(task_dir.join("99").join("schedstat"), "100 2500000 1\n")
+        .expect("write scheduler statistics");
 
     let facet = collect_threads_from_proc_dir(&root, 5_000);
     assert_eq!(facet.state, DeviceState::healthy(5_000));
@@ -100,6 +104,8 @@ fn collect_from_proc_dir_returns_sorted_threads_or_typed_state() {
     // 10000 ticks / 100 == 100.0 s
     assert_eq!(facet.threads[0].cpu_time_secs, Some(100.0));
     assert_eq!(facet.threads[0].cpu_percent, None);
+    assert_eq!(facet.threads[0].run_queue_wait_ns, Some(2_500_000));
+    assert_eq!(facet.threads[0].wait_kind, Some(ThreadWaitKind::KernelLock));
     assert_eq!(facet.threads[1].cpu_time_secs, Some(3.0));
     assert_eq!(facet.threads[1].cpu_percent, None);
 
@@ -107,6 +113,17 @@ fn collect_from_proc_dir_returns_sorted_threads_or_typed_state() {
     let stale = collect_threads_from_proc_dir(&root, 6_000);
     assert_eq!(stale.state.status, DeviceStatus::Stale);
     assert!(stale.threads.is_empty());
+}
+
+#[test]
+fn scheduler_wait_parser_rejects_missing_or_malformed_fields() {
+    let root = crate::test_support::repo_temp_dir()
+        .join(format!("taskmanager-schedstat-{}", std::process::id()));
+    std::fs::write(&root, "100 2500000 1\n").expect("write schedstat");
+    assert_eq!(read_run_queue_wait_ns(&root), Some(2_500_000));
+    std::fs::write(&root, "100 nope 1\n").expect("write malformed schedstat");
+    assert_eq!(read_run_queue_wait_ns(&root), None);
+    std::fs::remove_file(root).expect("remove schedstat fixture");
 }
 
 #[cfg(target_os = "linux")]

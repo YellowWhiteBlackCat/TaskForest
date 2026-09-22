@@ -33,6 +33,7 @@ mod config_runtime;
 mod config_store;
 mod control;
 mod device_lifecycle;
+pub mod diagnostic_bundle;
 mod diagnostics;
 /// Toolkit-neutral history-series decimation kernels (LTTB run selection and
 /// the stride max-envelope) — the single source every frontend's replay and
@@ -110,6 +111,14 @@ pub use device_lifecycle::{
     DeviceLifecycleProjectionDelta, DeviceLifecycleProjectionIssue,
     DeviceLifecycleSnapshotRejection, DeviceLifecycleSnapshotRevision, DeviceLifecycleViewState,
     ProjectedDeviceLifecycle,
+};
+pub use diagnostic_bundle::{
+    DiagnosticBundle, DiagnosticBundleEngine, DiagnosticBundleExportPort, DiagnosticBundleManifest,
+    DiagnosticCapabilityEntry, DiagnosticDomainHealth, DiagnosticLoadAverage,
+    DiagnosticPlatformCapabilities, DiagnosticPressure, DiagnosticProcessSummary,
+    DiagnosticProcessTopEntry, DiagnosticProviderHealth, DiagnosticSourceHealth,
+    DiagnosticSystemOverview, DiagnosticTelemetryHealth, collect_diagnostic_bundle_from_client,
+    export_client_diagnostic_bundle, export_diagnostic_bundle, generate_diagnostic_report,
 };
 pub use diagnostics::{
     DiagnosticBundleCompletion, DiagnosticBundlePort, DiagnosticBundleRequest,
@@ -220,8 +229,8 @@ pub use router::{
     default_bindings, default_router,
 };
 pub use service_lifecycle::{
-    ServiceAttemptId, ServiceDependenciesLifecycle, ServiceLogStreamLifecycle,
-    ServiceRequestCorrelation, service_submission_failure,
+    ServiceAttemptId, ServiceDependenciesLifecycle, ServiceLifecycleState,
+    ServiceLogStreamLifecycle, ServiceRequestCorrelation, service_submission_failure,
 };
 pub use source_status::{
     MergedSourceState, SourceLineProjection, SourceNotice, SourceStateKind, device_source_line,

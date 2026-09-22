@@ -460,3 +460,43 @@ fn rail_spark_fingerprint_tracks_snapshot_generation_and_scale() {
         .fingerprint()
     );
 }
+
+#[test]
+fn compact_mode_device_button_text_truncation_cleanly_indicates_gpu() {
+    pin_english();
+    // Overlong GPU labels must never be cut off as "GPU I... Graphics..." (e.g. "GPU Intel Core Ul…")
+    assert_eq!(
+        bounded_sidebar_label("GPU Intel Core Ultra Graphics", 18),
+        "GPU",
+        "GPU must cleanly indicate 'GPU' without mid-word truncation"
+    );
+    assert_eq!(
+        bounded_sidebar_label("GPU 0 Intel Arc Graphics", 18),
+        "GPU 0",
+        "Indexed GPU must cleanly indicate 'GPU 0'"
+    );
+    assert_eq!(
+        bounded_sidebar_label("GPU 1 NVIDIA GeForce RTX 4090", 18),
+        "GPU 1",
+        "Indexed GPU must cleanly indicate 'GPU 1'"
+    );
+    assert_eq!(bounded_sidebar_label("GPU", 18), "GPU");
+    assert_eq!(bounded_sidebar_label("GPU 0", 18), "GPU 0");
+    // Non-GPU labels still bound properly to their character limits
+    assert_eq!(bounded_sidebar_label("CPU 39%", 18), "CPU 39%");
+    assert_eq!(bounded_sidebar_label("Disk nvme0n1", 18), "Disk nvme0n1");
+    assert_eq!(bounded_sidebar_label("Network wlan0", 18), "Network wlan0");
+}
+
+#[test]
+fn compact_device_label_cleanly_indicates_gpu_in_demo_app() {
+    pin_english();
+    let app = crate::IcedApp::demo();
+    let label = compact_device_label(&app, PerfDevice::Gpu(0));
+    assert_eq!(
+        label, "GPU",
+        "Single GPU in demo must cleanly indicate 'GPU'"
+    );
+    assert!(!label.contains('…'));
+    assert!(!label.contains("Graphics"));
+}

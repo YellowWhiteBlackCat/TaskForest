@@ -237,6 +237,24 @@ fn network_lines(
             t("net.connection"),
             data.connection,
         )));
+        lines.push(ratatui::text::Line::from(format!(
+            "  {} {} · {} {}",
+            t("net.mtu"),
+            data.mtu,
+            t("net.tx_queue"),
+            data.tx_queue,
+        )));
+        for (key, value) in [
+            ("net.drops", data.drops.as_deref()),
+            ("net.errors", data.errors.as_deref()),
+            ("net.overruns", data.overruns.as_deref()),
+        ] {
+            if let Some(value) = value {
+                lines.push(ratatui::text::Line::from(
+                    format!("  {} {}", t(key), value,),
+                ));
+            }
+        }
         // Assigned addresses + hardware MAC. Each is independently optional; the
         // line renders only when at least one is present so an unprobed NIC
         // prints nothing rather than three dashes. IPv6 can be long; the panel
@@ -293,6 +311,15 @@ fn network_lines(
                 adapter.unwrap_or(MISSING_VALUE),
             )));
         }
+        if network.master_interface.is_some() || network.peer_interface.is_some() {
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {} · {} {}",
+                t("net.master"),
+                network.master_interface.as_deref().unwrap_or(MISSING_VALUE),
+                t("net.peer"),
+                network.peer_interface.as_deref().unwrap_or(MISSING_VALUE),
+            )));
+        }
         // Wireless-only association: SSID + signal level. Renders nothing for a
         // wired adapter (honest absence, not a fabricated "— dBm" line). Either
         // field may be unavailable independently for an unassociated but
@@ -334,9 +361,9 @@ fn network_lines(
 /// preallocation.
 fn network_body_line_count(network: &NetworkMetrics) -> usize {
     if network.adapter_type() == NetworkAdapterType::WiFi {
-        13
+        14
     } else {
-        10
+        11
     }
 }
 

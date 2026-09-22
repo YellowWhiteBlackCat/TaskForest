@@ -146,3 +146,41 @@ fn empty_inventory_relations_keep_the_legacy_wire_shape_without_typed_noise() {
     assert_eq!(encoded["after"], "");
     assert!(encoded.get("relations").is_none());
 }
+
+#[test]
+fn service_diagnostics_round_trip_and_failure_precedence_are_explicit() {
+    let diagnostics = ServiceDiagnostics {
+        result: Some("start-limit-hit".into()),
+        exec_main_status: Some(78),
+        oom_killed: Some(true),
+        memory_max_bytes: Some(1024),
+        memory_current_bytes: Some(1024),
+        start_limit_hit: Some(true),
+        triggers: vec!["demo.socket".into()],
+        ..ServiceDiagnostics::default()
+    };
+    let item = ServiceItem::from_inventory(
+        "linux.service.systemd:demo.service",
+        "demo",
+        ServiceStatus::Failed,
+        "",
+        "loaded",
+        "failed",
+        "failed",
+    )
+    .with_diagnostics(diagnostics.clone());
+    let encoded = serde_json::to_value(&item).expect("diagnostics should serialize");
+    assert_eq!(encoded["diagnostics"]["oom_killed"], true);
+    let decoded: ServiceItem = serde_json::from_value(encoded).expect("diagnostics should decode");
+    assert_eq!(decoded.diagnostics(), &diagnostics);
+    assert_eq!(
+        decoded.diagnostics().failure_cause(),
+        Some(ServiceFailureCause::OomKilled)
+    );
+    assert_eq!(
+        decoded.diagnostics().oom_cause(),
+        Some(ServiceOomCause::UnitLimit)
+    );
+    assert_eq!(service_exit_status_label(78), Some("EX_CONFIG"));
+    assert_eq!(service_exit_status_label(127), None);
+}

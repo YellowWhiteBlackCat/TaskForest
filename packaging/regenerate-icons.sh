@@ -17,6 +17,7 @@ export RUSTC_WRAPPER=
 SOURCE="$REPO_ROOT/packaging/linux/io.github.YellowWhiteBlackCat.TaskForest.svg"
 TRAY_SOURCE="$REPO_ROOT/packaging/tray/taskforest-tray.svg"
 MACOS_DIR="$REPO_ROOT/packaging/macos"
+LINUX_ICON_DIR="$REPO_ROOT/packaging/linux/icons/hicolor"
 WINDOWS_ICON="$REPO_ROOT/packaging/windows/taskmanager.ico"
 TRAY_RGBA="$REPO_ROOT/crates/taskmanager-assets/assets/product/taskforest-tray-22.rgba"
 TRAY_PNG="$TMPDIR/taskforest-tray-22.png"
@@ -31,6 +32,13 @@ done
 printf '%s\n' '==> rasterizing TaskForest SVG to the macOS size ladder'
 for size in 16 32 64 128 256 512 1024; do
     rsvg-convert -w "$size" -h "$size" "$SOURCE" -o "$MACOS_DIR/icon_${size}.png"
+done
+
+printf '%s\n' '==> rasterizing the freedesktop hicolor size ladder'
+for size in 16 24 32 48 64 128 256 512; do
+    destination="$LINUX_ICON_DIR/${size}x${size}/apps/taskforest-taskboard.png"
+    mkdir -p "$(dirname "$destination")"
+    rsvg-convert -w "$size" -h "$size" "$SOURCE" -o "$destination"
 done
 
 printf '%s\n' '==> assembling macOS ICNS with the checked-in Rust tool'

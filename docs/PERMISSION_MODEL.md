@@ -43,6 +43,26 @@ driver 加一次性随机命名回传文件），并已通过 `x86_64-pc-windows
 `pkexec` 126 解释为明确拒绝。目标机实测取消也可能返回 127，因此 127 使用中性的
 `AuthorizationUnavailable`/“授权未完成”，不得臆测是用户拒绝或授权服务故障。
 
+### 提权不变量：能力态用 `RequiresEscalation`，不降级为 `PermissionRequired`
+
+跨平台不变量：**任何能为被拒能力提供 OS 原生提权路径的 provider，其能力态必须发
+`CapabilityStatus::RequiresEscalation`，不得发 `CapabilityStatus::PermissionRequired`。**
+只有 `RequiresEscalation` 证明该 feature 存在可触达的提权 seam（ADR-023 Boundary 2），
+前端才可据此提供一个明确的原生授权入口，并在授权完成前绝不伪造数值。两条轴必须分开、不得互替：
+
+- **能力级 gate**（`CapabilityStatus`）：`PermissionRequired` = 需要权限决策、但本能力无提权
+  offer；`RequiresEscalation` = 需要权限且存在可触达的原生提权路径。两者都不是失败原因。
+- **失败原因级**（`taskmanager_core::FailureKind` / `ProviderFailure`）：`PermissionDenied` =
+  硬拒绝或当前无可行授权；`RequiresEscalation` = 可经原生授权重试。二者作为 `Degraded`/
+  `Unavailable` 等的嵌套 `failure` 载荷。
+
+映射由 runtime catalog 的折叠点承载：`FailureKind::PermissionDenied →
+CapabilityStatus::PermissionRequired`，`FailureKind::RequiresEscalation →
+CapabilityStatus::RequiresEscalation`。公开降级词表 `PUBLIC_CAPABILITY_DEGRADATION_WORDS`
+含 `RequiresEscalation`；`PermissionDenied` 只由失败原因轴声明
+（`PUBLIC_FAILURE_AXIS_PERMISSION_WORD`）。后续 Windows（UAC）与 macOS（native authorization）
+provider 必须遵守该不变量；只有确实无法提供原生提权的能力才可停在 `PermissionRequired`。
+
 ## Boundary 3 — Capability classification
 
 | 类别 | 典型能力 | 拒绝后的产品语义 |
@@ -67,7 +87,16 @@ driver 加一次性随机命名回传文件），并已通过 `x86_64-pc-windows
   live on-box receipt 闭合。
 - Windows 遥测、测试和开发辅助路径禁止 PowerShell/CMD；缺少合格 API 时保持 typed fallback。
 
-## 磁盘弹出（MC !493）授权走查
+## 磁盘弹出（MC !493）授权走查（规划中 surface / 尚未落地契约）
+
+> **状态：规划中，尚未落地。** 本节是授权路径走查，不是现行类型契约：仓库当前没有任何
+> eject 能力、provider 或弹出 outcome 枚举（`crates/**` 无对应实现）。下文 `Ejected`、
+> `Denied`、`Busy`、`TargetUnavailable`、`ServiceUnavailable` 是走查中拟定的**设计词汇**，
+> 尚无弹出专属的落地变体；其中 `ServiceUnavailable` 在全仓代码中**没有任何同名字段或变体**，
+> `Ejected`/`Busy` 也无落地点（`AuthorizationUnavailable` 仅是 escalation 域的既有变体，
+> 不等于弹出 outcome 已接线）。实现该能力前必须先按「新能力退出门」建立 typed contract，
+> 并把这些词与实际 owner 变体（`CapabilityStatus`/`FailureKind`/该能力自有 outcome enum）
+> 一一对齐；在此之前不得把它们读成现行能力或已承诺的降级词。
 
 弹出是控制（写）能力，不是遥测：removable 介质与 hotplug 已是 typed 事实
 （`media_removable`/`hotplug_capable`/`device_generation`），弹出入口只出现在可弹出设备上。

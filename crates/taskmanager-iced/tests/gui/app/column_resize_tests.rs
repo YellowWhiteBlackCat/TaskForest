@@ -298,7 +298,7 @@ fn overrides_round_trip_through_the_config_token() {
             .iter()
             .map(|entry| entry.column.as_str())
             .collect::<Vec<_>>(),
-        ["CPU", "Memory", "PSS"],
+        ["CPU", "Memory", "MemoryPss"],
         "entries serialize in token order so unchanged layouts are byte-stable"
     );
     assert!(token.iter().all(|entry| entry.width.fract() == 0.0));

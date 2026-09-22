@@ -43,6 +43,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
         with:
@@ -66,6 +68,19 @@ jobs:
       # Reduced debug builds remain useful for fallback tests; releases reject
       # them and always use the default hardware-all profile.
       - run: cargo check --locked -p taskmanager-gpui --lib --no-default-features
+      # Structural lint parity with the Linux clippy job (ci.yml) and the local
+      # standard gate (scripts/quality/local-gates.sh): both `-W` lints are
+      # allow-by-default (restriction / pedantic), so `-D warnings` alone never
+      # activates clippy.toml's 48/650 ratchets. This is the only job where the
+      # macOS-only `cfg` modules are compiled, so it is where those ratchets
+      # reach the macOS adapter. No mold link flag (see the workflow env note).
+      # `--exclude taskmanager-platform-linux` is the same scope boundary this
+      # job's nextest runs already use: that crate is structurally Linux-only
+      # (its lib re-exports `cfg(target_os = "linux")` items unconditionally),
+      # so a native-target workspace clippy cannot compile it. Placed after the
+      # native steps so a lint-only failure still leaves the build/test evidence
+      # above intact.
+      - run: cargo clippy --locked --workspace --exclude taskmanager-platform-linux --all-targets --features test-support -- -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
 
   windows:
     name: Windows (native safety receipt)
@@ -80,6 +95,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
         with:
@@ -118,3 +135,16 @@ jobs:
       # Reduced debug builds remain useful for fallback tests; releases reject
       # them and always use the default hardware-all profile.
       - run: cargo check --locked -p taskmanager-gpui --lib --no-default-features -j 4
+      # Structural lint parity with the Linux clippy job (ci.yml) and the local
+      # standard gate (scripts/quality/local-gates.sh): both `-W` lints are
+      # allow-by-default (restriction / pedantic), so `-D warnings` alone never
+      # activates clippy.toml's 48/650 ratchets. This is the only job where the
+      # Windows-only `cfg` modules (boundary and native adapter) are compiled,
+      # so it is where those ratchets reach them. No mold link flag (see the
+      # workflow env note). `--exclude taskmanager-platform-linux` is the same
+      # scope boundary this job's nextest runs already use: that crate is
+      # structurally Linux-only (its lib re-exports `cfg(target_os = "linux")`
+      # items unconditionally), so a native-target workspace clippy cannot
+      # compile it. Placed after the native steps so a lint-only failure still
+      # leaves the receipt and test evidence above intact.
+      - run: cargo clippy --locked --workspace --exclude taskmanager-platform-linux --all-targets --features test-support -- -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines

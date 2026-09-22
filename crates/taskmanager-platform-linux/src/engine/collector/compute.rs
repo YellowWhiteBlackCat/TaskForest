@@ -12,6 +12,9 @@ use taskmanager_core::core::metrics::{
 };
 use taskmanager_platform_contract::CompositeSourceSnapshot;
 
+#[cfg(target_os = "linux")]
+use nix::unistd::{SysconfVar, sysconf};
+
 mod cpu_sources;
 mod memory_sources;
 
@@ -21,6 +24,9 @@ mod memory_sources;
 #[cfg(feature = "test-support")]
 pub use memory_sources::parse_zram_mm_stat;
 
+use cpu_sources::diagnostics::{
+    observe_cpu_idle_states, observe_cpu_packages, observe_interrupts, observe_power_limits,
+};
 use cpu_sources::{
     bogomips_to_frequency_value, observe_bogomips, observe_cpufreq, observe_rapl,
     observe_temperatures,
@@ -41,6 +47,110 @@ fn delta_rate(
     let dt = now.duration_since(prev_t).as_secs_f32() as f64;
     let rate = (dt > 0.0).then(|| (curr as f64 - prev_val as f64) / dt);
     (rate, new_prev)
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct SwapActivitySample {
+    in_pages: u64,
+    out_pages: u64,
+    at: Instant,
+}
+
+/// Read cumulative swap page counters. Occupancy alone cannot identify
+/// thrashing: a full swap can remain at the same size while pages churn in
+/// and out on every sample.
+fn read_swap_activity() -> Option<(u64, u64)> {
+    let text = std::fs::read_to_string("/proc/vmstat").ok()?;
+    parse_swap_activity(&text)
+}
+
+fn parse_swap_activity(text: &str) -> Option<(u64, u64)> {
+    let mut input = None;
+    let mut output = None;
+    for line in text.lines() {
+        let mut fields = line.split_whitespace();
+        let Some(name) = fields.next() else {
+            continue;
+        };
+        let Some(value) = fields.next().and_then(|value| value.parse::<u64>().ok()) else {
+            continue;
+        };
+        match name {
+            "pswpin" => input = Some(value),
+            "pswpout" => output = Some(value),
+            _ => {}
+        }
+    }
+    Some((input?, output?))
+}
+
+#[cfg(target_os = "linux")]
+fn linux_page_size() -> Option<u64> {
+    sysconf(SysconfVar::PAGE_SIZE)
+        .ok()
+        .flatten()
+        .and_then(|value| u64::try_from(value).ok())
+        .filter(|value| *value > 0)
+}
+
+#[cfg(not(target_os = "linux"))]
+fn linux_page_size() -> Option<u64> {
+    None
+}
+
+fn swap_rate(
+    previous: Option<SwapActivitySample>,
+    current: Option<(u64, u64)>,
+    now: Instant,
+    now_ms: u64,
+    page_size: Option<u64>,
+    select: impl Fn((u64, u64)) -> u64,
+) -> (ScalarObservation<u64>, Option<SwapActivitySample>) {
+    let Some((in_pages, out_pages)) = current else {
+        return (
+            ScalarObservation::unavailable(FailureKind::Unsupported),
+            previous,
+        );
+    };
+    let next = Some(SwapActivitySample {
+        in_pages,
+        out_pages,
+        at: now,
+    });
+    let Some(previous) = previous else {
+        return (
+            ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
+            next,
+        );
+    };
+    let Some(page_size) = page_size else {
+        return (
+            ScalarObservation::unavailable(FailureKind::Unsupported),
+            next,
+        );
+    };
+    let elapsed_ms = u64::try_from(now.duration_since(previous.at).as_millis())
+        .ok()
+        .filter(|value| *value > 0);
+    let current_value = select((in_pages, out_pages));
+    let previous_value = select((previous.in_pages, previous.out_pages));
+    let Some(elapsed_ms) = elapsed_ms else {
+        return (
+            ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
+            next,
+        );
+    };
+    if current_value < previous_value {
+        return (
+            ScalarObservation::unavailable(FailureKind::ProviderFault),
+            next,
+        );
+    }
+    let bytes = current_value
+        .saturating_sub(previous_value)
+        .saturating_mul(page_size);
+    let per_second = bytes.saturating_mul(1_000) / elapsed_ms;
+    (ScalarObservation::available(per_second, now_ms), next)
 }
 
 fn observed_sysinfo_frequency_mhz(frequency_mhz: u64) -> Option<u64> {
@@ -259,8 +369,12 @@ pub(super) fn collect_cpu(
     let physical_core_count = sysinfo::System::physical_core_count().filter(|count| *count > 0);
     let sysinfo_status = cpu_sources::sysinfo_status(cpus.len(), physical_core_count.is_some());
     let cpufreq = observe_cpufreq(cpus.len());
+    let power_limits = observe_power_limits();
     let bogomips = observe_bogomips();
     let temperatures = observe_temperatures(cpus.len());
+    let packages = observe_cpu_packages(cpus.len());
+    let idle_states = observe_cpu_idle_states();
+    let interrupts = observe_interrupts(cpus.len());
     let rapl = observe_rapl();
     let sysinfo_frequency_mhz = cpus
         .first()
@@ -386,7 +500,15 @@ pub(super) fn collect_cpu(
         frequency_implementation: cpufreq.driver,
         active_policy: cpufreq.governor,
         energy_preference: cpufreq.power_preference,
+        boost_enabled: cpufreq.boost_enabled,
+        boost_max_frequency_mhz: cpufreq.boost_max_frequency_mhz,
+        power_limit_1_w: power_limits.0,
+        power_limit_2_w: power_limits.1,
+        power_time_window_ms: power_limits.2,
     };
+    metrics.packages = packages;
+    metrics.idle_states = idle_states;
+    metrics.interrupts = interrupts;
     CompositeSourceSnapshot::new(metrics, sources)
 }
 
@@ -396,6 +518,7 @@ pub(super) fn collect_cpu(
 pub(super) fn collect_memory(
     sys: &System,
     prev_mem_used: &mut Option<(u64, Instant)>,
+    prev_swap_activity: &mut Option<SwapActivitySample>,
     now: Instant,
     now_ms: u64,
 ) -> CompositeSourceSnapshot<MemoryMetrics> {
@@ -414,6 +537,25 @@ pub(super) fn collect_memory(
     let (bytes_per_sec, new_prev) = delta_rate(*prev_mem_used, mem_used, now);
     *prev_mem_used = new_prev;
     let mem_used_rate_mbps = bytes_per_sec.map(|rate| (rate / 1_048_576.0) as f32);
+    let swap_activity = read_swap_activity();
+    let page_size = linux_page_size();
+    let (swap_in_rate, next_swap) = swap_rate(
+        *prev_swap_activity,
+        swap_activity,
+        now,
+        now_ms,
+        page_size,
+        |values| values.0,
+    );
+    let (swap_out_rate, _) = swap_rate(
+        *prev_swap_activity,
+        swap_activity,
+        now,
+        now_ms,
+        page_size,
+        |values| values.1,
+    );
+    *prev_swap_activity = next_swap;
     let scalar_observations = MemoryScalarObservations {
         total_bytes: ScalarObservation::available(mem_total, now_ms),
         used_bytes: ScalarObservation::available(mem_used, now_ms),
@@ -424,6 +566,8 @@ pub(super) fn collect_memory(
             || ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
             |rate| ScalarObservation::available(rate, now_ms),
         ),
+        swap_in_bytes_per_sec: swap_in_rate,
+        swap_out_bytes_per_sec: swap_out_rate,
     };
     let optional_observations = MemoryOptionalObservations {
         composition: MemoryCompositionObservations {

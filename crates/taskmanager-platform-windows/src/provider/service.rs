@@ -397,6 +397,7 @@ fn control_scm(service_id: &ServiceId, action: ServiceAction) -> Result<(), Prov
             ServiceAccess::START | ServiceAccess::STOP | ServiceAccess::QUERY_STATUS
         }
         ServiceAction::Enable | ServiceAction::Disable => ServiceAccess::QUERY_STATUS,
+        ServiceAction::ReloadDaemon => return Err(ProviderFailure::Unsupported),
     };
     let service = manager
         .open_service(service_id.as_str(), access)
@@ -422,6 +423,7 @@ fn control_scm(service_id: &ServiceId, action: ServiceAction) -> Result<(), Prov
                 .map_err(|_| ProviderFailure::ProviderFault)
         }
         ServiceAction::Enable | ServiceAction::Disable => Err(ProviderFailure::Unsupported),
+        ServiceAction::ReloadDaemon => Err(ProviderFailure::Unsupported),
     }
 }
 

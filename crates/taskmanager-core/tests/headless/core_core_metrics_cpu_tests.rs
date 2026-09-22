@@ -227,3 +227,126 @@ fn usage_gate_rejects_phantom_percentages_and_keeps_measured_bounds() {
         ScalarObservation::available(100.0, 30)
     );
 }
+
+#[test]
+fn cpu_package_metrics_thermal_throttling_and_numa_topology_round_trip() {
+    let mut pkg = CpuPackageMetrics::new(0);
+    assert_eq!(pkg.package_id, 0);
+    assert!(!pkg.is_currently_throttled());
+    assert_eq!(pkg.total_throttle_events(), None);
+
+    pkg.numa_node_id = Some(0);
+    pkg.numa_node_ids = vec![0, 1];
+    pkg.logical_core_ids = vec![0, 1, 2, 3, 4, 5, 6, 7];
+    pkg.physical_core_count = Some(4);
+    pkg.smt_sibling_groups = vec![vec![0, 4], vec![1, 5]];
+    pkg.local_memory_bytes = Some(34_359_738_368); // 32 GiB
+    pkg.numa_hit_ratio_pct = Some(98.7);
+    pkg.is_throttled = Some(true);
+    pkg.package_throttle_count = Some(15);
+    pkg.core_throttle_count = Some(45);
+    pkg.thermal_margin_c = Some(2.5);
+    pkg.temperature_c = Some(97.5);
+    pkg.power_w = Some(125.0);
+    pkg.frequency_mhz = Some(4_200);
+
+    assert!(pkg.is_currently_throttled());
+    assert!(pkg.contains_numa_node(0));
+    assert!(pkg.contains_numa_node(1));
+    assert!(!pkg.contains_numa_node(2));
+    assert!(pkg.contains_logical_core(3));
+    assert!(!pkg.contains_logical_core(16));
+    assert_eq!(pkg.total_throttle_events(), Some(60));
+
+    let encoded = serde_json::to_value(&pkg).expect("serialize CpuPackageMetrics");
+    assert_eq!(encoded["package_id"], 0);
+    assert_eq!(encoded["is_throttled"], true);
+    assert_eq!(encoded["package_throttle_count"], 15);
+    assert_eq!(encoded["core_throttle_count"], 45);
+    assert_eq!(encoded["thermal_margin_c"], 2.5);
+    assert_eq!(encoded["numa_node_id"], 0);
+    assert_eq!(encoded["numa_node_ids"], serde_json::json!([0, 1]));
+    assert_eq!(
+        encoded["smt_sibling_groups"],
+        serde_json::json!([[0, 4], [1, 5]])
+    );
+    assert_eq!(encoded["local_memory_bytes"], 34_359_738_368u64);
+    let encoded_ratio = encoded["numa_hit_ratio_pct"]
+        .as_f64()
+        .expect("serialized NUMA hit ratio");
+    assert!((encoded_ratio - 98.7).abs() < 1e-4);
+
+    let decoded: CpuPackageMetrics =
+        serde_json::from_value(encoded).expect("deserialize CpuPackageMetrics");
+    assert!((decoded.numa_hit_ratio_pct.expect("decoded NUMA ratio") - 98.7).abs() < 1e-4);
+    let mut decoded_for_equality = decoded;
+    decoded_for_equality.numa_hit_ratio_pct = pkg.numa_hit_ratio_pct;
+    assert_eq!(decoded_for_equality, pkg);
+}
+
+#[test]
+fn idle_residency_percentage_requires_two_monotonic_samples() {
+    let previous = CpuIdleState {
+        name: "C6".into(),
+        residency_us: Some(1_000),
+        ..Default::default()
+    };
+    let current = CpuIdleState {
+        name: "C6".into(),
+        residency_us: Some(6_000),
+        ..Default::default()
+    };
+    assert_eq!(
+        current.residency_percentage_since(&previous, 10),
+        Some(50.0)
+    );
+    assert_eq!(current.residency_percentage_since(&previous, 0), None);
+    let reset = CpuIdleState {
+        residency_us: Some(900),
+        ..current.clone()
+    };
+    assert_eq!(reset.residency_percentage_since(&previous, 10), None);
+}
+
+#[test]
+fn cpu_metrics_package_integration_and_wire_omission() {
+    // Empty packages must be omitted on the wire to preserve legacy compatibility.
+    let default_cpu = CpuMetrics::default();
+    let default_wire = serde_json::to_value(&default_cpu).expect("serialize default CpuMetrics");
+    assert!(default_wire.get("packages").is_none());
+
+    // When populated, packages round-trip cleanly through CpuMetrics wire DTO.
+    let mut cpu = CpuMetrics::default();
+    let mut pkg0 = CpuPackageMetrics::new(0);
+    pkg0.is_throttled = Some(false);
+    pkg0.package_throttle_count = Some(0);
+    pkg0.numa_node_id = Some(0);
+    pkg0.logical_core_ids = vec![0, 1];
+
+    let mut pkg1 = CpuPackageMetrics::new(1);
+    pkg1.is_throttled = Some(true);
+    pkg1.package_throttle_count = Some(12);
+    pkg1.numa_node_id = Some(1);
+    pkg1.logical_core_ids = vec![2, 3];
+
+    cpu.packages = vec![pkg0, pkg1];
+    assert_eq!(cpu.packages().len(), 2);
+    assert_eq!(
+        cpu.package(0).map(|p| p.is_currently_throttled()),
+        Some(false)
+    );
+    assert_eq!(
+        cpu.package(1).map(|p| p.is_currently_throttled()),
+        Some(true)
+    );
+    assert_eq!(cpu.package(2), None);
+
+    let encoded = serde_json::to_value(&cpu).expect("serialize CpuMetrics with packages");
+    assert!(encoded.get("packages").is_some());
+    assert_eq!(encoded["packages"].as_array().map(Vec::len), Some(2));
+
+    let decoded: CpuMetrics =
+        serde_json::from_value(encoded).expect("deserialize CpuMetrics with packages");
+    assert_eq!(decoded.packages.len(), 2);
+    assert_eq!(decoded.packages, cpu.packages);
+}

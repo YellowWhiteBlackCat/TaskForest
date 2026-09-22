@@ -29,11 +29,16 @@ fn process_menu_offers_the_batch_control_vocabulary() {
         .into_iter()
         .map(crate::ui::process_menu::action_label)
         .collect();
-    assert_eq!(labels.len(), 11);
+    assert_eq!(labels.len(), 12);
     assert!(
         labels
             .iter()
             .any(|l| l.contains("Affinity") || l.contains("affinity"))
+    );
+    assert!(
+        labels
+            .iter()
+            .any(|l| l.contains("Efficiency") || l.contains("efficiency"))
     );
     assert!(labels[0].contains("End task"));
     assert!(
@@ -865,5 +870,35 @@ fn end_task_arms_the_frozen_menu_row_not_the_flat_neighbor() {
             );
         }
         other => panic!("an end-task confirmation must be pending, got {other:?}"),
+    }
+}
+
+#[test]
+fn all_process_menu_control_actions_are_reachable_via_keyboard() {
+    use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+    for (hotkey, expected_action) in [
+        ('e', ProcessMenuAction::EndTask),
+        ('t', ProcessMenuAction::EndProcessTree),
+        ('s', ProcessMenuAction::Suspend),
+        ('r', ProcessMenuAction::Resume),
+        ('k', ProcessMenuAction::Kill),
+        ('h', ProcessMenuAction::PriorityHigh),
+        ('n', ProcessMenuAction::PriorityNormal),
+        ('l', ProcessMenuAction::PriorityLow),
+        ('m', ProcessMenuAction::EfficiencyMode),
+    ] {
+        let mut app = crate::demo_app();
+        let _ = app.apply_action(AppAction::SelectPage(AppPage::Applications));
+        assert!(app.open_process_menu());
+
+        let _effect = handle_key(
+            &mut app,
+            KeyEvent::new(KeyCode::Char(hotkey), KeyModifiers::NONE),
+        );
+        assert!(
+            app.process_menu().is_none(),
+            "menu should close after hotkey '{hotkey}' ({expected_action:?})"
+        );
     }
 }

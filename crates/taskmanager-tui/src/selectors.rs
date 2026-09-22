@@ -19,6 +19,7 @@ pub enum PerfDevice {
     Disk,
     Network,
     Gpu,
+    Npu,
     Battery,
     Fan,
 }
@@ -42,6 +43,7 @@ impl PerfDevice {
             PerfDevice::Disk => "common.disk",
             PerfDevice::Network => "sidebar.network",
             PerfDevice::Gpu => "common.gpu",
+            PerfDevice::Npu => "npu.title",
             PerfDevice::Battery => "common.battery",
             PerfDevice::Fan => "common.fan",
         }
@@ -79,6 +81,7 @@ impl TuiApp {
     pub(crate) fn select_perf_device(&mut self, device: PerfDevice) {
         self.perf_device = device;
         self.cpu_core_scroll = 0;
+        self.cpu_detail_scroll = 0;
         self.gpu_engine_scroll = 0;
     }
 
@@ -89,6 +92,17 @@ impl TuiApp {
             self.cpu_core_scroll = self.cpu_core_scroll.saturating_add(delta as usize);
         } else {
             self.cpu_core_scroll = self.cpu_core_scroll.saturating_sub(delta.unsigned_abs());
+        }
+    }
+
+    /// Move the CPU details rail by terminal lines. The renderer clamps this
+    /// intent against the wrapped row height, so a changing provider payload
+    /// can never leave the rail beyond its last line.
+    pub(crate) fn scroll_cpu_details(&mut self, delta: isize) {
+        if delta >= 0 {
+            self.cpu_detail_scroll = self.cpu_detail_scroll.saturating_add(delta as usize);
+        } else {
+            self.cpu_detail_scroll = self.cpu_detail_scroll.saturating_sub(delta.unsigned_abs());
         }
     }
 

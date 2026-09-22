@@ -93,9 +93,14 @@ const fn presentation_from_capability(
     status: Option<CapabilityStatus>,
 ) -> GpuEngineRowsPresentation<'static> {
     match status {
-        Some(CapabilityStatus::Available | CapabilityStatus::PermissionRequired) => {
-            GpuEngineRowsPresentation::PermissionRequired
-        }
+        // `RequiresEscalation` is the escalatable state; `PermissionRequired`
+        // is a permission gate. Both need a user authorization decision, which
+        // is exactly what this presentation asks for.
+        Some(
+            CapabilityStatus::Available
+            | CapabilityStatus::PermissionRequired
+            | CapabilityStatus::RequiresEscalation,
+        ) => GpuEngineRowsPresentation::PermissionRequired,
         Some(CapabilityStatus::Degraded(kind)) => presentation_from_failure(kind),
         Some(CapabilityStatus::MissingDependency) => GpuEngineRowsPresentation::MissingDependency,
         Some(CapabilityStatus::Unsupported) | None => GpuEngineRowsPresentation::Unsupported,

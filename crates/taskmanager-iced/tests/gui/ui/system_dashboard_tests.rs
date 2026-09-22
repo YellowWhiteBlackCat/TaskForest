@@ -4,27 +4,19 @@
 //! never zero), and render coverage across every window selection.
 
 use super::*;
-use taskmanager_core::core::history::HistoryWindow;
 use taskmanager_shell::SystemProjectionStore;
 
 #[test]
 fn window_labels_resolve_to_localized_distinct_copy() {
-    let labels: Vec<&'static str> = HistoryWindow::ALL
+    let labels: Vec<&'static str> = ResourceHistoryWindow::ALL
         .iter()
         .map(|window| history_window_label(*window))
         .collect();
-    assert_eq!(labels.len(), 3);
+    assert_eq!(labels.len(), 4);
     for label in &labels {
         assert!(!label.is_empty());
     }
-    // Resolution fell through to a raw key for none of the windows.
-    assert_ne!(labels[0], "perf.replay.window.1h");
-    assert_ne!(labels[1], "perf.replay.window.24h");
-    assert_ne!(labels[2], "perf.replay.window.7d");
-    // The three windows never share one label.
-    assert_ne!(labels[0], labels[1]);
-    assert_ne!(labels[1], labels[2]);
-    assert_ne!(labels[0], labels[2]);
+    assert_eq!(labels, vec!["1m", "5m", "15m", "60m"]);
 }
 
 #[test]
@@ -70,7 +62,7 @@ fn summary_fold_tracks_the_live_projection() {
 #[test]
 fn segment_renders_for_every_window_selection_without_panic() {
     let app = crate::IcedApp::demo();
-    for window in HistoryWindow::ALL {
+    for window in ResourceHistoryWindow::ALL {
         let _ = render_system_dashboard(&app, window);
     }
 }

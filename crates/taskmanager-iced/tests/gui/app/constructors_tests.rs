@@ -4,17 +4,8 @@ use taskmanager_application::{ConfigStore, PlatformClient};
 
 #[test]
 fn capture_device_selector_accepts_only_the_complete_performance_vocabulary() {
-    let expected = [
-        ("cpu", PerfDevice::Cpu),
-        ("memory", PerfDevice::Memory),
-        ("disk", PerfDevice::Disk(0)),
-        ("network", PerfDevice::Network(0)),
-        ("gpu", PerfDevice::Gpu(0)),
-        ("battery", PerfDevice::Battery(0)),
-        ("fan", PerfDevice::Fan(0)),
-    ];
-    for (name, device) in expected {
-        assert_eq!(capture_device_from_name(name), Some(device));
+    for device in PerfDevice::ALL {
+        assert_eq!(capture_device_from_name(device.key()), Some(device));
     }
     assert_eq!(capture_device_from_name("services"), None);
     assert_eq!(capture_device_from_name("GPU"), None);
@@ -105,7 +96,7 @@ fn capture_fixture_has_multi_sample_dynamic_and_engine_data() {
 }
 
 #[test]
-fn only_the_system_capture_target_seeds_complete_typed_npu_facts() {
+fn system_and_npu_capture_targets_seed_complete_typed_npu_facts() {
     let mut system = IcedApp::demo();
     assert!(system.shell.projection().npu_inventory.is_none());
     apply_capture_target(&mut system, "system");
@@ -132,6 +123,14 @@ fn only_the_system_capture_target_seeds_complete_typed_npu_facts() {
         taskmanager_core::core::metrics::ScalarAvailability::Unavailable(
             taskmanager_core::core::failure::FailureKind::Unsupported
         )
+    );
+
+    let mut npu = IcedApp::demo();
+    apply_capture_target(&mut npu, "npu");
+    assert_eq!(npu.performance.selected_device, PerfDevice::Npu(0));
+    assert_eq!(
+        npu.shell.projection().npu_inventory,
+        system.shell.projection().npu_inventory
     );
 
     let mut services = IcedApp::demo();

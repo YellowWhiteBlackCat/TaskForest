@@ -111,6 +111,35 @@ Iced 的 renderer-local 组件入口是 `taskmanager-iced/src/ui/components.rs`�
 可访问激活壳，`theme.rs` 负责 token 到 Iced style 的映射，`virtual_list.rs` 负责有界表格窗口。
 它们与 `taskmanager-ui` 平行而非上下游关系。
 
+## 四端对齐与“求同存异”质量基线
+
+TaskForest 践行“求同存异”端际契约治理：四端（GPUI、Iced、TUI、Bevy）在用户意图（`ProductIntent`）、
+命令集（`CommandId`）、列规范（`PROCESS_COLUMNS`）与焦点生命周期上保持 100% 强类型同源；
+在渲染范式与交互表达上，充分尊重并发挥 toolkit 原生优势。Toolkit 原生差异是第一等的主动设计资产，
+绝非妥协产物：
+
+- **GPUI（TaskForest-G，参考表面）**：基于 `gpui` 0.2.2 的保留模式 GPU 画布。以根字号 rem
+  弹性布局预算（`UiSize::{Small, Standard, Large}`）为基准，提供浮层 Toast 栈、指针拖拽实时调宽、
+  微像素平滑图表与多设备并行卡片。
+- **TUI（TaskForest-T，字符网格与键盘优先）**：基于 Ratatui 的离散字符网格。
+  - *Braille Sparkline*：利用 Unicode 盲文点阵（U+2800..U+28FF，单格 2×4 = 8 点分辨率）在 1 行高内
+    提供纵向 4 倍、横向 2 倍精度的历史走势曲线；
+  - *纯键盘驱动与单行底栏*：放弃悬浮 Toast 与鼠标悬停，通过底部单行 `footer.activity-line` 提供即时
+    状态；模态使用 `Clear` + `Block` 且 `Esc` 绝对优先；
+  - *真实性保障*：未支持标量严格呈现 `—`，绝不虚构零值；文本选择归属终端模拟器。
+- **Iced（TaskForest-I，纯函数式 TEA）**：基于 Elm 架构（Model-Update-View）。
+  - *纯函数式虚拟表格*：通过 `VirtualWindow` 与 `lazy` 仅材料化可视行，杜绝命令式状态泄漏；
+  - *单行紧凑控件条（Presets Ribbon）*：在 720×480 等小视口下，预设条收敛为 32px 横向滑轨，工具栏
+    强制单行或纯图标，为数据网格保留至少 7–9 行有效高度；
+  - *底部反馈行*：操作反馈收敛于窗口底栏，维持纯函数界面的平静与稳定。
+- **Bevy UI（TaskForest-B，纯数据驱动 ECS）**：基于 Bevy 0.19 实体-组件-系统。
+  - *100% `bsn!` 场景树*：无 DOM 树或命令式回调，所有元素为携带响应式组件的实体；
+  - *拾取穿透纪律*：按钮子实体强制挂载 `Pickable::IGNORE`，确保点击事件穿透父按钮；
+  - *自适应弹性槽位*：列宽采用 flex 比例自适应而非鼠标拖拽把手，保障游戏/引擎视口稳定。
+
+各端声明的 `AcceptedDifference` 或 `Divergent` 必须明确绑定上述质量基线，严禁以“实现困难”
+为由引入未经治理的功能缺失或静默降级。
+
 ## 视觉不变量
 
 - 颜色只能来自 `taskmanager_theme` token；禁止在组件中新增产品色 literal。

@@ -37,6 +37,30 @@ fn zero_and_unlimited_are_current_serializable_values() {
 }
 
 #[test]
+fn finite_soft_limits_report_usage_and_warning_bands_without_fabricating_unlimited() {
+    let finite = ResourceLimit {
+        kind: ResourceLimitKind::OpenFiles,
+        soft: LimitValue::Value(100),
+        hard: LimitValue::Value(200),
+        unit: Some("files".to_owned()),
+    };
+    assert_eq!(finite.soft_usage_percent(Some(0)), Some(0.0));
+    assert_eq!(finite.soft_usage_percent(Some(90)), Some(90.0));
+    assert_eq!(finite.soft_usage_percent(Some(125)), Some(125.0));
+    assert_eq!(finite.is_near_soft_limit(Some(89), 90.0), Some(false));
+    assert_eq!(finite.is_near_soft_limit(Some(90), 90.0), Some(true));
+    assert_eq!(finite.is_near_soft_limit(Some(125), 90.0), Some(true));
+    assert_eq!(finite.is_near_soft_limit(Some(90), f32::NAN), None);
+
+    let unlimited = ResourceLimit {
+        soft: LimitValue::Unlimited,
+        ..finite
+    };
+    assert_eq!(unlimited.soft_usage_percent(Some(100)), None);
+    assert_eq!(unlimited.is_near_soft_limit(Some(100), 90.0), None);
+}
+
+#[test]
 fn absent_stale_and_unavailable_are_structurally_distinct() {
     let absent = ResourceObservation::<u64>::absent(10);
     let stale = absent

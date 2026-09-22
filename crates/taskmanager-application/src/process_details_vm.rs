@@ -69,7 +69,10 @@
 //!   `0`, `0.0%`, or empty string. A whitespace-only `Cmdline`
 //!   is missing (the majority TUI/Iced dash-on-empty semantics).
 
+use std::path::Path;
+
 use taskmanager_core::core::process::ProcessItem;
+use taskmanager_core::core::process_telemetry::{ProcessEnvironment, ProcessEnvironmentEntry};
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_core::core::units::{
     QuantityFamily, UnitPreferences, format_memory, format_quantity,
@@ -80,6 +83,36 @@ use taskmanager_core::core::units::{
 pub struct ProcessDetailsRowVm {
     pub field: ProcessDetailsField,
     pub value: DetailValue,
+}
+
+/// A detected mismatch between the physical executable and the process's
+/// advertised `argv[0]`. This is an observation, not a malware verdict: a
+/// launcher, symlink or intentional self-renaming can all produce it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProcessCommandIdentityComparison {
+    pub executable_name: String,
+    pub argv0: String,
+}
+
+/// Compare `/proc/<pid>/exe`'s basename with the first command-line argument.
+/// Empty/unavailable observations return `None`; the UI must not claim a
+/// mismatch when either side was not actually read.
+#[must_use]
+pub fn command_identity_comparison(item: &ProcessItem) -> Option<ProcessCommandIdentityComparison> {
+    let executable_name = item.current_exe_path()?.file_name()?.to_str()?.trim();
+    let argv0 = item
+        .cmdline
+        .split(['\0', ' ', '\t', '\n'])
+        .find(|value| !value.trim().is_empty())?
+        .trim();
+    let argv0_name = Path::new(argv0).file_name()?.to_str()?.trim();
+    if executable_name.is_empty() || argv0_name.is_empty() || executable_name == argv0_name {
+        return None;
+    }
+    Some(ProcessCommandIdentityComparison {
+        executable_name: executable_name.to_owned(),
+        argv0: argv0_name.to_owned(),
+    })
 }
 
 /// The process-details field vocabulary — the single list every frontend's
@@ -102,6 +135,10 @@ pub enum ProcessDetailsField {
     Memory,
     /// Hybrid proportional set size. TUI panel (combined) only.
     Pss,
+    /// Unique set size (private unshared physical memory).
+    Uss,
+    /// Anonymous transparent huge-page charge.
+    AnonHugePages,
     /// Swap charged to the process. TUI panel (combined) only.
     Swap,
     /// Thread count. TUI panel (combined), overviews.
@@ -110,6 +147,12 @@ pub enum ProcessDetailsField {
     Fds,
     /// Scheduling niceness, signed. TUI panel, Iced overview.
     Nice,
+    /// Kernel scheduling policy (e.g. SCHED_OTHER, SCHED_BATCH, SCHED_IDLE).
+    SchedPolicy,
+    /// Linux OOM killer score (0..1000).
+    OomScore,
+    /// Cumulative page faults (minor / major loaded from disk).
+    PageFaults,
     /// Start time, UTC `YYYY-MM-DD HH:MM:SS`. All ends.
     StartTime,
     /// Cumulative CPU time, `01h 01m` / `1d 01h 00m`. TUI panel, Iced overview.
@@ -118,6 +161,10 @@ pub enum ProcessDetailsField {
     DiskReadRate,
     /// Disk write rate (`/s` suffix). TUI panel, performance tabs.
     DiskWriteRate,
+    /// Instantaneous network transfer rate (`/s` suffix).
+    NetworkRate,
+    /// Cumulative writes discarded by the kernel after overwrite/truncation.
+    CancelledWriteBytes,
     /// Cumulative disk read bytes. Iced overview.
     DiskReadTotal,
     /// Cumulative disk write bytes. Iced overview.
@@ -131,7 +178,7 @@ pub enum ProcessDetailsField {
 impl ProcessDetailsField {
     /// Every field in the canonical row order — the single variant list
     /// ([`process_details_rows`] emits exactly this sequence).
-    pub const ALL: [Self; 20] = [
+    pub const ALL: [Self; 27] = [
         Self::Name,
         Self::Pid,
         Self::ParentPid,
@@ -140,14 +187,21 @@ impl ProcessDetailsField {
         Self::Cpu,
         Self::Memory,
         Self::Pss,
+        Self::Uss,
+        Self::AnonHugePages,
         Self::Swap,
         Self::Threads,
         Self::Fds,
         Self::Nice,
+        Self::SchedPolicy,
+        Self::OomScore,
+        Self::PageFaults,
         Self::StartTime,
         Self::CpuTime,
         Self::DiskReadRate,
         Self::DiskWriteRate,
+        Self::NetworkRate,
+        Self::CancelledWriteBytes,
         Self::DiskReadTotal,
         Self::DiskWriteTotal,
         Self::Exe,
@@ -167,14 +221,21 @@ impl ProcessDetailsField {
             Self::Cpu => "cpu",
             Self::Memory => "memory",
             Self::Pss => "pss",
+            Self::Uss => "uss",
+            Self::AnonHugePages => "anon_huge_pages",
             Self::Swap => "swap",
             Self::Threads => "threads",
             Self::Fds => "fds",
             Self::Nice => "nice",
+            Self::SchedPolicy => "sched_policy",
+            Self::OomScore => "oom_score",
+            Self::PageFaults => "page_faults",
             Self::StartTime => "start_time",
             Self::CpuTime => "cpu_time",
             Self::DiskReadRate => "disk_read_rate",
             Self::DiskWriteRate => "disk_write_rate",
+            Self::NetworkRate => "network_rate",
+            Self::CancelledWriteBytes => "cancelled_write_bytes",
             Self::DiskReadTotal => "disk_read_total",
             Self::DiskWriteTotal => "disk_write_total",
             Self::Exe => "exe",
@@ -281,6 +342,21 @@ pub fn process_details_rows_with_local_time(
             ),
         },
         ProcessDetailsRowVm {
+            field: ProcessDetailsField::Uss,
+            value: text(
+                item.current_memory_uss_bytes()
+                    .map(|bytes| format_memory(bytes, units)),
+            ),
+        },
+        ProcessDetailsRowVm {
+            field: ProcessDetailsField::AnonHugePages,
+            value: text(item.current_memory_anon_huge_pages_bytes().map(|bytes| {
+                let value = format_memory(bytes, units);
+                item.current_memory_anon_huge_pages_ratio()
+                    .map_or(value.clone(), |ratio| format!("{value} ({ratio:.1}% RSS)"))
+            })),
+        },
+        ProcessDetailsRowVm {
             field: ProcessDetailsField::Swap,
             value: text(
                 item.current_swap_bytes()
@@ -298,6 +374,24 @@ pub fn process_details_rows_with_local_time(
         ProcessDetailsRowVm {
             field: ProcessDetailsField::Nice,
             value: text(item.current_nice().map(format_nice)),
+        },
+        ProcessDetailsRowVm {
+            field: ProcessDetailsField::SchedPolicy,
+            value: text(
+                item.current_scheduling_policy()
+                    .map(|p| p.label().to_string()),
+            ),
+        },
+        ProcessDetailsRowVm {
+            field: ProcessDetailsField::OomScore,
+            value: text(item.current_oom_score().map(|s| s.to_string())),
+        },
+        ProcessDetailsRowVm {
+            field: ProcessDetailsField::PageFaults,
+            value: text(
+                item.current_page_faults()
+                    .map(|(minor, major)| format!("{minor} (I/O: {major})")),
+            ),
         },
         ProcessDetailsRowVm {
             field: ProcessDetailsField::StartTime,
@@ -322,6 +416,20 @@ pub fn process_details_rows_with_local_time(
             field: ProcessDetailsField::DiskWriteRate,
             value: text(
                 item.current_disk_write_bytes_per_sec()
+                    .map(|bytes| format_quantity(bytes, QuantityFamily::Drive, true, units)),
+            ),
+        },
+        ProcessDetailsRowVm {
+            field: ProcessDetailsField::NetworkRate,
+            value: text(
+                item.current_network_bytes_per_sec()
+                    .map(|bytes| format_quantity(bytes, QuantityFamily::Drive, true, units)),
+            ),
+        },
+        ProcessDetailsRowVm {
+            field: ProcessDetailsField::CancelledWriteBytes,
+            value: text(
+                item.current_cancelled_write_bytes()
                     .map(|bytes| format_quantity(bytes, QuantityFamily::Drive, true, units)),
             ),
         },
@@ -413,6 +521,117 @@ pub fn format_local_timestamp_seconds(
         local.minute(),
         local.second()
     ))
+}
+
+/// Canonical mask string of asterisks used to redact sensitive environment variable values.
+pub const SENSITIVE_VALUE_MASK: &str = "********";
+
+/// Alias for [`SENSITIVE_VALUE_MASK`].
+pub const SENSITIVE_ENV_MASK: &str = SENSITIVE_VALUE_MASK;
+
+/// Substring patterns identifying sensitive environment variable keys.
+pub const SENSITIVE_KEY_PATTERNS: &[&str] = &["TOKEN", "KEY", "SECRET", "PASSWORD", "AUTH"];
+
+/// Returns true if an environment variable key contains any sensitive pattern
+/// (`TOKEN`, `KEY`, `SECRET`, `PASSWORD`, `AUTH`), matched case-insensitively.
+#[must_use]
+pub fn is_sensitive_env_key(key: &str) -> bool {
+    let upper = key.to_ascii_uppercase();
+    SENSITIVE_KEY_PATTERNS
+        .iter()
+        .any(|pattern| upper.contains(pattern))
+}
+
+/// Alias for [`is_sensitive_env_key`].
+#[must_use]
+pub fn is_sensitive_environment_key(key: &str) -> bool {
+    is_sensitive_env_key(key)
+}
+
+/// Render an environment variable's value, masking sensitive values with asterisks.
+///
+/// If `key` is sensitive (contains `TOKEN`, `KEY`, `SECRET`, `PASSWORD`, or `AUTH`),
+/// returns [`SENSITIVE_VALUE_MASK`]. Otherwise returns the original value.
+#[must_use]
+pub fn render_environment_value(key: &str, value: &str) -> String {
+    if is_sensitive_env_key(key) {
+        SENSITIVE_VALUE_MASK.to_string()
+    } else {
+        value.to_string()
+    }
+}
+
+/// Mask an environment variable's value with asterisks if its key is sensitive.
+#[must_use]
+pub fn mask_environment_value(key: &str, value: &str) -> String {
+    render_environment_value(key, value)
+}
+
+/// Mask an environment variable's value with asterisks if its key is sensitive.
+#[must_use]
+pub fn mask_sensitive_env_value(key: &str, value: &str) -> String {
+    render_environment_value(key, value)
+}
+
+/// Render an environment variable as a `(key, value)` pair, masking sensitive values with asterisks.
+#[must_use]
+pub fn render_environment_key_value(key: &str, value: &str) -> (String, String) {
+    (key.to_string(), render_environment_value(key, value))
+}
+
+/// Render one environment variable as `KEY=VALUE`, with sensitive values masked by asterisks.
+#[must_use]
+pub fn render_environment_variable(key: &str, value: &str) -> String {
+    format!("{key}={}", render_environment_value(key, value))
+}
+
+/// Format one environment entry as `KEY=VALUE`, with sensitive values masked by asterisks.
+#[must_use]
+pub fn format_environment_entry(key: &str, value: &str) -> String {
+    render_environment_variable(key, value)
+}
+
+/// Render a single [`ProcessEnvironmentEntry`], masking its value with asterisks if sensitive.
+#[must_use]
+pub fn render_environment_entry(entry: &ProcessEnvironmentEntry) -> ProcessEnvironmentEntry {
+    ProcessEnvironmentEntry {
+        key: entry.key.clone(),
+        value: render_environment_value(&entry.key, &entry.value),
+    }
+}
+
+/// Render a slice of [`ProcessEnvironmentEntry`], returning a new list where sensitive values are masked with asterisks.
+#[must_use]
+pub fn render_environment_entries(
+    entries: &[ProcessEnvironmentEntry],
+) -> Vec<ProcessEnvironmentEntry> {
+    entries.iter().map(render_environment_entry).collect()
+}
+
+/// Render a [`ProcessEnvironment`], returning a cloned environment snapshot where all sensitive entry values are masked with asterisks.
+#[must_use]
+pub fn render_process_environment(env: &ProcessEnvironment) -> ProcessEnvironment {
+    ProcessEnvironment {
+        state: env.state,
+        working_directory: env.working_directory.clone(),
+        entries: render_environment_entries(&env.entries),
+        truncated_count: env.truncated_count,
+    }
+}
+
+/// Alias for [`render_process_environment`].
+#[must_use]
+pub fn render_environment(env: &ProcessEnvironment) -> ProcessEnvironment {
+    render_process_environment(env)
+}
+
+/// Format one environment entry for single-line display, escaping control characters
+/// and masking sensitive values with asterisks.
+#[must_use]
+pub fn format_env_entry(entry: &ProcessEnvironmentEntry) -> String {
+    let masked_val = render_environment_value(&entry.key, &entry.value);
+    let escaped = masked_val.replace('\r', "\\r").replace('\n', "\\n");
+    format!("{}={}", entry.key, escaped)
 }
 
 #[cfg(test)]

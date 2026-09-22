@@ -82,7 +82,7 @@ pub(crate) fn service_details_modal_scene(
     let title = format!("{} · {}", t("dialog.service_details"), service.name);
     let id_label = service.id.to_string();
 
-    let rows: Vec<Box<dyn Scene>> = vec![
+    let mut rows: Vec<Box<dyn Scene>> = vec![
         fact_row_scene(t("common.name"), &service.name, palette),
         fact_row_scene("ID", &id_label, palette),
         fact_row_scene(t("common.status"), service.status.as_str(), palette),
@@ -91,6 +91,11 @@ pub(crate) fn service_details_modal_scene(
         fact_row_scene(t("svc.sub_state"), &service.sub_state, palette),
         fact_row_scene(t("common.description"), &service.description, palette),
     ];
+    for (label, value) in
+        taskmanager_shell::presentation::service_diagnostics_rows(service.diagnostics())
+    {
+        rows.push(fact_row_scene(&label, &value, palette));
+    }
 
     let panel = Box::new(bsn! {
         Node {

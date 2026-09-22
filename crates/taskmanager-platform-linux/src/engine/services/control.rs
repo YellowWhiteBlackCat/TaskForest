@@ -31,6 +31,23 @@ impl ControlCommandRunner for NativeControlCommandRunner {
 }
 
 impl ServiceManager {
+    /// Ask the active systemd manager to rescan unit files after an external
+    /// unit change. This is deliberately separate from per-unit lifecycle
+    /// actions: `daemon-reload` targets the manager, never a service name, and
+    /// is unsupported on OpenRC/non-Linux supervisors.
+    #[allow(dead_code)]
+    pub fn reload_daemon() -> Result<(), ProviderFailure> {
+        #[cfg(target_os = "linux")]
+        {
+            let mut runner = NativeControlCommandRunner;
+            reload_daemon_with(Self::detect_init(), &mut runner)
+        }
+        #[cfg(not(target_os = "linux"))]
+        {
+            Err(ProviderFailure::Unsupported)
+        }
+    }
+
     pub fn control_service(
         target: &ServiceId,
         action: ServiceAction,
@@ -50,6 +67,21 @@ impl ServiceManager {
     }
 }
 
+#[allow(dead_code)]
+fn reload_daemon_with(
+    detected: Result<InitSystem, FailureKind>,
+    runner: &mut impl ControlCommandRunner,
+) -> Result<(), ProviderFailure> {
+    let init = detected.map_err(ProviderFailure::from_kind)?;
+    if init != InitSystem::Systemd {
+        return Err(ProviderFailure::Unsupported);
+    }
+    match runner.run("systemctl", &["daemon-reload"]) {
+        ControlCommandResult::Success(_) => Ok(()),
+        ControlCommandResult::Failure(failure) => Err(failure),
+    }
+}
+
 fn control_service_with(
     target: &ResolvedServiceTarget,
     action: ServiceAction,
@@ -58,12 +90,25 @@ fn control_service_with(
 ) -> Result<(), ProviderFailure> {
     verify_detected_init(detector(), target.init())?;
     let native_name = target.native();
+    if action == ServiceAction::ReloadDaemon {
+        return match target.init() {
+            InitSystem::Systemd => {
+                let args = if target.user_scope() {
+                    ["--user", "daemon-reload"].as_slice()
+                } else {
+                    ["daemon-reload"].as_slice()
+                };
+                successful(runner.run("systemctl", args))
+            }
+            InitSystem::Openrc | InitSystem::Unsupported => Err(ProviderFailure::Unsupported),
+        };
+    }
     match target.init() {
         InitSystem::Systemd => {
             if !native_name.ends_with(".service") {
                 return Err(ProviderFailure::Rejected);
             }
-            revalidate_systemd_target(native_name, runner)?;
+            revalidate_systemd_target(native_name, target.user_scope(), runner)?;
         }
         InitSystem::Openrc => {
             revalidate_openrc_target(native_name, runner)?;
@@ -72,10 +117,14 @@ fn control_service_with(
     }
     verify_detected_init(detector(), target.init())?;
     match target.init() {
-        InitSystem::Systemd => successful(runner.run(
-            "systemctl",
-            &[service_action_name(action), "--", native_name],
-        )),
+        InitSystem::Systemd => {
+            let mut args = Vec::with_capacity(4);
+            if target.user_scope() {
+                args.push("--user");
+            }
+            args.extend([service_action_name(action), "--", native_name]);
+            successful(runner.run("systemctl", &args))
+        }
         InitSystem::Openrc => match action {
             ServiceAction::Start | ServiceAction::Stop | ServiceAction::Restart => {
                 successful(runner.run("rc-service", &[native_name, service_action_name(action)]))
@@ -86,6 +135,7 @@ fn control_service_with(
             ServiceAction::Disable => {
                 successful(runner.run("rc-update", &["del", native_name, "default"]))
             }
+            ServiceAction::ReloadDaemon => Err(ProviderFailure::Unsupported),
         },
         InitSystem::Unsupported => Err(ProviderFailure::Unsupported),
     }
@@ -105,12 +155,15 @@ fn verify_detected_init(
 
 fn revalidate_systemd_target(
     unit: &str,
+    user_scope: bool,
     runner: &mut impl ControlCommandRunner,
 ) -> Result<(), ProviderFailure> {
-    match runner.run(
-        "systemctl",
-        &["show", "--property=LoadState", "--value", "--", unit],
-    ) {
+    let mut args = Vec::with_capacity(5);
+    if user_scope {
+        args.push("--user");
+    }
+    args.extend(["show", "--property=LoadState", "--value", "--", unit]);
+    match runner.run("systemctl", &args) {
         ControlCommandResult::Success(stdout) if stdout.trim() == "loaded" => Ok(()),
         ControlCommandResult::Success(_) => Err(ProviderFailure::IdentityChanged),
         ControlCommandResult::Failure(ProviderFailure::Rejected) => {
@@ -147,6 +200,7 @@ const fn service_action_name(action: ServiceAction) -> &'static str {
         ServiceAction::Restart => "restart",
         ServiceAction::Enable => "enable",
         ServiceAction::Disable => "disable",
+        ServiceAction::ReloadDaemon => "daemon-reload",
     }
 }
 

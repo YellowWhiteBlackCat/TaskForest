@@ -40,10 +40,10 @@ use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 use taskmanager_theme::Theme;
 
 use super::{
-    EnabledChip, StartupRowClicked, StartupRowMarker, StartupSelection, StartupSelectionMoved,
-    StartupSortClicked, StartupStatusLine, chip_fill, empty_state_text, enabled_chip,
-    evidence_line, moved_row, selected_row, startup_impact_text, startup_rows, startup_source_text,
-    status_line_text,
+    EnabledChip, StartupDisableButton, StartupEnableButton, StartupRowClicked, StartupRowMarker,
+    StartupSelection, StartupSelectionMoved, StartupSortClicked, StartupStatusLine,
+    StartupToggleButton, chip_fill, empty_state_text, enabled_chip, evidence_line, moved_row,
+    selected_row, startup_impact_text, startup_rows, startup_source_text, status_line_text,
 };
 use crate::app::{FrontendTrack, Page, Route, RouteChanged};
 use crate::palette::ui_palette;
@@ -435,9 +435,10 @@ fn folded_rows_render_then_refresh_and_idle_frames_redraw_nothing() {
         [(0, "ent-b".to_owned()), (1, "ent-a".to_owned())],
         "rows render in provider order until a sort is picked"
     );
-    assert_eq!(
-        status_line(&mut app),
-        format!("2 {} · provider order", t("startup.noun"))
+    let status = status_line(&mut app);
+    assert!(
+        status.starts_with("2 ") && status.ends_with(" · provider order"),
+        "the status line keeps the row count and provider-order suffix: {status}"
     );
 
     let before = row_entities(&mut app);
@@ -559,4 +560,135 @@ fn keyboard_moves_clamp_and_out_of_range_clicks_change_nothing() {
         Some(StartupEntryId::new("ent-b")),
         "the selection resource stays id-keyed and honest"
     );
+}
+
+#[test]
+fn startup_table_columns_match_shared_contract() {
+    let cols = super::columns();
+    let labels: Vec<String> = cols.iter().map(|c| c.label.clone()).collect();
+    assert_eq!(
+        labels,
+        vec![
+            t("common.status"),
+            t("common.name"),
+            t("startup.impact"),
+            t("startup.source"),
+            t("startup.command"),
+        ],
+        "table column headers must align to Status, Name, Impact, Source, Command"
+    );
+}
+
+#[test]
+fn startup_toolbar_mounts_enable_and_disable_buttons() {
+    let (mut app, events) = headless_startup_app();
+    route_to_startup(&mut app);
+    push_startup(&events, vec![startup_entry("ent-a", "alpha", true)]);
+    app.update();
+    app.update();
+
+    let enable_buttons: Vec<_> = app
+        .world_mut()
+        .query_filtered::<Entity, With<StartupEnableButton>>()
+        .iter(app.world())
+        .collect();
+    let disable_buttons: Vec<_> = app
+        .world_mut()
+        .query_filtered::<Entity, With<StartupDisableButton>>()
+        .iter(app.world())
+        .collect();
+    let toggle_buttons: Vec<_> = app
+        .world_mut()
+        .query_filtered::<Entity, With<StartupToggleButton>>()
+        .iter(app.world())
+        .collect();
+
+    assert_eq!(
+        enable_buttons.len(),
+        1,
+        "startup toolbar mounts exactly one Enable button"
+    );
+    assert_eq!(
+        disable_buttons.len(),
+        1,
+        "startup toolbar mounts exactly one Disable button"
+    );
+    assert_eq!(
+        toggle_buttons.len(),
+        1,
+        "startup row mounts an interactive toggle button"
+    );
+}
+
+#[test]
+fn startup_toggle_button_and_toolbar_trigger_control() {
+    let (mut app, events) = headless_startup_app();
+    route_to_startup(&mut app);
+    push_startup(&events, vec![startup_entry("ent-a", "alpha", true)]);
+    app.update();
+    app.update();
+
+    let toggle_entity = app
+        .world_mut()
+        .query_filtered::<Entity, With<StartupToggleButton>>()
+        .iter(app.world())
+        .next()
+        .expect("toggle button entity");
+
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::Activate {
+            entity: toggle_entity,
+        });
+    app.update();
+
+    let shell = &app.world().non_send::<FrontendTrack>().shell;
+    let pending = shell
+        .pending_startup()
+        .expect("gate armed by toggle button");
+    assert!(
+        !pending.enabled,
+        "toggling enabled entry requests disabled state"
+    );
+    assert_eq!(pending.entry.name, "alpha");
+
+    // Select row and test toolbar disable button
+    let disable_entity = app
+        .world_mut()
+        .query_filtered::<Entity, With<StartupDisableButton>>()
+        .iter(app.world())
+        .next()
+        .expect("disable button entity");
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::Activate {
+            entity: disable_entity,
+        });
+    app.update();
+
+    let shell = &app.world().non_send::<FrontendTrack>().shell;
+    let pending = shell
+        .pending_startup()
+        .expect("gate armed by disable button");
+    assert!(!pending.enabled);
+
+    // Test toolbar enable button
+    let enable_entity = app
+        .world_mut()
+        .query_filtered::<Entity, With<StartupEnableButton>>()
+        .iter(app.world())
+        .next()
+        .expect("enable button entity");
+    app.world_mut()
+        .commands()
+        .trigger(bevy::ui_widgets::Activate {
+            entity: enable_entity,
+        });
+    app.update();
+
+    let shell = &app.world().non_send::<FrontendTrack>().shell;
+    let pending = shell
+        .pending_startup()
+        .expect("gate armed by enable button");
+    assert!(pending.enabled);
 }

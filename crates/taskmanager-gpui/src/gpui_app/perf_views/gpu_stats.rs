@@ -56,9 +56,41 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> 
                 Some(version.to_owned()),
             ));
         }
+        if let Some(version) = api
+            .mesa_version
+            .as_deref()
+            .filter(|value| !value.is_empty())
+        {
+            stats.push(StatRow::text(
+                i18n::t("gpu.mesa_version"),
+                Some(version.to_owned()),
+            ));
+        }
     }
 
     // ── Split VRAM: dedicated on-card (amdgpu) + shared GTT aperture ──
+
+    if let Some(width) = g.memory_bus_width_bits.filter(|width| *width > 0) {
+        stats.push(StatRow::text(
+            i18n::t("gpu.memory_bus_width"),
+            Some(format!("{width} bit")),
+        ));
+    }
+    if let Some(bandwidth) = g
+        .memory_bandwidth_gbps
+        .filter(|value| value.is_finite() && *value > 0.0)
+    {
+        stats.push(StatRow::text(
+            i18n::t("gpu.memory_bandwidth"),
+            Some(format!("{bandwidth:.1} GB/s")),
+        ));
+    }
+    if let Some(depth) = g.queue_depth {
+        stats.push(StatRow::text(
+            i18n::t("gpu.queue_depth"),
+            Some(depth.to_string()),
+        ));
+    }
 
     // ── Live core clock + advertised max (Intel i915/xe tile freq). ──
     // The clock reads 0 only when fully unavailable; the reader already falls
@@ -90,6 +122,27 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> 
             Some(format!("{w:.1} W")),
         ));
     }
+    if let Some(limit) = g
+        .power_limit_w
+        .filter(|value| value.is_finite() && *value > 0.0)
+    {
+        stats.push(StatRow::text(
+            i18n::t("gpu.power_limit"),
+            Some(format!("{limit:.1} W")),
+        ));
+    }
+    if let Some(rpm) = g.current_fan_speed_rpm() {
+        stats.push(StatRow::text(
+            i18n::t("fan.rpm"),
+            Some(format!("{rpm} RPM")),
+        ));
+    }
+    if let Some(pct) = g.current_fan_speed_pct().filter(|value| value.is_finite()) {
+        stats.push(StatRow::text(
+            i18n::t("fan.pwm"),
+            Some(format!("{pct:.0}%")),
+        ));
+    }
     // ── Driver (basename of device/driver symlink — xe / i915 / amdgpu). ──
     if let Some(d) = &g.driver {
         stats.push(StatRow::text(i18n::t("common.driver"), Some(d.clone())));
@@ -103,6 +156,12 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> 
     {
         stats.push(StatRow::text(
             i18n::t("gpu.driver_version"),
+            Some(version.to_owned()),
+        ));
+    }
+    if let Some(version) = g.vbios_version.as_deref().filter(|value| !value.is_empty()) {
+        stats.push(StatRow::text(
+            i18n::t("gpu.vbios_version"),
             Some(version.to_owned()),
         ));
     }
@@ -167,6 +226,12 @@ pub(super) fn gpu_stats(g: &GpuMetrics, units: UnitPreferences) -> Vec<StatRow> 
         stats.push(StatRow::text(
             i18n::t("gpu.pci_slot"),
             Some(slot.to_owned()),
+        ));
+    }
+    if let Some(connected) = g.display_connected {
+        stats.push(StatRow::text(
+            i18n::t("gpu.display_output"),
+            Some(i18n::t(if connected { "common.yes" } else { "common.no" }).to_string()),
         ));
     }
     stats

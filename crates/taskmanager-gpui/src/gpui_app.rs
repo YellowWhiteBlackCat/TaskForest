@@ -11,6 +11,7 @@ pub mod containers_view;
 pub mod cpu_view;
 pub mod dashboard;
 pub mod elements;
+pub mod feature_coverage;
 pub mod first_run;
 pub mod formatting;
 pub mod functional;
@@ -33,6 +34,8 @@ pub mod system_view;
 pub mod theme;
 pub mod timeline;
 pub mod users_view;
+
+pub use feature_coverage::feature_coverage_declaration;
 
 pub(crate) use root::init_demo;
 pub use root::{RootView, StartupEnvironment, StartupRuntime, init};

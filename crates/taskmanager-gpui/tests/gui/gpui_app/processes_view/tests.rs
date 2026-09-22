@@ -117,8 +117,10 @@ async fn header_arrow_keys_switch_the_sort_column(cx: &mut TestAppContext) {
     for (key, expected) in [
         ("right", SortCol::Memory),
         ("right", SortCol::Swap),
+        ("right", SortCol::Pss),
         ("right", SortCol::DiskRead),
         ("right", SortCol::DiskWrite),
+        ("right", SortCol::Network),
         ("right", SortCol::CpuTime),
         ("right", SortCol::Fds),
         ("right", SortCol::Nice),
@@ -144,8 +146,10 @@ async fn header_arrow_keys_switch_the_sort_column(cx: &mut TestAppContext) {
         ("left", SortCol::Nice),
         ("left", SortCol::Fds),
         ("left", SortCol::CpuTime),
+        ("left", SortCol::Network),
         ("left", SortCol::DiskWrite),
         ("left", SortCol::DiskRead),
+        ("left", SortCol::Pss),
     ] {
         cx.dispatch_keystroke(win.into(), Keystroke::parse(key).unwrap());
         assert_eq!(
@@ -171,13 +175,15 @@ async fn header_arrow_keys_switch_the_sort_column(cx: &mut TestAppContext) {
     )));
 
     // Hidden columns are skipped by the navigation (same projection as the
-    // rendered header). Hide Memory + Swap + DiskWrite: Cpu's right neighbor is
+    // rendered header). Hide Memory + Swap + Pss + DiskWrite + Network: Cpu's right neighbor is
     // DiskRead and its left neighbor is Status.
     view.update(cx, |v, cx| {
         v.set_process_sort(SortCol::Cpu, v.process_sort().1);
         v.processes_state.hidden_cols.insert(SortCol::Memory);
         v.processes_state.hidden_cols.insert(SortCol::Swap);
+        v.processes_state.hidden_cols.insert(SortCol::Pss);
         v.processes_state.hidden_cols.insert(SortCol::DiskWrite);
+        v.processes_state.hidden_cols.insert(SortCol::Network);
         cx.notify();
     });
     cx.dispatch_keystroke(win.into(), Keystroke::parse("right").unwrap());
@@ -685,8 +691,10 @@ async fn standalone_proc_row_keeps_its_height(cx: &mut TestAppContext) {
                 cpu_aggregate: None,
                 memory_aggregate: None,
                 swap: None,
+                pss: None,
                 disk_read: None,
                 disk_write: None,
+                network: None,
                 threads: Some(4),
                 start_time_secs: Some(1000),
                 cpu_time_secs: Some(500),
@@ -788,8 +796,10 @@ async fn mc03_app_icon_case_verified_application_asset_mounts_as_a_gpui_image(
                 cpu_aggregate: None,
                 memory_aggregate: None,
                 swap: None,
+                pss: None,
                 disk_read: None,
                 disk_write: None,
+                network: None,
                 threads: Some(4),
                 start_time_secs: Some(1000),
                 cpu_time_secs: Some(500),
@@ -895,8 +905,10 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
         cpu_aggregate: None,
         memory_aggregate: None,
         swap: None,
+        pss: None,
         disk_read: None,
         disk_write: None,
+        network: None,
         threads: Some(2),
         start_time_secs: Some(1000),
         cpu_time_secs: Some(100),

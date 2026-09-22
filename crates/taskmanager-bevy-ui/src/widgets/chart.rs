@@ -89,6 +89,58 @@ pub(crate) fn line_segments(
     segments
 }
 
+/// Project sample window into line segments anchored to a fixed ceiling (0.0..ceiling)
+/// rather than normalizing across local extrema.
+#[must_use]
+pub(crate) fn line_segments_scaled(
+    samples: &[f32],
+    width: f32,
+    height: f32,
+    max_points: usize,
+    ceiling: f32,
+) -> Vec<ChartSegment> {
+    if samples.is_empty() || max_points == 0 {
+        return Vec::new();
+    }
+    let window = &samples[samples.len().saturating_sub(max_points)..];
+    let safe_ceiling = if ceiling.is_finite() && ceiling > 0.0 {
+        ceiling
+    } else {
+        100.0
+    };
+    let position = |index: usize, value: f32| -> ChartVertex {
+        let x = if window.len() <= 1 {
+            width
+        } else {
+            width * index as f32 / (window.len() - 1) as f32
+        };
+        let y = if !value.is_finite() {
+            height / 2.0
+        } else {
+            height * (1.0 - (value / safe_ceiling).clamp(0.0, 1.0))
+        };
+        ChartVertex { x, y }
+    };
+
+    let mut segments = Vec::new();
+    let mut previous = None;
+    for (index, value) in window.iter().copied().enumerate() {
+        if !value.is_finite() {
+            previous = None;
+            continue;
+        }
+        let current = position(index, value);
+        if let Some(start) = previous {
+            segments.push(ChartSegment {
+                start,
+                end: current,
+            });
+        }
+        previous = Some(current);
+    }
+    segments
+}
+
 /// The layout/render anchor for a chart surface. `segment_count` is metadata
 /// only until the vector renderer is integrated; retaining it makes the scene
 /// truthful and headlessly inspectable.

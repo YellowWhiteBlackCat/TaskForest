@@ -224,7 +224,7 @@ fn build_drm_card_metrics(card_name: &str, device_path: &Path, module_root: &Pat
 /// kernel driver and — only when the bound module itself declares one — the
 /// kernel driver version. It deliberately performs no vendor telemetry reads.
 fn build_drm_identity_metrics(
-    _card_name: &str,
+    card_name: &str,
     device_path: &Path,
     module_root: &Path,
 ) -> GpuMetrics {
@@ -267,9 +267,44 @@ fn build_drm_identity_metrics(
     metrics.pci_subsystem_device_id = pci_subsystem_device_id;
     metrics.pci_slot = pci_slot;
     metrics.pci_modalias = pci_modalias;
+    metrics.vbios_version = read_sysfs_string(&device_path.join("vbios_version").to_string_lossy())
+        .filter(|value| !value.trim().is_empty());
+    metrics.display_connected = read_connected_display(card_name, device_path);
     metrics.driver = driver;
     metrics.driver_version = driver_version;
     metrics
+}
+
+/// Read connector state for one DRM card. A card is considered connected when
+/// at least one connector explicitly reports `connected`; `Some(false)` is
+/// returned only when the connector inventory was readable and every
+/// connector reported `disconnected`. Missing or malformed connector state is
+/// kept as `None` so a render cannot claim a GPU drives the desktop by default.
+fn read_connected_display(card_name: &str, device_path: &Path) -> Option<bool> {
+    let card_path = device_path.parent()?;
+    let drm_root = card_path.parent()?;
+    let mut saw_connector = false;
+    let mut saw_readable = false;
+    let prefix = format!("{card_name}-");
+    let entries = std::fs::read_dir(drm_root).ok()?;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !name.starts_with(&prefix) {
+            continue;
+        }
+        saw_connector = true;
+        let status = std::fs::read_to_string(entry.path().join("status")).ok();
+        match status.as_deref().map(str::trim) {
+            Some("connected") => return Some(true),
+            Some("disconnected") => saw_readable = true,
+            _ => {}
+        }
+    }
+    if saw_connector && saw_readable {
+        Some(false)
+    } else {
+        None
+    }
 }
 
 fn linux_gpu_device_id(device_path: &Path, pci_slot: Option<&str>) -> String {
@@ -317,6 +352,12 @@ fn apply_gpu_metric_field(
             if sample.pci_modalias.is_some() {
                 target.pci_modalias.clone_from(&sample.pci_modalias);
             }
+            if sample.display_connected.is_some() {
+                target.display_connected = sample.display_connected;
+            }
+            if sample.vbios_version.is_some() {
+                target.vbios_version.clone_from(&sample.vbios_version);
+            }
         }
         GpuMetricField::Brand => target.brand.clone_from(&sample.brand),
         GpuMetricField::GraphicsApi => target.graphics_api.clone_from(&sample.graphics_api),
@@ -348,7 +389,21 @@ fn apply_gpu_metric_field(
         GpuMetricField::Temperature => {
             observations.temperature_c = sample_observations.temperature_c;
         }
-        GpuMetricField::Power => observations.power_w = sample_observations.power_w,
+        GpuMetricField::Power => {
+            observations.power_w = sample_observations.power_w;
+        }
+        GpuMetricField::MemoryBusWidth => {
+            target.memory_bus_width_bits = sample.memory_bus_width_bits;
+        }
+        GpuMetricField::MemoryBandwidth => {
+            target.memory_bandwidth_gbps = sample.memory_bandwidth_gbps;
+        }
+        GpuMetricField::QueueDepth => {
+            target.queue_depth = sample.queue_depth;
+        }
+        GpuMetricField::PowerLimit => {
+            target.power_limit_w = sample.power_limit_w;
+        }
         GpuMetricField::Fan => {
             observations.fan_speed_rpm = sample_observations.fan_speed_rpm;
             observations.fan_speed_pct = sample_observations.fan_speed_pct;

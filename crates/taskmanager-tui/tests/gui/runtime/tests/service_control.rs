@@ -3,7 +3,27 @@
 
 use super::super::*;
 
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 use taskmanager_application::AppAction;
+
+use crate::render;
+use crate::{TuiApp, TuiTheme};
+
+/// Render the live frame through the same TestBackend path the render tests
+/// use, pinning English and serializing against the language-flipping test.
+fn frame_text(app: &TuiApp, width: u16, height: u16) -> String {
+    let _guard = crate::ui::test_support::LANG_TEST_GUARD
+        .lock()
+        .expect("lang test guard");
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    let backend = TestBackend::new(width, height);
+    let mut terminal = Terminal::new(backend).expect("test terminal");
+    terminal
+        .draw(|frame| render(frame, app, TuiTheme::default()))
+        .expect("draw");
+    terminal.backend().to_string()
+}
 
 #[test]
 fn enter_on_services_opens_the_action_menu_and_esc_closes_it() {
@@ -322,6 +342,167 @@ fn service_log_open_and_panel_keys_drive_the_shared_state_machine() {
     assert!(
         !app.shell.service_log.is_some(),
         "leaving Services must close the log stream"
+    );
+}
+
+#[test]
+fn service_log_panel_paints_the_stream_and_the_level_filter_drops_lower_rows() {
+    use taskmanager_core::core::services::{
+        ServiceLogEntries, ServiceLogEntry, ServiceLogLevel, ServiceLogLevelFilter,
+        ServiceLogQuery, ServiceLogStreamSnapshot, ServiceLogStreamState, ServiceLogTimeFilter,
+    };
+
+    let mut app = crate::demo_app();
+    let _ = app.apply_action(AppAction::SelectPage(AppPage::Services));
+    let effect = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('o'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert!(
+        matches!(effect, Some(PlatformEffect::ServiceLogStream(_))),
+        "o must open the stream for the selected service"
+    );
+    let service_id = app
+        .shell
+        .service_log
+        .as_ref()
+        .and_then(|open| open.service_id())
+        .cloned()
+        .expect("the open stream freezes a service identity");
+
+    // Seed the shared feed through the same typed snapshot the provider
+    // runtime delivers. Each entry carries the syslog priority the shared
+    // level filter matches on.
+    let entries = ServiceLogEntries::new(vec![
+        ServiceLogEntry {
+            cursor: "error-1".into(),
+            realtime_timestamp_micros: Some(1_000_000),
+            priority: Some(3),
+            level: ServiceLogLevel::Error,
+            message: "journal: disk quota exceeded".into(),
+        },
+        ServiceLogEntry {
+            cursor: "warning-1".into(),
+            realtime_timestamp_micros: Some(1_001_000),
+            priority: Some(4),
+            level: ServiceLogLevel::Warning,
+            message: "connection pool retrying".into(),
+        },
+        ServiceLogEntry {
+            cursor: "info-1".into(),
+            realtime_timestamp_micros: Some(1_002_000),
+            priority: Some(6),
+            level: ServiceLogLevel::Info,
+            message: "telemetry service started".into(),
+        },
+        ServiceLogEntry {
+            cursor: "debug-1".into(),
+            realtime_timestamp_micros: Some(1_003_000),
+            priority: Some(7),
+            level: ServiceLogLevel::Debug,
+            message: "trace buffer flushed".into(),
+        },
+    ])
+    .expect("non-empty entry batch");
+    app.shell
+        .service_log
+        .as_mut()
+        .expect("stream open")
+        .feed
+        .apply_at(
+            ServiceLogStreamSnapshot {
+                query: ServiceLogQuery {
+                    service_id,
+                    level: ServiceLogLevelFilter::All,
+                    time: ServiceLogTimeFilter::All,
+                    after_cursor: None,
+                },
+                state: ServiceLogStreamState::Ready(entries),
+            },
+            100,
+        );
+
+    // The painted band carries the shared stream's rows under the default
+    // All filter — the "renders the log stream" half of the definition.
+    let all_kinds = frame_text(&app, 140, 44);
+    for message in [
+        "journal: disk quota exceeded",
+        "connection pool retrying",
+        "telemetry service started",
+        "trace buffer flushed",
+    ] {
+        assert!(
+            all_kinds.contains(message),
+            "stream row {message:?} must paint in the log band:\n{all_kinds}"
+        );
+    }
+
+    // `l` cycles the shared filter All → Errors. Only the error-level row may
+    // survive the painted band; the filter is applied by the shared feed, not
+    // by the renderer, so this proves the control reached the rendered rows.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('l'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert_eq!(
+        app.shell
+            .service_log
+            .as_ref()
+            .expect("stream open")
+            .feed
+            .level,
+        ServiceLogLevelFilter::Errors
+    );
+    let errors_only = frame_text(&app, 140, 44);
+    assert!(
+        errors_only.contains("journal: disk quota exceeded"),
+        "the error row must survive the Errors filter:\n{errors_only}"
+    );
+    for message in [
+        "connection pool retrying",
+        "telemetry service started",
+        "trace buffer flushed",
+    ] {
+        assert!(
+            !errors_only.contains(message),
+            "the Errors filter must drop {message:?} from the painted band:\n{errors_only}"
+        );
+    }
+
+    // A second `l` widens to WarningsAndErrors: the warning rejoins while the
+    // info/debug rows stay filtered.
+    let _ = handle_key(
+        &mut app,
+        KeyEvent::new(
+            ratatui::crossterm::event::KeyCode::Char('l'),
+            KeyModifiers::NONE,
+        ),
+    );
+    assert_eq!(
+        app.shell
+            .service_log
+            .as_ref()
+            .expect("stream open")
+            .feed
+            .level,
+        ServiceLogLevelFilter::WarningsAndErrors
+    );
+    let warnings_and_errors = frame_text(&app, 140, 44);
+    assert!(
+        warnings_and_errors.contains("journal: disk quota exceeded")
+            && warnings_and_errors.contains("connection pool retrying"),
+        "WarningsAndErrors must paint both surviving rows:\n{warnings_and_errors}"
+    );
+    assert!(
+        !warnings_and_errors.contains("telemetry service started")
+            && !warnings_and_errors.contains("trace buffer flushed"),
+        "WarningsAndErrors must keep the info/debug rows filtered:\n{warnings_and_errors}"
     );
 }
 

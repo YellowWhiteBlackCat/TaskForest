@@ -3,6 +3,7 @@
 
 use super::suggest::{shape_suggestion, suggest_thresholds_json};
 use super::*;
+use std::path::PathBuf;
 use taskmanager_core::core::alerts::{
     AlertMetric, SUGGESTION_MIN_SAMPLES, SuggestedThreshold, SuggestionBasis, SuggestionConfidence,
 };
@@ -368,4 +369,137 @@ fn shape_suggestion_renders_a_suggested_verdict_with_its_derivation() {
     assert_eq!(shaped["basis"], "mean_plus_stddev_floor_p95");
     assert_eq!(shaped["sample_count"], 64);
     assert_eq!(shaped["confidence"], "high");
+}
+
+#[test]
+fn parse_args_handles_export_diagnostic_bundle_modes() {
+    // 1. --export-diagnostic-bundle with separate path
+    assert_eq!(
+        parse_args([
+            "--export-diagnostic-bundle".into(),
+            "target/test-bundle.json".into()
+        ]),
+        Ok(CliMode::ExportDiagnosticBundle {
+            path: PathBuf::from("target/test-bundle.json")
+        })
+    );
+
+    // 2. --export-diagnostic-bundle=path
+    assert_eq!(
+        parse_args(["--export-diagnostic-bundle=target/direct.json".into()]),
+        Ok(CliMode::ExportDiagnosticBundle {
+            path: PathBuf::from("target/direct.json")
+        })
+    );
+
+    // 3. --diagnostic-bundle with explicit path
+    assert_eq!(
+        parse_args(["--diagnostic-bundle".into(), "out/bundle.json".into()]),
+        Ok(CliMode::ExportDiagnosticBundle {
+            path: PathBuf::from("out/bundle.json")
+        })
+    );
+
+    // 4. --diagnostic-bundle with default path
+    assert_eq!(
+        parse_args(["--diagnostic-bundle".into()]),
+        Ok(CliMode::ExportDiagnosticBundle {
+            path: PathBuf::from("taskforest-diagnostic-bundle.json")
+        })
+    );
+
+    // 5. --diagnostic-bundle=path
+    assert_eq!(
+        parse_args(["--diagnostic-bundle=out/diag.json".into()]),
+        Ok(CliMode::ExportDiagnosticBundle {
+            path: PathBuf::from("out/diag.json")
+        })
+    );
+}
+
+#[test]
+fn parse_args_rejects_missing_diagnostic_bundle_paths() {
+    assert_eq!(
+        parse_args(["--export-diagnostic-bundle".into()]),
+        Err(CliArgError::MissingDiagnosticBundleOutput)
+    );
+    assert_eq!(
+        parse_args(["--export-diagnostic-bundle=".into()]),
+        Err(CliArgError::MissingDiagnosticBundleOutput)
+    );
+    assert_eq!(
+        parse_args(["--diagnostic-bundle=".into()]),
+        Err(CliArgError::MissingDiagnosticBundleOutput)
+    );
+}
+
+#[test]
+fn parse_args_rejects_trailing_tokens_after_export_diagnostic_bundle() {
+    assert_eq!(
+        parse_args([
+            "--export-diagnostic-bundle".into(),
+            "target/out.json".into(),
+            "trailing".into()
+        ]),
+        Err(CliArgError::UnknownArgument)
+    );
+    assert_eq!(
+        parse_args([
+            "--diagnostic-bundle".into(),
+            "target/out.json".into(),
+            "trailing".into()
+        ]),
+        Err(CliArgError::UnknownArgument)
+    );
+}
+
+#[test]
+fn error_message_and_code_for_missing_diagnostic_bundle_path() {
+    let error = CliArgError::MissingDiagnosticBundleOutput;
+    assert_eq!(error.code(), "missing_diagnostic_bundle_output");
+    assert!(
+        error
+            .to_string()
+            .contains("--export-diagnostic-bundle requires an output path")
+    );
+
+    let unknown = CliArgError::UnknownArgument;
+    assert!(unknown.to_string().contains("--export-diagnostic-bundle"));
+}
+
+#[test]
+fn help_output_lists_export_diagnostic_bundle() {
+    let mut buffer = Vec::new();
+    print_help_to(&mut buffer, "taskforest-g", CliCapabilities::default())
+        .expect("print help to buffer");
+    let text = String::from_utf8(buffer).expect("valid utf-8");
+    assert!(
+        text.contains("--export-diagnostic-bundle PATH"),
+        "--help must list --export-diagnostic-bundle PATH"
+    );
+}
+
+#[test]
+#[cfg(target_os = "linux")]
+fn live_export_diagnostic_bundle_writes_valid_json() {
+    let mut client = taskmanager_platform_native::NativePlatformRuntime::spawn()
+        .map(taskmanager_application::PlatformClient::new)
+        .expect("native runtime spawns");
+    let scratch = crate::test_support::repo_temp_dir().join("cli_exported_bundle.json");
+    let exported = run_export_diagnostic_bundle_with(&mut client, &scratch, None)
+        .expect("export diagnostic bundle succeeds");
+    assert_eq!(exported, scratch);
+    assert!(scratch.exists());
+
+    let content = std::fs::read_to_string(&scratch).expect("read exported file");
+    let value: serde_json::Value = serde_json::from_str(&content).expect("parse json");
+    assert_eq!(value["version"], 1);
+    assert!(value["files"].is_array());
+    assert!(value["preview"].is_object());
+
+    // Verify manifest checksum is present
+    let manifest_hash = value["preview"]["manifest_sha256"]
+        .as_str()
+        .expect("manifest sha256 string");
+    assert!(!manifest_hash.is_empty());
 }

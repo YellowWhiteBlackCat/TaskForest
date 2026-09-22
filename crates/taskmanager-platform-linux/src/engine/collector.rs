@@ -34,8 +34,10 @@ use sources::*;
 #[derive(Default)]
 struct DiskStatsState {
     reads_completed: u64,
+    reads_merged: u64,
     sectors_read: u64,
     writes_completed: u64,
+    writes_merged: u64,
     sectors_written: u64,
     io_time_ms: u64,
     /// `/proc/diskstats` field 14 — weighted time spent doing I/Os (ms). This

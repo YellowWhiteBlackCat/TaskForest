@@ -34,7 +34,9 @@ fn visible_sort_cols_drops_hidden_columns_and_keeps_canonical_order() {
             SortCol::State,
             SortCol::Cpu,
             SortCol::Swap,
+            SortCol::Pss,
             SortCol::DiskRead,
+            SortCol::Network,
             SortCol::CpuTime,
             SortCol::Fds,
             SortCol::Nice,
@@ -106,20 +108,24 @@ fn sort_col_step_wraps_across_visible_columns() {
     );
 }
 
-/// The default 14-column header wraps Cpu back to itself after a full cycle.
+/// The default 16-column header wraps Cpu back to itself after a full cycle.
 #[test]
 fn sort_col_step_cycles_the_full_default_header() {
     let visible = all_visible();
     let mut col = SortCol::Cpu;
-    for step in 1..=14 {
+    for step in 1..=16 {
         col = sort_col_step(col, true, &visible);
         match step {
             1 => assert_eq!(col, SortCol::Memory),
             2 => assert_eq!(col, SortCol::Swap),
-            3 => assert_eq!(col, SortCol::DiskRead),
-            6 => assert_eq!(col, SortCol::Fds),
-            7 => assert_eq!(col, SortCol::Nice),
-            8 => assert_eq!(
+            3 => assert_eq!(col, SortCol::Pss),
+            4 => assert_eq!(col, SortCol::DiskRead),
+            5 => assert_eq!(col, SortCol::DiskWrite),
+            6 => assert_eq!(col, SortCol::Network),
+            7 => assert_eq!(col, SortCol::CpuTime),
+            8 => assert_eq!(col, SortCol::Fds),
+            9 => assert_eq!(col, SortCol::Nice),
+            10 => assert_eq!(
                 col,
                 SortCol::Name,
                 "Right past the last column wraps to Name"
@@ -127,7 +133,7 @@ fn sort_col_step_cycles_the_full_default_header() {
             _ => {}
         }
     }
-    assert_eq!(col, SortCol::Cpu, "14 rights complete a full header cycle");
+    assert_eq!(col, SortCol::Cpu, "16 rights complete a full header cycle");
     assert_eq!(
         sort_col_step(SortCol::Cpu, false, &all_visible()),
         SortCol::State

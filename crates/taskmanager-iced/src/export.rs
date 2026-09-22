@@ -178,6 +178,19 @@ fn diagnostics_markdown_body(
                 .map(|c| c.to_string())
                 .unwrap_or_else(missing_value)
         ));
+        if let Some(errors) = hw.kernel_errors.as_ref() {
+            out.push_str(&format!(
+                "Kernel errors (priority <= 3): {}\n",
+                errors.len()
+            ));
+            for error in errors.iter().take(32) {
+                out.push_str(&format!(
+                    "  [{}] {}\n",
+                    error.priority.number(),
+                    error.message
+                ));
+            }
+        }
     }
 
     if let Some(snap) = snapshot {

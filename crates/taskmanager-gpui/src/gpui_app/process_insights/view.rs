@@ -5,11 +5,8 @@ use gpui::{Div, ParentElement, Styled, div, px};
 
 use taskmanager_application::{ProjectedProcessResources, project_process_resources};
 use taskmanager_core::core::device_state::DeviceStatus;
-use taskmanager_core::core::process_telemetry::{
-    ConnectionAddressFamily, ConnectionTransport, IsolationKind, LimitValue, ProcessConnection,
-    ProcessTelemetrySnapshot,
-};
-use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
+use taskmanager_core::core::process_telemetry::{LimitValue, ProcessTelemetrySnapshot};
+use taskmanager_core::core::units::UnitPreferences;
 use taskmanager_theme::tokens;
 use taskmanager_theme::{Color, Theme};
 
@@ -18,11 +15,16 @@ use taskmanager_ui::data::key_value_row::KeyValueRow;
 use taskmanager_ui::primitives::card_surface::CardSurface;
 
 mod fixture;
+mod formatting;
 mod gpu_engines;
+mod labels;
 mod open_files;
 mod threads;
 
 pub use fixture::process_insights_capture_fixture;
+pub(super) use formatting::format_connection;
+use formatting::{format_bytes, format_limit, format_pair, format_rate, isolation_label};
+pub use labels::ProcessInsightsLabels;
 
 /// Widget-materialization cap shared by the scrollable insight cards (threads,
 /// open files, connections). The collected data stays complete — card headers
@@ -38,102 +40,6 @@ pub(super) const MAX_INSIGHT_CARD_ROWS: usize = 200;
 pub(super) fn capped_card_rows(total: usize) -> (usize, usize) {
     let shown = total.min(MAX_INSIGHT_CARD_ROWS);
     (shown, total - shown)
-}
-
-/// Copy supplied by the Properties caller. Keeping it outside the component
-/// lets final integration wire locale keys without hard-coded production copy.
-#[derive(Clone, Copy)]
-pub struct ProcessInsightsLabels {
-    pub loading: &'static str,
-    pub connections: &'static str,
-    pub no_connections: &'static str,
-    pub network_throughput: &'static str,
-    pub received: &'static str,
-    pub sent: &'static str,
-    pub gpu: &'static str,
-    pub no_gpu: &'static str,
-    pub gpu_usage: &'static str,
-    pub vram: &'static str,
-    pub resource_limits: &'static str,
-    pub memory: &'static str,
-    pub cpu: &'static str,
-    pub pids: &'static str,
-    pub resource_group: &'static str,
-    pub isolation: &'static str,
-    pub container_id: &'static str,
-    pub sandboxed: &'static str,
-    pub host_process: &'static str,
-    pub open_files: &'static str,
-    pub no_open_files: &'static str,
-    pub unreadable: &'static str,
-    pub threads: &'static str,
-    pub no_threads: &'static str,
-    pub thread_id: &'static str,
-    pub thread_name: &'static str,
-    pub thread_state: &'static str,
-    pub thread_cpu_time: &'static str,
-    pub thread_cpu_percent: &'static str,
-    pub environment: &'static str,
-    pub no_environment: &'static str,
-    pub yes: &'static str,
-    pub no: &'static str,
-    pub unknown: &'static str,
-    pub unlimited: &'static str,
-    pub healthy: &'static str,
-    pub stale: &'static str,
-    pub permission_denied: &'static str,
-    pub provider_unavailable: &'static str,
-    pub unsupported: &'static str,
-    pub worker_disconnected: &'static str,
-}
-
-impl ProcessInsightsLabels {
-    /// Stable English strings reserved for deterministic headless/capture use.
-    pub const fn capture_fixture() -> Self {
-        Self {
-            loading: "Loading process insights…",
-            connections: "Connections",
-            no_connections: "No active connections",
-            network_throughput: "Network throughput",
-            received: "Received",
-            sent: "Sent",
-            gpu: "GPU",
-            no_gpu: "No process GPU counters",
-            gpu_usage: "Usage",
-            vram: "VRAM",
-            resource_limits: "Resource limits",
-            memory: "Memory",
-            cpu: "CPU quota",
-            pids: "Processes",
-            resource_group: "Resource group",
-            isolation: "Isolation",
-            container_id: "Container ID",
-            sandboxed: "Sandboxed",
-            host_process: "Host process",
-            open_files: "Open files",
-            no_open_files: "No readable file descriptors",
-            unreadable: "unreadable",
-            threads: "Threads",
-            no_threads: "No threads",
-            thread_id: "TID",
-            thread_name: "Name",
-            thread_state: "State",
-            thread_cpu_time: "CPU time",
-            thread_cpu_percent: "CPU %",
-            environment: "Environment variables",
-            no_environment: "No environment variables observed",
-            yes: "Yes",
-            no: "No",
-            unknown: "Unknown",
-            unlimited: "Unlimited",
-            healthy: "Available",
-            stale: "Process unavailable",
-            permission_denied: "Permission denied",
-            provider_unavailable: "Provider unavailable",
-            unsupported: "Unsupported by this provider",
-            worker_disconnected: "Telemetry worker stopped",
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -341,6 +247,12 @@ fn network_card(
                 connections.child(crate::gpui_app::elements::more_rows_hint(theme, hidden));
         }
     }
+    let counter_row = network
+        .connection_counters
+        .as_ref()
+        .and_then(taskmanager_shell::presentation::network_connection_counters_summary)
+        .map(|summary| metric_row(theme, labels.network_throughput, summary))
+        .unwrap_or_else(|| div());
     card(theme, labels.network_throughput, width)
         .child(metric_row(
             theme,
@@ -352,6 +264,7 @@ fn network_card(
             labels.sent,
             format_rate(units, network.tx_bytes_per_sec, availability),
         ))
+        .child(counter_row)
         .child(escalation_row(theme, network, net_escalation, entity))
         .child(connections)
 }
@@ -474,6 +387,11 @@ fn resource_card(
             .map(|value| format_limit(value, labels.unlimited, |b| format_bytes(units, b))),
         labels.unknown,
     );
+    let memory = resources
+        .memory_usage_percent()
+        .map_or(memory.clone(), |percent| {
+            format!("{memory} ({percent:.0}%)")
+        });
     let cpu = match (
         resources.cpu_time_quota_micros,
         resources.cpu_time_period_micros,
@@ -491,6 +409,9 @@ fn resource_card(
             .map(|value| format_limit(value, labels.unlimited, |value| value.to_string())),
         labels.unknown,
     );
+    let pids = resources
+        .process_usage_percent()
+        .map_or(pids.clone(), |percent| format!("{pids} ({percent:.0}%)"));
     let resource_group = resources
         .resource_group
         .map(ToOwned::to_owned)
@@ -524,6 +445,64 @@ fn isolation_card(
         .child(metric_row(theme, labels.sandboxed, sandboxed.to_string()));
     if let Some(container_id) = &isolation.container_id {
         content = content.child(metric_row(theme, labels.container_id, container_id.clone()));
+    }
+    content = content
+        .child(metric_row(
+            theme,
+            labels.security_profile,
+            isolation
+                .security_profile
+                .clone()
+                .unwrap_or_else(|| labels.unknown.to_owned()),
+        ))
+        .child(metric_row(
+            theme,
+            labels.seccomp,
+            isolation
+                .seccomp_mode
+                .map_or_else(|| labels.unknown.to_owned(), |mode| mode.to_string()),
+        ))
+        .child(metric_row(
+            theme,
+            labels.no_new_privs,
+            isolation.no_new_privs.map_or_else(
+                || labels.unknown.to_owned(),
+                |enabled| {
+                    if enabled {
+                        labels.yes.to_owned()
+                    } else {
+                        labels.no.to_owned()
+                    }
+                },
+            ),
+        ))
+        .child(metric_row(
+            theme,
+            labels.ptrace_scope,
+            isolation
+                .yama_ptrace_scope
+                .map_or_else(|| labels.unknown.to_owned(), |scope| scope.to_string()),
+        ));
+    content = content.child(metric_row(
+        theme,
+        labels.capabilities,
+        isolation
+            .capabilities
+            .as_ref()
+            .map(taskmanager_shell::presentation::capabilities_summary)
+            .unwrap_or_else(|| labels.unknown.to_owned()),
+    ));
+    content = content.child(metric_row(
+        theme,
+        labels.namespaces,
+        isolation
+            .namespaces
+            .as_ref()
+            .map(taskmanager_shell::presentation::namespaces_summary)
+            .unwrap_or_else(|| labels.unknown.to_owned()),
+    ));
+    if let Some(details) = taskmanager_shell::presentation::sandbox_details_summary(isolation) {
+        content = content.child(metric_row(theme, labels.sandbox_details, details));
     }
     content
 }
@@ -583,7 +562,12 @@ pub(crate) fn environment_card(
                     .take(shown)
                     .enumerate()
                     .map(|(i, entry)| {
-                        KeyValueRow::new(&entry.key, &entry.value, theme.palette())
+                        let value =
+                            taskmanager_application::process_details_vm::render_environment_value(
+                                &entry.key,
+                                &entry.value,
+                            );
+                        KeyValueRow::new(&entry.key, value, theme.palette())
                             .label_width(taskmanager_theme::Length(110.0))
                             .value_align_right(false)
                             .selectable_value(gpui::ElementId::Name(
@@ -616,60 +600,6 @@ fn error_label(kind: ProcessInsightsErrorKind, labels: &ProcessInsightsLabels) -
         ProcessInsightsErrorKind::ProviderUnavailable => labels.provider_unavailable,
         ProcessInsightsErrorKind::Unsupported => labels.unsupported,
         ProcessInsightsErrorKind::WorkerDisconnected => labels.worker_disconnected,
-    }
-}
-
-pub(super) fn format_connection(connection: &ProcessConnection) -> String {
-    let transport = match (&connection.transport, &connection.family) {
-        (ConnectionTransport::Tcp, ConnectionAddressFamily::Ipv6) => "TCP6".to_string(),
-        (ConnectionTransport::Udp, ConnectionAddressFamily::Ipv6) => "UDP6".to_string(),
-        _ => connection.transport.to_string(),
-    };
-    format!("{transport}  {} → {}", connection.local, connection.remote)
-}
-
-/// Memory-family capacity cell (VRAM, process memory usage and limits).
-fn format_bytes(units: UnitPreferences, bytes: u64) -> String {
-    units.format_quantity(bytes, QuantityFamily::Memory, false)
-}
-
-fn format_rate(units: UnitPreferences, value: Option<u64>, unavailable: &str) -> String {
-    value
-        .map(|value| units.format_quantity(value, QuantityFamily::Network, true))
-        .unwrap_or_else(|| unavailable.to_string())
-}
-
-fn format_limit(
-    value: LimitValue,
-    unlimited: &str,
-    format_value: impl FnOnce(u64) -> String,
-) -> String {
-    match value {
-        LimitValue::Unlimited => unlimited.to_string(),
-        LimitValue::Value(value) => format_value(value),
-    }
-}
-
-fn format_pair(current: Option<String>, maximum: Option<String>, unknown: &str) -> String {
-    match (current, maximum) {
-        (Some(current), Some(maximum)) => format!("{current} / {maximum}"),
-        (Some(current), None) => format!("{current} / {unknown}"),
-        (None, Some(maximum)) => format!("{unknown} / {maximum}"),
-        (None, None) => unknown.to_string(),
-    }
-}
-
-fn isolation_label(kind: &IsolationKind) -> &'static str {
-    match kind {
-        IsolationKind::Docker => "Docker",
-        IsolationKind::Podman => "Podman",
-        IsolationKind::Kubernetes => "Kubernetes",
-        IsolationKind::Lxc => "LXC",
-        IsolationKind::SystemdNspawn => "systemd-nspawn",
-        IsolationKind::Flatpak => "Flatpak",
-        IsolationKind::Snap => "Snap",
-        IsolationKind::Wsl => "WSL",
-        IsolationKind::OtherContainer => "Container",
     }
 }
 

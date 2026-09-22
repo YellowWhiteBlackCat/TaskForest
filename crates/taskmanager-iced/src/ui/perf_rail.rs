@@ -54,7 +54,7 @@ fn rail_icon(device: &PerfDevice) -> Option<IconId> {
         PerfDevice::Disk(_) => Some(IconId::Disk),
         PerfDevice::Network(_) => Some(IconId::Network),
         PerfDevice::Gpu(_) => Some(IconId::Gpu),
-        PerfDevice::Battery(_) | PerfDevice::Fan(_) => None,
+        PerfDevice::Battery(_) | PerfDevice::Fan(_) | PerfDevice::Npu(_) => None,
     }
 }
 
@@ -89,6 +89,61 @@ pub(crate) const RAIL_CARD_HEIGHT: f32 = 104.0;
 /// Fixed compact selector extent. It lets a horizontal viewport represent
 /// offscreen device identities with leading/trailing spacers.
 pub(crate) const COMPACT_DEVICE_ITEM_WIDTH: f32 = 156.0;
+
+/// Compact device selector labels keep the stable device family plus a bounded
+/// identity/value. For GPU, the label cleanly indicates "GPU" (or "GPU {index}"
+/// when multiple GPUs are present), avoiding unsightly mid-word truncation like
+/// "GPU I... Graphics...".
+pub(crate) fn compact_device_label(app: &crate::IcedApp, device: PerfDevice) -> String {
+    if let PerfDevice::Gpu(index) = device {
+        let gpu_count = app
+            .shell
+            .projection()
+            .snapshot
+            .as_ref()
+            .map(|s| s.gpu.len())
+            .unwrap_or(0);
+        let base = if gpu_count > 1 || index > 0 {
+            format!("{} {index}", t("common.gpu"))
+        } else {
+            t("common.gpu").to_string()
+        };
+        return base;
+    }
+    let label = super::performance::performance_sidebar_label(app, device);
+    bounded_sidebar_label(&label, 18)
+}
+
+/// Bound a compact sidebar label to `max_chars`.
+/// For GPU labels with long product/brand identities (e.g. "GPU Intel Core Ultra Graphics"),
+/// truncation cleanly indicates "GPU" (or "GPU {index}") instead of cutting off mid-word
+/// as "GPU I... Graphics...".
+#[must_use]
+pub(crate) fn bounded_sidebar_label(label: &str, max_chars: usize) -> String {
+    let chars: Vec<char> = label.chars().collect();
+    if chars.len() <= max_chars {
+        return label.to_owned();
+    }
+    let gpu_token = t("common.gpu");
+    if label.starts_with(gpu_token)
+        && (label.len() == gpu_token.len()
+            || label[gpu_token.len()..].starts_with(' ')
+            || label[gpu_token.len()..].starts_with('\t'))
+    {
+        let parts: Vec<&str> = label.split_whitespace().collect();
+        if parts.len() > 1 && parts[1].chars().all(|c| c.is_ascii_digit()) {
+            let clean = format!("{} {}", parts[0], parts[1]);
+            if clean.chars().count() <= max_chars {
+                return clean;
+            }
+        }
+        if gpu_token.chars().count() <= max_chars {
+            return gpu_token.to_string();
+        }
+    }
+    let take = max_chars.saturating_sub(1).max(1);
+    format!("{}…", chars.into_iter().take(take).collect::<String>())
+}
 
 /// The semantic category one rail row belongs to — resolves the sparkline
 /// stroke color from the theme's per-category graph accents (the same tokens
@@ -328,6 +383,7 @@ fn rail_row(
                 value_format: RailValueFormat::Rpm,
             }
         }
+        PerfDevice::Npu(_) => return None,
     })
 }
 

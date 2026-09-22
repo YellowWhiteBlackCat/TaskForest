@@ -223,10 +223,29 @@ fn smart_self_test_decision_is_local_surface() {
 }
 
 #[test]
+fn diagnostic_bundle_decision_is_an_accepted_difference() {
+    let declaration = functional_declaration();
+    let entry = declaration
+        .entries
+        .iter()
+        .find(|entry| entry.intent == ProductIntent::DiagnosticBundle)
+        .expect("diagnostic bundle intent is registered");
+    match entry.decision {
+        SurfaceDecision::AcceptedDifference { route, reason } => {
+            assert_eq!(route, "system.diagnostic-report.export");
+            assert!(
+                !reason.trim().is_empty(),
+                "reason for DiagnosticBundle must not be empty"
+            );
+        }
+        other => panic!("expected DiagnosticBundle to be an accepted difference, got {other:?}"),
+    }
+}
+
+#[test]
 fn unsupported_intents_are_explicit_and_have_honest_reasons() {
     let declaration = functional_declaration();
     for intent in [
-        ProductIntent::DiagnosticBundle,
         ProductIntent::CurrentWindowScreenshot,
         ProductIntent::FirstRunSetup,
     ] {

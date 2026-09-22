@@ -111,7 +111,11 @@ impl NetworkTelemetryProvider for MacNetworkTelemetryProvider {
             let mut row = NetworkMetrics::new(Arc::from(name.as_str()));
             row.device_id = Arc::from(format!("macos:nic:{name}"));
             row.mac_addr = Some(Arc::from(data.mac_address().to_string()));
-            let link = facts.links.get(&name.to_ascii_lowercase()).copied();
+            let link = facts.links.get(&name.to_ascii_lowercase()).cloned();
+            if let Some(link) = link.as_ref() {
+                row.ipv4_addr = link.ipv4_addr.as_deref().map(Arc::from);
+                row.ipv6_addr = link.ipv6_addr.as_deref().map(Arc::from);
+            }
             let scalar_observations = NetworkScalarObservations {
                 total_rx_bytes: ScalarObservation::available(rx_total, observed_at_ms),
                 total_tx_bytes: ScalarObservation::available(tx_total, observed_at_ms),
@@ -120,15 +124,26 @@ impl NetworkTelemetryProvider for MacNetworkTelemetryProvider {
                 // `ifconfig` gives negotiated media + carrier state directly.
                 // Utilization (rx+tx vs link capacity) is derived elsewhere and
                 // stays Unsupported until a safe source exists.
-                link_speed_mbps: match link.and_then(|l| l.speed_mbps) {
+                link_speed_mbps: match link.as_ref().and_then(|l| l.speed_mbps) {
                     Some(mbps) => ScalarObservation::available(mbps, observed_at_ms),
                     None => ScalarObservation::unavailable(FailureKind::MissingDependency),
                 },
                 utilization_pct: ScalarObservation::unavailable(FailureKind::Unsupported),
-                link_up: match link {
+                link_up: match link.as_ref() {
                     Some(adapter) => ScalarObservation::available(adapter.up, observed_at_ms),
                     None => ScalarObservation::unavailable(FailureKind::MissingDependency),
                 },
+                mtu_bytes: match link.as_ref().and_then(|value| value.mtu_bytes) {
+                    Some(mtu) => ScalarObservation::available(mtu, observed_at_ms),
+                    None => ScalarObservation::unavailable(FailureKind::Unsupported),
+                },
+                tx_queue_len: ScalarObservation::unavailable(FailureKind::Unsupported),
+                rx_drops: ScalarObservation::unavailable(FailureKind::Unsupported),
+                tx_drops: ScalarObservation::unavailable(FailureKind::Unsupported),
+                rx_errors: ScalarObservation::unavailable(FailureKind::Unsupported),
+                tx_errors: ScalarObservation::unavailable(FailureKind::Unsupported),
+                rx_overruns: ScalarObservation::unavailable(FailureKind::Unsupported),
+                tx_overruns: ScalarObservation::unavailable(FailureKind::Unsupported),
             };
             let mut adapter_type = NetworkAdapterType::Unknown;
             let mut wireless_observations = NetworkWirelessObservations::default();
@@ -171,6 +186,7 @@ impl NetworkTelemetryProvider for MacNetworkTelemetryProvider {
                     bssid: OptionalObservation::unavailable(FailureKind::Unsupported),
                     frequency_mhz: OptionalObservation::unavailable(FailureKind::Unsupported),
                     channel: OptionalObservation::unavailable(FailureKind::Unsupported),
+                    channel_width_mhz: OptionalObservation::unavailable(FailureKind::Unsupported),
                     rx_bitrate_mbps: OptionalObservation::unavailable(FailureKind::Unsupported),
                     tx_bitrate_mbps: OptionalObservation::unavailable(FailureKind::Unsupported),
                     protocol: OptionalObservation::unavailable(FailureKind::Unsupported),
@@ -209,10 +225,13 @@ fn is_loopback(name: &str) -> bool {
 /// Per-interface link facts parsed from `ifconfig -a` (route C, ADR-019):
 /// the `media:` parenthesized token ("1000baseT") -> Mbps; the `status:` line
 /// ("active") -> link_up.
-#[derive(Clone, Copy, Default, Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
 struct IfaceLink {
     speed_mbps: Option<u64>,
     up: bool,
+    mtu_bytes: Option<u32>,
+    ipv4_addr: Option<String>,
+    ipv6_addr: Option<String>,
 }
 
 /// Honest Wi-Fi association state for the identified Wi-Fi interface.
@@ -286,7 +305,12 @@ fn parse_ifconfig_a(stdout: &str) -> HashMap<String, IfaceLink> {
             {
                 current = Some(first_token.to_ascii_lowercase());
                 // Ensure an entry exists even when no media/status follows.
-                out.entry(current.clone().unwrap_or_default()).or_default();
+                let entry = out.entry(current.clone().unwrap_or_default()).or_default();
+                entry.mtu_bytes = line
+                    .split_once(" mtu ")
+                    .and_then(|(_, rest)| rest.split_whitespace().next())
+                    .and_then(|value| value.parse::<u32>().ok())
+                    .filter(|value| *value > 0);
                 continue;
             }
         }
@@ -295,7 +319,24 @@ fn parse_ifconfig_a(stdout: &str) -> HashMap<String, IfaceLink> {
         };
         let entry = out.entry(iface.to_string()).or_default();
         let trimmed = line.trim_start();
-        if let Some(rest) = trimmed.strip_prefix("media:") {
+        if let Some(rest) = trimmed.strip_prefix("mtu ") {
+            entry.mtu_bytes = rest
+                .split_whitespace()
+                .next()
+                .and_then(|value| value.parse::<u32>().ok())
+                .filter(|value| *value > 0);
+        } else if let Some(rest) = trimmed.strip_prefix("inet6 ") {
+            let address = rest.split_whitespace().next().unwrap_or("");
+            let address = address.split('%').next().unwrap_or(address);
+            if !address.is_empty() {
+                entry.ipv6_addr = Some(address.to_owned());
+            }
+        } else if let Some(rest) = trimmed.strip_prefix("inet ") {
+            let address = rest.split_whitespace().next().unwrap_or("");
+            if !address.is_empty() {
+                entry.ipv4_addr = Some(address.to_owned());
+            }
+        } else if let Some(rest) = trimmed.strip_prefix("media:") {
             // "media: autoselect (1000baseT <full-duplex>)" -> paren content.
             if let Some(open) = rest.find('(') {
                 let inside = &rest[open + 1..];

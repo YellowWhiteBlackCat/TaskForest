@@ -154,8 +154,11 @@ struct NvmlDeviceReadout {
     uuid: Result<String, NvmlFailureKind>,
     utilization: Result<(u32, u32), NvmlFailureKind>,
     memory: Result<(u64, u64), NvmlFailureKind>,
+    memory_bus_width_bits: Result<u32, NvmlFailureKind>,
+    memory_clock_mhz: Result<u64, NvmlFailureKind>,
     temperature_c: Result<f32, NvmlFailureKind>,
     power_w: Result<f32, NvmlFailureKind>,
+    power_limit_w: Result<f32, NvmlFailureKind>,
     current_clock_mhz: Result<u64, NvmlFailureKind>,
     max_clock_mhz: Result<u64, NvmlFailureKind>,
     encoder_pct: Result<f32, NvmlFailureKind>,
@@ -201,12 +204,23 @@ fn read_nvml_device(
             .memory_info()
             .map(|memory| (memory.used, memory.total))
             .map_err(|error| classify_error(&error)),
+        memory_bus_width_bits: device
+            .memory_bus_width()
+            .map_err(|error| classify_error(&error)),
+        memory_clock_mhz: device
+            .clock_info(Clock::Memory)
+            .map(u64::from)
+            .map_err(|error| classify_error(&error)),
         temperature_c: device
             .temperature(TemperatureSensor::Gpu)
             .map(|temperature| temperature as f32)
             .map_err(|error| classify_error(&error)),
         power_w: device
             .power_usage()
+            .map(|milliwatts| milliwatts as f32 / 1_000.0)
+            .map_err(|error| classify_error(&error)),
+        power_limit_w: device
+            .enforced_power_limit()
             .map(|milliwatts| milliwatts as f32 / 1_000.0)
             .map_err(|error| classify_error(&error)),
         current_clock_mhz: device
@@ -362,6 +376,37 @@ fn assemble_nvml_device(readout: NvmlDeviceReadout) -> NvmlDeviceAssembly {
             kind,
         }),
     }
+    match readout.memory_bus_width_bits {
+        Ok(width) if width > 0 => {
+            metrics.memory_bus_width_bits = Some(width);
+            fields.push(GpuMetricField::MemoryBusWidth);
+        }
+        Ok(_) => failures.push(NvmlFieldFailure {
+            field: GpuMetricField::MemoryBusWidth,
+            kind: NvmlFailureKind::NotSupported,
+        }),
+        Err(kind) => failures.push(NvmlFieldFailure {
+            field: GpuMetricField::MemoryBusWidth,
+            kind,
+        }),
+    }
+    match (&readout.memory_bus_width_bits, &readout.memory_clock_mhz) {
+        (Ok(width), Ok(clock)) if *width > 0 && *clock > 0 => {
+            let bandwidth = *clock as f32 * *width as f32 / 4_000.0;
+            if bandwidth.is_finite() && bandwidth > 0.0 {
+                metrics.memory_bandwidth_gbps = Some(bandwidth);
+                fields.push(GpuMetricField::MemoryBandwidth);
+            }
+        }
+        (Err(kind), _) | (_, Err(kind)) => failures.push(NvmlFieldFailure {
+            field: GpuMetricField::MemoryBandwidth,
+            kind: *kind,
+        }),
+        _ => failures.push(NvmlFieldFailure {
+            field: GpuMetricField::MemoryBandwidth,
+            kind: NvmlFailureKind::NotSupported,
+        }),
+    }
     match readout.temperature_c {
         Ok(temperature) => {
             observations.temperature_c = ScalarObservation::available(temperature, 0);
@@ -379,6 +424,20 @@ fn assemble_nvml_device(readout: NvmlDeviceReadout) -> NvmlDeviceAssembly {
         }
         Err(kind) => failures.push(NvmlFieldFailure {
             field: GpuMetricField::Power,
+            kind,
+        }),
+    }
+    match readout.power_limit_w {
+        Ok(limit) if limit.is_finite() && limit > 0.0 => {
+            metrics.power_limit_w = Some(limit);
+            fields.push(GpuMetricField::PowerLimit);
+        }
+        Ok(_) => failures.push(NvmlFieldFailure {
+            field: GpuMetricField::PowerLimit,
+            kind: NvmlFailureKind::NotSupported,
+        }),
+        Err(kind) => failures.push(NvmlFieldFailure {
+            field: GpuMetricField::PowerLimit,
             kind,
         }),
     }

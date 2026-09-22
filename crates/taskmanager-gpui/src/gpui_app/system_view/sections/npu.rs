@@ -56,6 +56,10 @@ impl NpuDeviceViewModel {
                 "npu.shared_memory",
                 device.memory.shared_total_bytes.current_value().copied(),
             ),
+            (
+                "npu.sram",
+                device.memory.sram_total_bytes.current_value().copied(),
+            ),
         ]
         .into_iter()
         .filter_map(|(label_key, bytes)| {

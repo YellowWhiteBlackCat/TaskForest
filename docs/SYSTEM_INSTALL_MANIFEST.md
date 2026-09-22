@@ -14,6 +14,58 @@ ownership, hashes and install state belong to a local receipt under
 `.private/install-receipts/`; no host receipt is part of the public repository.
 This document does not copy host counts, audit dates or receipt status.
 
+## Manifest model
+
+The TSV holds exactly one authoritative row per destination. A destination
+provided by several packages keeps that single row and lists every provider in
+`install_method`, joined by ` or `. Each token is either a repository-relative
+recipe path (`packaging/arch/PKGBUILD`, `packaging/debian/build-deb-iced.sh`,
+`packaging/rpm/taskforest-i.spec`) or a parameterised Windows build
+(`packaging/windows/build-msi.sh ui=G`). For package-managed rows `install_method`
+is the authoritative provider list, and `source` names the definition those
+providers implement — the provider recipes for Linux packages, or the WiX manifest
+`packaging/windows/taskforest.wxs` for MSI rows. For helper and developer rows
+`source` names the single script or source artifact that owns the path. The
+manifest guard requires every destination written by a scanned recipe to name that
+recipe as a provider, so a shared path can no longer be silently credited to one
+package.
+`removal_method` names every removal authority; the installed copy belongs to
+whichever package owns it in its transaction.
+
+The shared hicolor icon set is the current cross-package case. The
+`taskforest-common` data package is its single DEB and RPM owner: the frontend
+packages depend on it, the Iced and Bevy recipes no longer install icons, and
+the GPUI `.deb`/`.rpm` builders remove the manifest-declared common
+destinations from the PKGBUILD-derived tree. The monolithic Arch package
+(`packaging/arch/PKGBUILD`) still ships the icons for its own single-package
+install and is credited as a provider. The manifest guard rejects any
+destination installed by both the common package and another DEB or RPM
+recipe, so the multi-provider overflow cannot return.
+
+## Windows MSI destinations
+
+Each MSI is a per-machine product for one UI target. The WiX file
+[`packaging/windows/taskforest.wxs`](../packaging/windows/taskforest.wxs) is the
+file-manifest authority and `packaging/windows/build-msi.sh` binds the UI target.
+Non-Linux landing spots are expressed with WiX standard-directory tokens and
+Windows separators instead of a `/usr` prefix:
+
+```text
+[ProgramFiles64Folder]\TaskForest\   per-UI executable, shared helper, LICENSE, notices
+[ProgramMenuFolder]\TaskForest\      per-UI Start Menu shortcut
+HKLM\Software\TaskForest\            install markers (StartMenuShortcut, Version)
+```
+
+`INSTALLFOLDER` is user-selectable through `WixUI_InstallDir`, so no drive letter
+or user profile appears in the destination; the token names the WiX standard root.
+The provider token is `packaging/windows/build-msi.sh ui=<G|I|T|B>`. The frontend
+executable and Start Menu shortcut are per-UI; the process-control helper,
+`LICENSE`, `THIRD-PARTY-NOTICES.txt`, and the family install markers live in
+components whose GUID is identical in every product, so Windows Installer
+reference-counts them and removes them only when the last product uninstalls.
+There is no separate common MSI. The MSI installs no service or autostart entry,
+and the Linux polkit helpers are not part of it.
+
 ## Non-negotiable rules
 
 1. The TSV is the allowlist. There are no wildcard destinations and no
@@ -47,7 +99,8 @@ This document does not copy host counts, audit dates or receipt status.
 
 | Group | Files and responsibility | Owner / removal authority |
 |---|---|---|
-| Package base | `/usr/bin/taskmanager` compatibility entry, the `taskforest-g` GPUI binary, the TaskForestG `.desktop` entry, AppStream metadata, SVG icon, setup payload, setup polkit policy, and the generated third-party notices under `/usr/share/licenses/taskforest/` | Root package transaction — the same staged tree ships as the Arch package, the `.deb`, and the `.rpm` (layout authority: `packaging/arch/PKGBUILD`); remove with `pacman -Rns taskforest-git` / `dpkg -r taskforest` / `rpm -e taskforest`, never ad hoc `rm` |
+| Package base | `/usr/bin/taskmanager` compatibility entry, the `taskforest-g` GPUI binary, the TaskForestG `.desktop` entry, AppStream metadata, setup payload, setup polkit policy, and the generated third-party notices under `/usr/share/licenses/taskforest/` | Root package transaction — the same staged tree ships as the Arch package, the `.deb`, and the `.rpm` (layout authority: `packaging/arch/PKGBUILD`); remove with `pacman -Rns taskforest-git` / `dpkg -r taskforest` / `rpm -e taskforest`, never ad hoc `rm` |
+| Shared frontend icons | Hicolor SVG and PNG ladder under `/usr/share/icons/hicolor/`, owned by the `taskforest-common` DEB/RPM data package and shipped by the monolithic Arch package | Package transaction for the owning package (`taskforest-common` for DEB/RPM, `taskforest-git` for Arch); the byte-identical asset is never installed by a second package in the same format |
 | Optional RAPL setup | `/etc/udev/rules.d/99-taskforest.rules` | Root, but only through `taskforest-setup-helper install/revert`; exact content and atomic rollback |
 | GPU PMU optional capability | `taskforest-privilege-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.perf-helper.policy` | Package transaction or [`scripts/manage-polkit-install.sh`](../scripts/manage-polkit-install.sh) `perf` transaction |
 | Per-process network optional capability | `taskforest-net-launcher` plus `io.github.YellowWhiteBlackCat.TaskForest.net-launcher.policy` | Package transaction or the same manager's `net` transaction |
@@ -56,6 +109,7 @@ This document does not copy host counts, audit dates or receipt status.
 | RAPL package-power optional capability | `taskforest-rapl-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.rapl-helper.policy` | Package transaction or the same manager's `rapl` transaction |
 | MSR readout optional capability | `taskforest-msr-helper` plus `io.github.YellowWhiteBlackCat.TaskForest.msr-helper.policy` | Package transaction or the same manager's `msr` transaction |
 | Developer user integration | User-local TaskForestG/TaskForestI `.desktop` entries, shared SVG, conditional `index.theme`, and one ownership receipt | [`scripts/dev-install-frontends.sh`](../scripts/dev-install-frontends.sh); user-owned and separate from root package files |
+| Windows MSI products | Per-UI `taskforest-<ui>.exe` and Start Menu shortcut, plus the shared process-control helper, license notices, and `HKLM\Software\TaskForest` markers | Windows Installer — one MSI per UI target; remove with `msiexec /x TaskForest-<UI>.msi` |
 
 The full path, artifact, permission, conflict, and removal fields are kept in
 the TSV instead of being inferred from this summary table.

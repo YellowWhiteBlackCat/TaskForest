@@ -9,6 +9,7 @@ fn scalar_truth(total: u64, used: u64, at_ms: u64) -> MemoryScalarObservations {
         swap_total_bytes: ScalarObservation::available(0, at_ms),
         swap_used_bytes: ScalarObservation::available(0, at_ms),
         used_rate_mib_per_sec: ScalarObservation::available(0.0, at_ms),
+        ..Default::default()
     }
 }
 

@@ -234,8 +234,16 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
                                             !query_text.trim().is_empty(),
                                             columns.name.length(),
                                         ),
-                                        text(service.status.as_str())
-                                            .width(columns.status.length()),
+                                        text(if service.cycle {
+                                            format!(
+                                                "{} · {}",
+                                                t("svc.cycle"),
+                                                service.status.as_str()
+                                            )
+                                        } else {
+                                            service.status.as_str().to_owned()
+                                        })
+                                        .width(columns.status.length()),
                                     ]
                                     .spacing(8),
                                 )
@@ -250,7 +258,12 @@ pub(super) fn services_page(app: &IcedApp) -> Element<'_, Message, iced::Theme, 
                                         !query_text.trim().is_empty(),
                                         columns.name.length(),
                                     ),
-                                    text(service.status.as_str()).width(columns.status.length()),
+                                    text(if service.cycle {
+                                        format!("{} · {}", t("svc.cycle"), service.status.as_str())
+                                    } else {
+                                        service.status.as_str().to_owned()
+                                    })
+                                    .width(columns.status.length()),
                                     text(
                                         service_description(service.description.as_str())
                                             .to_owned(),
@@ -401,6 +414,7 @@ pub(super) fn service_action_label(action: ServiceAction) -> &'static str {
         ServiceAction::Restart => t("svc.restart"),
         ServiceAction::Enable => t("svc.enable"),
         ServiceAction::Disable => t("svc.disable"),
+        ServiceAction::ReloadDaemon => t("svc.reload_daemon"),
     }
 }
 
@@ -522,6 +536,7 @@ pub(crate) struct ServiceRow {
     pub(super) name: String,
     pub(super) status: ServiceStatus,
     pub(super) description: String,
+    pub(super) cycle: bool,
 }
 
 pub(crate) fn service_matches_lower(service: &ServiceRow, query: &str) -> bool {
@@ -606,6 +621,7 @@ pub(crate) fn service_rows(shell: &ShellApp) -> Vec<ServiceRow> {
     // the way into action messages; no pointer scan can turn this into an
     // O(N²) projection when a large service inventory is sorted.
     let provider = shell.projection().services.as_deref().unwrap_or(&[]);
+    let cycle_members = taskmanager_shell::service_cycle_members(provider);
     shell
         .sorted_service_indices()
         .into_iter()
@@ -616,6 +632,7 @@ pub(crate) fn service_rows(shell: &ShellApp) -> Vec<ServiceRow> {
                 name: service.name.clone(),
                 status: service.status,
                 description: service.description.clone(),
+                cycle: cycle_members.contains(&service.id),
             })
         })
         .collect()

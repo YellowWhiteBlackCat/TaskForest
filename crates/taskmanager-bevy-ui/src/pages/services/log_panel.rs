@@ -20,6 +20,7 @@ use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
 use bevy::ecs::world::World;
 use bevy::input::keyboard::KeyCode;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
+use bevy::text::TextColor;
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, Display, FlexDirection, JustifyContent, Node,
     Overflow, UiRect, Val, percent, px,
@@ -198,7 +199,14 @@ fn entry_stamp(entry: &ServiceLogEntry) -> String {
 
 // ---- scenes ----------------------------------------------------------------
 
-fn entry_row_scene(entry: &ServiceLogEntry, _palette: &UiPalette) -> impl Scene + use<> {
+fn entry_row_scene(entry: &ServiceLogEntry, palette: &UiPalette) -> impl Scene + use<> {
+    let ink = match entry.level {
+        taskmanager_core::core::services::ServiceLogLevel::Error => palette.danger_color,
+        taskmanager_core::core::services::ServiceLogLevel::Warning => palette.warning_color,
+        taskmanager_core::core::services::ServiceLogLevel::Info => palette.body_color,
+        taskmanager_core::core::services::ServiceLogLevel::Debug
+        | taskmanager_core::core::services::ServiceLogLevel::Unknown => palette.dim_color,
+    };
     bsn! {
         Node {
             width: percent(100.0),
@@ -218,6 +226,7 @@ fn entry_row_scene(entry: &ServiceLogEntry, _palette: &UiPalette) -> impl Scene 
                 Children [
                     (
                         Text(entry_stamp(entry))
+                        TextColor(ink)
                         TextRole(Role::Mono)
                         template_value(no_wrap_text())
                     )
@@ -225,6 +234,7 @@ fn entry_row_scene(entry: &ServiceLogEntry, _palette: &UiPalette) -> impl Scene 
             ),
             (
                 Text({ entry.message.clone() })
+                TextColor(ink)
                 TextRole(Role::Mono)
                 template_value(no_wrap_text())
             ),

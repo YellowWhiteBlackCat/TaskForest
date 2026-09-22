@@ -6,8 +6,10 @@
 
 ## 硬合同
 
-- 先明确滚动 owner。Performance 只有左侧设备选择栏允许滚动；主视图、右侧统计栏和固定页
-  面内容不得挂载滚动句柄。其他页面若允许滚动，必须在页面合同中明确声明边界。
+- 先明确滚动 owner。Performance 的主图表视口和统计外壳保持固定；左侧设备选择栏允许滚动，
+  CPU 统计外壳内部的完整详情投影可以挂载独立滚动句柄，以保证拓扑/策略行在小窗口仍可达。
+  该嵌套 viewport 不得改变图表、统计外壳或右边缘的 bounds。其他页面若允许滚动，必须在
+  页面合同中明确声明边界。
 - 根布局一次生成 `FrameBudget` / `ContentBudget`；页面消费 typed slot，不重新读取外层窗口像素，
   不在每个页面复制 breakpoint 和 shell chrome 计算。
 - 每个区域先标记为 mandatory、elastic 或 optional。mandatory 有最小可读尺寸；optional 只能
@@ -31,7 +33,8 @@
    同一布局状态内使用 `clamp(floor, remaining, ceiling)` 平滑伸缩；只有剩余空间低于 floor
    时才切换到下一个 typed degradation rung。
 4. 对 lower band 做整组准入检查。准入失败时先降级次要组，不能让 flex shrink 把关键 row
-   压成半行，也不能新建页面滚动来掩盖预算不足。
+  压成半行，也不能新建页面滚动来掩盖预算不足；若详情是独立的高密度检查面，则必须在
+  组件合同中显式声明一个 bounded nested viewport，并保证其内容全量可达。
 5. 共享几何只在 composition root / component 层实现一次。页面只声明内容和语义，不自行拼
    第二套 label/value、chart tier、scroll 或 bottom-inset 规则。
 6. 用代表性真实数据检查长标题、长序列号、复合内存值、多引擎和缺失权限；数据异常不能改变

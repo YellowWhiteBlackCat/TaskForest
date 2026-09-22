@@ -173,6 +173,132 @@ fn folded_snapshots_grow_visible_entries_without_cursor_duplicates() {
     assert_eq!(messages.len(), visible.len(), "no duplicate rows render");
 }
 
+// ---- painted rows vs the level filter ---------------------------------------
+
+/// Every `(role, text)` node the freshly spawned log panel paints. The scene
+/// is rebuilt from the shell exactly like the production repaint path does.
+fn painted_panel(shell: &ShellApp) -> Vec<(crate::window::Role, String)> {
+    use bevy::MinimalPlugins;
+    use bevy::asset::{AssetPlugin, Assets};
+    use bevy::scene::{ScenePlugin, WorldSceneExt};
+    use bevy::text::Font;
+    use bevy::ui::widget::Text;
+
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    app.init_resource::<Assets<Font>>();
+    let palette = crate::palette::ui_palette(&taskmanager_theme::Theme::dark());
+    let scene = super::log_panel::service_log_panel_scene(shell, &palette);
+    let world = app.world_mut();
+    let root = world
+        .spawn_scene(scene)
+        .expect("the log panel scene resolves without app resources")
+        .id();
+    let texts = world
+        .query::<(&Text, &crate::window::TextRole)>()
+        .iter(world)
+        .map(|(text, role)| (role.0, text.0.clone()))
+        .collect();
+    assert!(world.despawn(root), "the log panel scene despawns cleanly");
+    texts
+}
+
+fn painted_texts(shell: &ShellApp) -> Vec<String> {
+    painted_panel(shell)
+        .into_iter()
+        .map(|(_, text)| text)
+        .collect()
+}
+
+/// The painted stream rows: the monospace texts minus each row's stamp (the
+/// chips/title/status carry Caption/Body roles).
+fn painted_messages(shell: &ShellApp) -> Vec<String> {
+    painted_panel(shell)
+        .into_iter()
+        .filter(|(role, text)| *role == crate::window::Role::Mono && text != "--:--:--")
+        .map(|(_, text)| text)
+        .collect()
+}
+
+#[test]
+fn painted_rows_follow_the_level_filter() {
+    use taskmanager_core::core::services::ServiceLogLevel;
+
+    let mut shell = ShellApp::new();
+    let service = taskmanager_core::core::target::ServiceId::new("demo.service");
+    let _ = shell.open_service_log_for(service.clone());
+    let query = ServiceLogQuery {
+        service_id: service,
+        level: ServiceLogLevelFilter::All,
+        time: ServiceLogTimeFilter::All,
+        after_cursor: None,
+    };
+    let graded =
+        |index: usize, priority: u8, level: ServiceLogLevel, message: &str| ServiceLogEntry {
+            cursor: format!("j:{index:04}"),
+            realtime_timestamp_micros: None,
+            priority: Some(priority),
+            level,
+            message: message.to_owned(),
+        };
+    let entries = vec![
+        graded(0, 3, ServiceLogLevel::Error, "disk failure"),
+        graded(1, 4, ServiceLogLevel::Warning, "retrying mount"),
+        graded(2, 6, ServiceLogLevel::Info, "started worker"),
+        graded(3, 7, ServiceLogLevel::Debug, "trace payload"),
+    ];
+    if let Some(open) = shell.service_log.as_mut() {
+        open.feed.apply_at(stream_snapshot(&query, entries), 1_000);
+    }
+
+    // All levels: every seeded stream row paints.
+    assert_eq!(
+        painted_messages(&shell),
+        vec![
+            "disk failure",
+            "retrying mount",
+            "started worker",
+            "trace payload"
+        ]
+    );
+
+    // All -> Errors: only the error row paints, and the chip names the filter.
+    shell.cycle_service_log_level();
+    assert_eq!(painted_messages(&shell), vec!["disk failure"]);
+    assert!(
+        painted_texts(&shell)
+            .iter()
+            .any(|text| text == taskmanager_application::i18n::t("svc.logs_level_errors")),
+        "the level chip must name the active filter"
+    );
+
+    // Errors -> WarningsAndErrors: warning + error rows paint, info/debug do
+    // not (the filtered stream is a whole-row decision, not a text swap).
+    shell.cycle_service_log_level();
+    assert_eq!(
+        painted_messages(&shell),
+        vec!["disk failure", "retrying mount"]
+    );
+    let texts = painted_texts(&shell);
+    assert_eq!(
+        texts.iter().filter(|text| *text == "--:--:--").count(),
+        2,
+        "one painted stamp per visible row: {texts:?}"
+    );
+    assert!(
+        !texts.iter().any(|text| text.contains("started worker"))
+            && !texts.iter().any(|text| text.contains("trace payload")),
+        "a filtered-out row must not paint: {texts:?}"
+    );
+    assert!(
+        texts
+            .iter()
+            .any(|text| text == taskmanager_application::i18n::t("svc.logs_level_warnings")),
+        "the level chip must follow the second cycle"
+    );
+}
+
 // ---- honest status caption ------------------------------------------------
 
 #[test]

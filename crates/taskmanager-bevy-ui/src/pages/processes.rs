@@ -50,7 +50,7 @@ use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, Node, Val, percent, px,
 };
 use bevy::ui::widget::Text;
-use bevy::ui_widgets::Button;
+use bevy::ui_widgets::{Activate, Button};
 use taskmanager_application::i18n::t;
 use taskmanager_application::{AppAction, AppPage};
 use taskmanager_core::core::process::ProcessLiveKey;
@@ -86,16 +86,15 @@ const TABLE_VIEWPORT_HEIGHT_PX: f32 = 512.0;
 
 // ---- pure view model ----------------------------------------------------
 
-/// Map the shell's sort slot onto the ui-contract column token. `PSS` has no
-/// contract column, so sorting by it shows no header marker — honest absence
-/// rather than a fabricated nearest-column marker.
+/// Map the shell's sort slot onto the ui-contract column token. All 16 sort axes
+/// map onto their exact contract tokens (including PSS mapping to MemoryPss).
 fn contract_token(column: SortCol) -> Option<&'static str> {
     match column {
         SortCol::Pid => Some("PID"),
         SortCol::Name => Some("Name"),
         SortCol::Cpu => Some("CPU"),
         SortCol::Memory => Some("Memory"),
-        SortCol::Pss => None,
+        SortCol::Pss => Some("MemoryPss"),
         SortCol::Swap => Some("Swap"),
         SortCol::User => Some("User"),
         SortCol::State => Some("Status"),
@@ -103,6 +102,7 @@ fn contract_token(column: SortCol) -> Option<&'static str> {
         SortCol::CpuTime => Some("CPUTime"),
         SortCol::DiskRead => Some("DiskRead"),
         SortCol::DiskWrite => Some("DiskWrite"),
+        SortCol::Network => Some("Network"),
         SortCol::StartTime => Some("StartTime"),
         SortCol::Fds => Some("FDs"),
         SortCol::Nice => Some("Nice"),
@@ -210,6 +210,22 @@ pub(crate) fn count_line_text(visible: usize, query: &str) -> String {
     )
 }
 
+fn count_line_text_for_shell(shell: &ShellApp, visible: usize, query: &str) -> String {
+    let base = count_line_text(visible, query);
+    let processes = shell
+        .projection()
+        .processes
+        .as_ref()
+        .map(|items| items.as_slice());
+    [
+        taskmanager_shell::presentation::uninterruptible_process_summary(processes),
+        taskmanager_shell::presentation::process_anomaly_summary(processes),
+    ]
+    .into_iter()
+    .flatten()
+    .fold(base, |line, summary| format!("{line} · {summary}"))
+}
+
 /// Honest empty-table copy: a quiet platform (no processes reported yet) is a
 /// different state from an over-narrow query — shared `empty.*` strings.
 pub(crate) fn empty_state_text(query: &str) -> String {
@@ -267,6 +283,59 @@ pub(crate) struct ProcessScrollIntent {
     pub(crate) rows: isize,
 }
 
+#[derive(Component, Clone, Default)]
+pub(crate) struct ProcessTableContainer;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct ProcessDetailsContainer;
+
+pub(crate) fn sync_processes_responsive_layout(
+    windows: Query<&bevy::window::Window, With<bevy::window::PrimaryWindow>>,
+    mut tables: Query<
+        &mut Node,
+        (
+            With<ProcessTableContainer>,
+            bevy::ecs::query::Without<ProcessDetailsContainer>,
+        ),
+    >,
+    mut details: Query<
+        &mut Node,
+        (
+            With<ProcessDetailsContainer>,
+            bevy::ecs::query::Without<ProcessTableContainer>,
+        ),
+    >,
+) {
+    let width = windows
+        .iter()
+        .next()
+        .map_or(1180.0, bevy::window::Window::width);
+    if width < 960.0 {
+        for mut node in &mut tables {
+            if node.width != percent(100) {
+                node.width = percent(100);
+            }
+        }
+        for mut node in &mut details {
+            if node.display != bevy::ui::Display::None {
+                node.display = bevy::ui::Display::None;
+            }
+        }
+    } else {
+        for mut node in &mut tables {
+            if node.width != percent(68) {
+                node.width = percent(68);
+            }
+        }
+        for mut node in &mut details {
+            if node.display != bevy::ui::Display::Flex {
+                node.display = bevy::ui::Display::Flex;
+                node.width = percent(32);
+            }
+        }
+    }
+}
+
 /// Search-box commit: replace the shell query with `text` (sanitized and
 /// capped by the shell's bulk `push_search_text` contract; the cursor resets
 /// exactly like per-character typing).
@@ -304,6 +373,47 @@ pub(crate) struct ProcessCountLine;
 /// submodule's re-render observer).
 #[derive(Component, Clone, Default)]
 pub(crate) struct ProcessSearchInput;
+
+/// Table column width configuration on the Processes page.
+#[derive(Resource, Clone, Debug, Default)]
+pub(crate) struct ProcessColumnWidthConfig {
+    pub(crate) overrides: std::collections::HashMap<String, f32>,
+    #[allow(dead_code)]
+    pub(crate) available_width: Option<f32>,
+}
+
+/// Event to resize a table column by ID.
+#[derive(Clone, Debug, PartialEq, EntityEvent)]
+pub(crate) struct ProcessColumnResize {
+    pub(crate) entity: Entity,
+    pub(crate) column_id: String,
+    pub(crate) width: f32,
+}
+
+pub(crate) fn on_process_column_resize(
+    trigger: On<ProcessColumnResize>,
+    mut config: Option<ResMut<ProcessColumnWidthConfig>>,
+    mut commands: Commands,
+) {
+    let event = trigger.event();
+    if let Some(ref mut cfg) = config {
+        cfg.overrides.insert(event.column_id.clone(), event.width);
+        commands.trigger(crate::input::ShellInteractionApplied);
+    }
+}
+
+pub(crate) fn on_search_input_activated(
+    _activate: On<Activate>,
+    mut track: NonSendMut<FrontendTrack>,
+    mut text_state: Option<ResMut<crate::input::TextInputState>>,
+    mut commands: Commands,
+) {
+    track.shell.open_search();
+    if let Some(ref mut state) = text_state {
+        state.cursor = track.shell.query.chars().count();
+    }
+    commands.trigger(crate::input::ShellInteractionApplied);
+}
 
 /// Shared observer parameters for the table surface, bundled to keep every
 /// observer under the argument budget.
@@ -350,6 +460,8 @@ fn bootstrap_processes_page(
     mut commands: Commands,
 ) {
     let root = trigger.event().entity;
+    commands.init_resource::<ProcessColumnWidthConfig>();
+    commands.init_resource::<crate::input::TextInputState>();
     let Some(palette) = palette else {
         return;
     };
@@ -484,16 +596,15 @@ fn on_query_commit(
     trigger: On<ProcessQueryCommit>,
     mut track: NonSendMut<FrontendTrack>,
     mut surface: TableSurface,
+    mut text_state: Option<ResMut<crate::input::TextInputState>>,
     mut commands: Commands,
 ) {
     let text = trigger.event().text.clone();
     let shell = &mut track.shell;
     ensure_applications_row_context(shell);
-    while !shell.query.is_empty() {
-        shell.pop_search_char();
-    }
-    if !text.is_empty() {
-        shell.push_search_text(&text);
+    crate::input::commit_query_to_shell(shell, &text);
+    if let Some(ref mut state) = text_state {
+        state.cursor = shell.query.chars().count();
     }
     surface.scroll.top = 0; // the cursor reset puts row 0 back in view
     let Ok(root) = surface.roots.single() else {
@@ -606,7 +717,7 @@ fn rebuild_table(
         commands.entity(root).add_one_related::<ChildOf>(child);
     }
     if let Ok(mut line) = surface.count.single_mut() {
-        line.0 = count_line_text(projection.total, &shell.query);
+        line.0 = count_line_text_for_shell(shell, projection.total, &shell.query);
     }
 }
 
@@ -630,6 +741,8 @@ fn search_input_scene(palette: &UiPalette, query: &str) -> impl Scene + use<> {
         }
         BackgroundColor({ palette.panel_fill })
         ProcessSearchInput
+        Button
+        on(on_search_input_activated)
         Children [
             ( Text(text) TextRole(Role::Body) ),
         ]
@@ -657,6 +770,7 @@ fn rows_root_scene(
         on(on_toggle_row_selection)
         on(on_scroll_intent)
         on(on_query_commit)
+        on(on_process_column_resize)
         ProcessRowsRoot
         Children [
             { rows },
@@ -676,7 +790,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
     );
     let viewport_rows = rows_in_viewport(TABLE_VIEWPORT_HEIGHT_PX, palette.control_height_px);
     let projection = rows_projection(context.shell, viewport_rows, 0);
-    let count = count_line_text(projection.total, &context.shell.query);
+    let count = count_line_text_for_shell(context.shell, projection.total, &context.shell.query);
     let columns = visible_columns(&[]);
     let header = header_scene(
         &columns,
@@ -693,6 +807,7 @@ pub(crate) fn content(context: &PageContext<'_>) -> impl Scene + use<> {
             flex_direction: FlexDirection::Column,
             row_gap: Val::Px(space_8()),
         }
+        ProcessTableContainer
         Children [
             ( { header } ),
             ( { rows_root } ),

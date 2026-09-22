@@ -113,6 +113,12 @@ fn network_section<'a>(
                         .unwrap_or_else(missing_value),
                 ),
             ];
+            if let Some(counters) = network.connection_counters.as_ref()
+                && let Some(summary) =
+                    taskmanager_shell::presentation::network_connection_counters_summary(counters)
+            {
+                rows.push(muted_text(theme_snapshot, summary));
+            }
             if network.connections.is_empty() {
                 rows.push(muted_text(
                     theme_snapshot,
@@ -178,7 +184,21 @@ fn format_connection(
         ) => "UDP6".to_string(),
         _ => connection.transport.to_string(),
     };
-    format!("{transport}  {} → {}", connection.local, connection.remote)
+    let scope = if connection.is_loopback() {
+        "LOOPBACK"
+    } else {
+        "EXTERNAL"
+    };
+    let rtt = connection
+        .rtt_ms
+        .filter(|value| value.is_finite() && *value >= 0.0)
+        .map_or_else(String::new, |value| {
+            format!(" · {} {value:.1} ms", t("net.rtt"))
+        });
+    format!(
+        "{transport} [{} · {scope}]  {} → {}{rtt}",
+        connection.state, connection.local, connection.remote
+    )
 }
 
 /// The per-PCI GPU device facet: one row per device (device id, usage %, VRAM).
@@ -281,6 +301,11 @@ pub(crate) fn resources_section<'a>(
                 resources.memory_limit,
                 bytes,
             ) {
+                let mem_str = resources
+                    .memory_usage_percent()
+                    .map_or(mem_str.clone(), |percent| {
+                        format!("{mem_str} ({percent:.0}%)")
+                    });
                 rows.push(kv_row(
                     theme_snapshot,
                     t("common.memory").to_string(),
@@ -314,6 +339,11 @@ pub(crate) fn resources_section<'a>(
                 resources.process_limit,
                 |v| v.to_string(),
             ) {
+                let pids_str = resources
+                    .process_usage_percent()
+                    .map_or(pids_str.clone(), |percent| {
+                        format!("{pids_str} ({percent:.0}%)")
+                    });
                 rows.push(kv_row(
                     theme_snapshot,
                     t("proc_insights.pids").to_string(),
@@ -390,6 +420,65 @@ pub(crate) fn isolation_section<'a>(
                 t("proc_insights.sandboxed").to_string(),
                 sandboxed_str,
             ));
+            rows.push(kv_row(
+                theme_snapshot,
+                t("proc_insights.security_profile").to_string(),
+                isolation
+                    .security_profile
+                    .as_deref()
+                    .map_or_else(|| t("proc_insights.unknown").to_owned(), str::to_owned),
+            ));
+            rows.push(kv_row(
+                theme_snapshot,
+                t("proc_insights.seccomp").to_string(),
+                isolation.seccomp_mode.map_or_else(
+                    || t("proc_insights.unknown").to_owned(),
+                    |mode| mode.to_string(),
+                ),
+            ));
+            rows.push(kv_row(
+                theme_snapshot,
+                t("proc_insights.no_new_privs").to_string(),
+                isolation.no_new_privs.map_or_else(
+                    || t("proc_insights.unknown").to_owned(),
+                    |enabled| t(if enabled { "common.yes" } else { "common.no" }).to_owned(),
+                ),
+            ));
+            rows.push(kv_row(
+                theme_snapshot,
+                t("proc_insights.ptrace_scope").to_string(),
+                isolation.yama_ptrace_scope.map_or_else(
+                    || t("proc_insights.unknown").to_owned(),
+                    |scope| scope.to_string(),
+                ),
+            ));
+            rows.push(kv_row(
+                theme_snapshot,
+                t("proc_insights.capabilities").to_string(),
+                isolation
+                    .capabilities
+                    .as_ref()
+                    .map(taskmanager_shell::presentation::capabilities_summary)
+                    .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
+            ));
+            rows.push(kv_row(
+                theme_snapshot,
+                t("proc_insights.namespaces").to_string(),
+                isolation
+                    .namespaces
+                    .as_ref()
+                    .map(taskmanager_shell::presentation::namespaces_summary)
+                    .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
+            ));
+            if let Some(details) =
+                taskmanager_shell::presentation::sandbox_details_summary(isolation)
+            {
+                rows.push(kv_row(
+                    theme_snapshot,
+                    t("proc_insights.sandbox_details").to_string(),
+                    details,
+                ));
+            }
             (t("proc_insights.isolation").to_string(), rows)
         }
     };

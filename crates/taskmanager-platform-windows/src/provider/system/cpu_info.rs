@@ -99,7 +99,9 @@ pub(super) fn detected_instruction_features() -> Vec<CpuInstructionFeature> {
                 CpuInstructionFeature::Avx512Vnni => extended.is_some_and(|e| e.4),
                 CpuInstructionFeature::AmxInt8 => extended.is_some_and(|e| e.5),
                 CpuInstructionFeature::AmxBf16 => extended.is_some_and(|e| e.6),
-                CpuInstructionFeature::Neon | CpuInstructionFeature::Sve => false,
+                CpuInstructionFeature::Avx10
+                | CpuInstructionFeature::Neon
+                | CpuInstructionFeature::Sve => false,
             })
             .collect()
     }

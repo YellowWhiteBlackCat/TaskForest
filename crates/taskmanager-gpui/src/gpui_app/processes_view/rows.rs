@@ -58,8 +58,10 @@ pub fn columns() -> &'static [SortCol] {
         SortCol::Cpu,
         SortCol::Memory,
         SortCol::Swap,
+        SortCol::Pss,
         SortCol::DiskRead,
         SortCol::DiskWrite,
+        SortCol::Network,
         SortCol::CpuTime,
         SortCol::Fds,
         SortCol::Nice,
@@ -84,14 +86,13 @@ pub fn contract_id(col: SortCol) -> &'static str {
         SortCol::Cpu => "CPU",
         SortCol::Memory => "Memory",
         SortCol::Swap => "Swap",
+        SortCol::Pss => "MemoryPss",
         SortCol::DiskRead => "DiskRead",
         SortCol::DiskWrite => "DiskWrite",
+        SortCol::Network => "Network",
         SortCol::CpuTime => "CPUTime",
         SortCol::Fds => "FDs",
         SortCol::Nice => "Nice",
-        // Not a renderable GPUI column (see the module docs); the token keeps
-        // the arm exhaustive without ever entering a persisted layout.
-        SortCol::Pss => "PSS",
     }
 }
 
@@ -140,6 +141,7 @@ pub fn header_label(col: SortCol) -> &'static str {
         SortCol::Swap => i18n::t("proc.swap"),
         SortCol::DiskRead => i18n::t("proc.disk_read"),
         SortCol::DiskWrite => i18n::t("proc.disk_write"),
+        SortCol::Network => i18n::t("proc.network"),
         SortCol::CpuTime => i18n::t("proc.cpu_time"),
         SortCol::Fds => i18n::t("proc.fds"),
         SortCol::Nice => i18n::t("proc.nice"),

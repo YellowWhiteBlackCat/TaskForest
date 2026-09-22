@@ -1,0 +1,20 @@
+Package: taskforest-common
+Version: __VERSION__
+Section: admin
+Priority: optional
+Architecture: __ARCH__
+Recommends: polkitd
+Maintainer: TaskForest contributors <noreply@yellowwhiteblackcat.github.io>
+Installed-Size: __INSTALLED_SIZE__
+Homepage: https://github.com/YellowWhiteBlackCat/TaskForest
+Description: Shared data assets for the TaskForest frontends
+ TaskForest ships four independent frontend products (TaskForest-G,
+ TaskForest-I, TaskForest-T, and TaskForest-B) over one product identity.
+ This data-only package owns the assets those products share — the hicolor
+ application icon ladder — so exactly one package owns each shared path
+ instead of every frontend installing its own byte-identical copy. The
+ per-frontend executables, desktop entries, and AppStream metadata remain in
+ their own packages.
+ .
+ It installs no executable, helper, or privileged asset.
+License: Apache-2.0

@@ -606,3 +606,247 @@ fn f9_toggles_performance_sidebar_visibility() {
         .unwrap_or(false);
     assert!(restored, "F9 restores the performance sidebar in Bevy");
 }
+
+fn press_key(app: &mut App, key: KeyCode, text: Option<&str>) {
+    press(app, key, text);
+    app.update();
+}
+
+fn press_ctrl(app: &mut App, key: KeyCode, text: Option<&str>) {
+    press(app, KeyCode::ControlLeft, None);
+    press(app, key, text);
+    app.update();
+    app.world_mut()
+        .resource_mut::<bevy::input::ButtonInput<KeyCode>>()
+        .reset_all();
+}
+
+fn query_of(app: &App) -> String {
+    app.world().non_send::<FrontendTrack>().shell.query.clone()
+}
+
+fn cursor_of(app: &App) -> usize {
+    let q = query_of(app);
+    app.world()
+        .resource::<super::TextInputState>()
+        .cursor_pos(&q)
+}
+
+#[test]
+fn text_input_cursor_movement_and_insertion() {
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+
+    // Open search with Ctrl+F
+    press_ctrl(&mut app, KeyCode::KeyF, None);
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .search_active(),
+        "Ctrl+F opens search"
+    );
+
+    // Type "ac"
+    press_key(&mut app, KeyCode::KeyA, Some("a"));
+    press_key(&mut app, KeyCode::KeyC, Some("c"));
+    assert_eq!(query_of(&app), "ac");
+    assert_eq!(cursor_of(&app), 2);
+
+    // Move left once: cursor between 'a' and 'c'
+    press_key(&mut app, KeyCode::ArrowLeft, None);
+    assert_eq!(cursor_of(&app), 1);
+
+    // Type 'b' -> query should become "abc"
+    press_key(&mut app, KeyCode::KeyB, Some("b"));
+    assert_eq!(query_of(&app), "abc");
+    assert_eq!(cursor_of(&app), 2);
+
+    // Press Home -> cursor to 0
+    press_key(&mut app, KeyCode::Home, None);
+    assert_eq!(cursor_of(&app), 0);
+
+    // Type 'X' at start -> "Xabc"
+    press_key(&mut app, KeyCode::KeyX, Some("X"));
+    assert_eq!(query_of(&app), "Xabc");
+    assert_eq!(cursor_of(&app), 1);
+
+    // Press End -> cursor to 4
+    press_key(&mut app, KeyCode::End, None);
+    assert_eq!(cursor_of(&app), 4);
+
+    // Type 'Z' at end -> "XabcZ"
+    press_key(&mut app, KeyCode::KeyZ, Some("Z"));
+    assert_eq!(query_of(&app), "XabcZ");
+    assert_eq!(cursor_of(&app), 5);
+}
+
+#[test]
+fn text_input_backspace_and_delete() {
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+
+    // Open search
+    press_ctrl(&mut app, KeyCode::KeyF, None);
+
+    // Type "hello"
+    for ch in ["h", "e", "l", "l", "o"] {
+        press_key(&mut app, KeyCode::KeyA, Some(ch));
+    }
+    assert_eq!(query_of(&app), "hello");
+
+    // Backspace at end removes 'o'
+    press_key(&mut app, KeyCode::Backspace, None);
+    assert_eq!(query_of(&app), "hell");
+    assert_eq!(cursor_of(&app), 4);
+
+    // Move to Home (cursor 0) and Delete removes 'h'
+    press_key(&mut app, KeyCode::Home, None);
+    press_key(&mut app, KeyCode::Delete, None);
+    assert_eq!(query_of(&app), "ell");
+    assert_eq!(cursor_of(&app), 0);
+
+    // Backspace at start is a safe no-op
+    press_key(&mut app, KeyCode::Backspace, None);
+    assert_eq!(query_of(&app), "ell");
+
+    // Move Right to position 1 and Backspace removes 'e'
+    press_key(&mut app, KeyCode::ArrowRight, None);
+    press_key(&mut app, KeyCode::Backspace, None);
+    assert_eq!(query_of(&app), "ll");
+}
+
+#[test]
+fn text_input_clear_actions() {
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+
+    press_ctrl(&mut app, KeyCode::KeyF, None);
+    for ch in ["t", "e", "s", "t"] {
+        press_key(&mut app, KeyCode::KeyA, Some(ch));
+    }
+    assert_eq!(query_of(&app), "test");
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .search_active()
+    );
+
+    // First Escape clears the query
+    press_key(&mut app, KeyCode::Escape, None);
+    assert_eq!(query_of(&app), "");
+    assert!(
+        app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .search_active(),
+        "first Escape clears but search stays active"
+    );
+
+    // Second Escape closes search
+    press_key(&mut app, KeyCode::Escape, None);
+    assert!(
+        !app.world()
+            .non_send::<FrontendTrack>()
+            .shell
+            .search_active(),
+        "second Escape closes search"
+    );
+
+    // Re-open and test Ctrl+U line clear
+    press_ctrl(&mut app, KeyCode::KeyF, None);
+    for ch in ["q", "u", "e", "r", "y"] {
+        press_key(&mut app, KeyCode::KeyA, Some(ch));
+    }
+    press_ctrl(&mut app, KeyCode::KeyU, None);
+    assert_eq!(query_of(&app), "", "Ctrl+U clears query");
+}
+
+#[test]
+fn text_input_paste_and_clipboard() {
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+
+    press_ctrl(&mut app, KeyCode::KeyF, None);
+
+    // Set clipboard buffer directly
+    app.world_mut()
+        .resource_mut::<super::TextInputState>()
+        .set_clipboard("pasted_term");
+
+    // Ctrl+V pastes
+    press_ctrl(&mut app, KeyCode::KeyV, None);
+    assert_eq!(query_of(&app), "pasted_term");
+    assert_eq!(cursor_of(&app), 11);
+
+    // Ctrl+C copies query to clipboard
+    app.world_mut()
+        .resource_mut::<super::TextInputState>()
+        .set_clipboard("");
+    press_ctrl(&mut app, KeyCode::KeyC, None);
+    assert_eq!(
+        app.world()
+            .resource::<super::TextInputState>()
+            .get_clipboard(),
+        "pasted_term"
+    );
+
+    // Ctrl+X cuts query to clipboard
+    press_ctrl(&mut app, KeyCode::KeyX, None);
+    assert_eq!(query_of(&app), "");
+    assert_eq!(
+        app.world()
+            .resource::<super::TextInputState>()
+            .get_clipboard(),
+        "pasted_term"
+    );
+
+    // Ctrl+V pastes it back
+    press_ctrl(&mut app, KeyCode::KeyV, None);
+    assert_eq!(query_of(&app), "pasted_term");
+}
+
+#[test]
+fn text_input_word_navigation_and_deletion() {
+    let mut app = input_app(shell_with_selection());
+    app.update();
+    app.update();
+
+    press_ctrl(&mut app, KeyCode::KeyF, None);
+    app.world_mut()
+        .resource_mut::<super::TextInputState>()
+        .set_clipboard("first second third");
+    press_ctrl(&mut app, KeyCode::KeyV, None);
+
+    assert_eq!(query_of(&app), "first second third");
+    assert_eq!(cursor_of(&app), 18);
+
+    // Ctrl+ArrowLeft jumps to start of "third" (index 13)
+    press_ctrl(&mut app, KeyCode::ArrowLeft, None);
+    assert_eq!(cursor_of(&app), 13);
+
+    // Ctrl+ArrowLeft jumps to start of "second" (index 6)
+    press_ctrl(&mut app, KeyCode::ArrowLeft, None);
+    assert_eq!(cursor_of(&app), 6);
+
+    // Ctrl+ArrowRight jumps past "second" to start of "third" (index 13)
+    press_ctrl(&mut app, KeyCode::ArrowRight, None);
+    assert_eq!(cursor_of(&app), 13);
+
+    // End jumps to end (index 18)
+    press_key(&mut app, KeyCode::End, None);
+
+    // Ctrl+Backspace deletes "third"
+    press_ctrl(&mut app, KeyCode::Backspace, None);
+    assert_eq!(query_of(&app), "first second ");
+}
+
+// The dispatch-arm behavior tests (0b / 2b / 2c / 3a) live in a sibling
+// path-mounted module so each test file stays inside the per-file budget.
+#[path = "input_arms.rs"]
+mod dispatch_arms;

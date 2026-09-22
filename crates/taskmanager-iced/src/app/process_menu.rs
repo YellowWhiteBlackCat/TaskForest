@@ -25,13 +25,22 @@ pub enum ProcessMenuAction {
     Kill,
     Suspend,
     Resume,
+    Priority(taskmanager_core::core::process::PriorityTier),
+    EfficiencyMode,
     Signal(ProcessSignal),
     OpenLocation,
     SearchOnline,
+    Affinity,
     Properties,
     CopyName,
     CopyPid,
     CopyCommandLine,
+}
+
+impl ProcessMenuAction {
+    /// Alias for `OpenLocation` for complete parity across product vocabularies.
+    #[allow(non_upper_case_globals)]
+    pub const OpenFileLocation: Self = Self::OpenLocation;
 }
 
 impl IcedApp {
@@ -68,9 +77,16 @@ impl IcedApp {
             ProcessMenuAction::Resume => {
                 self.shell.request_process_batch(ProcessBatchAction::Resume)
             }
+            ProcessMenuAction::Priority(tier) => self
+                .shell
+                .request_process_batch(ProcessBatchAction::SetPriority(tier)),
+            ProcessMenuAction::EfficiencyMode => self
+                .shell
+                .request_process_batch(ProcessBatchAction::SetEfficiencyMode(true)),
             ProcessMenuAction::Signal(signal) => self.shell.request_process_signal(signal),
             ProcessMenuAction::OpenLocation => self.process_location_effect(),
             ProcessMenuAction::SearchOnline => self.process_search_effect(),
+            ProcessMenuAction::Affinity => self.open_process_affinity_effect(),
             ProcessMenuAction::Properties => self.shell.apply_action(AppAction::OpenProperties),
             ProcessMenuAction::CopyName => {
                 self.copy_process_field(

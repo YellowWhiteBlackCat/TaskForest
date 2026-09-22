@@ -12,6 +12,8 @@ mod capability;
 mod envelope;
 mod failure;
 mod instance;
+mod platform;
+mod platform_surface;
 mod port;
 mod scheduler;
 mod source;
@@ -20,7 +22,8 @@ mod window_capture;
 
 pub use capability::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilityRequest, CapabilitySnapshot,
-    CapabilityStatus, MAX_REQUEST_SCOPE_BYTES, RequestScope, RequestTracking, RequestTrackingError,
+    CapabilityStatus, MAX_REQUEST_SCOPE_BYTES, PUBLIC_CAPABILITY_DEGRADATION_WORDS,
+    PUBLIC_FAILURE_AXIS_PERMISSION_WORD, RequestScope, RequestTracking, RequestTrackingError,
     SidebandPolicy,
 };
 pub use envelope::{EventEnvelope, EventSequence, RequestEnvelope, RequestId, RequestIdGenerator};
@@ -29,6 +32,8 @@ pub use failure::{
     SubmissionErrorKind, TrayFailure,
 };
 pub use instance::{InstanceEvent, InstanceFailure, InstanceGuard, InstanceRole};
+pub use platform::PlatformAxis;
+pub use platform_surface::{PlatformCapabilitySurface, PlatformSource, PlatformSourceError};
 pub use port::{EventPort, RequestPort};
 pub use scheduler::{
     CapabilityRecoveryOutcome, CapabilityRecoveryTrigger, CapabilityScheduler,

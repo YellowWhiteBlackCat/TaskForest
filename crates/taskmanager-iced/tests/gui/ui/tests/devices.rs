@@ -130,6 +130,83 @@ fn gpu_summary_projects_real_values_for_a_populated_snapshot() {
 }
 
 #[test]
+fn gpu_selector_enumerates_every_projected_adapter() {
+    use taskmanager_application::i18n::{Language, set_language};
+    use taskmanager_core::core::metrics::GpuMetrics;
+    set_language(Language::En);
+
+    // A dGPU and an iGPU in one projection: each adapter must get its own
+    // selectable entry and its own readout, so enumeration never collapses
+    // two accelerators onto one panel.
+    fn adapter(id: &str, model: &str, usage_pct: f32) -> GpuMetrics {
+        let mut gpu = GpuMetrics::new(id, model);
+        gpu.apply_scalar_observations(GpuScalarObservations {
+            utilization_pct: ScalarObservation::available(usage_pct, 1),
+            ..GpuScalarObservations::default()
+        });
+        gpu
+    }
+
+    let mut app = crate::IcedApp::demo();
+    let snapshot = SystemSnapshot {
+        gpu: vec![
+            adapter("gpu:pci:0000:01:00.0", "Discrete GPU", 42.0),
+            adapter("gpu:pci:0000:00:02.0", "Integrated Graphics", 7.0),
+        ],
+        ..SystemSnapshot::default()
+    };
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut app.shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+    );
+
+    let devices = available_perf_devices(&app);
+    assert!(devices.contains(&PerfDevice::Gpu(0)));
+    assert!(devices.contains(&PerfDevice::Gpu(1)));
+    let mut labels: Vec<String> = [PerfDevice::Gpu(0), PerfDevice::Gpu(1)]
+        .into_iter()
+        .map(|device| performance_sidebar_label(&app, device))
+        .collect();
+    labels.sort();
+    labels.dedup();
+    assert_eq!(
+        labels.len(),
+        2,
+        "two adapters must keep two distinct identities: {labels:?}"
+    );
+    assert_eq!(
+        perf_detail_kind(PerfDevice::Gpu(1)),
+        PerfDetail::Gpu,
+        "each adapter selector routes to an accelerator panel"
+    );
+
+    // Each panel's rows come from that adapter's own projection.
+    let snapshot = app
+        .shell
+        .projection()
+        .snapshot
+        .as_ref()
+        .expect("seeded snapshot");
+    assert_eq!(gpu_title(&snapshot.gpu[0], 0), "Discrete GPU");
+    assert_eq!(gpu_title(&snapshot.gpu[1], 1), "Integrated Graphics");
+    assert_eq!(
+        flat(&gpu_summary_lines(&snapshot.gpu[0]))[1],
+        ("Utilization", "42%")
+    );
+    assert_eq!(
+        flat(&gpu_summary_lines(&snapshot.gpu[1]))[1],
+        ("Utilization", "7%")
+    );
+
+    // Selecting the second adapter renders that adapter's panel.
+    let _ = app.update(Message::SelectPerfDevice(PerfDevice::Gpu(1)));
+    assert_eq!(app.perf_device(), PerfDevice::Gpu(1));
+    let _ = view(&app);
+
+    set_language(Language::En);
+}
+
+#[test]
 fn gpu_summary_keeps_honest_dashes_for_unavailable_fields() {
     use taskmanager_application::i18n::{Language, set_language};
     use taskmanager_core::core::metrics::GpuMetrics;
@@ -303,8 +380,8 @@ fn perf_device_selector_tabs_cover_every_variant_with_a_localized_label() {
     // non-empty; each tab's focus-operation id is unique and tab-bound.
     assert_eq!(
         PerfDevice::ALL.len(),
-        7,
-        "exactly seven Performance resources are selectable"
+        8,
+        "exactly eight Performance resources are selectable"
     );
 
     let labels: Vec<&'static str> = PerfDevice::ALL.into_iter().map(perf_device_label).collect();
@@ -313,6 +390,7 @@ fn perf_device_selector_tabs_cover_every_variant_with_a_localized_label() {
     assert_eq!(perf_device_label(PerfDevice::Cpu), "CPU");
     assert_eq!(perf_device_label(PerfDevice::Memory), "Memory");
     assert_eq!(perf_device_label(PerfDevice::Gpu(0)), "GPU");
+    assert_eq!(perf_device_label(PerfDevice::Npu(0)), "NPU");
     assert_eq!(perf_device_label(PerfDevice::Disk(0)), "Disk");
     assert_eq!(perf_device_label(PerfDevice::Network(0)), "Network");
     assert_eq!(perf_device_label(PerfDevice::Battery(0)), "Battery");
@@ -427,7 +505,7 @@ fn compact_device_labels_are_bounded_without_losing_the_family_name() {
     assert_eq!(bounded_sidebar_label("CPU 39%", 18), "CPU 39%");
     assert_eq!(
         bounded_sidebar_label("GPU Intel Core Ultra Graphics", 18),
-        "GPU Intel Core Ul…"
+        "GPU"
     );
     assert_eq!(
         bounded_sidebar_label("网络设备很长的型号", 6),
@@ -441,12 +519,6 @@ fn compact_control_rows_have_a_bounded_row_count() {
     assert_eq!(chunk_count(5, 3), 2);
     assert_eq!(chunk_count(7, 4), 2);
     assert_eq!(chunk_count(1, 0), 1);
-}
-
-#[test]
-fn compact_toolbar_stays_single_row_when_the_route_strip_has_room() {
-    assert_eq!(compact_toolbar_columns(720.0), 5);
-    assert_eq!(compact_toolbar_columns(520.0), 3);
 }
 
 #[test]
@@ -592,10 +664,12 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
             ("Write", "40.0 MiB/s"),
             ("IOPS", "—"),
             ("Response", "—"),
+            ("Avg queue", "—"),
+            ("Service estimate", "—"),
             ("Capacity", "500.0 GiB"),
             ("Free", "250.0 GiB"),
             ("Type", "SATA SSD"),
-            ("Filesystem", ""),
+            ("Filesystem", "—"),
             ("Temperature", "33 °C"),
             ("Endurance used", "2%"),
             ("Power-on", "7200 h (300 d)"),
@@ -613,6 +687,57 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
     );
     // The one-line vital fact carries the capacity + partition census.
     assert!(disk_vital_line(&disk, crate::ui::UnitPrefs::default()).contains("partitions"));
+
+    set_language(Language::En);
+}
+
+#[test]
+fn disk_summary_renders_observed_iops_latency_and_queue_depth() {
+    use taskmanager_application::i18n::{Language, set_language};
+    set_language(Language::En);
+
+    // Every throughput-depth fact comes from its own typed observation: the
+    // disk summary must paint the observed values, not the shared dash.
+    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        .device_id("disk:test:nvme0".into())
+        .name("nvme0n1".into())
+        .scalar_observations(taskmanager_core::core::metrics::DiskScalarObservations {
+            capacity_bytes: ScalarObservation::available(500 * 1024 * 1024 * 1024, 1),
+            iops: ScalarObservation::available(137, 1),
+            response_time_ms: ScalarObservation::available(1.54, 1),
+            average_queue_depth: ScalarObservation::available(2.25, 1),
+            service_time_ms: ScalarObservation::available(0.42, 1),
+            ..taskmanager_core::core::metrics::DiskScalarObservations::default()
+        })
+        .build();
+    // The builder's scalar-group stage applies the full group; keep the
+    // observation self-check explicit so a dropped field cannot pass silently.
+    assert_eq!(disk.current_iops(), Some(137));
+    assert_eq!(disk.current_average_queue_depth(), Some(2.25));
+
+    let summary_rows = disk_summary_lines(&disk, true, true, &[]);
+    let rows = flat(&summary_rows);
+    for expected in [
+        ("IOPS", "137"),
+        ("Response", "1.54 ms"),
+        ("Avg queue", "2.25"),
+        ("Service estimate", "0.42 ms"),
+    ] {
+        assert!(
+            rows.contains(&expected),
+            "the disk summary must paint {expected:?}: {rows:?}"
+        );
+    }
+
+    // Unobserved depth facts keep the shared dash, never a fabricated zero.
+    let bare_rows_source = disk_summary_lines(&DiskMetrics::default(), true, true, &[]);
+    let bare_rows = flat(&bare_rows_source);
+    assert!(
+        bare_rows.contains(&("IOPS", "—"))
+            && bare_rows.contains(&("Response", "—"))
+            && bare_rows.contains(&("Avg queue", "—")),
+        "unobserved depth facts must stay dashes: {bare_rows:?}"
+    );
 
     set_language(Language::En);
 }
@@ -639,11 +764,13 @@ fn disk_summary_keeps_honest_dashes_and_omits_unavailable_scalars() {
             ("Write", "—"),
             ("IOPS", "—"),
             ("Response", "—"),
+            ("Avg queue", "—"),
+            ("Service estimate", "—"),
             ("Capacity", "—"),
             ("Free", "—"),
-            // Type/FileSystem always render (GPUI parity) with honest empties.
-            ("Type", ""),
-            ("Filesystem", ""),
+            // Type/Filesystem always render with an honest unavailable marker.
+            ("Type", "—"),
+            ("Filesystem", "—"),
         ]
     );
     // Rate-family gaps keep their rows with the shared dash (GPUI parity);

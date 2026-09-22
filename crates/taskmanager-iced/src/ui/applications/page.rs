@@ -79,11 +79,21 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                 Message::FocusSearch,
                 false,
             ),
-            text(format!(
-                "{} {}",
-                visible_indices.len(),
-                t("proc.process_count")
-            )),
+            text({
+                let count = format!("{} {}", visible_indices.len(), t("proc.process_count"));
+                let processes = shell
+                    .projection()
+                    .processes
+                    .as_ref()
+                    .map(|items| items.as_slice());
+                [
+                    taskmanager_shell::presentation::uninterruptible_process_summary(processes),
+                    taskmanager_shell::presentation::process_anomaly_summary(processes),
+                ]
+                .into_iter()
+                .flatten()
+                .fold(count, |line, summary| format!("{line} · {summary}"))
+            }),
         ]
         .spacing(8)
         .into()
@@ -260,6 +270,14 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
                     control.is_single_process(),
                 ));
             }
+            actions.push(focus::button_enabled(
+                theme_snapshot,
+                FocusTarget::ProcessEfficiencyMode,
+                t("proc.efficiency_mode"),
+                Message::RequestProcessBatch(ProcessBatchAction::SetEfficiencyMode(true)),
+                false,
+                control.is_ready(),
+            ));
             let columns_trigger = focus::button(
                 theme_snapshot,
                 FocusTarget::ProcessColumnsTrigger,
@@ -338,16 +356,28 @@ pub(crate) fn applications_page(app: &IcedApp) -> Element<'_, Message, Theme, Re
         },
     );
 
-    column![
-        search,
-        ribbon,
-        view_selector,
-        status_selector,
-        table,
-        action_bar,
-    ]
-    .spacing(8)
-    .width(Length::Fill)
-    .height(Length::Fill)
-    .into()
+    if app.compact_layout() {
+        let top_strip = row![search, Space::new().width(Length::Fill), view_selector,]
+            .spacing(8)
+            .align_y(Alignment::Center);
+
+        column![top_strip, status_selector, ribbon, table, action_bar,]
+            .spacing(4)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .into()
+    } else {
+        column![
+            search,
+            ribbon,
+            view_selector,
+            status_selector,
+            table,
+            action_bar,
+        ]
+        .spacing(8)
+        .width(Length::Fill)
+        .height(Length::Fill)
+        .into()
+    }
 }

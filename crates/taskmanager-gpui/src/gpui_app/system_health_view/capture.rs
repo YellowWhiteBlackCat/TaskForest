@@ -25,8 +25,12 @@ pub fn capture_fixture() -> SystemHealthCaptureFixture {
             mount_point: mount.into(),
             source: Some(source.into()),
             fs_type: fs_type.into(),
+            backing_kind: taskmanager_core::core::storage_health::FilesystemBackingKind::Unknown,
             read_only,
             error_count: errors,
+            inode_used: None,
+            inode_total: None,
+            inode_usage_percent: None,
             status,
             state: DeviceState::healthy(now),
             integrity_state: errors

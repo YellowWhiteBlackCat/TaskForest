@@ -9,8 +9,12 @@ fn fs(fs_type: &str, integrity: DeviceStatus) -> FilesystemHealth {
         mount_point: "/mnt/test".into(),
         source: None,
         fs_type: fs_type.into(),
+        backing_kind: taskmanager_core::core::storage_health::FilesystemBackingKind::Unknown,
         read_only: None,
         error_count: None,
+        inode_used: None,
+        inode_total: None,
+        inode_usage_percent: None,
         status: taskmanager_core::core::storage_health::FilesystemHealthStatus::Healthy,
         state: DeviceState {
             status: DeviceStatus::Healthy,

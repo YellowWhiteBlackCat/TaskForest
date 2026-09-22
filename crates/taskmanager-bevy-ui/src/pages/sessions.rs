@@ -9,12 +9,12 @@
 //!   translation — bypassing it is the wrong-row defect class);
 //! - the seat/tty summary renders per row with the shared `MISSING_VALUE`
 //!   marker for unobserved fields (never a fabricated empty string), and the
-//!   type column reads Local/Remote from the shared catalog;
+//!   remote column reads Yes/No from the shared catalog;
 //! - an empty list from a FAILED source renders the typed reason via the
 //!   source-status notice — never "no sessions";
 //! - the last accepted session-control outcome renders as one caption line
 //!   under the table (GPUI feedback-status parity, read-only: the Disconnect/
-//!   Lock verbs are routed by the action menu).
+//!   Lock verbs are routed by the action buttons and the action menu).
 //!
 //! Action-menu seam: the disconnect/lock verbs read the current target
 //! from [`SessionSelection`]; the pointer and key adapters fire
@@ -33,6 +33,7 @@ use bevy::ecs::resource::Resource;
 use bevy::ecs::system::Query;
 use bevy::ecs::system::{Commands, NonSendMut, Res, ResMut};
 use bevy::ecs::world::{DeferredWorld, World};
+use bevy::picking::Pickable;
 use bevy::scene::{CommandsSceneExt, Scene, bsn, on, template_value};
 use bevy::ui::prelude::{
     AlignItems, BackgroundColor, BorderRadius, FlexDirection, JustifyContent, Node, Overflow,
@@ -51,11 +52,14 @@ use taskmanager_shell::{InfoSortCol, InfoTable, ShellApp, SortDir};
 
 use crate::app::{FrontendTrack, Page, PageContext, ShellTrack};
 use crate::drain::ShellProjectionFolded;
-use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_24};
-use crate::widgets::controls::sort_indicator_scene;
+use crate::palette::{UiPalette, no_wrap_text, space_2, space_4, space_8, space_12, space_24};
+use crate::widgets::controls::{ControlTone, ControlVisual, sort_indicator_scene};
 use crate::window::{Role, TextRole, WindowPalette};
 
 pub(crate) mod menu;
+mod scene;
+
+use scene::sessions_body_scene;
 
 // ---- pure core: row view model, seat/tty summary, copy ----
 
@@ -82,9 +86,9 @@ pub(crate) fn session_rows(shell: &ShellApp) -> Vec<SessionRowModel> {
             seat: session_seat_text(session),
             tty: session_tty_text(session),
             kind: if session.remote {
-                t("users.remote")
+                t("common.yes")
             } else {
-                t("users.local")
+                t("common.no")
             },
             since: session
                 .timestamp
@@ -223,12 +227,12 @@ fn columns() -> Vec<Column> {
         },
         Column {
             sort: None,
-            label: t("common.type").to_owned(),
+            label: t("users.remote").to_owned(),
             width_px: 100.0,
         },
         Column {
             sort: None,
-            label: t("users.since").to_owned(),
+            label: t("users.logon").to_owned(),
             width_px: 200.0,
         },
     ]
@@ -325,190 +329,69 @@ pub(crate) fn content(_context: &PageContext<'_>) -> impl Scene + use<> {
     }
 }
 
-fn sessions_body_scene(
-    shell: &ShellApp,
-    palette: &UiPalette,
-    selection: &SessionSelection,
-) -> impl Scene + use<> {
-    let rows = session_rows(shell);
-    let selected = selected_row(&rows, selection);
-    let sources = shell.projection().sessions_source.as_deref();
-    let notice = source_notice_text(sources);
-    let empty = empty_state_text(sources);
-    let feedback = shell
-        .projection()
-        .session_control_feedback
-        .as_ref()
-        .map(feedback_line_text);
-    let children = body_children(&rows, selected, notice, feedback, empty, palette);
-    let header = header_scene(shell.sessions_sort, palette);
-    bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(space_2()),
-        }
-        Children [
-            ( header ),
-            { children },
-        ]
+#[derive(Component, Clone, Default)]
+pub(crate) struct SessionDisconnectButton;
+
+#[derive(Component, Clone, Default)]
+pub(crate) struct SessionLockButton;
+
+fn on_session_disconnect_button_activated(
+    activate: On<Activate>,
+    buttons: Query<&SessionDisconnectButton>,
+    mut track: NonSendMut<FrontendTrack>,
+    selection: Res<SessionSelection>,
+    mut commands: Commands,
+) {
+    let button = buttons
+        .get(activate.entity)
+        .or_else(|_| buttons.get(activate.event().entity));
+    if button.is_err() {
+        return;
+    }
+    if let Some(target) = &selection.target
+        && let Some(session) = track
+            .shell
+            .sorted_sessions()
+            .into_iter()
+            .find(|s| &s.id == target)
+            .cloned()
+        && track
+            .shell
+            .select_session_control(&session, SessionControlAction::Disconnect)
+    {
+        crate::confirmation::republish(&track.shell, &mut commands);
+        commands.trigger(crate::input::ShellInteractionApplied);
+        commands.queue(paint_sessions);
     }
 }
 
-fn body_children(
-    rows: &[SessionRowModel],
-    selected: Option<usize>,
-    notice: Option<String>,
-    feedback: Option<String>,
-    empty: String,
-    palette: &UiPalette,
-) -> Vec<Box<dyn Scene>> {
-    let mut children = Vec::new();
-    if let Some(text) = notice {
-        children.push(Box::new(caption_line_scene(text)) as Box<dyn Scene>);
+fn on_session_lock_button_activated(
+    activate: On<Activate>,
+    buttons: Query<&SessionLockButton>,
+    mut track: NonSendMut<FrontendTrack>,
+    selection: Res<SessionSelection>,
+    mut commands: Commands,
+) {
+    let button = buttons
+        .get(activate.entity)
+        .or_else(|_| buttons.get(activate.event().entity));
+    if button.is_err() {
+        return;
     }
-    if rows.is_empty() {
-        children.push(Box::new(empty_scene(empty)) as Box<dyn Scene>);
-    } else {
-        for (index, row) in rows.iter().enumerate() {
-            children.push(session_row_scene(
-                row,
-                index,
-                selected == Some(index),
-                palette,
-            ));
-        }
-    }
-    if let Some(text) = feedback {
-        children.push(Box::new(caption_line_scene(text)) as Box<dyn Scene>);
-    }
-    children
-}
-
-/// Header row: one caption cell per column; every cell carries the
-/// [`SessionsSortHeader`] identity for the pointer adapter.
-fn header_scene(sort: Option<(InfoSortCol, SortDir)>, palette: &UiPalette) -> impl Scene + use<> {
-    let cells: Vec<Box<dyn Scene>> = columns()
-        .into_iter()
-        .map(|column| {
-            let label = header_label(&column);
-            let direction = sorted_direction(&column, sort);
-            let indicator = sort_indicator_scene(direction, palette);
-            let width = column.width_px;
-            let sort_target = column.sort;
-            Box::new(bsn! {
-                Node {
-                    width: px(width),
-                    flex_direction: FlexDirection::Row,
-                    align_items: AlignItems::Center,
-                    column_gap: Val::Px(space_4()),
-                    overflow: Overflow::clip_x(),
-                }
-                SessionsSortHeader(sort_target)
-                Children [
-                    ( Text(label) TextRole(Role::Caption) template_value(no_wrap_text()) ),
-                    { indicator },
-                ]
-            }) as Box<dyn Scene>
-        })
-        .collect();
-    bsn! {
-        Node {
-            width: percent(100),
-            height: Val::Auto,
-            flex_direction: FlexDirection::Row,
-            column_gap: Val::Px(space_8()),
-            padding: UiRect::horizontal(Val::Px(space_8())),
-        }
-        Children [
-            { cells }
-        ]
-    }
-}
-
-fn session_row_scene(
-    row: &SessionRowModel,
-    index: usize,
-    selected: bool,
-    palette: &UiPalette,
-) -> Box<dyn Scene> {
-    let widths = columns();
-    let session = row.session.clone();
-    let user = row.user.clone();
-    let seat = row.seat.clone();
-    let tty = row.tty.clone();
-    let kind = row.kind.to_owned();
-    let since = row.since.clone();
-    let fill = if selected {
-        palette.nav_active_bg
-    } else {
-        Color::NONE
-    };
-    let target = row.target.clone();
-    let height = palette.control_height_px;
-    let radius = palette.control_radius_px;
-    let session_width = widths[0].width_px;
-    let user_width = widths[1].width_px;
-    let seat_width = widths[2].width_px;
-    let tty_width = widths[3].width_px;
-    let kind_width = widths[4].width_px;
-    let since_width = widths[5].width_px;
-    Box::new(bsn! {
-        Node {
-            width: percent(100),
-            height: px(height),
-            flex_direction: FlexDirection::Row,
-            align_items: AlignItems::Center,
-            column_gap: Val::Px(space_8()),
-            padding: UiRect::horizontal(Val::Px(space_8())),
-            border_radius: BorderRadius::all(Val::Px(radius)),
-        }
-        BackgroundColor(fill)
-        SessionsRowMarker(index, target)
-        Button
-        on(on_sessions_row_activated)
-        Children [
-            ( text_cell_scene(session, session_width, Role::Body) ),
-            ( text_cell_scene(user, user_width, Role::Body) ),
-            ( text_cell_scene(seat, seat_width, Role::Body) ),
-            ( text_cell_scene(tty, tty_width, Role::Body) ),
-            ( text_cell_scene(kind, kind_width, Role::Body) ),
-            ( text_cell_scene(since, since_width, Role::Body) ),
-        ]
-    })
-}
-
-fn text_cell_scene(text: String, width: f32, role: Role) -> impl Scene + use<> {
-    bsn! {
-        Node { width: px(width), align_items: AlignItems::FlexStart }
-        Children [
-            ( Text(text) TextRole(role) ),
-        ]
-    }
-}
-
-fn caption_line_scene(text: String) -> impl Scene + use<> {
-    bsn! {
-        Node { width: percent(100) }
-        Children [
-            ( Text(text) TextRole(Role::Caption) ),
-        ]
-    }
-}
-
-fn empty_scene(message: String) -> impl Scene + use<> {
-    bsn! {
-        Node {
-            width: percent(100),
-            flex_grow: 1.0,
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            padding: UiRect::all(Val::Px(space_24())),
-        }
-        Children [
-            ( Text(message) TextRole(Role::Body) ),
-        ]
+    if let Some(target) = &selection.target
+        && let Some(session) = track
+            .shell
+            .sorted_sessions()
+            .into_iter()
+            .find(|s| &s.id == target)
+            .cloned()
+        && track
+            .shell
+            .select_session_control(&session, SessionControlAction::Lock)
+    {
+        crate::confirmation::republish(&track.shell, &mut commands);
+        commands.trigger(crate::input::ShellInteractionApplied);
+        commands.queue(paint_sessions);
     }
 }
 
@@ -584,6 +467,8 @@ fn bind_sessions_page(mut world: DeferredWorld<'_>, _context: HookContext) {
     commands.add_observer(on_sessions_sort_clicked);
     commands.add_observer(on_sessions_row_clicked);
     commands.add_observer(on_sessions_selection_moved);
+    commands.add_observer(on_session_disconnect_button_activated);
+    commands.add_observer(on_session_lock_button_activated);
     // The initial paint rides the body's own insertion: the hook runs while
     // the page scene is still spawning (its children apply later in the same
     // command queue), so painting here would find no body yet. The observer

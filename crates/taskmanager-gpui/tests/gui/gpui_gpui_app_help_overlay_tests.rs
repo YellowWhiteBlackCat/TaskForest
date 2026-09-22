@@ -2,7 +2,7 @@ use super::{binding_declaration, local_binding_rows};
 use gpui::AppContext;
 use taskmanager_theme::{HighContrast, LightDark, ResolvedFonts, Skin, Theme};
 use taskmanager_ui_contract::{
-    Binding, CoverageStatus, FrontendShape, coverage_report, drift_findings,
+    Binding, BindingCoverageStatus, FrontendShape, coverage_report, drift_findings,
 };
 
 fn theme() -> Theme {
@@ -87,7 +87,7 @@ fn binding_declaration_binds_every_contract_command() {
     assert!(drift_findings(&report).is_empty(), "{report:?}");
     for (command, status) in report {
         assert!(
-            matches!(status, CoverageStatus::Bound(_)),
+            matches!(status, BindingCoverageStatus::Bound(_)),
             "{command:?}: {status:?} — GPUI advertises the complete shared router"
         );
     }

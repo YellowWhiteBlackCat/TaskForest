@@ -25,6 +25,10 @@ fn fully_observed_item() -> ProcessItem {
     item.parent_pid = Some(1);
     item.cmdline = "sample --flag value".to_owned();
     item.status = "S".to_owned();
+    item.scheduling_policy = Some(taskmanager_core::ProcessSchedulingPolicy::Other);
+    item.oom_score = Some(250);
+    item.minor_page_faults = Some(15000);
+    item.major_page_faults = Some(3);
     item.apply_metadata_observations(ProcessMetadataObservations {
         owner: ProcessMetadataObservation::available(
             ProcessOwner {
@@ -48,6 +52,10 @@ fn fully_observed_item() -> ProcessItem {
         disk_write_bytes_total: ScalarObservation::available(20 * 1024 * 1024, 42),
         disk_read_bytes_per_sec: ScalarObservation::available(1536, 42),
         disk_write_bytes_per_sec: ScalarObservation::available(1024 * 1024, 42),
+        network_rx_bytes_per_sec: ScalarObservation::available(1000, 42),
+        network_tx_bytes_per_sec: ScalarObservation::available(2000, 42),
+        memory_uss_bytes: ScalarObservation::available(40 * 1024 * 1024, 42),
+        memory_anon_huge_pages_bytes: ScalarObservation::available(8 * 1024 * 1024, 42),
         threads: ScalarObservation::available(8, 42),
         start_time_secs: ScalarObservation::available(1_600_000_000, 42),
         cpu_time_secs: ScalarObservation::available(3_690, 42),
@@ -99,6 +107,14 @@ fn fully_observed_row_folds_every_field_to_text() {
         &DetailValue::Text("50.0 MiB".to_owned())
     );
     assert_eq!(
+        value(&rows, ProcessDetailsField::Uss),
+        &DetailValue::Text("40.0 MiB".to_owned())
+    );
+    assert_eq!(
+        value(&rows, ProcessDetailsField::AnonHugePages),
+        &DetailValue::Text("8.0 MiB (8.0% RSS)".to_owned())
+    );
+    assert_eq!(
         value(&rows, ProcessDetailsField::Swap),
         &DetailValue::Text("2.0 MiB".to_owned())
     );
@@ -115,6 +131,18 @@ fn fully_observed_row_folds_every_field_to_text() {
         &DetailValue::Text("+10".to_owned())
     );
     assert_eq!(
+        value(&rows, ProcessDetailsField::SchedPolicy),
+        &DetailValue::Text("Normal (SCHED_OTHER)".to_owned())
+    );
+    assert_eq!(
+        value(&rows, ProcessDetailsField::OomScore),
+        &DetailValue::Text("250".to_owned())
+    );
+    assert_eq!(
+        value(&rows, ProcessDetailsField::PageFaults),
+        &DetailValue::Text("15000 (I/O: 3)".to_owned())
+    );
+    assert_eq!(
         value(&rows, ProcessDetailsField::StartTime),
         &DetailValue::Text("2020-09-13 12:26:40".to_owned())
     );
@@ -129,6 +157,10 @@ fn fully_observed_row_folds_every_field_to_text() {
     assert_eq!(
         value(&rows, ProcessDetailsField::DiskWriteRate),
         &DetailValue::Text("1.0 MiB/s".to_owned())
+    );
+    assert_eq!(
+        value(&rows, ProcessDetailsField::NetworkRate),
+        &DetailValue::Text("2.9 KiB/s".to_owned())
     );
     assert_eq!(
         value(&rows, ProcessDetailsField::DiskReadTotal),
@@ -357,4 +389,207 @@ fn nice_pins_the_signed_spelling() {
             Some(expected)
         );
     }
+}
+
+/// Sensitive environment variable keys containing TOKEN, KEY, SECRET, PASSWORD, or AUTH
+/// are detected case-insensitively, while benign keys pass through unflagged.
+#[test]
+fn sensitive_env_key_detection() {
+    let sensitive_keys = [
+        "API_KEY",
+        "PRIVATE_KEY",
+        "SECRET_KEY",
+        "apiKey",
+        "key",
+        "GITHUB_TOKEN",
+        "OAUTH_TOKEN",
+        "authToken",
+        "access_token",
+        "token",
+        "CLIENT_SECRET",
+        "JWT_SECRET",
+        "appSecret",
+        "secret",
+        "DB_PASSWORD",
+        "PASSWORD",
+        "user_password",
+        "passWord",
+        "AUTH_HEADER",
+        "AUTHORIZATION",
+        "HTTP_AUTH",
+        "SSH_AUTH_SOCK",
+        "auth",
+        "AWS_SECRET_ACCESS_KEY",
+    ];
+    for key in sensitive_keys {
+        assert!(
+            is_sensitive_env_key(key),
+            "key '{key}' must be detected as sensitive"
+        );
+        assert!(
+            is_sensitive_environment_key(key),
+            "key '{key}' must be detected as sensitive via alias"
+        );
+    }
+
+    let benign_keys = [
+        "PATH",
+        "HOME",
+        "USER",
+        "SHELL",
+        "TERM",
+        "LANG",
+        "DISPLAY",
+        "WAYLAND_DISPLAY",
+        "XDG_RUNTIME_DIR",
+        "RUST_LOG",
+        "PWD",
+        "EDITOR",
+    ];
+    for key in benign_keys {
+        assert!(
+            !is_sensitive_env_key(key),
+            "key '{key}' must NOT be detected as sensitive"
+        );
+    }
+}
+
+/// Environment variable rendering masks sensitive values with asterisks while
+/// preserving benign values intact.
+#[test]
+fn environment_value_masking_with_asterisks() {
+    assert!(SENSITIVE_VALUE_MASK.chars().all(|c| c == '*'));
+    assert_eq!(SENSITIVE_VALUE_MASK, "********");
+
+    // Sensitive keys have values replaced with asterisks
+    assert_eq!(
+        render_environment_value("API_KEY", "super_secret_value_123"),
+        SENSITIVE_VALUE_MASK
+    );
+    assert_eq!(
+        render_environment_value("GITHUB_TOKEN", "ghp_xxxxxxxxxxxx"),
+        SENSITIVE_VALUE_MASK
+    );
+    assert_eq!(
+        render_environment_value("CLIENT_SECRET", "xyz789"),
+        SENSITIVE_VALUE_MASK
+    );
+    assert_eq!(
+        render_environment_value("DB_PASSWORD", "p@ssword!"),
+        SENSITIVE_VALUE_MASK
+    );
+    assert_eq!(
+        render_environment_value("AUTH_TOKEN", "bearer_abc"),
+        SENSITIVE_VALUE_MASK
+    );
+    assert_eq!(render_environment_value("SECRET", ""), SENSITIVE_VALUE_MASK);
+
+    // Benign keys preserve value
+    assert_eq!(
+        render_environment_value("PATH", "/usr/bin:/bin"),
+        "/usr/bin:/bin"
+    );
+    assert_eq!(render_environment_value("USER", "alice"), "alice");
+    assert_eq!(
+        render_environment_value("LANG", "en_US.UTF-8"),
+        "en_US.UTF-8"
+    );
+
+    // Mask helper aliases
+    assert_eq!(
+        mask_environment_value("API_KEY", "secret"),
+        SENSITIVE_VALUE_MASK
+    );
+    assert_eq!(
+        mask_sensitive_env_value("PASSWORD", "pass"),
+        SENSITIVE_VALUE_MASK
+    );
+}
+
+/// Key=value rendering and entry-level conversions mask sensitive variables with asterisks.
+#[test]
+fn environment_variable_and_entry_rendering() {
+    assert_eq!(
+        render_environment_variable("API_KEY", "my_secret_token"),
+        format!("API_KEY={SENSITIVE_VALUE_MASK}")
+    );
+    assert_eq!(
+        render_environment_variable("PATH", "/usr/local/bin"),
+        "PATH=/usr/local/bin"
+    );
+    assert_eq!(
+        format_environment_entry("AUTH_TOKEN", "token_val"),
+        format!("AUTH_TOKEN={SENSITIVE_VALUE_MASK}")
+    );
+
+    let (key, val) = render_environment_key_value("DB_PASSWORD", "db_pass_123");
+    assert_eq!(key, "DB_PASSWORD");
+    assert_eq!(val, SENSITIVE_VALUE_MASK);
+
+    let entry_sensitive = ProcessEnvironmentEntry {
+        key: "SECRET_KEY".to_string(),
+        value: "topsecret".to_string(),
+    };
+    let rendered_sensitive = render_environment_entry(&entry_sensitive);
+    assert_eq!(rendered_sensitive.key, "SECRET_KEY");
+    assert_eq!(rendered_sensitive.value, SENSITIVE_VALUE_MASK);
+
+    let entry_benign = ProcessEnvironmentEntry {
+        key: "HOME".to_string(),
+        value: "/example/profile".to_string(),
+    };
+    let rendered_benign = render_environment_entry(&entry_benign);
+    assert_eq!(rendered_benign.key, "HOME");
+    assert_eq!(rendered_benign.value, "/example/profile");
+
+    // Batch rendering over a slice
+    let entries = vec![
+        entry_benign,
+        entry_sensitive,
+        ProcessEnvironmentEntry {
+            key: "ACCESS_TOKEN".to_string(),
+            value: "tok".to_string(),
+        },
+    ];
+    let rendered_list = render_environment_entries(&entries);
+    assert_eq!(rendered_list.len(), 3);
+    assert_eq!(rendered_list[0].value, "/example/profile");
+    assert_eq!(rendered_list[1].value, SENSITIVE_VALUE_MASK);
+    assert_eq!(rendered_list[2].value, SENSITIVE_VALUE_MASK);
+
+    // Full snapshot rendering
+    let snapshot = ProcessEnvironment {
+        state: taskmanager_core::DeviceState::healthy(42),
+        working_directory: Some(PathBuf::from("/app")),
+        entries,
+        truncated_count: 5,
+    };
+    let rendered_snapshot = render_process_environment(&snapshot);
+    assert_eq!(rendered_snapshot.entries.len(), 3);
+    assert_eq!(rendered_snapshot.entries[0].value, "/example/profile");
+    assert_eq!(rendered_snapshot.entries[1].value, SENSITIVE_VALUE_MASK);
+    assert_eq!(rendered_snapshot.entries[2].value, SENSITIVE_VALUE_MASK);
+    assert_eq!(rendered_snapshot.truncated_count, 5);
+    assert_eq!(
+        rendered_snapshot.working_directory,
+        Some(PathBuf::from("/app"))
+    );
+
+    // format_env_entry escapes newlines and masks sensitive values
+    let entry_multiline = ProcessEnvironmentEntry {
+        key: "MULTILINE".to_string(),
+        value: "line1\nline2\rline3".to_string(),
+    };
+    assert_eq!(
+        format_env_entry(&entry_multiline),
+        "MULTILINE=line1\\nline2\\rline3"
+    );
+    let entry_sensitive_multiline = ProcessEnvironmentEntry {
+        key: "SECRET_MULTILINE".to_string(),
+        value: "line1\nline2".to_string(),
+    };
+    assert_eq!(
+        format_env_entry(&entry_sensitive_multiline),
+        format!("SECRET_MULTILINE={SENSITIVE_VALUE_MASK}")
+    );
 }

@@ -22,8 +22,10 @@ use super::{PROCESS_LIST_PROVIDER, source};
 
 /// Process list from `sysinfo`: PID, parent, name, command line, CPU/memory,
 /// start time, per-process disk totals and executable path are all real.
-/// Per-process handle count is real via `sysinfo::Process::open_files`, which
-/// uses the crate's audited Windows backend. Owner and POSIX nice are
+/// Per-process handle count is real via the audited
+/// `GetProcessHandleCount` boundary on Windows (the Linux cross-target test
+/// build retains a sysinfo approximation only for deterministic compilation).
+/// Owner and POSIX nice are
 /// explicitly unsupported rather than obtained through a command interpreter
 /// or a guessed mapping; thread counts come from the audited ToolHelp thread
 /// snapshot and stay typed unavailable when that enumeration fails. Handle
@@ -174,6 +176,10 @@ impl ProcessListProvider for WinProcessListProvider {
                 cpu_percentage: ScalarObservation::available(process.cpu_usage(), observed_at_ms),
                 memory_bytes: ScalarObservation::available(process.memory(), observed_at_ms),
                 memory_pss_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+                memory_uss_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
+                memory_anon_huge_pages_bytes: ScalarObservation::unavailable(
+                    FailureKind::Unsupported,
+                ),
                 swap_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
                 disk_read_bytes_total: ScalarObservation::available(
                     disk.total_read_bytes,
@@ -185,6 +191,12 @@ impl ProcessListProvider for WinProcessListProvider {
                 ),
                 disk_read_bytes_per_sec: read_rate,
                 disk_write_bytes_per_sec: write_rate,
+                network_rx_bytes_per_sec: ScalarObservation::unavailable(
+                    FailureKind::RequiresEscalation,
+                ),
+                network_tx_bytes_per_sec: ScalarObservation::unavailable(
+                    FailureKind::RequiresEscalation,
+                ),
                 threads: thread_count,
                 start_time_secs: ScalarObservation::available(start_time_secs, observed_at_ms),
                 cpu_time_secs: ScalarObservation::available(
@@ -323,15 +335,39 @@ fn observe_fd_count(
     observed_at_ms: u64,
 ) -> ScalarObservation<u32> {
     let current = if want_fd_count {
-        process.open_files().map_or_else(
-            || ScalarObservation::unavailable(FailureKind::Unsupported),
-            |count| {
-                ScalarObservation::available(
-                    u32::try_from(count).unwrap_or(u32::MAX),
-                    observed_at_ms,
-                )
-            },
-        )
+        #[cfg(windows)]
+        {
+            match taskmanager_windows_api::process_handle_count(process.pid().as_u32()) {
+                Ok(count) => ScalarObservation::available(count, observed_at_ms),
+                Err(taskmanager_windows_api::WindowsApiError::PermissionDenied) => {
+                    ScalarObservation::unavailable(FailureKind::PermissionDenied)
+                }
+                Err(taskmanager_windows_api::WindowsApiError::IdentityChanged) => {
+                    ScalarObservation::unavailable(FailureKind::IdentityChanged)
+                }
+                Err(taskmanager_windows_api::WindowsApiError::Unsupported) => {
+                    ScalarObservation::unavailable(FailureKind::Unsupported)
+                }
+                Err(_) => ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable),
+            }
+        }
+        #[cfg(not(windows))]
+        {
+            // The adapter is cross-compiled on Linux for contract tests. Keep
+            // that deterministic fallback available there; the native
+            // Windows path above is the authoritative GetProcessHandleCount
+            // implementation and never uses sysinfo's narrower open-file
+            // approximation.
+            process.open_files().map_or_else(
+                || ScalarObservation::unavailable(FailureKind::Unsupported),
+                |count| {
+                    ScalarObservation::available(
+                        u32::try_from(count).unwrap_or(u32::MAX),
+                        observed_at_ms,
+                    )
+                },
+            )
+        }
     } else {
         ScalarObservation::unavailable(FailureKind::TemporarilyUnavailable)
     };

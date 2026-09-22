@@ -154,7 +154,7 @@ pub(super) fn render_process_properties_at(
         }
         ProcessDetailsSection::Command => command_lines(&target.item, &app.local_time_rules, theme),
         ProcessDetailsSection::Insights => {
-            super::process_details::insights_lines(app, theme, target.item.pid)
+            super::process_details::modal_insights_lines(app, theme, target.item.pid)
         }
     };
     // Short-terminal scroll: a tab body can exceed the modal's bounded body
@@ -221,6 +221,23 @@ fn overview_pairs(
         (t("common.user"), text(ProcessDetailsField::User)),
         (t("common.status"), text(ProcessDetailsField::Status)),
         (t("common.threads"), text(ProcessDetailsField::Threads)),
+        (t("proc.pss"), text(ProcessDetailsField::Pss)),
+        (t("proc.uss"), text(ProcessDetailsField::Uss)),
+        (
+            t("proc.anon_huge_pages"),
+            text(ProcessDetailsField::AnonHugePages),
+        ),
+        (
+            t("proc.sched_policy"),
+            text(ProcessDetailsField::SchedPolicy),
+        ),
+        (t("proc.oom_score"), text(ProcessDetailsField::OomScore)),
+        (t("proc.page_faults"), text(ProcessDetailsField::PageFaults)),
+        (t("common.network"), text(ProcessDetailsField::NetworkRate)),
+        (
+            t("proc.cancelled_write"),
+            text(ProcessDetailsField::CancelledWriteBytes),
+        ),
         (t("prop.start_time"), text(ProcessDetailsField::StartTime)),
     ]
 }
@@ -311,11 +328,15 @@ fn command_pairs(
         local_time_rules,
     );
     let text = |field| vm_text(&rows, field);
-    vec![
+    let mut pairs = vec![
         (t("common.name"), text(ProcessDetailsField::Name)),
         (t("prop.location"), text(ProcessDetailsField::Exe)),
         (t("prop.command_line"), text(ProcessDetailsField::Cmdline)),
-    ]
+    ];
+    if let Some(summary) = taskmanager_shell::presentation::command_identity_summary(item) {
+        pairs.push((t("proc_insights.command_identity"), summary));
+    }
+    pairs
 }
 
 fn command_lines(

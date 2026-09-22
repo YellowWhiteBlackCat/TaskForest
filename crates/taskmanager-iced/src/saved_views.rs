@@ -271,6 +271,7 @@ pub fn sort_token(sort: SortCol) -> &'static str {
         SortCol::Swap => "Swap",
         SortCol::DiskRead => "DiskRead",
         SortCol::DiskWrite => "DiskWrite",
+        SortCol::Network => "Network",
         SortCol::CpuTime => "CPUTime",
         SortCol::Fds => "FDs",
         SortCol::Nice => "Nice",
@@ -291,6 +292,7 @@ pub fn sort_from_token(token: &str) -> Option<SortCol> {
         "Swap" => Some(SortCol::Swap),
         "DiskRead" => Some(SortCol::DiskRead),
         "DiskWrite" => Some(SortCol::DiskWrite),
+        "Network" => Some(SortCol::Network),
         "CPUTime" => Some(SortCol::CpuTime),
         "FDs" => Some(SortCol::Fds),
         "Nice" => Some(SortCol::Nice),
@@ -414,10 +416,15 @@ pub fn presets_ribbon<'a>(
     }
 
     if state.compact {
-        // The preset names plus Save/Export/Import are wider than the compact
-        // viewport. Wrap the finite action vocabulary into complete rows so
-        // no button is presented as a clipped partial label.
-        crate::ui::chunked_rows(items, 4)
+        // Keep the preset ribbon to a single bounded horizontal scrollable strip
+        // so it never wraps into multiple vertical rows that consume the table viewport.
+        iced::widget::scrollable(row(items).spacing(6).align_y(iced::Alignment::Center))
+            .direction(iced::widget::scrollable::Direction::Horizontal(
+                iced::widget::scrollable::Scrollbar::default(),
+            ))
+            .height(Length::Fixed(32.0))
+            .width(Length::Fill)
+            .into()
     } else {
         container(row(items).spacing(6).align_y(iced::Alignment::Center))
             .padding([4, 8])

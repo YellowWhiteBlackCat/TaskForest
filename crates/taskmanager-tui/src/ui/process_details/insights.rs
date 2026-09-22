@@ -10,13 +10,17 @@ use ratatui::text::Span;
 use taskmanager_application::{ProcessInsightUnavailable, i18n::t};
 use taskmanager_core::core::failure::FailureKind;
 use taskmanager_core::core::process_telemetry::{
-    ConnectionEndpoint, ConnectionTransport, LimitValue, OpenFileEntry, ProcessEnvironment,
-    ProcessEnvironmentEntry, ProcessGpuDevice, ProcessGpuEngineUsage, ProcessOpenFiles,
-    ProcessThreadInfo, ProcessThreads,
+    ConnectionEndpoint, ConnectionTransport, LimitValue, ProcessThreadInfo, ProcessThreads,
 };
 use taskmanager_shell::presentation::{bytes, missing_value};
 
 use crate::TuiTheme;
+
+mod formatting;
+pub(crate) use formatting::{
+    capabilities_preview_lines_with_limit, environment_preview_lines_with_limit,
+    format_engine_usage_line, format_gpu_device_row, open_files_preview_lines_with_limit,
+};
 
 /// Whether the network facet for `pid` reports the typed
 /// `RequiresEscalation` state — the one facet whose unavailability the
@@ -52,6 +56,26 @@ pub(crate) fn insights_lines(
     theme: TuiTheme,
     pid: u32,
 ) -> Vec<ratatui::text::Line<'static>> {
+    insights_lines_with_limit(app, theme, pid, THREADS_PREVIEW)
+}
+
+/// Rich process-insights representation for the dedicated Process Properties
+/// modal: renders up to 64 rows per facet with scroll navigation rather than
+/// the compact 3-row limit of the fixed inline bottom panel.
+pub(crate) fn modal_insights_lines(
+    app: &crate::TuiApp,
+    theme: TuiTheme,
+    pid: u32,
+) -> Vec<ratatui::text::Line<'static>> {
+    insights_lines_with_limit(app, theme, pid, 64)
+}
+
+pub(crate) fn insights_lines_with_limit(
+    app: &crate::TuiApp,
+    theme: TuiTheme,
+    pid: u32,
+    limit: usize,
+) -> Vec<ratatui::text::Line<'static>> {
     use taskmanager_application::ProcessInsightFacetState;
     let collecting = || {
         ratatui::text::Line::from(Span::styled(
@@ -70,7 +94,7 @@ pub(crate) fn insights_lines(
         t("prop.insights"),
         Style::new().fg(theme.accent).add_modifier(Modifier::BOLD),
     )));
-    // Network connections: count plus the first three endpoints. An
+    // Network connections: count plus bounded endpoint list. An
     // escalation-requiring capture renders the typed reason line plus the
     // `e` trigger hint (G-04b) — never the Debug formatting of the reason.
     match &projection.network {
@@ -109,15 +133,34 @@ pub(crate) fn insights_lines(
                 t("proc_insights.connections"),
                 snapshot.connections.len()
             )));
-            for connection in snapshot.connections.iter().take(3) {
+            if let Some(counters) = snapshot.connection_counters.as_ref()
+                && let Some(summary) =
+                    taskmanager_shell::presentation::network_connection_counters_summary(counters)
+            {
+                lines.push(ratatui::text::Line::from(format!("  {summary}")));
+            }
+            for connection in snapshot.connections.iter().take(limit) {
+                let rtt = connection
+                    .rtt_ms
+                    .filter(|value| value.is_finite() && *value >= 0.0)
+                    .map_or_else(String::new, |value| {
+                        format!(" · {} {value:.1} ms", t("net.rtt"))
+                    });
                 lines.push(ratatui::text::Line::from(format!(
-                    "    {} {} -> {}",
+                    "    {} [{} · {}] {} -> {}{}",
                     transport_text(&connection.transport),
+                    connection.state,
+                    if connection.is_loopback() {
+                        "LOOPBACK"
+                    } else {
+                        "EXTERNAL"
+                    },
                     endpoint_text(&connection.local),
                     endpoint_text(&connection.remote),
+                    rtt,
                 )));
             }
-            if snapshot.connections.len() > 3 {
+            if snapshot.connections.len() > limit {
                 lines.push(ratatui::text::Line::from(Span::styled(
                     "    …",
                     Style::new().fg(theme.dim),
@@ -132,13 +175,13 @@ pub(crate) fn insights_lines(
             lines.push(insight_unavailable(theme, reason))
         }
         ProcessInsightFacetState::Current(snapshot) => {
-            for device in snapshot.devices.iter().take(2) {
+            for device in snapshot.devices.iter().take(limit.max(2)) {
                 lines.push(ratatui::text::Line::from(format!(
                     "  {}",
                     format_gpu_device_row(device)
                 )));
             }
-            if snapshot.devices.len() > 2 {
+            if snapshot.devices.len() > limit.max(2) {
                 lines.push(ratatui::text::Line::from(Span::styled(
                     "  …",
                     Style::new().fg(theme.dim),
@@ -147,13 +190,13 @@ pub(crate) fn insights_lines(
             // Per-engine breakdown (drm-engine fdinfo, deeper-indented under
             // the device rollup): name + current usage_pct + cumulative time/cycles.
             // An empty engine list renders nothing fabricated — a live, non-GPU process.
-            for engine in snapshot.engines.engines.iter().take(GPU_ENGINES_PREVIEW) {
+            for engine in snapshot.engines.engines.iter().take(limit) {
                 lines.push(ratatui::text::Line::from(format!(
                     "    {}",
                     format_engine_usage_line(engine)
                 )));
             }
-            if snapshot.engines.engines.len() > GPU_ENGINES_PREVIEW {
+            if snapshot.engines.engines.len() > limit {
                 lines.push(ratatui::text::Line::from(Span::styled(
                     "    …",
                     Style::new().fg(theme.dim),
@@ -190,14 +233,29 @@ pub(crate) fn insights_lines(
                     limit_value(snapshot.current_process_limit(), Some(pids)),
                 )));
             }
-            if let Some(groups) = snapshot.current_resource_groups()
-                && let Some(first) = groups.first()
-            {
-                lines.push(ratatui::text::Line::from(format!(
-                    "  {} {}",
-                    t("proc_insights.resource_group"),
-                    first.native_locator,
-                )));
+            if let Some(groups) = snapshot.current_resource_groups() {
+                if let Some(first) = groups.first() {
+                    lines.push(ratatui::text::Line::from(format!(
+                        "  {} {}",
+                        t("proc_insights.resource_group"),
+                        first.native_locator,
+                    )));
+                }
+                let mut capabilities = Vec::new();
+                for group in groups {
+                    for cap in &group.capabilities {
+                        if !capabilities.contains(cap) {
+                            capabilities.push(cap.clone());
+                        }
+                    }
+                }
+                if !capabilities.is_empty() {
+                    lines.extend(capabilities_preview_lines_with_limit(
+                        &capabilities,
+                        theme,
+                        limit,
+                    ));
+                }
             }
         }
     }
@@ -238,6 +296,65 @@ pub(crate) fn insights_lines(
                 t("proc_insights.sandboxed"),
                 sandboxed_str,
             )));
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc_insights.security_profile"),
+                isolation
+                    .security_profile
+                    .as_deref()
+                    .unwrap_or_else(|| t("proc_insights.unknown")),
+            )));
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc_insights.seccomp"),
+                isolation.seccomp_mode.map_or_else(
+                    || t("proc_insights.unknown").to_owned(),
+                    |mode| mode.to_string(),
+                ),
+            )));
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc_insights.no_new_privs"),
+                isolation.no_new_privs.map_or_else(
+                    || t("proc_insights.unknown").to_owned(),
+                    |enabled| t(if enabled { "common.yes" } else { "common.no" }).to_owned(),
+                ),
+            )));
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc_insights.ptrace_scope"),
+                isolation.yama_ptrace_scope.map_or_else(
+                    || t("proc_insights.unknown").to_owned(),
+                    |scope| scope.to_string(),
+                ),
+            )));
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc_insights.capabilities"),
+                isolation
+                    .capabilities
+                    .as_ref()
+                    .map(taskmanager_shell::presentation::capabilities_summary)
+                    .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
+            )));
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc_insights.namespaces"),
+                isolation
+                    .namespaces
+                    .as_ref()
+                    .map(taskmanager_shell::presentation::namespaces_summary)
+                    .unwrap_or_else(|| t("proc_insights.unknown").to_owned()),
+            )));
+            if let Some(details) =
+                taskmanager_shell::presentation::sandbox_details_summary(isolation)
+            {
+                lines.push(ratatui::text::Line::from(format!(
+                    "  {} {}",
+                    t("proc_insights.sandbox_details"),
+                    details,
+                )));
+            }
         }
     }
     // Threads: compact column header plus the first N thread rows.
@@ -247,7 +364,7 @@ pub(crate) fn insights_lines(
             lines.push(insight_unavailable(theme, reason))
         }
         ProcessInsightFacetState::Current(threads) => {
-            lines.extend(thread_preview_lines(threads, theme))
+            lines.extend(thread_preview_lines_with_limit(threads, theme, limit))
         }
     }
     // Open files: entry count (+ unreadable marker) plus the first N descriptors.
@@ -256,9 +373,9 @@ pub(crate) fn insights_lines(
         ProcessInsightFacetState::Unavailable(reason) => {
             lines.push(insight_unavailable(theme, reason))
         }
-        ProcessInsightFacetState::Current(open_files) => {
-            lines.extend(open_files_preview_lines(open_files, theme))
-        }
+        ProcessInsightFacetState::Current(open_files) => lines.extend(
+            open_files_preview_lines_with_limit(open_files, theme, limit),
+        ),
     }
     // Environment: entry count plus the first N bounded key=value entries.
     match &projection.environment {
@@ -267,8 +384,45 @@ pub(crate) fn insights_lines(
             lines.push(insight_unavailable(theme, reason))
         }
         ProcessInsightFacetState::Current(env) => {
-            lines.extend(environment_preview_lines(env, theme))
+            lines.extend(environment_preview_lines_with_limit(env, theme, limit))
         }
+    }
+    // CPU Affinity: render observed affinity state for this process
+    match app.shell.process_affinity_state() {
+        taskmanager_application::ProcessAffinityState::Ready(ready) if ready.target.pid == pid => {
+            let total = app.logical_cpu_count();
+            let cpus_summary = if ready.cpus.is_empty() {
+                missing_value()
+            } else if total > 0 && ready.cpus.len() == total {
+                format!("All ({total} CPUs)")
+            } else if ready.cpus.len() <= 8 {
+                let mut sorted: Vec<u32> = ready.cpus.to_vec();
+                sorted.sort_unstable();
+                let joined = sorted
+                    .iter()
+                    .map(|c| c.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ");
+                format!("CPUs {joined}")
+            } else {
+                format!("{} / {total} CPUs", ready.cpus.len())
+            };
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc.affinity"),
+                cpus_summary,
+            )));
+        }
+        taskmanager_application::ProcessAffinityState::Loading { target, .. }
+            if target.pid == pid =>
+        {
+            lines.push(ratatui::text::Line::from(format!(
+                "  {} {}",
+                t("proc.affinity"),
+                t("common.collecting_telemetry"),
+            )));
+        }
+        _ => {}
     }
     lines
 }
@@ -324,7 +478,7 @@ fn endpoint_text(endpoint: &ConnectionEndpoint) -> String {
 
 /// Render a limit row: `Unlimited` is honest "∞"; a value renders the number.
 fn limit_value(limit: Option<LimitValue>, current: Option<u64>) -> String {
-    match limit {
+    let base = match limit {
         Some(LimitValue::Unlimited) => {
             if let Some(current) = current {
                 format!("{current} / ∞")
@@ -340,7 +494,10 @@ fn limit_value(limit: Option<LimitValue>, current: Option<u64>) -> String {
             }
         }
         None => current.map_or_else(missing_value, |value| value.to_string()),
-    }
+    };
+    limit
+        .and_then(|value| value.usage_percent(current))
+        .map_or(base.clone(), |percent| format!("{base} ({percent:.0}%)"))
 }
 
 /// Bounded preview row counts for the populated insight facets. The detail
@@ -348,9 +505,14 @@ fn limit_value(limit: Option<LimitValue>, current: Option<u64>) -> String {
 /// an honest "…" when more remain — the same shape the connections and device
 /// previews already use.
 const THREADS_PREVIEW: usize = 3;
+#[allow(dead_code)]
 const OPEN_FILES_PREVIEW: usize = 3;
+#[allow(dead_code)]
 const GPU_ENGINES_PREVIEW: usize = 3;
+#[allow(dead_code)]
 const ENVIRONMENT_PREVIEW: usize = 3;
+#[allow(dead_code)]
+const CAPABILITIES_PREVIEW: usize = 3;
 
 /// Compact thread row: `tid  comm  state  cpu-time  cpu%`. Missing CPU time or
 /// percent render an explicit dash, never a fabricated `0.0` — the first
@@ -369,22 +531,60 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
     } else {
         thread.comm.clone()
     };
-    format!(
-        "{}  {}  {}  {}  {}",
-        thread.tid,
-        comm,
-        thread.state.as_short_label(),
-        cpu_time,
-        cpu_percent,
-    )
+    let wait = thread.run_queue_wait_ns.map(|nanos| {
+        let kind = thread
+            .wait_kind
+            .map(taskmanager_core::core::process_telemetry::ThreadWaitKind::as_str)
+            .unwrap_or("wait");
+        format!("{kind} {:.1}ms", nanos as f64 / 1_000_000.0)
+    });
+    if let Some(ref wchan) = thread.wchan {
+        let mut line = format!(
+            "{}  {}  {}  {}  {}  [{}]",
+            thread.tid,
+            comm,
+            thread.state.as_short_label(),
+            cpu_time,
+            cpu_percent,
+            wchan,
+        );
+        if let Some(wait) = wait {
+            line.push_str("  ");
+            line.push_str(&wait);
+        }
+        line
+    } else {
+        let mut line = format!(
+            "{}  {}  {}  {}  {}",
+            thread.tid,
+            comm,
+            thread.state.as_short_label(),
+            cpu_time,
+            cpu_percent,
+        );
+        if let Some(wait) = wait {
+            line.push_str("  ");
+            line.push_str(&wait);
+        }
+        line
+    }
 }
 
 /// Bounded Threads-facet preview: a count title, a compact column header, the
 /// first [`THREADS_PREVIEW`] rows, and an honest "…" when more remain. An empty
 /// thread list renders the explicit empty state, never a fabricated row.
+#[cfg_attr(not(test), allow(dead_code))]
 fn thread_preview_lines(
     threads: &ProcessThreads,
     theme: TuiTheme,
+) -> Vec<ratatui::text::Line<'static>> {
+    thread_preview_lines_with_limit(threads, theme, THREADS_PREVIEW)
+}
+
+fn thread_preview_lines_with_limit(
+    threads: &ProcessThreads,
+    theme: TuiTheme,
+    limit: usize,
 ) -> Vec<ratatui::text::Line<'static>> {
     let mut out = Vec::new();
     if threads.threads.is_empty() {
@@ -401,185 +601,26 @@ fn thread_preview_lines(
     )));
     out.push(ratatui::text::Line::from(Span::styled(
         format!(
-            "    TID  Name  St  {}  {}",
+            "    TID  Name  St  {}  {}  {}",
             t("proc_insights.thread_cpu_time"),
+            t("proc_insights.thread_wait"),
             t("proc_insights.thread_cpu_percent")
         ),
         Style::new().fg(theme.dim),
     )));
-    for thread in threads.threads.iter().take(THREADS_PREVIEW) {
+    for thread in threads.threads.iter().take(limit) {
         out.push(ratatui::text::Line::from(format!(
             "    {}",
             format_thread_row(thread)
         )));
     }
-    if threads.threads.len() > THREADS_PREVIEW {
+    if threads.threads.len() > limit {
         out.push(ratatui::text::Line::from(Span::styled(
             "    …",
             Style::new().fg(theme.dim),
         )));
     }
     out
-}
-
-/// Compact open-file row: `fd → target`. A descriptor whose readlink failed
-/// (`target: None`) surfaces the typed unreadable marker, never a blank or a
-/// fabricated path.
-fn format_open_file_row(entry: &OpenFileEntry, unreadable: &str) -> String {
-    let target = entry
-        .target
-        .clone()
-        .unwrap_or_else(|| unreadable.to_string());
-    format!("{} → {}", entry.fd, target)
-}
-
-/// Bounded Open-files-facet preview: the entry count (plus an "N unreadable"
-/// marker when readlink failed for any descriptor), then the first
-/// [`OPEN_FILES_PREVIEW`] `fd → target` rows and an honest "…" when more
-/// remain. A healthy process with no readable descriptors renders the explicit
-/// empty state.
-fn open_files_preview_lines(
-    open_files: &ProcessOpenFiles,
-    theme: TuiTheme,
-) -> Vec<ratatui::text::Line<'static>> {
-    let unreadable_label = t("proc_insights.unreadable");
-    let mut out = Vec::new();
-    if open_files.entries.is_empty() {
-        out.push(ratatui::text::Line::from(Span::styled(
-            format!("  {}", t("proc_insights.no_open_files")),
-            Style::new().fg(theme.dim),
-        )));
-        return out;
-    }
-    let header = if open_files.unreadable_count > 0 {
-        format!(
-            "  {} {} · {} {}",
-            t("proc_insights.open_files"),
-            open_files.entries.len(),
-            open_files.unreadable_count,
-            unreadable_label,
-        )
-    } else {
-        format!(
-            "  {} {}",
-            t("proc_insights.open_files"),
-            open_files.entries.len()
-        )
-    };
-    out.push(ratatui::text::Line::from(header));
-    for entry in open_files.entries.iter().take(OPEN_FILES_PREVIEW) {
-        out.push(ratatui::text::Line::from(format!(
-            "    {}",
-            format_open_file_row(entry, unreadable_label)
-        )));
-    }
-    if open_files.entries.len() > OPEN_FILES_PREVIEW {
-        out.push(ratatui::text::Line::from(Span::styled(
-            "    …",
-            Style::new().fg(theme.dim),
-        )));
-    }
-    out
-}
-
-/// Format one environment entry as `key=escaped_value`. Newlines and carriage returns
-/// are escaped to keep each entry on a single terminal row.
-fn format_env_entry(entry: &ProcessEnvironmentEntry) -> String {
-    let escaped = entry.value.replace('\r', "\\r").replace('\n', "\\n");
-    format!("{}={}", entry.key, escaped)
-}
-
-/// Bounded Environment-facet preview: the entry count, then the first
-/// [`ENVIRONMENT_PREVIEW`] `key=value` rows and an honest "…" when more
-/// remain or entries were dropped by the capture budget. An empty environment
-/// renders the explicit empty state.
-fn environment_preview_lines(
-    env: &ProcessEnvironment,
-    theme: TuiTheme,
-) -> Vec<ratatui::text::Line<'static>> {
-    let mut out = Vec::new();
-    if env.entries.is_empty() {
-        out.push(ratatui::text::Line::from(Span::styled(
-            format!("  {}", t("prop.environment_empty")),
-            Style::new().fg(theme.dim),
-        )));
-        return out;
-    }
-    out.push(ratatui::text::Line::from(format!(
-        "  {} {}",
-        t("prop.environment"),
-        env.entries.len()
-    )));
-    for entry in env.entries.iter().take(ENVIRONMENT_PREVIEW) {
-        out.push(ratatui::text::Line::from(format!(
-            "    {}",
-            format_env_entry(entry)
-        )));
-    }
-    if env.entries.len() > ENVIRONMENT_PREVIEW || env.truncated_count > 0 {
-        out.push(ratatui::text::Line::from(Span::styled(
-            "    …",
-            Style::new().fg(theme.dim),
-        )));
-    }
-    out
-}
-
-/// Compact GPU device line: `GPU #<id> <util> · VRAM in use <bytes>`.
-fn format_gpu_device_row(device: &ProcessGpuDevice) -> String {
-    let vram = device.memory_bytes.map_or_else(missing_value, bytes);
-    let util = device
-        .utilization_pct
-        .map_or_else(missing_value, |value| format!("{value:.1}%"));
-    format!(
-        "{} #{} {} · {} {}",
-        t("common.gpu"),
-        device.device_id,
-        util,
-        t("gpu.vram_in_use"),
-        vram,
-    )
-}
-
-/// Format one engine's cumulative busy time as seconds.
-fn format_engine_time(nanoseconds: u64) -> String {
-    let seconds = nanoseconds as f64 / 1_000_000_000.0;
-    format!("{seconds:.1}s")
-}
-
-/// Format a cumulative cycle counter (xe fdinfo) as a compact count.
-fn format_engine_cycles(cycles: u64) -> String {
-    if cycles >= 1_000_000_000 {
-        format!("{:.2}G cycles", cycles as f64 / 1_000_000_000.0)
-    } else if cycles >= 1_000_000 {
-        format!("{:.1}M cycles", cycles as f64 / 1_000_000.0)
-    } else {
-        format!("{cycles} cycles")
-    }
-}
-
-/// Compact per-engine line: `name  usage%  cumulative`. The current usage is a
-/// typed [`ScalarObservation`] — the cold-start first sample and any counter
-/// rollback are a typed gap, rendered as an explicit dash rather than a
-/// fabricated `0.0%`. Cumulative DRM busy time or cycles are shown when observed;
-/// if neither is present, it renders an explicit dash.
-fn format_engine_usage_line(engine: &ProcessGpuEngineUsage) -> String {
-    let usage = engine
-        .usage_pct
-        .current_value()
-        .map_or_else(missing_value, |value| format!("{value:.1}%"));
-    let cumulative = engine
-        .engine_time_ns
-        .current_value()
-        .map(|value| format_engine_time(*value))
-        .or_else(|| {
-            engine
-                .engine_cycles
-                .current_value()
-                .map(|value| format_engine_cycles(*value))
-        })
-        .unwrap_or_else(missing_value);
-    format!("{}  {usage}  {cumulative}", engine.name)
 }
 
 #[cfg(test)]

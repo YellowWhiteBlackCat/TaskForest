@@ -35,14 +35,22 @@ fn format_thread_row(thread: &ProcessThreadInfo) -> String {
     let cpu_percent = thread
         .cpu_percent
         .map_or_else(|| MISSING_VALUE.to_owned(), |v| format!("{v:.1}%"));
-    format!(
+    let mut line = format!(
         "{}  {}  {}  {}  {}",
         thread.tid,
         comm,
         thread.state.as_short_label(),
         cpu_time,
         cpu_percent
-    )
+    );
+    if let Some(nanos) = thread.run_queue_wait_ns {
+        let kind = thread
+            .wait_kind
+            .map(taskmanager_core::core::process_telemetry::ThreadWaitKind::as_str)
+            .unwrap_or("wait");
+        line.push_str(&format!("  {kind} {:.1}ms", nanos as f64 / 1_000_000.0));
+    }
+    line
 }
 
 pub(crate) fn open_files_summary(files: &ProcessOpenFiles) -> String {
@@ -68,7 +76,12 @@ pub(crate) fn open_files_summary(files: &ProcessOpenFiles) -> String {
             .target
             .as_deref()
             .unwrap_or_else(|| t("proc_insights.unreadable"));
-        lines.push(format!("{} -> {}", entry.fd, target));
+        lines.push(format!(
+            "{} [{}] -> {}",
+            entry.fd,
+            entry.resolved_kind(),
+            target
+        ));
     }
     if files.entries.len() > 3 {
         lines.push("…".to_owned());
@@ -88,15 +101,34 @@ pub(crate) fn network_summary(network: &ProcessNetworkSnapshot) -> String {
     let mut lines = vec![format!("{} · RX {rx} · TX {tx}", network.connections.len())];
 
     for connection in network.connections.iter().take(3) {
+        let rtt = connection
+            .rtt_ms
+            .filter(|value| value.is_finite() && *value >= 0.0)
+            .map_or_else(String::new, |value| {
+                format!(" · {} {value:.1} ms", t("net.rtt"))
+            });
         lines.push(format!(
-            "{} {} -> {}",
+            "{} [{} · {}] {} -> {}{}",
             format_transport(&connection.transport, &connection.family),
+            connection.state,
+            if connection.is_loopback() {
+                "LOOPBACK"
+            } else {
+                "EXTERNAL"
+            },
             format_endpoint(&connection.local),
             format_endpoint(&connection.remote),
+            rtt,
         ));
     }
     if network.connections.len() > 3 {
         lines.push("…".to_owned());
+    }
+    if let Some(counters) = network.connection_counters.as_ref()
+        && let Some(summary) =
+            taskmanager_shell::presentation::network_connection_counters_summary(counters)
+    {
+        lines.push(summary);
     }
     if network.traffic_failure == Some(FailureKind::RequiresEscalation) {
         lines.push(format!(
@@ -211,6 +243,12 @@ pub(crate) fn resources_summary(resources: &ProcessResourceSnapshot) -> String {
         (None, Some(LimitValue::Unlimited)) => Some("— / ∞".to_owned()),
         (None, None) => None,
     };
+    let memory = projection
+        .memory_limit
+        .and_then(|limit| limit.usage_percent(projection.memory_usage_bytes))
+        .map_or(memory.clone(), |percent| {
+            memory.map(|value| format!("{value} ({percent:.0}%)"))
+        });
     let cpu_quota = match (
         projection.cpu_time_quota_micros,
         projection.cpu_time_period_micros,
@@ -237,6 +275,12 @@ pub(crate) fn resources_summary(resources: &ProcessResourceSnapshot) -> String {
         (None, Some(LimitValue::Unlimited)) => Some(format!("— / ∞ {}", t("proc_insights.pids"))),
         (None, None) => None,
     };
+    let pids = projection
+        .process_limit
+        .and_then(|limit| limit.usage_percent(projection.process_count))
+        .map_or(pids.clone(), |percent| {
+            pids.map(|value| format!("{value} ({percent:.0}%)"))
+        });
     let resource_group = projection.resource_group.map(ToOwned::to_owned);
 
     let mut parts = Vec::new();
@@ -277,10 +321,52 @@ pub(crate) fn isolation_summary(isolation: &ProcessIsolation) -> String {
         Some(id) if !id.is_empty() => format!("{kind} · {id}"),
         _ => kind.to_owned(),
     };
-    match isolation.sandboxed {
+    let base = match isolation.sandboxed {
         Some(true) => format!("{base} · {}", t("proc_insights.sandboxed")),
         Some(false) => format!("{base} · not sandboxed"),
         None => base,
+    };
+    let mut security = Vec::new();
+    if let Some(profile) = isolation.security_profile.as_deref() {
+        security.push(format!(
+            "{}: {profile}",
+            t("proc_insights.security_profile")
+        ));
+    }
+    if let Some(mode) = isolation.seccomp_mode {
+        security.push(format!("{}: {mode}", t("proc_insights.seccomp")));
+    }
+    if let Some(enabled) = isolation.no_new_privs {
+        security.push(format!(
+            "{}: {}",
+            t("proc_insights.no_new_privs"),
+            t(if enabled { "common.yes" } else { "common.no" })
+        ));
+    }
+    if let Some(scope) = isolation.yama_ptrace_scope {
+        security.push(format!("{}: {scope}", t("proc_insights.ptrace_scope")));
+    }
+    if let Some(capabilities) = isolation.capabilities.as_ref() {
+        security.push(format!(
+            "{}: {}",
+            t("proc_insights.capabilities"),
+            taskmanager_shell::presentation::capabilities_summary(capabilities),
+        ));
+    }
+    if let Some(namespaces) = isolation.namespaces.as_ref() {
+        security.push(format!(
+            "{}: {}",
+            t("proc_insights.namespaces"),
+            taskmanager_shell::presentation::namespaces_summary(namespaces),
+        ));
+    }
+    if let Some(details) = taskmanager_shell::presentation::sandbox_details_summary(isolation) {
+        security.push(format!("{}: {details}", t("proc_insights.sandbox_details")));
+    }
+    if security.is_empty() {
+        base
+    } else {
+        format!("{base} · {}", security.join(" · "))
     }
 }
 
@@ -299,7 +385,12 @@ pub(crate) fn environment_summary(environment: &ProcessEnvironment) -> String {
     };
     let mut lines = vec![header];
     for entry in environment.entries.iter().take(3) {
-        lines.push(format!("{}={}", entry.key, entry.value));
+        lines.push(
+            taskmanager_application::process_details_vm::render_environment_variable(
+                &entry.key,
+                &entry.value,
+            ),
+        );
     }
     if environment.entries.len() > 3 || environment.truncated_count > 0 {
         lines.push("…".to_owned());

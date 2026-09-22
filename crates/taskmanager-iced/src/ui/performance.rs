@@ -8,17 +8,15 @@
 //! parity). No secondary compact-flag derivation remains.
 
 use iced::Element;
-use iced::widget::{column, container, row, scrollable, text};
+use iced::widget::{Space, column, container, mouse_area, row, scrollable, text};
 use taskmanager_application::i18n::t;
 use taskmanager_theme::tokens;
 
 use super::history_replay;
-use super::responsive::{
-    COMPACT_TOOLBAR_FIVE_COLUMN_MIN_WIDTH, DeviceNavigationPresentation, PerformancePageBudget,
-};
+use super::responsive::{DeviceNavigationPresentation, PerformancePageBudget};
 use super::{
     VirtualWindow, battery_section, cpu_memory_detail, disk_section, fan, gpu_section,
-    network_section, perf_rail, virtual_horizontal_body,
+    network_section, npu_section, perf_rail, virtual_horizontal_body,
 };
 use crate::app::{FocusTarget, Message, PerfDevice};
 use crate::{focus, theme};
@@ -39,6 +37,7 @@ pub(crate) const fn compact_detail_viewport(device: PerfDevice) -> CompactDetail
         PerfDevice::Memory
         | PerfDevice::Disk(_)
         | PerfDevice::Network(_)
+        | PerfDevice::Npu(_)
         | PerfDevice::Battery(_)
         | PerfDevice::Fan(_) => CompactDetailViewport::Scrollable,
     }
@@ -75,12 +74,20 @@ pub(crate) fn performance_page(
         .height(iced::Length::Fill)
         .into()
     } else {
-        match compact_detail_viewport(selected) {
-            CompactDetailViewport::Elastic => perf_detail(app, selected, budget),
-            CompactDetailViewport::Scrollable => scrollable(perf_detail(app, selected, budget))
-                .width(iced::Length::Fill)
-                .height(iced::Length::Fill)
-                .into(),
+        match (compact_detail_viewport(selected), budget.device_navigation) {
+            // A sidebar frame already gives `main_with_stats` a definite
+            // viewport and its statistics rail owns the only variable-height
+            // scroll. Wrapping the whole detail in another Iced scrollable
+            // makes `Length::Fill` resolve to zero, which was the blank Disk
+            // panel seen in the real 1180px capture.
+            (CompactDetailViewport::Scrollable, DeviceNavigationPresentation::Sidebar)
+            | (CompactDetailViewport::Elastic, _) => perf_detail(app, selected, budget),
+            (CompactDetailViewport::Scrollable, DeviceNavigationPresentation::Strip) => {
+                scrollable(perf_detail(app, selected, budget))
+                    .width(iced::Length::Fill)
+                    .height(iced::Length::Fill)
+                    .into()
+            }
         }
     };
     let detail = column![detail]
@@ -117,8 +124,26 @@ pub(crate) fn performance_page(
                 detail_stack.push(entry);
             }
             detail_stack.push(detail.into());
-            row![selector, column(detail_stack).spacing(8)]
-                .spacing(12)
+            let resize_handle: Element<'_, Message, iced::Theme, iced::Renderer> = mouse_area(
+                container(
+                    Space::new()
+                        .width(iced::Length::Fixed(1.0))
+                        .height(iced::Length::Fill),
+                )
+                .width(iced::Length::Fixed(6.0))
+                .height(iced::Length::Fill)
+                .center_x(iced::Length::Fixed(6.0))
+                .style(move |_| iced::widget::container::Style {
+                    background: Some(
+                        crate::theme_binding::color(theme_snapshot.palette().border).into(),
+                    ),
+                    ..Default::default()
+                }),
+            )
+            .interaction(iced::mouse::Interaction::ResizingColumn)
+            .into();
+            row![selector, resize_handle, column(detail_stack).spacing(8)]
+                .spacing(6)
                 .width(iced::Length::Fill)
                 .height(iced::Length::Fill)
                 .into()
@@ -201,6 +226,10 @@ pub(crate) fn selection_disconnected(app: &crate::IcedApp) -> bool {
             .power_supplies
             .as_ref()
             .is_some_and(|power| index >= power.batteries.len()),
+        PerfDevice::Npu(index) => projection
+            .npu_inventory
+            .as_ref()
+            .is_some_and(|npu| index >= npu.devices.len()),
         PerfDevice::Fan(index) => projection.sensors.as_ref().is_some_and(|sensors| {
             index
                 >= sensors
@@ -388,17 +417,6 @@ pub(crate) fn chunk_count(item_count: usize, columns: usize) -> usize {
     item_count.div_ceil(columns.max(1))
 }
 
-/// Column count for the wrapped chrome's action toolbar. The 560px flip
-/// point is the frame budget's toolbar threshold (responsive.rs), not a
-/// local literal.
-pub(crate) fn compact_toolbar_columns(width: f32) -> usize {
-    if width < COMPACT_TOOLBAR_FIVE_COLUMN_MIN_WIDTH {
-        3
-    } else {
-        5
-    }
-}
-
 /// Keep compact Performance device pills fully visible. A fixed column count
 /// is preferable to a horizontal scrollbar here: the selector is a small
 /// finite vocabulary, so wrapping the pills preserves every identity and
@@ -450,6 +468,16 @@ pub(crate) fn available_perf_devices(app: &crate::IcedApp) -> Vec<PerfDevice> {
                     .map(|(index, _)| PerfDevice::Gpu(index)),
             );
         }
+    }
+    if let Some(npu) = app.shell.projection().npu_inventory.as_ref()
+        && npu.is_success()
+    {
+        devices.extend(
+            npu.devices
+                .iter()
+                .enumerate()
+                .map(|(index, _)| PerfDevice::Npu(index)),
+        );
     }
     // Battery / Fan have no visibility toggle in the GPUI Settings devices
     // group (the ten toggles cover CPU/Memory/Disks/Network±subclasses/GPUs),
@@ -550,17 +578,11 @@ pub(crate) fn performance_sidebar_label(app: &crate::IcedApp, device: PerfDevice
 /// the selector only needs enough text to distinguish siblings without
 /// forcing a horizontal scrollbar or clipping a neighboring pill.
 fn compact_performance_sidebar_label(app: &crate::IcedApp, device: PerfDevice) -> String {
-    bounded_sidebar_label(&performance_sidebar_label(app, device), 18)
+    perf_rail::compact_device_label(app, device)
 }
 
-pub(crate) fn bounded_sidebar_label(label: &str, max_chars: usize) -> String {
-    let chars: Vec<char> = label.chars().collect();
-    if chars.len() <= max_chars {
-        return label.to_owned();
-    }
-    let take = max_chars.saturating_sub(1).max(1);
-    format!("{}…", chars.into_iter().take(take).collect::<String>())
-}
+#[allow(unused_imports)]
+pub(crate) use super::perf_rail::bounded_sidebar_label;
 
 /// The localized label for one selector tab. Reuses the existing common/sidebar
 /// catalog keys verbatim — no new locale entries (CPU/Memory/Gpu/Disk via
@@ -573,6 +595,7 @@ pub(crate) fn perf_device_label(device: PerfDevice) -> &'static str {
         PerfDevice::Disk(_) => t("common.disk"),
         PerfDevice::Network(_) => t("sidebar.network"),
         PerfDevice::Gpu(_) => t("common.gpu"),
+        PerfDevice::Npu(_) => t("npu.title"),
         PerfDevice::Battery(_) => t("common.battery"),
         PerfDevice::Fan(_) => t("common.fan"),
     }
@@ -590,6 +613,7 @@ pub(crate) fn perf_detail_kind(device: PerfDevice) -> PerfDetail {
         PerfDevice::Disk(_) => PerfDetail::Disk,
         PerfDevice::Network(_) => PerfDetail::Network,
         PerfDevice::Gpu(_) => PerfDetail::Gpu,
+        PerfDevice::Npu(_) => PerfDetail::Npu,
         PerfDevice::Battery(_) => PerfDetail::Battery,
         PerfDevice::Fan(_) => PerfDetail::Fan,
     }
@@ -603,6 +627,7 @@ pub(crate) enum PerfDetail {
     Disk,
     Network,
     Gpu,
+    Npu,
     Battery,
     Fan,
 }
@@ -625,6 +650,7 @@ fn perf_detail(
         PerfDetail::Disk => disk_section(app, device.index().unwrap_or(0), budget),
         PerfDetail::Network => network_section(app, device.index().unwrap_or(0), budget),
         PerfDetail::Gpu => gpu_section(app, device.index().unwrap_or(0), budget),
+        PerfDetail::Npu => npu_section(app, device.index().unwrap_or(0), budget),
         PerfDetail::Battery => battery_section(app, device.index().unwrap_or(0), budget),
         PerfDetail::Fan => fan::fan_section(app, device.index().unwrap_or(0), budget),
     }

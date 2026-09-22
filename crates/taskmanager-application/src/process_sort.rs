@@ -73,6 +73,9 @@ pub enum ProcessSortAxis {
     /// Disk write rate via [`ProcessItem::current_disk_write_bytes_per_sec`].
     /// `None` sorts first ascending.
     DiskWrite,
+    /// Network aggregate throughput via [`ProcessItem::current_network_bytes_per_sec`].
+    /// `None` sorts first ascending.
+    Network,
     /// Wall-clock start time in seconds via
     /// [`ProcessItem::current_start_time_secs`]. `None` sorts first ascending.
     StartTime,
@@ -87,7 +90,7 @@ pub enum ProcessSortAxis {
 impl ProcessSortAxis {
     /// Every axis, in declaration order. The iteration source for consumers
     /// and tests — never duplicate the list elsewhere.
-    pub const ALL: [ProcessSortAxis; 15] = [
+    pub const ALL: [ProcessSortAxis; 16] = [
         ProcessSortAxis::Pid,
         ProcessSortAxis::Name,
         ProcessSortAxis::Cpu,
@@ -100,6 +103,7 @@ impl ProcessSortAxis {
         ProcessSortAxis::CpuTime,
         ProcessSortAxis::DiskRead,
         ProcessSortAxis::DiskWrite,
+        ProcessSortAxis::Network,
         ProcessSortAxis::StartTime,
         ProcessSortAxis::Fds,
         ProcessSortAxis::Nice,
@@ -155,6 +159,9 @@ pub fn compare_axis(left: &ProcessItem, right: &ProcessItem, axis: ProcessSortAx
         ProcessSortAxis::DiskWrite => left
             .current_disk_write_bytes_per_sec()
             .cmp(&right.current_disk_write_bytes_per_sec()),
+        ProcessSortAxis::Network => left
+            .current_network_bytes_per_sec()
+            .cmp(&right.current_network_bytes_per_sec()),
         ProcessSortAxis::StartTime => left
             .current_start_time_secs()
             .cmp(&right.current_start_time_secs()),

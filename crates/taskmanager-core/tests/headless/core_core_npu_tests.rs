@@ -57,6 +57,7 @@ fn snapshots_and_devices_round_trip_through_serde() {
             memory: NpuMemoryReport {
                 dedicated_total_bytes: ScalarObservation::unavailable(FailureKind::Unsupported),
                 shared_total_bytes: ScalarObservation::available(2_147_483_648, 7),
+                sram_total_bytes: ScalarObservation::available(32 * 1024 * 1024, 7),
             },
             ..NpuDevice::default()
         }],

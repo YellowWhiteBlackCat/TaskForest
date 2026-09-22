@@ -130,12 +130,28 @@ impl IcedApp {
                 // Fail closed: a report whose redaction could not be verified
                 // is never written to the clipboard, so no unredacted text can
                 // leak by way of a failure path.
-                if let Ok(report) = crate::export::system_diagnostics_markdown(
+                match crate::export::system_diagnostics_markdown(
                     self.shell.projection().hardware.as_ref(),
                     self.shell.projection().snapshot.as_ref(),
                     usernames,
                 ) {
-                    task = Some(iced::clipboard::write(report));
+                    Ok(report) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Clipboard,
+                            FeedbackSeverity::Success,
+                            FeedbackLifecycle::SHORT,
+                            format!("{} · {}", t("hint.copied"), t("diagnostics.action")),
+                        );
+                        task = Some(iced::clipboard::write(report));
+                    }
+                    Err(_) => {
+                        self.shell.report_notice(
+                            FeedbackSource::Clipboard,
+                            FeedbackSeverity::Warning,
+                            FeedbackLifecycle::SHORT,
+                            t("diagnostics.failure_encode"),
+                        );
+                    }
                 }
             }
             _ => return UpdateDispatch::none(),

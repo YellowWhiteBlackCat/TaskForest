@@ -4,11 +4,12 @@ use std::io;
 use std::process::Command;
 use std::time::Duration;
 
+use taskmanager_core::core::services::ServiceDiagnostics;
 use taskmanager_core::{FailureKind, ProviderId, SourceOutcome, SourceStatus};
 use taskmanager_platform_contract::PartialSourceSnapshot;
 
-use super::parsing::extract_openrc_description;
-use super::target::{systemd_service_id, valid_openrc_service_name, valid_systemd_service_name};
+use super::parsing::{extract_openrc_description, parse_systemctl_show_inventory};
+use super::target::{systemd_service_id, valid_openrc_service_name, valid_systemd_unit_name};
 use super::{
     InitSystem, SERVICE_COMMAND_TIMEOUT, ServiceItem, ServiceManager, ServiceStatus,
     parse_openrc_status, parse_openrc_update,
@@ -20,6 +21,10 @@ const OPENRC_INVENTORY_PROVIDER: ProviderId = ProviderId::borrowed("linux.servic
 const UNSUPPORTED_INVENTORY_PROVIDER: ProviderId =
     ProviderId::borrowed("linux.service.unsupported-init");
 const INIT_DETECTION_PROVIDER: ProviderId = ProviderId::borrowed("linux.service.init-detection");
+const SYSTEMD_USER_PROVIDER: ProviderId = ProviderId::borrowed("linux.service.systemd-user");
+const SYSTEMD_DIAGNOSTICS_PROVIDER: ProviderId =
+    ProviderId::borrowed("linux.service.systemd-diagnostics");
+const SYSTEMD_DIAGNOSTIC_PROPERTIES: &str = "Id,UnitFileState,Result,ExecMainCode,ExecMainStatus,OOMKilled,MemoryMax,MemoryCurrent,StartLimitHit,NeedDaemonReload,NextElapseUSecRealtime,NextElapseUSecMonotonic,NRestarts,StartLimitIntervalUSec,StartLimitBurst,JobTimeoutUSec,TimeoutStartUSec,User,Triggers,TriggeredBy,Requires,Wants,Requisite,BindsTo,PartOf,Conflicts,Before,After,WantedBy,RequiredBy,UpheldBy";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum InventoryCommandResult {
@@ -110,7 +115,13 @@ impl ServiceManager {
     /// completed successfully with a valid empty response.
     pub fn scan_snapshot() -> PartialSourceSnapshot<ServiceItem> {
         let mut runner = NativeInventoryCommandRunner;
-        Self::scan_snapshot_from_detection(Self::detect_init(), &mut runner, Self::scan_unit_files)
+        let detection = Self::detect_init();
+        let mut snapshot =
+            Self::scan_snapshot_from_detection(detection, &mut runner, Self::scan_unit_files);
+        if matches!(detection, Ok(InitSystem::Systemd)) {
+            enrich_live_systemd_snapshot(&mut snapshot.items, &mut snapshot.sources, &mut runner);
+        }
+        snapshot
     }
 
     fn scan_snapshot_with(
@@ -162,13 +173,108 @@ impl ServiceManager {
     }
 }
 
+/// Enrich the live systemd inventory without changing the test seam used by
+/// `scan_snapshot_with`. User-manager rows are optional: a missing user bus is
+/// not allowed to erase the authoritative system-manager inventory.
+fn enrich_live_systemd_snapshot(
+    items: &mut Vec<ServiceItem>,
+    sources: &mut Vec<SourceStatus>,
+    runner: &mut impl InventoryCommandRunner,
+) {
+    if let InventoryCommandResult::Success(output) = runner.run(
+        "systemctl",
+        &[
+            "show",
+            "--all",
+            "--type=service,timer,socket",
+            "--no-pager",
+            &format!("--property={SYSTEMD_DIAGNOSTIC_PROPERTIES}"),
+        ],
+    ) {
+        let records = parse_systemctl_show_inventory(&output, false);
+        attach_systemd_inventory_details(items, &records);
+        sources.push(SourceStatus {
+            provider: SYSTEMD_DIAGNOSTICS_PROVIDER,
+            outcome: if records.is_empty() {
+                SourceOutcome::Empty
+            } else {
+                SourceOutcome::Available
+            },
+            item_count: records.len(),
+        });
+    }
+
+    if let InventoryCommandResult::Success(output) = runner.run(
+        "systemctl",
+        &[
+            "--user",
+            "list-units",
+            "--type=service,timer,socket",
+            "--no-pager",
+            "--plain",
+            "--all",
+            "--no-legend",
+        ],
+    ) {
+        let mut user_items = parse_systemd_inventory(&output).items;
+        for item in &mut user_items {
+            let native = native_unit_name(&item.name);
+            item.id = super::target::systemd_user_service_id(&native);
+        }
+        let item_count = user_items.len();
+        let system_item_count = items.len();
+        items.extend(user_items);
+        sources.push(SourceStatus {
+            provider: SYSTEMD_USER_PROVIDER,
+            outcome: if item_count == 0 {
+                SourceOutcome::Empty
+            } else {
+                SourceOutcome::Available
+            },
+            item_count,
+        });
+        if let InventoryCommandResult::Success(output) = runner.run(
+            "systemctl",
+            &[
+                "--user",
+                "show",
+                "--all",
+                "--type=service,timer,socket",
+                "--no-pager",
+                &format!("--property={SYSTEMD_DIAGNOSTIC_PROPERTIES}"),
+            ],
+        ) {
+            let records = parse_systemctl_show_inventory(&output, true);
+            attach_systemd_inventory_details(&mut items[system_item_count..], &records);
+        }
+    }
+    sources.sort_by(|left, right| left.provider.cmp(&right.provider));
+}
+
+fn attach_systemd_inventory_details(
+    items: &mut [ServiceItem],
+    records: &[(
+        String,
+        ServiceDiagnostics,
+        taskmanager_core::ServiceRelationGraph,
+    )],
+) {
+    for item in items {
+        let native = native_unit_name(&item.name);
+        if let Some((_, details, relations)) = records.iter().find(|(unit, _, _)| unit == &native) {
+            item.diagnostics = details.clone();
+            item.replace_relations(relations.clone());
+        }
+    }
+}
+
 fn scan_systemd(
     runner: &mut impl InventoryCommandRunner,
     systemd_fallback: impl FnOnce() -> Vec<ServiceItem>,
 ) -> InventoryObservation {
     let args = [
         "list-units",
-        "--type=service",
+        "--type=service,timer,socket",
         "--no-pager",
         "--plain",
         "--all",
@@ -250,7 +356,7 @@ fn parse_systemd_inventory(output: &str) -> ParsedInventory {
         .filter(|line| !line.is_empty())
     {
         let parts = line.split_whitespace().collect::<Vec<_>>();
-        if parts.len() < 4 || !valid_systemd_service_name(parts[0]) {
+        if parts.len() < 4 || !valid_systemd_unit_name(parts[0]) {
             malformed = true;
             continue;
         }
@@ -258,10 +364,7 @@ fn parse_systemd_inventory(output: &str) -> ParsedInventory {
         let active_state = parts[2].to_string();
         items.push(ServiceItem::from_inventory(
             systemd_service_id(raw_name),
-            raw_name
-                .strip_suffix(".service")
-                .unwrap_or(raw_name)
-                .to_string(),
+            display_unit_name(raw_name),
             ServiceStatus::from(active_state.as_str()),
             parts
                 .get(4..)
@@ -272,6 +375,24 @@ fn parse_systemd_inventory(output: &str) -> ParsedInventory {
         ));
     }
     ParsedInventory { items, malformed }
+}
+
+/// Preserve the short service spelling used by the historical table while
+/// retaining `.timer`/`.socket` suffixes so auxiliary activation units are
+/// visibly distinguishable and cannot be mistaken for controllable services.
+fn display_unit_name(native: &str) -> String {
+    native.strip_suffix(".service").unwrap_or(native).to_owned()
+}
+
+/// Reconstruct the native unit name for diagnostics. Service rows omit the
+/// conventional suffix for presentation; timer/socket rows retain theirs.
+fn native_unit_name(display: &str) -> String {
+    if display.ends_with(".timer") || display.ends_with(".socket") || display.ends_with(".service")
+    {
+        display.to_owned()
+    } else {
+        format!("{display}.service")
+    }
 }
 
 fn parse_openrc_status_inventory(output: &str) -> ParsedInventory {

@@ -17,13 +17,14 @@ use taskmanager_shell::ShellApp;
 use crate::menu_modal::{ActionMenuContext, MenuModal};
 use crate::widgets::menu::{MenuItem, MenuSpec};
 
-/// The five shared verbs, in the same display order as the TUI action menu.
-pub(crate) const MENU_ACTIONS: [ServiceAction; 5] = [
+/// The six shared verbs, in the same display order as the TUI action menu.
+pub(crate) const MENU_ACTIONS: [ServiceAction; 6] = [
     ServiceAction::Start,
     ServiceAction::Stop,
     ServiceAction::Restart,
     ServiceAction::Enable,
     ServiceAction::Disable,
+    ServiceAction::ReloadDaemon,
 ];
 
 /// The frozen target: one provider-issued service row. Travels inside the

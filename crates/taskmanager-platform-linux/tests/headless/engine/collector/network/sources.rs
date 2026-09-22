@@ -1,6 +1,20 @@
+use std::fs;
+use std::io;
+use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use super::*;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_core::core::source::SourceOutcome;
+
+use super::wireless::{
+    IwLinkResult, iw_output_failure, parse_iw_info_details, parse_iw_link, parse_proc_wireless,
+    summarize_iw_results,
+};
+use super::{
+    command_spawn_failure, io_failure, read_counter, read_link_speed, read_link_up, read_mtu,
+    read_sysfs_inventory, read_tx_queue_len,
+};
 
 #[test]
 fn wireless_parser_preserves_unknown_zero_as_no_measurement() {
@@ -31,6 +45,7 @@ fn iw_parser_distinguishes_association_from_valid_disconnection() {
             signal_dbm: None,
             frequency_mhz: None,
             channel: None,
+            channel_width_mhz: None,
             rx_bitrate_mbps: None,
             tx_bitrate_mbps: None,
             protocol: None,
@@ -55,6 +70,7 @@ fn iw_parser_keeps_signal_past_ssid_line() {
             signal_dbm: Some(-52),
             frequency_mhz: Some(5180),
             channel: Some(36),
+            channel_width_mhz: None,
             rx_bitrate_mbps: None,
             tx_bitrate_mbps: None,
             protocol: None,
@@ -77,6 +93,7 @@ fn iw_parser_ceils_tx_bitrate_and_keeps_absence_as_none() {
             signal_dbm: Some(-50),
             frequency_mhz: None,
             channel: None,
+            channel_width_mhz: None,
             rx_bitrate_mbps: None,
             tx_bitrate_mbps: Some(867),
             protocol: None,
@@ -91,6 +108,7 @@ fn iw_parser_ceils_tx_bitrate_and_keeps_absence_as_none() {
             signal_dbm: None,
             frequency_mhz: None,
             channel: None,
+            channel_width_mhz: None,
             rx_bitrate_mbps: None,
             tx_bitrate_mbps: Some(1000),
             protocol: None,
@@ -123,6 +141,7 @@ fn iw_parser_collects_wireless_link_details_without_fabricating_missing_fields()
             signal_dbm: None,
             frequency_mhz: Some(5220),
             channel: Some(44),
+            channel_width_mhz: None,
             rx_bitrate_mbps: Some(2402),
             tx_bitrate_mbps: Some(4800),
             protocol: Some("802.11be (Wi-Fi 7)"),
@@ -133,10 +152,13 @@ fn iw_parser_collects_wireless_link_details_without_fabricating_missing_fields()
 #[test]
 fn iw_info_parser_keeps_channel_and_frequency_typed() {
     assert_eq!(
-        parse_iw_info("Interface wlan0\n\tchannel 44 (5220 MHz), width: 80 MHz\n"),
-        Some((44, 5220))
+        parse_iw_info_details("Interface wlan0\n\tchannel 44 (5220 MHz), width: 80 MHz\n"),
+        Some((44, 5220, Some(80)))
     );
-    assert_eq!(parse_iw_info("Interface wlan0\n\ttype managed\n"), None);
+    assert_eq!(
+        parse_iw_info_details("Interface wlan0\n\ttype managed\n"),
+        None
+    );
 }
 
 #[test]
@@ -150,6 +172,7 @@ fn iw_failure_is_partial_only_when_another_interface_succeeded() {
                 signal_dbm: None,
                 frequency_mhz: None,
                 channel: None,
+                channel_width_mhz: None,
                 rx_bitrate_mbps: None,
                 tx_bitrate_mbps: None,
                 protocol: None,
@@ -293,5 +316,69 @@ fn carrier_zero_is_a_current_down_link_not_missing_telemetry() {
     let observed = read_link_up(&path, 1_000);
 
     assert_eq!(observed, ScalarObservation::available(false, 1_000));
+    fs::remove_file(path).unwrap();
+}
+
+#[test]
+fn mtu_and_queue_parsers_keep_zero_queue_distinct_from_invalid_mtu() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock after epoch")
+        .as_nanos();
+    let mtu_path = crate::test_support::repo_temp_dir().join(format!(
+        "taskmanager-network-mtu-{unique}-{}",
+        std::process::id()
+    ));
+    let queue_path = crate::test_support::repo_temp_dir().join(format!(
+        "taskmanager-network-queue-{unique}-{}",
+        std::process::id()
+    ));
+
+    fs::write(&mtu_path, "1500\n").unwrap();
+    fs::write(&queue_path, "0\n").unwrap();
+    assert_eq!(
+        read_mtu(&mtu_path, 2_000),
+        ScalarObservation::available(1500, 2_000)
+    );
+    assert_eq!(
+        read_tx_queue_len(&queue_path, 2_000),
+        ScalarObservation::available(0, 2_000)
+    );
+
+    fs::write(&mtu_path, "0\n").unwrap();
+    assert_eq!(
+        read_mtu(&mtu_path, 2_000).availability(),
+        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::ProviderFault)
+    );
+
+    fs::remove_file(mtu_path).unwrap();
+    fs::remove_file(queue_path).unwrap();
+}
+
+#[test]
+fn network_error_counters_accept_measured_zero_and_reject_malformed_values() {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("clock after epoch")
+        .as_nanos();
+    let path = crate::test_support::repo_temp_dir().join(format!(
+        "taskmanager-network-counter-{unique}-{}",
+        std::process::id()
+    ));
+    fs::write(&path, "0\n").unwrap();
+    assert_eq!(
+        read_counter(&path, 3_000),
+        ScalarObservation::available(0, 3_000)
+    );
+    fs::write(&path, "17\n").unwrap();
+    assert_eq!(
+        read_counter(&path, 3_000),
+        ScalarObservation::available(17, 3_000)
+    );
+    fs::write(&path, "not-a-counter\n").unwrap();
+    assert_eq!(
+        read_counter(&path, 3_000).availability(),
+        taskmanager_core::ScalarAvailability::Unavailable(FailureKind::ProviderFault)
+    );
     fs::remove_file(path).unwrap();
 }

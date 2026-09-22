@@ -1,0 +1,182 @@
+# Feature-level P4 evidence anchors for the P5 three-axis ledger (G2 closure).
+#
+# One row per `(feature_id, frontend)`: the hand-declared behaviour test that
+# backs the shape's delivery claim for that feature.  The anchor must be a real
+# nextest test id, exactly as `cargo nextest list` reports it; the resolver
+# (scripts/parity/resolve_frontend_evidence.py) checks set membership (R4) and
+# fails the run when a referenced test is renamed or deleted.
+#
+# Columns (TAB separated):
+#   feature_id  stable `FeatureId` id; the vocabulary authority is the Rust
+#               `FeatureId::ALL` registry in taskmanager-ui-contract (the
+#               contract test rejects an unknown id, mirroring `ContractTag`).
+#   frontend    gpui | iced | tui | bevy
+#   test_id     the nextest test path, or `-` on a pending row
+#   status      anchored | pending
+#   note        `-` on an anchored row; the honest gap on a pending row
+#
+# Discipline (same as the facet manifest and the unified matrix):
+#   * anchors are declared by hand and verified against discovery; a test id is
+#     NEVER derived by scanning Rust source;
+#   * `pending` is not a pass: it records that this `(feature, frontend)` pair
+#     was surveyed and no discoverable behaviour test exists yet, so the folded
+#     cell stays refused by G2 with this note as the recorded gap;
+#   * a row absent from this table is simply not yet surveyed; `Ready` still
+#     requires a committed anchor, so absence is never a silent delivery claim.
+#
+# First anchored batch (2026-09-22): the four features every frontend really
+# renders and every Linux source lane registers as `Present` -
+# `handles.enumeration`, `threads.topology`, `services.lifecycle-control`,
+# `services.dependency-dag`.  The anchor proves the shape's delivered surface
+# for that feature (the P1 semantic specification owns "what counts as
+# delivered"; this table owns "a real test exists and resolves").
+
+# Second anchored batch (2026-09-22, W14-A): eight further features whose
+# delivered surface exists on the frontends listed below and whose whole
+# `Requires` capability set is `Present` on the Linux source lane -
+# `gpu.engine-utilization`, `memory.breakdown-rss-pss`,
+# `storage.device-topology`, `services.inventory`,
+# `security.posix-capabilities`, `security.sandbox-detection`,
+# `hardware.heterogeneous-cores`, `hardware.core-frequency`.  Every anchor was
+# hand-verified against the feature's semantic specification (the P1
+# `delivery_definition`) and checked by membership in `cargo nextest list`.
+# A frontend with no test proving the shape's delivered surface stays
+# unanchored; a surveyed near-miss is recorded below as an explicit gap.
+
+# Third anchored batch (2026-09-22, W15-A): six further cells whose whole
+# `Requires` capability set is `Present` on the Linux source lane and whose
+# delivered surface a real frame/panel test proves -
+# `storage.smart-health` (iced/tui), `storage.iops-queue-latency` (tui),
+# `power.battery-inventory` (iced/tui), and `services.log-stream` (iced).
+# Every anchor was hand-verified clause by clause against that feature's
+# `delivery_definition`: the receipt names the clauses each anchor proves and
+# the clauses that stay unasserted.  The same survey re-read the remaining
+# target features and records each real near-miss as an explicit `pending`
+# row (swap-throughput rates, the remaining IOPS/queue/latency rows, the GPUI
+# SMART/battery/log surfaces, the thermal-zone source traversal, the
+# process-details fault and huge-page counters, and the Bevy namespace audit);
+# a feature with no test touching its surface at all stays without a row.
+#
+# Fourth anchored batch (2026-09-22, W16-A): the GPUI cells whose
+# `power.battery-inventory` / `power.thermal-zones` claims were previously
+# recorded as pending on the strength of evidence that turned out to be
+# test-tree-only. The GPUI System hardware page never rendered battery or
+# thermal-control rows: `system_view/detail_rows.rs` defined its own
+# `battery_detail_rows` / `thermal_control_rows` folds inside the test tree and
+# the tests asserted those, while the i18n keys they used
+# (`system.battery_power`, `system.battery_cycles`, `system.cooling`,
+# `system.throttle`) had zero production references. That fixture and its five
+# tests were deleted rather than rendered; the two real GPUI delivery surfaces
+# now carry anchors - the Performance page's battery stat panel
+# (`battery_stats`, charge/power/voltage/health/cycles with honest absence) and
+# the System Health sensor center (`sensor_rows`, one labelled row per
+# thermal-zone reading). `power.thermal-throttle-events` (the fake fixture's
+# other half) stays declared `Unsupported` by this shape and gained no row.
+#
+# Fifth anchored batch (2026-09-22, W16-B/W16-C): eighteen new anchored rows
+# plus one re-verified row, each hand-checked clause by clause against the
+# feature's `delivery_definition` and each test id checked by membership in
+# `cargo nextest list` before it was committed.  W16-B closed the TUI
+# observation gaps: the Properties-modal page-fault counters (minor + major on
+# one painted row, honest dash when unobserved), the details-panel anonymous
+# huge-page charge (value + RSS share, never a fabricated 0 B), the painted
+# service log stream with its level filter reaching the drawn rows, and the
+# disk panel's queue/service row.  The already-anchored
+# `storage.iops-queue-latency` TUI row is the re-verified one: the same frame
+# test now writes the queue/service pair explicitly and proves all three
+# definition clauses in one frame - IOPS 137, latency 1.50 ms, queue depth
+# 2.50 - and omits the row when the pair is unobserved.  W16-C closed the
+# Iced/Bevy observations: the swap-in/out throughput rates, the
+# IOPS/response/queue/service rows, the PageFaults/AnonHugePages counters, the
+# per-adapter GPU enumeration (Iced and Bevy) with Bevy's per-engine rows, the
+# Bevy partition rows and the six-family Bevy SMART evidence (availability,
+# temperature, percentage used, available spare, power-on hours, unsafe
+# shutdowns), the Bevy painted log stream under its level filter, and the Bevy
+# Linux namespace audit (per-kind host/isolated status).  Five cells had no row
+# before and are newly surveyed (Iced `gpu.adapter-enumeration`; Bevy
+# `storage.iops-queue-latency`, `gpu.adapter-enumeration`,
+# `memory.page-faults`, `memory.transparent-huge-pages`); the other thirteen
+# replace a surveyed `pending` row with the verified anchor.  An anchored row
+# still carries `-` in the note column by schema, so the batch clause record
+# lives here.  The remaining `pending` rows keep their honest gaps: no test
+# proves the shape's delivered surface for them yet.
+#
+# Follow-up in the same batch (2026-09-22, W17-A): the Iced
+# `power.thermal-zones` cell was converted from `pending` to anchored after
+# the Iced health line landed the real delivery surface (the health modal's
+# thermal-zone panel).  The anchor is the traversal test - one row per shared
+# sensor-center temperature reading, each named by the reading's own source
+# label, with a failed read kept as the shared dash and never a fabricated
+# `0.0 °C`.  The same module's panel test proves the painted panel appears for
+# a temperature channel and stays absent for a fan-only snapshot, and its
+# capture-fixture test only seeds a named zone for the evidence run; those two
+# are supporting evidence, not the anchor.  Together with the eighteen rows
+# above the batch now carries nineteen anchors, and no `pending` row remains
+# on any shape whose delivered surface a real test proves.
+feature_id	frontend	test_id	status	note
+handles.enumeration	gpui	gpui_app::process_insights::view::open_files::tests::populated_open_files_render_with_unreadable_marker	anchored	-
+handles.enumeration	iced	ui::insights::tests::open_file_row_marks_an_unreadable_target_not_blank	anchored	-
+handles.enumeration	tui	ui::process_details::insights::tests::open_files_preview_renders_count_unreadable_and_rows	anchored	-
+handles.enumeration	bevy	pages::processes::details::tests::open_files_summary_empty_unreadable_and_populated	anchored	-
+threads.topology	gpui	gpui_app::process_insights::view::threads::tests::populated_threads_render_with_missing_cpu_dash	anchored	-
+threads.topology	iced	ui::insights::tests::thread_cpu_helpers_keep_a_missing_value_honest	anchored	-
+threads.topology	tui	ui::process_details::insights::tests::thread_preview_renders_header_rows_and_ellipsis	anchored	-
+threads.topology	bevy	pages::processes::details::tests::threads_summary_empty_and_populated_with_gap_honesty	anchored	-
+services.lifecycle-control	gpui	gpui_app::services_view::tests::service_row_context_menu_offers_all_six_actions	anchored	-
+services.lifecycle-control	iced	app::tests::settings_and_service_control_tests::service_control_select_request_confirm_round_trip_reaches_the_port	anchored	-
+services.lifecycle-control	tui	runtime::tests::service_control::service_control_round_trip_submits_through_queue_effect	anchored	-
+services.lifecycle-control	bevy	pages::services::tests::service_control_buttons_arm_service_actions	anchored	-
+services.dependency-dag	gpui	gpui_app::services_view::details_state::tests::details_state_projects_only_the_shared_correlated_dependency_session	anchored	-
+services.dependency-dag	iced	app::tests::service_details::service_details_entry_projects_lifecycle_and_dependency_facts	anchored	-
+services.dependency-dag	tui	ui::tests::service_details_render::a_resolved_dependency_capture_paints_its_relation_targets	anchored	-
+services.dependency-dag	bevy	pages::services::service_dependencies_tests::dependencies_panel_renders_relations_scene	anchored	-
+gpu.engine-utilization	gpui	gpui_app::perf_views::gpu_engines_panel::tests::mc04_gpu_panel_case_ready_session_renders_only_the_matching_session_payload	anchored	-
+gpu.engine-utilization	iced	ui::perf_devices::tests::gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact	anchored	-
+gpu.engine-utilization	tui	ui::perf_gpu::tests::standard_engine_projection_includes_live_and_pmu_rows	anchored	-
+memory.breakdown-rss-pss	gpui	processes_view_test::memory_projection_prefers_current_pss_and_falls_back_to_typed_rss	anchored	-
+memory.breakdown-rss-pss	iced	ui::tests::pages::apps_resource_projection_preserves_typed_pss_swap_and_measured_zero	anchored	-
+memory.breakdown-rss-pss	tui	ui::tests::process_render::apps_table_projects_typed_pss_and_swap_without_zero_fallbacks	anchored	-
+storage.device-topology	iced	ui::tests::devices::disk_summary_projects_real_rates_active_time_smart_and_partition_space	anchored	-
+storage.device-topology	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
+services.inventory	iced	ui::tests::pages::service_projection_preserves_fixture_rows_and_typed_status	anchored	-
+services.inventory	tui	ui::tests::service_details_render::the_selected_service_renders_its_state_triplet	anchored	-
+security.posix-capabilities	tui	ui::process_details::insights::tests::insights_lines_renders_capabilities_with_warning_markers	anchored	-
+security.sandbox-detection	bevy	pages::processes::details::tests::isolation_summary_exposes_sandboxed_and_container_dimensions	anchored	-
+hardware.heterogeneous-cores	gpui	gpui_app::cpu_view::topology_tests::hybrid_core_counts_render_as_separate_aligned_rows	anchored	-
+hardware.heterogeneous-cores	tui	ui::perf_core_grid::tests::grouped_grid_headers_carry_the_typed_labels_and_counts	anchored	-
+hardware.core-frequency	tui	ui::perf_core_grid::tests::the_cell_readout_is_utilization_frequency_temperature	anchored	-
+services.inventory	gpui	-	pending	no GPUI test asserts the inventory rows' typed active state; the row-memo test asserts name order only and the context-menu test proves lifecycle actions
+storage.device-topology	gpui	-	pending	no GPUI test asserts the painted partition rows; the disk-page layout case mounts two partition children but asserts panel geometry, and the partition_stats tests prove usage formatting only
+storage.smart-health	iced	ui::tests::devices::disk_summary_projects_real_rates_active_time_smart_and_partition_space	anchored	-
+storage.smart-health	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
+storage.iops-queue-latency	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
+power.battery-inventory	iced	ui::tests::battery::battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_honest	anchored	-
+power.battery-inventory	tui	ui::tests::device_render::battery_detail_section_renders_capacity_status_rate_and_voltage	anchored	-
+services.log-stream	iced	app::tests::service_details::service_details_merged_log_panel_folds_its_own_stream	anchored	-
+storage.smart-health	gpui	-	pending	no GPUI test asserts the SMART readout family; the disk_stats tests cover the power-on row and the temperature trend only, so availability/endurance/spare/unsafe-shutdowns stay unproven
+storage.swap-throughput	gpui	-	pending	no GPUI test seeds or asserts the swap-in/swap-out throughput rows; the composition-card test folds swap occupancy (used/total) only
+storage.swap-throughput	tui	-	pending	no TUI test seeds or asserts the swap-in/swap-out throughput rows; the memory-stats test renders every other measured fact
+storage.iops-queue-latency	gpui	-	pending	the only GPUI IOPS assertion is a first-sample dash; no test renders a real IOPS/queue-depth/latency value
+power.battery-inventory	gpui	gpui_app::perf_views::dynamic_stats::tests::battery_stats_render_charge_power_voltage_health_and_cycles_with_honest_absence	anchored	-
+power.thermal-zones	gpui	gpui_app::system_health_view::stats::tests::sensor_rows_traverse_every_thermal_zone_reading_and_name_its_source	anchored	-
+power.thermal-zones	tui	-	pending	the fan test asserts a same-device temperature value ("54.5 °C"); the painted source label and any thermal-zone traversal are unasserted
+services.log-stream	gpui	-	pending	the details-state tests prove the typed log-state projection; no test asserts the painted stream rows or a level-filtered fold
+memory.page-faults	tui	runtime::tests::process_properties::overview_renders_observed_page_fault_counters	anchored	-
+memory.page-faults	iced	ui::overlays::process_details::vm_parity_tests::observed_fault_and_huge_page_counters_reach_the_rendered_rows	anchored	-
+memory.page-faults	bevy	pages::processes::details::tests::observed_page_fault_and_huge_page_counters_reach_the_overview_rows	anchored	-
+memory.transparent-huge-pages	tui	ui::tests::process_render::process_details_panel_renders_the_observed_anonymous_huge_page_charge	anchored	-
+memory.transparent-huge-pages	iced	ui::overlays::process_details::vm_parity_tests::observed_fault_and_huge_page_counters_reach_the_rendered_rows	anchored	-
+memory.transparent-huge-pages	bevy	pages::processes::details::tests::observed_page_fault_and_huge_page_counters_reach_the_overview_rows	anchored	-
+storage.swap-throughput	iced	ui::perf_overview::tests::memory_stats_tests::swap_throughput_rows_render_the_observed_system_rates	anchored	-
+storage.swap-throughput	bevy	pages::performance::tests::memory_summary_renders_the_observed_swap_throughput_rates	anchored	-
+storage.iops-queue-latency	iced	ui::tests::devices::disk_summary_renders_observed_iops_latency_and_queue_depth	anchored	-
+storage.iops-queue-latency	bevy	pages::performance::device_rows_tests::disk_caption_renders_observed_iops_latency_and_queue_depth	anchored	-
+storage.smart-health	bevy	pages::performance::device_rows_tests::disk_caption_renders_observed_smart_evidence_rows	anchored	-
+storage.device-topology	bevy	pages::performance::device_rows_tests::disk_block_renders_the_projected_partition_rows	anchored	-
+gpu.adapter-enumeration	iced	ui::tests::devices::gpu_selector_enumerates_every_projected_adapter	anchored	-
+gpu.adapter-enumeration	bevy	pages::performance::device_rows_tests::gpu_section_enumerates_every_projected_adapter	anchored	-
+gpu.engine-utilization	bevy	pages::performance::device_rows_tests::gpu_section_enumerates_every_projected_adapter	anchored	-
+services.log-stream	tui	runtime::tests::service_control::service_log_panel_paints_the_stream_and_the_level_filter_drops_lower_rows	anchored	-
+services.log-stream	bevy	pages::services::service_logs_tests::painted_rows_follow_the_level_filter	anchored	-
+security.namespace-audit	bevy	pages::processes::details::tests::isolation_summary_renders_the_linux_namespace_audit	anchored	-
+power.thermal-zones	iced	ui::health::tests::thermal_zone_tests::thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source	anchored	-

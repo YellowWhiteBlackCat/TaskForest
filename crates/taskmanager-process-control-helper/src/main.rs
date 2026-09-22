@@ -362,8 +362,22 @@ fn apply_operation(pid: u32, expected: u64, operation: &Operation) -> Result<(),
             set_priority(pid, *nice)
         }
         Operation::Affinity(cpus) => {
-            validate_start_token(pid, expected)?;
-            set_affinity(pid, cpus)
+            // `sched_setaffinity(2)` is Linux-only; other Unix targets answer
+            // with the crate's typed `Unsupported` vocabulary before any
+            // identity probe (the /proc token read does not exist off Linux),
+            // matching the Windows suspend/resume precedent.
+            #[cfg(target_os = "linux")]
+            {
+                validate_start_token(pid, expected)?;
+                set_affinity(pid, cpus)
+            }
+            #[cfg(not(target_os = "linux"))]
+            {
+                let _ = cpus;
+                Err(HelperError::Unsupported(
+                    "process affinity is unsupported on this platform".to_owned(),
+                ))
+            }
         }
     }
 }
@@ -472,7 +486,9 @@ fn set_priority(pid: u32, nice: i32) -> Result<(), HelperError> {
         .map_err(|error| classify_rustix_errno(error, "setting process priority failed"))
 }
 
-#[cfg(unix)]
+// `sched_setaffinity(2)` is Linux-only; the dispatch arm above answers with a
+// typed `Unsupported` on other Unix targets before reaching this function.
+#[cfg(target_os = "linux")]
 fn set_affinity(pid: u32, cpus: &[u32]) -> Result<(), HelperError> {
     let raw_pid = i32::try_from(pid)
         .map_err(|_| HelperError::Rejected("pid exceeds the Unix pid range".to_owned()))?;

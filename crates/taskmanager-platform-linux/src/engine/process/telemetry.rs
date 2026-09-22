@@ -10,15 +10,15 @@ use std::path::{Path, PathBuf};
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 #[cfg(feature = "test-support")]
 use taskmanager_core::core::process_telemetry::{
-    ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
-    ProcessConnection, ProcessGpuDevice, ProcessGpuEngines, ProcessGpuSnapshot, ProcessIdentity,
-    ProcessNetworkSnapshot,
+    ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey, ConnectionState,
+    ConnectionTransport, ProcessConnection, ProcessGpuDevice, ProcessGpuEngines,
+    ProcessGpuSnapshot, ProcessIdentity, ProcessNetworkSnapshot,
 };
 #[cfg(not(feature = "test-support"))]
 use taskmanager_core::core::process_telemetry::{
-    ConnectionAddressFamily, ConnectionEndpoint, ConnectionState, ConnectionTransport,
-    ProcessConnection, ProcessGpuDevice, ProcessGpuEngines, ProcessGpuSnapshot, ProcessIdentity,
-    ProcessNetworkSnapshot,
+    ConnectionAddressFamily, ConnectionEndpoint, ConnectionProviderKey, ConnectionState,
+    ConnectionTransport, ProcessConnection, ProcessGpuDevice, ProcessGpuEngines,
+    ProcessGpuSnapshot, ProcessIdentity, ProcessNetworkSnapshot,
 };
 
 pub mod containers;

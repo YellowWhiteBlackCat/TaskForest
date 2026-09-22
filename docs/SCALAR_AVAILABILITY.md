@@ -7,8 +7,10 @@ provider 与前端只实现或消费它，不定义第二套语义。
 ## 共享契约
 
 `ScalarObservation<T>` 区分 `Unknown`、`Available`、`Partial`、`Stale` 和 `Unavailable`；
-`FailureKind` 至少区分 `Unsupported`、`PermissionDenied`、`MissingDependency`、`Timeout`、
-`IdentityChanged`、`TemporarilyUnavailable`、`Rejection` 与 `ProviderFault`。可选事实使用
+`FailureKind` 至少区分 `Unsupported`、`PermissionDenied`、`RequiresEscalation`、
+`MissingDependency`、`TimedOut`、`IdentityChanged`、`TemporarilyUnavailable`、`Rejected` 与
+`ProviderFault`（均为 `taskmanager-core::FailureKind` 的真实变体名；`PermissionDenied` 是失败
+原因轴词，与能力级 `CapabilityStatus::PermissionRequired` 分属两轴）。可选事实使用
 `OptionalObservation<T>` 的 `Unknown`、`Present`、`Absent`、`NotApplicable` 轴，禁止用
 `ScalarObservation<Option<T>>` 混淆语义。
 

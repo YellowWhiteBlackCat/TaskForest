@@ -59,8 +59,11 @@ const fn decision(intent: ProductIntent) -> SurfaceDecision {
         ProductIntent::SmartSelfTest => SurfaceDecision::Local {
             route: "performance.disk.smart-self-test",
         },
-        ProductIntent::DiagnosticBundle => SurfaceDecision::Unsupported {
-            reason: "the terminal product shape has no diagnostic-bundle preview or export surface",
+        ProductIntent::DiagnosticBundle => SurfaceDecision::AcceptedDifference {
+            route: "system.diagnostic-report.export",
+            reason: "the terminal exports a redacted plain-text diagnostic report through the \
+                     shared application engine while GPUI provides the preview/write bundle \
+                     workflow",
         },
         ProductIntent::CurrentWindowScreenshot => SurfaceDecision::Unsupported {
             reason: "the terminal product shape does not expose a compositor current-window PNG capture control",

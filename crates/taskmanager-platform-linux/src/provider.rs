@@ -19,6 +19,9 @@ use taskmanager_escalation::polkit::NetLaunchHandle;
 use taskmanager_escalation::polkit::NetLauncherProcess;
 #[cfg(target_os = "linux")]
 use taskmanager_escalation::polkit::PkexecNetLauncher;
+use taskmanager_platform_contract::{
+    CapabilityId, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
+};
 use taskmanager_platform_runtime::ProviderRegistration;
 use tracing::{info, warn};
 
@@ -164,6 +167,112 @@ fn new_net_launcher() -> Box<dyn NetLauncherProcess + Send> {
     {
         Box::new(UnsupportedNetLauncher)
     }
+}
+
+/// Layer B of the three-axis parity ledger: the capability identities this
+/// adapter registers a real provider for.
+///
+/// The list is declared AT the registration site and must stay in step with
+/// [`real_provider_registry`] (and the `native_system_providers` function that
+/// builds the system domain): Linux implements every lane it registers, so each
+/// entry is `Present` and no lane is registered-pending. The matching proof is
+/// `the_linux_capability_surface_is_the_live_catalog_registration_face`, which
+/// compares this declaration with the live runtime catalog in both directions.
+const REGISTERED_CAPABILITY_SOURCES: &[(CapabilityId, PlatformSource)] = &[
+    // -- system telemetry, hardware inventory, accelerators -----------------
+    (CapabilityId::TELEMETRY_HOST, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_CPU, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_MEMORY, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_STORAGE, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_NETWORK, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_GPU, PlatformSource::Present),
+    (CapabilityId::TELEMETRY_GPU_ENGINES, PlatformSource::Present),
+    (
+        CapabilityId::TELEMETRY_MEMORY_SMBIOS,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::TELEMETRY_CPU_PACKAGE_POWER,
+        PlatformSource::Present,
+    ),
+    (CapabilityId::TELEMETRY_CPU_MSR, PlatformSource::Present),
+    (CapabilityId::ACCELERATOR_NPU, PlatformSource::Present),
+    (CapabilityId::HARDWARE_INVENTORY, PlatformSource::Present),
+    (CapabilityId::CONTAINERS, PlatformSource::Present),
+    // -- process observation and control -------------------------------------
+    (CapabilityId::PROCESS_LIST, PlatformSource::Present),
+    (
+        CapabilityId::PROCESS_INSIGHTS_NETWORK,
+        PlatformSource::Present,
+    ),
+    (CapabilityId::PROCESS_INSIGHTS_GPU, PlatformSource::Present),
+    (
+        CapabilityId::PROCESS_INSIGHTS_RESOURCES,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_INSIGHTS_ISOLATION,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_INSIGHTS_THREADS,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_INSIGHTS_OPEN_FILES,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_INSIGHTS_ENVIRONMENT,
+        PlatformSource::Present,
+    ),
+    (CapabilityId::PROCESS_AFFINITY, PlatformSource::Present),
+    (
+        CapabilityId::PROCESS_AFFINITY_CONTROL,
+        PlatformSource::Present,
+    ),
+    (CapabilityId::PROCESS_CONTROL, PlatformSource::Present),
+    (
+        CapabilityId::PROCESS_RESOURCE_CONTROL,
+        PlatformSource::Present,
+    ),
+    (
+        CapabilityId::PROCESS_NETWORK_ESCALATION,
+        PlatformSource::Present,
+    ),
+    // -- services, startup, sessions ----------------------------------------
+    (CapabilityId::SERVICES, PlatformSource::Present),
+    (CapabilityId::SERVICE_DEPENDENCIES, PlatformSource::Present),
+    (CapabilityId::SERVICE_CONTROL, PlatformSource::Present),
+    (CapabilityId::SERVICE_LOGS, PlatformSource::Present),
+    (CapabilityId::SERVICE_LOG_STREAM, PlatformSource::Present),
+    (CapabilityId::STARTUP, PlatformSource::Present),
+    (CapabilityId::STARTUP_EVIDENCE, PlatformSource::Present),
+    (CapabilityId::STARTUP_CONTROL, PlatformSource::Present),
+    (CapabilityId::SESSIONS, PlatformSource::Present),
+    (CapabilityId::SESSION_CONTROL, PlatformSource::Present),
+    // -- shell integration ---------------------------------------------------
+    (CapabilityId::COMMAND_LAUNCH, PlatformSource::Present),
+    (CapabilityId::RESOURCE_REVEAL, PlatformSource::Present),
+    (CapabilityId::URL_OPEN, PlatformSource::Present),
+    (CapabilityId::DESKTOP_APPEARANCE, PlatformSource::Present),
+    (CapabilityId::DESKTOP_NOTIFY, PlatformSource::Present),
+    (CapabilityId::FIRST_RUN_SETUP, PlatformSource::Present),
+    // -- storage, sensors, power --------------------------------------------
+    (CapabilityId::STORAGE_HEALTH, PlatformSource::Present),
+    (CapabilityId::SMART, PlatformSource::Present),
+    (CapabilityId::SMART_CONTROL, PlatformSource::Present),
+    (CapabilityId::DIRECTORY_USAGE, PlatformSource::Present),
+    (CapabilityId::SENSORS, PlatformSource::Present),
+    (CapabilityId::POWER_SUPPLIES, PlatformSource::Present),
+];
+
+/// The Linux layer-B capability surface: every registered lane is `Present`,
+/// every other product-expected identity answers `Absent(Unsupported)` because
+/// this adapter registers no source for it.
+#[must_use]
+pub fn capability_surface() -> PlatformCapabilitySurface {
+    PlatformCapabilitySurface::declaring(PlatformAxis::Linux, REGISTERED_CAPABILITY_SOURCES)
 }
 
 pub(super) fn real_provider_registry() -> LinuxProviderRegistry {

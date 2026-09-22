@@ -34,13 +34,14 @@ type KeySystem = fn(&mut TuiApp, &KeyEvent) -> InputDispatch;
 
 /// Input precedence is data, not nesting. New input owners must be inserted in
 /// this registry and return an explicit dispatch state.
-const KEY_SYSTEMS: [KeySystem; 11] = [
+const KEY_SYSTEMS: [KeySystem; 12] = [
     open_modal_system,
     owned_input_system,
     character_system,
     details_focus_system,
     selection_extension_system,
     detail_scroll_system,
+    cpu_detail_scroll_system,
     performance_scroll_system,
     table_navigation_system,
     nonflat_navigation_system,
@@ -388,6 +389,10 @@ fn execute_tui_local_direct(
             app.export_snapshot();
             InputDispatch::Consumed
         }
+        TuiDirectAction::ExportDiagnosticReport => {
+            let _ = app.export_diagnostic_report();
+            InputDispatch::Consumed
+        }
         TuiDirectAction::SelectPerfResource => {
             let Some(digit) = digit else {
                 return InputDispatch::Unhandled;
@@ -574,6 +579,27 @@ fn detail_scroll_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
         KeyCode::Down => app.detail_scroll_by(1),
         _ => return InputDispatch::Unhandled,
     }
+    InputDispatch::Consumed
+}
+
+fn cpu_detail_scroll_system(app: &mut TuiApp, key: &KeyEvent) -> InputDispatch {
+    if app.page() != AppPage::Performance
+        || app.perf_device != PerfDevice::Cpu
+        || !key.modifiers.contains(KeyModifiers::CONTROL)
+        || key
+            .modifiers
+            .intersects(KeyModifiers::ALT | KeyModifiers::SUPER)
+    {
+        return InputDispatch::Unhandled;
+    }
+    let delta = match key.code {
+        KeyCode::Up => -1,
+        KeyCode::Down => 1,
+        KeyCode::PageUp => -(HELP_PAGE_STEP as isize),
+        KeyCode::PageDown => HELP_PAGE_STEP as isize,
+        _ => return InputDispatch::Unhandled,
+    };
+    app.scroll_cpu_details(delta);
     InputDispatch::Consumed
 }
 

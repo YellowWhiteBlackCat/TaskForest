@@ -84,6 +84,62 @@ pub(super) fn fixture_process_provider(capability: &CapabilityId) -> ProviderId 
     }
 }
 
+/// The composed Linux adapter answers for the complete product surface: every
+/// standard lane carries its registered provider, and every capability without
+/// a Linux lane keeps its typed absence instead of disappearing. This is the
+/// Linux half of the three-platform registration contract (M3.2/M3.3).
+#[test]
+fn product_surface_is_registered_or_typed_absent_on_linux() {
+    let handle = spawn_complete(fake_registry(FakeProvider::default()));
+    let snapshot = handle.capabilities().snapshot();
+
+    let registered: Vec<_> = snapshot.registered().collect();
+    assert!(
+        !registered.is_empty(),
+        "the complete fixture must register real Linux lanes"
+    );
+    for descriptor in &registered {
+        assert!(
+            descriptor.id.is_expected(),
+            "a registered capability must be product-expected: {}",
+            descriptor.id
+        );
+        assert!(
+            !descriptor.providers.is_empty(),
+            "a registered capability names its provider: {}",
+            descriptor.id
+        );
+    }
+
+    for descriptor in snapshot.typed_absences() {
+        assert!(
+            descriptor.id.is_expected(),
+            "an unregistered capability must still be product-expected: {}",
+            descriptor.id
+        );
+        assert_eq!(descriptor.status, CapabilityStatus::Unsupported);
+        assert!(descriptor.providers.is_empty());
+        assert_eq!(descriptor.observed_at_ms, 0);
+        assert!(descriptor.last_success_at_ms.is_none());
+    }
+
+    for expected in CapabilityId::EXPECTED_SURFACE {
+        assert!(
+            snapshot.get(&expected).is_some(),
+            "the product surface must stay addressable: {expected}"
+        );
+    }
+
+    // A Linux-only family without a request lane yet is still addressable on
+    // Linux; it becomes registered only when the real lane lands.
+    assert!(
+        snapshot
+            .get(&CapabilityId::TELEMETRY_PRESSURE)
+            .is_some_and(|descriptor| descriptor.is_typed_absence()),
+        "telemetry.pressure has no request lane yet and must stay typed-absent"
+    );
+}
+
 #[test]
 fn system_catalog_keeps_seven_distinct_registration_identities() {
     let handle = spawn_complete(fake_registry(FakeProvider::default()));

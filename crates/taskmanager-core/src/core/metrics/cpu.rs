@@ -8,6 +8,8 @@ use super::availability::hydrate_legacy_group;
 use super::{ScalarAvailability, ScalarObservation, ScalarObservationGroup};
 use crate::core::FailureKind;
 
+mod legacy;
+
 /// Hard ceiling for per-logical-CPU derived histories and projections.
 ///
 /// The authoritative [`CpuMetrics`] snapshot is not truncated: this bound
@@ -204,16 +206,16 @@ impl Serialize for CpuScalarObservations {
     {
         CpuScalarObservationsWire {
             global_usage_pct: self.global_usage_pct,
-            core_usage_pct: legacy_observation_group_projection(&self.core_usage_group),
+            core_usage_pct: legacy::observation_group_projection(&self.core_usage_group),
             core_usage_group: self.core_usage_group.clone(),
             frequency_mhz: self.frequency_mhz,
             max_frequency_mhz: self.max_frequency_mhz,
-            per_core_frequency_mhz: legacy_observation_group_projection(
+            per_core_frequency_mhz: legacy::observation_group_projection(
                 &self.per_core_frequency_group,
             ),
             per_core_frequency_group: self.per_core_frequency_group.clone(),
             temperature_c: self.temperature_c,
-            per_core_temperature_c: legacy_observation_group_projection(
+            per_core_temperature_c: legacy::observation_group_projection(
                 &self.per_core_temperature_group,
             ),
             per_core_temperature_group: self.per_core_temperature_group.clone(),
@@ -257,7 +259,7 @@ impl<'de> Deserialize<'de> for CpuScalarObservations {
 /// example, Linux cpufreq supplies its scaling driver, governor, and
 /// energy-performance preference without making those Linux names part of the
 /// Rust API consumed by other platforms.
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct CpuPerformancePolicy {
     /// Native implementation responsible for CPU frequency/performance control.
     #[serde(default, rename = "cpufreq_driver", alias = "frequency_implementation")]
@@ -268,6 +270,234 @@ pub struct CpuPerformancePolicy {
     /// Active native energy-versus-performance preference, when exposed.
     #[serde(default, rename = "power_preference", alias = "energy_preference")]
     pub energy_preference: Option<String>,
+    /// Whether the native boost/turbo policy is currently enabled.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boost_enabled: Option<bool>,
+    /// Highest per-CPU turbo-cap frequency observed from the native policy
+    /// files, in MHz. This is separate from the live current clock.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub boost_max_frequency_mhz: Option<u64>,
+    /// Long-term package power limit (PL1), in watts, when the native power
+    /// controller exposes it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power_limit_1_w: Option<f32>,
+    /// Short-term package power limit (PL2), in watts, when exposed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power_limit_2_w: Option<f32>,
+    /// The controller's observed PL1 time window (Tau), in milliseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power_time_window_ms: Option<u64>,
+}
+
+/// Telemetry and topology metrics for an individual CPU package (physical socket),
+/// including thermal throttling indicators and NUMA topology awareness.
+///
+/// Multi-socket server configurations, multi-die chiplet packages, and NUMA nodes
+/// partition hardware resources (cores, caches, and memory channels) into distinct
+/// domains. This struct models per-package telemetry with explicit differentiation
+/// between normal unthrottled operation, active thermal throttling trips, and
+/// unobserved or unsupported capabilities (following ADR-016 scalar authenticity).
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CpuPackageMetrics {
+    /// Zero-based physical socket or package index (e.g. 0 for Socket 0).
+    pub package_id: u32,
+    /// Primary NUMA memory node index associated with this physical socket, if known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub numa_node_id: Option<u32>,
+    /// All NUMA node IDs associated with this physical package.
+    ///
+    /// Multi-NUMA-per-socket architectures (e.g. Sub-NUMA Clustering / SNC on Intel Xeon
+    /// or NUMA nodes per socket / NPS on AMD EPYC) partition a single physical socket
+    /// into multiple memory nodes.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub numa_node_ids: Vec<u32>,
+    /// Logical core IDs belonging to this physical package.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub logical_core_ids: Vec<usize>,
+    /// Kernel-reported die/cluster identifiers associated with this package.
+    /// On AMD this is the closest safe generic representation of CCD/CCX
+    /// topology; an empty vector means the kernel did not expose a chiplet
+    /// identifier, not that the package has zero chiplets.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub chiplet_ids: Vec<u32>,
+    /// Maximum number of logical threads in one physical-core sibling group.
+    /// `Some(2)` is the common SMT case; `None` means sibling topology was not
+    /// readable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub smt_threads_per_core: Option<usize>,
+    /// Stable logical-CPU groups that share one physical execution core.
+    ///
+    /// Each inner vector is a kernel-reported `thread_siblings_list`, sorted
+    /// and de-duplicated by the native adapter. An empty vector means the
+    /// kernel did not expose pairing; it is not a claim that no SMT exists.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub smt_sibling_groups: Vec<Vec<usize>>,
+    /// Physical execution core count present in this package, distinct from logical threads.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub physical_core_count: Option<usize>,
+    /// Total local physical memory capacity attached to this package's NUMA node(s), in bytes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub local_memory_bytes: Option<u64>,
+    /// Local NUMA memory allocation hit ratio percentage in the range `0.0..=100.0`.
+    ///
+    /// Derived from platform numastat (`numa_hit / (numa_hit + numa_miss + numa_foreign)`).
+    /// `None` when NUMA telemetry is unavailable or unexposed by the host kernel.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub numa_hit_ratio_pct: Option<f32>,
+    /// Real-time thermal throttling indicator for this CPU package.
+    ///
+    /// `Some(true)` denotes that the package is currently actively throttled due to thermal
+    /// limits (e.g. PROCHOT assertion or digital thermal sensor trip status). `Some(false)`
+    /// denotes verified unthrottled operation. `None` indicates the provider cannot observe
+    /// real-time throttle status.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_throttled: Option<bool>,
+    /// Cumulative count of package-level thermal throttling events since boot or counter reset.
+    ///
+    /// Sourced from Linux sysfs `/sys/devices/system/cpu/cpu*/thermal_throttle/package_throttle_count`
+    /// or x86 MSR `IA32_PACKAGE_THERM_STATUS` (0x1B1).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub package_throttle_count: Option<u64>,
+    /// Cumulative count of core-level thermal throttling events across cores within this package.
+    ///
+    /// Sourced from Linux sysfs `/sys/devices/system/cpu/cpu*/thermal_throttle/core_throttle_count`
+    /// or x86 MSR `IA32_THERM_STATUS` (0x19C).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub core_throttle_count: Option<u64>,
+    /// Thermal headroom in degrees Celsius below the critical maximum junction temperature ($T_j\text{Max}$).
+    ///
+    /// Positive values denote available thermal margin before throttling occurs. Values
+    /// at or below zero denote active thermal saturation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thermal_margin_c: Option<f32>,
+    /// Package temperature in degrees Celsius, when reported by a dedicated sensor.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub temperature_c: Option<f32>,
+    /// Package power consumption in watts (e.g. derived from RAPL `energy_uj` differential counters).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub power_w: Option<f32>,
+    /// Average or representative clock frequency in MHz across cores in this package.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub frequency_mhz: Option<u64>,
+}
+
+impl CpuPackageMetrics {
+    /// Create a new package metrics descriptor for a physical socket index.
+    #[must_use]
+    pub const fn new(package_id: u32) -> Self {
+        Self {
+            package_id,
+            numa_node_id: None,
+            numa_node_ids: Vec::new(),
+            logical_core_ids: Vec::new(),
+            chiplet_ids: Vec::new(),
+            smt_threads_per_core: None,
+            smt_sibling_groups: Vec::new(),
+            physical_core_count: None,
+            local_memory_bytes: None,
+            numa_hit_ratio_pct: None,
+            is_throttled: None,
+            package_throttle_count: None,
+            core_throttle_count: None,
+            thermal_margin_c: None,
+            temperature_c: None,
+            power_w: None,
+            frequency_mhz: None,
+        }
+    }
+
+    /// True if this package is actively thermal throttling.
+    #[must_use]
+    pub const fn is_currently_throttled(&self) -> bool {
+        matches!(self.is_throttled, Some(true))
+    }
+
+    /// Whether this package contains or is associated with the given NUMA node.
+    #[must_use]
+    pub fn contains_numa_node(&self, node_id: u32) -> bool {
+        self.numa_node_id == Some(node_id) || self.numa_node_ids.contains(&node_id)
+    }
+
+    /// Whether this package contains the given logical CPU processor index.
+    #[must_use]
+    pub fn contains_logical_core(&self, core_id: usize) -> bool {
+        self.logical_core_ids.contains(&core_id)
+    }
+
+    /// Total number of thermal throttle events recorded across package and core counters.
+    #[must_use]
+    pub fn total_throttle_events(&self) -> Option<u64> {
+        match (self.package_throttle_count, self.core_throttle_count) {
+            (Some(pkg), Some(core)) => Some(pkg.saturating_add(core)),
+            (Some(pkg), None) => Some(pkg),
+            (None, Some(core)) => Some(core),
+            (None, None) => None,
+        }
+    }
+}
+
+/// One Linux cpuidle state aggregated from the kernel's cumulative counters.
+///
+/// The counters are intentionally kept as cumulative microseconds and entry
+/// counts. A frontend can derive a residency percentage only when it has two
+/// samples from the same CPU generation; it must not turn one cumulative
+/// counter into a percentage by guessing a denominator.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct CpuIdleState {
+    /// Stable kernel state name such as `POLL`, `C1`, or `C6`.
+    pub name: String,
+    /// Human-readable kernel description, when exposed.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Cumulative time spent in this state, in microseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub residency_us: Option<u64>,
+    /// Percentage of the measured interval spent in this state. This is only
+    /// populated after two samples with the same state identity; a first
+    /// sample or counter rollback remains `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub residency_pct: Option<f32>,
+    /// Cumulative number of entries into this state.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub usage_count: Option<u64>,
+    /// Exit latency advertised by the kernel, in microseconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latency_us: Option<u64>,
+    /// Whether the state is disabled by the kernel policy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub disabled: Option<bool>,
+}
+
+impl CpuIdleState {
+    /// Derive a bounded residency percentage from two monotonic samples.
+    ///
+    /// The denominator is wall time, not a guessed boot-time value. A missing
+    /// counter, zero interval, reset, or impossible counter delta returns
+    /// `None` so a provider cannot turn an invalid sample into `0%`.
+    #[must_use]
+    pub fn residency_percentage_since(&self, previous: &Self, elapsed_ms: u64) -> Option<f32> {
+        let current = self.residency_us?;
+        let before = previous.residency_us?;
+        if elapsed_ms == 0 || current < before {
+            return None;
+        }
+        let elapsed_us = elapsed_ms.checked_mul(1_000)?;
+        let delta = current - before;
+        if delta > elapsed_us {
+            return None;
+        }
+        Some((delta as f64 / elapsed_us as f64 * 100.0) as f32)
+    }
+}
+
+/// Cumulative interrupt counts grouped by logical processor. These are raw
+/// kernel counters, not rates; a rate requires two observations and belongs
+/// to the history layer. A missing vector means the source was unavailable or
+/// exposed no parseable CPU columns.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq, Eq)]
+pub struct CpuInterruptSnapshot {
+    pub total: Option<u64>,
+    pub per_logical_cpu: Vec<u64>,
 }
 
 /// Global CPU Metrics & Cache Info
@@ -307,6 +537,15 @@ pub struct CpuMetrics {
     /// Flattening preserves the legacy top-level JSON keys while keeping the
     /// Rust model free of Linux cpufreq terminology.
     pub performance_policy: CpuPerformancePolicy,
+    /// Per-package (physical socket) metrics including thermal throttling
+    /// indicators and NUMA topology awareness. Empty on single-package hosts
+    /// where package topology is not exposed or when package enumeration fails.
+    pub packages: Vec<CpuPackageMetrics>,
+    /// Cumulative cpuidle state counters from a representative logical CPU.
+    /// Empty means cpuidle is unavailable or the provider exposed no states.
+    pub idle_states: Vec<CpuIdleState>,
+    /// Cumulative interrupt distribution by logical CPU, when exposed.
+    pub interrupts: Option<CpuInterruptSnapshot>,
 }
 
 /// Compatibility-only outer CPU shape. Live values are always projected from
@@ -351,6 +590,12 @@ struct CpuMetricsWire {
     performance_policy: CpuPerformancePolicy,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     cpu_power_w: Option<f32>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    packages: Vec<CpuPackageMetrics>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    idle_states: Vec<CpuIdleState>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    interrupts: Option<CpuInterruptSnapshot>,
 }
 
 impl Serialize for CpuMetrics {
@@ -359,17 +604,17 @@ impl Serialize for CpuMetrics {
         S: Serializer,
     {
         CpuMetricsWire {
-            global_usage: legacy_scalar_projection(&self.scalar_observations.global_usage_pct),
-            core_usages: legacy_complete_group_projection(
+            global_usage: legacy::scalar_projection(&self.scalar_observations.global_usage_pct),
+            core_usages: legacy::complete_group_projection(
                 &self.scalar_observations.core_usage_group,
             ),
             scalar_observations: self.scalar_observations.clone(),
             brand: self.brand.clone(),
-            frequency_mhz: legacy_scalar_projection(&self.scalar_observations.frequency_mhz),
+            frequency_mhz: legacy::scalar_projection(&self.scalar_observations.frequency_mhz),
             frequency_source: self.frequency_source,
             temperature_source: self.temperature_source,
-            max_freq_mhz: legacy_scalar_projection(&self.scalar_observations.max_frequency_mhz),
-            per_core_freq_mhz: legacy_optional_group_projection(
+            max_freq_mhz: legacy::scalar_projection(&self.scalar_observations.max_frequency_mhz),
+            per_core_freq_mhz: legacy::optional_group_projection(
                 &self.scalar_observations.per_core_frequency_group,
             ),
             physical_cores: self.physical_cores,
@@ -378,12 +623,15 @@ impl Serialize for CpuMetrics {
             l1i_cache_kb: self.l1i_cache_kb,
             l2_cache_kb: self.l2_cache_kb,
             l3_cache_kb: self.l3_cache_kb,
-            temperature_c: legacy_scalar_projection(&self.scalar_observations.temperature_c),
-            per_core_temps_c: legacy_complete_group_projection(
+            temperature_c: legacy::scalar_projection(&self.scalar_observations.temperature_c),
+            per_core_temps_c: legacy::complete_group_projection(
                 &self.scalar_observations.per_core_temperature_group,
             ),
             performance_policy: self.performance_policy.clone(),
-            cpu_power_w: legacy_scalar_projection(&self.scalar_observations.power_w),
+            cpu_power_w: legacy::scalar_projection(&self.scalar_observations.power_w),
+            packages: self.packages.clone(),
+            idle_states: self.idle_states.clone(),
+            interrupts: self.interrupts.clone(),
         }
         .serialize(serializer)
     }
@@ -414,28 +662,28 @@ impl<'de> Deserialize<'de> for CpuMetrics {
                 .as_ref()
                 .is_some_and(|values| !values.is_empty());
         let mut observations = wire.scalar_observations;
-        observations.global_usage_pct = hydrate_legacy_scalar(
+        observations.global_usage_pct = legacy::hydrate_scalar(
             observations.global_usage_pct,
             trustworthy_identity.then_some(wire.global_usage).flatten(),
         );
-        observations.frequency_mhz = hydrate_legacy_scalar(
+        observations.frequency_mhz = legacy::hydrate_scalar(
             observations.frequency_mhz,
             trustworthy_identity.then_some(wire.frequency_mhz).flatten(),
         );
-        observations.max_frequency_mhz = hydrate_legacy_scalar(
+        observations.max_frequency_mhz = legacy::hydrate_scalar(
             observations.max_frequency_mhz,
             trustworthy_identity.then_some(wire.max_freq_mhz).flatten(),
         );
-        observations.temperature_c = hydrate_legacy_scalar(
+        observations.temperature_c = legacy::hydrate_scalar(
             observations.temperature_c,
             trustworthy_identity.then_some(wire.temperature_c).flatten(),
         );
-        observations.power_w = hydrate_legacy_scalar(
+        observations.power_w = legacy::hydrate_scalar(
             observations.power_w,
             trustworthy_identity.then_some(wire.cpu_power_w).flatten(),
         );
         if trustworthy_identity {
-            observations.core_usage_group = hydrate_outer_group(
+            observations.core_usage_group = legacy::hydrate_group(
                 observations.core_usage_group,
                 wire.core_usages
                     .unwrap_or_default()
@@ -443,11 +691,11 @@ impl<'de> Deserialize<'de> for CpuMetrics {
                     .map(|value| ScalarObservation::available(value, 0))
                     .collect(),
             );
-            observations.per_core_frequency_group = hydrate_outer_optional_group(
+            observations.per_core_frequency_group = legacy::hydrate_optional_group(
                 observations.per_core_frequency_group,
                 wire.per_core_freq_mhz.unwrap_or_default(),
             );
-            observations.per_core_temperature_group = hydrate_outer_group(
+            observations.per_core_temperature_group = legacy::hydrate_group(
                 observations.per_core_temperature_group,
                 wire.per_core_temps_c
                     .unwrap_or_default()
@@ -468,6 +716,9 @@ impl<'de> Deserialize<'de> for CpuMetrics {
             l2_cache_kb: wire.l2_cache_kb,
             l3_cache_kb: wire.l3_cache_kb,
             performance_policy: wire.performance_policy,
+            packages: wire.packages,
+            idle_states: wire.idle_states,
+            interrupts: wire.interrupts,
         })
     }
 }
@@ -589,6 +840,32 @@ impl CpuMetrics {
         self.scalar_observations.power_w.current_value().copied()
     }
 
+    /// Read-only access to per-package telemetry and topology metrics.
+    #[must_use]
+    pub fn packages(&self) -> &[CpuPackageMetrics] {
+        &self.packages
+    }
+
+    /// Find a package's metrics by physical package / socket ID.
+    #[must_use]
+    pub fn package(&self, package_id: u32) -> Option<&CpuPackageMetrics> {
+        self.packages
+            .iter()
+            .find(|pkg| pkg.package_id == package_id)
+    }
+
+    /// Read-only access to cumulative kernel cpuidle state counters.
+    #[must_use]
+    pub fn idle_states(&self) -> &[CpuIdleState] {
+        &self.idle_states
+    }
+
+    /// Read-only access to cumulative per-logical-CPU interrupt counters.
+    #[must_use]
+    pub const fn interrupts(&self) -> Option<&CpuInterruptSnapshot> {
+        self.interrupts.as_ref()
+    }
+
     /// Replace canonical live truth in one operation.
     pub fn apply_scalar_observations(&mut self, observations: CpuScalarObservations) {
         self.scalar_observations = observations;
@@ -600,86 +877,6 @@ impl CpuMetrics {
             .clone()
             .retain_previous(previous.scalar_observations.clone());
     }
-}
-
-const fn legacy_scalar_projection<T: Copy>(observation: &ScalarObservation<T>) -> Option<T> {
-    if matches!(observation.availability(), ScalarAvailability::Available) {
-        observation.current_value().copied()
-    } else {
-        None
-    }
-}
-
-fn legacy_complete_group_projection<T: Copy>(group: &ScalarObservationGroup<T>) -> Option<Vec<T>> {
-    if !matches!(group.availability(), ScalarAvailability::Available) {
-        return None;
-    }
-    Some(
-        group
-            .last_known_observations()
-            .iter()
-            .filter_map(legacy_scalar_projection)
-            .collect(),
-    )
-}
-
-fn legacy_optional_group_projection<T: Copy>(
-    group: &ScalarObservationGroup<T>,
-) -> Option<Vec<Option<T>>> {
-    if !matches!(group.availability(), ScalarAvailability::Available) {
-        return None;
-    }
-    Some(
-        group
-            .last_known_observations()
-            .iter()
-            .map(legacy_scalar_projection)
-            .collect(),
-    )
-}
-
-fn legacy_observation_group_projection<T: Clone>(
-    group: &ScalarObservationGroup<T>,
-) -> Option<Vec<ScalarObservation<T>>> {
-    matches!(group.availability(), ScalarAvailability::Available)
-        .then(|| group.last_known_observations().to_vec())
-}
-
-fn hydrate_legacy_scalar<T: Copy>(
-    observation: ScalarObservation<T>,
-    legacy: Option<T>,
-) -> ScalarObservation<T> {
-    if matches!(observation.availability(), ScalarAvailability::Unknown)
-        && let Some(value) = legacy
-    {
-        return ScalarObservation::available(value, 0);
-    }
-    observation
-}
-
-fn hydrate_outer_group<T>(
-    group: ScalarObservationGroup<T>,
-    legacy_items: Vec<ScalarObservation<T>>,
-) -> ScalarObservationGroup<T> {
-    hydrate_legacy_group(group, legacy_items)
-}
-
-fn hydrate_outer_optional_group<T>(
-    group: ScalarObservationGroup<T>,
-    legacy: Vec<Option<T>>,
-) -> ScalarObservationGroup<T> {
-    hydrate_legacy_group(
-        group,
-        legacy
-            .into_iter()
-            .map(|value| {
-                value.map_or_else(
-                    || ScalarObservation::unavailable(FailureKind::Unsupported),
-                    |value| ScalarObservation::available(value, 0),
-                )
-            })
-            .collect(),
-    )
 }
 
 #[cfg(test)]

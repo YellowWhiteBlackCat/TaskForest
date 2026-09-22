@@ -8,6 +8,8 @@
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::Duration;
 
 use sysinfo::System;
 use taskmanager_core::core::cpu_features::CpuInstructionFeature;
@@ -19,6 +21,7 @@ use taskmanager_core::core::hardware::{
 use taskmanager_core::core::identity::ProviderId;
 use taskmanager_core::core::source::{SourceOutcome, SourceStatus};
 use taskmanager_platform_contract::CompositeSourceSnapshot;
+use taskmanager_platform_portable::run_with_timeout;
 
 use super::display;
 use super::{
@@ -571,17 +574,82 @@ impl HardwareInventoryCollector {
             display.status,
         ];
 
-        CompositeSourceSnapshot::new(
-            HardwareInfo::from_fragments_with_displays(
-                host.value,
-                kernel.value,
-                topology.value,
-                firmware.value,
-                display.value,
-            ),
-            sources,
-        )
+        let mut hardware = HardwareInfo::from_fragments_with_displays(
+            host.value,
+            kernel.value,
+            topology.value,
+            firmware.value,
+            display.value,
+        );
+        // Synthetic inventory roots used by headless tests must never leak a
+        // host command into the fixture. A real native sysfs root is the only
+        // path allowed to query the bounded kernel-log source.
+        hardware.kernel_errors = self
+            .paths
+            .uses_native_cpu_root()
+            .then(collect_kernel_errors)
+            .flatten();
+        CompositeSourceSnapshot::new(hardware, sources)
     }
+}
+
+/// Read only the kernel error priorities required by the health surface. No
+/// shell interpreter is involved and the command is bounded; failure is kept
+/// as `None`, while a successful empty response is `Some(empty)`.
+fn collect_kernel_errors() -> Option<Vec<taskmanager_core::KernelLogEntry>> {
+    let mut command = Command::new("dmesg");
+    command.args([
+        "--level=emerg,alert,crit,err",
+        "--no-pager",
+        "--color=never",
+    ]);
+    let output = run_with_timeout(&mut command, Duration::from_secs(2)).ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(parse_kernel_errors(&String::from_utf8_lossy(
+        &output.stdout,
+    )))
+}
+
+fn parse_kernel_errors(text: &str) -> Vec<taskmanager_core::KernelLogEntry> {
+    text.lines()
+        .filter_map(|line| {
+            let (timestamp_seconds, priority, message) = parse_kernel_line(line)?;
+            let mut entry = taskmanager_core::KernelLogEntry::new(priority, message)?;
+            entry.timestamp_seconds = timestamp_seconds;
+            Some(entry)
+        })
+        .take(128)
+        .collect()
+}
+
+fn parse_kernel_line(
+    line: &str,
+) -> Option<(Option<u64>, taskmanager_core::KernelLogPriority, &str)> {
+    let line = line.trim();
+    let (priority, line) = if let Some(rest) = line.strip_prefix('<') {
+        let (number, rest) = rest.split_once('>')?;
+        let priority = number
+            .parse::<u8>()
+            .ok()
+            .and_then(taskmanager_core::KernelLogPriority::from_number)?;
+        (priority, rest.trim())
+    } else {
+        (taskmanager_core::KernelLogPriority::Error, line)
+    };
+    let (timestamp_seconds, message) = if let Some(rest) = line.strip_prefix('[') {
+        let (timestamp, rest) = rest.split_once(']')?;
+        let seconds = timestamp
+            .trim()
+            .strip_prefix("T=")
+            .or_else(|| timestamp.trim().strip_prefix("time="))
+            .and_then(|value| value.parse::<u64>().ok());
+        (seconds, rest.trim())
+    } else {
+        (None, line)
+    };
+    (!message.is_empty()).then_some((timestamp_seconds, priority, message))
 }
 
 #[cfg(test)]

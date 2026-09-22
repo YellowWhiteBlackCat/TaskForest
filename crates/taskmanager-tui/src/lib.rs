@@ -28,6 +28,8 @@ mod clipboard;
 mod column_prefs;
 mod command_palette;
 mod demo;
+mod diagnostic_report;
+mod feature_coverage;
 mod functional;
 mod history_runtime;
 mod menus;
@@ -50,11 +52,17 @@ pub use bindings::binding_declaration;
 
 pub use capabilities::capability_declaration;
 
+pub use feature_coverage::feature_coverage_declaration;
+
 pub use functional::functional_declaration;
 
 pub use command_palette::{CommandPalette, CommandPaletteRow, PaletteLocalAction};
 
 pub use demo::demo_app;
+pub use diagnostic_report::{
+    DEFAULT_DIAGNOSTIC_FILENAME, DiagnosticExportError, default_diagnostic_path,
+    render_diagnostic_report,
+};
 pub use menus::BatchMenuTarget;
 pub use runtime::{run_demo, run_live, snapshot_text};
 pub use selectors::{FocusPanel, PerfDevice};
@@ -151,6 +159,10 @@ pub struct TuiApp {
     /// clamps it against the current topology and visible grid height; it is
     /// reset whenever the selected Performance resource changes.
     pub cpu_core_scroll: usize,
+    /// Vertical line offset for the CPU details rail. The rail keeps its
+    /// pinned geometry, while Ctrl+Up/Ctrl+Down exposes lower topology and
+    /// policy rows on short terminals.
+    pub cpu_detail_scroll: usize,
     /// Vertical line offset for the standard GPU engine viewport. The primary
     /// utilization chart and fact strip never scroll; compact layout removes
     /// this optional region entirely.
@@ -281,6 +293,7 @@ impl TuiApp {
             perf_device: PerfDevice::Cpu,
             detail_scroll: 0,
             cpu_core_scroll: 0,
+            cpu_detail_scroll: 0,
             gpu_engine_scroll: 0,
             system_scroll: 0,
             health_rule_selection: 0,

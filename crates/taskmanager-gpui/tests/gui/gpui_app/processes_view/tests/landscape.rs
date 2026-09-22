@@ -165,9 +165,9 @@ async fn landscape_apps_page_keeps_table_and_chrome_inside_window(cx: &mut TestA
         cx.notify();
     });
     for (width, height) in [
-        (1280.0f32, 720.0f32),
+        (2386.0f32, 1631.0f32),
+        (1280.0, 720.0),
         (1193.0, 815.0),
-        (2386.0, 1631.0),
         (800.0, 480.0),
         (720.0, 480.0),
     ] {
@@ -270,7 +270,7 @@ async fn landscape_apps_page_keeps_table_and_chrome_inside_window(cx: &mut TestA
             "Apps search box",
         );
         let horizontal_track = vcx.debug_bounds("tm-procs-hscroll-track");
-        if width <= 800.0 {
+        if width < 1250.0 {
             assert!(
                 horizontal_track.is_some(),
                 "compact Apps content must mount the returned horizontal scrollbar"

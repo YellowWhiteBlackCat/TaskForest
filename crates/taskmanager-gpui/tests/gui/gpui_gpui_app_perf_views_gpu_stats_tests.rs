@@ -60,14 +60,22 @@ fn available_gpu_identity_and_clock_facts_render_as_detail_rows() {
     let mut gpu = GpuMetrics::new("gpu:pci:0000:01:00.0", "Intel Arc Graphics");
     gpu.driver = Some("xe".into());
     gpu.driver_version = Some("6.14.0".into());
+    gpu.vbios_version = Some("101.0.0.0".into());
+    gpu.memory_bus_width_bits = Some(256);
+    gpu.memory_bandwidth_gbps = Some(160.0);
+    gpu.queue_depth = Some(3);
+    gpu.power_limit_w = Some(165.0);
     gpu.pci_slot = Some("0000:01:00.0".into());
     gpu.graphics_api = Some(GpuGraphicsApi {
         opengl_version: Some("4.6".into()),
         vulkan_version: Some("1.4.354".into()),
+        mesa_version: Some("25.1.4".into()),
     });
     gpu.apply_scalar_observations(GpuScalarObservations {
         frequency_mhz: ScalarObservation::available(2_080, 1),
         max_frequency_mhz: ScalarObservation::available(2_500, 1),
+        fan_speed_rpm: ScalarObservation::available(1_240, 1),
+        fan_speed_pct: ScalarObservation::available(42.0, 1),
         idle_residency_pct: ScalarObservation::available(62.0, 1),
         ..Default::default()
     });
@@ -87,6 +95,14 @@ fn available_gpu_identity_and_clock_facts_render_as_detail_rows() {
     assert_eq!(row("gpu.pci_slot").value(), Some("0000:01:00.0"));
     assert_eq!(row("gpu.opengl_version").value(), Some("4.6"));
     assert_eq!(row("gpu.vulkan_version").value(), Some("1.4.354"));
+    assert_eq!(row("gpu.mesa_version").value(), Some("25.1.4"));
+    assert_eq!(row("gpu.vbios_version").value(), Some("101.0.0.0"));
+    assert_eq!(row("fan.rpm").value(), Some("1240 RPM"));
+    assert_eq!(row("fan.pwm").value(), Some("42%"));
+    assert_eq!(row("gpu.memory_bus_width").value(), Some("256 bit"));
+    assert_eq!(row("gpu.memory_bandwidth").value(), Some("160.0 GB/s"));
+    assert_eq!(row("gpu.queue_depth").value(), Some("3"));
+    assert_eq!(row("gpu.power_limit").value(), Some("165.0 W"));
 }
 
 /// The driver version is an independent proven fact: a driver name alone

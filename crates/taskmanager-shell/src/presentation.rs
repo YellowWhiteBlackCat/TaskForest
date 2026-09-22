@@ -3,33 +3,65 @@
 //! (ADR-020 single-source rule; the GPUI, TUI, iced, and Bevy frontends all call
 //! these — never a per-frontend copy).
 
+use std::collections::BTreeSet;
+
 use taskmanager_application::{AppPage, CommandId, KeyCode, Modifiers, default_bindings, i18n};
+use taskmanager_core::ServiceId;
 use taskmanager_core::core::device_state::DeviceStatus;
 use taskmanager_core::core::failure::FailureKind;
-use taskmanager_core::core::metrics::{DiskMetrics, GpuMetrics, SmartAvailability};
+use taskmanager_core::core::metrics::{
+    DiskMetrics, GpuMetrics, SmartAvailability, SmbiosMemorySnapshot,
+};
 use taskmanager_core::core::process::{PriorityTier, ProcessBatchAction};
+use taskmanager_core::core::services::{
+    ServiceItem, detect_ordering_cycles, detect_requirement_cycles,
+};
 use taskmanager_core::core::time::LocalTimeRulesObservation;
 use taskmanager_ui_contract::{IconId, MessageKey, descriptor, page_descriptors, page_shortcut};
 
+mod constants;
 pub mod gpu_chart_metric;
 pub mod gpu_engine_rows;
+mod network;
+mod process;
+mod service_exit;
+mod storage;
+mod telemetry;
 pub mod trend;
 
-/// The single missing-value placeholder every frontend renders for an
-/// uncollected-but-applicable observation (an em dash). "求同": one spelling,
-/// one semantic — frontends that prefer hiding a row entirely simply omit it
-/// instead of substituting their own placeholder text.
-pub const MISSING_VALUE: &str = "—";
+pub use constants::MISSING_VALUE;
+pub use network::*;
+pub use process::*;
+pub use storage::*;
+pub use telemetry::*;
 
-/// Owned form of [`MISSING_VALUE`] for `String` readouts.
+/// Stable service IDs participating in an observed ordering or strict
+/// requirement cycle. The graph algorithms remain owned by core; this shell
+/// helper only folds the inventory into the set every renderer can consume.
 #[must_use]
-pub fn missing_value() -> String {
-    MISSING_VALUE.to_owned()
+pub fn service_cycle_members<'a>(
+    services: impl IntoIterator<Item = &'a ServiceItem>,
+) -> BTreeSet<ServiceId> {
+    let services = services.into_iter().collect::<Vec<_>>();
+    let mut members = BTreeSet::new();
+    for cycle in detect_ordering_cycles(
+        services
+            .iter()
+            .map(|service| (&service.id, service.relations())),
+    )
+    .into_iter()
+    .chain(detect_requirement_cycles(
+        services
+            .iter()
+            .map(|service| (&service.id, service.relations())),
+        true,
+    )) {
+        members.extend(cycle.path);
+    }
+    members
 }
 
-/// Format a byte count the same way every frontend does: binary units
-/// (`KiB`/`MiB`/`GiB`), one decimal place above the byte tier. This is the
-/// SINGLE implementation — frontends must not re-format byte counts.
+/// Owned form of [`MISSING_VALUE`] for `String` readouts.
 #[must_use]
 pub fn bytes(value: u64) -> String {
     const KIB: f64 = 1024.0;
@@ -74,6 +106,23 @@ pub fn duration(seconds: u64) -> String {
 #[must_use]
 pub fn optional_count(value: Option<u32>) -> String {
     value.map_or_else(missing_value, |count| count.to_string())
+}
+
+/// Format a ResourcePressure (some/full) into a human-readable display string,
+/// e.g. "some 0.5% · full 0.1%" or "some 0.0%".
+#[must_use]
+pub fn format_resource_pressure(
+    pressure: Option<&taskmanager_core::core::metrics::ResourcePressure>,
+) -> String {
+    let Some(pressure) = pressure else {
+        return missing_value();
+    };
+    let some = format!("{:.1}%", pressure.some.avg10);
+    if let Some(full) = &pressure.full {
+        format!("some {some} · full {:.1}%", full.avg10)
+    } else {
+        format!("some {some}")
+    }
 }
 
 /// Format an optional second-duration (CPU time) through the shared
@@ -175,6 +224,21 @@ pub fn process_batch_action_label(action: ProcessBatchAction) -> String {
             i18n::t("proc.priority"),
             priority_tier_label(tier)
         ),
+        ProcessBatchAction::SetEfficiencyMode(enable) => {
+            if enable {
+                format!(
+                    "{} ({})",
+                    i18n::t("proc.efficiency_mode"),
+                    i18n::t("common.on")
+                )
+            } else {
+                format!(
+                    "{} ({})",
+                    i18n::t("proc.efficiency_mode"),
+                    i18n::t("common.off")
+                )
+            }
+        }
     }
 }
 
@@ -264,6 +328,69 @@ pub fn gpu_display_identity(gpu: &GpuMetrics) -> GpuDisplayIdentity<'_> {
 #[must_use]
 pub fn temperature_c_precise(value: f32) -> String {
     format!("{value:.1} °C")
+}
+
+/// Format one SMBIOS memory inventory snapshot into canonical (label, value) rows:
+/// first the slots used/total summary, then each populated physical DIMM module.
+#[must_use]
+pub fn smbios_memory_inventory_rows(snapshot: &SmbiosMemorySnapshot) -> Vec<(String, String)> {
+    if snapshot.failure.is_some() {
+        return Vec::new();
+    }
+    let mut rows = vec![(
+        i18n::t("system.memory_slots").to_string(),
+        format!(
+            "{} / {} {}",
+            snapshot.slots_used,
+            snapshot.slots_total,
+            i18n::t("common.used")
+        ),
+    )];
+    for module in &snapshot.modules {
+        let label = module
+            .locator
+            .clone()
+            .filter(|loc| !loc.trim().is_empty())
+            .unwrap_or_else(|| format!("{} {}", i18n::t("system.slot"), module.slot));
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(part) = &module.part_number {
+            let part = part.trim();
+            if !part.is_empty() {
+                parts.push(part.to_string());
+            }
+        }
+        if let Some(mb) = module.size_mb {
+            parts.push(bytes(mb as u64 * 1024 * 1024));
+        }
+        if let Some(speed) = module.configured_speed_mts.or(module.speed_mts) {
+            parts.push(format!("{speed} MT/s"));
+        }
+        if let Some(mfg) = &module.manufacturer {
+            let mfg = mfg.trim();
+            if !mfg.is_empty() {
+                parts.push(mfg.to_string());
+            }
+        }
+        if let Some(ff) = &module.form_factor {
+            let ff = ff.trim();
+            if !ff.is_empty() {
+                parts.push(ff.to_string());
+            }
+        }
+        if let Some(mem_type) = &module.memory_type {
+            let mem_type = mem_type.trim();
+            if !mem_type.is_empty() {
+                parts.push(mem_type.to_string());
+            }
+        }
+        let value = if parts.is_empty() {
+            missing_value()
+        } else {
+            parts.join(" · ")
+        };
+        rows.push((label, value));
+    }
+    rows
 }
 
 /// Format a fan speed in RPM the way every badge/graph readout does
@@ -687,10 +814,17 @@ pub fn effective_smart_status(disk: &DiskMetrics) -> DeviceStatus {
 #[must_use]
 pub fn has_smart_fields(disk: &DiskMetrics) -> bool {
     disk.smart_temperature_c.is_some()
+        || disk
+            .smart_temperature_sensors_c
+            .iter()
+            .any(|value| value.is_finite())
         || disk.smart_critical_warning.is_some()
         || disk.smart_temp_critical_c.is_some()
         || disk.smart_percent_used.is_some()
+        || disk.smart_available_spare_pct.is_some()
+        || disk.smart_available_spare_threshold_pct.is_some()
         || disk.smart_power_on_hours.is_some()
+        || disk.smart_unsafe_shutdowns.is_some()
 }
 
 /// Whether a disk's SMART section should render at all. A provider that could

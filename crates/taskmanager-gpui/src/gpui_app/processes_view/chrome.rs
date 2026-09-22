@@ -333,6 +333,26 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
             entity,
         ));
     }
+    if !hidden_cols.contains(&SortCol::Pss) {
+        let w = header_col_width(col_widths, SortCol::Pss);
+        h = h.child(mount_resize_handle(
+            sort_cell(SortCellProps {
+                theme,
+                label: i18n::t("proc.pss"),
+                col: SortCol::Pss,
+                sort_col,
+                sort_asc,
+                hovered,
+                entity,
+                visible: &visible,
+            })
+            .w(w),
+            SortCol::Pss,
+            w,
+            theme,
+            entity,
+        ));
+    }
     if !hidden_cols.contains(&SortCol::DiskRead) {
         let w = header_col_width(col_widths, SortCol::DiskRead);
         h = h.child(mount_resize_handle(
@@ -368,6 +388,26 @@ fn sort_header_row(props: SortHeaderRowProps<'_>) -> Stateful<Div> {
             })
             .w(w),
             SortCol::DiskWrite,
+            w,
+            theme,
+            entity,
+        ));
+    }
+    if !hidden_cols.contains(&SortCol::Network) {
+        let w = header_col_width(col_widths, SortCol::Network);
+        h = h.child(mount_resize_handle(
+            sort_cell(SortCellProps {
+                theme,
+                label: i18n::t("proc.network"),
+                col: SortCol::Network,
+                sort_col,
+                sort_asc,
+                hovered,
+                entity,
+                visible: &visible,
+            })
+            .w(w),
+            SortCol::Network,
             w,
             theme,
             entity,
