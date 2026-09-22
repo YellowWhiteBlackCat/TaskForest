@@ -228,8 +228,10 @@ fn apply_capture_overrides(app: &mut TuiApp) {
         && let Some(device) = device_name.as_deref().and_then(capture_device)
     {
         app.select_perf_device(device);
-        if device == PerfDevice::Gpu {
-            seed_gpu_capture_history(app);
+        match device {
+            PerfDevice::Gpu => seed_gpu_capture_history(app),
+            PerfDevice::Fan => seed_fan_capture_sensors(app),
+            _ => {}
         }
     }
     if scene_name.as_deref() == Some("system-npu") {
@@ -406,6 +408,75 @@ fn seed_gpu_capture_history(app: &mut TuiApp) {
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+    );
+}
+
+/// Capture-only fan/thermal scene for `TM_TUI_CAPTURE_DEVICE=fan`: one readable
+/// fan channel with its own same-device `Package` temperature, plus two system
+/// thermal zones (`acpitz` readable, `nvme0` unread). The named zones prove the
+/// system thermal-zone traversal in a real terminal frame, the unread zone
+/// keeps its named row with the shared dash, and the same-device `Package` row
+/// keeps the device-level fan context visible beside the system group. This is
+/// deterministic fixture data (the same zone families iced's capture fixture
+/// seeds), never a host read; an invalid fixture magnitude seeds nothing rather
+/// than panicking.
+pub(crate) fn seed_fan_capture_sensors(app: &mut TuiApp) {
+    use taskmanager_core::core::sensors::{
+        SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
+        SensorReading, SensorScale,
+    };
+
+    const OBSERVED_AT_MS: u64 = 1_785_292_800_000;
+    let fan = SensorMeasurementObservation::available(
+        SensorDescriptor::fan_speed(SensorScale::IDENTITY),
+        SensorMagnitude::Unsigned(2_400),
+        OBSERVED_AT_MS,
+    );
+    let package = SensorMeasurementObservation::available(
+        SensorDescriptor::temperature(SensorScale::IDENTITY),
+        SensorMagnitude::Decimal(51.0),
+        OBSERVED_AT_MS,
+    );
+    let acpitz = SensorMeasurementObservation::available(
+        SensorDescriptor::temperature(SensorScale::IDENTITY),
+        SensorMagnitude::Decimal(61.0),
+        OBSERVED_AT_MS,
+    );
+    let (Ok(fan), Ok(package), Ok(acpitz)) = (fan, package, acpitz) else {
+        return;
+    };
+    let reading =
+        |device: &str, id: &str, label: &str, observation: SensorMeasurementObservation| {
+            SensorReading::from_measurement_observation(
+                device.into(),
+                id.into(),
+                label.into(),
+                observation,
+            )
+            .with_device_generation(DeviceGeneration::new(1))
+        };
+    let readings = vec![
+        reading("hwmon:cpu", "cpu_fan", "cpu_fan", fan),
+        reading("hwmon:cpu", "cpu_package", "Package", package),
+        reading("thermal:acpitz", "acpitz", "acpitz", acpitz),
+        reading(
+            "thermal:nvme0",
+            "nvme0",
+            "nvme0",
+            SensorMeasurementObservation::unavailable(
+                SensorDescriptor::temperature(SensorScale::IDENTITY),
+                FailureKind::PermissionDenied,
+            ),
+        ),
+    ];
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut app.shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
+            state: DeviceState::healthy(OBSERVED_AT_MS),
+            timestamp_ms: OBSERVED_AT_MS,
+            readings,
+            ..Default::default()
+        })),
     );
 }
 
