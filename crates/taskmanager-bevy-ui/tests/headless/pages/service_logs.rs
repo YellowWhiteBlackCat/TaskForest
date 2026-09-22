@@ -390,42 +390,123 @@ fn the_chord_mapping_is_total_and_exclusive() {
 
 #[test]
 fn panel_controls_actually_move_the_log_state_and_a_stopped_feed_stays_quiet() {
-    let mut shell = ShellApp::new();
-    let service = taskmanager_core::core::target::ServiceId::new("demo.service");
-    let _ = shell.open_service_log_for(service);
+    let service = taskmanager_core::core::target::ServiceId::new("alpha.service");
+    let (mut app, events) = headless_services_app();
+    push_services(
+        &events,
+        vec![service_item(
+            "alpha.service",
+            "alpha",
+            ServiceStatus::Active,
+        )],
+    );
+    route_to_services(&mut app);
+    app.update();
 
-    shell.toggle_service_log_follow();
+    // Open the panel through the production request the page's own affordance
+    // fires, then drive every panel chord through the real keyboard dispatch:
+    // the open panel owns the Services-page keyboard, so the keys must move
+    // the shared log state rather than fall through to navigation.
+    app.world_mut()
+        .resource_mut::<crate::pages::services::ServiceSelection>()
+        .target = Some(service);
+    app.world_mut()
+        .commands()
+        .trigger(crate::pages::services::log_panel::ServiceLogsRequested);
+    app.update();
     assert!(
-        !shell.service_log.as_ref().expect("open").feed.follow,
-        "follow toggles off"
+        app.world()
+            .non_send::<crate::app::FrontendTrack>()
+            .shell
+            .service_log
+            .is_some(),
+        "the open request mounts the panel lifecycle"
     );
-    shell.toggle_service_log_paused();
+
+    press_input(&mut app, KeyCode::KeyF);
+    app.update();
     assert!(
-        shell.service_log.as_ref().expect("open").feed.paused,
-        "pause toggles on"
+        !app.world()
+            .non_send::<crate::app::FrontendTrack>()
+            .shell
+            .service_log
+            .as_ref()
+            .expect("open")
+            .feed
+            .follow,
+        "F toggles follow off through the keyboard lane"
     );
-    shell.cycle_service_log_level();
+
+    press_input(&mut app, KeyCode::KeyP);
+    app.update();
+    assert!(
+        app.world()
+            .non_send::<crate::app::FrontendTrack>()
+            .shell
+            .service_log
+            .as_ref()
+            .expect("open")
+            .feed
+            .paused,
+        "P pauses the feed through the keyboard lane"
+    );
+
+    press_input(&mut app, KeyCode::KeyL);
+    app.update();
     assert_eq!(
-        shell.service_log.as_ref().expect("open").feed.level,
+        app.world()
+            .non_send::<crate::app::FrontendTrack>()
+            .shell
+            .service_log
+            .as_ref()
+            .expect("open")
+            .feed
+            .level,
         ServiceLogLevelFilter::Errors,
-        "level cycles All -> Errors"
-    );
-    shell.cycle_service_log_time();
-    assert_eq!(
-        shell.service_log.as_ref().expect("open").feed.time,
-        ServiceLogTimeFilter::LastHour,
-        "time cycles All -> LastHour"
+        "L cycles All -> Errors"
     );
 
-    // A stopped feed never submits follow requests, and closing the panel
-    // leaves nothing behind that could poll.
-    assert!(
-        shell.poll_service_log(10_000).is_none(),
-        "follow-off + paused submit nothing"
+    press_input(&mut app, KeyCode::KeyT);
+    app.update();
+    assert_eq!(
+        app.world()
+            .non_send::<crate::app::FrontendTrack>()
+            .shell
+            .service_log
+            .as_ref()
+            .expect("open")
+            .feed
+            .time,
+        ServiceLogTimeFilter::LastHour,
+        "T cycles All -> LastHour"
     );
-    shell.close_service_log();
-    assert!(shell.service_log.is_none(), "close clears the lifecycle");
-    assert!(shell.poll_service_log(20_000).is_none());
+
+    // A stopped feed never submits follow requests, and the panel's own close
+    // chord clears the lifecycle so nothing can poll afterwards.
+    {
+        let world = app.world_mut();
+        let mut track = world.non_send_mut::<crate::app::FrontendTrack>();
+        assert!(
+            track.shell.poll_service_log(10_000).is_none(),
+            "follow-off + paused submit nothing"
+        );
+    }
+
+    press_input(&mut app, KeyCode::Escape);
+    app.update();
+    assert!(
+        app.world()
+            .non_send::<crate::app::FrontendTrack>()
+            .shell
+            .service_log
+            .is_none(),
+        "Escape closes the panel lifecycle"
+    );
+    {
+        let world = app.world_mut();
+        let mut track = world.non_send_mut::<crate::app::FrontendTrack>();
+        assert!(track.shell.poll_service_log(20_000).is_none());
+    }
 }
 
 // ---- repaint gate -----------------------------------------------------------

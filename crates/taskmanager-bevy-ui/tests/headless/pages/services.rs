@@ -836,3 +836,69 @@ fn service_control_buttons_arm_service_actions() {
         );
     }
 }
+
+/// The dependency-DAG definition's ordering-cycle clause: a typed `Before`
+/// cycle between inventory units paints the warning plate on exactly those
+/// rows through the shared cycle fold, while an acyclic unit stays unmarked.
+#[test]
+fn ordering_cycle_members_paint_the_warning_plate() {
+    use bevy::ecs::hierarchy::ChildOf;
+    use taskmanager_core::core::services::{
+        ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind,
+    };
+    use taskmanager_ui_contract::IconId;
+
+    let cyclic = |id: &str, name: &str, other: &str| {
+        service_item(id, name, ServiceStatus::Active).with_relations(
+            ServiceRelationGraph::from_edges([ServiceRelationEdge::new(
+                ServiceRelationKind::Before,
+                other,
+            )]),
+        )
+    };
+    let (mut app, events) = headless_services_app();
+    route_to_services(&mut app);
+    push_services(
+        &events,
+        vec![
+            cyclic("cycle-a.service", "cycle-a", "cycle-b.service"),
+            cyclic("cycle-b.service", "cycle-b", "cycle-a.service"),
+            service_item("plain.service", "plain", ServiceStatus::Active),
+        ],
+    );
+    app.update();
+    app.update();
+
+    let mut plate_query = app
+        .world_mut()
+        .query::<(Entity, &crate::icons::IconPlate)>();
+    let alert_entities: Vec<Entity> = plate_query
+        .iter(app.world())
+        .filter(|(_, plate)| plate.0 == IconId::Alert)
+        .map(|(entity, _)| entity)
+        .collect();
+    assert!(
+        !alert_entities.is_empty(),
+        "a typed ordering cycle must paint its warning plate"
+    );
+    let mut marked: Vec<String> = Vec::new();
+    for entity in alert_entities {
+        let mut current = entity;
+        loop {
+            if let Some(marker) = app.world().get::<ServicesRowMarker>(current) {
+                marked.push(marker.1.as_str().to_owned());
+                break;
+            }
+            match app.world().get::<ChildOf>(current) {
+                Some(parent) => current = parent.0,
+                None => break,
+            }
+        }
+    }
+    marked.sort_unstable();
+    assert_eq!(
+        marked,
+        vec!["cycle-a.service".to_owned(), "cycle-b.service".to_owned()],
+        "exactly the ordering-cycle members must carry the warning plate"
+    );
+}

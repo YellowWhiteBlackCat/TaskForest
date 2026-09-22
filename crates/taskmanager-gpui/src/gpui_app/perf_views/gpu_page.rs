@@ -15,7 +15,7 @@ use crate::gpui_app::formatting::{
     GraphUnit, PerformanceSettings, gpu_identity_text, missing_value,
 };
 use crate::gpui_app::graph::{GraphCacheHandle, GraphHover, GraphSettings};
-use crate::gpui_app::history_samples::{gpu_engine_samples, gpu_engine_series_names};
+use crate::gpui_app::history_samples::gpu_engine_samples;
 use crate::gpui_app::perf_views::gpu_stats::{
     VramCompositionData, gpu_stats, vram_composition_data,
 };
@@ -30,12 +30,13 @@ use taskmanager_core::core::units::{QuantityFamily, UnitPreferences};
 use taskmanager_shell::presentation::gpu_chart_metric::{
     GpuChartMetric, GpuChartMetricAvailability, gpu_chart_metric_history,
 };
-use taskmanager_shell::presentation::gpu_engine_rows::{
-    GpuEngineRowsPresentation, present_gpu_engine_rows,
-};
 use taskmanager_telemetry_store::live_graph::LiveGraphHistory;
 use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+
+pub(crate) mod engine_grid;
+
+use engine_grid::present_gpu_engine_mini_grid;
 
 /// Fixed geometry used by the GPU lower-band fit check. These are allocation
 /// bounds, not paint-time clipping dimensions: a group is admitted only when
@@ -118,34 +119,18 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
         graph_cache,
         max_rows,
     } = props;
-    let mut engine_names = gpu_engine_series_names(history, metrics);
-    if let GpuEngineRowsPresentation::Active(engines) =
-        present_gpu_engine_rows(engine_session, engine_device_id, engine_capability_status)
-    {
-        for engine in engines {
-            if !engine_names.iter().any(|name| name == &engine.name) {
-                engine_names.push(engine.name.clone());
-            }
-        }
-        engine_names.sort_unstable();
-    }
-    if engine_names.is_empty() {
-        return None;
-    }
-
-    let active_engines =
-        match present_gpu_engine_rows(engine_session, engine_device_id, engine_capability_status) {
-            GpuEngineRowsPresentation::Active(engines) => Some(engines),
-            _ => None,
-        };
-    let columns = engine_names.len().clamp(1, 4);
-    let visible_count = max_rows.map_or(engine_names.len(), |rows| {
-        engine_names.len().min(rows.saturating_mul(columns))
-    });
-    if visible_count == 0 {
-        return None;
-    }
-    let row_count = visible_count.div_ceil(columns);
+    let presentation = present_gpu_engine_mini_grid(
+        history,
+        metrics,
+        engine_session,
+        engine_device_id,
+        engine_capability_status,
+        max_rows,
+    )?;
+    let visible_count = presentation.visible_count();
+    let total_engines = presentation.total_engines;
+    let columns = presentation.columns;
+    let row_count = presentation.row_count();
     let mut grid = div()
         .flex()
         .flex_col()
@@ -174,10 +159,10 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
                     div()
                         .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_11))
                         .text_color(taskmanager_ui::theme_binding::hsla(theme.fg_dim))
-                        .child(if visible_count == engine_names.len() {
+                        .child(if visible_count == total_engines {
                             visible_count.to_string()
                         } else {
-                            format!("{visible_count} / {}", engine_names.len())
+                            format!("{visible_count} / {total_engines}")
                         }),
                 ),
         );
@@ -193,19 +178,8 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
             .w_full();
         for column_index in 0..columns {
             let index = row_index * columns + column_index;
-            if index < visible_count {
-                let name = &engine_names[index];
-                let current = active_engines
-                    .and_then(|engines| engines.iter().find(|engine| engine.name == *name))
-                    .map(|engine| engine.utilization_pct)
-                    .or_else(|| {
-                        metrics
-                            .engines
-                            .iter()
-                            .find(|engine| engine.name == *name)
-                            .map(|engine| engine.usage_pct)
-                    })
-                    .filter(|value| value.is_finite());
+            if let Some(cell) = presentation.cells.get(index) {
+                let name = &cell.name;
                 let samples = gpu_engine_samples(
                     &graph_cache,
                     history,
@@ -213,8 +187,9 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
                     metrics.device_generation,
                     name,
                 );
-                let cell_label = format!("{name}  {}", gpu_percentage_readout(current));
-                let cell = elements::mini_graph_cell(
+                let cell_label =
+                    format!("{name}  {}", gpu_percentage_readout(cell.utilization_pct));
+                let graph_cell = elements::mini_graph_cell(
                     theme,
                     (
                         ElementId::from("tm-gpu-engine-graph"),
@@ -228,11 +203,11 @@ fn render_gpu_engine_mini_grid(props: GpuEngineMiniGridProps<'_>) -> Option<AnyE
                 )
                 .size_full();
                 #[cfg(any(test, feature = "test-support"))]
-                let cell = {
+                let graph_cell = {
                     let debug_name = name.clone();
-                    cell.debug_selector(move || format!("tm-perf-gpu-engine:{debug_name}"))
+                    graph_cell.debug_selector(move || format!("tm-perf-gpu-engine:{debug_name}"))
                 };
-                row = row.child(div().flex_1().min_w(px(0.0)).child(cell));
+                row = row.child(div().flex_1().min_w(px(0.0)).child(graph_cell));
             } else {
                 row = row.child(div().flex_1().min_w(px(0.0)));
             }

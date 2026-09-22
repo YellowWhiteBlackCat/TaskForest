@@ -1,4 +1,7 @@
-use super::{PerfDevice, device_name, marker_line, page_name, target_marker_line};
+use super::{
+    PerfDevice, append_device_marker, append_marker, device_name, marker_line, page_name,
+    target_marker_line,
+};
 
 #[must_use]
 pub(crate) fn device_marker_line(device: PerfDevice) -> String {
@@ -11,6 +14,43 @@ fn marker_line_has_typed_capture_identity() {
         marker_line("frame_ready", "demo", "performance"),
         "ICED_CAPTURE_MARKER event=frame_ready mode=demo page=performance\n"
     );
+
+    // The format is only half of the readiness contract: the external runner
+    // reads the file the production app appends. Drive the real append path —
+    // the page marker and the typed device target marker — and read back what
+    // the capture script sees.
+    let dir = crate::test_support::temp_dir("capture-marker");
+    let path = dir.join("markers.txt");
+    append_marker(
+        &path,
+        "frame_ready",
+        "demo",
+        page_name(taskmanager_application::AppPage::Applications),
+    );
+    append_device_marker(&path, PerfDevice::Gpu(0));
+    let text = std::fs::read_to_string(&path).expect("the appended marker file");
+    assert!(
+        text.contains("ICED_CAPTURE_MARKER event=frame_ready mode=demo page=applications\n"),
+        "the appended page marker must carry the live page: {text:?}"
+    );
+    assert!(
+        text.contains(
+            "ICED_CAPTURE_MARKER event=target_ready mode=demo page=performance device=gpu\n"
+        ),
+        "the appended target marker must carry the typed device token: {text:?}"
+    );
+
+    // A failed marker write is deliberately ignored: an unwritable evidence
+    // path degrades to a missing marker the validator rejects, never to an
+    // application failure.
+    let unwritable = dir.join("missing-parent").join("markers.txt");
+    append_marker(&unwritable, "frame_ready", "demo", "performance");
+    append_device_marker(&unwritable, PerfDevice::Cpu);
+    assert!(
+        !unwritable.exists(),
+        "an unwritable marker path must not fabricate evidence"
+    );
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]
