@@ -439,6 +439,35 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   (57.0 °C) rows, and the honest `nvme` dash, with the alert panel below them
   in frame, so the `power.thermal-zones` pixel cell is no longer a SKIP; the
   headless anchor above remains the always-run evidence.
+- **TUI capture now covers the Fan page's system thermal group (W21-B).** The
+  TUI route stays one supervised frame (`scripts/capture-tui.sh`, no scenario
+  table); the Fan device reaches the system group through the capture fixture
+  (`TM_TUI_CAPTURE_DEVICE=fan` seeds deterministic non-host readings:
+  `hwmon:cpu` `cpu_fan` + `Package` 51.0 °C, readable `thermal:acpitz`
+  61.0 °C, and permission-denied `thermal:nvme0`). The targeted run
+  `TM_TUI_CAPTURE_PAGE=performance TM_TUI_CAPTURE_DEVICE=fan bash
+  scripts/capture-tui.sh` landed 2026-09-22 (clean upstream tree at
+  `16fea6372376`; the run recorded `worktree=dirty` only because an unrelated
+  concurrent line held two non-TUI files modified) and produced
+  `target/tui-evidence/runs/577ee263-933f-4be2-ac2d-e2d7ea62568d/tui-mvp.png`
+  (1184x859, 66322 B, sha256
+  `779f7b039021b9f79fa2a3af6f929f4a5f3e8f88b217e3b89533cfef4b7c8e80`) with
+  `tui-capture-validation.json` `status=pass` and source manifest sha256
+  `2343be520857edadaa69da5636ddc7c583c5735fcf933b46437e9cb3c11d1854`;
+  `target/tui-evidence/latest` points at the run, and the receipt satisfies the
+  TUI component of `ui-evidence-route.sh --require-capture` (diagnostic base
+  `277f9b28~1`: the missing list named only `gpui-capture`, itself caused by
+  the same diff touching `crates/taskmanager-ui-contract/*`). The frame shows
+  the Fan selector `风扇 1 · · · · cpu_fan · 2400 RPM`, the device rows
+  `转速 2400 RPM · PWM —` and `温度 Package · 51.0 °C`, then the system group
+  header `温度` with `Package · 51.0 °C`, `acpitz · 61.0 °C` and the honest
+  unread `nvme0 · —`, none of them clipped. Unit words are localized by the
+  host locale (zh-CN: 转速 = speed, 温度 = temperature); source labels and
+  numeric values are locale-independent, and the fixture never reads the host.
+  The `power.thermal-zones` headless anchor in `feature_evidence.tsv` remains
+  the always-run evidence; the pixel frame is the targeted run, preconditioned
+  on a Wayland session plus `dbus-run-session`, `kwin_wayland --virtual` and
+  `niri` and bounded by the supervisor's 30-minute limit.
 
 ## Discipline
 
