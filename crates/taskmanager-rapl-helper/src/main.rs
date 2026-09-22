@@ -162,6 +162,6 @@ fn serialize_error_json(detail: &str) -> (String, Option<ErrorKindJson>) {
 #[path = "../tests/headless/rapl_helper_main.rs"]
 mod tests;
 
-#[cfg(test)]
+#[cfg(all(test, target_os = "linux"))]
 #[path = "../tests/common/test_support.rs"]
 pub(crate) mod test_support;

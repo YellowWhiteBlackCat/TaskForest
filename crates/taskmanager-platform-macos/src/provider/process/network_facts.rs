@@ -73,12 +73,12 @@ fn collect_nettop_process_rates() -> HashMap<u32, (Option<u64>, Option<u64>)> {
             "-J",
             "pid,bytes_in,bytes_out",
         ]);
-        return match run_with_timeout(&mut command, NETTOP_TIMEOUT) {
+        match run_with_timeout(&mut command, NETTOP_TIMEOUT) {
             Ok(output) if output.status.success() => {
                 parse_nettop_csv(&String::from_utf8_lossy(&output.stdout))
             }
             _ => HashMap::new(),
-        };
+        }
     }
     #[cfg(not(target_os = "macos"))]
     {

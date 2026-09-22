@@ -276,11 +276,11 @@ fn collect_ioreg_gpu_utilization() -> Result<Option<f32>, FailureKind> {
             return Err(FailureKind::TemporarilyUnavailable);
         }
         let values = parse_ioreg_gpu_utilizations(&String::from_utf8_lossy(&output.stdout));
-        return if values.len() == 1 {
+        if values.len() == 1 {
             Ok(Some(values[0]))
         } else {
             Ok(None)
-        };
+        }
     }
     #[cfg(not(target_os = "macos"))]
     {

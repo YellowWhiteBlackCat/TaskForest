@@ -55,6 +55,25 @@ fn error_contracts_keep_distinct_exit_meanings() {
     );
 }
 
+/// Non-Linux Unix targets must answer affinity with the typed `Unsupported`
+/// vocabulary before any `/proc` identity probe (that probe is Linux-only),
+/// while Windows keeps its native affinity path.
+#[cfg(all(unix, not(target_os = "linux")))]
+#[test]
+fn affinity_is_typed_unsupported_on_non_linux_unix() {
+    match apply_operation(1, 1, &Operation::Affinity(vec![0])) {
+        Err(error) => {
+            assert_eq!(error.kind(), "unsupported");
+            assert_eq!(error.exit_code(), 69);
+            assert!(
+                error.detail().contains("affinity"),
+                "detail must name the unsupported operation, got {error:?}"
+            );
+        }
+        Ok(()) => panic!("non-Linux Unix must not claim affinity support"),
+    }
+}
+
 // Behavior tests for the check-to-act identity seam. A deterministic
 // "pid was recycled into an innocent successor" cannot be constructed in a
 // test, so these assert the equivalent invariants the TOCTOU fix must keep:
