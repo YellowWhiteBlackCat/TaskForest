@@ -36,11 +36,24 @@ telemetry as a shortcut.
 ## Module map
 
 ```text
-Call-group modules, one per audited surface:
-pdh/ (performance counters)  process/ (+ insights, tree)  gpu  disk  network  power
-thermal  display  event_log  smbios  task_scheduler  job_control  sessions
-known_folders  time_zones  single_instance  msg_pump  runas (UAC, ADR-035)
-npu  open_files  process_network  icons  memory_info
+src/pdh/                         performance counters (counters.rs, cpu.rs, gpu.rs)
+src/process/                     exact-process control (+ insights/)
+src/process_tree.rs              ToolHelp32 process tree snapshot
+src/process_network.rs           IP Helper per-process network tables
+src/gpu.rs  disk.rs  network.rs  power.rs  thermal.rs  display.rs
+src/memory_info.rs               kernel-snapshot memory/compression size
+src/event_log.rs                 Windows Event Log (EvtQuery/EvtSubscribe)
+src/smbios.rs                    SMBIOS table reading
+src/task_scheduler.rs            startup-item inventory
+src/job_control.rs               job-object process limits
+src/sessions.rs                  WTS session inventory and lock
+src/topology.rs                  CPU topology and cache
+src/npu.rs                       SetupAPI compute-accelerator (NPU) inventory
+src/open_files.rs                handle-table open-files lane
+src/icons.rs                     process icon extraction
+src/known_folders.rs  time_zones.rs  single_instance.rs  msg_pump.rs
+src/runas.rs                     UAC ShellExecuteExW(\"runas\") (ADR-035)
+src/wsl.rs                       LXss registry WSL distribution inventory
 ```
 
 Every unsafe block carries a SAFETY proof; public APIs return typed values only (ADR-031).

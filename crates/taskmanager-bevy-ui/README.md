@@ -36,16 +36,15 @@ adopted — theme tokens are the only skin authority.
   page mounting, and `ShellTrack`: the SystemParam every page reads the
   folded projection through (the page-agent data entry).
 - `src/input.rs` — the real-input seam: Bevy keyboard events forwarded
-  through the shell's own routers (`handle_local_key`/`handle_local_char`),
-  the frontend-owned route chords (the shell page always follows the visible
-  page), the Dialog-scope Enter mapping, the per-inventory action-menu open
-  chords, the `PendingEffects` effect bridge to the drain, and the one-shot
-  quit forward.
+  through the shell's own routers, the frontend-owned route chords (the
+  shell page always follows the visible page), the Dialog-scope Enter
+  mapping, the per-inventory action-menu open chords, the `PendingEffects`
+  effect bridge to the drain, and the one-shot quit forward.
 - `src/confirmation.rs` — the shell's armed destructive-action gate rendered
   as one modal under the app shell root, with typed confirm/dismiss paths
   and republished gate transitions.
 - `src/semantic.rs` — the accessibility seam: the ui-contract
-  `SemanticSnapshot` (revision-keyed) plus `bevy_a11y` row nodes.
+  `SemanticSnapshot` (revision-keyed) plus accessibility row nodes.
 - `src/window.rs` — the bsn! app shell (route-aware shell + nav rail + content slot),
   including the shared MiSans VF UI and Roboto Mono telemetry font roles.
   and its observers; the bsn! idiom reference for this crate.

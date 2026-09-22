@@ -261,13 +261,32 @@ evidence. Component implementation belongs to `taskmanager-ui`.
 ## Module map
 
 ```text
-src/assets.rs  src/capture.rs          assets and evidence capture
-src/gpui_app/                          RootView composition root
+src/assets.rs  capture.rs  run.rs      assets, evidence capture, binary entry
+src/window_presentation.rs             layer-shell / standalone host adapter
+src/gpui_app.rs                        RootView composition root
+├── root/                              root view layout and lifecycle
 ├── chrome.rs  containers_view.rs      window skeleton and containers
-├── dashboard/  cpu_view/  graph/      pages and cards (ADR-038/039 budgets)
-├── functional.rs                      CORE-04 GPUI surface declarations
-├── first_run.rs  about.rs  app_history_view.rs
-└── elements.rs  formatting.rs  capabilities.rs
+├── sidebar/                           navigation sidebar
+├── dashboard/                         dashboard page and cards
+├── perf_views/                        performance page composition (ADR-039)
+├── cpu_view/                          per-core CPU detail views
+├── processes_view/                    process table page
+├── process_insights/                  per-process detail overlay
+├── services_view/                     services page
+├── startup_view/                      startup items page
+├── users_view/                        user sessions page
+├── system_view/                       system information page
+├── system_health_view/                system health page
+├── settings_view/                     settings page
+├── graph/                             shared graph/chart components
+├── elements/                          shared UI elements
+├── list_view.rs                       virtual list component
+├── history_samples.rs  timeline.rs    history and timeline rendering
+├── help_overlay.rs                    keyboard help overlay
+├── system_about.rs  about.rs          system/app about pages
+├── app_history_view.rs  first_run.rs  application history and first-run
+├── functional.rs  capabilities.rs     CORE-04 declarations and capabilities
+├── icons.rs  theme.rs  formatting.rs  icon bindings, theme, formatting
 ```
 
 Consumes shell projections only; every frame drains a bounded projection cache.

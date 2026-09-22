@@ -1,5 +1,7 @@
 # Bevy UI 第四前端章程
 
+> **Role**: Architecture — decisions, constraints, layer boundaries. For widget/rendering patterns see [UI_GUIDE_BEVY_UI.md](UI_GUIDE_BEVY_UI.md).
+
 `taskmanager-bevy-ui` 是第四个前端：以 Bevy 0.19 的官方两件套 `bevy_ui` +
 `bevy_ui_widgets` 渲染同一份中立 shell 投影。本文是它当前的公开事实权威；
 跨前端组件契约归 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)，

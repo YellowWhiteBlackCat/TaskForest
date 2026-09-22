@@ -1,5 +1,7 @@
 # Bevy UI (TaskForest-B) 前端架构与开发指南
 
+> **Role**: Implementation guide — widget patterns, rendering, interaction. For architecture decisions see [BEVY_UI_FRONTEND.md](BEVY_UI_FRONTEND.md).
+
 本文定义 `taskmanager-bevy-ui` 前端基于 Bevy 0.19 的数据驱动 ECS 架构范式与交互纪律。
 跨端中立契约见 [UI_COMPONENT_ARCHITECTURE.md](UI_COMPONENT_ARCHITECTURE.md)。
 

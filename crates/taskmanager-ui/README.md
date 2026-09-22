@@ -70,11 +70,25 @@ page adapters retain column identity and persistence.
 ## Module map
 
 ```text
-src/data/                        table, tree, virtual list, row models, highlighting
-│   └── data/table/              columns, interaction, model, render, resize
-src/inputs/                      checkbox, select, slider, switch, text_input, search_input
-src/overlays/                    context_menu, dialog, dropdown_menu, popup, layer_stack
-src/layout.rs (+ adaptive_grid.rs)  focus.rs
+src/primitives.rs                 foundational UI primitives
+│   ├── button.rs  icon_button.rs  label.rs  selectable_text.rs
+│   ├── badge.rs  pill.rs  divider.rs  spinner.rs  progress.rs
+│   ├── toolbar.rs  section_header.rs  state_panel.rs  card_surface.rs
+│   ├── tooltip.rs  scrollbar/  segmented.rs  motion.rs
+src/data.rs                       data display components
+│   ├── table/                    columns, interaction, model, render, resize
+│   ├── tree.rs  virtual_list/    hierarchical tree and virtualized list
+│   ├── highlighter.rs  row.rs  key_value_row.rs
+src/inputs.rs                     input components
+│   ├── checkbox.rs  select.rs  slider.rs  switch.rs
+│   ├── text_input/  search_input.rs
+src/overlays.rs                   overlay components
+│   ├── context_menu.rs  dialog.rs  dropdown_menu.rs
+│   ├── popup.rs  layer_stack.rs  toast.rs
+src/layout.rs  layout/adaptive_grid.rs    page viewport/scaffold and grid
+src/focus.rs                      modal focus trap/restore
+src/styled.rs                     palette-driven style helpers
+src/icons_binding.rs  theme_binding.rs    icon and theme integration
 ```
 
 Toolkit-neutral component contracts; each frontend materializes them (ADR-017/020/026).

@@ -202,11 +202,19 @@ timeout, delivery ownership and live drain without host UI.
 ## Module map
 
 ```text
-src/assembly.rs  composition.rs     channel assembly and composition
-src/channel/                        one bounded channel per capability (lanes, port, budget)
-src/delivery/                       FairEventPort + EventClass fair delivery
-│                                   (event_port, event_queue, publisher, worker/, catalog)
-src/ecs/                            Bevy ECS scheduling kernel: WorkState admission,
-│                                   lease renewal, stall and terminal verdicts (ADR-033)
-src/health.rs  lifecycle.rs  config.rs   runtime health, lifecycle and configuration
+src/assembly.rs  composition.rs        channel assembly and composition
+src/registration.rs                    provider catalog wiring
+src/channel/                           one bounded channel per capability
+│   └── construction/  lanes.rs  port.rs
+src/delivery/                          FairEventPort + EventClass fair delivery
+│   └── event_port.rs  event_queue.rs  publisher.rs  worker/  catalog.rs
+src/ecs/                               Bevy ECS scheduling kernel (ADR-033)
+│   └── domain.rs  lifecycle/  scheduling_systems.rs  target_jobs.rs
+src/process/  (+ spawn.rs)             process worker jobs and startup
+src/system/  (+ snapshot_lanes.rs)     system telemetry jobs
+src/storage/  (+ directory_scan.rs  smart_state.rs  smart_tracking.rs)
+src/environment.rs  integration.rs     environment and integration jobs
+src/power.rs  sensor.rs  service.rs    power, sensor, service jobs
+src/absent.rs                          absent-capability typed handle
+src/health.rs  lifecycle.rs  config.rs runtime health, lifecycle and configuration
 ```

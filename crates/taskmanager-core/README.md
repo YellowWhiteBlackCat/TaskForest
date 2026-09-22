@@ -126,13 +126,25 @@ republish the old vocabulary.
 src/core.rs                     owner-module index for every fact below
 ├── metrics/                    domain measurements and availability joins
 │   └── */wire.rs               private ingress DTOs (legacy payloads canonicalize here)
-├── process/                    process facts: identity.rs (ProcessLiveKey),
-│                               aggregate.rs, group_aggregate.rs
+├── process/                    process facts: identity.rs, aggregate.rs, group_aggregate.rs
+├── process_telemetry/          per-process GPU/network/resource telemetry facts
+├── process_batch_history.rs    batched process history snapshots
 ├── services/  startup/         service and startup-item facts
 ├── alerts/                     alert rules, active-set transitions, bounded event export
 ├── export/                     typed export formatting (CSV and friends)
-├── history.rs  config.rs       gap-aware history and configuration facts
-└── identity.rs  hardware.rs  failure.rs  diagnostics/  …
+├── sensors/                    thermal and fan sensor facts
+├── smart/                      SMART health and attribute facts
+├── time/                       TZif parsing, local time rules, time-zone transitions
+├── config/  config.rs          configuration facts and runtime config groups
+├── diagnostics/                diagnostic snapshot and bundle facts
+├── history.rs                  gap-aware history facts
+├── storage.rs  storage_health.rs  directory_usage.rs   storage and health facts
+├── power.rs  npu.rs            power/RAPL and NPU accelerator facts
+├── cpu_codename.rs  cpu_features.rs                    CPU identity facts
+├── appearance.rs  text.rs  units.rs  tray.rs           presentation helpers
+├── device_state.rs  system_health.rs  kernel_log.rs    system-level facts
+├── session.rs  setup.rs  source.rs  target.rs          session/setup/source identity
+└── identity.rs  hardware.rs  failure.rs                core identity and failure types
 ```
 
 Pure rules and typed facts only: no I/O, no clock reads, no toolkit types.

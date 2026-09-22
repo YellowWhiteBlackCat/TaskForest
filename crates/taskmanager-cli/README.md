@@ -37,3 +37,15 @@ null/discriminators, never a fabricated `0`) is proven end-to-end by
 `tests/logic/main_tests.rs` against the real native runtime, and the parser/
 renderer contracts by the `cli_*_tests` units mounted through `#[path]`.
 Run: `cargo nextest run -p taskmanager-cli -j 4`.
+
+## Module map
+
+```text
+src/cli.rs (+ cli/suggest.rs)              argv parsing, CliMode, typed arg errors
+src/run.rs                                 FrontendHandlers composition and entry
+src/cli_gpu_engines.rs                     --gpu-engines escalation mode
+src/cli_memory_smbios.rs                   --memory-smbios escalation mode
+src/cli_msr.rs                             --msr escalation mode
+src/cli_package_power.rs                   --package-power escalation mode
+src/cli_process_gpu.rs                     per-process GPU fdinfo bulk scan
+```

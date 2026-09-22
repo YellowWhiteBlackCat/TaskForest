@@ -36,9 +36,16 @@ runtime wiring.
 ## Module map
 
 ```text
-src/provider/                  process, storage, system, sensor, service, environment,
-│                              power, gpu, integration providers
-src/bindings.rs                safe system-API bindings with typed degradation
+src/provider.rs                        capability provider implementations
+├── process/  process.rs               process control and telemetry
+├── process_facts.rs                   per-process fact assembly
+├── storage/  storage.rs               disk inventory and SMART
+├── system/  system.rs                 system telemetry and hardware
+├── sensor.rs  service.rs              thermal sensors and launchd services
+├── environment.rs  integration.rs     environment and integration providers
+├── power.rs  gpu.rs                   power and GPU providers
+├── directory_usage.rs                 directory size scanning
+src/bindings.rs                        safe system-API bindings with typed degradation
 src/instance.rs  config.rs  tray.rs  window_capture.rs
 ```
 
