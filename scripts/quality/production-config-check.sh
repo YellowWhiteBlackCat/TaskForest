@@ -17,7 +17,9 @@
 #
 # `check` (not `build`) keeps the stage inside the check-artifact cache and
 # still runs every rustc lint; `-D warnings` is the same policy as CI's
-# workflow-level RUSTFLAGS. Each command is bounded by its own `timeout`.
+# workflow-level RUSTFLAGS. Each command is bounded by its own external
+# `timeout` where the host provides a GNU one (see the deadline-selection
+# block below).
 #
 # Usage:
 #   scripts/quality/production-config-check.sh [gpui|iced|tui|bevy ...]
@@ -29,6 +31,16 @@
 #   TM_CARGO_LOCK                    set-but-empty replicates the gate's
 #                                    unlocked dev-phase fallback
 #   CARGO_BUILD_JOBS                 parallelism (default 4, capped by -j 4)
+#
+# Portability: the macOS runner image ships no GNU coreutils, so neither
+# `timeout` nor `gtimeout` exists there, and Git Bash can resolve Windows'
+# System32 `timeout.exe`, which rejects GNU flags. The selection block below
+# therefore probes `--kill-after` behavior instead of trusting `command -v`
+# alone; with no usable tool the stage still runs every command and prints
+# "no external timeout available", leaving the caller's budget (the `timeout`
+# wrapper in ci.yml, `run_stage`'s deadline in local-gates.sh, the portability
+# job's `timeout-minutes` on macOS) as the only deadline. On such a host
+# PRODUCTION_CONFIG_TIMEOUT is inert.
 
 set -u
 
@@ -54,10 +66,26 @@ lock_args=()
 
 check_timeout="${PRODUCTION_CONFIG_TIMEOUT:-900}"
 
+# Portable external deadline (see the portability note above): prefer GNU
+# `timeout`, accept Homebrew's `gtimeout` (same GNU coreutils flags), and
+# otherwise run unbounded with a printed notice. The probe runs `true` under a
+# short deadline so a shadowed non-GNU `timeout` is rejected by behavior, not
+# by name.
+timeout_bin=""
+if command -v timeout >/dev/null 2>&1 && timeout --kill-after=1s 5s true >/dev/null 2>&1; then
+    timeout_bin="timeout"
+elif command -v gtimeout >/dev/null 2>&1 && gtimeout --kill-after=1s 5s true >/dev/null 2>&1; then
+    timeout_bin="gtimeout"
+fi
+
 frontends="${*:-gpui iced tui bevy}"
 echo "production-config: frontends=$frontends"
 echo "production-config: RUSTFLAGS=$RUSTFLAGS"
-echo "production-config: lock=${lock_flag:-unlocked} timeout=${check_timeout}s per command"
+if [[ -n "$timeout_bin" ]]; then
+    echo "production-config: lock=${lock_flag:-unlocked} timeout=${check_timeout}s per command (via $timeout_bin)"
+else
+    echo "production-config: lock=${lock_flag:-unlocked} no external timeout available (timeout/gtimeout unusable); commands run unbounded" >&2
+fi
 
 failed_labels=()
 
@@ -68,7 +96,17 @@ run_check() {
     echo "--- $label"
     echo "+ $*"
     local rc=0
-    timeout --kill-after=30s "$check_timeout" "$@" || rc=$?
+    case "$timeout_bin" in
+    timeout)
+        timeout --kill-after=30s "$check_timeout" "$@" || rc=$?
+        ;;
+    gtimeout)
+        gtimeout --kill-after=30s "$check_timeout" "$@" || rc=$?
+        ;;
+    *)
+        "$@" || rc=$?
+        ;;
+    esac
     if [[ $rc -eq 0 ]]; then
         echo "PASS $label"
     else
