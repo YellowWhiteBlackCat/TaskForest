@@ -20,6 +20,11 @@ discovery payloads and proves the resolver is not a rubber stamp:
 * the optional requirement authority rejects an unknown `p0_id`, reports
   per-frontend `P0-MC-*` coverage, and `--require-requirement-coverage` fails
   closed on an uncovered `(frontend, requirement)` cell;
+* the feature-level evidence table resolves every anchored `(feature_id,
+  frontend)` test id against discovery, reports a dangling anchor with its
+  cell and test id, counts `pending` rows separately, and rejects a malformed
+  row (missing test id, note on an anchored row, test id on a pending row,
+  empty gap note, duplicate cell, unknown frontend or status);
 * the `--scope auto` diff-scope only skips when no evidence-relevant path
   changed, evaluates fail-closed when the git probe fails, and never treats a
   skipped diff as a resolved anchor set.
@@ -47,6 +52,8 @@ _spec.loader.exec_module(resolver)
 
 HEADER = "\t".join(resolver.MANIFEST_FIELDS)
 INTERACTION_HEADER = "\t".join(resolver.INTERACTION_FIELDS)
+FEATURE_HEADER = "\t".join(resolver.FEATURE_EVIDENCE_FIELDS)
+DEFAULT_FEATURE_EVIDENCE = "scripts/parity/feature_evidence.tsv"
 
 CHECKS = 0
 FAILURES: list[str] = []
@@ -125,6 +132,48 @@ def write_interaction_matrix(path: Path, rows: list[str]) -> Path:
     return path
 
 
+def feature_row(
+    feature_id: str,
+    frontend: str,
+    *,
+    test_id: str = "-",
+    status: str = "anchored",
+    note: str = "-",
+) -> str:
+    """One feature-evidence row; anchored rows default to the `-` note."""
+    return "\t".join([feature_id, frontend, test_id, status, note])
+
+
+def write_feature_evidence(path: Path, rows: list[str]) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text("\n".join([FEATURE_HEADER, *rows]) + "\n", encoding="utf-8")
+    return path
+
+
+# The synthetic committed feature table: one anchored row per frontend, each
+# naming a test `base_discovery` really discovers.  The real vocabulary is owned
+# by Rust; a synthetic id is enough for resolution.
+FEATURE_GPUI_TEST = "feature_suite::anchor_gpui"
+FEATURE_ICED_TEST = "feature_suite::anchor_iced"
+FEATURE_TUI_TEST = "feature_suite::anchor_tui"
+FEATURE_BEVY_TEST = "feature_suite::anchor_bevy"
+
+DEFAULT_FEATURE_ROWS = [
+    feature_row("process.scheduler-policy", "gpui", test_id=FEATURE_GPUI_TEST),
+    feature_row("process.scheduler-policy", "iced", test_id=FEATURE_ICED_TEST),
+    feature_row("process.scheduler-policy", "tui", test_id=FEATURE_TUI_TEST),
+    feature_row("process.scheduler-policy", "bevy", test_id=FEATURE_BEVY_TEST),
+]
+
+
+def default_feature_evidence(repo: Path) -> Path:
+    """Materialize the synthetic default table where the resolver looks for it."""
+    path = repo / DEFAULT_FEATURE_EVIDENCE
+    if not path.is_file():
+        write_feature_evidence(path, DEFAULT_FEATURE_ROWS)
+    return path
+
+
 def write_requirements(path: Path, ids: list[str]) -> Path:
     path.write_text(
         "\n".join(["requirement_id", *ids]) + "\n", encoding="utf-8"
@@ -156,7 +205,16 @@ def namespace(
     interaction_matrix: Path | None = None,
     requirements: Path | None = None,
     require_requirement_coverage: bool = False,
+    feature_evidence: Path | None = None,
 ) -> argparse.Namespace:
+    # The feature-evidence source is default-on (the gate consumes it without a
+    # flag), so every synthetic repo carries a committed-shape table unless a
+    # test overrides the path.
+    materialized = (
+        feature_evidence
+        if feature_evidence is not None
+        else default_feature_evidence(repo)
+    )
     return argparse.Namespace(
         manifest=str(manifest),
         interaction_matrix=str(interaction_matrix) if interaction_matrix else None,
@@ -164,6 +222,7 @@ def namespace(
         capture_scenarios=[],
         requirements=str(requirements) if requirements else None,
         require_requirement_coverage=require_requirement_coverage,
+        feature_evidence=str(materialized),
         nextest=False,
         nextest_timeout=30,
         scope=scope,
@@ -202,10 +261,18 @@ BASE_ROWS = [
 
 def base_discovery(tmp: Path) -> dict[str, Path]:
     return {
-        "gpui": write_json_discovery(tmp / "gpui.json", ["suite::alpha_ok"]),
-        "iced": write_json_discovery(tmp / "iced.json", ["suite::beta_ok"]),
-        "tui": write_json_discovery(tmp / "tui.json", ["suite::tui_ok"]),
-        "bevy": write_json_discovery(tmp / "bevy.json", ["suite::bevy_ok"]),
+        "gpui": write_json_discovery(
+            tmp / "gpui.json", ["suite::alpha_ok", FEATURE_GPUI_TEST]
+        ),
+        "iced": write_json_discovery(
+            tmp / "iced.json", ["suite::beta_ok", FEATURE_ICED_TEST]
+        ),
+        "tui": write_json_discovery(
+            tmp / "tui.json", ["suite::tui_ok", FEATURE_TUI_TEST]
+        ),
+        "bevy": write_json_discovery(
+            tmp / "bevy.json", ["suite::bevy_ok", FEATURE_BEVY_TEST]
+        ),
     }
 
 
@@ -240,19 +307,24 @@ INTERACTION_ROWS = [
 
 
 def interaction_discovery(tmp: Path) -> dict[str, Path]:
-    """Discovery carrying both the facet anchors and the interaction anchors."""
+    """Discovery carrying both the facet anchors, the feature anchors, and the
+    interaction anchors."""
     return {
         "gpui": write_json_discovery(
-            tmp / "gpui.json", ["suite::alpha_ok", INTERACTION_GPUI_TEST]
+            tmp / "gpui.json",
+            ["suite::alpha_ok", FEATURE_GPUI_TEST, INTERACTION_GPUI_TEST],
         ),
         "iced": write_json_discovery(
-            tmp / "iced.json", ["suite::beta_ok", INTERACTION_ICED_TEST]
+            tmp / "iced.json",
+            ["suite::beta_ok", FEATURE_ICED_TEST, INTERACTION_ICED_TEST],
         ),
         "tui": write_json_discovery(
-            tmp / "tui.json", ["suite::tui_ok", INTERACTION_TUI_TEST]
+            tmp / "tui.json",
+            ["suite::tui_ok", FEATURE_TUI_TEST, INTERACTION_TUI_TEST],
         ),
         "bevy": write_json_discovery(
-            tmp / "bevy.json", ["suite::bevy_ok", INTERACTION_BEVY_TEST]
+            tmp / "bevy.json",
+            ["suite::bevy_ok", FEATURE_BEVY_TEST, INTERACTION_BEVY_TEST],
         ),
     }
 
@@ -308,8 +380,9 @@ def test_legal_anchor_passes(tmp: Path) -> None:
 
 def test_dangling_anchor_fails(tmp: Path) -> None:
     discovery = base_discovery(tmp)
-    # Simulate deleting the referenced iced test.
-    write_json_discovery(discovery["iced"], ["suite::unrelated"])
+    # Simulate deleting the referenced iced test (the feature table's iced
+    # anchor stays discoverable, so only the facet anchor dangles).
+    write_json_discovery(discovery["iced"], ["suite::unrelated", FEATURE_ICED_TEST])
     report = run(tmp, BASE_ROWS, discovery)
     check(report["status"] == "fail", "deleting a referenced test fails the run")
     check(report["counts"]["dangling"] == 1, "deleted anchor is dangling")
@@ -346,13 +419,17 @@ def test_plain_text_discovery(tmp: Path) -> None:
     text = tmp / "gpui-list.txt"
     text.write_text(
         "taskmanager-gpui suite::alpha_ok\n"
-        "taskmanager-gpui suite::extra\n",
+        "taskmanager-gpui suite::extra\n"
+        f"taskmanager-gpui {FEATURE_GPUI_TEST}\n",
         encoding="utf-8",
     )
     discovery = base_discovery(tmp) | {"gpui": text}
     report = run(tmp, BASE_ROWS, discovery)
     check(report["status"] == "pass", "plain --list text discovery is accepted")
-    check(report["frontends"]["gpui"]["discovered_tests"] == 2, "plain text names parsed")
+    check(
+        report["frontends"]["gpui"]["discovered_tests"] == 3,
+        "plain text names parsed",
+    )
 
 
 def test_malformed_manifest_fails_loudly(tmp: Path) -> None:
@@ -761,9 +838,9 @@ def test_requirement_authority_rejects_unknown_id(tmp: Path) -> None:
 def test_interaction_matrix_dangling(tmp: Path) -> None:
     discovery = interaction_discovery(tmp)
     # Deleting the referenced iced test turns the exact-anchor cell dangling.
-    write_json_discovery(discovery["iced"], ["suite::beta_ok"])
+    write_json_discovery(discovery["iced"], ["suite::beta_ok", FEATURE_ICED_TEST])
     # Deleting the GPUI case-prefix test turns the prefix-channel cell dangling.
-    write_json_discovery(discovery["gpui"], ["suite::alpha_ok"])
+    write_json_discovery(discovery["gpui"], ["suite::alpha_ok", FEATURE_GPUI_TEST])
     report = run_interaction(tmp, INTERACTION_ROWS, discovery)
     check(report["status"] == "fail", "deleting an interaction anchor fails the run")
     check(
@@ -899,6 +976,172 @@ def test_interaction_matrix_absent_leaves_report_unchanged(tmp: Path) -> None:
     )
 
 
+def test_feature_evidence_resolves(tmp: Path) -> None:
+    report = run(tmp, BASE_ROWS, base_discovery(tmp))
+    check(report["status"] == "pass", "the committed feature table resolves")
+    check(
+        report["counts"]["feature_cells"] == 4
+        and report["counts"]["feature_anchored"] == 4,
+        "four feature anchors are counted",
+    )
+    check(
+        report["counts"]["feature_pending"] == 0
+        and report["counts"]["feature_dangling"] == 0,
+        "no feature cell is pending or dangling",
+    )
+    check(
+        report["feature_evidence"]["path"].endswith(DEFAULT_FEATURE_EVIDENCE)
+        and report["feature_evidence"]["rows"] == 4,
+        "the default feature table is the resolved source",
+    )
+    check(
+        report["counts"]["pending"] == 1,
+        "the feature table adds no pending share to the facet count",
+    )
+
+
+def test_feature_evidence_dangling(tmp: Path) -> None:
+    discovery = base_discovery(tmp)
+    # Simulate deleting the referenced Bevy feature test.
+    write_json_discovery(discovery["bevy"], ["suite::unrelated"])
+    report = run(tmp, BASE_ROWS, discovery)
+    check(report["status"] == "fail", "deleting a referenced feature anchor fails")
+    check(report["counts"]["feature_dangling"] == 1, "the feature anchor is dangling")
+    entry = next(
+        (item for item in report["dangling"] if item["subject_kind"] == "feature"),
+        None,
+    )
+    check(
+        entry is not None
+        and entry["subject_id"] == "process.scheduler-policy"
+        and entry["frontend"] == "bevy"
+        and entry["test_id"] == FEATURE_BEVY_TEST,
+        "the feature dangling entry names the cell and its test id",
+    )
+    check(
+        report["counts"]["dangling"] == 2
+        and report["counts"]["feature_dangling"] == 1,
+        "the shared dangling total includes the feature share",
+    )
+
+
+def test_feature_evidence_pending_rows() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        manifest = write_manifest(tmp / "manifest.tsv", BASE_ROWS)
+        table = write_feature_evidence(
+            tmp / "feature.tsv",
+            DEFAULT_FEATURE_ROWS
+            + [
+                feature_row(
+                    "storage.smart-health",
+                    "bevy",
+                    status="pending",
+                    note="no Bevy SMART evidence test",
+                )
+            ],
+        )
+        report = resolver.resolve(
+            namespace(manifest, base_discovery(tmp), tmp, feature_evidence=table)
+        )
+        check(report["status"] == "pass", "a pending feature row never dangles")
+        check(
+            report["counts"]["feature_pending"] == 1
+            and report["counts"]["pending"] == 2,
+            "the pending feature row is counted in the shared total",
+        )
+        check(
+            any(
+                item["subject_kind"] == "feature"
+                and item["subject_id"] == "storage.smart-health"
+                and item["frontend"] == "bevy"
+                for item in report["pending"]
+            ),
+            "the pending list names the surveyed feature gap",
+        )
+
+
+def test_feature_evidence_malformed() -> None:
+    with tempfile.TemporaryDirectory() as raw:
+        tmp = Path(raw)
+        manifest = write_manifest(tmp / "manifest.tsv", BASE_ROWS)
+        discovery = base_discovery(tmp)
+
+        def reject(rows: list[str], label: str) -> None:
+            table = write_feature_evidence(tmp / "feature.tsv", rows)
+            try:
+                resolver.resolve(
+                    namespace(manifest, discovery, tmp, feature_evidence=table)
+                )
+            except resolver.ResolveError:
+                check(True, label)
+            else:
+                check(False, label)
+
+        reject(
+            [feature_row("process.scheduler-policy", "gpui")],
+            "an anchored feature row without a test id is rejected",
+        )
+        reject(
+            [
+                feature_row(
+                    "process.scheduler-policy",
+                    "gpui",
+                    test_id="suite::alpha_ok",
+                    note="not a gap",
+                )
+            ],
+            "an anchored feature row with a note is rejected",
+        )
+        reject(
+            [
+                feature_row(
+                    "process.scheduler-policy",
+                    "gpui",
+                    test_id="suite::alpha_ok",
+                    status="pending",
+                    note="gap",
+                )
+            ],
+            "a pending feature row with a test id is rejected",
+        )
+        reject(
+            [feature_row("process.scheduler-policy", "gpui", status="pending", note="-")],
+            "a pending feature row without a gap note is rejected",
+        )
+        reject(
+            [
+                feature_row("process.scheduler-policy", "gpui", test_id="suite::alpha_ok"),
+                feature_row("process.scheduler-policy", "gpui", test_id="suite::beta_ok"),
+            ],
+            "a duplicate (feature_id, frontend) cell is rejected",
+        )
+        reject(
+            [feature_row("process.scheduler-policy", "watch", test_id="suite::alpha_ok")],
+            "an unknown feature frontend is rejected",
+        )
+        reject(
+            [feature_row("process.scheduler-policy", "gpui", status="someday")],
+            "an unknown feature status is rejected",
+        )
+
+
+def test_feature_evidence_missing_file_errors(tmp: Path) -> None:
+    manifest = write_manifest(tmp / "manifest.tsv", BASE_ROWS)
+    missing = tmp / "absent-feature-evidence.tsv"
+    try:
+        resolver.resolve(
+            namespace(manifest, base_discovery(tmp), tmp, feature_evidence=missing)
+        )
+    except resolver.ResolveError as exc:
+        check(
+            "feature evidence not found" in str(exc),
+            "a missing feature table fails loudly",
+        )
+    else:
+        check(False, "a missing feature table fails loudly")
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
@@ -923,6 +1166,11 @@ def main() -> int:
         test_require_requirement_coverage_fails_closed(tmp)
         test_requirement_authority_rejects_unknown_id(tmp)
         test_interaction_matrix_absent_leaves_report_unchanged(tmp)
+        test_feature_evidence_resolves(tmp)
+        test_feature_evidence_dangling(tmp)
+        test_feature_evidence_pending_rows()
+        test_feature_evidence_malformed()
+        test_feature_evidence_missing_file_errors(tmp)
 
     if FAILURES:
         print(f"\nself-test: FAIL ({len(FAILURES)}/{CHECKS} checks failed)")

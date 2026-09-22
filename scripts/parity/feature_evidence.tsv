@@ -1,0 +1,51 @@
+# Feature-level P4 evidence anchors for the P5 three-axis ledger (G2 closure).
+#
+# One row per `(feature_id, frontend)`: the hand-declared behaviour test that
+# backs the shape's delivery claim for that feature.  The anchor must be a real
+# nextest test id, exactly as `cargo nextest list` reports it; the resolver
+# (scripts/parity/resolve_frontend_evidence.py) checks set membership (R4) and
+# fails the run when a referenced test is renamed or deleted.
+#
+# Columns (TAB separated):
+#   feature_id  stable `FeatureId` id; the vocabulary authority is the Rust
+#               `FeatureId::ALL` registry in taskmanager-ui-contract (the
+#               contract test rejects an unknown id, mirroring `ContractTag`).
+#   frontend    gpui | iced | tui | bevy
+#   test_id     the nextest test path, or `-` on a pending row
+#   status      anchored | pending
+#   note        `-` on an anchored row; the honest gap on a pending row
+#
+# Discipline (same as the facet manifest and the unified matrix):
+#   * anchors are declared by hand and verified against discovery; a test id is
+#     NEVER derived by scanning Rust source;
+#   * `pending` is not a pass: it records that this `(feature, frontend)` pair
+#     was surveyed and no discoverable behaviour test exists yet, so the folded
+#     cell stays refused by G2 with this note as the recorded gap;
+#   * a row absent from this table is simply not yet surveyed; `Ready` still
+#     requires a committed anchor, so absence is never a silent delivery claim.
+#
+# First anchored batch (2026-09-22): the four features every frontend really
+# renders and every Linux source lane registers as `Present` -
+# `handles.enumeration`, `threads.topology`, `services.lifecycle-control`,
+# `services.dependency-dag`.  The anchor proves the shape's delivered surface
+# for that feature (the P1 semantic specification owns "what counts as
+# delivered"; this table owns "a real test exists and resolves").
+feature_id	frontend	test_id	status	note
+handles.enumeration	gpui	gpui_app::process_insights::view::open_files::tests::populated_open_files_render_with_unreadable_marker	anchored	-
+handles.enumeration	iced	ui::insights::tests::open_file_row_marks_an_unreadable_target_not_blank	anchored	-
+handles.enumeration	tui	ui::process_details::insights::tests::open_files_preview_renders_count_unreadable_and_rows	anchored	-
+handles.enumeration	bevy	pages::processes::details::tests::open_files_summary_empty_unreadable_and_populated	anchored	-
+threads.topology	gpui	gpui_app::process_insights::view::threads::tests::populated_threads_render_with_missing_cpu_dash	anchored	-
+threads.topology	iced	ui::insights::tests::thread_cpu_helpers_keep_a_missing_value_honest	anchored	-
+threads.topology	tui	ui::process_details::insights::tests::thread_preview_renders_header_rows_and_ellipsis	anchored	-
+threads.topology	bevy	pages::processes::details::tests::threads_summary_empty_and_populated_with_gap_honesty	anchored	-
+services.lifecycle-control	gpui	gpui_app::services_view::tests::service_row_context_menu_offers_all_six_actions	anchored	-
+services.lifecycle-control	iced	app::tests::settings_and_service_control_tests::service_control_select_request_confirm_round_trip_reaches_the_port	anchored	-
+services.lifecycle-control	tui	runtime::tests::service_control::service_control_round_trip_submits_through_queue_effect	anchored	-
+services.lifecycle-control	bevy	pages::services::tests::service_control_buttons_arm_service_actions	anchored	-
+services.dependency-dag	gpui	gpui_app::services_view::details_state::tests::details_state_projects_only_the_shared_correlated_dependency_session	anchored	-
+services.dependency-dag	iced	app::tests::service_details::service_details_entry_projects_lifecycle_and_dependency_facts	anchored	-
+services.dependency-dag	tui	ui::tests::service_details_render::a_resolved_dependency_capture_paints_its_relation_targets	anchored	-
+services.dependency-dag	bevy	pages::services::service_dependencies_tests::dependencies_panel_renders_relations_scene	anchored	-
+storage.smart-health	bevy	-	pending	no Bevy test asserts the SMART evidence rows (availability, spare, power-on hours, unsafe shutdowns); only the self-test arming flow is covered
+storage.swap-throughput	bevy	-	pending	no Bevy test asserts the system swap-in/swap-out throughput rows; the composition bar test only folds totals

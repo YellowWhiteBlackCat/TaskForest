@@ -10,6 +10,7 @@
 //! 3. the live baseline census - the accepted-debt list and the ceiling
 //!    numbers are exact, so they only move when the gaps move.
 
+use super::evidence::{FeatureEvidenceFinding, FeatureEvidenceTable};
 use super::*;
 use crate::capabilities::CapabilitySupport;
 use crate::feature_coverage::{
@@ -326,6 +327,7 @@ fn g5_reports_a_binding_outside_the_product_surface() {
         expected_surface: &expected,
         feature_independent: &[],
         baseline: &baseline,
+        evidence: PLATFORM_GATE_POLICY.evidence,
     };
     let sources = PlatformCapabilitySurface::new();
     let ledger =
@@ -356,6 +358,7 @@ fn g5_reports_unbound_orphans_and_stale_baselines() {
         expected_surface: &expected,
         feature_independent: &[],
         baseline: &baseline,
+        evidence: PLATFORM_GATE_POLICY.evidence,
     };
     let findings = feature_platform_gate_findings(&ledger, &sources, &policy);
     assert!(
@@ -377,6 +380,7 @@ fn g5_reports_unbound_orphans_and_stale_baselines() {
         expected_surface: &CapabilityId::EXPECTED_SURFACE,
         feature_independent: &[],
         baseline: &baseline,
+        evidence: PLATFORM_GATE_POLICY.evidence,
     };
     let findings = feature_platform_gate_findings(&ledger, &sources, &policy);
     assert!(
@@ -393,6 +397,7 @@ fn g5_reports_unbound_orphans_and_stale_baselines() {
         expected_surface: &CapabilityId::EXPECTED_SURFACE,
         feature_independent: &independent,
         baseline: &baseline,
+        evidence: PLATFORM_GATE_POLICY.evidence,
     };
     let findings = feature_platform_gate_findings(&ledger, &sources, &policy);
     assert!(
@@ -424,6 +429,7 @@ fn g6_reports_a_missing_count_above_its_ceiling() {
         expected_surface: &CapabilityId::EXPECTED_SURFACE,
         feature_independent: FEATURE_INDEPENDENT_CAPABILITIES,
         baseline: &baseline,
+        evidence: PLATFORM_GATE_POLICY.evidence,
     };
     let findings = feature_platform_gate_findings(&ledger, &sources, &policy);
     assert!(findings.is_empty(), "{findings:?}");
@@ -438,6 +444,7 @@ fn g6_reports_a_missing_count_above_its_ceiling() {
         expected_surface: &CapabilityId::EXPECTED_SURFACE,
         feature_independent: FEATURE_INDEPENDENT_CAPABILITIES,
         baseline: &baseline,
+        evidence: PLATFORM_GATE_POLICY.evidence,
     };
     let findings = feature_platform_gate_findings(&ledger, &sources, &policy);
     assert!(
@@ -467,6 +474,7 @@ fn g6_reports_an_unregistered_count_above_its_ceiling() {
         expected_surface: &CapabilityId::EXPECTED_SURFACE,
         feature_independent: FEATURE_INDEPENDENT_CAPABILITIES,
         baseline: &baseline,
+        evidence: PLATFORM_GATE_POLICY.evidence,
     };
     let findings = feature_platform_gate_findings(&ledger, &sources, &policy);
     assert!(
@@ -559,6 +567,250 @@ fn rule_ids_are_stable_machine_names() {
     assert_eq!(PlatformGateRule::G4.id(), "G4");
     assert_eq!(PlatformGateRule::G5.id(), "G5");
     assert_eq!(PlatformGateRule::G6.id(), "G6");
+}
+
+/// The committed feature-evidence table is structurally clean: an empty
+/// findings list is the only passing state, every row is unique, and the
+/// anchored batch is non-empty.
+#[test]
+fn the_committed_feature_evidence_table_is_structurally_clean() {
+    let table = PLATFORM_GATE_POLICY.feature_evidence();
+    assert!(table.findings().is_empty(), "{:?}", table.findings());
+    assert!(
+        table.anchored_count() > 0,
+        "the first anchored batch is non-empty"
+    );
+    let mut cells: Vec<(String, String)> = table
+        .rows()
+        .iter()
+        .map(|row| (row.feature.id().to_owned(), row.frontend.name().to_owned()))
+        .collect();
+    let count = cells.len();
+    cells.sort_unstable();
+    cells.dedup();
+    assert_eq!(cells.len(), count, "one row per (feature, frontend) cell");
+}
+
+/// The first batch is a conscious census: four features, each anchored on every
+/// frontend, plus the surveyed pending gaps. Growing the batch must move this
+/// pin in the same change.
+#[test]
+fn the_first_anchor_batch_is_a_conscious_census() {
+    let table = PLATFORM_GATE_POLICY.feature_evidence();
+    for feature in [
+        FeatureId::HandleEnumeration,
+        FeatureId::ThreadTopologyEnumeration,
+        FeatureId::ServiceLifecycleControl,
+        FeatureId::SystemdDependencyDag,
+    ] {
+        for frontend in FrontendShape::ALL {
+            assert!(
+                table.anchor(feature, frontend).is_some(),
+                "{}: {} must carry a committed anchor",
+                frontend.name(),
+                feature.id()
+            );
+        }
+    }
+    assert_eq!(
+        table.anchored_count(),
+        16,
+        "the anchored batch census moved"
+    );
+    assert_eq!(
+        table.pending_count(),
+        2,
+        "the surveyed pending-gap census moved"
+    );
+    for row in table.rows().iter().filter(|row| !row.is_anchored()) {
+        assert!(
+            !row.note.is_empty(),
+            "{}: a pending row records its gap",
+            row.feature.id()
+        );
+    }
+}
+
+/// The evidence closure attaches the committed anchor only where the static
+/// source commitment is complete: an undeclared/absent lane keeps
+/// [`NO_EVIDENCE`], a pending row never becomes an anchor, and a complete lane
+/// returns the committed test id.
+#[test]
+fn the_evidence_closure_requires_a_complete_source_commitment() {
+    let table = PLATFORM_GATE_POLICY.feature_evidence();
+    let feature = FeatureId::HandleEnumeration;
+    let frontend = FrontendShape::Gpui;
+    let committed = table.anchor(feature, frontend).expect("committed anchor");
+
+    let undeclared = PlatformCapabilitySurface::new();
+    let closure = PLATFORM_GATE_POLICY.evidence_closure(&undeclared);
+    for platform in PlatformAxis::ALL {
+        assert_eq!(
+            closure(feature, frontend, platform),
+            NO_EVIDENCE,
+            "an undeclared source must not attach an anchor"
+        );
+    }
+
+    let mut complete = PlatformCapabilitySurface::new();
+    for capability in feature.platform_binding().capabilities() {
+        complete.declare(
+            PlatformAxis::Linux,
+            capability.clone(),
+            PlatformSource::Present,
+        );
+    }
+    let closure = PLATFORM_GATE_POLICY.evidence_closure(&complete);
+    assert_eq!(closure(feature, frontend, PlatformAxis::Linux), committed);
+    for platform in [PlatformAxis::Windows, PlatformAxis::Macos] {
+        assert_eq!(
+            closure(feature, frontend, platform),
+            NO_EVIDENCE,
+            "every other platform axis is still undeclared"
+        );
+    }
+
+    let pending_feature = FeatureId::DiskSmartHealth;
+    let pending_frontend = FrontendShape::Bevy;
+    assert!(
+        table
+            .pending_note(pending_feature, pending_frontend)
+            .is_some(),
+        "the surveyed gap is committed"
+    );
+    let mut pending_sources = PlatformCapabilitySurface::new();
+    for capability in pending_feature.platform_binding().capabilities() {
+        pending_sources.declare(
+            PlatformAxis::Linux,
+            capability.clone(),
+            PlatformSource::Present,
+        );
+    }
+    let closure = PLATFORM_GATE_POLICY.evidence_closure(&pending_sources);
+    assert_eq!(
+        closure(pending_feature, pending_frontend, PlatformAxis::Linux),
+        NO_EVIDENCE,
+        "a pending row is an explicit gap, never an anchor"
+    );
+}
+
+/// G2 is not relaxed by the committed table: on a complete source surface the
+/// anchored rows materialize once per platform, and every un-anchored
+/// `Ready` cell is still refused.
+#[test]
+fn g2_refuses_the_un_anchored_remainder_even_with_the_committed_table() {
+    let sources = total_surface();
+    let ledger = FeaturePlatformLedger::from_declarations_with_evidence(
+        &all_declarations(),
+        &sources,
+        PLATFORM_GATE_POLICY.evidence_closure(&sources),
+    );
+    let findings = feature_platform_gate_findings(&ledger, &sources, &PLATFORM_GATE_POLICY);
+    assert!(
+        findings
+            .iter()
+            .all(|finding| finding.rule() == PlatformGateRule::G2),
+        "{findings:?}"
+    );
+    let admitted = ledger
+        .iter()
+        .filter(|cell| matches!(cell.status, FeaturePlatformStatus::Ready) && cell.has_evidence())
+        .count();
+    assert_eq!(
+        admitted,
+        PLATFORM_GATE_POLICY.feature_evidence().anchored_count() * PlatformAxis::ALL.len(),
+        "every committed anchor materializes on every complete platform axis"
+    );
+    let refused = ledger
+        .iter()
+        .filter(|cell| matches!(cell.status, FeaturePlatformStatus::Ready) && !cell.has_evidence())
+        .count();
+    assert!(
+        refused > 0,
+        "the un-anchored remainder must still be refused"
+    );
+    assert_eq!(count_rule(&findings, PlatformGateRule::G2), refused);
+}
+
+/// The parser is not a rubber stamp: an unknown feature or frontend id, a
+/// placeholder anchor, a pending row with a test id or without a note, a
+/// duplicated cell, and an anchor on a non-delivery binding are all findings.
+#[test]
+fn the_evidence_table_parser_rejects_malformed_rows() {
+    let header = "feature_id\tfrontend\ttest_id\tstatus\tnote\n";
+    let legal = FeatureEvidenceTable::parse(concat!(
+        "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
+        "handles.enumeration\tgpui\tgpui_app::tests::anchor\tanchored\t-\n",
+        "storage.smart-health\tbevy\t-\tpending\tno Bevy SMART evidence test\n",
+    ));
+    assert!(legal.findings().is_empty(), "{:?}", legal.findings());
+    assert_eq!(legal.anchored_count(), 1);
+    assert_eq!(legal.pending_count(), 1);
+
+    type EvidenceFindingCase = (&'static str, fn(&FeatureEvidenceFinding) -> bool);
+    let cases: [EvidenceFindingCase; 6] = [
+        (
+            concat!(
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
+                "handles.nope\tgpui\tgpui_app::tests::anchor\tanchored\t-\n",
+            ),
+            |finding| matches!(finding, FeatureEvidenceFinding::UnknownFeature { .. }),
+        ),
+        (
+            concat!(
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
+                "handles.enumeration\twatch\tgpui_app::tests::anchor\tanchored\t-\n",
+            ),
+            |finding| matches!(finding, FeatureEvidenceFinding::UnknownFrontend { .. }),
+        ),
+        (
+            concat!(
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
+                "handles.enumeration\tgpui\tpending\tanchored\t-\n",
+            ),
+            |finding| matches!(finding, FeatureEvidenceFinding::UnusableAnchor { .. }),
+        ),
+        (
+            concat!(
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
+                "handles.enumeration\tgpui\tgpui_app::tests::anchor\tpending\t-\n",
+            ),
+            |finding| matches!(finding, FeatureEvidenceFinding::PendingWithAnchor { .. }),
+        ),
+        (
+            concat!(
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
+                "handles.enumeration\tgpui\tgpui_app::tests::anchor\tanchored\t-\n",
+                "handles.enumeration\tgpui\tgpui_app::tests::other\tanchored\t-\n",
+            ),
+            |finding| matches!(finding, FeatureEvidenceFinding::DuplicateCell { .. }),
+        ),
+        (
+            concat!(
+                "feature_id\tfrontend\ttest_id\tstatus\tnote\n",
+                "memory.leak-trend\tgpui\tgpui_app::tests::anchor\tanchored\t-\n",
+            ),
+            |finding| {
+                matches!(
+                    finding,
+                    FeatureEvidenceFinding::AnchorOnNonDeliveryBinding { .. }
+                )
+            },
+        ),
+    ];
+    for (table, predicate) in cases {
+        let parsed = FeatureEvidenceTable::parse(table);
+        assert!(
+            parsed.findings().iter().any(predicate),
+            "expected a finding for:\n{table}got {:?}",
+            parsed.findings()
+        );
+    }
+    assert!(
+        FeatureEvidenceTable::parse(header)
+            .findings()
+            .contains(&FeatureEvidenceFinding::EmptyTable)
+    );
 }
 
 /// Test-only helper: a cell with the fixture shape and an empty anchor.

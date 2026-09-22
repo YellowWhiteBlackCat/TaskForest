@@ -5,7 +5,8 @@
 //! ([`PlatformGateFinding::rule`]) so a red gate points at the exact invariant
 //! it refused, and [`PlatformGatePolicy`] carries the one authority for the
 //! product-expected identity set, the explicit feature-independent
-//! declarations, and the directional baselines.
+//! declarations, the directional baselines, and the committed feature-level
+//! evidence table.
 //!
 //! ## Rules
 //!
@@ -26,12 +27,26 @@
 //! feature-independent, makes the baseline entry stale and fails G5 until the
 //! baseline shrinks in the same change - the ceiling only moves down.
 //!
-//! Evidence anchors arrive with the P4 manifest integration; until then no cell
-//! may claim `Ready` with an empty anchor, so a new `Ready` claim is forced to
-//! land together with its proof instead of borrowing the static-commitment
-//! wording.
+//! ## Evidence closure (G2)
+//!
+//! The committed `scripts/parity/feature_evidence.tsv` table (owned by the
+//! [`evidence`] submodule) is the one authority for "which `(feature,
+//! frontend)` pair carries a hand-declared behaviour anchor".
+//! [`FeatureEvidenceTable::committed`] parses it (unknown feature or frontend
+//! ids, placeholder anchors, duplicated cells, and pending rows without a note
+//! are findings), and [`PlatformGatePolicy::evidence_closure`] folds it against
+//! a layer-B surface: the anchor attaches only where the static source
+//! commitment is complete, so a non-delivery cell can never carry one (G4 holds
+//! by construction) while a `Ready` cell without a committed anchor is still
+//! refused (G2 is not relaxed). A `pending` row is an explicit, reasoned gap:
+//! it never becomes an anchor.
+//!
+//! Anchors are declaration data, never a source scan: the resolver
+//! (`scripts/parity/resolve_frontend_evidence.py`) proves every anchored row is
+//! a real `cargo nextest list` id, so a renamed or deleted test fails the gate.
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::sync::LazyLock;
 
 use taskmanager_platform_contract::{
     CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
@@ -44,6 +59,10 @@ use super::platform_axis::{
 };
 use super::platform_binding::{FEATURE_INDEPENDENT_CAPABILITIES, PlatformBinding};
 use crate::keybindings::FrontendShape;
+
+mod evidence;
+
+use evidence::FeatureEvidenceTable;
 
 /// The gate rule a finding belongs to.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -237,6 +256,37 @@ pub struct PlatformGatePolicy<'a> {
     pub feature_independent: &'a [(CapabilityId, &'static str)],
     /// The directional baselines.
     pub baseline: &'a PlatformGateBaseline<'a>,
+    /// The committed feature-level evidence table (G2 closure). Dereference it
+    /// through [`PlatformGatePolicy::feature_evidence`], or build the ledger
+    /// evidence closure with [`PlatformGatePolicy::evidence_closure`].
+    pub evidence: &'static LazyLock<FeatureEvidenceTable>,
+}
+
+impl PlatformGatePolicy<'_> {
+    /// The committed feature-level evidence table.
+    #[must_use]
+    pub fn feature_evidence(&self) -> &'static FeatureEvidenceTable {
+        self.evidence
+    }
+
+    /// The G2 evidence closure over the committed table: it attaches the
+    /// committed anchor exactly where this feature's static source commitment
+    /// is complete on the folded platform, and
+    /// [`NO_EVIDENCE`](super::platform_axis::NO_EVIDENCE) everywhere else.
+    ///
+    /// Attaching only at complete source commitments keeps G4 by construction
+    /// (a `Missing`/`Unsupported`/`Gated` cell can never carry an anchor), while
+    /// G2 is untouched: a `Ready` cell without a committed anchor is still
+    /// refused, so `Ready` cannot be borrowed from the static commitment alone.
+    pub fn evidence_closure<'a>(
+        &'a self,
+        sources: &'a PlatformCapabilitySurface,
+    ) -> impl Fn(FeatureId, FrontendShape, PlatformAxis) -> &'static str + 'a {
+        move |feature, frontend, platform| {
+            self.evidence
+                .ledger_anchor(sources, feature, frontend, platform)
+        }
+    }
 }
 
 /// Evidence anchors that are present but can never prove a behaviour claim.
@@ -741,12 +791,18 @@ pub static PLATFORM_GATE_BASELINE: PlatformGateBaseline<'static> = PlatformGateB
     unbound_expected_capabilities: UNBOUND_EXPECTED_CAPABILITIES,
 };
 
+/// The parsed committed feature-evidence table, parsed once per process.
+static COMMITTED_FEATURE_EVIDENCE: LazyLock<FeatureEvidenceTable> =
+    LazyLock::new(FeatureEvidenceTable::committed);
+
 /// The product gate policy: the single authority for the product-expected
-/// surface, the explicit feature-independent declarations, and the baseline.
+/// surface, the explicit feature-independent declarations, the baseline, and
+/// the committed feature-level evidence table.
 pub static PLATFORM_GATE_POLICY: PlatformGatePolicy<'static> = PlatformGatePolicy {
     expected_surface: &PRODUCT_EXPECTED_SURFACE,
     feature_independent: FEATURE_INDEPENDENT_CAPABILITIES,
     baseline: &PLATFORM_GATE_BASELINE,
+    evidence: &COMMITTED_FEATURE_EVIDENCE,
 };
 
 #[cfg(test)]

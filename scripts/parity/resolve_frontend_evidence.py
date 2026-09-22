@@ -71,6 +71,18 @@ resolver does not define ids.  When the authority is supplied (or demanded by
 Without either flag the coverage block is `null` and the run keeps its original
 anchor-resolution semantics; `p0_id` stays opaque.
 
+Feature evidence (`--feature-evidence`)
+--------------------------------------
+The P5 G2 closure table (`scripts/parity/feature_evidence.tsv` by default) is
+the ONE authority for "which (feature, frontend) pair carries a hand-declared
+behaviour anchor": one row per cell, `status` is `anchored` or `pending`, and
+every anchored `test_id` is checked against the owning frontend's discovery
+exactly like a manifest behavior anchor (R4). `pending` rows are counted and
+reported, never dangling, and never become an anchor. The `feature_id`
+vocabulary authority is the Rust `FeatureId::ALL` registry in
+`taskmanager-ui-contract` (its contract test rejects an unknown id); like
+`contract_tag`, this resolver treats the field as opaque data.
+
 Scopes
 ------
 * `--scope all` (default) evaluates every declared anchor and keeps the
@@ -148,6 +160,24 @@ INTERACTION_FIELDS = (
 # kinds (for example `requirement`) must be added deliberately, together with
 # their resolution rule, not silently accepted.
 INTERACTION_SUBJECT_KIND = "interaction"
+
+# Feature-level evidence table (`--feature-evidence`, G2 closure).  One row per
+# `(feature_id, frontend)`.  The `feature_id` vocabulary is owned by the Rust
+# `FeatureId::ALL` registry in taskmanager-ui-contract; this resolver treats the
+# field as opaque declaration data (its contract test rejects an unknown id).
+FEATURE_EVIDENCE_FIELDS = ("feature_id", "frontend", "test_id", "status", "note")
+
+# The only statuses a feature-evidence row may declare: an anchored row names a
+# discoverable test id; a pending row records a surveyed gap and never becomes
+# an anchor.
+FEATURE_EVIDENCE_STATUSES = {"anchored", "pending"}
+
+# Default committed feature-evidence table; `--feature-evidence PATH` overrides
+# it.  It is committed declaration data, never a second vocabulary.
+DEFAULT_FEATURE_EVIDENCE = "scripts/parity/feature_evidence.tsv"
+
+# The feature-evidence subject kind used in reports and dangling entries.
+FEATURE_SUBJECT_KIND = "feature"
 
 # Matrix `target` vocabulary.  It selects which nextest binary the anchor
 # belongs to in the owning frontend, mirroring the per-frontend validators.
@@ -463,6 +493,72 @@ def read_interaction_matrix(path: Path) -> list[dict[str, str]]:
     return rows
 
 
+def read_feature_evidence(path: Path) -> list[dict[str, str]]:
+    """Read the P5 feature-level evidence table (`--feature-evidence`).
+
+    Structural rules only: the schema, the `anchored`/`pending` status
+    vocabulary, the per-frontend `(feature_id, frontend)` key, the `-` marker
+    discipline (`test_id` unused on a pending row, `note` unused on an anchored
+    row), and a non-empty gap note on every pending row.  The `feature_id`
+    vocabulary is owned by the Rust `FeatureId::ALL` registry and is NOT copied
+    here; this resolver only resolves the anchored test ids against discovery.
+    """
+    if not path.is_file():
+        raise ResolveError(f"feature evidence not found: {path}")
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        data_lines = [
+            line for line in handle
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+    reader = csv.DictReader(data_lines, delimiter="\t")
+    if tuple(reader.fieldnames or ()) != FEATURE_EVIDENCE_FIELDS:
+        raise ResolveError(
+            f"{path}: expected fields {FEATURE_EVIDENCE_FIELDS}, got {reader.fieldnames}"
+        )
+    rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for lineno, row in enumerate(reader, start=2):
+        if any(value is None for value in row.values()):
+            raise ResolveError(f"{path}:{lineno}: malformed row (wrong field count)")
+        empty = [field for field in FEATURE_EVIDENCE_FIELDS if row[field].strip() == ""]
+        if empty:
+            raise ResolveError(f"{path}:{lineno}: empty field(s): {', '.join(empty)}")
+        frontend = row["frontend"].strip()
+        if frontend not in FRONTEND_PACKAGES:
+            raise ResolveError(f"{path}:{lineno}: unknown frontend {frontend!r}")
+        status = row["status"].strip()
+        if status not in FEATURE_EVIDENCE_STATUSES:
+            raise ResolveError(f"{path}:{lineno}: unknown status {status!r}")
+        if status == "anchored":
+            if row["test_id"].strip() == "-":
+                raise ResolveError(
+                    f"{path}:{lineno}: an anchored row must name its test id"
+                )
+            if row["note"].strip() != "-":
+                raise ResolveError(
+                    f"{path}:{lineno}: an anchored row must use `-` for its note"
+                )
+        else:
+            if row["test_id"].strip() != "-":
+                raise ResolveError(
+                    f"{path}:{lineno}: a pending row must use `-` for its test id"
+                )
+            if row["note"].strip() in ("", "-"):
+                raise ResolveError(
+                    f"{path}:{lineno}: a pending row must state its gap in `note`"
+                )
+        key = (row["feature_id"].strip(), frontend)
+        if key in seen:
+            raise ResolveError(
+                f"{path}:{lineno}: duplicate (feature_id, frontend) cell: {key[0]}/{key[1]}"
+            )
+        seen.add(key)
+        rows.append(row)
+    if not rows:
+        raise ResolveError(f"{path}: feature evidence has no data rows")
+    return rows
+
+
 def read_requirements(path: Path) -> list[str]:
     """Read the public requirement-id vocabulary (`requirement_id` header).
 
@@ -679,6 +775,7 @@ def skipped_report(
     manifest_path: Path,
     decision: ScopeDecision,
     interaction_path: Path | None = None,
+    feature_evidence_path: Path | None = None,
 ) -> dict:
     """Report for an `--scope auto` run whose diff cannot move an anchor.
 
@@ -698,12 +795,23 @@ def skipped_report(
         "interaction_anchored": 0,
         "interaction_pending": 0,
         "interaction_dangling": 0,
+        "feature_cells": 0,
+        "feature_anchored": 0,
+        "feature_pending": 0,
+        "feature_dangling": 0,
     }
     return {
         "manifest": str(manifest_path),
         "interaction_matrix": {
             "path": str(interaction_path) if interaction_path else None,
             "cases": 0,
+            "anchored": 0,
+            "pending": 0,
+            "dangling": 0,
+        },
+        "feature_evidence": {
+            "path": str(feature_evidence_path) if feature_evidence_path else None,
+            "rows": 0,
             "anchored": 0,
             "pending": 0,
             "dangling": 0,
@@ -737,9 +845,17 @@ def resolve(args: argparse.Namespace) -> dict:
         read_interaction_matrix(interaction_path) if interaction_path else []
     )
 
+    feature_path = getattr(args, "feature_evidence", None) or DEFAULT_FEATURE_EVIDENCE
+    feature_path = Path(feature_path)
+    if not feature_path.is_absolute():
+        feature_path = repo / feature_path
+    feature_rows = read_feature_evidence(feature_path)
+
     decision = scope_decision_for_run(args, repo)
     if not decision.relevant:
-        return skipped_report(manifest_path, decision, interaction_path)
+        return skipped_report(
+            manifest_path, decision, interaction_path, feature_path
+        )
 
     provided = split_pairs(args.discovery, "discovery")
     unknown = sorted(set(provided) - set(FRONTEND_PACKAGES))
@@ -751,6 +867,7 @@ def resolve(args: argparse.Namespace) -> dict:
     required_frontends = sorted(
         {row["frontend"] for row in rows}
         | {row["frontend"] for row in interaction_rows}
+        | {row["frontend"] for row in feature_rows}
     )
     badly_named = sorted(set(required_frontends) - set(FRONTEND_PACKAGES))
     if badly_named:
@@ -907,6 +1024,32 @@ def resolve(args: argparse.Namespace) -> dict:
                 "channel": "test-name",
             })
 
+    # Feature-level evidence table: each anchored row resolves by exact
+    # membership in the owning frontend's discovery; a `pending` row records a
+    # surveyed gap and is counted, never dangling, and never an anchor.
+    feature_cells = feature_anchored = feature_pending = feature_dangling = 0
+    for row in feature_rows:
+        feature_cells += 1
+        if row["status"].strip() == "pending":
+            feature_pending += 1
+            pending_cells.append({
+                "subject_kind": FEATURE_SUBJECT_KIND,
+                "subject_id": row["feature_id"],
+                "frontend": row["frontend"],
+            })
+            continue
+        feature_anchored += 1
+        if row["test_id"] not in discovered[row["frontend"]]:
+            feature_dangling += 1
+            dangling.append({
+                "reason": "anchor not discovered by cargo nextest list (R4)",
+                "subject_kind": FEATURE_SUBJECT_KIND,
+                "subject_id": row["feature_id"],
+                "frontend": row["frontend"],
+                "test_id": row["test_id"],
+                "channel": "feature-evidence",
+            })
+
     # Optional requirement-coverage authority (`--requirements` or
     # `--require-requirement-coverage`).  Without it `p0_id` stays opaque.
     requirement_coverage_report = None
@@ -947,6 +1090,13 @@ def resolve(args: argparse.Namespace) -> dict:
             "pending": interaction_pending,
             "dangling": interaction_dangling,
         },
+        "feature_evidence": {
+            "path": str(feature_path),
+            "rows": feature_cells,
+            "anchored": feature_anchored,
+            "pending": feature_pending,
+            "dangling": feature_dangling,
+        },
         "requirement_coverage": requirement_coverage_report,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "status": status,
@@ -956,9 +1106,10 @@ def resolve(args: argparse.Namespace) -> dict:
             "cells": cells,
             "anchored_behavior": anchored_behavior,
             "anchored_visual": anchored_visual,
-            # Shared pending total (manifest + interaction matrix); the facet
-            # share is `pending - interaction_pending`, mirroring `dangling`.
-            "pending": pending + interaction_pending,
+            # Shared pending total (manifest + interaction matrix + feature
+            # evidence); the facet share is `pending` minus the interaction and
+            # feature shares, mirroring `dangling`.
+            "pending": pending + interaction_pending + feature_pending,
             "none": none,
             "dangling": len(dangling),
             "invalid": len(invalid),
@@ -967,6 +1118,10 @@ def resolve(args: argparse.Namespace) -> dict:
             "interaction_anchored": interaction_anchored,
             "interaction_pending": interaction_pending,
             "interaction_dangling": interaction_dangling,
+            "feature_cells": feature_cells,
+            "feature_anchored": feature_anchored,
+            "feature_pending": feature_pending,
+            "feature_dangling": feature_dangling,
         },
         "frontends": {
             frontend: {
@@ -1011,6 +1166,17 @@ def build_parser() -> argparse.ArgumentParser:
             "requirement id vocabulary (default with --require-requirement-coverage: "
             f"{DEFAULT_REQUIREMENTS}); enables the per-frontend requirement_coverage "
             "report and rejects unknown p0_id values"
+        ),
+    )
+    parser.add_argument(
+        "--feature-evidence",
+        default=DEFAULT_FEATURE_EVIDENCE,
+        metavar="PATH",
+        help=(
+            "P5 feature-level evidence table resolved as a third declaration "
+            "source (default: %(default)s); anchored rows are checked against "
+            "the owning frontend's discovery, `pending` rows are counted, never "
+            "dangling"
         ),
     )
     parser.add_argument(
@@ -1092,13 +1258,16 @@ def format_summary(report: dict) -> str:
         lines.append("          no test discovery was run; nothing to resolve")
         return "\n".join(lines)
     interaction = report.get("interaction_matrix") or {}
+    feature_evidence = report.get("feature_evidence") or {}
     # `counts.dangling`/`counts.pending` are the shared totals (manifest +
-    # interaction matrix); the facet line shows the manifest share so the two
-    # sources stay readable.
+    # interaction matrix + feature evidence); the facet line shows the manifest
+    # share so the sources stay readable.
     interaction_dangling = int(interaction.get("dangling") or 0)
-    facet_dangling = counts.get("dangling", 0) - interaction_dangling
+    feature_dangling = int(feature_evidence.get("dangling") or 0)
+    facet_dangling = counts.get("dangling", 0) - interaction_dangling - feature_dangling
     interaction_pending = int(interaction.get("pending") or 0)
-    facet_pending = counts.get("pending", 0) - interaction_pending
+    feature_pending = int(feature_evidence.get("pending") or 0)
+    facet_pending = counts.get("pending", 0) - interaction_pending - feature_pending
     lines.append(
         (
             "cells:    {cells} manifest cells | {anchored_behavior} behavior anchors | "
@@ -1132,6 +1301,19 @@ def format_summary(report: dict) -> str:
                         unmapped=info["unmapped_cells"],
                     )
                 )
+    if feature_evidence.get("rows"):
+        if feature_evidence.get("pending"):
+            lines.append(
+                "features: {rows} feature cells | {anchored} anchored | "
+                "{pending} pending | {dangling} dangling  ({path})".format(
+                    **feature_evidence
+                )
+            )
+        else:
+            lines.append(
+                "features: {rows} feature cells | {anchored} anchored | "
+                "{dangling} dangling  ({path})".format(**feature_evidence)
+            )
     for frontend, info in report["frontends"].items():
         lines.append(
             f"  {frontend:5s} discovered {info['discovered_tests']} tests  ({info['discovery_source']})"

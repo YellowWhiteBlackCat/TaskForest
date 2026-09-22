@@ -6,6 +6,12 @@ against real test discovery.
 
 - `cross_frontend_manifest.tsv` — the declaration list. One row per
   `(subject_kind, subject_id, frontend)`.
+- `feature_evidence.tsv` — the P5 feature-level evidence table (G2 closure).
+  One row per `(feature_id, frontend)`: the hand-declared nextest anchor that
+  backs that shape's delivery claim, or an explicit `pending` gap. It is the
+  data source the Rust gate's evidence closure reads through
+  `include_str!`, so a `Ready` cell can no longer be claimed from the static
+  source commitment alone.
 - `cross_frontend_matrix.tsv` — the unified interaction matrix (S4 + W10-B). It
   carries the per-frontend interaction matrices as one list with a `frontend`
   dimension, including the **TUI rows that never had a per-frontend matrix**
@@ -18,19 +24,22 @@ against real test discovery.
   `behavior` anchors with `cargo nextest list` output and fails on dangling
   anchors (R4) or target/frontend mismatches (R6). With `--interaction-matrix`
   it consumes the unified matrix as a second declaration source, including
-  `pending` rows. It owns no contract-tag vocabulary (`contract_tag` is an
-  opaque required field) and no requirement vocabulary (`p0_id` is opaque
-  unless `--requirements` supplies the public id list). `--scope auto` is the
-  local-gate entry: it short-circuits when the git diff since `--base` cannot
-  move an anchor (see "Local gate route"), and `--report-json` pins the
-  machine-readable report path.
+  `pending` rows, and with `--feature-evidence` (default:
+  `scripts/parity/feature_evidence.tsv`, so it is on in the gate) the P5
+  feature-level table as a third. It owns no contract-tag vocabulary
+  (`contract_tag` is an opaque required field), no requirement vocabulary
+  (`p0_id` is opaque unless `--requirements` supplies the public id list), and
+  no feature vocabulary (`feature_id` is opaque; the Rust registry owns it).
+  `--scope auto` is the local-gate entry: it short-circuits when the git diff
+  since `--base` cannot move an anchor (see "Local gate route"), and
+  `--report-json` pins the machine-readable report path.
 - `test_resolve_frontend_evidence.py` — standard-library self-test proving the
   resolver rejects a deleted referenced test, a target mismatch, a duplicate
-  cell, malformed declarations, malformed unified-matrix rows and a deleted
-  interaction anchor on either channel, counts `pending` rows instead of
-  dangling them, validates requirement coverage fail-closed, and only skips the
-  diff-scope when no evidence-relevant path changed (fail-closed on a failed
-  diff probe).
+  cell, malformed declarations, malformed unified-matrix rows, a deleted
+  interaction anchor on either channel, and a deleted feature-level anchor;
+  counts `pending` rows instead of dangling them, validates requirement
+  coverage fail-closed, and only skips the diff-scope when no
+  evidence-relevant path changed (fail-closed on a failed diff probe).
 
 The contract vocabulary itself is the Rust
 [`ContractTag`](../../crates/taskmanager-ui-contract/src/conformance.rs) enum.
@@ -56,6 +65,48 @@ and both committed declarations only reference its ids.
 
 `pending` means "no discoverable anchor has been assigned yet". Pending cells
 are counted and reported, never treated as dangling.
+
+## Feature-level evidence table (P5 G2 closure)
+
+`feature_evidence.tsv` is the P4 closure of the P5 three-axis ledger's G2 rule:
+a `(feature, frontend)` cell may claim `Ready` only when a real, discoverable
+behaviour test backs that shape's delivery claim.
+
+| column | meaning |
+|---|---|
+| `feature_id` | stable `FeatureId` id. The vocabulary authority is the Rust `FeatureId::ALL` registry in `taskmanager-ui-contract`; the contract test parses this file and rejects an unknown id, so no second vocabulary exists here. |
+| `frontend` | `gpui`, `iced`, `tui`, or `bevy` |
+| `test_id` | the nextest test path exactly as discovery reports it, or `-` on a pending row |
+| `status` | `anchored` or `pending` |
+| `note` | `-` on an anchored row; the honest gap on a pending row |
+
+Semantics:
+
+- **anchored** — the row names a hand-declared test id; the resolver checks set
+  membership against the owning frontend's discovery (R4), so a renamed or
+  deleted test is `dangling` and fails the run. The id is never derived by
+  scanning Rust source.
+- **pending** — the pair was surveyed and no discoverable behaviour test exists
+  yet. The row is counted, never dangling, and never becomes an anchor: the
+  folded cell stays refused by G2, with the note as the recorded gap.
+- **absent** — the pair has not been surveyed yet. Absence is not a delivery
+  claim either: `Ready` still requires a committed anchor.
+
+The Rust side reads the same file through `include_str!`
+(`crates/taskmanager-ui-contract/src/feature_coverage/platform_gate/evidence.rs`)
+and folds it with `PlatformGatePolicy::evidence_closure`, which attaches the
+anchor only where the feature's whole `Requires` capability set is `Present` on
+that platform axis. That keeps G4 by construction (a `Missing`/`Unsupported`/`Gated`
+cell can never carry an anchor) while G2 is untouched: a `Ready` cell without a
+committed anchor is still a finding, so the table cannot be used to make a cell
+`Ready`; it can only document a real test.
+
+First anchored batch (2026-09-22): `handles.enumeration`, `threads.topology`,
+`services.lifecycle-control`, and `services.dependency-dag`, each anchored on
+all four frontends (16 rows), plus two surveyed `pending` gaps on Bevy
+(`storage.smart-health`, `storage.swap-throughput`). Every other
+source-complete cell keeps its G2 finding until a real test is anchored; the
+batch is a bounded first delivery, never a blanket `Ready` claim.
 
 ## Unified interaction matrix
 
@@ -244,6 +295,11 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
 - `platform` is reserved and empty: the field is not allowed to become a second
   axis vocabulary in TSV/Python/bash. When P5 lands it gets its own single
   authority, and this resolver keeps treating it as opaque.
+- `feature_id` in `feature_evidence.tsv` is the same kind of opaque reference:
+  the vocabulary authority is the Rust `FeatureId::ALL` registry, and the
+  contract test in `ui_feature_platform_gate.rs` parses the table and rejects an
+  unknown id. The resolver never defines feature ids; it only resolves the
+  anchored `test_id` values against discovery.
 
 ## Local gate route
 
@@ -269,6 +325,13 @@ requirement vocabulary (`--requirements scripts/interaction_requirements.tsv`)
 as a report-only coverage input. `--require-requirement-coverage` is the
 deferred hard gate; its release condition is the Bevy `p0_id` mapping landing
 (D1), at which point the stage adds the flag in the same change.
+
+The feature-level evidence table is consumed by the same pass **without a
+flag**: `--feature-evidence` defaults to
+`scripts/parity/feature_evidence.tsv`, so the gate validates the feature
+anchors (R4) exactly like the other two declaration sources, and its
+`dangling` count feeds the same fail-closed exit. A commit that renames a test
+referenced by the table is red at the `parity-evidence` stage.
 
 Known boundary: an anchored test deleted or renamed *without* touching the
 paths above stays invisible until one of them changes. That is the deliberate
@@ -312,6 +375,15 @@ python3 scripts/parity/resolve_frontend_evidence.py \
 
 # Drive cargo directly (--locked, CARGO_BUILD_JOBS=4):
 python3 scripts/parity/resolve_frontend_evidence.py --nextest
+
+# Resolve the P5 feature-level evidence table explicitly (the default path is
+# the same file, so the gate call above already consumes it):
+python3 scripts/parity/resolve_frontend_evidence.py \
+  --discovery gpui=discovery/gpui.json \
+  --discovery iced=discovery/iced.json \
+  --discovery tui=discovery/tui.json \
+  --discovery bevy=discovery/bevy.json \
+  --feature-evidence scripts/parity/feature_evidence.tsv
 
 # Local gate entry (the exact parity-evidence stage): skip when the diff cannot
 # move an anchor, resolve both declaration sources, pin the report:
