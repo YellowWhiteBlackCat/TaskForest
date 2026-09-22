@@ -45,6 +45,10 @@ Windows 生产、测试和开发辅助代码均禁止 PowerShell、CMD 或其他
   command、history 或 UI 语义。
 - provider unavailable、权限失败、驱动缺失和 confirmed absent 必须分开；一个字段失败不
   能让同一设备或其他平台条目消失。
+- 产品期望面（`CapabilityId::EXPECTED_SURFACE`）是"每个平台都必须作答"的能力身份全集，
+  是产品事实而非平台能力声明：未注册期望能力由 runtime catalog 兜底发布 typed 缺席
+  descriptor（`Unsupported`、无 provider 归属），真实注册只替换自身条目，"无条目"不是
+  合法产品答案。具体机制与不可逆性见 [ADR-053](../adr/053-product-expected-capability-surface.md)。
 - 稳定 identity、generation、last-success 和 recovery 由 runtime/application 管理；热插拔、
   重排、counter rollback 和 PID reuse 都必须断开旧 baseline。
 - 标准二进制在运行时发现 Intel、AMD、NVIDIA、NVMe、ATA、Wi-Fi 等能力；硬件 vendor 不是

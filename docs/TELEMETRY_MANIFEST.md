@@ -166,6 +166,12 @@ swap 读出（`/proc/swaps` used 口径）、压缩深度（orig→compr + 守�
 能力是否已注册、可用、部分可用或 `Unsupported`，以 platform contract/provider catalog、
 对应 crate README 和实现验证共同判定；本清单不承载现场数据、评分或待办事项。
 
+产品期望面（`CapabilityId::EXPECTED_SURFACE`）声明"每个平台都必须作答"的能力身份全集：
+runtime catalog 对每个期望身份先发布 typed 缺席 descriptor（`Unsupported`、无 provider
+归属），平台真实注册只替换自身条目，因此不存在"未注册即无条目"的静默缺席
+（[ADR-053](../adr/053-product-expected-capability-surface.md)）。本清单某平台没有合格
+来源的能力，运行时以该 typed 缺席作答；不在期望面内的 vendor/诊断身份不受此承诺约束。
+
 ---
 
 ## 4. 维护与更新规范

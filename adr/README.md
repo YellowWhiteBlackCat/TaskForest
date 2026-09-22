@@ -57,6 +57,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 | [050](050-wayland-current-window-capture.md) | Wayland current-window capture | GPUI submits a typed one-shot PNG request; Linux uses fixed-argv Spectacle today, with Portal Screenshot and ScreenCast/PipeWire reserved behind the same host boundary. | Platform, Frontend |
 | [051](051-four-frontend-products-zero-ui-features.md) | Four frontend products, zero UI features | Each frontend is an independent product crate + bin over the shared `taskmanager-cli` harness; `ui-*` features and every frontend conditional in shared layers are deleted; `cfg` is platform-axis only. | Frontend, Release, Layering |
 | [052](052-private-capture-run-isolation.md) | UUID-scoped private capture runs | Each background capture owns a UUID-scoped D-Bus/Wayland/KWin/runtime/binary/receipt namespace, a cgroup-supervised process tree and an atomic locked publication pointer; dual-run isolation is a release gate. | Frontend, Safety, Release |
+| [053](053-product-expected-capability-surface.md) | Product-expected capability surface | The product declares the expected capability identities and the runtime catalog seeds a typed `Unsupported` absence for every unregistered expected capability; "no entry" is never a product answer. | Capability, Observation |
 
 ## Decision chains
 
@@ -80,6 +81,9 @@ existing ADRs: cross-references and history depend on stable numbers.
   ADR-048/049 MSR chain runs under ADR-023.
 - ADR-052 governs the Linux background evidence route introduced beside ADR-041
   and ADR-050; it does not turn diagnostic receipts into parity evidence.
+- ADR-053 extends ADR-009's absent-capability handle to the catalog: every
+  product-expected capability answers with a real source or a typed absence,
+  which is the shape ADR-043/044 capability-absence claims use.
 
 ## Find by topic
 
@@ -87,7 +91,7 @@ existing ADRs: cross-references and history depend on stable numbers.
 |---|---|
 | Layering & cross-crate boundary | 005, 008, 009, 011, 027, 037, 047 |
 | Platform acquisition & data sources | 006, 009, 010, 011, 013, 018, 019, 024, 031, 043, 044, 049, 050 |
-| Observation & availability semantics | 007, 015, 016 |
+| Observation & availability semantics | 007, 015, 016, 053 |
 | History & refresh | 014, 036 |
 | Privilege & escalation | 023, 035, 048 |
 | Audited unsafe boundaries | 022, 024, 025, 031 |

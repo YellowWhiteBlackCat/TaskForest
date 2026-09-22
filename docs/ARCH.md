@@ -156,7 +156,7 @@ application-owned command/reducer/projection。`taskmanager-app-host` 与
    指 typed **结果语义**（真实值或 typed 原因）相同，不指事实可用性相同；某平台没有合格来源
    或原生实现时，该 feature 必须以 typed 原因呈现缺席（能力级真实词为 `CapabilityStatus` 的
    `Unsupported`/`PermissionRequired`/`RequiresEscalation`/`MissingDependency`/`TemporarilyUnavailable`；`PermissionDenied` 属失败原因轴），而非伪装成可用或静默消失。
-   守门：`dual_track_policy_parity`、`renderer_fold_boundary`、`control_semantic_parity`。
+   缺席身份由产品期望面（`CapabilityId::EXPECTED_SURFACE`）声明，并由 catalog 兜底 typed 缺席 descriptor 机械保证（ADR-053）；守门：`dual_track_policy_parity`、`renderer_fold_boundary`、`control_semantic_parity`。
 5. **折叠律**：渲染入口只回放数据层折叠（"一次折叠，四端渲染"），渲染模块不得重算
    数据折叠。
 
