@@ -188,6 +188,7 @@ impl DiagnosticPlatformCapabilities {
                     }
                     CapabilityStatus::Unsupported => "unsupported".to_owned(),
                     CapabilityStatus::PermissionRequired => "permission_required".to_owned(),
+                    CapabilityStatus::RequiresEscalation => "requires_escalation".to_owned(),
                     CapabilityStatus::MissingDependency => "missing_dependency".to_owned(),
                     CapabilityStatus::TemporarilyUnavailable => {
                         "temporarily_unavailable".to_owned()

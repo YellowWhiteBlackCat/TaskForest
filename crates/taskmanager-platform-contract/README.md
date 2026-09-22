@@ -47,7 +47,10 @@ Physical-device producers use the constrained `DeviceDiscovery` constructor so
 IDs, discovery outcome, and item count are derived together; it is the only
 public construction route. `RequiresEscalation` survives
 provider-to-operation mapping as its own outcome rather than becoming a generic
-permission denial.
+permission denial. `ProviderFailure::capability_status` is the sole
+failure→capability-status projection: the runtime catalog and the conformance
+scenarios delegate to it, and a caller holding the core `FailureKind` vocabulary
+reaches the same function through the lossless `from_kind` conversion.
 
 ## Module map
 

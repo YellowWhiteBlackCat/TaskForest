@@ -107,9 +107,16 @@ fn live_selected_count(processes: &[ProcessItem], selected: &[ProcessLiveKey]) -
 pub(crate) const fn process_control_capability_allowed(
     capability: Option<CapabilityStatus>,
 ) -> bool {
+    // `RequiresEscalation` is as actionable as `PermissionRequired`: the
+    // process-control request itself makes the final permission decision, so a
+    // pending gate must not disable the surface.
     matches!(
         capability,
-        None | Some(CapabilityStatus::Available | CapabilityStatus::PermissionRequired)
+        None | Some(
+            CapabilityStatus::Available
+                | CapabilityStatus::PermissionRequired
+                | CapabilityStatus::RequiresEscalation
+        )
     )
 }
 

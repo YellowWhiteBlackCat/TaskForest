@@ -71,10 +71,15 @@ pub(crate) fn msr_readouts_model(inputs: &MsrReadoutsInputs<'_>) -> MsrReadoutsM
         MsrReadoutState::Failed(failed) => model_from_failure(failure_kind(&failed.failure)),
         MsrReadoutState::Closed => match inputs.capability {
             // The runtime catalog proves an escalation-backed lane exists:
-            // offer the one explicit authorization entry.
-            Some(CapabilityStatus::Available | CapabilityStatus::PermissionRequired) => {
-                MsrReadoutsModel::AuthorizationRequired
-            }
+            // offer the one explicit authorization entry. `RequiresEscalation`
+            // is the escalatable state (the per-feature OS-native prompt can
+            // grant it); `PermissionRequired` is a permission gate with no
+            // escalation offer. Both still require one explicit decision.
+            Some(
+                CapabilityStatus::Available
+                | CapabilityStatus::PermissionRequired
+                | CapabilityStatus::RequiresEscalation,
+            ) => MsrReadoutsModel::AuthorizationRequired,
             Some(CapabilityStatus::MissingDependency) => {
                 MsrReadoutsModel::Unavailable("cpu.msr_readouts_helper")
             }

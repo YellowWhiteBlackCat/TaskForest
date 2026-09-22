@@ -135,3 +135,17 @@ fn missing_crossing_fails_fast_without_launching_pkexec() {
         0
     );
 }
+
+fn escalation_crossing() -> EscalationAvailability {
+    EscalationAvailability::RequiresEscalation(EscalationFeature::CpuMsr)
+}
+
+#[test]
+fn escalation_available_crossing_reports_the_escalatable_capability_state() {
+    let provider = NativeMsrReadoutProvider::with_crossing(escalation_crossing, counted_helper);
+    assert_eq!(
+        provider.initial_status(),
+        CapabilityStatus::RequiresEscalation,
+        "an available escalation must not fold onto the plain permission gate",
+    );
+}

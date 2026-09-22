@@ -8,7 +8,6 @@ use std::collections::{BTreeMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, RwLock};
 
-use taskmanager_core::core::failure::FailureKind;
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilityRecoveryOutcome,
     CapabilityRecoveryTrigger, CapabilitySnapshot, CapabilityStatus, EventQueueSchedulingSnapshot,
@@ -425,18 +424,11 @@ impl CapabilityScheduler for RuntimeCapabilityCatalog {
     }
 }
 
+/// Publish one provider failure as a capability status.
+///
+/// This adapter owns no copy of the failure→status table: it delegates to the
+/// contract authority [`ProviderFailure::capability_status`], so the runtime
+/// catalog and the headless conformance scenario observe one rule.
 const fn capability_status(error: ProviderFailure) -> CapabilityStatus {
-    match error.kind() {
-        FailureKind::Unsupported => CapabilityStatus::Unsupported,
-        // RequiresEscalation is an escalatable denial; the capability-status
-        // vocabulary has no escalation token, so fold it into PermissionRequired.
-        FailureKind::PermissionDenied | FailureKind::RequiresEscalation => {
-            CapabilityStatus::PermissionRequired
-        }
-        FailureKind::MissingDependency => CapabilityStatus::MissingDependency,
-        FailureKind::TimedOut | FailureKind::TemporarilyUnavailable | FailureKind::Rejected => {
-            CapabilityStatus::TemporarilyUnavailable
-        }
-        FailureKind::IdentityChanged | FailureKind::ProviderFault => CapabilityStatus::Stale,
-    }
+    error.capability_status()
 }

@@ -162,6 +162,10 @@ pub(crate) fn capability_summary_line(snapshot: &CapabilitySnapshot) -> String {
         match descriptor.status {
             CapabilityStatus::Available => available += 1,
             CapabilityStatus::PermissionRequired => permission_required += 1,
+            // An escalatable capability is still a pending permission decision;
+            // the operator summary counts it with the permission gates rather
+            // than the non-actionable other states.
+            CapabilityStatus::RequiresEscalation => permission_required += 1,
             CapabilityStatus::Unsupported => unsupported += 1,
             CapabilityStatus::Degraded(_)
             | CapabilityStatus::MissingDependency

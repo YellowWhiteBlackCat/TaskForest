@@ -199,7 +199,9 @@ pub fn demo_app() -> ShellApp {
     app.apply_capability_snapshot(CapabilitySnapshot::from_descriptors([
         CapabilityDescriptor {
             id: CapabilityId::TELEMETRY_GPU_ENGINES,
-            status: CapabilityStatus::PermissionRequired,
+            // The demo GPU-engine lane is escalation-backed (ADR-023), so it
+            // shows the honest escalatable state rather than a plain gate.
+            status: CapabilityStatus::RequiresEscalation,
             providers: vec![ProviderId::borrowed("fixture.gpu-engines")],
             observed_at_ms: 0,
             last_success_at_ms: None,

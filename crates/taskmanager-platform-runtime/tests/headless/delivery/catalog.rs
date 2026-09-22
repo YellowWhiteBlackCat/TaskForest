@@ -56,6 +56,52 @@ fn catalog_publishes_composition_status_before_first_request() {
 }
 
 #[test]
+fn capability_status_keeps_escalation_and_permission_states_distinct() {
+    for (failure, expected) in [
+        (
+            ProviderFailure::PermissionDenied,
+            CapabilityStatus::PermissionRequired,
+        ),
+        (
+            ProviderFailure::RequiresEscalation,
+            CapabilityStatus::RequiresEscalation,
+        ),
+    ] {
+        let catalog = catalog();
+        let owner = request_id(1);
+        let scheduler = catalog.ecs_scheduler_handle();
+        assert!(
+            scheduler
+                .lock()
+                .expect("scheduler lock")
+                .reserve_submission(&CapabilityId::TELEMETRY_CPU, owner, 0)
+        );
+        assert!(
+            catalog
+                .claim_terminal_delivery(&CapabilityId::TELEMETRY_CPU, owner)
+                .is_accepted()
+        );
+        assert_eq!(
+            catalog.record(
+                &CapabilityId::TELEMETRY_CPU,
+                CapabilityHealth::Unavailable(failure),
+                10,
+                owner,
+            ),
+            CompletionVerdict::Accepted(CompletionOwner::Capability),
+        );
+        assert_eq!(
+            catalog
+                .snapshot()
+                .get(&CapabilityId::TELEMETRY_CPU)
+                .map(|descriptor| descriptor.status),
+            Some(expected),
+            "{failure:?} must not be folded onto the other permission state",
+        );
+    }
+}
+
+#[test]
 fn stale_completion_cannot_change_catalog_or_release_the_owner() {
     let catalog = catalog();
     let owner = request_id(1);

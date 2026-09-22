@@ -20,7 +20,8 @@ mod window_capture;
 
 pub use capability::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilityRequest, CapabilitySnapshot,
-    CapabilityStatus, MAX_REQUEST_SCOPE_BYTES, RequestScope, RequestTracking, RequestTrackingError,
+    CapabilityStatus, MAX_REQUEST_SCOPE_BYTES, PUBLIC_CAPABILITY_DEGRADATION_WORDS,
+    PUBLIC_FAILURE_AXIS_PERMISSION_WORD, RequestScope, RequestTracking, RequestTrackingError,
     SidebandPolicy,
 };
 pub use envelope::{EventEnvelope, EventSequence, RequestEnvelope, RequestId, RequestIdGenerator};

@@ -3,8 +3,14 @@
 //!
 //! Provider failures precede request correlation; operation and delivery
 //! failures are tracked separately for accepted requests.
+//!
+//! [`ProviderFailure::capability_status`] owns the failure→capability-status
+//! projection for the whole workspace. The runtime catalog and the conformance
+//! scenarios consume it rather than restating the table; a caller holding the
+//! core [`FailureKind`] vocabulary reaches the same authority through the
+//! lossless [`ProviderFailure::from_kind`] conversion.
 
-use crate::{CapabilityId, EventSequence, RequestId};
+use crate::{CapabilityId, CapabilityStatus, EventSequence, RequestId};
 use taskmanager_core::FailureKind;
 use taskmanager_core::ProviderId;
 
@@ -75,6 +81,36 @@ impl ProviderFailure {
             Self::TimedOut | Self::TemporarilyUnavailable | Self::ProviderFault => {
                 RetryDisposition::RetryLater
             }
+        }
+    }
+
+    /// The capability status this provider failure publishes on the
+    /// capability-availability axis.
+    ///
+    /// This is the single authority for the failure→capability-status
+    /// projection. The runtime capability catalog and the headless conformance
+    /// scenario reuse it instead of re-deriving the table from
+    /// [`FailureKind`], so the two can no longer drift. A caller that holds the
+    /// core failure vocabulary delegates through the lossless [`Self::from_kind`]:
+    /// `ProviderFailure::from_kind(kind).capability_status()`.
+    ///
+    /// The permission/escalation split is deliberate and never collapsed.
+    /// [`CapabilityStatus::PermissionRequired`] is a permission gate with no
+    /// offer, while [`CapabilityStatus::RequiresEscalation`] proves the
+    /// per-feature escalation seam (ADR-023, permission-model Boundary 2) can
+    /// still reach the data; folding the latter onto the former would silently
+    /// discard the escalation affordance.
+    #[must_use]
+    pub const fn capability_status(self) -> CapabilityStatus {
+        match self {
+            Self::Unsupported => CapabilityStatus::Unsupported,
+            Self::PermissionDenied => CapabilityStatus::PermissionRequired,
+            Self::RequiresEscalation => CapabilityStatus::RequiresEscalation,
+            Self::MissingDependency => CapabilityStatus::MissingDependency,
+            Self::TimedOut | Self::TemporarilyUnavailable | Self::Rejected => {
+                CapabilityStatus::TemporarilyUnavailable
+            }
+            Self::IdentityChanged | Self::ProviderFault => CapabilityStatus::Stale,
         }
     }
 }

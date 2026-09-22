@@ -222,7 +222,11 @@ pub(crate) fn rapl_power_needs_authorization(
         }
         RaplPowerState::Closed => matches!(
             capability,
-            Some(CapabilityStatus::Available | CapabilityStatus::PermissionRequired)
+            Some(
+                CapabilityStatus::Available
+                    | CapabilityStatus::PermissionRequired
+                    | CapabilityStatus::RequiresEscalation
+            )
         ),
         _ => false,
     }
@@ -243,7 +247,11 @@ pub(crate) fn msr_readout_needs_authorization(
         }
         MsrReadoutState::Closed => matches!(
             capability,
-            Some(CapabilityStatus::Available | CapabilityStatus::PermissionRequired)
+            Some(
+                CapabilityStatus::Available
+                    | CapabilityStatus::PermissionRequired
+                    | CapabilityStatus::RequiresEscalation
+            )
         ),
         _ => false,
     }

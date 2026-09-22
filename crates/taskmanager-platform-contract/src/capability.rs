@@ -285,11 +285,54 @@ pub enum CapabilityStatus {
     /// independently fallible source failed.
     Degraded(FailureKind),
     Unsupported,
+    /// The capability needs a permission decision the current process cannot
+    /// grant itself, and no escalation offer is part of this state. This is the
+    /// capability-level twin of a hard `core::FailureKind::PermissionDenied`;
+    /// when the per-feature escalation seam can still reach the data it is
+    /// [`Self::RequiresEscalation`] instead, so consumers can tell the two
+    /// states apart.
     PermissionRequired,
+    /// The capability is absent because the unprivileged process lacks a
+    /// privilege that the per-feature escalation seam (ADR-023,
+    /// permission-model Boundary 2) can reach through the OS-native prompt.
+    ///
+    /// This is the capability-level twin of
+    /// `core::FailureKind::RequiresEscalation`. It is deliberately not folded
+    /// into [`Self::PermissionRequired`]: only this state proves that an
+    /// escalation affordance exists, so a frontend may offer the one explicit
+    /// prompt while never fabricating a value in the meantime.
+    RequiresEscalation,
     MissingDependency,
     TemporarilyUnavailable,
     Stale,
 }
+
+/// Published public-commitment words for the capability-availability axis.
+///
+/// This array is a projection of [`CapabilityStatus`], not a second vocabulary:
+/// the enum variants are the sole authority, and
+/// `public_degradation_words_match_the_authoritative_enum` fails if a rename
+/// ever desynchronizes these literals from the real variant names. The public
+/// docs (`docs/RELEASE.md`, `docs/GLOSSARY.md`,
+/// `docs/CROSSPLATFORM_STRATEGY.md`) must spell degradation reasons with these
+/// exact words.
+pub const PUBLIC_CAPABILITY_DEGRADATION_WORDS: [&str; 5] = [
+    "Unsupported",
+    "PermissionRequired",
+    "RequiresEscalation",
+    "MissingDependency",
+    "TemporarilyUnavailable",
+];
+
+/// The permission word that belongs to the failure-reason axis rather than the
+/// capability-availability axis.
+///
+/// `PermissionDenied` names `taskmanager_core::FailureKind::PermissionDenied`
+/// (and `ProviderFailure::PermissionDenied`); the capability-level gate is
+/// spelled [`CapabilityStatus::PermissionRequired`]. Published docs cite this
+/// literal only when naming a failure reason so the two axes stay visibly
+/// distinct.
+pub const PUBLIC_FAILURE_AXIS_PERMISSION_WORD: &str = "PermissionDenied";
 
 /// Runtime description of one independently usable capability.
 #[derive(Clone, Debug, PartialEq, Eq)]

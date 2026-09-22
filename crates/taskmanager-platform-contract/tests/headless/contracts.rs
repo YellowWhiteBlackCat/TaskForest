@@ -1,7 +1,8 @@
 use taskmanager_core::{FailureKind, ProviderId};
 use taskmanager_platform_contract::{
     CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
-    MAX_REQUEST_SCOPE_BYTES, ProviderFailure, RequestIdGenerator, RequestScope,
+    MAX_REQUEST_SCOPE_BYTES, PUBLIC_CAPABILITY_DEGRADATION_WORDS,
+    PUBLIC_FAILURE_AXIS_PERMISSION_WORD, ProviderFailure, RequestIdGenerator, RequestScope,
     RequestTrackingError, RetryDisposition,
 };
 
@@ -79,6 +80,77 @@ fn provider_failures_have_stable_operation_failure_mapping() {
     ] {
         assert_eq!(ProviderFailure::from_kind(failure).kind(), failure);
     }
+}
+
+#[test]
+fn provider_failure_capability_status_is_the_single_authority() {
+    for (failure, expected) in [
+        (ProviderFailure::Unsupported, CapabilityStatus::Unsupported),
+        (
+            ProviderFailure::RequiresEscalation,
+            CapabilityStatus::RequiresEscalation,
+        ),
+        (
+            ProviderFailure::PermissionDenied,
+            CapabilityStatus::PermissionRequired,
+        ),
+        (
+            ProviderFailure::MissingDependency,
+            CapabilityStatus::MissingDependency,
+        ),
+        (
+            ProviderFailure::TimedOut,
+            CapabilityStatus::TemporarilyUnavailable,
+        ),
+        (ProviderFailure::IdentityChanged, CapabilityStatus::Stale),
+        (
+            ProviderFailure::TemporarilyUnavailable,
+            CapabilityStatus::TemporarilyUnavailable,
+        ),
+        (
+            ProviderFailure::Rejected,
+            CapabilityStatus::TemporarilyUnavailable,
+        ),
+        (ProviderFailure::ProviderFault, CapabilityStatus::Stale),
+    ] {
+        assert_eq!(failure.capability_status(), expected, "{failure:?}");
+        // A caller holding the core vocabulary reaches this same authority
+        // through the lossless `from_kind` conversion rather than a second
+        // mapping.
+        assert_eq!(
+            ProviderFailure::from_kind(failure.kind()).capability_status(),
+            expected,
+            "core FailureKind delegation for {failure:?}",
+        );
+    }
+}
+
+#[test]
+fn public_degradation_words_match_the_authoritative_enum() {
+    let variants = [
+        CapabilityStatus::Unsupported,
+        CapabilityStatus::PermissionRequired,
+        CapabilityStatus::RequiresEscalation,
+        CapabilityStatus::MissingDependency,
+        CapabilityStatus::TemporarilyUnavailable,
+    ];
+    // `Debug` is derived on the enum, so the formatted name is the real Rust
+    // variant name; a rename that leaves the published array stale fails here.
+    assert_eq!(
+        variants.map(|status| format!("{status:?}")),
+        PUBLIC_CAPABILITY_DEGRADATION_WORDS.map(str::to_owned),
+        "published degradation words drifted from the CapabilityStatus variants",
+    );
+    // The permission failure reason is a different axis and must never appear
+    // as a capability-availability word.
+    assert_eq!(
+        format!("{:?}", FailureKind::PermissionDenied),
+        PUBLIC_FAILURE_AXIS_PERMISSION_WORD,
+    );
+    assert!(
+        !PUBLIC_CAPABILITY_DEGRADATION_WORDS.contains(&PUBLIC_FAILURE_AXIS_PERMISSION_WORD),
+        "PermissionDenied belongs to the failure-reason axis, not capability availability",
+    );
 }
 
 #[test]
