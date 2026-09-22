@@ -83,7 +83,6 @@ fn the_unsupported_feature_set_is_pinned() {
             "hardware.core-frequency",
             "gpu.process-attribution",
             "power.rapl-draw",
-            "power.thermal-throttle-events",
             "pressure.use-attribution",
             "pressure.unresponsive-apps",
             "ipc.dbus-service-topology",
@@ -227,7 +226,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        16,
+        17,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

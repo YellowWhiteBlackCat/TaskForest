@@ -74,6 +74,7 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::GpuMemoryReadout
         | FeatureId::RaplPowerDraw
         | FeatureId::ThermalZoneSensors
+        | FeatureId::ThermalThrottleEvents
         | FeatureId::CpuCStateAnalysis
         | FeatureId::BatteryPowerInventory
         | FeatureId::LinuxNamespaceAudit
@@ -119,10 +120,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the Iced process \
                      surface",
-        },
-        FeatureId::ThermalThrottleEvents => Unsupported {
-            reason: "no CPU thermal-throttle/PROCHOT event readout is wired in \
-                     the Iced CPU surface",
         },
         FeatureId::ProcessAncestorLineage => Unsupported {
             reason: "the Iced process surface renders the row table without the \

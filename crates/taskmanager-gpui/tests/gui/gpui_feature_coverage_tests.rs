@@ -83,7 +83,6 @@ fn the_reference_undelivered_set_is_pinned() {
             "network.socket-queue-backlog",
             "hardware.numa-memory-distribution",
             "gpu.process-attribution",
-            "power.thermal-throttle-events",
             "pressure.use-attribution",
             "pressure.unresponsive-apps",
             "ipc.dbus-service-topology",
@@ -230,7 +229,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        15,
+        16,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

@@ -812,6 +812,56 @@ fn text_input_paste_and_clipboard() {
 }
 
 #[test]
+fn selectable_readout_copy_has_no_path_in_this_shape() {
+    // TextSelection is declared `Unsupported`: read-out text nodes are not
+    // selectable, and Ctrl+C has no row/summary clipboard route. The shared
+    // row-summary seam itself is available (other shapes write it to the OS
+    // clipboard); this shape leaves it untouched — and does not even reach
+    // the shell-owned editor buffer while search is closed.
+    let shell = shell_with_selection();
+    assert!(
+        shell.selected_row_summary().is_some(),
+        "the shared row-summary seam is available to shapes that wire a clipboard"
+    );
+    let selection_before = shell.selected_process_identity();
+    let feedback_before = shell.feedback_text().to_owned();
+
+    let mut app = input_app(shell);
+    app.update();
+    app.update();
+
+    let buffer_before = app
+        .world()
+        .resource::<super::TextInputState>()
+        .get_clipboard()
+        .to_owned();
+    press_ctrl(&mut app, KeyCode::KeyC, None);
+
+    let shell = &app.world().non_send::<FrontendTrack>().shell;
+    assert_eq!(
+        shell.selected_process_identity(),
+        selection_before,
+        "Ctrl+C must not move the row selection"
+    );
+    assert!(
+        shell.feedback_notice().is_none(),
+        "no copy receipt may appear: this shape wires no row-copy path"
+    );
+    assert_eq!(
+        shell.feedback_text(),
+        feedback_before,
+        "Ctrl+C must not repaint the feedback line"
+    );
+    assert_eq!(
+        app.world()
+            .resource::<super::TextInputState>()
+            .get_clipboard(),
+        buffer_before,
+        "with search closed, Ctrl+C must not touch the editor buffer either"
+    );
+}
+
+#[test]
 fn text_input_word_navigation_and_deletion() {
     let mut app = input_app(shell_with_selection());
     app.update();

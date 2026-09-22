@@ -262,6 +262,35 @@ fn spec_grid(
     column
 }
 
+/// Compact per-package summary of the cumulative thermal-throttle trigger
+/// counters (`power.thermal-throttle-events`): one `S{package_id}` segment per
+/// package that observed at least one counter, naming the package-level and
+/// per-core event counts. An unobserved sibling counter inside an observed
+/// package keeps the shared dash; a projection with no observed counter at all
+/// returns `None` so the caller omits the row entirely — a missing observation
+/// is never fabricated as `0`.
+fn thermal_throttle_summary(cpu: &CpuMetrics) -> Option<String> {
+    let mut packages = Vec::new();
+    for package in &cpu.packages {
+        if package.package_throttle_count.is_none() && package.core_throttle_count.is_none() {
+            continue;
+        }
+        let package_count = package
+            .package_throttle_count
+            .map_or_else(formatting::missing_value, |value| value.to_string());
+        let core_count = package
+            .core_throttle_count
+            .map_or_else(formatting::missing_value, |value| value.to_string());
+        packages.push(format!(
+            "S{} {} {package_count} · {} {core_count}",
+            package.package_id,
+            i18n::t("cpu.throttle_package"),
+            i18n::t("cpu.throttle_core"),
+        ));
+    }
+    (!packages.is_empty()).then(|| packages.join(" | "))
+}
+
 /// Pure data-layer builder for the CPU specification rows (ADR-020
 /// single-source / data-render split, ARCH.md §4): the exact ordered
 /// (label, value) list `spec_grid` paints, free of any element/theme
@@ -372,6 +401,13 @@ pub(crate) fn cpu_spec_rows(
     }
     if let Some(interrupts) = taskmanager_shell::presentation::cpu_interrupt_summary(cpu) {
         rows.push((i18n::t("cpu.interrupts").to_string(), interrupts));
+    }
+    // Diagnostic reliability counters follow the same "absent whole fact =
+    // absent row" discipline as the topology/idle/interrupt summaries; the
+    // retained projection never fabricates a zero counter for an unobserved
+    // package.
+    if let Some(throttle) = thermal_throttle_summary(cpu) {
+        rows.push((i18n::t("cpu.thermal_throttle").to_string(), throttle));
     }
     // An unavailable optional value is represented by absence and its
     // authorization/recovery affordance belongs to the Settings permission

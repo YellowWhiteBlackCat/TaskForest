@@ -235,6 +235,72 @@ fn dense_right_rail_scroll_exposes_the_tail_without_an_omitted_rows_placeholder(
     );
 }
 
+/// The `power.thermal-throttle-events` delivery: the CPU rail paints the
+/// cumulative package/per-core thermal-throttle trigger counters from the
+/// shared CPU projection, keeps an unobserved sibling counter as the labeled
+/// shared dash in the projection, and paints no row at all when no package
+/// observed a counter — never a fabricated zero.
+#[test]
+fn thermal_throttle_counters_paint_with_honest_absence() {
+    let mut app = cpu_app();
+
+    // Observed counters: the single package segment reaches the painted rail
+    // (the bounded value slot fits "S0 Package 7 · Core 3" exactly).
+    set_package_counters(&mut app, &[(0, Some(7), Some(3))]);
+    app.scroll_cpu_details(isize::MAX);
+    let observed = frame_text(&app, 120, 48);
+    assert!(
+        row_paints(&observed, "Thermal throttle", "S0 Package 7 · Core 3"),
+        "the observed package counters must paint:\n{observed}"
+    );
+
+    // The projection keeps an unobserved core counter a labeled dash and a
+    // second package its own S-id (the rail's bounded value slot may elide the
+    // tail, so the fold is asserted at the data layer it paints from).
+    set_package_counters(&mut app, &[(0, Some(7), Some(3)), (1, Some(12), None)]);
+    let snapshot = app
+        .shell
+        .projection()
+        .snapshot
+        .clone()
+        .expect("demo snapshot");
+    let rows = crate::ui::perf_overview_data::cpu_spec_rail_rows(&snapshot.cpu, None);
+    let throttle = rows
+        .iter()
+        .find(|row| row.label == taskmanager_application::i18n::t("cpu.thermal_throttle"))
+        .expect("the observed counters must grow a rail row");
+    assert_eq!(
+        throttle.value, "S0 Package 7 · Core 3 | S1 Package 12 · Core —",
+        "an unobserved counter must stay a labeled dash, never a fabricated 0"
+    );
+
+    // No package observed any counter: the whole row is absent (the honest
+    // absence convention of this rail), not a row of fabricated zeros.
+    set_package_counters(&mut app, &[(0, None, None)]);
+    app.scroll_cpu_details(isize::MAX);
+    let cold = frame_text(&app, 120, 48);
+    assert!(
+        !cold.contains("Thermal throttle"),
+        "an unobserved counter family must not grow a rail row:\n{cold}"
+    );
+}
+
+fn set_package_counters(app: &mut crate::TuiApp, counters: &[(u32, Option<u64>, Option<u64>)]) {
+    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+        let snapshot = snapshot.as_mut().expect("demo snapshot");
+        snapshot.cpu.packages = counters
+            .iter()
+            .map(|&(package_id, package_count, core_count)| {
+                let mut package =
+                    taskmanager_core::core::metrics::CpuPackageMetrics::new(package_id);
+                package.package_throttle_count = package_count;
+                package.core_throttle_count = core_count;
+                package
+            })
+            .collect();
+    });
+}
+
 /// Speed-row parity (#3): a BogoMIPS fallback frequency carries the typed
 /// source qualifier so a boot-calibration value never masquerades as a
 /// native clock measurement; a native readout stays unqualified.

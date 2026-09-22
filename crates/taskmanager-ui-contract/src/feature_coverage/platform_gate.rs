@@ -768,7 +768,9 @@ static UNBOUND_EXPECTED_CAPABILITIES: &[CapabilityId] = &[
 ///
 /// - `Missing` ceilings are the frontend-axis parity gaps the four shapes
 ///   already declare explicitly (their own P1 tests pin the same sets);
-///   delivering the feature lowers the ceiling.
+///   delivering the feature lowers the ceiling. The W25-A
+///   `power.thermal-throttle-events` delivery lowered each shape's ceiling by
+///   three (one cell per platform axis).
 /// - `unregistered_per_frontend` is the live `NotInVocabulary` census
 ///   multiplied by the three platforms. The M3.3 lowering pass rebound every
 ///   feature whose capability identity already existed
@@ -782,10 +784,10 @@ static UNBOUND_EXPECTED_CAPABILITIES: &[CapabilityId] = &[
 ///   census; it only shrinks.
 pub static PLATFORM_GATE_BASELINE: PlatformGateBaseline<'static> = PlatformGateBaseline {
     missing_by_frontend: &[
-        (FrontendShape::Gpui, 78),
-        (FrontendShape::Iced, 87),
-        (FrontendShape::Tui, 78),
-        (FrontendShape::Bevy, 96),
+        (FrontendShape::Gpui, 75),
+        (FrontendShape::Iced, 84),
+        (FrontendShape::Tui, 75),
+        (FrontendShape::Bevy, 93),
     ],
     unregistered_per_frontend: 3,
     unbound_expected_capabilities: UNBOUND_EXPECTED_CAPABILITIES,

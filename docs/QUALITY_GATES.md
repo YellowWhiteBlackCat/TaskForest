@@ -12,7 +12,7 @@
 | public-repo guard | 拒绝私有路径、真实截图、个人邮箱、凭据模式和主机路径 |
 | cargo-deny | 拒绝已知漏洞、不允许的许可证和依赖策略违规 |
 | Python/Shell 政策门 | 检查安装清单、自动化安全、模块边界和测试布局 |
-| rustfmt / clippy | 格式和 warning-free 编译 |
+| rustfmt / clippy / production-config | 格式、warning-free 编译与不带 test-support 的生产配置 |
 | release build | 验证默认 GPUI 发布形态（PR 用无 LTO 冒烟 profile，main 与 tag 用完整发布 profile） |
 | package stage simulation | 验证 Linux 安装树、权限和 polkit 路径 |
 | workspace nextest | 行为和平台无关契约 |
@@ -44,8 +44,8 @@ bash scripts/quality/local-gates.sh standard
 bash scripts/quality/local-gates.sh extended
 ```
 
-- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
-- `standard`：quick + dependency audit、clippy、nextest、doctest、rustdoc、release build 和
+- `quick`：公开边界、文档、格式、依赖版本底线、模块、安装清单、自动化、测试执行器和测试布局政策门，以及 CI/本地 clippy 命令口径守卫 `clippy-parity`；其中 `scripts/quality/test_runner_guard.py` 机械拒绝非 doctest 的裸 Cargo 测试入口及缺少四并行度的测试执行。具备宿主 Wayland/KWin 依赖时还运行真实私有 A/B 隔离测试；可用 `TM_CAPTURE_ISOLATION_GATE=1` 强制运行，缺少环境时 `auto` 只记录明确的 SKIP。
+- `standard`：quick + dependency audit、clippy、production-config、nextest、doctest、rustdoc、release build 和
   平台无关形态矩阵，以及 Linux release/package smoke；
 - `extended`：standard + coverage、mutation、Miri、fuzz 和性能/体积回归。
 
@@ -131,10 +131,10 @@ SKIP，不能把 fixture、编译或静态图片写成平台验证通过。
 
 | 前端 | headless 交互矩阵 | 真实像素证据 |
 |---|---|---|
-| GPUI | `scripts/accept-gpui-interactions.sh`（standard `--with-gui`） | `scripts/capture-niri.sh` / `capture-windows.sh` |
+| GPUI | `scripts/parity/accept-frontend-interactions.sh gpui --scope linux`（standard `--with-gui`；内部仍调用 `scripts/accept-gpui-interactions.sh` 作为权威 runner 与回执作者） | `scripts/capture-niri.sh` / `capture-windows.sh` |
 | Iced | crate headless tests + capture matrix | `scripts/capture-iced.sh` |
 | TUI | crate headless tests + capture matrix | `scripts/capture-tui.sh` |
-| Bevy | `scripts/accept-bevy-interactions.sh`（standard `--with-gui`） | `scripts/capture-bevy.sh`（Wayland-only） |
+| Bevy | `scripts/parity/accept-frontend-interactions.sh bevy`（standard `--with-gui`，Bevy 线 scoped standard 同样运行；内部仍调用 `scripts/accept-bevy-interactions.sh` 作为权威 runner 与回执作者） | `scripts/capture-bevy.sh`（Wayland-only） |
 
 四个前端的画面证据统一默认 `TM_CAPTURE_NIRI_BACKGROUND=1`：由私有
 `dbus-run-session`（无 service activation）和 `kwin_wayland --virtual` 承载 nested Niri，
@@ -160,6 +160,10 @@ nextest discovery，矩阵中的每个命名测试必须真实存在，然后完
 marker、source provenance 和当前 worktree fail-closed；无 compositor 时只报告 SKIP。
 UI 边界改动由 `scripts/quality/ui-evidence-route.sh` 按前端路由到对应矩阵与新鲜回执。
 
+真实捕获的 provenance 与当前工作树绑定：validator 比较 git head、rustc 版本与
+worktree clean/dirty 三元组；捕获期间工作树由 clean 变 dirty 会让校验失败且该次捕获不发布，
+dirty 状态下三元组不变即通过：捕获必须单跑并等待安静的稳定窗口，失败后在同一稳定状态重跑，不修改 validator。
+
 ### 7.1 弹性布局收口协议
 
 所有响应式、密集详情、图表分组或固定 viewport 改动必须先遵循
@@ -173,6 +177,9 @@ UI 边界改动由 `scripts/quality/ui-evidence-route.sh` 按前端路由到对�
 
 验证器必须自动发现范围、执行目标、检查结果和副作用，并在范围为空、解析失败或回执不完整
 时 fail-closed。禁止用源码字符串存在性、恒真断言、固定测试数量或 `echo PASS` 证明行为。
+
+- 静态策略守卫的禁用 token 列表按（去行注释后的）精确子串匹配生产源，夹具文本必须避开；
+  发生碰撞时修改夹具（例如改用真实设备节点名），不得放宽或绕过守卫。
 
 ## 9. 并行隔离验证与视觉对等（标准，2026-08-29 起）
 

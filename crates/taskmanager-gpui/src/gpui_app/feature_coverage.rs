@@ -79,6 +79,7 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::GpuMemoryReadout
         | FeatureId::RaplPowerDraw
         | FeatureId::ThermalZoneSensors
+        | FeatureId::ThermalThrottleEvents
         | FeatureId::CpuCStateAnalysis
         | FeatureId::BatteryPowerInventory
         | FeatureId::LinuxNamespaceAudit
@@ -108,7 +109,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::SocketQueueBacklog
         | FeatureId::NumaMemoryDistribution
         | FeatureId::ProcessGpuAttribution
-        | FeatureId::ThermalThrottleEvents
         | FeatureId::UseBottleneckAttribution
         | FeatureId::UnresponsiveAppDetection
         | FeatureId::DbusServiceTopology

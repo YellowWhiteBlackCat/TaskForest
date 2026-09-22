@@ -171,3 +171,9 @@ Clean/Dirty/Conflict。projection cache 只返回 owned snapshot，不向 view �
 没有回流到外部组件层。质量入口见 [`QUALITY_GATES.md`](QUALITY_GATES.md)，视觉入口见
 [`screenshots/README.md`](screenshots/README.md)，实现细节见 `crates/taskmanager-ui/README.md`
 与 `crates/taskmanager-theme/README.md`。
+
+GPUI 帧断言只读取 debug selector 的几何：vendored `debug_bounds` 是帧级缓存且不随帧
+清理，所以“某元素在新帧消失”不能在同一窗口内断言——缺席只能取“该窗口从未画过”语义，
+需要对照时另开一个只渲染目标状态的新窗口，存在性断言必须落在真实画出的帧上。测试
+harness 必须在每帧按 typed snapshot 重建元素，禁止用 `mem::take`/`mem::replace` 交付
+一次性 `Div`：GPUI 在 `add_window` 期间可能先渲染一次，被消费的元素会让断言帧为空。

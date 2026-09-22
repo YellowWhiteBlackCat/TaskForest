@@ -40,10 +40,10 @@ use taskmanager_application::{
 };
 use taskmanager_core::core::metrics::MemoryTelemetryObservation;
 use taskmanager_core::core::metrics::{
-    CpuMetrics, CpuScalarObservations, CpuTelemetryObservation, DiskMetrics, MemoryMetrics,
-    MemoryScalarObservations, NetworkAdapterType, NetworkMetrics, NetworkScalarObservations,
-    NetworkTelemetryObservation, NetworkWirelessObservations, ScalarObservation,
-    ScalarObservationGroup,
+    CpuMetrics, CpuPackageMetrics, CpuScalarObservations, CpuTelemetryObservation, DiskMetrics,
+    MemoryMetrics, MemoryScalarObservations, NetworkAdapterType, NetworkMetrics,
+    NetworkScalarObservations, NetworkTelemetryObservation, NetworkWirelessObservations,
+    ScalarObservation, ScalarObservationGroup,
 };
 use taskmanager_platform_contract::{
     CapabilityCatalog, CapabilityDescriptor, CapabilityId, CapabilitySnapshot, CapabilityStatus,
@@ -57,7 +57,7 @@ use taskmanager_theme::Theme;
 
 use super::scene::content;
 use super::{
-    CurveCard, CurveGate, DynBlock, DynField, DynText, PerformanceDeviceButton,
+    CpuField, CurveCard, CurveGate, DynBlock, DynField, DynText, PerformanceDeviceButton,
     PerformanceDeviceFocus, PerformanceDeviceTarget, PerformanceFocus, PerformanceFocusButton,
     Section, SparkStrip, SummaryField, SystemCurve, curve_caption, curve_wanted, section_keys,
     summary_value,
@@ -327,6 +327,50 @@ fn partial_projection_keeps_missing_domains_on_dashes() {
     // The shell's saturating segment math yields the two-segment fallback
     // (in-use + available) for this observation shape.
     assert_eq!(section_keys(shell, Section::MemorySegments).len(), 2);
+}
+
+/// The `power.thermal-throttle-events` delivery: the Performance CPU
+/// diagnostic strip renders the cumulative package/per-core trigger counters
+/// per package from the shared projection. The mounted row keeps the shared
+/// dash while no package observed a counter (never a fabricated 0); a folded
+/// package observation rewrites the mounted text; an unobserved sibling
+/// counter stays a labeled dash.
+#[test]
+fn cpu_thermal_throttle_counters_render_with_honest_absence() {
+    taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
+    let field = DynField::Cpu(CpuField::ThermalThrottle);
+    let mut app = headless_perf_app();
+    app.update();
+    route_to_performance(&mut app);
+    assert_eq!(
+        dyn_text_value(app.world_mut(), &field).as_deref(),
+        Some(MISSING_VALUE),
+        "the mounted diagnostic row must keep the shared dash until a counter is observed"
+    );
+
+    let at = 1_000;
+    let mut cpu = cpu_metrics(20.0, &[12.0], at);
+    let mut observed = CpuPackageMetrics::new(0);
+    observed.package_throttle_count = Some(7);
+    observed.core_throttle_count = Some(3);
+    let mut package_only = CpuPackageMetrics::new(1);
+    package_only.package_throttle_count = Some(12);
+    package_only.core_throttle_count = None;
+    cpu.packages = vec![observed, package_only];
+    let memory = memory_metrics(at, 4 * GIB, 16 * GIB, 12 * GIB, (GIB, 4 * GIB));
+    fold_and_trigger(
+        &mut app,
+        PlatformEventBatch {
+            system_telemetry_outcomes: vec![cpu_outcome(1, at, cpu.clone())],
+            system_telemetry_projections: vec![projection(1, cpu, memory, Vec::new())],
+            ..PlatformEventBatch::default()
+        },
+    );
+    assert_eq!(
+        dyn_text_value(app.world_mut(), &field).as_deref(),
+        Some("S0 Package 7 · Core 3 | S1 Package 12 · Core —"),
+        "the folded counters must reach the mounted DynText row"
+    );
 }
 
 #[test]
