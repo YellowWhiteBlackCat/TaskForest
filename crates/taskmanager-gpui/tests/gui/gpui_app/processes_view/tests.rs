@@ -976,3 +976,87 @@ async fn selected_row_paints_accent_rail_at_leading_edge(cx: &mut TestAppContext
         "unselected rows must not paint the accent rail"
     );
 }
+
+/// The Apps status filter is the reference `SegmentedControl` instantiated in
+/// production: its track is one tab stop whose ArrowRight handler fires the
+/// next segment's production callback, so a keyboard traversal must move the
+/// typed shell bucket, and the painted table must follow that bucket. The
+/// reference component's own test renders states without assertions, so this
+/// proves the interaction through the app consumption.
+#[gpui::test]
+async fn status_filter_segmented_keyboard_moves_the_typed_bucket_and_rows(cx: &mut TestAppContext) {
+    use taskmanager_shell::ProcessStatusFilter;
+
+    let (win, view) = wrapped_root(cx);
+    view.update(cx, |v, cx| {
+        v.mark_telemetry_frame_ready();
+        v.page = TopPage::Apps;
+        v.replace_processes_for_test(vec![
+            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                .pid(4242)
+                .name("segmented-running-worker".into())
+                .status("R".into())
+                .build(),
+        ]);
+        cx.notify();
+    });
+    draw(cx, win);
+
+    // Locate the filter track in the Apps tab order: only that control moves
+    // the typed bucket on ArrowRight (the sort-header probe pattern).
+    let mut reached = false;
+    for _ in 0..64 {
+        win.update(cx, |_root, window, _cx| window.focus_next())
+            .unwrap();
+        cx.dispatch_keystroke(win.into(), Keystroke::parse("right").unwrap());
+        if view.read_with(cx, |v, _cx| v.process_status_filter()) != ProcessStatusFilter::All {
+            reached = true;
+            break;
+        }
+    }
+    assert!(
+        reached,
+        "the status-filter segmented control must be reachable in the Apps tab order"
+    );
+    assert_eq!(
+        view.read_with(cx, |v, _cx| v.process_status_filter()),
+        ProcessStatusFilter::Running,
+        "the first segment right of All is Running"
+    );
+
+    // The painted table follows the typed bucket: the Running fixture keeps a
+    // painted row and the empty body stays absent...
+    draw(cx, win);
+    {
+        let mut vcx = VisualTestContext::from_window(win.into(), cx);
+        assert!(
+            vcx.debug_bounds("tm-proc-row-root:0").is_some(),
+            "a running process must stay painted under the Running bucket"
+        );
+        assert!(
+            vcx.debug_bounds("tm-procs-empty-body").is_none(),
+            "a non-empty Running bucket must not paint the empty body"
+        );
+    }
+
+    // ...and the next ArrowRight moves to Sleeping, which filters the row out
+    // of the production projection and paints the empty body instead.
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    vcx.simulate_keystrokes("right");
+    assert_eq!(
+        view.read_with(&vcx, |v, _cx| v.process_status_filter()),
+        ProcessStatusFilter::Sleeping,
+        "the second segment right of All is Sleeping"
+    );
+    let projected_before_draw =
+        vcx.update(|_window, cx| view.update(cx, |v, _cx| v.processes_projection().0.len()));
+    assert_eq!(
+        projected_before_draw, 0,
+        "the Sleeping bucket must filter the running fixture out of the render projection"
+    );
+    draw(cx, win);
+    assert!(
+        vcx.debug_bounds("tm-procs-empty-body").is_some(),
+        "the frame after the Sleeping switch must paint the empty body"
+    );
+}

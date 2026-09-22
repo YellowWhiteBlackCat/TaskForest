@@ -33,6 +33,54 @@ fn inherited_ui_font_declares_the_bundled_cjk_fallback() {
     );
 }
 
+/// Focus-visible is a modality decision, not a focus decision: GPUI 0.2.2
+/// attaches no input origin to `FocusHandle`, so the per-window state machine
+/// is the sole source of the ring policy. The capture listeners call these
+/// exact transitions before descendants handle the same event, and the render
+/// snapshot consumes `shows_focus_ring()` through `Theme::with_focus_visible`.
+#[test]
+fn input_modality_only_keyboard_paints_the_focus_ring() {
+    use super::super::InputModality;
+
+    let mut modality = InputModality::default();
+    assert!(
+        !modality.shows_focus_ring(),
+        "programmatic focus must stay calm (initial state)"
+    );
+
+    assert!(
+        modality.observe_keyboard(),
+        "the keyboard origin must be a real transition"
+    );
+    assert!(
+        modality.shows_focus_ring(),
+        "keyboard navigation must paint the ring"
+    );
+    assert!(
+        !modality.observe_keyboard(),
+        "a repeated key must not churn the render"
+    );
+
+    assert!(
+        modality.observe_pointer(),
+        "the pointer origin must be a real transition"
+    );
+    assert!(
+        !modality.shows_focus_ring(),
+        "pointer-driven focus must suppress the ring"
+    );
+    assert!(
+        !modality.observe_pointer(),
+        "a repeated press must not churn the render"
+    );
+
+    assert!(
+        modality.observe_keyboard(),
+        "the next keyboard origin must ring again"
+    );
+    assert!(modality.shows_focus_ring());
+}
+
 #[gpui::test]
 async fn demo_root_materializes_shared_facts_without_a_platform_client(cx: &mut TestAppContext) {
     let window =
