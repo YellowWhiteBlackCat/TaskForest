@@ -1,8 +1,15 @@
 //! Runtime capability status catalog updated from provider health.
 //!
-//! `RuntimeCapabilityCatalog` seeds `CapabilityDescriptor`s from configured
-//! routes, folds each `CapabilityHealth` observation into status and
-//! last-success timestamps, and serves read snapshots.
+//! `RuntimeCapabilityCatalog` seeds one descriptor per
+//! [`CapabilityId::EXPECTED_SURFACE`] entry, replaces the entries a platform
+//! actually registers with its configured routes, folds each
+//! `CapabilityHealth` observation into status and last-success timestamps, and
+//! serves read snapshots.
+//!
+//! An expected capability with no registered route keeps its typed absence
+//! ([`CapabilityDescriptor::typed_absence`]) instead of disappearing from the
+//! snapshot: "no source on this platform" is a typed product answer, never a
+//! silent omission.
 
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -150,9 +157,21 @@ impl RuntimeCapabilityCatalog {
         // One capability has one runtime route authority. Preserve the first
         // typed registration deterministically and do not let malformed
         // duplicate construction input inflate the catalog or ECS world.
+        //
+        // The product-expected surface seeds every identity first, so a
+        // capability no platform source registered still answers with its
+        // typed absence; a real route replaces its own entry (never another
+        // capability's) with the provider attribution and initial status.
         let mut by_capability = BTreeMap::new();
+        for capability in CapabilityId::EXPECTED_SURFACE {
+            by_capability.insert(
+                capability.clone(),
+                CapabilityDescriptor::typed_absence(capability),
+            );
+        }
+        let mut registered: BTreeMap<CapabilityId, CapabilityDescriptor> = BTreeMap::new();
         for route in routes {
-            by_capability
+            registered
                 .entry(route.capability.clone())
                 .or_insert_with(|| CapabilityDescriptor {
                     id: route.capability.clone(),
@@ -162,6 +181,7 @@ impl RuntimeCapabilityCatalog {
                     last_success_at_ms: None,
                 });
         }
+        by_capability.extend(registered);
         let descriptors = by_capability.into_values().collect();
         let scheduler = if budgets == RuntimeBudgets::DEFAULT {
             crate::ecs::RuntimeEcsSchedulerHandle::new(routes, monotonic_clock_ms)
@@ -341,6 +361,12 @@ mod tests;
 impl CapabilityCatalog for RuntimeCapabilityCatalog {
     fn snapshot(&self) -> CapabilitySnapshot {
         let _publication = self.terminal_publication_guard();
+        // A poisoned descriptor lock is a process-level invariant violation
+        // (a panic inside a critical section), not a platform absence. The
+        // fail-closed answer is an empty inventory - "unknown" - never a
+        // fabricated `Unsupported` typed absence for the product surface; the
+        // product-surface absence is seeded once at construction and only a
+        // real route replaces it.
         self.descriptors
             .read()
             .map(|descriptors| CapabilitySnapshot::from_descriptors(descriptors.clone()))

@@ -383,14 +383,18 @@ fn complete_standard_surface_composes_with_descriptors_and_facets() {
 
     let snapshot = handle.capabilities().snapshot();
     assert_eq!(
-        snapshot.iter().count(),
+        snapshot.registered().count(),
         STANDARD_SURFACE.len(),
-        "the second OS adapter must expose exactly the standard product surface"
+        "the second OS adapter must register exactly the standard product surface"
     );
     for (capability, provider) in STANDARD_SURFACE {
         let descriptor = snapshot
             .get(&CapabilityId::borrowed(capability))
             .unwrap_or_else(|| panic!("missing capability descriptor {capability}"));
+        assert!(
+            CapabilityId::borrowed(capability).is_expected(),
+            "{capability} must be part of the product-expected surface"
+        );
         assert_eq!(
             descriptor.status,
             CapabilityStatus::TemporarilyUnavailable,
@@ -402,6 +406,27 @@ fn complete_standard_surface_composes_with_descriptors_and_facets() {
             "{capability} must be owned by its windows.* provider"
         );
         assert!(descriptor.last_success_at_ms.is_none());
+    }
+
+    // Every product capability this adapter does not register answers with its
+    // typed absence: no silent omission, no fabricated provider, no fabricated
+    // success.
+    for descriptor in snapshot.typed_absences() {
+        assert!(
+            descriptor.id.is_expected(),
+            "an unregistered capability must still be product-expected: {}",
+            descriptor.id
+        );
+        assert_eq!(descriptor.status, CapabilityStatus::Unsupported);
+        assert!(descriptor.providers.is_empty());
+        assert_eq!(descriptor.observed_at_ms, 0);
+        assert!(descriptor.last_success_at_ms.is_none());
+    }
+    for expected in CapabilityId::EXPECTED_SURFACE {
+        assert!(
+            snapshot.get(&expected).is_some(),
+            "the product surface must stay addressable: {expected}"
+        );
     }
 
     let facets = handle.facets();

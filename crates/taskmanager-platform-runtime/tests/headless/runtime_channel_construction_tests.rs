@@ -12,7 +12,7 @@ impl ChannelRuntime {
 }
 
 #[test]
-fn absent_binding_creates_no_port_lane_or_catalog_descriptor() {
+fn absent_binding_creates_no_port_lane_and_keeps_the_typed_absence() {
     fn fixed_clock() -> u64 {
         7
     }
@@ -24,14 +24,14 @@ fn absent_binding_creates_no_port_lane_or_catalog_descriptor() {
 
     assert!(runtime.handle.host_telemetry().is_none());
     assert!(runtime.lanes.system.observations.host_rx.is_none());
-    assert!(
-        runtime
-            .handle
-            .capabilities()
-            .snapshot()
-            .get(&CapabilityId::TELEMETRY_CPU)
-            .is_none()
-    );
+    // No route means no registered descriptor, not a silent omission: the
+    // product surface answers with its typed absence until a source registers.
+    let snapshot = runtime.handle.capabilities().snapshot();
+    let descriptor = snapshot
+        .get(&CapabilityId::TELEMETRY_CPU)
+        .expect("an unregistered product capability stays addressable");
+    assert!(descriptor.is_typed_absence());
+    assert!(descriptor.providers.is_empty());
 }
 
 #[test]

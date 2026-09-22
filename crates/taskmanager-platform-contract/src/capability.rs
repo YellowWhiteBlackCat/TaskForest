@@ -3,6 +3,15 @@
 //!
 //! Capability ownership belongs to the request type rather than to an OS
 //! adapter, provider, or runtime channel.
+//!
+//! [`CapabilityId::EXPECTED_SURFACE`] is the product-expected capability
+//! identity set: the capabilities the product promises to answer for on every
+//! platform, whether the answer is a real observation or a typed absence. The
+//! extensible [`CapabilityId`] remains open to vendor/diagnostic identities,
+//! but those are not product promises. A platform that registers no source for
+//! an expected capability must publish
+//! [`CapabilityDescriptor::typed_absence`] - `Unsupported` with no provider
+//! attribution - instead of omitting the capability silently.
 
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -90,8 +99,11 @@ impl CapabilityId {
     pub const SESSION_CONTROL: Self = Self::borrowed("sessions.control");
     pub const STORAGE_HEALTH: Self = Self::borrowed("storage.health");
     /// User-initiated directory usage analysis: bounded,
-    /// cancellable directory scans with progress publications. An absent
-    /// provider (e.g. Windows adapter) simply leaves this capability absent.
+    /// cancellable directory scans with progress publications. An adapter
+    /// without a provider does not leave the capability silently absent: the
+    /// product surface publishes its typed absence
+    /// ([`CapabilityDescriptor::typed_absence`]) until a real source
+    /// registers.
     pub const DIRECTORY_USAGE: Self = Self::borrowed("filesystem.directory.usage");
     pub const SMART: Self = Self::borrowed("storage.smart");
     pub const SMART_CONTROL: Self = Self::borrowed("storage.smart.control");
@@ -110,6 +122,98 @@ impl CapabilityId {
     /// native adapters must expose a fixed, auditable setup asset and helper.
     pub const FIRST_RUN_SETUP: Self = Self::borrowed("first-run.setup");
 
+    // ── Deep-surface capability families (mostly Linux-only) ─────────────
+    //
+    // These identities exist so the deepest facts of the 225/Wave3/Wave4
+    // surface have a product-level address instead of "no capability at all";
+    // they include one windowing-system probe (`desktop.responsiveness`) that
+    // is not OS-kernel specific. None of them is registered by a platform
+    // adapter yet; until the matching request lane lands, every platform
+    // publishes the product-surface typed absence
+    // ([`CapabilityDescriptor::typed_absence`]): `Unsupported`, no provider
+    // attribution, no fabricated value. The platform that eventually owns the
+    // source registers a real route and upgrades only itself; where the source
+    // sits behind the per-feature escalation seam (ADR-023), the adapter
+    // publishes [`CapabilityStatus::RequiresEscalation`] instead.
+
+    /// Per-domain Linux pressure-stall information (`/proc/pressure/*`, PSI) as
+    /// its own capability lane. Host telemetry already carries a bounded
+    /// pressure field; this identity addresses the dedicated pressure/stall
+    /// surface, which Windows/macOS cannot source and therefore answer
+    /// typed-absent.
+    pub const TELEMETRY_PRESSURE: Self = Self::borrowed("telemetry.pressure");
+    /// GPU hang/reset events (kernel TDR/hang reports) as a distinct
+    /// reliability fact from utilization telemetry.
+    pub const TELEMETRY_GPU_HANG: Self = Self::borrowed("telemetry.gpu.hang");
+    /// Hardware thermal-throttle trigger counters (PROCHOT / `thermal_throttle`
+    /// sysfs), distinct from temperature readouts.
+    pub const TELEMETRY_CPU_THROTTLE: Self = Self::borrowed("telemetry.cpu.throttle");
+    /// Per-process virtual-memory-area map (`smaps`/`smaps_rollup`):
+    /// proportional-resident and per-mapping accounting.
+    pub const MEMORY_VMA_MAP: Self = Self::borrowed("memory.vma-map");
+    /// Swap compression facts (`zswap`, `zram`) and their device-side effect.
+    pub const MEMORY_COMPRESSION: Self = Self::borrowed("memory.compression");
+    /// Transparent huge-page accounting (anonymous and shmem huge pages).
+    pub const MEMORY_HUGEPAGES: Self = Self::borrowed("memory.hugepages");
+    /// Advisory file locks (`/proc/locks`) with owner and range identity.
+    pub const FILESYSTEM_FILE_LOCKS: Self = Self::borrowed("filesystem.file-locks");
+    /// Handles whose backing file was deleted while the descriptor stayed open.
+    pub const FILESYSTEM_DELETED_HANDLES: Self = Self::borrowed("filesystem.deleted-handles");
+    /// Descriptor-table limits (`RLIMIT_NOFILE` soft/hard) and their pressure.
+    pub const FILESYSTEM_FD_LIMITS: Self = Self::borrowed("filesystem.fd-limits");
+    /// Per-process scheduler policy/priority and I/O scheduling class facts.
+    pub const PROCESS_SCHEDULING: Self = Self::borrowed("process.scheduling");
+    /// Per-process out-of-memory criticality (`oom_score`/`oom_score_adj`).
+    pub const PROCESS_OOM_SCORE: Self = Self::borrowed("process.oom-score");
+    /// Per-thread context-switch accounting (voluntary and involuntary).
+    pub const THREADS_CONTEXT_SWITCH: Self = Self::borrowed("threads.context-switch");
+    /// Why a thread is not running (kernel wait channel / futex wait state).
+    pub const THREADS_WAIT_CHANNEL: Self = Self::borrowed("threads.wait-channel");
+    /// System-wide socket inventory via the kernel socket diagnostics
+    /// interface, including unix-domain sockets.
+    pub const NETWORK_SOCKET_INVENTORY: Self = Self::borrowed("network.socket-inventory");
+    /// Control lane: destroy one local socket (an escalation-bound reset).
+    pub const NETWORK_SOCKET_CONTROL: Self = Self::borrowed("network.socket-control");
+    /// Traffic shaping / rate-limit state for interfaces and cgroups.
+    pub const NETWORK_TRAFFIC_CONTROL: Self = Self::borrowed("network.traffic-control");
+    /// Per-process logical versus physical I/O accounting.
+    pub const STORAGE_IO_ACCOUNTING: Self = Self::borrowed("storage.io-accounting");
+    /// Per-process I/O scheduling priority (best-effort class and level).
+    pub const STORAGE_IO_PRIORITY: Self = Self::borrowed("storage.io-priority");
+    /// Dirty-page writeback state and its pressure on storage latency.
+    pub const STORAGE_WRITEBACK: Self = Self::borrowed("storage.writeback");
+    /// NUMA node topology, distance, and per-node memory statistics.
+    pub const NUMA_TOPOLOGY: Self = Self::borrowed("numa.topology");
+    /// CPU idle-state (C-state) residency and latency facts.
+    pub const POWER_C_STATES: Self = Self::borrowed("power.c-states");
+    /// Platform power-profile state and switching (power-profiles D-Bus).
+    pub const POWER_PROFILES: Self = Self::borrowed("power.profiles");
+    /// Scheduled service timers and their next-elapse facts.
+    pub const SERVICES_TIMERS: Self = Self::borrowed("services.timers");
+    /// Socket-activated service units and their activation state.
+    pub const SERVICES_SOCKET_ACTIVATION: Self = Self::borrowed("services.socket-activation");
+    /// System/session bus topology, object introspection, and call rates.
+    pub const IPC_DBUS: Self = Self::borrowed("ipc.dbus");
+    /// POSIX inter-process objects (shared memory, message queues, semaphores).
+    pub const IPC_POSIX: Self = Self::borrowed("ipc.posix");
+    /// System V inter-process objects (shm, msg, sem).
+    pub const IPC_SYSV: Self = Self::borrowed("ipc.sysv");
+    /// Anonymous pipe topology between processes, including wait-for cycles.
+    pub const IPC_PIPE_GRAPH: Self = Self::borrowed("ipc.pipe-graph");
+    /// Hardware performance counters via the PMU (`perf_event_open`); the
+    /// source is escalation-bound on hosts that gate PMU access.
+    pub const PROFILING_PMU: Self = Self::borrowed("profiling.pmu");
+    /// Off-CPU time attribution for scheduling and blocking analysis.
+    pub const PROFILING_OFF_CPU: Self = Self::borrowed("profiling.off-cpu");
+    /// Syscall frequency/latency distribution and slow-syscall traps.
+    pub const PROFILING_SYSCALLS: Self = Self::borrowed("profiling.syscalls");
+    /// Foreground-window responsiveness probes (hung/unresponsive application
+    /// detection); the probe mechanism is windowing-system specific.
+    pub const DESKTOP_RESPONSIVENESS: Self = Self::borrowed("desktop.responsiveness");
+    /// Process lifecycle event capture (fork/exec/exit connector); the source
+    /// is escalation-bound where the kernel requires a privileged listener.
+    pub const HISTORY_PROCESS_EVENTS: Self = Self::borrowed("history.process-events");
+
     #[must_use]
     pub const fn borrowed(value: &'static str) -> Self {
         Self(Cow::Borrowed(value))
@@ -123,6 +227,114 @@ impl CapabilityId {
     #[must_use]
     pub fn as_str(&self) -> &str {
         self.0.as_ref()
+    }
+
+    /// Every capability identity the product promises to answer for on every
+    /// platform: real observation where a source exists, typed absence
+    /// otherwise.
+    ///
+    /// This is a product fact, not a platform claim. The array is the single
+    /// authority for "which capabilities must appear in a runtime catalog at
+    /// all"; the runtime catalog seeds one typed-absence descriptor per entry
+    /// and lets a platform's real registration replace it. Vendor/diagnostic
+    /// identities created with [`Self::borrowed`]/[`Self::owned`] remain
+    /// supported but are deliberately outside the product promise.
+    ///
+    /// Every product capability constant must be listed here; the contract
+    /// surface census and the per-platform catalog contracts fail when a
+    /// registered capability is not product-expected.
+    pub const EXPECTED_SURFACE: [Self; 81] = [
+        Self::TELEMETRY_HOST,
+        Self::TELEMETRY_CPU,
+        Self::TELEMETRY_MEMORY,
+        Self::TELEMETRY_STORAGE,
+        Self::TELEMETRY_NETWORK,
+        Self::TELEMETRY_GPU,
+        Self::TELEMETRY_GPU_ENGINES,
+        Self::TELEMETRY_MEMORY_SMBIOS,
+        Self::TELEMETRY_CPU_PACKAGE_POWER,
+        Self::TELEMETRY_CPU_MSR,
+        Self::ACCELERATOR_NPU,
+        Self::HARDWARE_INVENTORY,
+        Self::CONTAINERS,
+        Self::PROCESS_LIST,
+        Self::PROCESS_CONTROL,
+        Self::PROCESS_INSIGHTS_NETWORK,
+        Self::PROCESS_INSIGHTS_GPU,
+        Self::PROCESS_INSIGHTS_RESOURCES,
+        Self::PROCESS_INSIGHTS_ISOLATION,
+        Self::PROCESS_INSIGHTS_THREADS,
+        Self::PROCESS_INSIGHTS_OPEN_FILES,
+        Self::PROCESS_INSIGHTS_ENVIRONMENT,
+        Self::PROCESS_AFFINITY,
+        Self::PROCESS_AFFINITY_CONTROL,
+        Self::PROCESS_RESOURCE_CONTROL,
+        Self::PROCESS_NETWORK_ESCALATION,
+        Self::SERVICES,
+        Self::SERVICE_DEPENDENCIES,
+        Self::SERVICE_CONTROL,
+        Self::SERVICE_LOGS,
+        Self::SERVICE_LOG_STREAM,
+        Self::STARTUP,
+        Self::STARTUP_EVIDENCE,
+        Self::STARTUP_CONTROL,
+        Self::SESSIONS,
+        Self::SESSION_CONTROL,
+        Self::STORAGE_HEALTH,
+        Self::DIRECTORY_USAGE,
+        Self::SMART,
+        Self::SMART_CONTROL,
+        Self::SENSORS,
+        Self::POWER_SUPPLIES,
+        Self::COMMAND_LAUNCH,
+        Self::RESOURCE_REVEAL,
+        Self::URL_OPEN,
+        Self::DESKTOP_APPEARANCE,
+        Self::DESKTOP_NOTIFY,
+        Self::FIRST_RUN_SETUP,
+        Self::TELEMETRY_PRESSURE,
+        Self::TELEMETRY_GPU_HANG,
+        Self::TELEMETRY_CPU_THROTTLE,
+        Self::MEMORY_VMA_MAP,
+        Self::MEMORY_COMPRESSION,
+        Self::MEMORY_HUGEPAGES,
+        Self::FILESYSTEM_FILE_LOCKS,
+        Self::FILESYSTEM_DELETED_HANDLES,
+        Self::FILESYSTEM_FD_LIMITS,
+        Self::PROCESS_SCHEDULING,
+        Self::PROCESS_OOM_SCORE,
+        Self::THREADS_CONTEXT_SWITCH,
+        Self::THREADS_WAIT_CHANNEL,
+        Self::NETWORK_SOCKET_INVENTORY,
+        Self::NETWORK_SOCKET_CONTROL,
+        Self::NETWORK_TRAFFIC_CONTROL,
+        Self::STORAGE_IO_ACCOUNTING,
+        Self::STORAGE_IO_PRIORITY,
+        Self::STORAGE_WRITEBACK,
+        Self::NUMA_TOPOLOGY,
+        Self::POWER_C_STATES,
+        Self::POWER_PROFILES,
+        Self::SERVICES_TIMERS,
+        Self::SERVICES_SOCKET_ACTIVATION,
+        Self::IPC_DBUS,
+        Self::IPC_POSIX,
+        Self::IPC_SYSV,
+        Self::IPC_PIPE_GRAPH,
+        Self::PROFILING_PMU,
+        Self::PROFILING_OFF_CPU,
+        Self::PROFILING_SYSCALLS,
+        Self::DESKTOP_RESPONSIVENESS,
+        Self::HISTORY_PROCESS_EVENTS,
+    ];
+
+    /// Whether this identity belongs to the product-expected surface.
+    ///
+    /// Membership is identity, never availability: an expected capability can
+    /// be typed-absent on every platform. Unknown or vendor identities answer
+    /// `false` instead of panicking.
+    #[must_use]
+    pub fn is_expected(&self) -> bool {
+        Self::EXPECTED_SURFACE.contains(self)
     }
 }
 
@@ -344,6 +556,39 @@ pub struct CapabilityDescriptor {
     pub last_success_at_ms: Option<u64>,
 }
 
+impl CapabilityDescriptor {
+    /// The honest descriptor for a product-expected capability that this
+    /// platform did not register.
+    ///
+    /// This is the single authority for the absence shape: `Unsupported`
+    /// (no qualified source on this platform), no provider attribution, no
+    /// observation time, and no last success. It is never a fabricated zero
+    /// and never a runtime transient: callers must not confuse it with a
+    /// registered-pending provider, which carries a real provider identity
+    /// and a typed initial status.
+    #[must_use]
+    pub fn typed_absence(id: CapabilityId) -> Self {
+        Self {
+            id,
+            status: CapabilityStatus::Unsupported,
+            providers: Vec::new(),
+            observed_at_ms: 0,
+            last_success_at_ms: None,
+        }
+    }
+
+    /// Whether this descriptor is the product-surface typed absence.
+    ///
+    /// The two decisive fields are the status and the empty provider
+    /// attribution: a registered source always names its provider, so an
+    /// `Unsupported` descriptor with a provider is a registered-pending lane,
+    /// not an unregistered absence.
+    #[must_use]
+    pub fn is_typed_absence(&self) -> bool {
+        self.status == CapabilityStatus::Unsupported && self.providers.is_empty()
+    }
+}
+
 /// Deterministic runtime capability inventory.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CapabilitySnapshot {
@@ -367,6 +612,24 @@ impl CapabilitySnapshot {
 
     pub fn iter(&self) -> impl Iterator<Item = &CapabilityDescriptor> {
         self.entries.values()
+    }
+
+    /// Every capability a real source registered on this platform.
+    ///
+    /// Registered descriptors always name their provider, so this iterator
+    /// excludes the product-surface typed absence.
+    pub fn registered(&self) -> impl Iterator<Item = &CapabilityDescriptor> {
+        self.iter()
+            .filter(|descriptor| !descriptor.is_typed_absence())
+    }
+
+    /// Every product-expected capability this platform did not register.
+    ///
+    /// These entries are the typed answer "no source here", never a runtime
+    /// transient and never a fabricated value.
+    pub fn typed_absences(&self) -> impl Iterator<Item = &CapabilityDescriptor> {
+        self.iter()
+            .filter(|descriptor| descriptor.is_typed_absence())
     }
 }
 
