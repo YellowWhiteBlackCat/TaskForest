@@ -265,15 +265,24 @@ impl TableDelegate for ServicesDelegate {
         };
         match col_ix {
             0 => {
-                let color = match s.status {
+                let status = s.status;
+                let color = match status {
                     ServiceStatus::Active => theme.disk,
                     ServiceStatus::Failed => theme.gpu,
                     _ => theme.fg_dim,
                 };
-                div()
+                let cell = div()
                     .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_12))
                     .text_color(taskmanager_ui::theme_binding::hsla(color))
-                    .child(s.status.as_str().to_string())
+                    .child(status.as_str().to_string());
+                // The status cell is the inventory's typed-active-state readout.
+                // A test-support selector carries the same typed token that the
+                // cell paints, so a frame test can prove the typed state (and not
+                // a fabricated label) reached this row's cell.
+                #[cfg(any(test, feature = "test-support"))]
+                let cell = cell
+                    .debug_selector(move || format!("tm-svc-status:{row_ix}:{}", status.as_str()));
+                cell
             }
             1 => {
                 let cycle = self.cycle_members.contains(&s.id);
@@ -796,3 +805,7 @@ mod tests;
 #[cfg(test)]
 #[path = "../../tests/gui/gpui_app/services_view/row_memo_tests.rs"]
 mod row_memo_tests;
+
+#[cfg(test)]
+#[path = "../../tests/gui/gpui_app/services_view/log_stream_tests.rs"]
+mod log_stream_tests;

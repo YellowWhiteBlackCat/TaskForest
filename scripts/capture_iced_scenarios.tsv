@@ -9,6 +9,7 @@ npu	npu	1180x780
 battery	battery	1180x780
 fan	fan	1180x780
 service-details	service-details	1180x780
+health-modal	health	1180x780
 cpu-compact	cpu	720x480
 applications-compact	applications	720x480
 services	services	1180x780

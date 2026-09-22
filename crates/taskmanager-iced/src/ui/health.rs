@@ -21,6 +21,28 @@ use taskmanager_shell::presentation::{
 
 mod projection;
 
+/// Stable widget id of the health modal's scrollable body. Production never
+/// addresses it; the capture lane uses it to bound one evidence frame (see
+/// [`bound_body_to_end`]).
+pub(crate) const BODY_SCROLL_ID: &str = "health-modal-body";
+
+/// Bound the health modal body to its end for one capture frame. The absolute
+/// offset is the widget's own maximum (Iced clamps a requested offset to the
+/// real content height), so the fixed 430px viewport reaches the panels below
+/// the summary - including the thermal-zone panel - without a magic pixel
+/// target that would rot when a panel's height changes. Capture-only: the
+/// caller gates on the evidence-runner marker path, so a production modal
+/// keeps the user's own scroll position.
+pub(crate) fn bound_body_to_end() -> iced::Task<Message> {
+    iced::widget::operation::scroll_to(
+        iced::advanced::widget::Id::new(BODY_SCROLL_ID),
+        iced::widget::operation::AbsoluteOffset {
+            x: None,
+            y: Some(f32::MAX),
+        },
+    )
+}
+
 /// Render the health modal: the device summary (or an honest empty state
 /// while telemetry has not arrived) plus the alert-rule list.
 pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, iced::Renderer> {
@@ -86,6 +108,7 @@ pub(super) fn render(app: &crate::IcedApp) -> Element<'_, Message, iced::Theme, 
         i18n::t(language, Key::Health),
         "Observed samples only · Esc closes",
         scrollable(column(modal_panels).spacing(12))
+            .id(BODY_SCROLL_ID)
             .height(Length::Fixed(430.0))
             .width(Length::Fill)
             .into(),

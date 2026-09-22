@@ -104,6 +104,10 @@ const DISK_BOTTOM_SAFETY: f32 = 12.0;
 #[path = "../../tests/gui/gpui_app/perf_views/tests.rs"]
 mod tests;
 
+#[cfg(test)]
+#[path = "../../tests/gui/gpui_gpui_app_perf_views_device_topology_tests.rs"]
+mod device_topology_tests;
+
 // ── graph value-badge formatters ─────────────────────────────────────────────
 // Plain `fn(f32) -> String` pointers (not closures) so they slot into
 // `GraphOpts::badge_fmt` while keeping `GraphOpts` `Copy`. One per series unit;

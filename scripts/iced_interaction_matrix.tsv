@@ -41,7 +41,7 @@ mc05-config-isolation	P0-MC-05	lib	app::tests::visual_navigation::demo_instances
 mc05-config-rollback	P0-MC-05	lib	app::tests_parity::settings_and_appearance::rejected_config_submission_rolls_renderer_preferences_back_to_canonical	failure|recovery	-
 mc06-hold-ctrl-pause	P0-MC-06	lib	app::tests::holding_ctrl_pauses_and_releasing_resumes_telemetry_refresh	success|keyboard|lifecycle	-
 mc06-pause-shortcut	P0-MC-06	lib	app::tests::ctrl_space_toggles_the_manual_telemetry_pause_through_the_keyboard_lane	success|keyboard	-
-mc06-local-modals	P0-MC-06	lib	app::tests_parity::local_modals_open_close_and_swallow_quit_keys	success|keyboard|cancel	-
+mc06-local-modals	P0-MC-06	lib	app::tests_parity::local_modals_open_close_and_swallow_quit_keys	success|keyboard|cancel	health-modal
 mc06-about-copy	P0-MC-06	lib	ui::about::tests::copy_about_details_message_records_the_footer_feedback	success|cancel	-
 mc06-first-run-failure	P0-MC-06	lib	app::update::first_run::tests::request_action_without_a_platform_folds_the_typed_failure_and_stays_shown	success|failure|cancel	-
 mc06-modal-focus-restore	P0-MC-06	lib	app::tests::modal_opening_captures_a_renderer_trigger_and_dismissal_clears_it	focus|cancel	-

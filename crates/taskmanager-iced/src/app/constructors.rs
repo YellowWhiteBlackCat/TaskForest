@@ -210,6 +210,12 @@ fn apply_capture_target(app: &mut IcedApp, target: &str) {
     if target == "service-details" {
         app.shell.application.active_page = taskmanager_application::AppPage::Services;
         let _ = app.open_service_details_for_effect(0);
+    } else if target == crate::capture::HEALTH_TARGET {
+        // The health modal is a renderer-local surface. Ride the same reducer
+        // the toolbar trigger dispatches (`Message::OpenHealth`) so the
+        // capture target cannot invent a second opening path, and leave the
+        // active page on Performance: the surface is the target, not a page.
+        let _ = app.update(Message::OpenHealth);
     } else if let Some(page) = capture_page_from_name(target) {
         app.shell.application.active_page = page;
         if page == taskmanager_application::AppPage::System {
@@ -559,7 +565,7 @@ fn capture_sensor_snapshot(
                 timestamp_ms,
             ),
             capture_sensor_reading(
-                device_id.into(),
+                device_id.clone().into(),
                 "temp1",
                 "Package",
                 taskmanager_core::core::sensors::SensorDescriptor::temperature(
@@ -568,9 +574,49 @@ fn capture_sensor_snapshot(
                 taskmanager_core::core::sensors::SensorMagnitude::Decimal(f64::from(temperature_c)),
                 timestamp_ms,
             ),
+            // A second readable zone keeps the thermal-zone panel's traversal
+            // (one row per temperature reading, each named by its own source
+            // label) visible in the evidence frame rather than only in the
+            // headless projection test.
+            capture_sensor_reading(
+                device_id.into(),
+                "temp2",
+                "acpitz",
+                taskmanager_core::core::sensors::SensorDescriptor::temperature(
+                    taskmanager_core::core::sensors::SensorScale::IDENTITY,
+                ),
+                taskmanager_core::core::sensors::SensorMagnitude::Decimal(f64::from(
+                    temperature_c + 6.0,
+                )),
+                timestamp_ms,
+            ),
+            // An unreadable zone from another hwmon device stays in the
+            // traversal as the shared typed dash - the pixel frame must show
+            // the honest absence, never a fabricated `0.0 °C`.
+            capture_unreadable_sensor_reading("hwmon:demo:nvme".into(), "temp1", "nvme"),
         ],
         ..Default::default()
     }
+}
+
+/// One honest typed-absence channel for the capture fixture: the failed read
+/// keeps its named row with the shared dash.
+fn capture_unreadable_sensor_reading(
+    device_id: taskmanager_core::core::identity::DeviceId,
+    id: &str,
+    label: &str,
+) -> taskmanager_core::core::sensors::SensorReading {
+    taskmanager_core::core::sensors::SensorReading::from_measurement_observation(
+        device_id,
+        id.into(),
+        label.into(),
+        taskmanager_core::core::sensors::SensorMeasurementObservation::unavailable(
+            taskmanager_core::core::sensors::SensorDescriptor::temperature(
+                taskmanager_core::core::sensors::SensorScale::IDENTITY,
+            ),
+            taskmanager_core::core::failure::FailureKind::PermissionDenied,
+        ),
+    )
 }
 
 fn capture_sensor_reading(

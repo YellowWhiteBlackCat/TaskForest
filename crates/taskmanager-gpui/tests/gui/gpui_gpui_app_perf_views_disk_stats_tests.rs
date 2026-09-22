@@ -1,6 +1,21 @@
 use super::{disk_stats, temperature_trend_stat_row, temperature_trend_value};
-use taskmanager_core::core::metrics::DiskMetrics;
+use taskmanager_core::core::metrics::{
+    DiskMetrics, DiskScalarObservations, ScalarObservation, SmartAvailability,
+};
 use taskmanager_core::core::units::UnitPreferences;
+
+fn row_value(rows: &[taskmanager_shell::viewmodel::StatRow], label: &str) -> Option<String> {
+    rows.iter()
+        .find(|row| row.label() == label)
+        .and_then(|row| row.value().map(str::to_owned))
+}
+
+fn keyed_value(
+    rows: &[taskmanager_shell::viewmodel::StatRow],
+    key: &'static str,
+) -> Option<String> {
+    row_value(rows, taskmanager_application::i18n::t(key))
+}
 
 /// An empty or all-gap window renders no trend row — absence stays
 /// absence instead of becoming a fabricated "0 °C" summary.
@@ -88,4 +103,148 @@ fn first_sample_rate_rows_are_none_not_fabricated_zeros() {
     assert_eq!(find("disk.write").value(), None);
     assert_eq!(find("disk.iops").value(), None);
     assert_eq!(find("disk.active_time").value(), None);
+}
+
+/// The `storage.iops-queue-latency` definition clause by clause: an observed
+/// IOPS, response latency, and average queue depth each render their own
+/// production row with the real projected value (plus the separate
+/// busy-time service-time estimate); a first-sample gap keeps the row's value
+/// `None` — the panel's shared dash — never a fabricated `0`.
+#[test]
+fn disk_stats_render_the_observed_iops_latency_and_queue_depth() {
+    taskmanager_test_support::pin_english();
+    let disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        .scalar_observations(DiskScalarObservations {
+            iops: ScalarObservation::available(137, 10),
+            response_time_ms: ScalarObservation::available(1.54, 10),
+            average_queue_depth: ScalarObservation::available(2.25, 10),
+            service_time_ms: ScalarObservation::available(0.42, 10),
+            ..Default::default()
+        })
+        .build();
+    let rows = disk_stats(&disk, UnitPreferences::default(), &[]);
+    assert_eq!(keyed_value(&rows, "disk.iops").as_deref(), Some("137"));
+    assert_eq!(
+        keyed_value(&rows, "disk.response").as_deref(),
+        Some("1.54 ms")
+    );
+    assert_eq!(
+        keyed_value(&rows, "disk.queue_depth").as_deref(),
+        Some("2.25")
+    );
+    assert_eq!(
+        keyed_value(&rows, "disk.service_time").as_deref(),
+        Some("0.42 ms")
+    );
+
+    // The unobserved twin keeps its row (an applicable fact) with the dash,
+    // so the panel can never fill the slot from a fabricated zero.
+    let cold = disk_stats(&DiskMetrics::default(), UnitPreferences::default(), &[]);
+    for key in [
+        "disk.iops",
+        "disk.response",
+        "disk.queue_depth",
+        "disk.service_time",
+    ] {
+        assert!(
+            cold.iter()
+                .any(|row| row.label() == taskmanager_application::i18n::t(key)),
+            "{key}: an applicable unobserved fact keeps its dash row"
+        );
+        assert_eq!(keyed_value(&cold, key), None, "{key}: never a fabricated 0");
+    }
+}
+
+/// The `storage.smart-health` definition clause by clause, on the row set the
+/// Performance disk panel paints (`disk_stats` feeds `stats_panel`): reported
+/// availability, temperature (shared + per-sensor), percentage used, available
+/// spare, power-on hours, and unsafe shutdowns each carry the real projected
+/// value. The honesty half: a disk whose SMART telemetry is not available
+/// grows none of those rows and reports the typed availability instead, so
+/// none of the six clauses can surface as a fabricated `0%` / `0 h` / `0`.
+#[test]
+fn disk_stats_render_the_smart_health_evidence_families() {
+    taskmanager_test_support::pin_english();
+    let mut disk = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        .device_id("disk:wwid:smart".into())
+        .name("nvme0n1".into())
+        .smart_availability(SmartAvailability::Available)
+        .smart_temperature_c(Some(41.0))
+        .smart_temp_critical_c(Some(85.0))
+        .smart_percent_used(Some(2.0))
+        .smart_power_on_hours(Some(7200))
+        .build();
+    disk.smart_temperature_sensors_c = vec![41.0, 43.0];
+    disk.smart_available_spare_pct = Some(4.0);
+    disk.smart_available_spare_threshold_pct = Some(10.0);
+    disk.smart_unsafe_shutdowns = Some(12);
+
+    let rows = disk_stats(&disk, UnitPreferences::default(), &[]);
+    assert_eq!(
+        keyed_value(&rows, "common.temperature").as_deref(),
+        Some("41 / 85 °C"),
+        "the shared temperature readout must carry the value and its critical bound"
+    );
+    let sensor = |index: usize| {
+        format!(
+            "{} {index}",
+            taskmanager_application::i18n::t("disk.temperature_sensor")
+        )
+    };
+    assert_eq!(
+        row_value(&rows, &sensor(1)).as_deref(),
+        Some("41 °C"),
+        "each SMART temperature sensor keeps its own named row"
+    );
+    assert_eq!(row_value(&rows, &sensor(2)).as_deref(), Some("43 °C"));
+    assert_eq!(
+        keyed_value(&rows, "disk.endurance_used").as_deref(),
+        Some("2%")
+    );
+    assert_eq!(
+        keyed_value(&rows, "disk.available_spare").as_deref(),
+        Some("4% ⚠ (≤10%)"),
+        "spare at/below its warning threshold must carry the threshold"
+    );
+    assert_eq!(
+        keyed_value(&rows, "disk.power_on").as_deref(),
+        Some(
+            taskmanager_application::i18n::t("disk.power_on_format")
+                .replace("{hours}", "7200")
+                .replace("{days}", "300")
+                .as_str()
+        )
+    );
+    assert_eq!(
+        keyed_value(&rows, "disk.unsafe_shutdowns").as_deref(),
+        Some("12")
+    );
+
+    // A disk whose provider can only report availability keeps that one typed
+    // row; a disk with no SMART telemetry at all gets the section hidden.
+    let availability_only = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        .smart_availability(SmartAvailability::Available)
+        .build();
+    let rows = disk_stats(&availability_only, UnitPreferences::default(), &[]);
+    assert_eq!(
+        keyed_value(&rows, "disk.smart_status").as_deref(),
+        Some(taskmanager_application::i18n::t("device.healthy")),
+        "a reported-available provider must surface its typed availability status"
+    );
+    assert_eq!(keyed_value(&rows, "disk.endurance_used"), None);
+
+    let cold = disk_stats(&DiskMetrics::default(), UnitPreferences::default(), &[]);
+    for key in [
+        "disk.smart_status",
+        "common.temperature",
+        "disk.endurance_used",
+        "disk.available_spare",
+        "disk.power_on",
+        "disk.unsafe_shutdowns",
+    ] {
+        assert!(
+            keyed_value(&cold, key).is_none(),
+            "{key}: an unsupported SMART provider must not fabricate a readout"
+        );
+    }
 }

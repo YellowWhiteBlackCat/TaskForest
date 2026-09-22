@@ -438,7 +438,10 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
     // Latency/throughput, top-level capacity, filesystem and SMART-depth
     // rows the panel gained for parity with the GPUI disk_stats view.
     assert!(text.contains("1.50 ms"), "response time must render");
-    assert!(text.contains("137"), "IOPS must render");
+    assert!(
+        text.contains("IOPS 137"),
+        "the IOPS counter must render under its own label"
+    );
     // Queue depth and the busy-time service estimate are the remaining two
     // per-disk counters the storage definition names; both ride this disk's own
     // scalar group and are rendered on one shared row.
@@ -781,12 +784,27 @@ fn fan_detail_section_renders_rpm_pwm_and_device_temperatures() {
         .expect("valid temperature magnitude"),
     )
     .with_device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1));
+    // A second temperature channel on the same physical device: the panel
+    // traverses this device's temperature channels, so each one gets its own
+    // row named by its own source label.
+    let second_temperature = SensorReading::from_measurement_observation(
+        "hwmon:cpu".into(),
+        "temp2".into(),
+        "board_temp".into(),
+        SensorMeasurementObservation::available(
+            SensorDescriptor::temperature(taskmanager_core::core::sensors::SensorScale::IDENTITY),
+            SensorMagnitude::Decimal(41.0),
+            1_000,
+        )
+        .expect("valid temperature magnitude"),
+    )
+    .with_device_generation(taskmanager_core::core::identity::DeviceGeneration::new(1));
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
         taskmanager_shell::fixture::ProjectionSeedFact::Sensors(Some(SensorCenterSnapshot {
             state: DeviceState::healthy(1_000),
             timestamp_ms: 1_000,
-            readings: vec![fan, pwm, temperature],
+            readings: vec![fan, pwm, temperature, second_temperature],
             ..Default::default()
         })),
     );
@@ -802,7 +820,18 @@ fn fan_detail_section_renders_rpm_pwm_and_device_temperatures() {
         text.contains("24%"),
         "duty cycle must render as a percent of its maximum"
     );
-    assert!(text.contains("54.5 °C"), "device temperature must render");
+    // The temperature rows name each reading's own source label next to its
+    // value, one row per same-device temperature channel. This proves the
+    // naming clause for this fan's device; a system-wide thermal-zone
+    // traversal is not part of this panel.
+    assert!(
+        text.contains("Temperature cpu_temp · 54.5 °C"),
+        "the temperature row must name its own source label:\n{text}"
+    );
+    assert!(
+        text.contains("Temperature board_temp · 41.0 °C"),
+        "every same-device temperature channel gets its own named row:\n{text}"
+    );
 }
 
 #[test]
