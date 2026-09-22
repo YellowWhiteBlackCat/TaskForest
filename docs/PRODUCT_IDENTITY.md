@@ -14,6 +14,14 @@ GPUI、Iced、TUI 与 Bevy 四大前端均已全部纳入官方发行包矩阵�
 （提供 DEB、RPM、MSI 官方安装包）。各端独立二进制分别为 `taskforest-g`、`taskforest-i`、
 `taskforest-t`、`taskforest-b`。
 
+"四端平权"仅指四端发行物与前端语义同权，不含"跨平台功能对等"，也不表示三个平台具备
+相同的系统级能力。平台能力一律以 typed 结果呈现——要么是可用值，要么是 typed 不可用
+（`Unsupported` / `PermissionRequired` / `RequiresEscalation` / `MissingDependency` /
+`TemporarilyUnavailable`，均为 `platform-contract::CapabilityStatus` 的真实变体名；
+`PermissionDenied` 属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴）；
+平台按 typed 原因诚实降级是产品承诺的一部分，平台缺席不视为落空，也不得
+用空值、静态占位或未接线按钮伪装为已实现功能。
+
 ## 程序与兼容名称
 
 仓库和 crate 仍使用 `taskmanager` / `taskmanager-*` 内部名称，以保持配置、包和升级兼容。

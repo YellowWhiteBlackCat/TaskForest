@@ -152,8 +152,11 @@ application-owned command/reducer/projection。`taskmanager-app-host` 与
    saved-view 传输协议、shell 选择字段的写入口）、`control_semantic_parity`
    （tier label 折叠）。
 4. **语义平价律**：同一投影、同一控制命令在四端三平台渲染与执行的语义必须相同——
-   标签、缺失性、行序、行为后果；像素与交互手势允许不同，语义不同即缺陷。守门：
-   `dual_track_policy_parity`、`renderer_fold_boundary`、`control_semantic_parity`。
+   标签、缺失性、行序、行为后果；像素与交互手势允许不同，语义不同即缺陷。这里「语义相同」
+   指 typed **结果语义**（真实值或 typed 原因）相同，不指事实可用性相同；某平台没有合格来源
+   或原生实现时，该 feature 必须以 typed 原因呈现缺席（能力级真实词为 `CapabilityStatus` 的
+   `Unsupported`/`PermissionRequired`/`RequiresEscalation`/`MissingDependency`/`TemporarilyUnavailable`；`PermissionDenied` 属失败原因轴），而非伪装成可用或静默消失。
+   守门：`dual_track_policy_parity`、`renderer_fold_boundary`、`control_semantic_parity`。
 5. **折叠律**：渲染入口只回放数据层折叠（"一次折叠，四端渲染"），渲染模块不得重算
    数据折叠。
 

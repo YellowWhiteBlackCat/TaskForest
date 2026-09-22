@@ -50,6 +50,15 @@
 
 - **四端 / 对等前端（peer frontends）**：GPUI（当前发布形态）、Iced、TUI、Bevy 共享
   同一应用投影，互不拥有业务事实（[ARCH](ARCH.md)）。
+- **平权 / 对等（parity）**：两根互不替代的轴。**前端轴**：GPUI、Iced、TUI、Bevy 必须对
+  同一 intent/feature 提供同一语义入口，某端缺入口（`Missing`）才算 parity 缺陷。**平台轴**：
+  Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，或 `Unsupported`、
+  `PermissionRequired`、`RequiresEscalation`、`MissingDependency`、`TemporarilyUnavailable`
+  （均为 `platform-contract::CapabilityStatus` 的真实变体名）；`PermissionDenied` 属失败原因轴
+  `FailureKind`，与能力级 `PermissionRequired` 分属两轴。平台按 typed 原因诚实降级是 parity 的
+  达成形态，不是失败。不得表述为四端「功能对等」或 Linux-only 能力「跨平台可用」，缺口不得用
+  `0`、空值或静态占位表示
+  （[CROSSPLATFORM_STRATEGY](CROSSPLATFORM_STRATEGY.md)、[ARCH §8](ARCH.md)）。
 - **同异律**：五条跨前端定律——语义完备、映射穷尽、同一、语义平价、折叠
   （[ARCH §8](ARCH.md)）。
 - **折叠律**：渲染入口只回放数据层折叠，不重算（"一次折叠，四端渲染"）。

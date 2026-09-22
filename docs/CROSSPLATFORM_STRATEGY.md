@@ -4,6 +4,22 @@
 OS 特性留在 adapter；没有合格来源的能力保持 typed `Unsupported`，不以临时脚本或假数字
 扩大支持面。
 
+## 平权口径
+
+**平权的两根轴是分开的。** 前端轴：GPUI、Iced、TUI、Bevy 必须对同一 intent/feature 提供
+同一语义入口。平台轴：Linux、Windows、macOS 对同一 feature 各自给出 typed 结果——真实可用，
+或 `Unsupported` / `PermissionRequired` / `RequiresEscalation` / `MissingDependency` /
+`TemporarilyUnavailable`（`platform-contract::CapabilityStatus` 的真实变体名）；`PermissionDenied`
+属失败原因轴 `FailureKind`，与能力级 `PermissionRequired` 分属两轴。**平台 typed 降级是产品
+承诺的一部分，不是平权缺口**：平台 `Unsupported` 不算 parity 失败，前端缺入口才是。「四端全量
+一碗水端平」仅指**发行物与前端语义**，不表示三个平台具备相同的系统级能力，更不是「跨平台功能
+对等」。
+
+承诺边界（不得越过）：
+
+- 可以说：四端发行物同权；四端对同一 feature 的语义入口一致；平台缺口一律 typed 且可见。
+- 不可以说：四端「功能对等」；某 Linux-only 能力「跨平台可用」；缺口以 `0`/空值/占位按钮表示。
+
 ## 安全选择顺序
 
 1. 复用成熟 safe crate 或标准 API，并把结果转换为 typed domain facts。
