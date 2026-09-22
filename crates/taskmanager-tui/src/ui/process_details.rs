@@ -469,6 +469,7 @@ fn detail_panel_pairs_with_local_time(
             ),
         ),
         (t("proc.uss"), text(ProcessDetailsField::Uss)),
+        (t("proc.shared"), text(ProcessDetailsField::Shared)),
         (
             t("proc.anon_huge_pages"),
             text(ProcessDetailsField::AnonHugePages),

@@ -126,13 +126,26 @@ fn process_details_panel_renders_frozen_and_current_row_facts() {
     assert!(text.contains("devuser"));
     assert!(text.contains("Running"));
     assert!(text.contains("Start"));
-    assert!(text.contains("Executable"));
     // The parity detail rows render their labels even when the demo fixture
     // carries no observation for them (an honest dash, not a fabricated 0).
     assert!(text.contains("CPU time"));
     assert!(text.contains("Nice"));
     assert!(text.contains("Disk read"));
     assert!(text.contains("Disk write"));
+    // The fixed-height details panel is a declared bounded viewport (its title
+    // carries the scroll chord and position while the field set overflows), so
+    // the late rows are asserted through the clamped scroll intent rather than
+    // demanded at scroll 0.
+    app.detail_scroll = usize::MAX;
+    let tail = frame_text(&app, 120, 56);
+    assert!(
+        tail.contains("Executable"),
+        "the late detail rows must stay reachable through the declared scroll owner:\n{tail}"
+    );
+    assert!(
+        tail.contains("Command"),
+        "the last detail row must stay reachable through the declared scroll owner:\n{tail}"
+    );
 }
 
 #[test]
@@ -224,6 +237,7 @@ fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
             .and_then(|processes| processes.iter_mut().find(|process| process.pid == 4201))
             .expect("demo process fixture");
         let mut observations = *process.scalar_observations();
+        observations.memory_bytes = ScalarObservation::available(1024 * 1024 * 1024, 1);
         observations.memory_pss_bytes = ScalarObservation::available(512 * 1024 * 1024, 1);
         observations.memory_uss_bytes = ScalarObservation::available(256 * 1024 * 1024, 1);
         observations.swap_bytes = ScalarObservation::available(0, 1);
@@ -257,6 +271,16 @@ fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
         uss_row.contains("256.0 MiB"),
         "the observed private (USS) facet must paint its real value: {uss_row:?}"
     );
+    // The definition's derived-shared facet: the same canonical observation
+    // family (`RSS - USS`) reaches the details panel's own row.
+    let shared_row = text
+        .lines()
+        .find(|line| line.contains(taskmanager_application::i18n::t("proc.shared")))
+        .unwrap_or_else(|| panic!("the derived-shared detail row must render:\n{text}"));
+    assert!(
+        shared_row.contains("768.0 MiB"),
+        "the derived-shared facet must paint RSS - USS: {shared_row:?}"
+    );
 
     // A process whose private facet was never observed keeps the shared dash;
     // nothing in the frame may invent a zero-byte USS.
@@ -274,6 +298,18 @@ fn apps_table_projects_typed_pss_and_swap_without_zero_fallbacks() {
     assert!(
         !cold_uss_row.contains("0 B"),
         "an unobserved private facet must never read as a fabricated 0 B: {cold_uss_row:?}"
+    );
+    let cold_shared_row = cold_text
+        .lines()
+        .find(|line| line.contains(taskmanager_application::i18n::t("proc.shared")))
+        .unwrap_or_else(|| panic!("the derived-shared detail row must render:\n{cold_text}"));
+    assert!(
+        cold_shared_row.contains('—'),
+        "an unobserved USS must keep the derived share absent: {cold_shared_row:?}"
+    );
+    assert!(
+        !cold_shared_row.contains("0 B"),
+        "an unobserved derived share must never read as a fabricated 0 B: {cold_shared_row:?}"
     );
 }
 

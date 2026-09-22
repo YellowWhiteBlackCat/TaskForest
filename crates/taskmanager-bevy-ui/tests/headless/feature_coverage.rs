@@ -126,7 +126,11 @@ fn the_unsupported_feature_set_is_pinned() {
 /// this shape's remaining observation gaps: the swap-in/out throughput rates,
 /// the IOPS/response/queue/service rows, the six-family SMART evidence, the
 /// projected partition rows, the per-adapter GPU blocks with their
-/// per-engine rows, and the page-fault / anonymous huge-page counters.
+/// per-engine rows, and the page-fault / anonymous huge-page counters. The
+/// W23-A batch anchored `memory.breakdown-rss-pss` for this shape
+/// after the details overview gained the derived-shared (`RSS - USS`) row, so
+/// the narrowed resident/proportional/private/derived-shared definition is
+/// proven by one details-overview fold.
 #[test]
 fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() {
     let declaration = feature_coverage_declaration();
@@ -223,7 +227,7 @@ fn the_committed_feature_anchors_produce_the_first_ready_batch_for_this_shape() 
             .rows_for(declaration.frontend)
             .filter(|row| row.is_anchored())
             .count(),
-        15,
+        16,
         "the committed anchored census for this shape moved"
     );
     let admitted = ledger

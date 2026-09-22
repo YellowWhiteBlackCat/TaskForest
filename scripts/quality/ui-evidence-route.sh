@@ -51,6 +51,17 @@
 # narrowing that dev-only layer is a separate owner decision, not an implicit
 # part of this refinement.
 #
+# S5 interaction route (W23-B): the headless requirement follows the unified
+# interaction declaration.  `scripts/parity/cross_frontend_matrix.tsv` carries
+# every frontend in one file, so the route reads its changed rows and maps each
+# to its own frontend (per-frontend-matrix parity: never a coarser "all four"
+# guess and never narrower than the changed rows).  The S5 driver, resolver,
+# schema and declaration files are dev-only evidence machinery whose channel is
+# the headless evidence chain, so they demand the headless route and never a
+# pixel receipt - the same class as the ui-contract declaration/test layers.
+# The legacy per-frontend matrices and accept scripts stay routed while they
+# remain compatibility assets (D6/S5 retirement window).
+#
 # Usage:
 #   bash scripts/quality/ui-evidence-route.sh [--base <ref>] [--with-gui]
 #     [--require-capture]
@@ -93,6 +104,41 @@ trap 'rm -f "$changed"' EXIT
 git diff --name-only "$base" >"$changed" || exit 1
 git ls-files --others --exclude-standard >>"$changed" 2>/dev/null || true
 sort -u "$changed" -o "$changed"
+
+# S5 unified interaction declaration: one file carries every frontend, so a
+# change maps to the frontends whose rows actually moved.  Added/removed data
+# rows name their own frontend; an unrecognised frontend token falls back to
+# all four (fail-closed - the resolver would reject it, the route must not
+# under-demand first); a comment-only change moves no row and demands no
+# frontend receipt; a wholesale replacement (an untracked file, a failed row
+# diff) falls back to the frontends the current file declares.  The mapping is
+# never narrower than the changed rows.
+unified_matrix="scripts/parity/cross_frontend_matrix.tsv"
+unified_matrix_frontends() {
+    local diff_text frontends
+    diff_text="$(git diff -U0 --no-color "$base" -- "$unified_matrix" 2>/dev/null || true)"
+    if [[ -n "$diff_text" ]]; then
+        frontends="$(printf '%s\n' "$diff_text" | awk -F'\t' '
+            /^[+-]/ && $0 !~ /^(\+\+\+|---)/ {
+                row = $0
+                sub(/^[+-]/, "", row)
+                if (row == "" || row ~ /^#/) next
+                split(row, columns, "\t")
+                if (columns[3] == "" || columns[3] == "frontend") next
+                if (columns[3] ~ /^(gpui|iced|tui|bevy)$/) print columns[3]
+                else print "all"
+            }' | sort -u)"
+    else
+        frontends=""
+        if [[ -f "$unified_matrix" ]]; then
+            frontends="$(awk -F'\t' '
+                !/^#/ && $3 != "" && $3 != "frontend" {
+                    print ($3 ~ /^(gpui|iced|tui|bevy)$/ ? $3 : "all")
+                }' "$unified_matrix" | sort -u)"
+        fi
+    fi
+    printf '%s\n' "$frontends"
+}
 
 ui_touched=0
 gpui_touched=0
@@ -217,6 +263,46 @@ while IFS= read -r path; do
         ui_touched=1
         bevy_touched=1
         ;;
+    "$unified_matrix")
+        # The unified S5 interaction declaration: a row change names the
+        # frontend whose interaction contract moved, so the route keeps the
+        # per-frontend matrix routes (W22-B) by reading the changed rows.  The
+        # file itself cannot paint; its channel is the headless interaction
+        # acceptance, so it never adds a pixel receipt of its own.
+        ui_touched=1
+        while IFS= read -r matrix_frontend; do
+            case "$matrix_frontend" in
+            gpui) gpui_touched=1 ;;
+            tui) tui_touched=1 ;;
+            iced) iced_touched=1 ;;
+            bevy) bevy_touched=1 ;;
+            all)
+                # Unrecognised frontend token: fail closed to every receipt.
+                gpui_touched=1
+                tui_touched=1
+                iced_touched=1
+                bevy_touched=1
+                ;;
+            esac
+        done < <(unified_matrix_frontends)
+        ;;
+    scripts/parity/accept-frontend-interactions.sh | \
+        scripts/parity/accept_frontend_interactions.py | \
+        scripts/parity/resolve_frontend_evidence.py | \
+        scripts/parity/test_resolve_frontend_evidence.py | \
+        scripts/parity/cross_frontend_manifest.tsv | \
+        scripts/parity/feature_evidence.tsv | \
+        scripts/parity/feature_evidence_co_anchors.tsv | \
+        scripts/parity/run_manifest.schema.json | \
+        scripts/parity/README.md | \
+        scripts/quality/cross_frontend_manifest.py)
+        # S5 evidence chain: committed declaration data and gate machinery for
+        # the cross-frontend evidence closure.  Their channel is the headless
+        # evidence chain (the resolver stage and the unified driver), not a
+        # pixel frame, so they demand the headless route and never a capture
+        # receipt -- the same class as the ui-contract declaration/test layers.
+        ui_touched=1
+        ;;
     esac
 done <"$changed"
 
@@ -241,7 +327,8 @@ fi
 
 if [[ "$with_gui" == "0" ]]; then
     echo "FAIL ui-evidence-route: UI boundary changed (base=$base); standard requires" >&2
-    echo "     --with-gui for the selected frontend interaction matrix" >&2
+    echo "     --with-gui for the headless interaction acceptance" >&2
+    echo "     (the interaction stages run scripts/parity/accept-frontend-interactions.sh)" >&2
     exit 1
 fi
 

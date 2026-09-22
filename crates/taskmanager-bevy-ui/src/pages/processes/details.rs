@@ -53,6 +53,7 @@ const OVERVIEW_FIELDS: &[(ProcessDetailsField, &str)] = &[
     (ProcessDetailsField::Memory, "common.memory"),
     (ProcessDetailsField::Pss, "proc.pss"),
     (ProcessDetailsField::Uss, "proc.uss"),
+    (ProcessDetailsField::Shared, "proc.shared"),
     (ProcessDetailsField::AnonHugePages, "proc.anon_huge_pages"),
     (ProcessDetailsField::SchedPolicy, "proc.sched_policy"),
     (ProcessDetailsField::OomScore, "proc.oom_score"),

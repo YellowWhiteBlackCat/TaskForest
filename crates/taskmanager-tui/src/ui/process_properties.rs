@@ -223,6 +223,7 @@ fn overview_pairs(
         (t("common.threads"), text(ProcessDetailsField::Threads)),
         (t("proc.pss"), text(ProcessDetailsField::Pss)),
         (t("proc.uss"), text(ProcessDetailsField::Uss)),
+        (t("proc.shared"), text(ProcessDetailsField::Shared)),
         (
             t("proc.anon_huge_pages"),
             text(ProcessDetailsField::AnonHugePages),

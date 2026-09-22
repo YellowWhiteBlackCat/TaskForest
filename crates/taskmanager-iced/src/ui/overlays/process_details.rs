@@ -624,6 +624,7 @@ fn property_pairs(
         row(ProcessDetailsField::Memory, t("common.memory")),
         row(ProcessDetailsField::Pss, t("proc.pss")),
         row(ProcessDetailsField::Uss, t("proc.uss")),
+        row(ProcessDetailsField::Shared, t("proc.shared")),
         row(
             ProcessDetailsField::AnonHugePages,
             t("proc.anon_huge_pages"),

@@ -111,6 +111,10 @@ fn fully_observed_row_folds_every_field_to_text() {
         &DetailValue::Text("40.0 MiB".to_owned())
     );
     assert_eq!(
+        value(&rows, ProcessDetailsField::Shared),
+        &DetailValue::Text("60.0 MiB".to_owned())
+    );
+    assert_eq!(
         value(&rows, ProcessDetailsField::AnonHugePages),
         &DetailValue::Text("8.0 MiB (8.0% RSS)".to_owned())
     );
@@ -177,6 +181,43 @@ fn fully_observed_row_folds_every_field_to_text() {
     assert_eq!(
         value(&rows, ProcessDetailsField::Cmdline),
         &DetailValue::Text("sample --flag value".to_owned())
+    );
+}
+
+/// The derived-shared facet is the core authority's `RSS - USS` difference:
+/// it needs both observations, and a missing USS keeps the honest dash
+/// instead of reading as a fabricated `0 B`.
+#[test]
+fn shared_facet_requires_both_observations_and_never_fabricates_a_zero() {
+    let mut item = fully_observed_item();
+    let observed = *item.scalar_observations();
+    assert_eq!(
+        value(
+            &process_details_rows(&item, &UnitPreferences::default()),
+            ProcessDetailsField::Shared
+        ),
+        &DetailValue::Text("60.0 MiB".to_owned())
+    );
+
+    item.apply_scalar_observations(ProcessScalarObservations {
+        memory_uss_bytes: ScalarObservation::default(),
+        ..observed
+    });
+    let cold = process_details_rows(&item, &UnitPreferences::default());
+    assert!(
+        value(&cold, ProcessDetailsField::Shared).is_missing(),
+        "an unobserved private facet makes the derived share missing, never 0"
+    );
+
+    item.apply_scalar_observations(ProcessScalarObservations {
+        memory_uss_bytes: ScalarObservation::available(100 * 1024 * 1024, 42),
+        ..observed
+    });
+    let fully_private = process_details_rows(&item, &UnitPreferences::default());
+    assert_eq!(
+        value(&fully_private, ProcessDetailsField::Shared),
+        &DetailValue::Text("0 B".to_owned()),
+        "a measured RSS == USS is a real zero, not an absence"
     );
 }
 

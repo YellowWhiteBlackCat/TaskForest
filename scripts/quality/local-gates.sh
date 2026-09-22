@@ -21,8 +21,12 @@
 #              bottom-up dev loop) + doctests + rustdoc + the nvidia fallback
 #              matrix + release/package smoke + the diff-scoped P4
 #              `parity-evidence` anchor resolver (facet manifest + unified
-#              interaction matrix) + (with --with-gui) the GPUI interaction
-#              matrix and fresh capture receipt route.
+#              interaction matrix + feature evidence/co-anchors) + (with
+#              --with-gui) the GPUI/Bevy headless interaction acceptance
+#              through the unified S5 driver
+#              (scripts/parity/accept-frontend-interactions.sh, which still
+#              runs the legacy per-frontend gates) and fresh capture receipt
+#              route.
 #   extended   the expensive pass: llvm-cov with per-crate floors, mutation
 #              testing of the core/application diff, Miri on the three
 #              Linux-audited unsafe crates, fuzz-target build (+ runs on demand),
@@ -594,7 +598,11 @@ if maybe parity-evidence; then
     #
     # Since W11-C the stage resolves both declaration sources: the facet
     # manifest and the unified S4 interaction matrix, so a renamed or deleted
-    # interaction test is dangling here too.  `--requirements` keeps the
+    # interaction test is dangling here too.  The P5 feature table and its
+    # sparse feature co-anchor side table are consumed by default
+    # (`--feature-evidence` / `--co-anchors` default to the committed files),
+    # so a renamed feature anchor or co-anchor is dangling in the same pass.
+    # `--requirements` keeps the
     # per-frontend P0-MC coverage report visible in the stage output/JSON
     # without failing on an uncovered (frontend, requirement) pair -- today
     # Bevy is 0/8 and the facet matcher is not a second vocabulary.  The
@@ -755,19 +763,33 @@ if [[ "$with_gui" == "1" ]]; then
         fi
     fi
     if maybe gpui-interactions; then
-        run_stage gpui-interactions standard timeout --kill-after=10s 2400 bash scripts/accept-gpui-interactions.sh
+        # S5 wiring (W23-B): the interaction stages run the unified driver
+        # (scripts/parity/accept-frontend-interactions.sh), which invokes the
+        # legacy per-frontend accept gate unchanged (still the authoritative
+        # runner and receipt writer for that frontend), folds its fresh
+        # receipts into the cross-frontend run manifest, and re-runs the
+        # Layer B resolver over the unified declaration.  The legacy accept
+        # scripts and per-frontend matrices stay committed as compatibility
+        # assets until the owner opens the D6/S5 retirement window; the
+        # Windows mirror still calls the legacy gate directly (outside this
+        # line's boundary).
+        run_stage gpui-interactions standard timeout --kill-after=10s 2400 \
+            bash scripts/parity/accept-frontend-interactions.sh gpui --scope linux
     fi
     if maybe bevy-interactions; then
         # Fourth frontend's headless interaction matrix: same contract as the
-        # gpui stage — the gate discovers every named test in the lib target,
-        # then runs the complete target under the locked workspace.
-        run_stage bevy-interactions standard timeout --kill-after=10s 1200 bash scripts/accept-bevy-interactions.sh
+        # gpui stage — the driver's Bevy adapter discovers every named test in
+        # the lib target, then runs the complete target under the locked
+        # workspace, and the legacy gate remains the runner.
+        run_stage bevy-interactions standard timeout --kill-after=10s 1200 \
+            bash scripts/parity/accept-frontend-interactions.sh bevy
     fi
 elif [[ "$scope" == "bevy" ]]; then
-    # The Bevy matrix is headless: a scoped Bevy line runs it on every
-    # standard pass, not only --with-gui.
+    # The Bevy interaction gate is headless: a scoped Bevy line runs it on
+    # every standard pass, not only --with-gui.
     if maybe bevy-interactions; then
-        run_stage bevy-interactions standard timeout --kill-after=10s 1200 bash scripts/accept-bevy-interactions.sh
+        run_stage bevy-interactions standard timeout --kill-after=10s 1200 \
+            bash scripts/parity/accept-frontend-interactions.sh bevy
     fi
 fi
 

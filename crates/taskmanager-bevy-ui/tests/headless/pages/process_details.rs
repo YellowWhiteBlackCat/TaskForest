@@ -59,6 +59,57 @@ fn empty_process_projection_is_an_explicit_unselected_state() {
     assert!(view.insights.is_empty());
 }
 
+/// The narrowed `memory.breakdown-rss-pss` definition, clause by clause: one
+/// typed observation family folds into the details overview's resident (RSS),
+/// proportional (PSS), private/unique (USS), and derived-shared
+/// (`RSS - USS`) rows, and a never-observed private facet leaves the derived
+/// share absent (the shared dash), never a fabricated `0 B`.
+#[test]
+fn memory_breakdown_rows_render_every_narrowed_facet() {
+    let mut process = ProcessItem::new(42, "worker");
+    let mut scalars = *process.scalar_observations();
+    scalars.memory_pss_bytes = ScalarObservation::available(128 * 1024 * 1024, 1);
+    scalars.memory_uss_bytes = ScalarObservation::available(64 * 1024 * 1024, 1);
+    process.apply_scalar_observations(scalars);
+    let view = projection(&shell_with(process));
+    let value = |key: &'static str| {
+        view.overview
+            .iter()
+            .find(|row| row.label == t(key))
+            .map(|row| row.value.as_str())
+    };
+    assert_eq!(
+        value("common.memory"),
+        Some("256.0 MiB"),
+        "the resident (RSS) facet must paint its observed value"
+    );
+    assert_eq!(value("proc.pss"), Some("128.0 MiB"));
+    assert_eq!(value("proc.uss"), Some("64.0 MiB"));
+    assert_eq!(
+        value("proc.shared"),
+        Some("192.0 MiB"),
+        "the derived-shared facet is RSS - USS"
+    );
+
+    // The same fold with the private facet never observed: the derived share
+    // stays missing and must not read as a fabricated `0 B`.
+    let mut cold = ProcessItem::new(43, "cold");
+    let mut scalars = *cold.scalar_observations();
+    scalars.memory_pss_bytes = ScalarObservation::available(128 * 1024 * 1024, 1);
+    cold.apply_scalar_observations(scalars);
+    let cold_view = projection(&shell_with(cold));
+    let cold_shared = cold_view
+        .overview
+        .iter()
+        .find(|row| row.label == t("proc.shared"))
+        .expect("the overview carries the derived-shared row");
+    assert_eq!(
+        cold_shared.value,
+        taskmanager_shell::presentation::MISSING_VALUE
+    );
+    assert_ne!(cold_shared.value, "0 B");
+}
+
 fn field_label(field: ProcessDetailsField) -> &'static str {
     match field {
         ProcessDetailsField::Cpu => "common.cpu",

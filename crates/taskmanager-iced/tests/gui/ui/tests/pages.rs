@@ -399,7 +399,6 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
     observations.memory_uss_bytes =
         taskmanager_core::core::metrics::ScalarObservation::available(256 * 1024 * 1024, 1);
     private.apply_scalar_observations(observations);
-
     let mut shell = taskmanager_shell::demo_app();
     taskmanager_shell::fixture::seed_projection_fact(
         &mut shell,
@@ -420,6 +419,15 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
             .map(|(_, value)| value.as_str()),
         Some("256.0 MiB"),
         "the details surface must paint the observed private (USS) facet"
+    );
+    // The derived-shared facet comes from the same observation family
+    // (`RSS - USS`), so the overlay paints 1.0 GiB - 256.0 MiB.
+    assert_eq!(
+        rows.iter()
+            .find(|(label, _)| label == taskmanager_application::i18n::t("proc.shared"))
+            .map(|(_, value)| value.as_str()),
+        Some("768.0 MiB"),
+        "the details surface must paint the derived-shared facet"
     );
 
     let mut observations = *private.scalar_observations();
@@ -452,6 +460,14 @@ fn apps_resource_projection_preserves_typed_pss_swap_and_measured_zero() {
             .iter()
             .all(|(label, value)| label != "USS" || value != "0 B"),
         "an unobserved private facet must never read as a fabricated 0 B"
+    );
+    assert_eq!(
+        cold_rows
+            .iter()
+            .find(|(label, _)| label == taskmanager_application::i18n::t("proc.shared"))
+            .map(|(_, value)| value.as_str()),
+        Some("—"),
+        "an unobserved USS makes the derived-shared facet absent, never 0 B"
     );
 }
 

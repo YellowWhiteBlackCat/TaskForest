@@ -95,6 +95,89 @@ fn overview_and_command_rows_mirror_the_neutral_vm() {
     assert_eq!(command[2].1, "sample --flag value");
 }
 
+/// The narrowed `memory.breakdown-rss-pss` definition, clause by clause
+/// through the dialog's production folds: the resident (RSS) facet is the
+/// performance current the dialog paints, and the overview paints the
+/// proportional (PSS), private (USS), and derived-shared (`RSS - USS`)
+/// facets of one typed observation family. A never-observed private facet
+/// leaves the derived share absent (the shared dash), never a fabricated
+/// `0 B`.
+#[test]
+fn memory_breakdown_rows_render_every_narrowed_facet() {
+    use taskmanager_application::process_details_vm::{DetailValue, detail_value};
+    use taskmanager_core::core::metrics::ScalarObservation;
+
+    let mut item = taskmanager_test_support::ProcessItemFixtureBuilder::from_item(
+        taskmanager_core::core::process::ProcessItem::default(),
+    )
+    .pid(4242)
+    .name("sample".to_owned())
+    .build();
+    let mut observations = *item.scalar_observations();
+    observations.start_token = ScalarObservation::available(600, 42);
+    observations.memory_bytes = ScalarObservation::available(100 * 1024 * 1024, 42);
+    observations.memory_pss_bytes = ScalarObservation::available(50 * 1024 * 1024, 42);
+    observations.memory_uss_bytes = ScalarObservation::available(40 * 1024 * 1024, 42);
+    item.apply_scalar_observations(observations);
+
+    let utc = taskmanager_core::core::time::LocalTimeRulesObservation::current(
+        taskmanager_core::core::time::LocalTimeRules::utc(),
+        0,
+    );
+    let vm = taskmanager_application::process_details_vm::process_details_rows_with_local_time(
+        &item,
+        &properties_unit_preferences(),
+        &utc,
+    );
+    assert_eq!(
+        vm_display(&vm, ProcessDetailsField::Memory),
+        "100.0 MiB",
+        "the resident (RSS) facet is the performance current the dialog paints"
+    );
+
+    let overview = vm_rows(&item, &OVERVIEW_FIELDS, &utc);
+    let facet = |field: ProcessDetailsField| {
+        let index = OVERVIEW_FIELDS
+            .iter()
+            .position(|(candidate, _)| *candidate == field)
+            .expect("the overview carries the narrowed memory facet");
+        overview[index].1.as_str()
+    };
+    assert_eq!(facet(ProcessDetailsField::Pss), "50.0 MiB");
+    assert_eq!(facet(ProcessDetailsField::Uss), "40.0 MiB");
+    assert_eq!(
+        facet(ProcessDetailsField::Shared),
+        "60.0 MiB",
+        "the derived-shared facet is RSS - USS"
+    );
+
+    // The same typed family with the private facet never observed: the
+    // derived share stays missing and must not read as a fabricated `0 B`.
+    let mut cold = item.clone();
+    let mut cold_observations = *cold.scalar_observations();
+    cold_observations.memory_uss_bytes = ScalarObservation::default();
+    cold.apply_scalar_observations(cold_observations);
+    let cold_overview = vm_rows(&cold, &OVERVIEW_FIELDS, &utc);
+    let cold_shared = OVERVIEW_FIELDS
+        .iter()
+        .position(|(candidate, _)| *candidate == ProcessDetailsField::Shared)
+        .expect("the overview carries the derived-shared row");
+    assert_eq!(cold_overview[cold_shared].1, missing_value());
+    assert_eq!(
+        detail_value(
+            &taskmanager_application::process_details_vm::process_details_rows_with_local_time(
+                &cold,
+                &properties_unit_preferences(),
+                &utc
+            ),
+            ProcessDetailsField::Shared
+        ),
+        &DetailValue::Missing,
+        "a missing USS must fold the derived share to the shared Missing"
+    );
+    assert_ne!(cold_overview[cold_shared].1, "0 B");
+}
+
 /// The performance graphs' displayed currents mirror the VM (the peaks
 /// stay history folds): memory lands on the neutral base-2 ladder —
 /// the documented convergence off the old hardcoded decimal MB.
