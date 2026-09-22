@@ -12,7 +12,10 @@
 #              private A/B capture-isolation check when a host Wayland/KWin
 #              session and writable user cgroup are available (or
 #              TM_CAPTURE_ISOLATION_GATE=1 forces it).
-#   standard   ~ the blocking Linux CI surface: quick + cargo deny + clippy + the
+#   standard   ~ the blocking Linux CI surface: quick + cargo deny + clippy +
+#              production-config (each frontend product compiled WITHOUT the
+#              dev-only `test-support`, under -D warnings — the native
+#              portability jobs' product build, brought local) + the
 #              nextest workspace split into core/logic/gui/perf layers
 #              (failure attribution per layer; `--only nextest-core` gives a
 #              bottom-up dev loop) + doctests + rustdoc + the nvidia fallback
@@ -626,6 +629,30 @@ if maybe clippy; then
         fi
         run_stage clippy standard cargo clippy "${LOCK_ARGS[@]}" "${SCOPE_CLIPPY_ARGS[@]}" --all-targets "${SCOPE_FEATURE_ARGS[@]}" -- \
             -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
+    fi
+fi
+if maybe production-config; then
+    # Production-config companion to the clippy stage above. The clippy stage —
+    # like every nextest layer — enables `test-support`, so frontend code that
+    # only compiles when that dev-only feature is OFF had no local gate at all;
+    # a warning there (e.g. a binding used solely by a
+    # `#[cfg(any(test, feature = "test-support"))]` debug selector) passed every
+    # local stage and failed the native portability product build. Merge-owner
+    # scope checks all four products; a scoped frontend line checks only its
+    # own; scope=core has no product crate to check.
+    production_config_frontends=(gpui iced tui bevy)
+    case "$scope" in
+    all) ;;
+    gpui | iced | tui | bevy) production_config_frontends=("$scope") ;;
+    core)
+        production_config_frontends=()
+        echo "SKIP production-config (scope=core: no frontend product crate)"
+        record production-config standard SKIP 0
+        ;;
+    esac
+    if [[ ${#production_config_frontends[@]} -gt 0 ]]; then
+        run_stage production-config standard bash scripts/quality/production-config-check.sh \
+            "${production_config_frontends[@]}"
     fi
 fi
 if maybe nextest-core; then
