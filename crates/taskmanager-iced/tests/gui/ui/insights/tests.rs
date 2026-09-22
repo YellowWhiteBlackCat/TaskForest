@@ -35,6 +35,46 @@ fn thread_cpu_helpers_keep_a_missing_value_honest() {
     assert_eq!(warm.state.as_short_label(), "S");
     assert_eq!(cpu_time_text(warm.cpu_time_secs), "12.5s");
     assert_eq!(cpu_percent_text(warm.cpu_percent), "18.5%");
+
+    // The facet's row fold enumerates one row per projected thread (same
+    // order), and the gap thread's own row keeps both dashes. The cap bounds
+    // the materialized rows instead of dropping the trailing ones silently.
+    let rows = thread_rows_vm(&[warm.clone(), gap.clone()], MAX_FACET_ROWS);
+    assert_eq!(rows.len(), 2, "one row per projected thread");
+    assert_eq!(
+        (
+            rows[0].tid.as_str(),
+            rows[0].comm.as_str(),
+            rows[0].state.as_str(),
+            rows[0].cpu_time.as_str(),
+            rows[0].cpu_percent.as_str(),
+        ),
+        ("4242", "telemetry-main", "S", "12.5s", "18.5%"),
+        "the warm thread row must carry its own per-thread statistics"
+    );
+    assert_eq!(
+        (
+            rows[1].tid.as_str(),
+            rows[1].comm.as_str(),
+            rows[1].state.as_str(),
+            rows[1].cpu_time.as_str(),
+            rows[1].cpu_percent.as_str(),
+        ),
+        ("4243", "reaper", "R", "—", "—"),
+        "the gap thread row must keep the typed dashes, never 0.0s/0.0%"
+    );
+    let many: Vec<ProcessThreadInfo> = (0..MAX_FACET_ROWS + 3)
+        .map(|index| ProcessThreadInfo {
+            tid: 5_000 + index as u32,
+            comm: format!("worker-{index}"),
+            ..warm.clone()
+        })
+        .collect();
+    assert_eq!(
+        thread_rows_vm(&many, MAX_FACET_ROWS).len(),
+        MAX_FACET_ROWS,
+        "the facet cap must bound the materialized thread rows"
+    );
 }
 
 /// Honesty: an unreadable descriptor (None target) must surface the typed
@@ -58,6 +98,30 @@ fn open_file_row_marks_an_unreadable_target_not_blank() {
     assert!(
         denied_line.contains(t("proc_insights.unreadable")),
         "an unreadable fd must surface the typed marker, got: {denied_line}"
+    );
+
+    // The facet's row fold enumerates one row per projected descriptor (same
+    // order): the readable descriptor keeps its target and the unresolved
+    // readlink keeps its typed marker. The cap bounds the materialized rows.
+    let rows = open_file_rows(&[readable.clone(), unreadable.clone()], MAX_FACET_ROWS);
+    assert_eq!(rows.len(), 2, "one row per projected descriptor");
+    assert!(rows[0].contains("/dev/null") && rows[0].starts_with("fd 0"));
+    assert!(
+        rows[1].contains(t("proc_insights.unreadable")) && rows[1].starts_with("fd 9"),
+        "the unreadable descriptor's own row carries its marker: {rows:?}"
+    );
+    let many: Vec<OpenFileEntry> = (0..MAX_FACET_ROWS + 3)
+        .map(|index| OpenFileEntry {
+            fd: index as u32,
+            kind: taskmanager_core::core::process_telemetry::OpenFileKind::File,
+            target: Some(format!("/tmp/session-{index}.lock")),
+            deleted: false,
+        })
+        .collect();
+    assert_eq!(
+        open_file_rows(&many, MAX_FACET_ROWS).len(),
+        MAX_FACET_ROWS,
+        "the facet cap must bound the materialized descriptor rows"
     );
 }
 

@@ -105,6 +105,14 @@ fn the_dependencies_fingerprint_tracks_lifecycle_transitions() {
 
 #[test]
 fn dependencies_panel_renders_relations_scene() {
+    use bevy::MinimalPlugins;
+    use bevy::app::App;
+    use bevy::asset::{AssetPlugin, Assets};
+    use bevy::scene::{ScenePlugin, WorldSceneExt};
+    use bevy::text::Font;
+    use bevy::ui::widget::Text;
+    use taskmanager_application::i18n::t;
+
     let mut shell = ShellApp::new();
     let target = ServiceId::new("demo.service");
     let mut deps = ServiceDeps::default();
@@ -123,5 +131,53 @@ fn dependencies_panel_renders_relations_scene() {
 
     let theme = taskmanager_theme::Theme::default();
     let palette = crate::palette::ui_palette(&theme);
-    let _scene = service_dependencies_panel_scene(&shell, &palette);
+    let scene = service_dependencies_panel_scene(&shell, &palette);
+
+    // Spawn the production scene and read the painted text nodes: the panel
+    // must really draw the resolved DAG's identity, its per-kind headers, and
+    // the relation targets — not merely build without panic.
+    let mut app = App::new();
+    app.add_plugins(MinimalPlugins);
+    app.add_plugins((AssetPlugin::default(), ScenePlugin));
+    app.init_resource::<Assets<Font>>();
+    let world = app.world_mut();
+    let root = world
+        .spawn_scene(scene)
+        .expect("the dependencies panel scene resolves without app resources")
+        .id();
+    let texts: Vec<String> = world
+        .query::<&Text>()
+        .iter(world)
+        .map(|text| text.0.clone())
+        .collect();
+    assert!(
+        world.despawn(root),
+        "the dependencies scene despawns cleanly"
+    );
+
+    for expected in [
+        format!("{} — demo.service", t("svc.dependencies")),
+        format!("{} (1):", t("svc.requires")),
+        "req.service".to_owned(),
+        format!("{} (1):", t("svc.wants")),
+        "wants.service".to_owned(),
+    ] {
+        assert!(
+            texts.iter().any(|text| text == &expected),
+            "the dependencies panel must paint {expected:?}: {texts:?}"
+        );
+    }
+    // The two untargeted kinds stay honest dashes in the same panel; they
+    // never borrow another kind's targets.
+    for empty in [t("svc.wanted_by"), t("svc.after")] {
+        let dashed = format!("{empty}: —");
+        assert!(
+            texts.iter().any(|text| text == &dashed),
+            "an untargeted kind must paint its honest dash ({dashed:?}): {texts:?}"
+        );
+    }
+    assert_eq!(
+        texts.iter().filter(|text| *text == "req.service").count(),
+        1
+    );
 }

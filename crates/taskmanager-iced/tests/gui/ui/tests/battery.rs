@@ -96,6 +96,17 @@ fn battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_hones
         Some(8.4),
         Some(312),
     );
+    // Degradation health is the fifth definition clause: the shared
+    // energy_full / energy_full_design core rule. The test-support helper has
+    // no parameter for the µWh pair, so it is applied as one typed group on
+    // top of the scalar readouts.
+    let mut battery = battery;
+    let mut energy = *battery.scalar_observations();
+    energy.energy_full_uwh =
+        taskmanager_core::core::metrics::ScalarObservation::available(49_000_000.0, 100);
+    energy.energy_full_design_uwh =
+        taskmanager_core::core::metrics::ScalarObservation::available(56_000_000.0, 100);
+    battery.apply_scalar_observations(energy);
     let rows = battery_summary_lines(&battery);
     // Headline capacity stays a real percentage, not a fabricated zero.
     assert_eq!(rows[0].label(), "Charge");
@@ -107,6 +118,12 @@ fn battery_summary_lines_projects_real_readouts_and_keeps_unknown_capacity_hones
     assert_eq!(lookup(&rows, "Power"), "8.4 W");
     assert_eq!(lookup(&rows, "Voltage"), "12.40 V");
     assert_eq!(lookup(&rows, "Cycles"), "312");
+    // Health derives through the shared ratio rule from the observed µWh pair.
+    assert_eq!(
+        lookup(&rows, "Health"),
+        "87.5%",
+        "the derived battery health must reach its own row"
+    );
     assert_eq!(lookup(&rows, "Technology"), "Li-ion");
     assert_eq!(lookup(&rows, "Manufacturer"), "TaskForest Cells");
 

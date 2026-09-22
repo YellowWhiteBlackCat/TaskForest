@@ -1,5 +1,7 @@
 use super::*;
-use gpui::{AppContext, Context, IntoElement, Render, TestAppContext, Window};
+use gpui::{
+    AppContext, Context, IntoElement, Render, TestAppContext, VisualTestContext, Window, px,
+};
 use taskmanager_core::core::device_state::{DeviceState, DeviceStatus};
 use taskmanager_core::core::process_telemetry::{ProcessThreads, ThreadState};
 
@@ -61,24 +63,33 @@ fn format_keeps_missing_cpu_time_honest() {
     );
 }
 
-/// Minimal root view that renders one card frame, so the threads card can
-/// be exercised through the same window-draw path the rest of the
-/// process-insights tests use.
+/// Minimal root view that renders one card frame per draw, so the threads card
+/// can be exercised through the same window-draw path the rest of the
+/// process-insights tests use. The card is rebuilt from the typed snapshot on
+/// every render because GPUI may render once during window creation; a
+/// consumed-once card would leave the explicit assertion draw empty.
 struct ThreadsCardView {
-    card: Div,
+    snapshot: ProcessTelemetrySnapshot,
 }
 impl Render for ThreadsCardView {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        std::mem::replace(&mut self.card, div())
+        threads_card(&Theme::dark(), &self.snapshot, &labels(), 480.0)
     }
 }
 
-fn draw_frame(cx: &mut TestAppContext, snapshot: ProcessTelemetrySnapshot) {
-    let theme = Theme::dark();
-    let card = threads_card(&theme, &snapshot, &labels(), 480.0);
-    let window = cx.add_window(|_w, _cx| ThreadsCardView { card });
+/// `debug_bounds` takes a `&'static str`; the row selectors are indexed.
+fn selector(text: String) -> &'static str {
+    Box::leak(text.into_boxed_str())
+}
+
+fn draw_frame(
+    cx: &mut TestAppContext,
+    snapshot: ProcessTelemetrySnapshot,
+) -> gpui::WindowHandle<ThreadsCardView> {
+    let window = cx.add_window(move |_w, _cx| ThreadsCardView { snapshot });
     cx.update_window(window.into(), |_, window, cx| window.draw(cx).clear())
         .unwrap();
+    window
 }
 
 #[gpui::test]
@@ -129,5 +140,30 @@ fn denied_state_renders_a_typed_status_not_blank(cx: &mut TestAppContext) {
 
 #[gpui::test]
 fn populated_threads_render_with_missing_cpu_dash(cx: &mut TestAppContext) {
-    draw_frame(cx, snapshot_with(populated_threads()));
+    let win = draw_frame(cx, snapshot_with(populated_threads()));
+    let mut vcx = VisualTestContext::from_window(win.into(), cx);
+    // One painted row per projected thread: the warm thread carries the
+    // measured token and the thread whose `stat` lacked CPU counters carries
+    // the typed `cpu-gap` token. The literal dash is locked by the sibling
+    // `format_keeps_missing_cpu_time_honest` (production `format_thread`);
+    // these selectors prove the typed gap reached the painted row.
+    for (index, token) in [(0_usize, "cpu-measured"), (1, "cpu-gap")] {
+        let sel = selector(format!("tm-insight-thread:{index}:{token}"));
+        let bounds = vcx
+            .debug_bounds(sel)
+            .unwrap_or_else(|| panic!("{sel} must paint its thread row"));
+        assert!(
+            bounds.size.width > px(0.0) && bounds.size.height > px(0.0),
+            "thread row {index} collapsed: {bounds:?}"
+        );
+    }
+    assert!(
+        vcx.debug_bounds("tm-insight-thread:2:cpu-measured")
+            .is_none(),
+        "no row beyond the projected threads may paint"
+    );
+    assert!(
+        vcx.debug_bounds("tm-insight-thread:0:cpu-gap").is_none(),
+        "a thread with parsed CPU counters must not carry the gap token"
+    );
 }

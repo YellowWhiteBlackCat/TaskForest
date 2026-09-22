@@ -650,6 +650,13 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
             )
             .build(),
     ];
+    // The remaining SMART evidence families the definition names: available
+    // spare with its observed warning threshold, and the unsafe-shutdown
+    // counter. The test-support builder has no setter for these two, so they
+    // are written on the typed disk.
+    disk.smart_available_spare_pct = Some(4.0);
+    disk.smart_available_spare_threshold_pct = Some(10.0);
+    disk.smart_unsafe_shutdowns = Some(12);
 
     let rows = disk_summary_lines(&disk, true, true, &[]);
     // GPUI row order: status, active time, rates, iops/response, capacity,
@@ -672,7 +679,9 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
             ("Filesystem", "—"),
             ("Temperature", "33 °C"),
             ("Endurance used", "2%"),
+            ("Available spare", "4% ⚠ (≤10%)"),
             ("Power-on", "7200 h (300 d)"),
+            ("Unsafe shutdowns", "12"),
         ]
     );
     assert_eq!(disk_title(&disk), "nvme1n1");
@@ -687,6 +696,44 @@ fn disk_summary_projects_real_rates_active_time_smart_and_partition_space() {
     );
     // The one-line vital fact carries the capacity + partition census.
     assert!(disk_vital_line(&disk, crate::ui::UnitPrefs::default()).contains("partitions"));
+    // The per-partition usage fold the topology panel paints: the typed
+    // used/total/free observations of the mounted child drive both the usage
+    // text and the bar fraction (70 / 100 GiB → 70%).
+    let partition = &disk.partitions[0];
+    let partition_observations = partition.scalar_observations();
+    let (usage, fraction) = partition_usage_text(
+        partition_observations.used_bytes.current_value().copied(),
+        partition_observations
+            .capacity_bytes
+            .current_value()
+            .copied(),
+        partition_observations.free_bytes.current_value().copied(),
+        partition.device_state.status,
+        crate::ui::UnitPrefs::default(),
+    );
+    assert_eq!(usage, "70.0 GiB / 100.0 GiB · Free 30.0 GiB · 70%");
+    assert!(
+        fraction.is_some_and(|value| (value - 0.70).abs() < 1e-6),
+        "the bar fraction must be the observed used/total ratio: {fraction:?}"
+    );
+
+    // Reported availability without any concrete readout still speaks through
+    // the shared SMART status row, and grows no fabricated readout.
+    let availability_only = taskmanager_test_support::DiskMetricsFixtureBuilder::new()
+        .smart_availability(taskmanager_core::core::metrics::SmartAvailability::Available)
+        .build();
+    let availability_source = disk_summary_lines(&availability_only, true, true, &[]);
+    let availability_rows = flat(&availability_source);
+    assert!(
+        availability_rows.contains(&("SMART status", "Healthy")),
+        "a reported-available provider must surface its typed status verdict: {availability_rows:?}"
+    );
+    assert!(
+        !availability_rows
+            .iter()
+            .any(|(label, _)| *label == "Endurance used"),
+        "an availability-only provider must not invent a fabricated endurance row: {availability_rows:?}"
+    );
 
     set_language(Language::En);
 }

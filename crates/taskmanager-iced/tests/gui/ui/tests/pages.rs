@@ -583,6 +583,50 @@ fn service_projection_preserves_fixture_rows_and_typed_status() {
     assert_eq!(rows[0].status, ServiceStatus::Active);
     assert_eq!(rows[4].status, ServiceStatus::Failed);
     assert_eq!(rows[4].description, "Recovery required");
+    assert!(
+        rows.iter().all(|row| !row.cycle),
+        "an acyclic demo inventory must not flag a cycle"
+    );
+
+    // The definition's ordering-cycle clause: both members of a typed
+    // Before-cycle are flagged through the shared fold, so the row can paint
+    // the conflict instead of silently rendering a normal unit.
+    use taskmanager_core::core::services::{
+        ServiceItem, ServiceRelationEdge, ServiceRelationGraph, ServiceRelationKind,
+    };
+    let cyclic = |id: &str, name: &str, other: &str| {
+        ServiceItem::from_inventory(
+            id,
+            name,
+            ServiceStatus::Active,
+            "cyclic fixture",
+            "loaded",
+            "active",
+            "running",
+        )
+        .with_relations(ServiceRelationGraph::from_edges([
+            ServiceRelationEdge::new(ServiceRelationKind::Before, other),
+        ]))
+    };
+    let first_id = "fixture.service:cycle-first.service";
+    let second_id = "fixture.service:cycle-second.service";
+    let mut cyclic_shell = taskmanager_shell::demo_app();
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut cyclic_shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
+            cyclic(first_id, "cycle-first", second_id),
+            cyclic(second_id, "cycle-second", first_id),
+        ])),
+    );
+    let cyclic_rows = service_rows(&cyclic_shell);
+    assert_eq!(
+        cyclic_rows
+            .iter()
+            .map(|row| (row.name.as_str(), row.cycle))
+            .collect::<Vec<_>>(),
+        vec![("cycle-first", true), ("cycle-second", true)],
+        "both ordering-cycle members must carry the shared cycle flag"
+    );
 }
 
 #[test]
