@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # bench-gate.sh — run the zero-dependency throughput benches and compare
-# each measurement against the committed trend.
+# each measurement against the newest local trend row.
 #
 # The bench binary prints one `RESULT<TAB><name><TAB><ns>` line per
 # measurement (contract in crates/taskmanager-platform-linux/benches/
@@ -9,6 +9,31 @@
 # for that name in docs/quality/bench-trend.tsv — a loose tolerance for a
 # shared, loaded machine; the point is catching 10x accidental regressions,
 # not nano-noise. First run seeds the trend file.
+#
+# Reachability: this script is the bench's only execution path. The local
+# `extended` tier runs it as its `benches` stage:
+#     bash scripts/quality/local-gates.sh extended
+#       -> `benches` stage -> scripts/quality/bench-gate.sh
+#       -> cargo bench -p taskmanager-platform-linux --bench throughput
+#            --features test-support   (external 900s deadline below)
+# The bench therefore does NOT appear in `cargo nextest ... --all-targets`
+# run, by construction: `.config/nextest.toml` carries a repository-level
+# `default-filter` that excludes the `harness = false` throughput binary from
+# nextest discovery, because a custom harness cannot answer nextest's `--list`
+# protocol (a plain `--all-targets` run aborts with "creating test list
+# failed" without it). That default-filter is a discovery fix, never a
+# cancellation of this gate — so keep this stage wired, and keep the
+# default-filter scoped to the exact binary id.
+#
+# docs/quality/bench-trend.tsv is a local receipt, deliberately absent from
+# the public tree (scripts/quality/public_repo_guard.py forbids tracking it):
+# a fresh clone seeds the file on the first run, and the >2x regression
+# comparison becomes meaningful from the second local run onward.
+#
+# Convention (shared with scripts/quality/trend-gate.sh): every measured row
+# is appended before the verdict, so a regressed value also becomes the next
+# baseline. The gate fires on the first run that observes the regression —
+# investigate that run, do not re-run for green.
 #
 # Usage: scripts/quality/bench-gate.sh
 
