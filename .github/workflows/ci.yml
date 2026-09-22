@@ -148,6 +148,25 @@ jobs:
       # (restriction / pedantic), so `-D warnings` alone never enables them.
       # Keep this command identical to the local gate.
       - run: cargo clippy --locked --workspace --all-targets --features test-support -- -D warnings -W clippy::cognitive_complexity -W clippy::too_many_lines
+      # Production-config companion to the clippy step above: the same helper
+      # script the local standard gate runs in this exact order (clippy, then
+      # production-config) and the same four product commands, so CI and local
+      # stay zero-drift by construction. The clippy step — like every nextest
+      # layer — enables `test-support`, so frontend code compiled only when
+      # that dev-only feature is OFF had no Linux gate; a warning there (e.g.
+      # a binding used solely by a `#[cfg(any(test, feature = "test-support"))]`
+      # debug selector, the 2026-09-22 macOS incident) stayed green here and
+      # failed the native jobs. This step covers all four product
+      # configurations without `test-support`: gpui (bin plus the reduced
+      # `--no-default-features` lib), iced, tui, and bevy — bevy had no
+      # production-config compile anywhere outside release packaging.
+      #
+      # The script preserves this job's RUSTFLAGS (mold included), appends
+      # `-D warnings` if absent, and defaults `TM_CARGO_LOCK` to `--locked`; no
+      # env override is needed, so `PRODUCTION_CONFIG_TIMEOUT` keeps its 900s
+      # per-command default. The outer timeout bounds the whole step at 30
+      # minutes, so a hang fails the step instead of the 45-minute job budget.
+      - run: timeout --kill-after=30s 1800s bash scripts/quality/production-config-check.sh
 
   test:
     name: Linux (workspace tests + doctests)
