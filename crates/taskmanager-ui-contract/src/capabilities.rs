@@ -96,6 +96,28 @@
 //! behavioral equivalence: each cell is backed by the shape's own behavior
 //! tests and evidence route (CORE-06), and a `Ported` cell claims the
 //! intent to match, never the match itself.
+//!
+//! ## Delivered-surface vocabulary (intentionally asymmetric)
+//!
+//! This registry is the DELIVERED-SURFACE vocabulary. A capability is admitted
+//! only because at least one shape really ships it, and the reference shape
+//! (GPUI, whose `taskmanager-ui` layer owns the semantics) must own every
+//! entry. The gate therefore rejects a reference shape that declares
+//! [`CapabilitySupport::Ported`], `Divergent`, or `Unsupported`
+//! ([`CapabilityFindingKind::ReferenceShapeCannotDefer`]): the reference layer
+//! cannot defer itself, and the vocabulary grows only when that layer grows.
+//!
+//! [`crate::feature_coverage`] is deliberately NOT symmetric. It is the full
+//! ROADMAP coverage matrix, so its reference shape MAY declare
+//! [`CapabilitySupport::Unsupported`] for a feature the reference surface has
+//! not delivered yet; only the porting decisions (`Ported`/`Divergent`/
+//! `Native`) are rejected there
+//! ([`crate::FeatureCoverageFindingKind::ReferenceShapeCannotPort`]). Do not
+//! "fix" the difference: allowing reference `Unsupported` here, or forbidding
+//! it there, would erase either the delivered-surface guarantee or the honest
+//! roadmap gap. The asymmetry is a contract and is pinned by a test in
+//! `tests/headless/ui_feature_coverage.rs`
+//! (`capability_and_feature_registries_are_deliberately_asymmetric`).
 
 use crate::keybindings::FrontendShape;
 
@@ -619,9 +641,18 @@ pub struct FrontendCapabilityDeclaration {
     pub entries: Vec<CapabilityEntry>,
 }
 
-/// The coverage outcome for one capability.
+/// The DECLARATION-DRIFT outcome for one capability.
+///
+/// This is the frontend declaration axis, not the platform availability axis:
+/// it reports whether a frontend declared a capability explicitly
+/// (`Declared`), or silently omitted/duplicated/over-declared it. It is
+/// deliberately NOT named `CapabilityStatus`, which is owned by
+/// `taskmanager-platform-contract` and describes runtime availability. The
+/// self-describing name also keeps it distinct from the sibling coverage axes
+/// ([`crate::BindingCoverageStatus`] for command bindings and
+/// [`crate::FeatureCoverageStatus`] for product features).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum CapabilityStatus {
+pub enum CapabilityCoverageStatus {
     /// An explicit support decision.
     Declared(CapabilitySupport),
     /// Contract-known but absent from the declaration — a silent omission.
@@ -632,7 +663,7 @@ pub enum CapabilityStatus {
     Unknown,
 }
 
-impl CapabilityStatus {
+impl CapabilityCoverageStatus {
     /// Whether the capability carries an explicit decision — the only
     /// status a no-drift declaration may show.
     #[must_use]
@@ -652,15 +683,15 @@ impl CapabilityStatus {
 #[must_use]
 pub fn capability_report(
     declaration: &FrontendCapabilityDeclaration,
-) -> Vec<(ComponentCapability, CapabilityStatus)> {
+) -> Vec<(ComponentCapability, CapabilityCoverageStatus)> {
     capability_report_over(declaration, ComponentCapability::ALL)
 }
 
 /// The drift findings alone.
 #[must_use]
 pub fn capability_drift(
-    report: &[(ComponentCapability, CapabilityStatus)],
-) -> Vec<(ComponentCapability, CapabilityStatus)> {
+    report: &[(ComponentCapability, CapabilityCoverageStatus)],
+) -> Vec<(ComponentCapability, CapabilityCoverageStatus)> {
     report
         .iter()
         .copied()
@@ -702,11 +733,11 @@ pub struct CapabilityFinding {
 /// empty result is the only passing state.
 #[must_use]
 pub fn capability_findings(declaration: &FrontendCapabilityDeclaration) -> Vec<CapabilityFinding> {
-    let drift_kind = |status: CapabilityStatus| match status {
-        CapabilityStatus::Missing => Some(CapabilityFindingKind::Missing),
-        CapabilityStatus::Duplicated => Some(CapabilityFindingKind::Duplicated),
-        CapabilityStatus::Unknown => Some(CapabilityFindingKind::Unknown),
-        CapabilityStatus::Declared(_) => None,
+    let drift_kind = |status: CapabilityCoverageStatus| match status {
+        CapabilityCoverageStatus::Missing => Some(CapabilityFindingKind::Missing),
+        CapabilityCoverageStatus::Duplicated => Some(CapabilityFindingKind::Duplicated),
+        CapabilityCoverageStatus::Unknown => Some(CapabilityFindingKind::Unknown),
+        CapabilityCoverageStatus::Declared(_) => None,
     };
     let mut findings: Vec<CapabilityFinding> = capability_report(declaration)
         .into_iter()
@@ -719,7 +750,7 @@ pub fn capability_findings(declaration: &FrontendCapabilityDeclaration) -> Vec<C
         })
         .collect();
     for (capability, status) in capability_report(declaration) {
-        let CapabilityStatus::Declared(support) = status else {
+        let CapabilityCoverageStatus::Declared(support) = status else {
             continue;
         };
         let kind = if support == CapabilitySupport::Reference
@@ -759,10 +790,10 @@ pub fn capability_findings(declaration: &FrontendCapabilityDeclaration) -> Vec<C
 fn capability_report_over(
     declaration: &FrontendCapabilityDeclaration,
     known: &[ComponentCapability],
-) -> Vec<(ComponentCapability, CapabilityStatus)> {
-    let mut report: Vec<(ComponentCapability, CapabilityStatus)> = known
+) -> Vec<(ComponentCapability, CapabilityCoverageStatus)> {
+    let mut report: Vec<(ComponentCapability, CapabilityCoverageStatus)> = known
         .iter()
-        .map(|capability| (*capability, CapabilityStatus::Missing))
+        .map(|capability| (*capability, CapabilityCoverageStatus::Missing))
         .collect();
     for entry in &declaration.entries {
         match report
@@ -770,13 +801,13 @@ fn capability_report_over(
             .find(|(capability, _)| *capability == entry.capability)
         {
             Some((_, status)) => {
-                if status.is_explicit() || matches!(status, CapabilityStatus::Duplicated) {
-                    *status = CapabilityStatus::Duplicated;
+                if status.is_explicit() || matches!(status, CapabilityCoverageStatus::Duplicated) {
+                    *status = CapabilityCoverageStatus::Duplicated;
                 } else {
-                    *status = CapabilityStatus::Declared(entry.support);
+                    *status = CapabilityCoverageStatus::Declared(entry.support);
                 }
             }
-            None => report.push((entry.capability, CapabilityStatus::Unknown)),
+            None => report.push((entry.capability, CapabilityCoverageStatus::Unknown)),
         }
     }
     report

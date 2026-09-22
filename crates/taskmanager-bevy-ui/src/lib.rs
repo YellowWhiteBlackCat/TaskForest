@@ -61,6 +61,7 @@ pub mod capabilities;
 pub mod confirmation;
 pub mod demo_fixture;
 pub mod drain;
+pub mod feature_coverage;
 pub mod functional;
 pub mod icons;
 pub mod input;
@@ -77,6 +78,8 @@ mod window;
 #[cfg(test)]
 #[path = "../tests/headless/visual_parity.rs"]
 mod visual_parity_tests;
+
+pub use feature_coverage::feature_coverage_declaration;
 
 use std::process::ExitCode;
 

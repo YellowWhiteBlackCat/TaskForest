@@ -79,7 +79,7 @@ fn silent_omission_is_drift() {
         capability_drift(&report),
         vec![(
             *ComponentCapability::ALL.last().expect("non-empty ALL"),
-            CapabilityStatus::Missing
+            CapabilityCoverageStatus::Missing
         )]
     );
     assert_eq!(
@@ -102,7 +102,7 @@ fn duplicated_declaration_is_drift() {
     let drift = capability_drift(&capability_report(&declaration));
     assert_eq!(drift.len(), 1);
     assert_eq!(drift[0].0, first.capability);
-    assert_eq!(drift[0].1, CapabilityStatus::Duplicated);
+    assert_eq!(drift[0].1, CapabilityCoverageStatus::Duplicated);
     assert_eq!(
         capability_findings(&declaration),
         vec![CapabilityFinding {

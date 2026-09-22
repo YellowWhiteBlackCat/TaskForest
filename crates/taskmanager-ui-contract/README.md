@@ -36,5 +36,9 @@ src/functional.rs                CORE-04 registry: product intent × frontend su
 src/command.rs  keybindings.rs  navigation.rs  focus.rs  message.rs
                                  shared interaction vocabulary
 src/columns.rs  icon.rs  capabilities.rs   column, icon and capability contracts
+src/feature_coverage.rs          FeatureId/FeatureArea coverage registry and the
+│                                feature_coverage_findings gate: one explicit
+│                                declaration per frontend, proving declaration
+│                                discipline only, never behavioral equivalence
 src/accessibility/               neutral accessibility model and snapshots
 ```

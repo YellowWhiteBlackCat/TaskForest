@@ -18,10 +18,10 @@ fn bound_and_unbound_entries_carry_their_explicit_status() {
     assert_eq!(
         report,
         vec![
-            (CommandId::Refresh, CoverageStatus::Bound("F5")),
+            (CommandId::Refresh, BindingCoverageStatus::Bound("F5")),
             (
                 CommandId::ToggleSidebar,
-                CoverageStatus::DeliberatelyUnbound
+                BindingCoverageStatus::DeliberatelyUnbound
             ),
         ]
     );
@@ -38,13 +38,13 @@ fn a_known_command_absent_from_the_declaration_is_missing() {
     assert_eq!(
         report,
         vec![
-            (CommandId::Refresh, CoverageStatus::Bound("F5")),
-            (CommandId::Dismiss, CoverageStatus::Missing),
+            (CommandId::Refresh, BindingCoverageStatus::Bound("F5")),
+            (CommandId::Dismiss, BindingCoverageStatus::Missing),
         ]
     );
     assert_eq!(
         drift_findings(&report),
-        vec![(CommandId::Dismiss, CoverageStatus::Missing)]
+        vec![(CommandId::Dismiss, BindingCoverageStatus::Missing)]
     );
 }
 
@@ -61,7 +61,7 @@ fn declaring_one_command_twice_is_duplicated() {
     let report = coverage_report_over(&decl, &known);
     assert_eq!(
         report,
-        vec![(CommandId::Confirm, CoverageStatus::Duplicated)]
+        vec![(CommandId::Confirm, BindingCoverageStatus::Duplicated)]
     );
 }
 
@@ -79,13 +79,13 @@ fn a_declared_command_outside_the_known_set_is_reported_unknown() {
     assert_eq!(
         report,
         vec![
-            (CommandId::Refresh, CoverageStatus::Bound("F5")),
-            (CommandId::EndTask, CoverageStatus::Unknown),
+            (CommandId::Refresh, BindingCoverageStatus::Bound("F5")),
+            (CommandId::EndTask, BindingCoverageStatus::Unknown),
         ]
     );
     assert_eq!(
         drift_findings(&report),
-        vec![(CommandId::EndTask, CoverageStatus::Unknown)]
+        vec![(CommandId::EndTask, BindingCoverageStatus::Unknown)]
     );
 }
 
@@ -98,7 +98,7 @@ fn the_contract_report_lists_every_command_in_canonical_order() {
     assert!(
         report
             .iter()
-            .all(|(_, status)| *status == CoverageStatus::Missing),
+            .all(|(_, status)| *status == BindingCoverageStatus::Missing),
         "an empty declaration must expose every command as missing, not hide it"
     );
 }

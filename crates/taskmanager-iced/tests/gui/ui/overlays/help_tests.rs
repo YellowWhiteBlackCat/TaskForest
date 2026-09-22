@@ -1,6 +1,6 @@
 use super::*;
 use taskmanager_application::CommandId;
-use taskmanager_ui_contract::{CoverageStatus, coverage_report, drift_findings};
+use taskmanager_ui_contract::{BindingCoverageStatus, coverage_report, drift_findings};
 
 #[test]
 fn page_and_command_help_build_valid_rows() {
@@ -22,7 +22,7 @@ fn binding_declaration_binds_every_contract_command() {
     assert!(drift_findings(&report).is_empty(), "{report:?}");
     for (command, status) in report {
         assert!(
-            matches!(status, CoverageStatus::Bound(_)),
+            matches!(status, BindingCoverageStatus::Bound(_)),
             "{command:?}: {status:?} — Iced advertises the complete shared router"
         );
     }

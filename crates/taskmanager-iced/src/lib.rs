@@ -45,6 +45,7 @@ pub(crate) mod app_history_chart;
 pub mod capabilities;
 pub(crate) mod capture;
 pub mod export;
+pub mod feature_coverage;
 pub mod focus;
 pub(crate) mod font_catalog;
 pub mod functional;
@@ -65,6 +66,7 @@ pub mod ui;
 pub mod theme_binding;
 
 pub use app::{IcedApp, Message};
+pub use feature_coverage::feature_coverage_declaration;
 
 #[cfg(test)]
 #[path = "../tests/common/test_support.rs"]

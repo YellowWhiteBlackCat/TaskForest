@@ -1,5 +1,7 @@
 use taskmanager_application::CommandId;
-use taskmanager_ui_contract::{CoverageStatus, FrontendShape, coverage_report, drift_findings};
+use taskmanager_ui_contract::{
+    BindingCoverageStatus, FrontendShape, coverage_report, drift_findings,
+};
 
 #[test]
 fn binding_declaration_is_complete_for_bevy() {
@@ -14,6 +16,6 @@ fn binding_declaration_is_complete_for_bevy() {
             .iter()
             .find(|(command, _)| *command == CommandId::ToggleSidebar)
             .map(|(_, status)| *status),
-        Some(CoverageStatus::Bound("F9"))
+        Some(BindingCoverageStatus::Bound("F9"))
     );
 }

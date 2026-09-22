@@ -5,8 +5,8 @@ use bevy::scene::{ScenePlugin, WorldSceneExt};
 use bevy::text::Font;
 use taskmanager_theme::Theme;
 use taskmanager_ui_contract::{
-    CapabilityStatus, CapabilitySupport, ComponentCapability, FrontendShape, capability_findings,
-    capability_report,
+    CapabilityCoverageStatus, CapabilitySupport, ComponentCapability, FrontendShape,
+    capability_findings, capability_report,
 };
 
 use crate::palette::ui_palette;
@@ -34,12 +34,14 @@ fn capability_declaration_is_complete_and_has_no_reference_claim() {
     assert_eq!(report.len(), ComponentCapability::ALL.len());
     assert!(report.iter().all(|(_, status)| matches!(
         status,
-        CapabilityStatus::Declared(taskmanager_ui_contract::CapabilitySupport::Ported)
-            | CapabilityStatus::Declared(taskmanager_ui_contract::CapabilitySupport::Native { .. })
-            | CapabilityStatus::Declared(
+        CapabilityCoverageStatus::Declared(taskmanager_ui_contract::CapabilitySupport::Ported)
+            | CapabilityCoverageStatus::Declared(
+                taskmanager_ui_contract::CapabilitySupport::Native { .. }
+            )
+            | CapabilityCoverageStatus::Declared(
                 taskmanager_ui_contract::CapabilitySupport::Divergent { .. }
             )
-            | CapabilityStatus::Declared(
+            | CapabilityCoverageStatus::Declared(
                 taskmanager_ui_contract::CapabilitySupport::Unsupported { .. }
             )
     )));
