@@ -77,6 +77,12 @@ fn the_selected_service_renders_its_state_triplet() {
     app.selected = 0;
 
     let frame = frame_text(&app, WIDE_WIDTH, WIDE_HEIGHT);
+    // The inventory table carries both units' identities; the details column
+    // is attributed to the selected one.
+    assert!(
+        frame.contains("alpha.service") && frame.contains("beta.service"),
+        "the inventory table must paint each unit's identity:\n{frame}"
+    );
     assert!(frame.contains("Load state"), "the triplet labels paint");
     assert!(frame.contains("loaded"), "load_state paints from the row");
     assert!(
@@ -130,6 +136,36 @@ fn a_resolved_dependency_capture_paints_its_relation_targets() {
     assert!(
         dashes >= 2,
         "untargeted relation rows keep dashes, got {dashes}"
+    );
+
+    // The definition's ordering-cycle clause: a typed `Before` cycle between
+    // the inventory's units is marked in the painted status cell through the
+    // shared cycle fold, never rendered as a normal unit.
+    let cyclic = |id: &str, other: &str| {
+        service(id, "loaded", "active", "running").with_relations(
+            taskmanager_core::core::services::ServiceRelationGraph::from_edges([
+                taskmanager_core::core::services::ServiceRelationEdge::new(
+                    ServiceRelationKind::Before,
+                    other,
+                ),
+            ]),
+        )
+    };
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut app.shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::Services(Some(vec![
+            cyclic("cycle-a.service", "cycle-b.service"),
+            cyclic("cycle-b.service", "cycle-a.service"),
+        ])),
+    );
+    app.selected = 0;
+    let cyclic_frame = frame_text(&app, WIDE_WIDTH, WIDE_HEIGHT);
+    // The status column is a fixed 12-cell slot, so the painted marker reads
+    // `Active · Cyc…`; the suffix is unique to the cycle fold (no other
+    // producer appends it), which is what the assertion pins.
+    assert!(
+        cyclic_frame.contains("Active · Cyc"),
+        "an ordering-cycle member must carry the shared cycle marker in its painted status cell:\n{cyclic_frame}"
     );
 }
 

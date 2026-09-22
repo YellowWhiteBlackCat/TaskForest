@@ -571,8 +571,8 @@ fn threads_section<'a>(
                 )
             } else {
                 let mut rows = vec![thread_header(theme_snapshot)];
-                for thread in threads.threads.iter().take(MAX_FACET_ROWS) {
-                    rows.push(thread_row(thread));
+                for vm in thread_rows_vm(&threads.threads, MAX_FACET_ROWS) {
+                    rows.push(thread_row(vm));
                 }
                 if threads.threads.len() > MAX_FACET_ROWS {
                     rows.push(muted_text(
@@ -628,12 +628,8 @@ fn open_files_section<'a>(
                 )
             } else {
                 let mut rows = Vec::new();
-                for entry in open_files.entries.iter().take(MAX_FACET_ROWS) {
-                    rows.push(
-                        text(format_open_file_row(entry))
-                            .size(f32::from(tokens::FONT_12))
-                            .into(),
-                    );
+                for line in open_file_rows(&open_files.entries, MAX_FACET_ROWS) {
+                    rows.push(text(line).size(f32::from(tokens::FONT_12)).into());
                 }
                 if open_files.entries.len() > MAX_FACET_ROWS {
                     rows.push(muted_text(

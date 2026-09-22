@@ -397,6 +397,12 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
         disk.fs_type = "btrfs".into();
         disk.smart_temp_critical_c = Some(70.0);
         disk.smart_power_on_hours = Some(8800);
+        // The remaining SMART evidence families the disk definition names:
+        // available spare (with its observed warning threshold) and the
+        // unsafe-shutdown counter.
+        disk.smart_available_spare_pct = Some(4.0);
+        disk.smart_available_spare_threshold_pct = Some(10.0);
+        disk.smart_unsafe_shutdowns = Some(12);
         // One mounted partition child, built through Default + public fields so
         // the test never names the (non-re-exported) DiskPartition type.
         disk.partitions.push(Default::default());
@@ -428,6 +434,14 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
         "SMART temperature with critical must render"
     );
     assert!(text.contains("5.0%"), "SMART endurance used must render");
+    assert!(
+        text.contains("Available spare 4% ⚠ (≤10%)"),
+        "available spare must render at its observed warning threshold: {text}"
+    );
+    assert!(
+        text.contains("Unsafe shutdowns 12"),
+        "the unsafe-shutdown counter must render: {text}"
+    );
     // Partition space is panel-only: name + capacity + free.
     assert!(text.contains("nvme0n1p1"), "partition name must render");
     assert!(text.contains("500.0 GiB"), "partition capacity must render");
@@ -489,6 +503,34 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
     assert!(
         !cold.contains("Avg queue") && !cold.contains("Service estimate"),
         "an unobserved queue/service pair must omit the row, never fabricate zeros:\n{cold}"
+    );
+
+    // Availability-only provider: the section keeps the typed status verdict
+    // when no concrete SMART readout arrived, and never grows a fabricated
+    // endurance/spare/temperature row.
+    let mut availability_only = crate::demo_app();
+    availability_only.perf_device = crate::PerfDevice::Disk;
+    taskmanager_shell::fixture::edit_snapshot(&mut availability_only.shell, |snapshot| {
+        let disk = snapshot
+            .as_mut()
+            .and_then(|snapshot| snapshot.disks.first_mut())
+            .expect("demo app should carry one disk");
+        disk.smart_availability = taskmanager_core::core::metrics::SmartAvailability::Available;
+    });
+    let status_only = frame_text(&availability_only, 140, 48);
+    assert!(
+        status_only.contains("SMART status Healthy"),
+        "a reported-available provider must surface its typed status verdict:\n{status_only}"
+    );
+    for absent in ["Available spare", "Unsafe shutdowns"] {
+        assert!(
+            !status_only.contains(absent),
+            "an availability-only provider must not invent a fabricated {absent:?} row:\n{status_only}"
+        );
+    }
+    assert!(
+        !status_only.contains("Endurance used 0") && !status_only.contains("Endurance used 5"),
+        "an availability-only provider must not invent an endurance percentage:\n{status_only}"
     );
 }
 
@@ -640,6 +682,14 @@ fn battery_detail_section_renders_capacity_status_rate_and_voltage() {
         ),
         power_w: taskmanager_core::core::metrics::ScalarObservation::available(9.5, 1_000),
         cycle_count: taskmanager_core::core::metrics::ScalarObservation::available(318, 1_000),
+        energy_full_uwh: taskmanager_core::core::metrics::ScalarObservation::available(
+            49_000_000.0,
+            1_000,
+        ),
+        energy_full_design_uwh: taskmanager_core::core::metrics::ScalarObservation::available(
+            56_000_000.0,
+            1_000,
+        ),
         ..Default::default()
     });
     let mut cold = BatteryInfo::default();
@@ -669,6 +719,12 @@ fn battery_detail_section_renders_capacity_status_rate_and_voltage() {
         "manufacturer descriptor must render"
     );
     assert!(text.contains("318"), "cycle count must render");
+    // The degradation-health family: the shared energy_full/design ratio rule
+    // must reach its own row, formatted as a percentage.
+    assert!(
+        text.contains("Health 87.5%"),
+        "the battery health readout must render its derived percentage: {text}"
+    );
     // The cold battery's unknown capacity is an honest dash, never 0%. The
     // only literal "0%" in the renderer is the Cpu/Memory history y-axis,
     // which the Battery tab does not draw, so its absence is meaningful.

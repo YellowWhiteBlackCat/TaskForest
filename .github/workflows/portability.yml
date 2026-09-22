@@ -68,6 +68,20 @@ jobs:
       # Reduced debug builds remain useful for fallback tests; releases reject
       # them and always use the default hardware-all profile.
       - run: cargo check --locked -p taskmanager-gpui --lib --no-default-features
+      # macOS product-config parity for the three non-GPUI products. Until this
+      # step, iced/tui/bevy were compiled on macOS only through test/clippy
+      # layers that carry the dev-only `test-support` wiring, so `cfg` code
+      # reachable only in their product configurations stayed invisible here —
+      # the same blind-spot class as the 2026-09-22 incident. Reuse the shared
+      # helper script instead of copying three commands so these product
+      # configurations cannot drift from the Linux lint job and the local
+      # standard gate. macOS runner images ship no GNU `timeout`/`gtimeout`,
+      # so the script prints "no external timeout available" and runs each
+      # command unbounded; this job's `timeout-minutes: 120` stays the outer
+      # bound. `gpui` is omitted on purpose: the two steps above already
+      # compile its production bin and its no-default-features lib.
+      - name: Check Iced, TUI, and Bevy product configs on macOS
+        run: bash scripts/quality/production-config-check.sh iced tui bevy
       # Structural lint parity with the Linux clippy job (ci.yml) and the local
       # standard gate (scripts/quality/local-gates.sh): both `-W` lints are
       # allow-by-default (restriction / pedantic), so `-D warnings` alone never
@@ -125,13 +139,22 @@ jobs:
       # boundary-crate edges are target-gated since 2026-08-18.
       - run: cargo nextest run --locked --workspace --lib --exclude taskmanager-platform-linux --exclude taskmanager-platform-macos --profile ci -j 4
       # Every frontend is a separate product crate (ADR-051). The default
-      # workspace build covers the GPUI product, so compile the Iced and TUI
-      # products explicitly; otherwise a Windows-only dependency or cfg
+      # workspace build covers the GPUI product, so compile the Iced, TUI, and
+      # Bevy products explicitly; otherwise a Windows-only dependency or cfg
       # regression can remain invisible while the native GPUI job stays green.
       - name: Check Iced frontend on Windows
         run: cargo check --locked -p taskmanager-iced -j 4
       - name: Check TUI frontend on Windows
         run: cargo check --locked -p taskmanager-tui -j 4
+      # Bevy is the fourth shipped product (`packaging.yml` builds
+      # `taskforest-b.exe` into the MSI) and the only frontend with no native
+      # Windows compile on the PR/main path; keep it warning-clean in product
+      # configuration like the Iced and TUI checks above. No `test-support`
+      # here and none needed: the workflow-level RUSTFLAGS already carry
+      # `-D warnings`, so this matches the two checks above in shape and
+      # shares their check-artifact cache.
+      - name: Check Bevy frontend on Windows
+        run: cargo check --locked -p taskmanager-bevy-ui -j 4
       # Reduced debug builds remain useful for fallback tests; releases reject
       # them and always use the default hardware-all profile.
       - run: cargo check --locked -p taskmanager-gpui --lib --no-default-features -j 4

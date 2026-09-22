@@ -88,29 +88,35 @@ pub(in crate::gpui_app::process_insights::view) fn open_files_card(
             .child(header),
     );
     let (shown, hidden) = super::capped_card_rows(open_files.entries.len());
-    content = content.child(
-        div()
-            .flex()
-            .flex_col()
-            .gap(taskmanager_ui::theme_binding::definite_length(
-                tokens::SPACE_3,
-            ))
-            .children(
-                open_files
-                    .entries
-                    .iter()
-                    .take(shown)
-                    .map(|entry| format_open_file(entry, labels.unreadable))
-                    .map(|line| {
-                        div()
+    content =
+        content.child(
+            div()
+                .flex()
+                .flex_col()
+                .gap(taskmanager_ui::theme_binding::definite_length(
+                    tokens::SPACE_3,
+                ))
+                .children(open_files.entries.iter().take(shown).enumerate().map(
+                    |(index, entry)| {
+                        // The selector token comes from the same typed
+                        // predicate `format_open_file` renders, so a render
+                        // test can prove this row's own typed unreadable
+                        // branch reached the painted row.
+                        let token = if entry.target.is_none() {
+                            "unreadable"
+                        } else {
+                            "readable"
+                        };
+                        let row = div()
                             .min_w(px(0.0))
                             .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
                             .font(mono_font_with_fallback(theme))
                             .whitespace_normal()
-                            .child(line)
-                    }),
-            ),
-    );
+                            .child(format_open_file(entry, labels.unreadable));
+                        super::insight_row(row, "open-file", index, token)
+                    },
+                )),
+        );
     if hidden > 0 {
         content = content.child(crate::gpui_app::elements::more_rows_hint(theme, hidden));
     }

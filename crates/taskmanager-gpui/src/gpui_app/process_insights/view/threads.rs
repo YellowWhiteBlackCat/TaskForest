@@ -146,14 +146,27 @@ pub(in crate::gpui_app::process_insights::view) fn threads_card(
                     .threads
                     .iter()
                     .take(shown)
-                    .map(format_thread)
-                    .map(|line| {
-                        div()
+                    .enumerate()
+                    .map(|(index, thread)| {
+                        // The selector token comes from the same typed
+                        // predicate `format_thread` renders for its CPU
+                        // columns, so a render test can prove a thread whose
+                        // counters were not parsed reached the painted row as
+                        // a typed gap (the dash itself is locked by
+                        // `format_keeps_missing_cpu_time_honest`).
+                        let token =
+                            if thread.cpu_time_secs.is_none() || thread.cpu_percent.is_none() {
+                                "cpu-gap"
+                            } else {
+                                "cpu-measured"
+                            };
+                        let row = div()
                             .min_w(px(0.0))
                             .text_size(taskmanager_ui::theme_binding::font_size(tokens::FONT_10))
                             .font(mono_font_with_fallback(theme))
                             .whitespace_normal()
-                            .child(line)
+                            .child(format_thread(thread));
+                        super::insight_row(row, "thread", index, token)
                     }),
             ),
     );

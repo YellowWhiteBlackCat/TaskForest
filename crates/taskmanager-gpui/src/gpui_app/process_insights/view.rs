@@ -1,6 +1,8 @@
 //! Responsive render-only Process Properties insights and capture fixture.
 
 use super::{ProcessInsightsErrorKind, ProcessInsightsRenderState};
+#[cfg(any(test, feature = "test-support"))]
+use gpui::InteractiveElement;
 use gpui::{Div, ParentElement, Styled, div, px};
 
 use taskmanager_application::{ProjectedProcessResources, project_process_resources};
@@ -40,6 +42,30 @@ pub(super) const MAX_INSIGHT_CARD_ROWS: usize = 200;
 pub(super) fn capped_card_rows(total: usize) -> (usize, usize) {
     let shown = total.min(MAX_INSIGHT_CARD_ROWS);
     (shown, total - shown)
+}
+
+/// Attach the test-support row selector to one insight-card row.
+///
+/// GPUI's test harness exposes geometry per debug selector and no text
+/// readback, so a render test can only prove that a row was painted — and
+/// which typed token it carried — through these selectors. `kind` names the
+/// card, `index` the row's projection position, and `token` the typed state
+/// the row's own format branch renders (`readable`/`unreadable`, `cpu-gap`/
+/// `cpu-measured`, …), mirroring the services status-cell selector. The
+/// product build compiles the identity arm, so this costs nothing at runtime.
+#[cfg(any(test, feature = "test-support"))]
+pub(super) fn insight_row(row: Div, kind: &'static str, index: usize, token: &'static str) -> Div {
+    row.debug_selector(move || format!("tm-insight-{kind}:{index}:{token}"))
+}
+
+#[cfg(not(any(test, feature = "test-support")))]
+pub(super) fn insight_row(
+    row: Div,
+    _kind: &'static str,
+    _index: usize,
+    _token: &'static str,
+) -> Div {
+    row
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]

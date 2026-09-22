@@ -170,6 +170,41 @@ fn service_control_select_request_confirm_round_trip_reaches_the_port() {
     assert_ne!(requests[0].request_id.get(), 0);
     drop(requests);
     assert!(app.shell.feedback_text().contains("queued"));
+
+    // The definition's whole verb set (start/stop/restart plus enable/disable)
+    // is offered against the selected unit: every verb must arm the shared
+    // gate for that unit and cross it to the provider on confirm.
+    for action in [
+        ServiceAction::Start,
+        ServiceAction::Stop,
+        ServiceAction::Restart,
+        ServiceAction::Enable,
+        ServiceAction::Disable,
+    ] {
+        let _ = app.update(Message::RequestServiceAction { index: 4, action });
+        assert_eq!(
+            app.shell
+                .pending_service_control()
+                .map(|target| (target.service_id.as_str(), target.action)),
+            Some(("fixture.service:demo-failed.service", action)),
+            "the {action:?} verb must arm the shared gate against the selected unit"
+        );
+        let before = recorded.0.lock().unwrap().len();
+        let _ = app.update(Message::ConfirmServiceControl);
+        let requests = recorded.0.lock().unwrap();
+        assert_eq!(
+            requests.len(),
+            before + 1,
+            "confirm must submit exactly once"
+        );
+        let submitted = requests.last().expect("just pushed request");
+        assert_eq!(submitted.action, action);
+        assert_eq!(
+            submitted.service_id.as_str(),
+            "fixture.service:demo-failed.service"
+        );
+        assert_ne!(submitted.request_id.get(), 0);
+    }
 }
 
 #[test]

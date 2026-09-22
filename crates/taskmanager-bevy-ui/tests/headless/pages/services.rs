@@ -808,4 +808,31 @@ fn service_control_buttons_arm_service_actions() {
             .map(|s| (s.service_id.as_str(), s.action)),
         Some(("svc-a", ServiceAction::Restart))
     );
+
+    // The definition also names enable/disable. Those two verbs live in the
+    // production action menu (the toolbar carries start/stop/restart); each
+    // committed pick must arm the same shared gate against the frozen unit.
+    use super::menu::{MENU_ACTIONS, ServiceMenuCtx};
+    use crate::menu_modal::ActionMenuContext;
+    let menu_ctx = ServiceMenuCtx(service_item("svc-a", "alpha", ServiceStatus::Active));
+    for action in [ServiceAction::Enable, ServiceAction::Disable] {
+        let pick = MENU_ACTIONS
+            .iter()
+            .position(|candidate| *candidate == action)
+            .expect("the shared services menu lists every lifecycle verb");
+        let mut track = app.world_mut().non_send_mut::<FrontendTrack>();
+        let effects = menu_ctx.commit(pick, &mut track.shell);
+        assert!(
+            effects.is_empty(),
+            "an inventory menu verb only arms the shared gate"
+        );
+        assert_eq!(
+            track
+                .shell
+                .pending_service_control()
+                .map(|s| (s.service_id.as_str(), s.action)),
+            Some(("svc-a", action)),
+            "the {action:?} menu pick must target the frozen unit"
+        );
+    }
 }

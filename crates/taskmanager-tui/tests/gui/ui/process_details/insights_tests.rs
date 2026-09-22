@@ -253,6 +253,14 @@ fn thread_preview_renders_header_rows_and_ellipsis() {
     // First three rows render with their tid + state label.
     assert!(text.contains("100") && text.contains("main") && text.contains("2.0s"));
     assert!(text.contains("102") && text.contains("extra-1"));
+    // A thread whose `stat` lacked parseable CPU counters keeps its own row
+    // with the explicit dash in both CPU columns — never a fabricated
+    // `0.0s` / `0.0%`.
+    let dash = taskmanager_shell::presentation::missing_value();
+    assert!(
+        text.contains(&format!("101  worker  S  {dash}  {dash}")),
+        "a thread without parsed CPU counters must render both dashes:\n{text}"
+    );
     // The fourth thread is beyond the preview bound: only the ellipsis shows.
     assert!(text.contains('…'));
     assert!(
