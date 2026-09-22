@@ -6,6 +6,8 @@
 //! the shared guard.
 
 use taskmanager_core::core::device_state::DeviceState;
+use taskmanager_core::core::failure::FailureKind;
+use taskmanager_core::core::metrics::ScalarObservation;
 use taskmanager_core::core::power::{BatteryInfo, PowerSupplySnapshot};
 use taskmanager_core::core::sensors::{
     SensorCenterSnapshot, SensorDescriptor, SensorMagnitude, SensorMeasurementObservation,
@@ -35,6 +37,29 @@ fn seed_measured_memory(app: &mut crate::TuiApp) {
         .commit_limit_bytes(16 * GIB)
         .current_used_rate_mib_per_sec(128.5)
         .buffers_bytes(512 * MIB)
+        .build();
+    taskmanager_shell::fixture::seed_projection_fact(
+        &mut app.shell,
+        taskmanager_shell::fixture::ProjectionSeedFact::Snapshot(Box::new(Some(snapshot))),
+    );
+}
+
+/// Install the two canonical swap-throughput rate observations onto the demo
+/// memory. Both rates ride the same `MemoryScalarObservations` group the Linux
+/// provider fills from the kernel's cumulative `pswpin`/`pswpout` counters
+/// (`platform-linux/src/engine/collector/compute.rs`), so the painted rows
+/// resolve through the shared typed accessors — never through a private copy.
+fn seed_swap_throughput_rates(
+    app: &mut crate::TuiApp,
+    swap_in_bytes_per_sec: ScalarObservation<u64>,
+    swap_out_bytes_per_sec: ScalarObservation<u64>,
+) {
+    let mut snapshot = app.projection().snapshot.clone().expect("demo snapshot");
+    let mut scalars = *snapshot.memory.scalar_observations();
+    scalars.swap_in_bytes_per_sec = swap_in_bytes_per_sec;
+    scalars.swap_out_bytes_per_sec = swap_out_bytes_per_sec;
+    snapshot.memory = MemoryMetricsFixtureBuilder::from_item(snapshot.memory.clone())
+        .scalar_observations(scalars)
         .build();
     taskmanager_shell::fixture::seed_projection_fact(
         &mut app.shell,
@@ -91,6 +116,8 @@ fn memory_stats_rows_render_honest_dashes_when_unavailable() {
         "Slots —",
         "Committed —",
         "Usage rate —",
+        "Swap in —",
+        "Swap out —",
     ] {
         assert!(
             text.contains(dashed),
@@ -139,6 +166,56 @@ fn memory_usage_rate_is_signed_and_noise_gated() {
         still.contains("Usage rate —"),
         "a sub-noise rate must dash instead of printing +0:\n{still}"
     );
+}
+
+/// `storage.swap-throughput`: the memory surface paints the two system
+/// swap-throughput rates under their own labels from the canonical memory
+/// scalar group, and a rate the host never observed (or failed to read) keeps
+/// its labelled shared dash — never a fabricated `0 B/s`.
+#[test]
+fn memory_stats_rows_render_the_observed_swap_throughput_rates() {
+    let mut app = crate::demo_app();
+    app.perf_device = crate::PerfDevice::Memory;
+    seed_swap_throughput_rates(
+        &mut app,
+        ScalarObservation::available(2 * MIB, 1_785_292_800_000),
+        ScalarObservation::available(512 * 1024, 1_785_292_800_000),
+    );
+
+    let text = frame_text(&app, WIDE.0, WIDE.1);
+
+    for expected in ["Swap in 2.0 MiB/s", "Swap out 512.0 KiB/s"] {
+        assert!(
+            text.contains(expected),
+            "the observed swap-throughput row must render {expected:?}:\n{text}"
+        );
+    }
+
+    // An unavailable rate observation (a first sample has no delta to divide,
+    // and a failed read keeps the typed failure) stays a dash on its own
+    // labelled row: the frame must not fabricate `0 B/s` for either direction.
+    let mut unreadable = crate::demo_app();
+    unreadable.perf_device = crate::PerfDevice::Memory;
+    seed_swap_throughput_rates(
+        &mut unreadable,
+        ScalarObservation::unavailable(FailureKind::TimedOut),
+        ScalarObservation::unavailable(FailureKind::TimedOut),
+    );
+
+    let unreadable_text = frame_text(&unreadable, WIDE.0, WIDE.1);
+    for dashed in ["Swap in —", "Swap out —"] {
+        assert!(
+            unreadable_text.contains(dashed),
+            "an unobserved swap rate must keep its labelled dash: {dashed:?}:\n{unreadable_text}"
+        );
+    }
+    for fabricated in ["Swap in 0 B", "Swap out 0 B"] {
+        assert!(
+            !unreadable_text.contains(fabricated),
+            "an unobserved swap rate must never print a fabricated zero: {fabricated:?}:\n\
+             {unreadable_text}"
+        );
+    }
 }
 
 /// §2.6 B-3: the strip carries the live caption fields per resource class —
