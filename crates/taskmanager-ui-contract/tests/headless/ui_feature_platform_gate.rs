@@ -633,7 +633,11 @@ fn the_committed_feature_evidence_table_is_structurally_clean() {
 /// by its own source label, an unread channel kept as the shared dash). The
 /// per-frontend anchored counts and the surveyed pending gaps are pinned, so
 /// growing either batch - or recording a new near-miss as `pending` again -
-/// must move this pin in the same change.
+/// must move this pin in the same change. The W23-A batch narrowed
+/// `memory.breakdown-rss-pss` to its real facets (resident/proportional/
+/// private/derived-shared), re-pointed the GPUI cell to the in-crate details
+/// dialog fold that proves the complete narrowed definition, and anchored the
+/// previously unanchored Bevy cell on the same details-overview fold.
 #[test]
 fn the_first_anchor_batch_is_a_conscious_census() {
     let table = PLATFORM_GATE_POLICY.feature_evidence();
@@ -654,14 +658,14 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        66,
+        67,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
         (FrontendShape::Gpui, 15usize),
         (FrontendShape::Iced, 17),
         (FrontendShape::Tui, 19),
-        (FrontendShape::Bevy, 15),
+        (FrontendShape::Bevy, 16),
     ] {
         assert_eq!(
             table

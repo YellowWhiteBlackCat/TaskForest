@@ -184,6 +184,21 @@
 # is `Present` on the platform axis, so this table documents evidence and
 # never forces a `Ready` cell; a future surveyed near-miss must again be
 # committed as an explicit `pending` row.
+# W23-A batch (2026-09-23): the `memory.breakdown-rss-pss` sweep.
+# The P1 definition was narrowed to the facets the shared projection really
+# delivers (resident RSS, proportional PSS, private/unique USS, and the
+# derived-shared `RSS - USS` share); the virtual address-space size is
+# explicitly OUTSIDE it (no `VmSize` observation exists) and the per-process
+# swap charge stays a separate fact.  The application VM gained
+# `ProcessDetailsField::Shared` and all four details surfaces now paint it, so
+# every anchor proves the complete narrowed definition: the GPUI row was
+# re-pointed from the gates-package table projection to the in-crate details
+# dialog fold (`gpui_app::root::chrome::tests`), which proves the resident
+# performance current plus the PSS/USS/derived-shared overview rows and the
+# honest dash when the private facet is unobserved; the Iced and TUI anchors
+# gained the same derived-shared value and cold-dash clauses; and the Bevy
+# cell (previously surveyed but unanchored) gained its first anchor on the
+# details-overview fold, taking the table to 67 anchored rows (bevy 16).
 feature_id	frontend	test_id	status	note
 handles.enumeration	gpui	gpui_app::process_insights::view::open_files::tests::populated_open_files_render_with_unreadable_marker	anchored	-
 handles.enumeration	iced	ui::insights::tests::open_file_row_marks_an_unreadable_target_not_blank	anchored	-
@@ -204,9 +219,10 @@ services.dependency-dag	bevy	pages::services::service_dependencies_tests::depend
 gpu.engine-utilization	gpui	gpui_app::perf_views::gpu_engines_panel::tests::mc04_gpu_panel_case_ready_session_renders_only_the_matching_session_payload	anchored	-
 gpu.engine-utilization	iced	ui::perf_devices::tests::gpu_chart_layout_keeps_all_engines_standard_and_only_aggregate_compact	anchored	-
 gpu.engine-utilization	tui	ui::perf_gpu::tests::standard_engine_projection_includes_live_and_pmu_rows	anchored	-
-memory.breakdown-rss-pss	gpui	processes_view_test::memory_projection_prefers_current_pss_and_falls_back_to_typed_rss	anchored	-
+memory.breakdown-rss-pss	gpui	gpui_app::root::chrome::tests::memory_breakdown_rows_render_every_narrowed_facet	anchored	-
 memory.breakdown-rss-pss	iced	ui::tests::pages::apps_resource_projection_preserves_typed_pss_swap_and_measured_zero	anchored	-
 memory.breakdown-rss-pss	tui	ui::tests::process_render::apps_table_projects_typed_pss_and_swap_without_zero_fallbacks	anchored	-
+memory.breakdown-rss-pss	bevy	pages::processes::details::tests::memory_breakdown_rows_render_every_narrowed_facet	anchored	-
 storage.device-topology	iced	ui::tests::devices::disk_summary_projects_real_rates_active_time_smart_and_partition_space	anchored	-
 storage.device-topology	tui	ui::tests::device_render::disk_detail_section_renders_rates_smart_and_partition_space	anchored	-
 services.inventory	iced	ui::tests::pages::service_projection_preserves_fixture_rows_and_typed_status	anchored	-

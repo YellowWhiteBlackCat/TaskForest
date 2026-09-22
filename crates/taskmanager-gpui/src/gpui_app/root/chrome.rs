@@ -395,7 +395,7 @@ fn vm_display(rows: &[ProcessDetailsRowVm], field: ProcessDetailsField) -> Strin
 
 /// The Overview section's field order (label keys + VM fields) — the single
 /// list `details_overview` renders.
-const OVERVIEW_FIELDS: [(ProcessDetailsField, &str); 15] = [
+const OVERVIEW_FIELDS: [(ProcessDetailsField, &str); 16] = [
     (ProcessDetailsField::Name, "common.name"),
     (ProcessDetailsField::Pid, "proc.pid"),
     (ProcessDetailsField::ParentPid, "prop.parent_pid"),
@@ -404,6 +404,7 @@ const OVERVIEW_FIELDS: [(ProcessDetailsField, &str); 15] = [
     (ProcessDetailsField::Threads, "common.threads"),
     (ProcessDetailsField::Pss, "proc.pss"),
     (ProcessDetailsField::Uss, "proc.uss"),
+    (ProcessDetailsField::Shared, "proc.shared"),
     (ProcessDetailsField::AnonHugePages, "proc.anon_huge_pages"),
     (ProcessDetailsField::SchedPolicy, "proc.sched_policy"),
     (ProcessDetailsField::OomScore, "proc.oom_score"),

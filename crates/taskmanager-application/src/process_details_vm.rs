@@ -27,6 +27,8 @@
 //! | `Cpu`            | combined  | performance current | performance current | overview + performance caption |
 //! | `Memory`         | combined  | performance current | performance current | overview + performance caption |
 //! | `Pss`            | combined  | —         | —           | —            |
+//! | `Uss`            | combined  | —         | overview    | overview     |
+//! | `Shared`         | combined  | —         | overview    | overview     |
 //! | `Swap`           | combined  | —         | —           | —            |
 //! | `Threads`        | combined  | overview  | overview    | overview     |
 //! | `Fds`            | combined  | —         | —           | overview     |
@@ -48,7 +50,8 @@
 //!
 //! * Byte quantities go through the neutral
 //!   [`taskmanager_core::core::units`] ladder with the
-//!   caller's `core::units::UnitPreferences`: memory family for `Memory`/`Pss`/`Swap`,
+//!   caller's `core::units::UnitPreferences`: memory family for
+//!   `Memory`/`Pss`/`Uss`/`Shared`/`Swap`,
 //!   drive family for the four disk fields (rates append `/s`). With the
 //!   Mission-Center-parity default (bytes, base-2) this matches the
 //!   historical TUI/Iced spelling byte-for-byte and converges the GPUI
@@ -137,6 +140,12 @@ pub enum ProcessDetailsField {
     Pss,
     /// Unique set size (private unshared physical memory).
     Uss,
+    /// Derived shared physical memory (`RSS - USS`): the resident pages this
+    /// process does not hold privately. The derivation is owned by
+    /// [`taskmanager_core::core::process::ProcessItem::current_memory_shared_bytes`],
+    /// so it keeps the shared honest-absence semantics when either RSS or USS
+    /// was not observed.
+    Shared,
     /// Anonymous transparent huge-page charge.
     AnonHugePages,
     /// Swap charged to the process. TUI panel (combined) only.
@@ -178,7 +187,7 @@ pub enum ProcessDetailsField {
 impl ProcessDetailsField {
     /// Every field in the canonical row order — the single variant list
     /// ([`process_details_rows`] emits exactly this sequence).
-    pub const ALL: [Self; 27] = [
+    pub const ALL: [Self; 28] = [
         Self::Name,
         Self::Pid,
         Self::ParentPid,
@@ -188,6 +197,7 @@ impl ProcessDetailsField {
         Self::Memory,
         Self::Pss,
         Self::Uss,
+        Self::Shared,
         Self::AnonHugePages,
         Self::Swap,
         Self::Threads,
@@ -222,6 +232,7 @@ impl ProcessDetailsField {
             Self::Memory => "memory",
             Self::Pss => "pss",
             Self::Uss => "uss",
+            Self::Shared => "shared",
             Self::AnonHugePages => "anon_huge_pages",
             Self::Swap => "swap",
             Self::Threads => "threads",
@@ -345,6 +356,13 @@ pub fn process_details_rows_with_local_time(
             field: ProcessDetailsField::Uss,
             value: text(
                 item.current_memory_uss_bytes()
+                    .map(|bytes| format_memory(bytes, units)),
+            ),
+        },
+        ProcessDetailsRowVm {
+            field: ProcessDetailsField::Shared,
+            value: text(
+                item.current_memory_shared_bytes()
                     .map(|bytes| format_memory(bytes, units)),
             ),
         },

@@ -112,7 +112,7 @@ fn observed_fault_and_huge_page_counters_reach_the_rendered_rows() {
 #[test]
 fn property_pairs_mirror_the_neutral_vm() {
     let pairs = property_pairs(&fixture(), &local_time_rules());
-    assert_eq!(pairs.len(), 24);
+    assert_eq!(pairs.len(), 25);
     let value = |field: ProcessDetailsField| {
         pairs
             .iter()
@@ -126,6 +126,7 @@ fn property_pairs_mirror_the_neutral_vm() {
         ProcessDetailsField::Memory,
         ProcessDetailsField::Pss,
         ProcessDetailsField::Uss,
+        ProcessDetailsField::Shared,
         ProcessDetailsField::AnonHugePages,
         ProcessDetailsField::Threads,
         ProcessDetailsField::NetworkRate,
@@ -157,6 +158,12 @@ fn property_pairs_mirror_the_neutral_vm() {
     // The private (USS) facet is a real observation in this fixture: the row
     // carries its value, not a placeholder that would pass a mirror check.
     assert_eq!(value(ProcessDetailsField::Uss), Some("32.0 MiB".to_owned()));
+    // The derived-shared facet is the same family's `RSS - USS`:
+    // 100.0 MiB - 32.0 MiB.
+    assert_eq!(
+        value(ProcessDetailsField::Shared),
+        Some("68.0 MiB".to_owned())
+    );
     assert_eq!(
         value(ProcessDetailsField::StartTime),
         Some("2020-09-13 12:26:40".to_owned())
@@ -198,6 +205,6 @@ fn overview_exactly_the_property_rows_minus_command_and_exe() {
         .map(|(f, _, _)| *f)
         .filter(|f| !matches!(f, ProcessDetailsField::Cmdline | ProcessDetailsField::Exe))
         .collect();
-    assert_eq!(overview.len(), 22);
+    assert_eq!(overview.len(), 23);
     assert_eq!(overview.first(), Some(&ProcessDetailsField::Name));
 }

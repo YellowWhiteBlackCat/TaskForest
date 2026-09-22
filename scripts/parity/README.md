@@ -12,6 +12,29 @@ against real test discovery.
   data source the Rust gate's evidence closure reads through
   `include_str!`, so a `Ready` cell can no longer be claimed from the static
   source commitment alone.
+- `feature_evidence_co_anchors.tsv` — the sparse optional column of the table
+  above (W23-B). One row per extra hand-declared test that proves a named
+  clause of an already-anchored `(feature_id, frontend)` cell when the primary
+  anchor test does not drive that clause's production surface (the registered
+  cases are the iced and bevy ordering-cycle clauses). The primary `test_id`
+  keeps its meaning and stays the single anchor authority; every `co_test_id`
+  is resolved against the owning frontend's discovery exactly like a primary
+  anchor, and the table can never make a cell `Ready` (the Rust G2 closure
+  reads `feature_evidence.tsv` alone). It is a side table rather than a sixth
+  column because the Rust consumer
+  (`crates/taskmanager-ui-contract/src/feature_coverage/platform_gate/evidence.rs`)
+  embeds `feature_evidence.tsv` with exactly five columns, so appending one is
+  a hard schema cutover that must change `crates/**` in the same commit; until
+  that window the column is materialized sparsely here, keyed by the cell it
+  extends.
+- `accept-frontend-interactions.sh` / `accept_frontend_interactions.py` — the
+  unified S5 driver. Since W23-B the `gpui-interactions` and
+  `bevy-interactions` stages of `scripts/quality/local-gates.sh` run it; per
+  selected frontend it records the frontend-scoped source fingerprint, invokes
+  the legacy `scripts/accept-<frontend>-interactions.sh` gate unchanged (still
+  the authoritative per-frontend runner and receipt writer), folds the fresh
+  receipts into one run segment, re-runs this resolver over the same discovery,
+  and verifies the aggregate cross-frontend run manifest.
 - `cross_frontend_matrix.tsv` — the unified interaction matrix (S4 + W10-B). It
   carries the per-frontend interaction matrices as one list with a `frontend`
   dimension, including the **TUI rows that never had a per-frontend matrix**
@@ -24,9 +47,11 @@ against real test discovery.
   `behavior` anchors with `cargo nextest list` output and fails on dangling
   anchors (R4) or target/frontend mismatches (R6). With `--interaction-matrix`
   it consumes the unified matrix as a second declaration source, including
-  `pending` rows, and with `--feature-evidence` (default:
+  `pending` rows, with `--feature-evidence` (default:
   `scripts/parity/feature_evidence.tsv`, so it is on in the gate) the P5
-  feature-level table as a third. It owns no contract-tag vocabulary
+  feature-level table as a third, and with `--co-anchors` (default:
+  `scripts/parity/feature_evidence_co_anchors.tsv`) the sparse co-anchor side
+  table in the same pass. It owns no contract-tag vocabulary
   (`contract_tag` is an opaque required field), no requirement vocabulary
   (`p0_id` is opaque unless `--requirements` supplies the public id list), and
   no feature vocabulary (`feature_id` is opaque; the Rust registry owns it).
@@ -36,10 +61,11 @@ against real test discovery.
 - `test_resolve_frontend_evidence.py` — standard-library self-test proving the
   resolver rejects a deleted referenced test, a target mismatch, a duplicate
   cell, malformed declarations, malformed unified-matrix rows, a deleted
-  interaction anchor on either channel, and a deleted feature-level anchor;
-  counts `pending` rows instead of dangling them, validates requirement
-  coverage fail-closed, and only skips the diff-scope when no
-  evidence-relevant path changed (fail-closed on a failed diff probe).
+  interaction anchor on either channel, a deleted feature-level anchor, and a
+  deleted feature co-anchor; counts `pending` rows instead of dangling them,
+  validates requirement coverage fail-closed, rejects a co-anchor that names an
+  unanchored cell or repeats its primary anchor, and only skips the diff-scope
+  when no evidence-relevant path changed (fail-closed on a failed diff probe).
 
 The contract vocabulary itself is the Rust
 [`ContractTag`](../../crates/taskmanager-ui-contract/src/conformance.rs) enum.
@@ -229,13 +255,93 @@ Anchored batches (2026-09-22):
   `0.0 °C`. Its sibling tests (whole-group admission, fanless reachability)
   are supporting evidence, not the anchor.
 
-The table now carries **66 anchored + 0 `pending`** rows (per frontend: gpui 15,
-iced 17, tui 19, bevy 15 anchored; no surveyed gap). Every registered cell is
+- W23-A batch (2026-09-23): the `memory.breakdown-rss-pss` sweep.
+  The P1 `delivery_definition` was narrowed to the facets the shared memory
+  projection really delivers — resident (RSS), proportional (PSS),
+  private/unique (USS), and the derived-shared share (`RSS - USS`) — with the
+  virtual address-space size explicitly OUTSIDE it (the shared projection
+  carries no `VmSize` observation; `memory.vma-map` owns that area) and the
+  per-process swap charge kept as a separate fact. The application VM gained
+  `ProcessDetailsField::Shared` and all four details surfaces paint it, so
+  every anchor proves the complete narrowed definition: the GPUI row was
+  re-pointed from the gates-package table projection
+  (`processes_view_test::memory_projection_prefers_current_pss_and_falls_back_to_typed_rss`)
+  to the in-crate details-dialog fold
+  (`gpui_app::root::chrome::tests::memory_breakdown_rows_render_every_narrowed_facet`:
+  the resident performance current plus the PSS/USS/derived-shared overview
+  rows, with the derived share keeping the shared dash when USS is
+  unobserved); the Iced and TUI anchors gained the derived-shared value
+  (`768.0 MiB` from `RSS - USS` in the same typed observation family) and the
+  cold-facet dash clause; and the Bevy cell — declared `Ported` but
+  previously unanchored — gained its first anchor on the details-overview
+  fold.
+
+The table now carries **67 anchored + 0 `pending`** rows (per frontend: gpui 15,
+iced 17, tui 19, bevy 16 anchored; no surveyed gap). Every registered cell is
 committed evidence; a new near-miss must again be recorded as an explicit
 `pending` row. Every other source-complete cell keeps its G2 finding until a
 real test is anchored; the batches are a bounded delivery, never a blanket
 `Ready` claim. A `pending` row is a survey record, not a delivery claim, and it
 never becomes an anchor.
+
+### Feature co-anchors (`feature_evidence_co_anchors.tsv`, W23-B)
+
+The W23-B batch is not a new cell but a schema extension: `feature_evidence.tsv`
+can now record a **co-anchor**, a further discoverable test that proves a named
+clause of an already-anchored cell whose production surface the primary anchor
+test does not drive. The table is read in the same resolver pass
+(`--co-anchors`, default on, fail closed when the file is missing).
+
+| column | meaning |
+|---|---|
+| `feature_id` | stable `FeatureId` id; it must name an **anchored** `(feature_id, frontend)` row of `feature_evidence.tsv`, whose primary `test_id` keeps its meaning |
+| `frontend` | `gpui`, `iced`, `tui`, or `bevy` |
+| `co_test_id` | the extra nextest test path, exactly as discovery reports it for the owning frontend |
+| `reason` | the delivery-definition clause the co-anchor proves (never `-`) |
+
+Rules, all fail-closed in the same resolver pass:
+
+- **dangling** - a `co_test_id` that discovery no longer lists fails the run
+  with its cell, frontend, test id and the `feature-evidence-co-anchor` channel,
+  exactly like a deleted primary anchor (R4);
+- **invalid** - a row whose `(feature_id, frontend)` cell has no anchored
+  feature-evidence row, or whose `co_test_id` repeats that cell's primary
+  anchor, fails the run (the primary row already resolves it);
+- the primary anchor grid is untouched: `feature_evidence.anchored` and
+  `feature_evidence.dangling` do not move when a co-anchor is added, so the
+  Rust G2 closure and its `Pending`/`Anchored` semantics are unchanged;
+- the report block is `co_anchors: {path, rows, cells, dangling}` in the
+  `--json`/`--report-json` output, plus
+  `counts.feature_co_anchors` / `feature_co_anchor_cells` /
+  `feature_co_anchor_dangling`; the shared `counts.dangling` total includes the
+  co-anchor share and the human summary prints a `co-anch.:` line when any row
+  is declared.
+
+The registered batch (W23-B, two rows, each hand-verified against
+`cargo nextest list`):
+
+- `services.dependency-dag` / iced - the ordering-cycle clause is co-proved by
+  `ui::tests::pages::service_projection_preserves_fixture_rows_and_typed_status`
+  (the `services.inventory` anchor test): both members of a typed `Before`-cycle
+  carry the shared cycle flag the row paints;
+- `services.dependency-dag` / bevy - the same clause is co-proved by
+  `pages::services::tests::ordering_cycle_members_paint_the_warning_plate`:
+  each cycle-member row paints the Alert plate while an acyclic row stays
+  unmarked (the dependency panel itself does not paint the cycle, which is why
+  the primary anchor does not drive it).
+
+A third candidate - the GPUI `memory.breakdown-rss-pss` private (USS) clause
+via the dialog's overview mirror test - was withdrawn in the same window: the
+W23-A memory sweep re-pointed that cell's primary anchor to the sibling
+in-crate dialog test `memory_breakdown_rows_render_every_narrowed_facet`, which
+proves the resident/proportional/private/derived-shared clauses together, so the
+candidate no longer proves an undriven clause and keeping it would add a
+redundant dangling surface. A co-anchor is never a substitute for re-pointing a
+primary anchor, and the table must never become an anchor authority of its own:
+it carries no status, no `Ready` claim, and no vocabulary. When a `crates/**`
+window can change the Rust consumer of `feature_evidence.tsv`, the side table
+is the natural source of a sixth column folded into that file in one cutover
+(see "Known S4/S5 residuals").
 
 ## Unified interaction matrix
 
@@ -494,6 +600,45 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   is owed. The conservative route direction is unchanged: it can demand more
   receipts than before (a shared path names every consumer), never fewer than
   its own paint impact.
+- **Unified interaction route (W23-B).** The S5 wiring moved the headless
+  interaction entry point to `scripts/parity/accept-frontend-interactions.sh`
+  and the declaration to `scripts/parity/cross_frontend_matrix.tsv`. The route
+  now consumes both: a change to the unified matrix maps to the frontends whose
+  **rows changed** (read from the diff; a comment-only change moves no row and
+  demands no receipt; an untracked/replaced file falls back to the frontends
+  the file declares), which keeps per-frontend-matrix parity without a coarser
+  "all four" guess, and the S5 driver, resolver, schema, declaration files and
+  the aggregator are routed to the headless requirement only (dev-only evidence
+  machinery, no paint path - the same class as the ui-contract
+  declaration/test layers). The legacy per-frontend matrices and accept scripts
+  stay routed while they remain compatibility assets, so the new wiring can
+  never be weaker than the assets it is replacing.
+
+### S5 status and remaining steps (W23-B)
+
+Delivered: (S5-1) the unified driver is committed and the GPUI/Bevy interaction
+stages of `local-gates.sh` run it; (S4) the unified matrix is the resolver's
+declaration source; (W11-C) the gate consumes the unified matrix; (W23-B) the
+feature co-anchor side table closes the cross-anchor record. Remaining, in
+order, each requiring its own decision:
+
+1. **D6 window**: retire the three per-frontend matrices and the embedded
+   validators (`validate_gpui_interaction_matrix.py` structure rules, the
+   Iced/Bevy in-script validators), migrate `scripts/windows/local-gates.sh`
+   off the legacy gate, and delete the compatibility views in one cutover
+   (AGENTS forbids a standing second address).
+2. **D1**: declare the Bevy `p0_id` mapping (option A) and add
+   `--require-requirement-coverage` to the `parity-evidence` stage in the same
+   change.
+3. **D3**: decide whether the GPUI stable case-prefix channel stays or the 39
+   rows get hand-verified explicit `test_name` ids.
+4. **Target ownership**: teach the resolver (or the driver) to carry the
+   `gui`/`lib` target of each discovery artifact so a cross-target rename
+   cannot pass on a flat discovery set.
+5. **Co-anchor fold-in**: when a `crates/**` window can change the Rust
+   consumer, fold `feature_evidence_co_anchors.tsv` into
+   `feature_evidence.tsv` as a sixth column in one cutover (consumer, resolver,
+   self-test, README in the same change) and delete the side table.
 
 ## Discipline
 
@@ -525,6 +670,12 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
   contract test in `ui_feature_platform_gate.rs` parses the table and rejects an
   unknown id. The resolver never defines feature ids; it only resolves the
   anchored `test_id` values against discovery.
+- A feature co-anchor (`feature_evidence_co_anchors.tsv`) is the same kind of
+  hand-declared anchor as a primary one: it must name a discoverable test for
+  the owning frontend, and it can never invent a clause, a status, or a
+  vocabulary. The side table exists only because the Rust consumer of
+  `feature_evidence.tsv` accepts exactly five columns; if the two ever
+  disagree, the primary table is the authority.
 
 ## Local gate route
 
@@ -556,7 +707,59 @@ flag**: `--feature-evidence` defaults to
 `scripts/parity/feature_evidence.tsv`, so the gate validates the feature
 anchors (R4) exactly like the other two declaration sources, and its
 `dangling` count feeds the same fail-closed exit. A commit that renames a test
-referenced by the table is red at the `parity-evidence` stage.
+referenced by the table is red at the `parity-evidence` stage. The sparse
+feature co-anchor side table follows the same rule (`--co-anchors` defaults to
+`scripts/parity/feature_evidence_co_anchors.tsv`), so a renamed co-anchor is
+dangling in the same pass, and a missing side table is a stage error rather
+than a silent skip.
+
+### Interaction stages run the unified driver (S5 wiring, W23-B)
+
+The `gpui-interactions` and `bevy-interactions` stages of
+`scripts/quality/local-gates.sh` no longer call the legacy accept gate
+directly. The committed call chain is:
+
+```
+local-gates.sh (--with-gui, or scope=bevy for the Bevy stage)
+  -> bash scripts/parity/accept-frontend-interactions.sh <gpui|bevy> [--scope linux]
+     -> python3 scripts/parity/accept_frontend_interactions.py
+        1. scripts/frontend_source_manifest.py --frontend <fe>   # fingerprint
+        2. bash scripts/accept-<fe>-interactions.sh              # legacy gate, UNCHANGED
+        3. read the fresh target/<fe>-interaction-evidence/<run>/ receipts
+        4. python3 scripts/parity/resolve_frontend_evidence.py   # Layer B, same discovery
+        5. python3 scripts/quality/cross_frontend_manifest.py    # fold + --verify
+```
+
+Authority split, so the compatibility window is explicit:
+
+- **The legacy per-frontend accept scripts stay the authoritative runners and
+  receipt writers.** The unified driver owns the segment -> aggregate ->
+  verify fold; it does not reimplement a per-frontend check, and it fails
+  closed when the legacy gate exits non-zero, produces no fresh evidence
+  directory, or fails to cover a declared cell.
+- **The unified matrix is the declaration authority for the interaction
+  resolver** (W11-C) and now also for the run-manifest aggregator. The
+  per-frontend matrices (`scripts/{gpui,iced,bevy}_interaction_matrix.tsv`)
+  remain committed compatibility views for the legacy validators until the
+  D6/S5 retirement window; the unified driver's declaration is the unified
+  matrix, so it cannot drift from the resolver's check.
+- **The Windows mirror** (`scripts/windows/local-gates.sh`) still calls
+  `scripts/windows/accept-gpui-interactions.sh` directly: it is outside the
+  Linux line's boundary and migrates in the D6/S5 window, together with the
+  legacy matrix/validator deletion.
+- The stage keeps its external `timeout --kill-after=10s` deadline; the driver
+  adds its own per-child deadlines and never backgrounds a child. No additional
+  discovery pass is added for GPUI/ICED/Bevy (the driver reads the gate's own
+  artifacts); only TUI, whose gate emits none, gets one bounded
+  `cargo nextest list`.
+- The Linux gate wires the GPUI and Bevy interaction stages - the two stages
+  that existed before this change. Iced and TUI have no `local-gates`
+  interaction stage, so nothing regressed: their interaction anchors are still
+  discovery-checked by the `parity-evidence` stage through the unified matrix,
+  and `bash scripts/parity/accept-frontend-interactions.sh iced|tui` runs the
+  same driver chain when an owner opens those stages. A single-frontend driver
+  run reports the resolver stage as skipped (the resolver resolves the whole
+  declaration) rather than silently passing it.
 
 Known boundary: an anchored test deleted or renamed *without* touching the
 paths above stays invisible until one of them changes. That is the deliberate
@@ -610,6 +813,26 @@ python3 scripts/parity/resolve_frontend_evidence.py \
   --discovery bevy=discovery/bevy.json \
   --feature-evidence scripts/parity/feature_evidence.tsv
 
+# The sparse feature co-anchor side table is default-on in the same pass
+# (`--co-anchors`; a missing file is fail-closed), so the calls above already
+# resolve every registered co-anchor:
+python3 scripts/parity/resolve_frontend_evidence.py \
+  --discovery gpui=discovery/gpui.json \
+  --discovery iced=discovery/iced.json \
+  --discovery tui=discovery/tui.json \
+  --discovery bevy=discovery/bevy.json \
+  --co-anchors scripts/parity/feature_evidence_co_anchors.tsv
+
+# The unified S5 interaction driver (what the GPUI/Bevy interaction stages
+# now run); a single frontend runs its legacy gate, folds one segment and
+# verifies the aggregate:
+bash scripts/parity/accept-frontend-interactions.sh gpui --scope linux
+# No-cargo rehearsal from pre-existing discovery/native receipts:
+bash scripts/parity/accept-frontend-interactions.sh iced --from-existing \
+  --discovery iced=discovery/iced.json \
+  --native-evidence iced=target/iced-interaction-evidence/<run> \
+  --fingerprint current --source-manifest iced=target/frontend-source-manifests/iced.txt
+
 # Local gate entry (the exact parity-evidence stage): skip when the diff cannot
 # move an anchor, resolve both declaration sources, pin the report:
 python3 scripts/parity/resolve_frontend_evidence.py --nextest --scope auto \
@@ -619,8 +842,9 @@ python3 scripts/parity/resolve_frontend_evidence.py --nextest --scope auto \
 ```
 
 Exit codes: `0` every declared anchor resolved, or the diff was out of scope
-(skipped); `1` dangling or invalid anchor (manifest or unified interaction
-matrix); `2` usage / IO / discovery error. A skipped run is still
+(skipped); `1` dangling or invalid anchor (manifest, unified interaction matrix,
+feature evidence, or feature co-anchor); `2` usage / IO / discovery error. A
+skipped run is still
 `status: "pass"` but carries `"skipped": true` and a `scope` block, so a
 consumer can tell "verified" from "not applicable". The machine-readable report
 lands at `target/cross-frontend-evidence/<run>/manifest-validation.json` by

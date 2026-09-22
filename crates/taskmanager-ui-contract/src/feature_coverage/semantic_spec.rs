@@ -70,9 +70,16 @@ impl FeatureId {
             },
             Self::MemoryBreakdownRssPss => FeatureSemanticSpec {
                 feature: self,
-                delivery_definition: "A memory surface renders the resident/shared/private and \
-                                      virtual-memory breakdown facets of the shared memory \
-                                      projection.",
+                delivery_definition: "A memory surface renders the resident (RSS), \
+                                      proportional (PSS), and private/unique (USS) \
+                                      physical-memory facets and the derived-shared \
+                                      share (`RSS - USS`, `shared_bytes`) of the shared \
+                                      memory projection. The virtual address-space size \
+                                      (VmSize) is explicitly OUTSIDE this definition: \
+                                      the shared projection carries no such observation, \
+                                      and the per-process swap charge is a separate \
+                                      fact; an unobserved facet stays an honest absence, \
+                                      never a fabricated zero.",
             },
             Self::MemoryVmaMap => FeatureSemanticSpec {
                 feature: self,
@@ -295,8 +302,16 @@ impl FeatureId {
             },
             Self::ThermalThrottleEvents => FeatureSemanticSpec {
                 feature: self,
-                delivery_definition: "A thermal surface renders the CPU package thermal-throttle \
-                                      (PROCHOT) state from the shared CPU projection.",
+                delivery_definition: "A thermal surface renders the CPU package \
+                                      thermal-throttle trigger counters (the cumulative \
+                                      package and per-core event counts, \
+                                      `package_throttle_count` / `core_throttle_count`) \
+                                      from the shared CPU projection. The real-time \
+                                      PROCHOT assertion state (`is_throttled`) is \
+                                      explicitly OUTSIDE this definition: no provider \
+                                      populates it, and the aggregate system-health \
+                                      deduction that consumes it is not a thermal \
+                                      surface.",
             },
             Self::LinuxNamespaceAudit => FeatureSemanticSpec {
                 feature: self,
