@@ -22,10 +22,26 @@ Contract
 * A `behavior` anchor that is not discoverable is `dangling` and fails the run.
 * A `behavior` anchor whose declared frontend differs from its `target_or_validator`
   is `invalid` and fails the run (R6 ownership).
+* `platform` is the reserved P5 axis (empty field = frontend axis).  Like
+  `contract_tag` it is an opaque field here: the resolver requires the column
+  and accepts an empty value, it does not define the vocabulary.
+
+Scopes
+------
+* `--scope all` (default) evaluates every declared anchor and keeps the
+  original semantics.
+* `--scope auto` is the local-gate entry: it inspects the git diff since
+  `--base` (default: merge-base with `origin/main`, else `HEAD~1`) plus
+  untracked files, and short-circuits with `status=pass`, `"skipped": true`
+  and no `cargo nextest list` when no evidence-relevant path changed.  A
+  failed diff probe is evaluated fail-closed (never skipped) and reported in
+  `scope.reason`.
+* `--report-json PATH` is the canonical machine-readable report path for gate
+  callers; `--report` is the original spelling of the same option.
 
 Exit codes
 ----------
-0  every declared anchor resolved (pending/none allowed)
+0  every declared anchor resolved, or the run was out of scope (skipped)
 1  at least one dangling or invalid anchor
 2  usage / IO / discovery error
 
@@ -37,6 +53,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import fnmatch
 import json
 import subprocess
 import sys
@@ -53,10 +70,36 @@ MANIFEST_FIELDS = (
     "evidence_kind",
     "test_id_or_scenario",
     "target_or_validator",
+    # Reserved P5 axis: empty in the committed manifest (empty = frontend
+    # axis).  The column exists so the three-dimensional ledger can land
+    # without a schema break; no vocabulary is defined here.
+    "platform",
 )
+
+# Fields that may legitimately be empty.  `reason` is required only for the
+# non-ready statuses (a rule owned by the structural gate), and `platform` is
+# the reserved axis above.
+OPTIONAL_FIELDS = ("reason", "platform")
 
 EVIDENCE_KINDS = {"behavior", "visual", "none", "pending"}
 STATUSES = {"ready", "partial", "missing", "unsupported", "pending"}
+SCOPES = ("all", "auto")
+
+# Paths that can move a declared anchor or the manifest's own contract.  A diff
+# that touches none of them cannot change the resolution outcome, so the local
+# gate may skip the (compiling) discovery walk.  `*` crosses directory
+# separators here, matching the committed layout at any depth.
+EVIDENCE_SCOPE_PATTERNS = (
+    # The declaration manifest, this resolver, its self-test, and any route
+    # artifact that lives in this directory.
+    "scripts/parity/*",
+    # Contract-tag authority and the Rust conformance reader of the manifest.
+    "crates/taskmanager-ui-contract/src/conformance.rs",
+    "crates/taskmanager-ui-contract/tests/*/ui_conformance.rs",
+    # Feature-coverage declarations (shared contract registry plus every
+    # per-frontend adapter) and their tests.
+    "crates/*/feature_coverage*",
+)
 
 # Frontend -> (cargo package, extra nextest args).
 FRONTEND_PACKAGES = {
@@ -73,6 +116,153 @@ class ResolveError(RuntimeError):
 
 class DiscoveryError(ResolveError):
     pass
+
+
+class ScopeDecision:
+    """Whether the run must evaluate anchors, and why.
+
+    A plain class rather than a dataclass: the self-test loads this module by
+    path (without registering it in `sys.modules`), and dataclass annotation
+    resolution requires it to be importable by name.
+    """
+
+    __slots__ = ("mode", "base", "relevant", "matched_paths", "reason")
+
+    def __init__(
+        self,
+        mode: str,
+        base: str | None,
+        relevant: bool,
+        matched_paths: tuple[str, ...],
+        reason: str,
+    ) -> None:
+        self.mode = mode
+        self.base = base
+        self.relevant = relevant
+        self.matched_paths = matched_paths
+        self.reason = reason
+
+    def as_dict(self) -> dict:
+        return {
+            "mode": self.mode,
+            "base": self.base,
+            "relevant": self.relevant,
+            "matched_paths": list(self.matched_paths),
+            "reason": self.reason,
+        }
+
+
+def evidence_relevant(path: str) -> bool:
+    """True when a repo-relative path can move a declared evidence anchor."""
+    normalised = path.strip().replace("\\", "/")
+    if normalised.startswith("./"):
+        normalised = normalised[2:]
+    if not normalised:
+        return False
+    return any(
+        fnmatch.fnmatchcase(normalised, pattern)
+        for pattern in EVIDENCE_SCOPE_PATTERNS
+    )
+
+
+def evaluate_scope(
+    paths: list[str] | tuple[str, ...],
+    mode: str,
+    base: str | None,
+    git_error: str | None = None,
+) -> ScopeDecision:
+    """Pure scope decision: which changed paths matter, and must we run?
+
+    Fail-closed: a failed diff probe (`git_error`) evaluates the anchors.
+    """
+    if mode == "all":
+        return ScopeDecision(
+            mode="all",
+            base=None,
+            relevant=True,
+            matched_paths=(),
+            reason="every declared anchor is evaluated",
+        )
+    matched = tuple(path for path in paths if evidence_relevant(path))
+    if git_error:
+        return ScopeDecision(
+            mode="auto",
+            base=base,
+            relevant=True,
+            matched_paths=matched,
+            reason=f"changed-path discovery failed ({git_error}); evaluating fail-closed",
+        )
+    if not matched:
+        return ScopeDecision(
+            mode="auto",
+            base=base,
+            relevant=False,
+            matched_paths=(),
+            reason=f"no evidence-relevant change since {base}",
+        )
+    return ScopeDecision(
+        mode="auto",
+        base=base,
+        relevant=True,
+        matched_paths=matched,
+        reason=f"{len(matched)} evidence-relevant path(s) since {base}",
+    )
+
+
+def _git(repo: Path, command: list[str]) -> subprocess.CompletedProcess:
+    return subprocess.run(
+        command,
+        cwd=repo,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+
+
+def default_scope_base(repo: Path) -> str:
+    """Mirror the ui-route default: merge-base with origin/main, else HEAD~1."""
+    try:
+        probe = _git(repo, ["git", "rev-parse", "--verify", "origin/main"])
+        if probe.returncode == 0:
+            merge = _git(repo, ["git", "merge-base", "HEAD", "origin/main"])
+            if merge.returncode == 0 and merge.stdout.strip():
+                return merge.stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return "HEAD~1"
+
+
+def git_changed_paths(repo: Path, base: str) -> tuple[list[str], str | None]:
+    """Repo-relative paths changed since `base`, including untracked files.
+
+    Returns `(paths, error)`; a non-empty error means the probe failed and the
+    caller must evaluate fail-closed.
+    """
+    paths: set[str] = set()
+    commands = (
+        ["git", "diff", "--name-only", base, "--"],
+        ["git", "ls-files", "--others", "--exclude-standard", "--"],
+    )
+    for command in commands:
+        try:
+            proc = _git(repo, command)
+        except (OSError, subprocess.TimeoutExpired) as exc:
+            return sorted(paths), f"{' '.join(command)}: {exc}"
+        if proc.returncode != 0:
+            detail = (proc.stderr or proc.stdout or "").strip().splitlines()
+            tail = detail[-1] if detail else f"exit {proc.returncode}"
+            return sorted(paths), f"{' '.join(command)}: {tail}"
+        paths.update(line.strip() for line in proc.stdout.splitlines() if line.strip())
+    return sorted(paths), None
+
+
+def scope_decision_for_run(args: argparse.Namespace, repo: Path) -> ScopeDecision:
+    if args.scope == "all":
+        return evaluate_scope((), "all", None)
+    base = args.base or default_scope_base(repo)
+    paths, error = git_changed_paths(repo, base)
+    return evaluate_scope(paths, "auto", base, error)
 
 
 def read_manifest(path: Path) -> list[dict[str, str]]:
@@ -94,7 +284,7 @@ def read_manifest(path: Path) -> list[dict[str, str]]:
             raise ResolveError(f"{path}:{lineno}: malformed row (wrong field count)")
         missing = [
             field for field in MANIFEST_FIELDS
-            if row[field].strip() == "" and field != "reason"
+            if row[field].strip() == "" and field not in OPTIONAL_FIELDS
         ]
         if missing:
             raise ResolveError(f"{path}:{lineno}: empty field(s): {', '.join(missing)}")
@@ -237,12 +427,47 @@ def split_pairs(values: list[str], label: str) -> dict[str, Path]:
     return result
 
 
+def skipped_report(manifest_path: Path, decision: ScopeDecision) -> dict:
+    """Report for an `--scope auto` run whose diff cannot move an anchor.
+
+    Shaped like a resolved report so every consumer can read one schema; no
+    frontend was discovered and no anchor was evaluated.
+    """
+    zero_counts = {
+        "cells": 0,
+        "anchored_behavior": 0,
+        "anchored_visual": 0,
+        "pending": 0,
+        "none": 0,
+        "dangling": 0,
+        "invalid": 0,
+        "visual_unverified": 0,
+    }
+    return {
+        "manifest": str(manifest_path),
+        "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "status": "pass",
+        "skipped": True,
+        "scope": decision.as_dict(),
+        "counts": zero_counts,
+        "frontends": {},
+        "dangling": [],
+        "invalid": [],
+        "visual_unverified": [],
+        "pending": [],
+    }
+
+
 def resolve(args: argparse.Namespace) -> dict:
     repo = Path(args.repo).resolve()
     manifest_path = Path(args.manifest)
     if not manifest_path.is_absolute():
         manifest_path = repo / manifest_path
     rows = read_manifest(manifest_path)
+
+    decision = scope_decision_for_run(args, repo)
+    if not decision.relevant:
+        return skipped_report(manifest_path, decision)
 
     provided = split_pairs(args.discovery, "discovery")
     unknown = sorted(set(provided) - set(FRONTEND_PACKAGES))
@@ -360,6 +585,8 @@ def resolve(args: argparse.Namespace) -> dict:
         "manifest": str(manifest_path),
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "status": status,
+        "skipped": False,
+        "scope": decision.as_dict(),
         "counts": {
             "cells": cells,
             "anchored_behavior": anchored_behavior,
@@ -418,8 +645,30 @@ def build_parser() -> argparse.ArgumentParser:
         "--nextest-timeout", type=int, default=1800,
         help="seconds before a cargo nextest list run is killed (default: %(default)s)",
     )
+    parser.add_argument(
+        "--scope",
+        choices=SCOPES,
+        default="all",
+        help=(
+            "all evaluates every declared anchor (default); auto short-circuits "
+            "when the diff since --base carries no evidence-relevant path"
+        ),
+    )
+    parser.add_argument(
+        "--base",
+        default=None,
+        help=(
+            "diff base for --scope auto (default: merge-base with origin/main, "
+            "else HEAD~1)"
+        ),
+    )
     parser.add_argument("--repo", default=".", help="repository root (default: cwd)")
-    parser.add_argument("--report", default=None, help="report JSON path")
+    parser.add_argument(
+        "--report", "--report-json",
+        dest="report",
+        default=None,
+        help="report JSON path (--report-json is the canonical gate spelling)",
+    )
     parser.add_argument("--no-report", action="store_true", help="do not write a report file")
     parser.add_argument("--json", action="store_true", help="print the report JSON to stdout")
     return parser
@@ -427,14 +676,28 @@ def build_parser() -> argparse.ArgumentParser:
 
 def format_summary(report: dict) -> str:
     counts = report["counts"]
+    scope = report.get("scope") or {}
     lines = [
         f"manifest: {report['manifest']}",
-        f"status:   {report['status'].upper()}",
+        f"status:   {report['status'].upper()}"
+        + (" (skipped)" if report.get("skipped") else ""),
+    ]
+    if scope:
+        base = scope.get("base") or "-"
+        lines.append(
+            "scope:    {mode} (base={base}): {reason}".format(
+                mode=scope.get("mode", "?"), base=base, reason=scope.get("reason", "")
+            )
+        )
+    if report.get("skipped"):
+        lines.append("          no test discovery was run; nothing to resolve")
+        return "\n".join(lines)
+    lines.append(
         (
             "cells:    {cells} total | {anchored_behavior} behavior anchors | "
             "{pending} pending | {none} none | {dangling} dangling | {invalid} invalid"
-        ).format(**counts),
-    ]
+        ).format(**counts)
+    )
     for frontend, info in report["frontends"].items():
         lines.append(
             f"  {frontend:5s} discovered {info['discovered_tests']} tests  ({info['discovery_source']})"

@@ -16,7 +16,8 @@
 #              nextest workspace split into core/logic/gui/perf layers
 #              (failure attribution per layer; `--only nextest-core` gives a
 #              bottom-up dev loop) + doctests + rustdoc + the nvidia fallback
-#              matrix + release/package smoke + (with --with-gui) the GPUI
+#              matrix + release/package smoke + the diff-scoped P4
+#              `parity-evidence` anchor resolver + (with --with-gui) the GPUI
 #              interaction matrix and fresh capture receipt route.
 #   extended   the expensive pass: llvm-cov with per-crate floors, mutation
 #              testing of the core/application diff, Miri on the three
@@ -565,6 +566,21 @@ if [[ "$with_gui" == "1" ]]; then
         # Capture acceptance is also cheap to reject early because it only
         # checks the freshness of receipts; the capture itself remains explicit.
         run_stage ui-capture-route standard bash scripts/quality/ui-evidence-route.sh --with-gui --require-capture
+    fi
+fi
+if maybe parity-evidence; then
+    # P4 Layer B: every declared behavior anchor must still be discoverable by
+    # `cargo nextest list`.  Discovery compiles test binaries, so this stage is
+    # diff-scoped like ui-route: `--scope auto` short-circuits (no cargo) when
+    # the diff since the merge-base with origin/main (else HEAD~1) touches no
+    # evidence-relevant path, and a failed diff probe evaluates fail-closed.
+    # When it does evaluate, dangling anchors fail closed while `pending` cells
+    # are only counted and reported.  Out of scope the resolver prints
+    # "PASS ... (skipped)" and the stage is green without discovering anything.
+    if scope_skip parity-evidence "merge-owner evidence surface" standard; then
+        run_stage parity-evidence standard python3 scripts/parity/resolve_frontend_evidence.py \
+            --nextest --scope auto \
+            --report-json target/cross-frontend-evidence/parity-evidence/manifest-validation.json
     fi
 fi
 if maybe deny; then

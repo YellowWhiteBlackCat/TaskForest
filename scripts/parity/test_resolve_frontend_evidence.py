@@ -9,7 +9,10 @@ discovery payloads and proves the resolver is not a rubber stamp:
 * `pending` is counted separately from `dangling`;
 * deleting a referenced test (discovery no longer lists it) turns the run red;
 * a target/frontend ownership mismatch is rejected;
-* malformed declarations fail loudly instead of being skipped.
+* malformed declarations fail loudly instead of being skipped;
+* the `--scope auto` diff-scope only skips when no evidence-relevant path
+  changed, evaluates fail-closed when the git probe fails, and never treats a
+  skipped diff as a resolved anchor set.
 
 Run:  python3 scripts/parity/test_resolve_frontend_evidence.py
 Exit: 0 when every check passes, 1 otherwise.
@@ -57,6 +60,7 @@ def manifest_row(
     evidence_kind: str = "behavior",
     anchor: str = "-",
     target: str | None = None,
+    platform: str = "",
 ) -> str:
     return "\t".join([
         "facet",
@@ -68,6 +72,7 @@ def manifest_row(
         evidence_kind,
         anchor,
         target if target is not None else frontend,
+        platform,
     ])
 
 
@@ -90,13 +95,22 @@ def write_json_discovery(path: Path, names: list[str]) -> Path:
     return path
 
 
-def namespace(manifest: Path, discovery: dict[str, Path], repo: Path) -> argparse.Namespace:
+def namespace(
+    manifest: Path,
+    discovery: dict[str, Path],
+    repo: Path,
+    *,
+    scope: str = "all",
+    base: str | None = None,
+) -> argparse.Namespace:
     return argparse.Namespace(
         manifest=str(manifest),
         discovery=[f"{frontend}={path}" for frontend, path in discovery.items()],
         capture_scenarios=[],
         nextest=False,
         nextest_timeout=30,
+        scope=scope,
+        base=base,
         repo=str(repo),
         report=None,
         no_report=True,
@@ -233,6 +247,164 @@ def test_missing_discovery_errors(tmp: Path) -> None:
         check(False, "missing frontend discovery is a fatal usage error")
 
 
+# The committed evidence surface: every one of these can move a declared
+# anchor, so `--scope auto` must evaluate.  Keep this list aligned with
+# EVIDENCE_SCOPE_PATTERNS (the test is the conscious-change guard).
+SCOPE_IN_PATH = [
+    "scripts/parity/cross_frontend_manifest.tsv",
+    "scripts/parity/resolve_frontend_evidence.py",
+    "crates/taskmanager-ui-contract/src/conformance.rs",
+    "crates/taskmanager-ui-contract/src/feature_coverage.rs",
+    "crates/taskmanager-ui-contract/src/feature_coverage/semantic_spec.rs",
+    "crates/taskmanager-ui-contract/tests/headless/ui_conformance.rs",
+    "crates/taskmanager-gpui/src/gpui_app/feature_coverage.rs",
+    "crates/taskmanager-iced/src/feature_coverage.rs",
+    "crates/taskmanager-iced/tests/gui/feature_coverage_tests.rs",
+    "crates/taskmanager-tui/src/feature_coverage.rs",
+    "crates/taskmanager-bevy-ui/tests/headless/feature_coverage.rs",
+]
+
+SCOPE_OUT_PATH = [
+    "crates/taskmanager-core/src/lib.rs",
+    "crates/taskmanager-gpui/src/gpui_app/root.rs",
+    "docs/QUALITY_GATES.md",
+    "tests/logic/four_frontend_parity_ledger_test.rs",
+    "scripts/accept-iced-interactions.sh",
+]
+
+
+def test_scope_patterns() -> None:
+    missed = [path for path in SCOPE_IN_PATH if not resolver.evidence_relevant(path)]
+    check(not missed, f"evidence-relevant paths are in scope (missed: {missed})")
+    extra = [path for path in SCOPE_OUT_PATH if resolver.evidence_relevant(path)]
+    check(not extra, f"unrelated paths stay out of scope (matched: {extra})")
+    check(
+        resolver.evidence_relevant("./scripts/parity/README.md"),
+        "a leading ./ is normalised away",
+    )
+
+    all_decision = resolver.evaluate_scope([], "all", None)
+    check(
+        all_decision.relevant and all_decision.mode == "all",
+        "--scope all always evaluates",
+    )
+
+    out = resolver.evaluate_scope(["docs/QUALITY_GATES.md"], "auto", "BASE")
+    check(not out.relevant, "a docs-only diff is out of scope")
+    check(out.base == "BASE", "the scope decision records its base")
+    check(out.matched_paths == (), "no matched paths for a docs-only diff")
+
+    inside = resolver.evaluate_scope(
+        ["scripts/parity/cross_frontend_manifest.tsv", "docs/README.md"],
+        "auto",
+        "BASE",
+    )
+    check(inside.relevant, "a manifest change is in scope")
+    check(
+        inside.matched_paths == ("scripts/parity/cross_frontend_manifest.tsv",),
+        "only evidence-relevant paths are matched",
+    )
+
+    broken = resolver.evaluate_scope([], "auto", "BASE", "git unavailable")
+    check(broken.relevant, "a failed diff probe evaluates fail-closed")
+    check("fail-closed" in broken.reason, "the fail-closed reason is explicit")
+
+
+def with_git_paths(paths: list[str], error: str | None, body) -> None:
+    """Run `body` with `git_changed_paths` stubbed out (restores after)."""
+    original = resolver.git_changed_paths
+    resolver.git_changed_paths = lambda repo, base: (paths, error)
+    try:
+        body()
+    finally:
+        resolver.git_changed_paths = original
+
+
+def test_auto_scope_short_circuit(tmp: Path) -> None:
+    manifest = write_manifest(tmp / "manifest.tsv", BASE_ROWS)
+
+    def body() -> None:
+        report = resolver.resolve(
+            namespace(manifest, {}, tmp, scope="auto", base="BASE")
+        )
+        check(report["status"] == "pass", "an out-of-scope run passes")
+        check(report["skipped"] is True, "an out-of-scope run is marked skipped")
+        check(
+            report["counts"]["cells"] == 0 and report["frontends"] == {},
+            "an out-of-scope run resolves nothing and discovers nothing",
+        )
+        check(
+            report["scope"]["relevant"] is False
+            and report["scope"]["base"] == "BASE",
+            "an out-of-scope run records the scope decision",
+        )
+        # The report still parses as the resolver's schema.
+        check(
+            "no evidence-relevant change" in report["scope"]["reason"],
+            "the skip reason names the scope",
+        )
+
+    with_git_paths([], None, body)
+
+
+def test_auto_scope_relevant_runs(tmp: Path) -> None:
+    manifest = write_manifest(tmp / "manifest.tsv", BASE_ROWS)
+    discovery = base_discovery(tmp)
+
+    def body() -> None:
+        report = resolver.resolve(
+            namespace(manifest, discovery, tmp, scope="auto", base="BASE")
+        )
+        check(report["skipped"] is False, "an in-scope run is not skipped")
+        check(report["scope"]["relevant"] is True, "an in-scope run records scope")
+        check(
+            report["scope"]["matched_paths"]
+            == ["scripts/parity/cross_frontend_manifest.tsv"],
+            "matched paths reach the report",
+        )
+        check(report["counts"]["anchored_behavior"] == 3, "anchors are evaluated")
+
+    with_git_paths(["scripts/parity/cross_frontend_manifest.tsv"], None, body)
+
+    def failing_probe() -> None:
+        report = resolver.resolve(
+            namespace(manifest, discovery, tmp, scope="auto", base="BASE")
+        )
+        check(report["skipped"] is False, "a failed diff probe still evaluates")
+        check(
+            "fail-closed" in report["scope"]["reason"],
+            "a failed diff probe is reported as fail-closed",
+        )
+
+    with_git_paths([], "git exploded", failing_probe)
+
+
+def test_platform_column_is_reserved(tmp: Path) -> None:
+    discovery = base_discovery(tmp)
+    reserved = run(
+        tmp,
+        [manifest_row("alpha", "gpui", anchor="suite::alpha_ok")],
+        discovery,
+    )
+    check(
+        reserved["status"] == "pass" and reserved["counts"]["cells"] == 1,
+        "an empty platform field is the frontend axis and passes",
+    )
+    # The field is opaque here: a future P5 vocabulary is not this resolver's
+    # to validate (like contract_tag, its authority lands with the axis).
+    opaque = run(
+        tmp,
+        [manifest_row("alpha", "gpui", anchor="suite::alpha_ok", platform="linux")],
+        discovery,
+    )
+    check(opaque["status"] == "pass", "a filled platform field stays opaque")
+    check_error(
+        [manifest_row("alpha", "gpui", anchor="suite::alpha_ok").rsplit("\t", 1)[0]],
+        discovery,
+        "a manifest row without the reserved platform column fails loudly",
+    )
+
+
 def main() -> int:
     with tempfile.TemporaryDirectory() as raw:
         tmp = Path(raw)
@@ -243,6 +415,10 @@ def main() -> int:
         test_plain_text_discovery(tmp)
         test_malformed_manifest_fails_loudly(tmp)
         test_missing_discovery_errors(tmp)
+        test_scope_patterns()
+        test_auto_scope_short_circuit(tmp)
+        test_auto_scope_relevant_runs(tmp)
+        test_platform_column_is_reserved(tmp)
 
     if FAILURES:
         print(f"\nself-test: FAIL ({len(FAILURES)}/{CHECKS} checks failed)")
