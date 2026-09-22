@@ -71,7 +71,8 @@
 # (`battery_stats`, charge/power/voltage/health/cycles with honest absence) and
 # the System Health sensor center (`sensor_rows`, one labelled row per
 # thermal-zone reading). `power.thermal-throttle-events` (the fake fixture's
-# other half) stays declared `Unsupported` by this shape and gained no row.
+# other half) was declared `Unsupported` by this shape then and gained no row;
+# the W25-A batch at the end of this file later delivered and anchored it.
 #
 # Fifth anchored batch (2026-09-22, W16-B/W16-C): eighteen new anchored rows
 # plus one re-verified row, each hand-checked clause by clause against the
@@ -267,3 +268,25 @@ services.log-stream	tui	runtime::tests::service_control::service_log_panel_paint
 services.log-stream	bevy	pages::services::service_logs_tests::painted_rows_follow_the_level_filter	anchored	-
 security.namespace-audit	bevy	pages::processes::details::tests::isolation_summary_renders_the_linux_namespace_audit	anchored	-
 power.thermal-zones	iced	ui::health::tests::thermal_zone_tests::thermal_zone_rows_traverse_every_temperature_reading_and_name_its_source	anchored	-
+# W25-A batch (2026-09-23): the `power.thermal-throttle-events` sweep.  The
+# W23-A definition had already been narrowed to the cumulative trigger
+# counters (`package_throttle_count`/`core_throttle_count` of the shared CPU
+# projection), with the real-time PROCHOT `is_throttled` state explicitly
+# OUTSIDE it, and W24-A made `CpuPackageMetrics` their single authority plus
+# the `telemetry.cpu.throttle` lane `Present` on Linux (registered-pending on
+# Windows/macOS).  All four shapes now really render the counters on their CPU
+# details surfaces, so the cell moves from the declared `Unsupported` gap to
+# the honest delivery status (GPUI `Reference`, Iced/TUI/Bevy `Ported`) and
+# each shape anchors the complete narrowed definition: one `S{package_id}`
+# segment per package that observed at least one counter, both the package
+# and the per-core event count painted from the shared projection, the
+# unobserved-family honest absence (GPUI/Iced/TUI omit the row; Bevy's
+# always-mounted diagnostic row keeps the shared dash), and the labeled dash
+# for an unobserved sibling counter — never a fabricated `0`.  The PROCHOT
+# clause stays unasserted because it is outside the definition; the Linux
+# `telemetry.cpu.throttle` lane keeps the whole cell host-derived.  This takes
+# the table to 71 anchored rows (gpui 16, iced 18, tui 20, bevy 17).
+power.thermal-throttle-events	gpui	gpui_app::cpu_view::details_panel::tests::cpu_spec_rows_render_the_thermal_throttle_counters_with_honest_absence	anchored	-
+power.thermal-throttle-events	iced	ui::perf_overview::tests::cpu_throttle_tests::cpu_stats_render_the_thermal_throttle_counters_with_honest_absence	anchored	-
+power.thermal-throttle-events	tui	ui::tests::cpu_right_rail::thermal_throttle_counters_paint_with_honest_absence	anchored	-
+power.thermal-throttle-events	bevy	pages::performance::tests::cpu_thermal_throttle_counters_render_with_honest_absence	anchored	-

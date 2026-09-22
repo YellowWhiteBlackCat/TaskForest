@@ -365,3 +365,63 @@ mod cpu_frequency_source_tests {
         );
     }
 }
+
+mod cpu_throttle_tests {
+    use super::*;
+
+    fn set_package_counters(
+        app: &mut crate::IcedApp,
+        counters: &[(u32, Option<u64>, Option<u64>)],
+    ) {
+        taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+            let snapshot = snapshot.as_mut().expect("demo snapshot");
+            snapshot.cpu.packages = counters
+                .iter()
+                .map(
+                    |&(package_id, package_throttle_count, core_throttle_count)| {
+                        let mut package =
+                            taskmanager_core::core::metrics::CpuPackageMetrics::new(package_id);
+                        package.package_throttle_count = package_throttle_count;
+                        package.core_throttle_count = core_throttle_count;
+                        package
+                    },
+                )
+                .collect();
+        });
+    }
+
+    fn throttle_row(
+        stats: &[taskmanager_shell::viewmodel::StatRow],
+    ) -> Option<&taskmanager_shell::viewmodel::StatRow> {
+        stats
+            .iter()
+            .find(|row| row.label() == t("cpu.thermal_throttle"))
+    }
+
+    /// The `power.thermal-throttle-events` delivery: the Performance CPU stat
+    /// column renders the cumulative package/per-core trigger counters per
+    /// package from the shared projection, keeps an unobserved sibling counter
+    /// a labeled dash, and omits the row entirely when no package observed a
+    /// counter — never a fabricated zero.
+    #[test]
+    fn cpu_stats_render_the_thermal_throttle_counters_with_honest_absence() {
+        taskmanager_test_support::pin_english();
+        let mut app = crate::IcedApp::demo();
+
+        set_package_counters(&mut app, &[(0, Some(7), Some(3)), (1, Some(12), None)]);
+        let (_, _, stats) = cpu_memory_header_and_stats(&app, PerfDevice::Cpu);
+        let row = throttle_row(&stats).expect("observed counters must grow a stat row");
+        assert_eq!(
+            row.value(),
+            Some("S0 Package 7 · Core 3 | S1 Package 12 · Core —"),
+            "an unobserved core counter must stay a labeled dash, never a 0"
+        );
+
+        set_package_counters(&mut app, &[(0, None, None)]);
+        let (_, _, stats) = cpu_memory_header_and_stats(&app, PerfDevice::Cpu);
+        assert!(
+            throttle_row(&stats).is_none(),
+            "an unobserved counter family must omit its row, never fabricate a zero"
+        );
+    }
+}

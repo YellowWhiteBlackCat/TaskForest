@@ -72,6 +72,7 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::NpuTelemetry
         | FeatureId::GpuEngineUtilization
         | FeatureId::GpuMemoryReadout
+        | FeatureId::ThermalThrottleEvents
         | FeatureId::CpuCStateAnalysis
         | FeatureId::LinuxNamespaceAudit
         | FeatureId::PosixCapabilitiesAudit
@@ -129,10 +130,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         FeatureId::RaplPowerDraw => Unsupported {
             reason: "no RAPL package-power readout is wired in the Bevy \
                      performance surface",
-        },
-        FeatureId::ThermalThrottleEvents => Unsupported {
-            reason: "no CPU thermal-throttle/PROCHOT event readout is wired in \
-                     the Bevy performance surface",
         },
         FeatureId::ProcessAncestorLineage => Unsupported {
             reason: "the Bevy process surface renders the tree without an \

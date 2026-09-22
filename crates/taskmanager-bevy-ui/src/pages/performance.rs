@@ -335,6 +335,7 @@ pub(crate) enum CpuField {
     Topology,
     IdleStates,
     PowerLimits,
+    ThermalThrottle,
     Interrupts,
     Core(usize),
 }

@@ -637,7 +637,10 @@ fn the_committed_feature_evidence_table_is_structurally_clean() {
 /// `memory.breakdown-rss-pss` to its real facets (resident/proportional/
 /// private/derived-shared), re-pointed the GPUI cell to the in-crate details
 /// dialog fold that proves the complete narrowed definition, and anchored the
-/// previously unanchored Bevy cell on the same details-overview fold.
+/// previously unanchored Bevy cell on the same details-overview fold. The
+/// W25-A batch promoted `power.thermal-throttle-events` from its surveyed
+/// `Unsupported` gap to the four shapes' real CPU-counter surfaces (GPUI
+/// reference; Iced/TUI/Bevy ported) with one fresh anchor per shape.
 #[test]
 fn the_first_anchor_batch_is_a_conscious_census() {
     let table = PLATFORM_GATE_POLICY.feature_evidence();
@@ -658,14 +661,14 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        67,
+        71,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
-        (FrontendShape::Gpui, 15usize),
-        (FrontendShape::Iced, 17),
-        (FrontendShape::Tui, 19),
-        (FrontendShape::Bevy, 16),
+        (FrontendShape::Gpui, 16usize),
+        (FrontendShape::Iced, 18),
+        (FrontendShape::Tui, 20),
+        (FrontendShape::Bevy, 17),
     ] {
         assert_eq!(
             table

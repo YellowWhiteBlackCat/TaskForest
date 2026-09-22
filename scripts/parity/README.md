@@ -176,8 +176,9 @@ Anchored batches (2026-09-22):
   (`system_health_view::stats::tests`, one labelled row per thermal-zone
   reading with its real value and typed absence). The fixture's thermal-control
   half (`system.cooling` / `system.throttle`) matches
-  `power.thermal-throttle-events`, which this shape declares `Unsupported`, and
-  gained no row.
+  `power.thermal-throttle-events`, which this shape declared `Unsupported` at
+  that point, and gained no row then — the W25-A batch below later delivered
+  and anchored that cell on the real CPU counters surface.
 - Fifth batch (W16-B/W16-C): eighteen new anchored rows plus one re-verified
   row, each hand-checked clause by clause against the feature's
   `delivery_definition` and each test id confirmed by membership in
@@ -276,8 +277,30 @@ Anchored batches (2026-09-22):
   previously unanchored — gained its first anchor on the details-overview
   fold.
 
-The table now carries **67 anchored + 0 `pending`** rows (per frontend: gpui 15,
-iced 17, tui 19, bevy 16 anchored; no surveyed gap). Every registered cell is
+- W25-A batch (2026-09-23): the `power.thermal-throttle-events` sweep. The
+  W23-A definition had already been narrowed to the cumulative trigger
+  counters (`package_throttle_count` / `core_throttle_count` of the shared
+  CPU projection), with the real-time PROCHOT `is_throttled` state explicitly
+  OUTSIDE it; W24-A then made `CpuPackageMetrics` their single authority and
+  registered the `telemetry.cpu.throttle` lane (`Present` on Linux,
+  registered-pending typed `Unsupported` on Windows/macOS). All four shapes
+  now really render the counters on their CPU details surfaces, so the four
+  declared `Unsupported` cells move to their honest delivery status (GPUI
+  `Reference`; Iced, TUI, and Bevy `Ported`) and each cell gains its anchor.
+  Every anchor proves the complete narrowed definition: one
+  `S{package_id}` segment per package that observed at least one counter,
+  both the package-level and the per-core event count painted from the shared
+  projection, the unobserved-family honest absence (GPUI's spec list, the
+  Iced stat column, and the TUI rail omit the row; Bevy's always-mounted
+  diagnostic row keeps the shared dash), and the labeled shared dash for an
+  unobserved sibling counter — never a fabricated `0`. The PROCHOT clause
+  stays deliberately unasserted (it is outside the definition), and the
+  Linux-only `telemetry.cpu.throttle` lane keeps each cell host-derived.
+  This takes the table to 71 anchored rows (gpui 16, iced 18, tui 20,
+  bevy 17).
+
+The table now carries **71 anchored + 0 `pending`** rows (per frontend: gpui 16,
+iced 18, tui 20, bevy 17 anchored; no surveyed gap). Every registered cell is
 committed evidence; a new near-miss must again be recorded as an explicit
 `pending` row. Every other source-complete cell keeps its G2 finding until a
 real test is anchored; the batches are a bounded delivery, never a blanket

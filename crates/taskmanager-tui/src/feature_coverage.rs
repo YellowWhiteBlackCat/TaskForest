@@ -78,6 +78,7 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         | FeatureId::GpuMemoryReadout
         | FeatureId::RaplPowerDraw
         | FeatureId::ThermalZoneSensors
+        | FeatureId::ThermalThrottleEvents
         | FeatureId::CpuCStateAnalysis
         | FeatureId::BatteryPowerInventory
         | FeatureId::LinuxNamespaceAudit
@@ -111,10 +112,6 @@ const fn support(feature: FeatureId) -> CapabilitySupport {
         },
         FeatureId::ProcessGpuAttribution => Unsupported {
             reason: "no per-process GPU attribution is wired in the terminal",
-        },
-        FeatureId::ThermalThrottleEvents => Unsupported {
-            reason: "no CPU thermal-throttle/PROCHOT event readout is wired in \
-                     the terminal",
         },
         FeatureId::ProcessAncestorLineage => Unsupported {
             reason: "the terminal process surface renders the tree without an \
