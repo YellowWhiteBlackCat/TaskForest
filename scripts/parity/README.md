@@ -391,26 +391,38 @@ Known S4/S5 residuals (owner decisions, not silently papered over):
 - TUI capture stays a single supervised frame (`scripts/capture-tui.sh`) with no
   scenario table, so TUI rows declare `capture_scenarios = -`; the anchored
   marker test proves the frame-marker contract, not a per-scenario matrix.
-- Iced capture reaches the six shared pages, the eight Performance devices and
-  the `service-details` local surface only: the scenario table's `device` token
-  is resolved in the application by `capture_device_from_name` /
-  `capture_page_from_name` plus that one local-surface branch, and the runner
-  carries no key or pointer injection. The iced health modal
-  (`LocalSurface::Health`) therefore has no pixel channel in this table -
-  including its `power.thermal-zones` panel, whose anchor is the traversal row in
-  `feature_evidence.tsv` - and a scenario name must never be committed ahead of
-  the app-side target: the marker validator requires the application to emit the
-  declared `device` token, so a `health` row with the current binary fails
-  closed (`expected one target marker for 'health'`) instead of producing a
-  Performance-page PNG under a health name. Once the application owns that
-  target, the scenario row is `health-modal` / `health` / `1180x780` and the
-  targeted run is
+- **Iced capture now includes the health modal (W19-B).** Iced capture reaches
+  the six shared pages, the eight Performance devices and two renderer-local
+  surfaces - `service-details` on Services and the health modal on Performance.
+  The scenario table's `device` token is resolved in the application by
+  `capture_device_from_name` / `capture_page_from_name` plus those local-surface
+  branches; the health branch opens through the same reducer the toolbar trigger
+  dispatches (`Message::OpenHealth`), so no second opening path exists, and the
+  first frame emits
+  `ICED_CAPTURE_MARKER event=target_ready mode=demo page=performance device=health`
+  (the modal rides the Performance page, so the validator's default page mapping
+  applies unchanged). The scenario row is `health-modal` / `health` / `1180x780`
+  and `mc06-local-modals` declares it as its capture scenario. The runner still
+  carries no key or pointer injection: the surface is reached by a declared
+  scenario token, never by synthesized input. Two evidence-frame properties are
+  deliberate and must not be mistaken for product layout: the modal body stays
+  the production fixed 430px scrollable, and a capture frame bounds it to its
+  end (Iced clamps the requested offset to the real content height), so the
+  thermal-zone panel - which sits below the device summary - is inside the
+  frame; and the capture fixture publishes more than one thermal zone plus one
+  unreadable zone, so the pixels show the per-reading traversal and the honest
+  dash, never a fabricated `0.0 °C`. The headless anchor stays the traversal row
+  in `feature_evidence.tsv`; the pixel frame is the targeted run
   `TM_ICED_CAPTURE_SCENARIOS=health-modal bash scripts/capture-iced.sh`,
   preconditioned on a Wayland session plus `dbus-run-session`,
   `kwin_wayland --virtual` and `niri` (the private supervisor route; the
   operator desktop is untouched and the run must not share the host with other
-  heavy work). Owner decision: land the application target with the scenario and
-  matrix rows in one change, or record the cell as a pixel-evidence SKIP.
+  heavy work). The application target, the scenario row and the matrix row land
+  in one change, because the marker validator fails closed on any scenario name
+  the application does not emit (`expected one target marker for 'health'`).
+  Until that targeted run lands on a quiet host or CI, the health-modal pixel
+  receipt is a recorded gap: the `power.thermal-zones` pixel cell is a SKIP and
+  the headless anchor above remains its delivered evidence.
 
 ## Discipline
 

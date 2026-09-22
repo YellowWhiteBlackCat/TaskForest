@@ -33,6 +33,11 @@ pub(crate) fn device_name(device: PerfDevice) -> &'static str {
     }
 }
 
+/// Capture target token for the health modal. It is one renderer-local surface
+/// with no page of its own, so its marker keeps the underlying Performance
+/// page and names the surface as the target (the `service-details` shape).
+pub(crate) const HEALTH_TARGET: &str = "health";
+
 /// Build the target marker for a canonical capture page/resource. Performance
 /// uses the resource vocabulary; other pages use their stable page name as the
 /// target token so the runner can prove it captured the requested surface.

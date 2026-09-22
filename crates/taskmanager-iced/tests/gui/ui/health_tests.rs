@@ -235,4 +235,41 @@ mod thermal_zone_tests {
             "the capture fixture must seed a named readable thermal zone: {rows:?}"
         );
     }
+
+    /// The evidence frame must show the traversal itself: more than one
+    /// readable zone, each named by its own source, plus an unreadable zone
+    /// that keeps its name and the shared dash. A single-zone fixture could
+    /// not prove the per-reading rows in the pixels.
+    #[test]
+    fn capture_fixture_traverses_every_zone_and_keeps_the_unreadable_one_as_a_dash() {
+        let app = crate::IcedApp::demo_for_capture();
+        let sensors = app
+            .shell
+            .projection()
+            .sensors
+            .as_ref()
+            .expect("capture sensor projection");
+        let rows = projection::thermal_zone_rows(sensors);
+
+        let readable: Vec<&str> = rows
+            .iter()
+            .filter(|row| row.present)
+            .map(|row| row.label.as_str())
+            .collect();
+        assert!(
+            readable.len() >= 2 && readable.contains(&"Package") && readable.contains(&"acpitz"),
+            "the capture fixture must seed more than one readable named zone: {rows:?}"
+        );
+
+        let unreadable = rows
+            .iter()
+            .find(|row| !row.present)
+            .expect("the capture fixture keeps an unreadable zone in the traversal");
+        assert_eq!(unreadable.label, "nvme");
+        assert_eq!(unreadable.value, missing_value());
+        assert!(
+            rows.iter().all(|row| !row.value.contains("0.0 °C")),
+            "an unreadable zone must never fabricate a temperature: {rows:?}"
+        );
+    }
 }

@@ -1,5 +1,6 @@
 use super::{IcedApp, apply_capture_target, capture_device_from_name, capture_page_from_name};
 use crate::app::PerfDevice;
+use crate::app::{LocalSurfaceKind, Message};
 use taskmanager_application::{ConfigStore, PlatformClient};
 
 #[test]
@@ -136,6 +137,31 @@ fn system_and_npu_capture_targets_seed_complete_typed_npu_facts() {
     let mut services = IcedApp::demo();
     apply_capture_target(&mut services, "services");
     assert!(services.shell.projection().npu_inventory.is_none());
+}
+
+#[test]
+fn health_capture_target_opens_the_local_surface_through_the_message_reducer() {
+    // `health` is a local-surface token: no Performance device and no shared
+    // page may claim it, so the surface branch is the only possible match.
+    assert_eq!(capture_device_from_name("health"), None);
+    assert_eq!(capture_page_from_name("health"), None);
+
+    let mut app = IcedApp::demo();
+    assert_eq!(app.local_surface_kind(), None);
+    apply_capture_target(&mut app, "health");
+    assert_eq!(app.local_surface_kind(), Some(LocalSurfaceKind::Health));
+    // The modal rides Performance with the default device selected; the
+    // surface is the target, not a page or a device.
+    assert_eq!(
+        app.shell.page(),
+        taskmanager_application::AppPage::Performance
+    );
+    assert_eq!(app.performance.selected_device, PerfDevice::Cpu);
+
+    // The toolbar trigger's own reducer path owns the same surface state.
+    let mut toolbar = IcedApp::demo();
+    let _ = toolbar.update(Message::OpenHealth);
+    assert_eq!(toolbar.local_surface_kind(), app.local_surface_kind());
 }
 
 impl IcedApp {

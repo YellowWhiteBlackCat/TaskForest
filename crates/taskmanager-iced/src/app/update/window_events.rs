@@ -4,7 +4,7 @@ use iced::Task;
 use taskmanager_application::AppPage;
 use taskmanager_shell::QuitReason;
 
-use super::super::{IcedApp, Message};
+use super::super::{IcedApp, LocalSurfaceKind, Message};
 use crate::app::viewport_state::ViewportRegion;
 
 pub(super) fn close_latest_window() -> Task<Message> {
@@ -51,7 +51,16 @@ impl IcedApp {
                         );
                         if self.is_demo() {
                             let page = crate::capture::page_name(self.shell.page());
-                            if self.shell.page() == AppPage::Performance {
+                            if self.local_surface_kind() == Some(LocalSurfaceKind::Health) {
+                                // The health modal rides the Performance page:
+                                // its target token names the local surface, the
+                                // same shape `service-details` uses on Services.
+                                crate::capture::append_target_marker(
+                                    path,
+                                    page,
+                                    crate::capture::HEALTH_TARGET,
+                                );
+                            } else if self.shell.page() == AppPage::Performance {
                                 crate::capture::append_device_marker(
                                     path,
                                     self.performance.selected_device,
@@ -66,11 +75,18 @@ impl IcedApp {
                         }
                     }
                 }
+                // A health-modal evidence frame bounds the modal body to its
+                // end: the body is a fixed 430px scrollable and the
+                // thermal-zone panel sits below the summary, so the unbounded
+                // first frame would cut its rows at the viewport edge. Iced
+                // clamps the offset to the real content, and the marker gate
+                // keeps every production modal on the user's own scroll.
+                let health_capture = self.health_capture_frame();
                 // The same per-frame pump also drives frontend-local motion:
                 // the eased modal entrance and the warm-up spinner advance on
                 // the frame timestamp (the tick stays as a coarse fallback).
                 self.advance_motion(now);
-                None
+                health_capture.then(crate::ui::health::bound_body_to_end)
             }
             Message::ApplicationsScrolled(viewport) => {
                 self.viewport.update(ViewportRegion::Applications, viewport);
@@ -118,4 +134,19 @@ impl IcedApp {
             _ => None,
         }
     }
+
+    /// True while a capture lane owns a health-modal frame: the evidence
+    /// runner set a marker path, this is the demo shape it launches, and the
+    /// health surface is the active one. The same gate as the health target
+    /// marker; a production launch never carries the marker, so the modal body
+    /// is only bounded for evidence (see `ui::health::bound_body_to_end`).
+    fn health_capture_frame(&self) -> bool {
+        self.capture.marker.is_some()
+            && self.is_demo()
+            && self.local_surface_kind() == Some(LocalSurfaceKind::Health)
+    }
 }
+
+#[cfg(test)]
+#[path = "../../../tests/gui/app/window_events_tests.rs"]
+mod tests;
