@@ -37,6 +37,10 @@ fn fixture() -> ProcessItem {
     observations.start_token = ScalarObservation::available(600, 42);
     observations.memory_pss_bytes = ScalarObservation::available(50 * 1024 * 1024, 42);
     observations.swap_bytes = ScalarObservation::available(2 * 1024 * 1024, 42);
+    // The anonymous transparent-huge-page charge (`smaps` AnonHugePages) rides
+    // the shared scalar group, so the inline details parity fixture observes
+    // the counter the definition names instead of pinning the row to a dash.
+    observations.memory_anon_huge_pages_bytes = ScalarObservation::available(8 * 1024 * 1024, 42);
     item.apply_scalar_observations(observations);
     item
 }

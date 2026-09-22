@@ -44,7 +44,14 @@ fn fixture() -> ProcessItem {
     observations.swap_bytes = ScalarObservation::available(2 * 1024 * 1024, 42);
     observations.disk_read_bytes_total = ScalarObservation::available(10 * 1024 * 1024, 42);
     observations.disk_write_bytes_total = ScalarObservation::available(20 * 1024 * 1024, 42);
+    // The two per-process memory counters the definitions name: the anonymous
+    // transparent-huge-page charge (`smaps` AnonHugePages) rides the shared
+    // scalar group; the minor/major fault counters are typed `ProcessItem`
+    // fields (`/proc/<pid>/stat` minflt/majflt).
+    observations.memory_anon_huge_pages_bytes = ScalarObservation::available(8 * 1024 * 1024, 42);
     item.apply_scalar_observations(observations);
+    item.minor_page_faults = Some(1_234_567);
+    item.major_page_faults = Some(42);
     item
 }
 

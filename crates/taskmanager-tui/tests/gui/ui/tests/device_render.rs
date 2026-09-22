@@ -383,11 +383,16 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
             .expect("demo app should carry one disk");
         disk.smart_temperature_c = Some(42.0);
         disk.smart_percent_used = Some(5.0);
-        // Latency/throughput, top-level capacity, filesystem and SMART-depth
-        // rows the panel gained for Mission Center parity.
+        // Latency/throughput, queue-depth/service-time, top-level capacity,
+        // filesystem and SMART-depth rows the panel gained for Mission Center
+        // parity. The queue pair is written explicitly (not inherited from the
+        // demo fixture) so the assertions below prove this panel reads the
+        // per-disk typed counters.
         let mut disk_observations = *disk.scalar_observations();
         disk_observations.response_time_ms = ScalarObservation::available(1.5, 1);
         disk_observations.iops = ScalarObservation::available(137, 1);
+        disk_observations.average_queue_depth = ScalarObservation::available(2.5, 1);
+        disk_observations.service_time_ms = ScalarObservation::available(0.75, 1);
         disk.apply_scalar_observations(disk_observations);
         disk.fs_type = "btrfs".into();
         disk.smart_temp_critical_c = Some(70.0);
@@ -434,6 +439,17 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
     // rows the panel gained for parity with the GPUI disk_stats view.
     assert!(text.contains("1.50 ms"), "response time must render");
     assert!(text.contains("137"), "IOPS must render");
+    // Queue depth and the busy-time service estimate are the remaining two
+    // per-disk counters the storage definition names; both ride this disk's own
+    // scalar group and are rendered on one shared row.
+    assert!(
+        text.contains("Avg queue 2.50"),
+        "average queue depth must render its observed value"
+    );
+    assert!(
+        text.contains("Service estimate 0.75 ms"),
+        "service-time estimate must render its observed value"
+    );
     assert!(text.contains("btrfs"), "filesystem type must render");
     assert!(
         text.contains("2000.0 GiB"),
@@ -444,6 +460,33 @@ fn disk_detail_section_renders_rates_smart_and_partition_space() {
         "top-level disk free space must render"
     );
     assert!(text.contains("8800 h"), "power-on hours must render");
+
+    // A disk whose two counters are explicitly unavailable omits the whole
+    // queue/service row: the panel never prints a fabricated "Avg queue 0.00"
+    // or "Service estimate 0.00 ms" for an unobserved device.
+    taskmanager_shell::fixture::edit_snapshot(&mut app.shell, |snapshot| {
+        let disk = snapshot
+            .as_mut()
+            .and_then(|snapshot| snapshot.disks.first_mut())
+            .expect("demo app should carry one disk");
+        let mut observations = *disk.scalar_observations();
+        observations.average_queue_depth = ScalarObservation::unavailable(
+            taskmanager_core::core::failure::FailureKind::Unsupported,
+        );
+        observations.service_time_ms = ScalarObservation::unavailable(
+            taskmanager_core::core::failure::FailureKind::Unsupported,
+        );
+        disk.apply_scalar_observations(observations);
+    });
+    let cold = frame_text(&app, 140, 48);
+    assert!(
+        cold.contains("nvme0n1") && cold.contains("1.50 ms"),
+        "the disk panel must keep painting after the counters go unavailable:\n{cold}"
+    );
+    assert!(
+        !cold.contains("Avg queue") && !cold.contains("Service estimate"),
+        "an unobserved queue/service pair must omit the row, never fabricate zeros:\n{cold}"
+    );
 }
 
 #[test]
