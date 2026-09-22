@@ -13,6 +13,7 @@ mod envelope;
 mod failure;
 mod instance;
 mod platform;
+mod platform_surface;
 mod port;
 mod scheduler;
 mod source;
@@ -32,6 +33,7 @@ pub use failure::{
 };
 pub use instance::{InstanceEvent, InstanceFailure, InstanceGuard, InstanceRole};
 pub use platform::PlatformAxis;
+pub use platform_surface::{PlatformCapabilitySurface, PlatformSource, PlatformSourceError};
 pub use port::{EventPort, RequestPort};
 pub use scheduler::{
     CapabilityRecoveryOutcome, CapabilityRecoveryTrigger, CapabilityScheduler,

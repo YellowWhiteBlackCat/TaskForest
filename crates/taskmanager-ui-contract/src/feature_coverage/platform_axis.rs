@@ -2,17 +2,18 @@
 //!
 //! This module owns the CONNECTION between the three axes, not a fourth
 //! vocabulary. It composes two axes this crate owns ([`FeatureId`] and
-//! [`FrontendShape`]) with the platform identity axis owned by
-//! `taskmanager-platform-contract` ([`PlatformAxis`]; consumers import that
-//! type from its owner, this crate never re-exports it) and folds them with
-//! one mechanical function, [`classify`].
+//! [`FrontendShape`]) with the platform axis and the static registration
+//! surface owned by `taskmanager-platform-contract` ([`PlatformAxis`],
+//! [`PlatformSource`], [`PlatformCapabilitySurface`]; consumers import those
+//! types from their owner, this crate never re-exports them) and folds them
+//! with one mechanical function, [`classify`].
 //!
 //! ## One fact, one authority
 //!
 //! | Layer | Fact | Authority |
 //! |---|---|---|
 //! | A | what a feature needs from the platform | [`FeatureId::platform_binding`] |
-//! | B | which source a platform registers per capability | [`PlatformCapabilitySurface`] (supplied by the caller; M3.2 moves the concrete declarations next to the real providers) |
+//! | B | which source a platform registers per capability | [`PlatformCapabilitySurface`] - owned by `taskmanager-platform-contract`, next to the capability identity and the platform axis; the caller supplies the concrete declarations |
 //! | C | what the runtime catalog reports right now | `CapabilityCatalog::snapshot`, consumed only by platform conformance - never folded into this static ledger |
 //!
 //! Layer C is deliberately excluded: the runtime catalog seeds descriptors only
@@ -35,15 +36,16 @@
 //! declared frontend entry is the achieved shape of definition A, not a gap;
 //! a platform `Present` with no frontend entry is `Missing`.
 //!
-//! ## Read-only at M3.1
+//! ## Read-only report, hard gate at M3.4
 //!
 //! [`feature_platform_report`] returns the per-cell status without failing
-//! anything: M3.1 lands the axes and the mechanical fold, and deliberately
-//! does not wire a hard gate (M3.4 does). [`FeaturePlatformStatus::Ready`]
+//! anything. [`feature_platform_gate_findings`](super::feature_platform_gate_findings)
+//! is the M3.4 hard gate over the same fold. [`FeaturePlatformStatus::Ready`]
 //! means "the static source commitment is complete" - never a runtime
 //! `Available` claim, which only platform conformance can prove on a real
-//! host. Evidence anchors arrive with the P4 manifest integration, so every
-//! M3.1 cell honestly reports [`NO_EVIDENCE`].
+//! host. Evidence anchors arrive with the P4 manifest integration, so a cell
+//! without an anchor reports [`NO_EVIDENCE`] and cannot pass the gate as
+//! `Ready`.
 //!
 //! ## `NotApplicable` criterion
 //!
@@ -54,11 +56,9 @@
 //! gap that is merely not implemented yet must stay `Requires` + absent or
 //! undeclared; marking it `NotApplicable` would legitimize the gap.
 
-use std::collections::BTreeMap;
-use std::fmt;
-
 use taskmanager_platform_contract::{
-    CapabilityId, CapabilityStatus, PlatformAxis, RetryDisposition,
+    CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
+    RetryDisposition,
 };
 
 use super::platform_binding::PlatformBinding;
@@ -83,127 +83,6 @@ pub const MISSING_UNSUPPORTED_REASON: &str = "frontend declares no entry point";
 
 const fn non_empty_reason(reason: &'static str, fallback: &'static str) -> &'static str {
     if reason.is_empty() { fallback } else { reason }
-}
-
-/// One capability's static registration fact on one platform.
-///
-/// This is a declaration, never a runtime status: `Present` means "this
-/// platform registers a real source for the capability identity"; a runtime
-/// `Available`/`Degraded` observation belongs to `CapabilityCatalog` and is
-/// checked by platform conformance, not folded here.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PlatformSource {
-    /// A real provider is registered for every required capability.
-    Present,
-    /// Registered but honestly absent, with the typed capability-level
-    /// reason. The status is restricted to the four absence projections of
-    /// `ProviderFailure::capability_status`
-    /// ([`PlatformSource::is_absence_projection`]); runtime transients are not
-    /// static commitments.
-    Absent(CapabilityStatus),
-    /// The product expects the capability identity, but this platform
-    /// registers no declaration at all - the forbidden silent absence.
-    Undeclared,
-}
-
-/// Why a [`CapabilityStatus`] cannot justify a static absence.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PlatformSourceError {
-    /// The rejected status.
-    pub status: CapabilityStatus,
-}
-
-impl fmt::Display for PlatformSourceError {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            formatter,
-            "capability status {:?} is a runtime state, not a static absence projection",
-            self.status
-        )
-    }
-}
-
-impl std::error::Error for PlatformSourceError {}
-
-impl PlatformSource {
-    /// Whether `status` is one of the four absence projections
-    /// `ProviderFailure::capability_status` can produce from a static failure.
-    ///
-    /// A runtime status (`Available`, `Degraded`, `TemporarilyUnavailable`,
-    /// `Stale`) never justifies a static absence.
-    #[must_use]
-    pub const fn is_absence_projection(status: CapabilityStatus) -> bool {
-        matches!(
-            status,
-            CapabilityStatus::Unsupported
-                | CapabilityStatus::PermissionRequired
-                | CapabilityStatus::RequiresEscalation
-                | CapabilityStatus::MissingDependency
-        )
-    }
-
-    /// Typed constructor for an honest static absence.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`PlatformSourceError`] when `status` is a runtime state that
-    /// cannot be a static source commitment.
-    pub fn absent(status: CapabilityStatus) -> Result<Self, PlatformSourceError> {
-        if Self::is_absence_projection(status) {
-            Ok(Self::Absent(status))
-        } else {
-            Err(PlatformSourceError { status })
-        }
-    }
-}
-
-/// One platform's declared source surface (layer B).
-///
-/// The surface is input, not authority: callers (platform adapter conformance
-/// crates, or a test fixture) declare `(platform, capability) -> source`.
-/// [`PlatformCapabilitySurface::source`] answers [`PlatformSource::Undeclared`]
-/// for a pair nobody declared, so a missing declaration is a typed, visible
-/// fact instead of a default success.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct PlatformCapabilitySurface {
-    entries: BTreeMap<(PlatformAxis, CapabilityId), PlatformSource>,
-}
-
-impl PlatformCapabilitySurface {
-    /// An empty surface: every queried pair is `Undeclared`.
-    #[must_use]
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Declare one platform's source commitment, replacing and returning any
-    /// previous declaration for the same pair.
-    pub fn declare(
-        &mut self,
-        platform: PlatformAxis,
-        capability: CapabilityId,
-        source: PlatformSource,
-    ) -> Option<PlatformSource> {
-        self.entries.insert((platform, capability), source)
-    }
-
-    /// The declared source for one platform/capability pair.
-    #[must_use]
-    pub fn source(&self, platform: PlatformAxis, capability: &CapabilityId) -> PlatformSource {
-        self.entries
-            .get(&(platform, capability.clone()))
-            .copied()
-            .unwrap_or(PlatformSource::Undeclared)
-    }
-
-    /// Every declared pair in deterministic order.
-    pub fn entries(
-        &self,
-    ) -> impl Iterator<Item = ((PlatformAxis, CapabilityId), PlatformSource)> + '_ {
-        self.entries
-            .iter()
-            .map(|(key, source)| (key.clone(), *source))
-    }
 }
 
 /// The typed reason a non-`Ready` cell reports for an unavailable source.
@@ -329,6 +208,22 @@ impl FeaturePlatformLedger {
         declarations: &[FeatureCoverageDeclaration],
         sources: &PlatformCapabilitySurface,
     ) -> Self {
+        Self::from_declarations_with_evidence(declarations, sources, |_, _, _| NO_EVIDENCE)
+    }
+
+    /// Fold several frontend declarations and attach the behaviour evidence
+    /// anchor per cell.
+    ///
+    /// The anchor is the P4 manifest `test_id_or_scenario` (never a file/line
+    /// literal): the caller answers [`NO_EVIDENCE`] while no anchor exists, and
+    /// a `Ready` claim then fails the gate instead of borrowing the static
+    /// source commitment as a behaviour proof.
+    #[must_use]
+    pub fn from_declarations_with_evidence(
+        declarations: &[FeatureCoverageDeclaration],
+        sources: &PlatformCapabilitySurface,
+        evidence: impl Fn(FeatureId, FrontendShape, PlatformAxis) -> &'static str,
+    ) -> Self {
         let mut cells =
             Vec::with_capacity(declarations.len() * FeatureId::ALL.len() * PlatformAxis::ALL.len());
         for declaration in declarations {
@@ -339,7 +234,7 @@ impl FeaturePlatformLedger {
                         frontend: declaration.frontend,
                         platform,
                         status: classify(declaration, *feature, platform, sources),
-                        evidence: NO_EVIDENCE,
+                        evidence: evidence(*feature, declaration.frontend, platform),
                     });
                 }
             }
@@ -351,6 +246,21 @@ impl FeaturePlatformLedger {
     #[must_use]
     pub fn cells(&self) -> &[FeaturePlatformCell] {
         &self.cells
+    }
+
+    /// The distinct frontend shapes folded into this ledger, in canonical
+    /// [`FrontendShape::ALL`] order; empty for a ledger with no cell.
+    ///
+    /// The hard gate derives its expected grid from this set crossed with
+    /// `FeatureId::ALL` and `PlatformAxis::ALL`, so a dropped cell is visible
+    /// without restating any declaration.
+    #[must_use]
+    pub fn frontends(&self) -> Vec<FrontendShape> {
+        FrontendShape::ALL
+            .iter()
+            .copied()
+            .filter(|shape| self.cells.iter().any(|cell| cell.frontend == *shape))
+            .collect()
     }
 
     /// Iterate every cell in canonical order.
@@ -529,7 +439,7 @@ fn unregistered_without_identity() -> FeaturePlatformStatus {
 /// A runtime status that cannot be an absence keeps
 /// [`RetryDisposition::Never`]: it is a declaration contradiction the report
 /// preserves, never a behaviour claim.
-const fn absence_retry(status: CapabilityStatus) -> RetryDisposition {
+pub(crate) const fn absence_retry(status: CapabilityStatus) -> RetryDisposition {
     match status {
         CapabilityStatus::Unsupported => RetryDisposition::Never,
         CapabilityStatus::PermissionRequired

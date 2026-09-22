@@ -34,13 +34,15 @@ pub use columns::{PROCESS_COLUMNS, ProcessColumnSpec, find};
 pub use command::{CommandDescriptor, descriptor};
 pub use conformance::ContractTag;
 pub use feature_coverage::{
-    FeatureArea, FeatureCoverageDeclaration, FeatureCoverageEntry, FeatureCoverageFinding,
-    FeatureCoverageFindingKind, FeatureCoverageStatus, FeatureId, FeatureOrigin,
-    FeaturePlatformCell, FeaturePlatformLedger, FeaturePlatformStatus, FeatureSemanticSpec,
-    MISSING_DECLARATION_REASON, MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PartialCause,
-    PlatformBinding, PlatformCapabilitySurface, PlatformSource, PlatformSourceError,
-    PlatformUnavailability, classify, feature_coverage_drift, feature_coverage_findings,
-    feature_coverage_report, feature_platform_report,
+    FEATURE_INDEPENDENT_CAPABILITIES, FeatureArea, FeatureCoverageDeclaration,
+    FeatureCoverageEntry, FeatureCoverageFinding, FeatureCoverageFindingKind,
+    FeatureCoverageStatus, FeatureId, FeatureOrigin, FeaturePlatformCell, FeaturePlatformLedger,
+    FeaturePlatformStatus, FeatureSemanticSpec, MISSING_DECLARATION_REASON,
+    MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PLATFORM_GATE_BASELINE, PLATFORM_GATE_POLICY,
+    PartialCause, PlatformBinding, PlatformGateBaseline, PlatformGateFinding, PlatformGatePolicy,
+    PlatformGateRule, PlatformUnavailability, classify, feature_coverage_drift,
+    feature_coverage_findings, feature_coverage_report, feature_platform_cell_findings,
+    feature_platform_gate_findings, feature_platform_report,
 };
 pub use focus::{FocusCycle, FocusCycleStep, FocusRestoreToken, FocusTarget, ModalFocusPolicy};
 pub use functional::{

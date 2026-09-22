@@ -106,12 +106,16 @@
 //! capability requirement set, an explicit vocabulary gap, or a
 //! `NotApplicable` delivery that has no operating-system source step.
 //! [`feature_platform_report`] folds that declaration against a supplied
-//! [`PlatformCapabilitySurface`] and one frontend declaration into
-//! [`FeaturePlatformLedger`], where `Missing` (no frontend entry) and
-//! `Unsupported`/`Unregistered` (no platform source) come from different axes
-//! and never infer each other. The platform identity type is
-//! `taskmanager-platform-contract::PlatformAxis`; this crate composes it and
-//! never re-exports it.
+//! [`PlatformCapabilitySurface`] (owned by `taskmanager-platform-contract`) and
+//! one frontend declaration into [`FeaturePlatformLedger`], where `Missing` (no
+//! frontend entry) and `Unsupported`/`Unregistered` (no platform source) come
+//! from different axes and never infer each other. [`feature_platform_gate_findings`]
+//! is the M3.4 hard gate over that fold: exhaustive grid, evidence on `Ready`,
+//! typed reasons elsewhere, zero false success, bidirectional capability
+//! binding, and directional ceilings from [`PLATFORM_GATE_BASELINE`]. The
+//! platform identity and registration types are owned by
+//! `taskmanager-platform-contract`; this crate composes them and never
+//! re-exports them.
 //!
 //! ## Honesty boundary
 //!
@@ -128,14 +132,20 @@ use crate::keybindings::FrontendShape;
 
 mod platform_axis;
 mod platform_binding;
+mod platform_gate;
 mod semantic_spec;
 
 pub use platform_axis::{
     FeaturePlatformCell, FeaturePlatformLedger, FeaturePlatformStatus, MISSING_DECLARATION_REASON,
-    MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PartialCause, PlatformCapabilitySurface,
-    PlatformSource, PlatformSourceError, PlatformUnavailability, classify, feature_platform_report,
+    MISSING_UNSUPPORTED_REASON, NO_EVIDENCE, PartialCause, PlatformUnavailability, classify,
+    feature_platform_report,
 };
-pub use platform_binding::PlatformBinding;
+pub use platform_binding::{FEATURE_INDEPENDENT_CAPABILITIES, PlatformBinding};
+pub use platform_gate::{
+    PLATFORM_GATE_BASELINE, PLATFORM_GATE_POLICY, PlatformGateBaseline, PlatformGateFinding,
+    PlatformGatePolicy, PlatformGateRule, feature_platform_cell_findings,
+    feature_platform_gate_findings,
+};
 pub use semantic_spec::FeatureSemanticSpec;
 
 /// One functional area of the 225-item four-frontend parity blueprint.

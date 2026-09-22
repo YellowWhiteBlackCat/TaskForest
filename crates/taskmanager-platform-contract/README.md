@@ -52,11 +52,18 @@ failure→capability-status projection: the runtime catalog and the conformance
 scenarios delegate to it, and a caller holding the core `FailureKind` vocabulary
 reaches the same function through the lossless `from_kind` conversion.
 
+`platform_surface.rs` owns the static per-platform registration declaration the
+three-axis parity ledger folds against: `Present`, a typed
+`Absent(CapabilityStatus)` restricted to the four absence projections, or the
+forbidden silent `Undeclared`. It is a declaration, never a runtime status;
+runtime availability stays with the catalog snapshot and platform conformance.
+
 ## Module map
 
 ```text
 src/capability.rs                 capability/request/outcome vocabulary
 src/platform.rs                   platform axis identity (linux/windows/macos)
+src/platform_surface.rs           static per-platform registration surface
 src/port.rs  scheduler.rs         port and scheduling vocabulary
 src/envelope.rs                   typed event envelope (EventSequence)
 src/failure.rs                    unified failure vocabulary

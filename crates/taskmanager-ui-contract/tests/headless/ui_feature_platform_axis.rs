@@ -410,22 +410,12 @@ fn inconsistent_surface_declarations_are_reported_never_silently_ready() {
         other => panic!("an inadmissible absence must stay visible, got {other:?}"),
     }
 
-    // (3) The typed constructor refuses the same contradiction.
+    // (3) The typed constructor that refuses the same contradiction is owned
+    // by `taskmanager-platform-contract`, next to the capability identity; the
+    // fold only preserves what the surface declared.
     let error = PlatformSource::absent(CapabilityStatus::Available)
         .expect_err("a runtime status cannot be a static absence");
     assert_eq!(error.status, CapabilityStatus::Available);
-    for status in [
-        CapabilityStatus::Unsupported,
-        CapabilityStatus::PermissionRequired,
-        CapabilityStatus::RequiresEscalation,
-        CapabilityStatus::MissingDependency,
-    ] {
-        assert_eq!(
-            PlatformSource::absent(status).expect("absence projection"),
-            PlatformSource::Absent(status)
-        );
-        assert!(PlatformSource::is_absence_projection(status));
-    }
 }
 
 /// With no platform declarations at all, the ledger reports zero `Ready`

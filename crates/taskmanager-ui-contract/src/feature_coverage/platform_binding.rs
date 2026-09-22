@@ -31,6 +31,21 @@
 
 use taskmanager_platform_contract::CapabilityId;
 
+/// Product-expected capabilities that no feature owns, declared explicitly
+/// with the reason they are not a feature-ledger item.
+///
+/// This is the second acceptance path of the bidirectional binding gate (G5):
+/// an expected capability is accounted for when a feature binds it (`Requires`)
+/// OR when it appears here with a reason. A capability that is merely not bound
+/// yet is NOT feature-independent - it belongs to the accepted-debt census in
+/// the gate baseline, so a gap is never legitimized as a design decision.
+///
+/// The list is empty today: every unbound expected identity is current
+/// feature-axis debt (the 75-item registry has not expanded to it yet), not a
+/// permanent product decision. Entries land here only when the owning product
+/// surface really is independent of every registered feature.
+pub const FEATURE_INDEPENDENT_CAPABILITIES: &[(CapabilityId, &str)] = &[];
+
 /// What the product statically expects the platform axis to provide for one
 /// feature.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
