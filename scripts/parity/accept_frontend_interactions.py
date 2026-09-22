@@ -18,7 +18,8 @@ Per selected frontend it
    segment contract is ``scripts/parity/run_manifest.schema.json``);
 4. re-resolves Layer B (R4/R6) with
    ``scripts/parity/resolve_frontend_evidence.py`` against the same discovery
-   artifacts;
+   artifacts (facet manifest, unified interaction matrix, feature evidence and
+   the sparse feature co-anchor side table);
 5. folds the segments with ``scripts/quality/cross_frontend_manifest.py`` and,
    unless ``--report-only`` is passed, verifies the aggregate.
 
@@ -90,6 +91,7 @@ DEFAULT_DECLARATION = "scripts/parity/cross_frontend_matrix.tsv"
 DEFAULT_EVIDENCE_ROOT = "target/cross-frontend-evidence"
 DEFAULT_FACET_MANIFEST = "scripts/parity/cross_frontend_manifest.tsv"
 DEFAULT_FEATURE_EVIDENCE = "scripts/parity/feature_evidence.tsv"
+DEFAULT_FEATURE_CO_ANCHORS = "scripts/parity/feature_evidence_co_anchors.tsv"
 DEFAULT_REQUIREMENTS = "scripts/interaction_requirements.tsv"
 DEFAULT_SEGMENTS_DIR = "segments"
 DEFAULT_DISCOVERY_DIR = "discovery"
@@ -1300,6 +1302,8 @@ def drive(args: argparse.Namespace) -> int:
                 args.resolver_facet_manifest,
                 "--feature-evidence",
                 args.resolver_feature_evidence,
+                "--co-anchors",
+                args.resolver_co_anchors,
                 "--interaction-matrix",
                 str(declaration),
                 "--requirements",
@@ -1562,6 +1566,13 @@ def self_test() -> int:
             + "\t".join(["demo-feature", "bevy", "-", "pending", "no discoverable anchor yet"])
             + "\n",
         )
+        # The co-anchor side table is default-on in the resolver; the fixture
+        # carries the legal empty state (header only), so the driver's flag
+        # plumbing is exercised without inventing a second anchored cell.
+        co_anchor_manifest = write(
+            "co-anchors.tsv",
+            "\t".join(resolver.FEATURE_CO_ANCHOR_FIELDS) + "\n",
+        )
         requirements = write("requirements.tsv", "requirement_id\nP0-MC-00\nP0-MC-01\nP0-MC-02\nP0-MC-03\n")
         source_manifests = {
             frontend: write(f"source/{frontend}.txt", f"{frontend}-source\n")
@@ -1577,6 +1588,8 @@ def self_test() -> int:
             str(facet_manifest),
             "--resolver-feature-evidence",
             str(feature_manifest),
+            "--resolver-co-anchors",
+            str(co_anchor_manifest),
             "--resolver-requirements",
             str(requirements),
             "--evidence-root",
@@ -1771,6 +1784,8 @@ def self_test() -> int:
                 str(dangling_facet),
                 "--resolver-feature-evidence",
                 str(dangling_feature),
+                "--resolver-co-anchors",
+                str(co_anchor_manifest),
                 "--resolver-requirements",
                 str(dangling_requirements),
                 "--evidence-root",
@@ -2003,6 +2018,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--resolver-facet-manifest", default=DEFAULT_FACET_MANIFEST)
     parser.add_argument("--resolver-feature-evidence", default=DEFAULT_FEATURE_EVIDENCE)
+    parser.add_argument(
+        "--resolver-co-anchors",
+        default=DEFAULT_FEATURE_CO_ANCHORS,
+        help=(
+            "sparse feature co-anchor side table passed to the resolver stage "
+            "(default: %(default)s, the same file the gate resolves)"
+        ),
+    )
     parser.add_argument("--resolver-requirements", default=DEFAULT_REQUIREMENTS)
     parser.add_argument(
         "--resolver",

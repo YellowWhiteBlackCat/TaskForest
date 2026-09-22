@@ -83,6 +83,21 @@ vocabulary authority is the Rust `FeatureId::ALL` registry in
 `taskmanager-ui-contract` (its contract test rejects an unknown id); like
 `contract_tag`, this resolver treats the field as opaque data.
 
+Feature co-anchors (`--co-anchors`)
+-----------------------------------
+`scripts/parity/feature_evidence_co_anchors.tsv` (default on, read in the same
+pass) is the sparse optional column of the feature table: one row per extra
+hand-declared test id that proves a named clause of an already-anchored
+`(feature_id, frontend)` cell. The cell's primary `test_id` keeps its meaning
+and stays the anchor authority; a co-anchor only records a further discoverable
+test for a clause whose production surface the primary anchor does not drive
+(the repository's cross-anchor case, for example the iced/bevy ordering-cycle
+clauses). Every `co_test_id` is checked against the owning frontend's discovery
+exactly like a primary anchor: a renamed or deleted co-anchor is `dangling`
+(R4). A row naming a cell without an anchored feature-evidence row, or
+repeating that cell's primary anchor, is `invalid`. The `feature_id` field is
+the same opaque reference as in the main table.
+
 Scopes
 ------
 * `--scope all` (default) evaluates every declared anchor and keeps the
@@ -175,6 +190,22 @@ FEATURE_EVIDENCE_STATUSES = {"anchored", "pending"}
 # Default committed feature-evidence table; `--feature-evidence PATH` overrides
 # it.  It is committed declaration data, never a second vocabulary.
 DEFAULT_FEATURE_EVIDENCE = "scripts/parity/feature_evidence.tsv"
+
+# Feature-level co-anchor side table (`--co-anchors`, default on).  One row per
+# extra hand-declared test id that proves a named clause of an already-anchored
+# `(feature_id, frontend)` cell in the table above.  It is the sparse form of
+# an optional sixth column: the Rust consumer embeds `feature_evidence.tsv`
+# with `include_str!` and accepts exactly five columns, so the column cannot be
+# appended until a `crates/**` change owns the cutover.  The primary `test_id`
+# keeps its meaning; this table never becomes an anchor authority of its own.
+FEATURE_CO_ANCHOR_FIELDS = ("feature_id", "frontend", "co_test_id", "reason")
+
+# Default committed co-anchor table; `--co-anchors PATH` overrides it.  Missing
+# file is a fatal usage error (fail closed), like the feature table itself.
+DEFAULT_FEATURE_CO_ANCHORS = "scripts/parity/feature_evidence_co_anchors.tsv"
+
+# The channel marker on co-anchor dangling/invalid entries.
+FEATURE_CO_ANCHOR_CHANNEL = "feature-evidence-co-anchor"
 
 # The feature-evidence subject kind used in reports and dangling entries.
 FEATURE_SUBJECT_KIND = "feature"
@@ -559,6 +590,60 @@ def read_feature_evidence(path: Path) -> list[dict[str, str]]:
     return rows
 
 
+def read_feature_co_anchors(path: Path) -> list[dict[str, str]]:
+    """Read the sparse feature co-anchor table (`--co-anchors`).
+
+    Structural rules only: the schema, the known frontend, the `-` marker
+    discipline (a co-anchor always names a test id and always states the clause
+    it proves), and the per-cell key.  Cross-table semantics -- the named cell
+    must carry an anchored `feature_evidence.tsv` row and the co-anchor must not
+    repeat that cell's primary test id -- are resolved in `resolve()`, where
+    both tables and discovery are available.  An empty table (header only) is a
+    legal state: no cell has declared a co-anchor yet.
+    """
+    if not path.is_file():
+        raise ResolveError(f"feature co-anchor table not found: {path}")
+    with path.open("r", encoding="utf-8", newline="") as handle:
+        data_lines = [
+            line for line in handle
+            if line.strip() and not line.lstrip().startswith("#")
+        ]
+    reader = csv.DictReader(data_lines, delimiter="\t")
+    if tuple(reader.fieldnames or ()) != FEATURE_CO_ANCHOR_FIELDS:
+        raise ResolveError(
+            f"{path}: expected fields {FEATURE_CO_ANCHOR_FIELDS}, got {reader.fieldnames}"
+        )
+    rows: list[dict[str, str]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for lineno, row in enumerate(reader, start=2):
+        if any(value is None for value in row.values()):
+            raise ResolveError(f"{path}:{lineno}: malformed row (wrong field count)")
+        empty = [field for field in FEATURE_CO_ANCHOR_FIELDS if row[field].strip() == ""]
+        if empty:
+            raise ResolveError(f"{path}:{lineno}: empty field(s): {', '.join(empty)}")
+        frontend = row["frontend"].strip()
+        if frontend not in FRONTEND_PACKAGES:
+            raise ResolveError(f"{path}:{lineno}: unknown frontend {frontend!r}")
+        if row["co_test_id"].strip() == "-":
+            raise ResolveError(
+                f"{path}:{lineno}: a co-anchor row must name its test id"
+            )
+        if row["reason"].strip() == "-":
+            raise ResolveError(
+                f"{path}:{lineno}: a co-anchor row must state the clause it proves "
+                "in `reason`"
+            )
+        key = (row["feature_id"].strip(), frontend, row["co_test_id"].strip())
+        if key in seen:
+            raise ResolveError(
+                f"{path}:{lineno}: duplicate (feature_id, frontend, co_test_id) row: "
+                f"{key[0]}/{key[1]}/{key[2]}"
+            )
+        seen.add(key)
+        rows.append(row)
+    return rows
+
+
 def read_requirements(path: Path) -> list[str]:
     """Read the public requirement-id vocabulary (`requirement_id` header).
 
@@ -776,6 +861,7 @@ def skipped_report(
     decision: ScopeDecision,
     interaction_path: Path | None = None,
     feature_evidence_path: Path | None = None,
+    feature_co_anchor_path: Path | None = None,
 ) -> dict:
     """Report for an `--scope auto` run whose diff cannot move an anchor.
 
@@ -799,6 +885,9 @@ def skipped_report(
         "feature_anchored": 0,
         "feature_pending": 0,
         "feature_dangling": 0,
+        "feature_co_anchors": 0,
+        "feature_co_anchor_cells": 0,
+        "feature_co_anchor_dangling": 0,
     }
     return {
         "manifest": str(manifest_path),
@@ -814,6 +903,12 @@ def skipped_report(
             "rows": 0,
             "anchored": 0,
             "pending": 0,
+            "dangling": 0,
+        },
+        "co_anchors": {
+            "path": str(feature_co_anchor_path) if feature_co_anchor_path else None,
+            "rows": 0,
+            "cells": 0,
             "dangling": 0,
         },
         "requirement_coverage": None,
@@ -851,10 +946,16 @@ def resolve(args: argparse.Namespace) -> dict:
         feature_path = repo / feature_path
     feature_rows = read_feature_evidence(feature_path)
 
+    co_anchor_path = getattr(args, "co_anchors", None) or DEFAULT_FEATURE_CO_ANCHORS
+    co_anchor_path = Path(co_anchor_path)
+    if not co_anchor_path.is_absolute():
+        co_anchor_path = repo / co_anchor_path
+    co_anchor_rows = read_feature_co_anchors(co_anchor_path)
+
     decision = scope_decision_for_run(args, repo)
     if not decision.relevant:
         return skipped_report(
-            manifest_path, decision, interaction_path, feature_path
+            manifest_path, decision, interaction_path, feature_path, co_anchor_path
         )
 
     provided = split_pairs(args.discovery, "discovery")
@@ -868,6 +969,7 @@ def resolve(args: argparse.Namespace) -> dict:
         {row["frontend"] for row in rows}
         | {row["frontend"] for row in interaction_rows}
         | {row["frontend"] for row in feature_rows}
+        | {row["frontend"] for row in co_anchor_rows}
     )
     badly_named = sorted(set(required_frontends) - set(FRONTEND_PACKAGES))
     if badly_named:
@@ -1050,6 +1152,68 @@ def resolve(args: argparse.Namespace) -> dict:
                 "channel": "feature-evidence",
             })
 
+    # Feature-level co-anchors: the sparse side table extends an already-anchored
+    # `(feature_id, frontend)` cell with further discoverable tests for a named
+    # definition clause whose production surface the primary anchor does not
+    # drive.  The primary `test_id` keeps its meaning; a co-anchor that names a
+    # cell without an anchored row, or repeats that cell's primary anchor, is
+    # `invalid`; a co-anchor missing from discovery is `dangling` (R4).
+    feature_co_anchors = feature_co_anchor_cells = feature_co_anchor_dangling = 0
+    anchored_cells: dict[tuple[str, str], str] = {
+        (row["feature_id"].strip(), row["frontend"].strip()): row["test_id"].strip()
+        for row in feature_rows
+        if row["status"].strip() == "anchored"
+    }
+    co_anchor_cells: set[tuple[str, str]] = set()
+    for row in co_anchor_rows:
+        feature_co_anchors += 1
+        feature_id = row["feature_id"].strip()
+        frontend = row["frontend"].strip()
+        test_id = row["co_test_id"].strip()
+        cell = (feature_id, frontend)
+        primary = anchored_cells.get(cell)
+        if primary is None:
+            invalid.append({
+                "reason": (
+                    "co-anchor names a (feature_id, frontend) cell without an "
+                    "anchored feature-evidence row"
+                ),
+                "subject_kind": FEATURE_SUBJECT_KIND,
+                "subject_id": feature_id,
+                "frontend": frontend,
+                "test_id": test_id,
+                "channel": FEATURE_CO_ANCHOR_CHANNEL,
+            })
+            continue
+        if test_id == primary:
+            invalid.append({
+                "reason": (
+                    "co-anchor repeats the cell's primary anchor test id; the "
+                    "primary anchor is resolved by its own row"
+                ),
+                "subject_kind": FEATURE_SUBJECT_KIND,
+                "subject_id": feature_id,
+                "frontend": frontend,
+                "test_id": test_id,
+                "channel": FEATURE_CO_ANCHOR_CHANNEL,
+            })
+            continue
+        co_anchor_cells.add(cell)
+        if test_id not in discovered[frontend]:
+            feature_co_anchor_dangling += 1
+            dangling.append({
+                "reason": (
+                    "anchor not discovered by cargo nextest list "
+                    "(R4, feature co-anchor)"
+                ),
+                "subject_kind": FEATURE_SUBJECT_KIND,
+                "subject_id": feature_id,
+                "frontend": frontend,
+                "test_id": test_id,
+                "channel": FEATURE_CO_ANCHOR_CHANNEL,
+            })
+    feature_co_anchor_cells = len(co_anchor_cells)
+
     # Optional requirement-coverage authority (`--requirements` or
     # `--require-requirement-coverage`).  Without it `p0_id` stays opaque.
     requirement_coverage_report = None
@@ -1097,6 +1261,12 @@ def resolve(args: argparse.Namespace) -> dict:
             "pending": feature_pending,
             "dangling": feature_dangling,
         },
+        "co_anchors": {
+            "path": str(co_anchor_path),
+            "rows": feature_co_anchors,
+            "cells": feature_co_anchor_cells,
+            "dangling": feature_co_anchor_dangling,
+        },
         "requirement_coverage": requirement_coverage_report,
         "generated_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "status": status,
@@ -1122,6 +1292,9 @@ def resolve(args: argparse.Namespace) -> dict:
             "feature_anchored": feature_anchored,
             "feature_pending": feature_pending,
             "feature_dangling": feature_dangling,
+            "feature_co_anchors": feature_co_anchors,
+            "feature_co_anchor_cells": feature_co_anchor_cells,
+            "feature_co_anchor_dangling": feature_co_anchor_dangling,
         },
         "frontends": {
             frontend: {
@@ -1177,6 +1350,17 @@ def build_parser() -> argparse.ArgumentParser:
             "source (default: %(default)s); anchored rows are checked against "
             "the owning frontend's discovery, `pending` rows are counted, never "
             "dangling"
+        ),
+    )
+    parser.add_argument(
+        "--co-anchors",
+        default=DEFAULT_FEATURE_CO_ANCHORS,
+        metavar="PATH",
+        help=(
+            "sparse feature co-anchor side table read in the same pass "
+            "(default: %(default)s); each row extends an anchored feature "
+            "cell with a further discoverable test and is resolved against the "
+            "owning frontend's discovery exactly like a primary anchor"
         ),
     )
     parser.add_argument(
@@ -1259,12 +1443,19 @@ def format_summary(report: dict) -> str:
         return "\n".join(lines)
     interaction = report.get("interaction_matrix") or {}
     feature_evidence = report.get("feature_evidence") or {}
+    co_anchors = report.get("co_anchors") or {}
     # `counts.dangling`/`counts.pending` are the shared totals (manifest +
-    # interaction matrix + feature evidence); the facet line shows the manifest
-    # share so the sources stay readable.
+    # interaction matrix + feature evidence + feature co-anchors); the facet
+    # line shows the manifest share so the sources stay readable.
     interaction_dangling = int(interaction.get("dangling") or 0)
     feature_dangling = int(feature_evidence.get("dangling") or 0)
-    facet_dangling = counts.get("dangling", 0) - interaction_dangling - feature_dangling
+    co_anchor_dangling = int(co_anchors.get("dangling") or 0)
+    facet_dangling = (
+        counts.get("dangling", 0)
+        - interaction_dangling
+        - feature_dangling
+        - co_anchor_dangling
+    )
     interaction_pending = int(interaction.get("pending") or 0)
     feature_pending = int(feature_evidence.get("pending") or 0)
     facet_pending = counts.get("pending", 0) - interaction_pending - feature_pending
@@ -1314,6 +1505,11 @@ def format_summary(report: dict) -> str:
                 "features: {rows} feature cells | {anchored} anchored | "
                 "{dangling} dangling  ({path})".format(**feature_evidence)
             )
+    if co_anchors.get("rows"):
+        lines.append(
+            "co-anch.: {rows} feature co-anchor rows | {cells} feature cells | "
+            "{dangling} dangling  ({path})".format(**co_anchors)
+        )
     for frontend, info in report["frontends"].items():
         lines.append(
             f"  {frontend:5s} discovered {info['discovered_tests']} tests  ({info['discovery_source']})"
