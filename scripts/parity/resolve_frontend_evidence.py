@@ -83,10 +83,9 @@ vocabulary authority is the Rust `FeatureId::ALL` registry in
 `taskmanager-ui-contract` (its contract test rejects an unknown id); like
 `contract_tag`, this resolver treats the field as opaque data.
 
-Feature co-anchors (`--co-anchors`)
------------------------------------
-`scripts/parity/feature_evidence_co_anchors.tsv` (default on, read in the same
-pass) is the sparse optional column of the feature table: one row per extra
+Feature co-anchors (sixth column of `feature_evidence.tsv`)
+-----------------------------------------------------------
+The feature table's optional sixth column (`co_test_id`) records one further
 hand-declared test id that proves a named clause of an already-anchored
 `(feature_id, frontend)` cell. The cell's primary `test_id` keeps its meaning
 and stays the anchor authority; a co-anchor only records a further discoverable
@@ -180,7 +179,17 @@ INTERACTION_SUBJECT_KIND = "interaction"
 # `(feature_id, frontend)`.  The `feature_id` vocabulary is owned by the Rust
 # `FeatureId::ALL` registry in taskmanager-ui-contract; this resolver treats the
 # field as opaque declaration data (its contract test rejects an unknown id).
-FEATURE_EVIDENCE_FIELDS = ("feature_id", "frontend", "test_id", "status", "note")
+# The optional sixth column (`co_test_id`) records one further discoverable test
+# that proves a named clause of the anchored cell; it extends the primary
+# `test_id`, never replaces it, and can never make a cell `Ready`.
+FEATURE_EVIDENCE_FIELDS = (
+    "feature_id",
+    "frontend",
+    "test_id",
+    "status",
+    "note",
+    "co_test_id",
+)
 
 # The only statuses a feature-evidence row may declare: an anchored row names a
 # discoverable test id; a pending row records a surveyed gap and never becomes
@@ -191,20 +200,8 @@ FEATURE_EVIDENCE_STATUSES = {"anchored", "pending"}
 # it.  It is committed declaration data, never a second vocabulary.
 DEFAULT_FEATURE_EVIDENCE = "scripts/parity/feature_evidence.tsv"
 
-# Feature-level co-anchor side table (`--co-anchors`, default on).  One row per
-# extra hand-declared test id that proves a named clause of an already-anchored
-# `(feature_id, frontend)` cell in the table above.  It is the sparse form of
-# an optional sixth column: the Rust consumer embeds `feature_evidence.tsv`
-# with `include_str!` and accepts exactly five columns, so the column cannot be
-# appended until a `crates/**` change owns the cutover.  The primary `test_id`
-# keeps its meaning; this table never becomes an anchor authority of its own.
-FEATURE_CO_ANCHOR_FIELDS = ("feature_id", "frontend", "co_test_id", "reason")
-
-# Default committed co-anchor table; `--co-anchors PATH` overrides it.  Missing
-# file is a fatal usage error (fail closed), like the feature table itself.
-DEFAULT_FEATURE_CO_ANCHORS = "scripts/parity/feature_evidence_co_anchors.tsv"
-
-# The channel marker on co-anchor dangling/invalid entries.
+# The channel marker on co-anchor dangling/invalid entries.  Co-anchors live in
+# the feature table's sixth column, so this only labels the evidence source.
 FEATURE_CO_ANCHOR_CHANNEL = "feature-evidence-co-anchor"
 
 # The feature-evidence subject kind used in reports and dangling entries.
@@ -530,9 +527,11 @@ def read_feature_evidence(path: Path) -> list[dict[str, str]]:
     Structural rules only: the schema, the `anchored`/`pending` status
     vocabulary, the per-frontend `(feature_id, frontend)` key, the `-` marker
     discipline (`test_id` unused on a pending row, `note` unused on an anchored
-    row), and a non-empty gap note on every pending row.  The `feature_id`
-    vocabulary is owned by the Rust `FeatureId::ALL` registry and is NOT copied
-    here; this resolver only resolves the anchored test ids against discovery.
+    row, `co_test_id` used only when the row declares a co-anchor), and a
+    non-empty gap note on every pending row.  The `feature_id` vocabulary is
+    owned by the Rust `FeatureId::ALL` registry and is NOT copied here; this
+    resolver only resolves the anchored test ids and the optional co-anchor
+    (`co_test_id`) against discovery.
     """
     if not path.is_file():
         raise ResolveError(f"feature evidence not found: {path}")
@@ -587,60 +586,6 @@ def read_feature_evidence(path: Path) -> list[dict[str, str]]:
         rows.append(row)
     if not rows:
         raise ResolveError(f"{path}: feature evidence has no data rows")
-    return rows
-
-
-def read_feature_co_anchors(path: Path) -> list[dict[str, str]]:
-    """Read the sparse feature co-anchor table (`--co-anchors`).
-
-    Structural rules only: the schema, the known frontend, the `-` marker
-    discipline (a co-anchor always names a test id and always states the clause
-    it proves), and the per-cell key.  Cross-table semantics -- the named cell
-    must carry an anchored `feature_evidence.tsv` row and the co-anchor must not
-    repeat that cell's primary test id -- are resolved in `resolve()`, where
-    both tables and discovery are available.  An empty table (header only) is a
-    legal state: no cell has declared a co-anchor yet.
-    """
-    if not path.is_file():
-        raise ResolveError(f"feature co-anchor table not found: {path}")
-    with path.open("r", encoding="utf-8", newline="") as handle:
-        data_lines = [
-            line for line in handle
-            if line.strip() and not line.lstrip().startswith("#")
-        ]
-    reader = csv.DictReader(data_lines, delimiter="\t")
-    if tuple(reader.fieldnames or ()) != FEATURE_CO_ANCHOR_FIELDS:
-        raise ResolveError(
-            f"{path}: expected fields {FEATURE_CO_ANCHOR_FIELDS}, got {reader.fieldnames}"
-        )
-    rows: list[dict[str, str]] = []
-    seen: set[tuple[str, str, str]] = set()
-    for lineno, row in enumerate(reader, start=2):
-        if any(value is None for value in row.values()):
-            raise ResolveError(f"{path}:{lineno}: malformed row (wrong field count)")
-        empty = [field for field in FEATURE_CO_ANCHOR_FIELDS if row[field].strip() == ""]
-        if empty:
-            raise ResolveError(f"{path}:{lineno}: empty field(s): {', '.join(empty)}")
-        frontend = row["frontend"].strip()
-        if frontend not in FRONTEND_PACKAGES:
-            raise ResolveError(f"{path}:{lineno}: unknown frontend {frontend!r}")
-        if row["co_test_id"].strip() == "-":
-            raise ResolveError(
-                f"{path}:{lineno}: a co-anchor row must name its test id"
-            )
-        if row["reason"].strip() == "-":
-            raise ResolveError(
-                f"{path}:{lineno}: a co-anchor row must state the clause it proves "
-                "in `reason`"
-            )
-        key = (row["feature_id"].strip(), frontend, row["co_test_id"].strip())
-        if key in seen:
-            raise ResolveError(
-                f"{path}:{lineno}: duplicate (feature_id, frontend, co_test_id) row: "
-                f"{key[0]}/{key[1]}/{key[2]}"
-            )
-        seen.add(key)
-        rows.append(row)
     return rows
 
 
@@ -861,7 +806,6 @@ def skipped_report(
     decision: ScopeDecision,
     interaction_path: Path | None = None,
     feature_evidence_path: Path | None = None,
-    feature_co_anchor_path: Path | None = None,
 ) -> dict:
     """Report for an `--scope auto` run whose diff cannot move an anchor.
 
@@ -906,7 +850,7 @@ def skipped_report(
             "dangling": 0,
         },
         "co_anchors": {
-            "path": str(feature_co_anchor_path) if feature_co_anchor_path else None,
+            "path": str(feature_evidence_path) if feature_evidence_path else None,
             "rows": 0,
             "cells": 0,
             "dangling": 0,
@@ -946,17 +890,9 @@ def resolve(args: argparse.Namespace) -> dict:
         feature_path = repo / feature_path
     feature_rows = read_feature_evidence(feature_path)
 
-    co_anchor_path = getattr(args, "co_anchors", None) or DEFAULT_FEATURE_CO_ANCHORS
-    co_anchor_path = Path(co_anchor_path)
-    if not co_anchor_path.is_absolute():
-        co_anchor_path = repo / co_anchor_path
-    co_anchor_rows = read_feature_co_anchors(co_anchor_path)
-
     decision = scope_decision_for_run(args, repo)
     if not decision.relevant:
-        return skipped_report(
-            manifest_path, decision, interaction_path, feature_path, co_anchor_path
-        )
+        return skipped_report(manifest_path, decision, interaction_path, feature_path)
 
     provided = split_pairs(args.discovery, "discovery")
     unknown = sorted(set(provided) - set(FRONTEND_PACKAGES))
@@ -969,7 +905,6 @@ def resolve(args: argparse.Namespace) -> dict:
         {row["frontend"] for row in rows}
         | {row["frontend"] for row in interaction_rows}
         | {row["frontend"] for row in feature_rows}
-        | {row["frontend"] for row in co_anchor_rows}
     )
     badly_named = sorted(set(required_frontends) - set(FRONTEND_PACKAGES))
     if badly_named:
@@ -1152,12 +1087,13 @@ def resolve(args: argparse.Namespace) -> dict:
                 "channel": "feature-evidence",
             })
 
-    # Feature-level co-anchors: the sparse side table extends an already-anchored
-    # `(feature_id, frontend)` cell with further discoverable tests for a named
-    # definition clause whose production surface the primary anchor does not
-    # drive.  The primary `test_id` keeps its meaning; a co-anchor that names a
-    # cell without an anchored row, or repeats that cell's primary anchor, is
-    # `invalid`; a co-anchor missing from discovery is `dangling` (R4).
+    # Feature-level co-anchors: the feature table's optional sixth column
+    # extends an already-anchored `(feature_id, frontend)` cell with a further
+    # discoverable test for a named definition clause whose production surface
+    # the primary anchor does not drive.  The primary `test_id` keeps its
+    # meaning; a co-anchor that names a cell without an anchored row, or repeats
+    # that cell's primary anchor, is `invalid`; a co-anchor missing from
+    # discovery is `dangling` (R4).
     feature_co_anchors = feature_co_anchor_cells = feature_co_anchor_dangling = 0
     anchored_cells: dict[tuple[str, str], str] = {
         (row["feature_id"].strip(), row["frontend"].strip()): row["test_id"].strip()
@@ -1165,11 +1101,13 @@ def resolve(args: argparse.Namespace) -> dict:
         if row["status"].strip() == "anchored"
     }
     co_anchor_cells: set[tuple[str, str]] = set()
-    for row in co_anchor_rows:
+    for row in feature_rows:
+        test_id = row["co_test_id"].strip()
+        if test_id == "-":
+            continue
         feature_co_anchors += 1
         feature_id = row["feature_id"].strip()
         frontend = row["frontend"].strip()
-        test_id = row["co_test_id"].strip()
         cell = (feature_id, frontend)
         primary = anchored_cells.get(cell)
         if primary is None:
@@ -1262,7 +1200,7 @@ def resolve(args: argparse.Namespace) -> dict:
             "dangling": feature_dangling,
         },
         "co_anchors": {
-            "path": str(co_anchor_path),
+            "path": str(feature_path),
             "rows": feature_co_anchors,
             "cells": feature_co_anchor_cells,
             "dangling": feature_co_anchor_dangling,
@@ -1353,17 +1291,6 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "--co-anchors",
-        default=DEFAULT_FEATURE_CO_ANCHORS,
-        metavar="PATH",
-        help=(
-            "sparse feature co-anchor side table read in the same pass "
-            "(default: %(default)s); each row extends an anchored feature "
-            "cell with a further discoverable test and is resolved against the "
-            "owning frontend's discovery exactly like a primary anchor"
-        ),
-    )
-    parser.add_argument(
         "--require-requirement-coverage",
         action="store_true",
         help=(
@@ -1445,8 +1372,9 @@ def format_summary(report: dict) -> str:
     feature_evidence = report.get("feature_evidence") or {}
     co_anchors = report.get("co_anchors") or {}
     # `counts.dangling`/`counts.pending` are the shared totals (manifest +
-    # interaction matrix + feature evidence + feature co-anchors); the facet
-    # line shows the manifest share so the sources stay readable.
+    # interaction matrix + feature evidence, whose sixth column carries the
+    # feature co-anchors); the facet line shows the manifest share so the
+    # sources stay readable.
     interaction_dangling = int(interaction.get("dangling") or 0)
     feature_dangling = int(feature_evidence.get("dangling") or 0)
     co_anchor_dangling = int(co_anchors.get("dangling") or 0)
