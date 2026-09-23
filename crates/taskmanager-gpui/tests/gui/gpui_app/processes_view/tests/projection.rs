@@ -150,9 +150,10 @@ mod canonical_category {
     };
     use taskmanager_application::i18n::{self, Language};
     use taskmanager_application::process_category_projection::category_expansion_key;
+    use taskmanager_core::core::metrics::ScalarObservation;
     use taskmanager_core::core::process::{
         ProcessApplicationIdentity, ProcessCategory, ProcessItem, ProcessLiveKey,
-        ProcessMetadataObservation,
+        ProcessMetadataObservation, ProcessScalarObservations,
     };
     use taskmanager_shell::ProcessStatusFilter;
     use taskmanager_shell::SortCol;
@@ -770,6 +771,81 @@ mod canonical_category {
             bg_rows[2].parent_key,
             Some(row_id(200)),
             "a category-tree child climbs to its in-tree parent"
+        );
+        i18n::set_language(prior);
+    }
+
+    /// The Apps-table Swap cell renders each row's OWN observed per-process
+    /// charge from the typed `swap_bytes` observation — never a shared or
+    /// system swap total, and never a fabricated zero for an unobserved row.
+    ///
+    /// Regression caught: if `rows/projection.rs` stops projecting
+    /// `ProcessItem::current_swap_bytes()` into `VisibleRow::swap` and the
+    /// memoized `cell_text.swap` (e.g. falls back to a system total or to
+    /// `Some(0)`), the two charged rows collapse to one value (or to `0 B`),
+    /// and the unobserved row stops rendering the shared dash.
+    #[test]
+    fn swap_cell_renders_the_observed_per_process_charge_without_a_zero_fallback() {
+        let prior = pinned_english();
+        let charged = |pid: u32, name: &str, swap: Option<u64>| {
+            let scalars = ProcessScalarObservations {
+                swap_bytes: swap.map_or_else(ScalarObservation::default, |bytes| {
+                    ScalarObservation::available(bytes, 7)
+                }),
+                ..ProcessScalarObservations::default()
+            };
+            taskmanager_test_support::ProcessItemFixtureBuilder::new()
+                .pid(pid)
+                .name(name.to_owned())
+                .status("S".to_owned())
+                .scalar_observations(scalars)
+                .build()
+        };
+        let procs = [
+            charged(501, "heavy-swap", Some(32 * 1024 * 1024)),
+            charged(502, "light-swap", Some(4 * 1024 * 1024)),
+            charged(503, "measured-zero", Some(0)),
+            charged(504, "unobserved-swap", None),
+        ];
+        let refs: Vec<&ProcessItem> = procs.iter().collect();
+        let rows = visible_rows(VisibleRowsProps {
+            processes: &refs,
+            observed_at_ms: 42,
+            query: "",
+            sort_col: SortCol::Pid,
+            sort_asc: true,
+            filter: ProcessStatusFilter::All,
+            collapsed: &HashSet::new(),
+            expanded_apps: &HashSet::from([category_expansion_key(ProcessCategory::Uncategorized)]),
+            units: taskmanager_core::core::units::UnitPreferences::default(),
+        });
+        assert_eq!(
+            rows.len(),
+            5,
+            "the expanded Uncategorized header plus four process rows"
+        );
+        let swap_for = |pid: u32| {
+            rows.iter()
+                .find(|row| row.process_identity.map(ProcessLiveKey::pid) == Some(pid))
+                .map_or_else(
+                    || panic!("missing process row for pid {pid}"),
+                    |row| row.cell_text.swap.clone(),
+                )
+        };
+        assert_eq!(
+            (swap_for(501).as_str(), swap_for(502).as_str()),
+            ("32.0 MiB", "4.0 MiB"),
+            "each row paints its own charge: two distinct observed charges must never collapse to one system total"
+        );
+        assert_eq!(
+            swap_for(503),
+            "0 B",
+            "a measured zero charge stays visible as an observed `0 B`"
+        );
+        assert_eq!(
+            swap_for(504),
+            "—",
+            "an unobserved charge keeps the honest dash, never a fabricated `0 B`"
         );
         i18n::set_language(prior);
     }

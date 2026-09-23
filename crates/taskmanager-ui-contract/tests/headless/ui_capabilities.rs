@@ -35,6 +35,18 @@ fn honest_reference_support(capability: ComponentCapability) -> CapabilitySuppor
     }
 }
 
+/// The audited semantic-contract set, in canonical [`ComponentCapability::ALL`]
+/// order. A capability joins only with mount evidence; pinning the exact ids
+/// makes a silent addition (or a component that starts being mounted) fail the
+/// test instead of letting a `Reference` claim drift in.
+fn audited_semantic_contracts() -> Vec<ComponentCapability> {
+    ComponentCapability::ALL
+        .iter()
+        .copied()
+        .filter(|capability| capability.is_semantic_contract())
+        .collect()
+}
+
 /// The registry is total and duplicate-free: every variant appears exactly
 /// once in `ALL`, ids are unique, and every entry names a reference path.
 /// The count is pinned so adding a capability is a conscious registry
@@ -171,59 +183,67 @@ fn the_reference_shape_cannot_port_diverge_or_defer() {
     }
 }
 
-/// The semantic-contract registration is explicit and minimal: only the
-/// audited `SearchInput` capability is classified that way, so the reference
-/// component path stays the mounted-component claim for every other cell.
+/// The semantic-contract registration is explicit and evidence-pinned: the
+/// audited set is exactly the capabilities whose `taskmanager-ui` module owns
+/// the semantics while no production path mounts the component. Adding a
+/// capability, or unmounting a component, must fail here rather than let a
+/// `Reference` claim slide in.
 #[test]
-fn only_the_audited_capability_is_a_semantic_contract() {
-    assert!(ComponentCapability::SearchInput.is_semantic_contract());
-    assert!(!ComponentCapability::TextInput.is_semantic_contract());
-    assert!(!ComponentCapability::Table.is_semantic_contract());
+fn only_the_audited_capabilities_are_semantic_contracts() {
+    let ids: Vec<_> = audited_semantic_contracts()
+        .iter()
+        .map(|capability| capability.id())
+        .collect();
     assert_eq!(
-        ComponentCapability::ALL
-            .iter()
-            .filter(|capability| capability.is_semantic_contract())
-            .count(),
-        1,
-        "a capability joins the semantic-contract set only with audit evidence"
+        ids,
+        vec!["search-input", "checkbox", "virtual-list", "tree"],
+        "a capability joins the semantic-contract set only with mount evidence"
     );
+    assert!(!ComponentCapability::TextInput.is_semantic_contract());
+    assert!(!ComponentCapability::Switch.is_semantic_contract());
+    assert!(!ComponentCapability::Table.is_semantic_contract());
 }
 
 /// A registered semantic contract cannot be claimed as a mounted reference
-/// component: the reference shape asserting `Reference` overclaims, and the
-/// gate names the exact capability. `Ported` (frontend-local composition) is
-/// the honest declaration, but diverging from or refusing the semantics stays
-/// forbidden.
+/// component: for every audited capability the reference shape asserting
+/// `Reference` overclaims, and the gate names the exact capability. `Ported`
+/// (frontend-local composition) is the honest declaration, but diverging from
+/// or refusing the semantics stays forbidden.
 #[test]
 fn semantic_contract_capability_cannot_claim_a_mounted_reference_component() {
     let overclaim = full_declaration(FrontendShape::Gpui, |_| CapabilitySupport::Reference);
-    assert_eq!(
-        capability_findings(&overclaim),
-        vec![CapabilityFinding {
+    let expected: Vec<_> = audited_semantic_contracts()
+        .iter()
+        .map(|capability| CapabilityFinding {
             frontend: FrontendShape::Gpui,
-            capability: ComponentCapability::SearchInput,
+            capability: *capability,
             kind: CapabilityFindingKind::ReferenceComponentNotMounted,
-        }]
-    );
+        })
+        .collect();
+    assert_eq!(capability_findings(&overclaim), expected);
 
     let honest = full_declaration(FrontendShape::Gpui, honest_reference_support);
     assert!(capability_findings(&honest).is_empty());
 
-    let mut refusing = full_declaration(FrontendShape::Gpui, honest_reference_support);
-    refusing
-        .entries
-        .iter_mut()
-        .find(|entry| entry.capability == ComponentCapability::SearchInput)
-        .expect("SearchInput is registered")
-        .support = CapabilitySupport::Unsupported { reason: "why" };
-    assert_eq!(
-        capability_findings(&refusing),
-        vec![CapabilityFinding {
-            frontend: FrontendShape::Gpui,
-            capability: ComponentCapability::SearchInput,
-            kind: CapabilityFindingKind::ReferenceShapeCannotDefer,
-        }]
-    );
+    for &capability in &audited_semantic_contracts() {
+        let mut refusing = full_declaration(FrontendShape::Gpui, honest_reference_support);
+        refusing
+            .entries
+            .iter_mut()
+            .find(|entry| entry.capability == capability)
+            .expect("audited capability is declared")
+            .support = CapabilitySupport::Unsupported { reason: "why" };
+        assert_eq!(
+            capability_findings(&refusing),
+            vec![CapabilityFinding {
+                frontend: FrontendShape::Gpui,
+                capability,
+                kind: CapabilityFindingKind::ReferenceShapeCannotDefer,
+            }],
+            "{} must not defer itself even as a semantic contract",
+            capability.id()
+        );
+    }
 }
 
 /// Deliberate differences must say why: empty `via`/`reason` text is a

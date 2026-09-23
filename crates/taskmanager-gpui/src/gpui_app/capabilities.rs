@@ -5,7 +5,7 @@
 //! them — so this declaration marks each capability
 //! [`CapabilitySupport::Reference`], with one audited exception: a capability
 //! registered as a semantic contract
-//! ([`ComponentCapability::is_semantic_contract`], currently `SearchInput`) has
+//! ([`ComponentCapability::is_semantic_contract`]) has
 //! no mounted reference component, so GPUI declares
 //! [`CapabilitySupport::Ported`] for it and composes the semantics locally
 //! (see `list_view::search_box_sized`). The reference shape may not defer any

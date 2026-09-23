@@ -666,14 +666,14 @@ fn the_first_anchor_batch_is_a_conscious_census() {
     }
     assert_eq!(
         table.anchored_count(),
-        73,
+        75,
         "the anchored batch census moved"
     );
     for (frontend, anchored) in [
-        (FrontendShape::Gpui, 16usize),
+        (FrontendShape::Gpui, 17usize),
         (FrontendShape::Iced, 19),
         (FrontendShape::Tui, 21),
-        (FrontendShape::Bevy, 17),
+        (FrontendShape::Bevy, 18),
     ] {
         assert_eq!(
             table
@@ -686,18 +686,16 @@ fn the_first_anchor_batch_is_a_conscious_census() {
         );
     }
     // The W28-A per-process swap addition (`memory.process-swap-charge`) is
-    // anchored on the two shapes whose delivered surface a real test proves
-    // (Iced and TUI, both on their Apps-table swap cells). GPUI and Bevy
-    // render the swap cell but have no discoverable test that proves the
-    // observed charge (GPUI only pins the column auto-hide rule and a capture
-    // fixture; Bevy only pins the honest-dash branch), so their cells are
-    // committed as explicit `pending` gaps rather than fabricated anchors. A
-    // new surveyed near-miss must again be committed as an explicit `pending`
-    // row, and the pending shape stays covered by the parser counterexamples
-    // and the synthetic evidence-closure witness below.
+    // anchored on every shape that renders the Apps-table swap cell: Iced and
+    // TUI on their existing swap-cell tests, and (W28-P) GPUI and Bevy on new
+    // tests that feed an observed `swap_bytes` and assert the rendered charge
+    // plus the honest dash for an unobserved one. A new surveyed near-miss
+    // must again be committed as an explicit `pending` row, and the pending
+    // shape stays covered by the parser counterexamples and the synthetic
+    // evidence-closure witness below.
     assert_eq!(
         table.pending_count(),
-        2,
+        0,
         "the surveyed pending-gap census moved"
     );
 }

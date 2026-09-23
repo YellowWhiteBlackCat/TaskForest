@@ -124,17 +124,25 @@
 //! capabilities it owns only a semantic CONTRACT: the capability's
 //! `reference_path` names the module whose behavior defines the result, yet no
 //! shape mounts that component. [`ComponentCapability::is_semantic_contract`]
-//! registers those audited exceptions (currently `SearchInput`). The reference
-//! shape must not claim such a capability through
-//! [`CapabilitySupport::Reference`], which asserts a MOUNTED reference
-//! component; it declares [`CapabilitySupport::Ported`] for the frontend-local
-//! composition instead. A `Reference` claim for a semantic-contract capability
-//! is rejected as [`CapabilityFindingKind::ReferenceComponentNotMounted`]. The
-//! registry therefore distinguishes semantic CONSUMPTION from component
-//! MOUNTING instead of treating the existence of a reference file as delivery
-//! proof. The exception list is an audit result, not a proof that unlisted
-//! capabilities mount their reference component: it grows only when evidence
-//! shows a capability has no mounted reference component.
+//! registers those audited exceptions. The reference shape must not claim such
+//! a capability through [`CapabilitySupport::Reference`], which asserts a
+//! MOUNTED reference component; it declares [`CapabilitySupport::Ported`] for
+//! the frontend-local composition instead. A `Reference` claim for a
+//! semantic-contract capability is rejected as
+//! [`CapabilityFindingKind::ReferenceComponentNotMounted`]. The registry
+//! therefore distinguishes semantic CONSUMPTION from component MOUNTING
+//! instead of treating the existence of a reference file as delivery proof.
+//!
+//! The audited semantic-contract set is exactly `SearchInput`, `Checkbox`,
+//! `Tree`, and `VirtualList`: each names a `taskmanager-ui` module that owns the
+//! contract, but no production path mounts that component — the reference shape
+//! composes the semantics locally. Every other capability keeps
+//! [`CapabilitySupport::Reference`] because an audited production path mounts
+//! its `reference_path` component. This set is an AUDIT RESULT, not a proof
+//! that unlisted capabilities mount their reference component: a capability
+//! joins (or leaves) it only when mount evidence changes, and the set is pinned
+//! by `only_the_audited_capabilities_are_semantic_contracts` in
+//! `tests/headless/ui_capabilities.rs`.
 //!
 //! [`crate::feature_coverage`] is deliberately NOT symmetric. It is the full
 //! ROADMAP coverage matrix, so its reference shape MAY declare
@@ -324,6 +332,13 @@ pub enum ComponentCapability {
 
     /// A two-state boolean selection control.
     ///
+    /// This capability is a SEMANTIC CONTRACT, not a mounted reference
+    /// component ([`Self::is_semantic_contract`]): `inputs/checkbox.rs` defines
+    /// the toggle contract, but no shape mounts it — the reference shape
+    /// composes the same two-state selection through checked menu entries
+    /// (`processes_view::chrome::columns`) and toggle pills — so the reference
+    /// shape declares [`CapabilitySupport::Ported`].
+    ///
     /// - **User-facing behavior**: A labeled checkbox reflecting checked or
     ///   unchecked state (e.g. column visibility, alert-rule toggles).
     /// - **Interaction semantics**: Pointer click on box or label, or keyboard
@@ -385,6 +400,14 @@ pub enum ComponentCapability {
 
     /// Bounded-window virtualized list rendering over large collections.
     ///
+    /// This capability is a SEMANTIC CONTRACT, not a mounted reference
+    /// component ([`Self::is_semantic_contract`]): `data/virtual_list.rs` owns
+    /// the variable-size window algorithm, the deferred scroll handle, and the
+    /// visible-range scan, but no shape mounts its `VirtualList` element — the
+    /// mounted reference table renders gpui's `uniform_list` and consumes only
+    /// the module's range helpers — so the reference shape declares
+    /// [`CapabilitySupport::Ported`].
+    ///
     /// - **User-facing behavior**: Smoothly scrolling list capable of handling
     ///   thousands of rows without latency, dropped frames, or visual tearing.
     /// - **Interaction semantics**: Responds smoothly to mouse wheel, trackpad scroll,
@@ -395,6 +418,13 @@ pub enum ComponentCapability {
     VirtualList,
 
     /// A hierarchical expandable and collapsible tree structure.
+    ///
+    /// This capability is a SEMANTIC CONTRACT, not a mounted reference
+    /// component ([`Self::is_semantic_contract`]): `data/tree.rs` owns the
+    /// hierarchy contract, but no shape mounts it — the reference shape
+    /// delivers the same expand/collapse semantics through its process-tree row
+    /// projection (`processes_view::rows::projection`) — so the reference shape
+    /// declares [`CapabilitySupport::Ported`].
     ///
     /// - **User-facing behavior**: Nested tree nodes with disclosure chevrons,
     ///   visual indentation guides, and parent-child aggregation (e.g. application
@@ -527,18 +557,24 @@ impl ComponentCapability {
     }
 
     /// Whether the reference layer owns only this capability's SEMANTICS
-    /// rather than a mounted component. `SearchInput` is the registered
-    /// exception: `taskmanager-ui/src/inputs/search_input.rs` defines the
-    /// contract (search glyph + text field over the shared `TextInputState`),
-    /// but the reference shape reaches the same result through frontend-local
-    /// composition instead of mounting it, so no shape can claim a mounted
-    /// reference component ([`CapabilitySupport::Reference`]). The rule and its
+    /// rather than a mounted component. The audited set is `SearchInput`,
+    /// `Checkbox`, `Tree`, and `VirtualList`: for each, a `taskmanager-ui`
+    /// module defines the contract, yet no production path mounts that
+    /// component, so the reference shape reaches the same result through
+    /// frontend-local composition and cannot claim a mounted reference
+    /// component ([`CapabilitySupport::Reference`]). The set is an audit
+    /// result; every other capability keeps `Reference` because an audited
+    /// production path mounts its `reference_path` component. The rule and its
     /// finding are pinned by
+    /// `only_the_audited_capabilities_are_semantic_contracts` and
     /// `semantic_contract_capability_cannot_claim_a_mounted_reference_component`
     /// in `tests/headless/ui_capabilities.rs`.
     #[must_use]
     pub const fn is_semantic_contract(self) -> bool {
-        matches!(self, Self::SearchInput)
+        matches!(
+            self,
+            Self::SearchInput | Self::Checkbox | Self::VirtualList | Self::Tree
+        )
     }
 
     /// Returns the explicit, toolkit-neutral semantic specification for this

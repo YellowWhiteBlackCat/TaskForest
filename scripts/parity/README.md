@@ -302,15 +302,20 @@ Anchored batches (2026-09-22):
   addition. The per-process swap charge is a real typed fact every shape
   renders in its Apps-table Swap column; it was unclaimed because
   `memory.breakdown-rss-pss` explicitly excludes it and `storage.swap-throughput`
-  is system-level. The new feature anchors Iced's
+  is system-level. The feature anchors Iced's
   `apps_resource_projection_preserves_typed_pss_swap_and_measured_zero` and
   TUI's `apps_table_projects_typed_pss_and_swap_without_zero_fallbacks`; GPUI
-  and Bevy render the cell but have no discoverable test proving the observed
-  charge, so both are recorded as explicit `pending` gaps.
+  and Bevy first landed as explicit `pending` gaps because their nearest tests
+  proved only the column auto-hide rule and the honest dash.
+- W28-P batch (2026-09-23): the two `memory.process-swap-charge` gaps were
+  closed with real tests rather than relabelled — GPUI
+  `swap_cell_renders_the_observed_per_process_charge_without_a_zero_fallback`
+  and Bevy `row_view_renders_the_observed_per_process_swap_charge` both feed an
+  observed `swap_bytes` and assert the rendered charge (plus the dash for an
+  unobserved one), so all four shapes now anchor the cell.
 
-The table now carries **73 anchored + 2 `pending`** rows (per frontend: gpui 16,
-iced 19, tui 21, bevy 17 anchored; the two surveyed gaps are the GPUI and Bevy
-`memory.process-swap-charge` cells). Every registered cell is committed
+The table now carries **75 anchored + 0 `pending`** rows (per frontend: gpui 17,
+iced 19, tui 21, bevy 18 anchored). Every registered cell is committed
 evidence; a new near-miss must again be recorded as an explicit `pending` row.
 Every other source-complete cell keeps its G2 finding until a real test is
 anchored; the batches are a bounded delivery, never a blanket `Ready` claim. A

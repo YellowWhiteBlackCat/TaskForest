@@ -243,6 +243,57 @@ fn row_view_formats_contract_columns_from_typed_observations() {
     assert_eq!(column("CPUTime"), "91s");
 }
 
+/// The Apps-table Swap cell renders each row's OWN observed per-process charge
+/// from the typed `swap_bytes` observation — never a shared/system total, and
+/// never a fabricated zero.
+///
+/// Regression caught: if `pages/processes/projection.rs` drops the
+/// `ProcessItem::current_swap_bytes()` arm (e.g. falls back to a system total
+/// or to `Some(0)`), the two distinct charges below collapse to one text (or
+/// to `0 B`). The unobserved-Swap dash branch stays pinned by
+/// `row_view_formats_contract_columns_from_typed_observations`.
+#[test]
+fn row_view_renders_the_observed_per_process_swap_charge() {
+    let mut heavy = process(501, "heavy-swap");
+    with_scalars(&mut heavy, |scalars| {
+        scalars.swap_bytes = ScalarObservation::available(32 * 1024 * 1024, 7);
+    });
+    let mut light = process(502, "light-swap");
+    with_scalars(&mut light, |scalars| {
+        scalars.swap_bytes = ScalarObservation::available(4 * 1024 * 1024, 7);
+    });
+    let mut measured_zero = process(503, "measured-zero");
+    with_scalars(&mut measured_zero, |scalars| {
+        scalars.swap_bytes = ScalarObservation::available(0, 7);
+    });
+
+    let shell = shell_with(vec![heavy, light, measured_zero]);
+    let projection = rows_projection(&shell, 10, 0);
+    assert_eq!(projection.total, 3);
+    let swap_index = crate::widgets::table::visible_columns(&[])
+        .iter()
+        .position(|spec| spec.id == "Swap")
+        .expect("contract Swap column");
+    let swap = |name: &str| {
+        projection
+            .rows
+            .iter()
+            .find(|row| row.name == name)
+            .map(|row| row.cells[swap_index].clone())
+            .unwrap_or_else(|| panic!("missing rendered row {name}"))
+    };
+    assert_eq!(
+        (swap("heavy-swap"), swap("light-swap")),
+        ("32.0 MiB".to_owned(), "4.0 MiB".to_owned()),
+        "each row renders its own observed charge; a system total would make both rows equal"
+    );
+    assert_eq!(
+        swap("measured-zero"),
+        "0 B",
+        "a measured zero charge must stay visible as an observed `0 B`"
+    );
+}
+
 #[test]
 fn the_selected_row_is_flagged_and_carries_the_cursor_marker() {
     let items = vec![process(1, "alpha"), process(2, "beta"), process(3, "gamma")];
