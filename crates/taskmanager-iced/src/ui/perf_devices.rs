@@ -12,6 +12,31 @@ use taskmanager_shell::presentation::{
     device_action_i18n_key, device_status_i18n_key, missing_value,
 };
 
+use super::responsive::PerformancePageBudget;
+
+/// The frame-local render context shared by every Performance device block
+/// (fan / disk / network / battery) and the graph helpers they delegate to.
+///
+/// Each `*_section` resolves the same facts before dispatch, so a block
+/// receives them as one value instead of a positional argument run: `app` is
+/// the cached-series source, `theme` is the frame's themed snapshot, `color`
+/// is the device family's resolved stroke color, `compact` selects the Strip
+/// presentation, and `budget` is the typed page geometry. `Copy` lets one
+/// section hand the same context to several helpers without rebuilding it.
+#[derive(Clone, Copy)]
+pub(super) struct DeviceBlockContext<'a> {
+    /// The Iced root the block reads cached series and preferences from.
+    pub app: &'a crate::IcedApp,
+    /// The resolved theme snapshot for this frame.
+    pub theme: &'a taskmanager_theme::Theme,
+    /// The device family's resolved stroke color.
+    pub color: iced::Color,
+    /// Whether the frame renders the compact Strip device navigation.
+    pub compact: bool,
+    /// The typed Performance page budget for this frame.
+    pub budget: PerformancePageBudget,
+}
+
 pub(crate) mod battery;
 pub(crate) use battery::battery_section;
 

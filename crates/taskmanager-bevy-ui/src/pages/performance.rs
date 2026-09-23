@@ -40,7 +40,7 @@ use bevy::ecs::lifecycle::HookContext;
 use bevy::ecs::observer::On;
 use bevy::ecs::query::{With, Without};
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, ParamSet, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, ParamSet, Query, Res, ResMut, SystemParam};
 use bevy::ecs::world::{DeferredWorld, World};
 use bevy::scene::{CommandsSceneExt, Scene, bsn};
 use bevy::ui::prelude::{
@@ -638,44 +638,74 @@ pub(crate) fn sync_performance_layout(
     }
 }
 
+/// The marker query surface a folded projection rewrites.
+///
+/// Grouped so the observer's parameter list stays its dependency list: the
+/// marker queries name the mounted page's nodes, while `nodes`/`transforms`
+/// are the shared node/transform queries the strip and gate adapters reuse.
+#[derive(SystemParam)]
+struct PerformanceRefreshQueries<'w, 's> {
+    /// Marked numeric texts.
+    texts: Query<'w, 's, (&'static DynText, &'static mut Text)>,
+    /// Marked core-fill bars.
+    bars: Query<'w, 's, (&'static DynBar, &'static mut Node), Without<DynText>>,
+    /// Marked disk-spare alerts.
+    disk_alerts: Query<'w, 's, (&'static DynDiskSpareAlert, &'static mut Node), Without<DynBar>>,
+    /// Spark strips with their segment children and chart surface.
+    strips: Query<
+        'w,
+        's,
+        (
+            Entity,
+            &'static SparkStrip,
+            &'static Children,
+            &'static mut ChartSurface,
+        ),
+    >,
+    /// Curve gate markers.
+    gates: Query<'w, 's, (Entity, &'static CurveGate)>,
+    /// Card section markers.
+    sections: Query<'w, 's, (Entity, &'static DynSection)>,
+    /// Device block markers.
+    blocks: Query<'w, 's, (Entity, &'static DynBlock)>,
+    /// Bare node query shared by the strip and gate adapters.
+    nodes: Query<'w, 's, &'static mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
+    /// UI transform query the strip adapter resizes through.
+    transforms: Query<'w, 's, &'static mut UiTransform>,
+}
+
 /// The pages' data-refresh trigger consumer (see [`crate::drain`]): re-read
 /// the folded shell and push new facts into the mounted tree. Runs only when
 /// the drain folded batches — an idle frame never reaches this observer, and
 /// a frame with the page unmounted finds no markers and does nothing.
-// Bevy observers declare their data access as parameters, so the param count
-// is the observer's dependency list, not function-design sprawl (the same
-// policy as the gpui graph builders).
-#[allow(clippy::too_many_arguments)]
 fn refresh_on_fold(
     _fold: On<ShellProjectionFolded>,
     track: ShellTrack,
     palette: Res<WindowPalette>,
     focus: Res<PerformanceFocus>,
-    mut texts: Query<(&DynText, &mut Text)>,
-    mut bars: Query<(&DynBar, &mut Node), Without<DynText>>,
-    mut disk_alerts: Query<(&DynDiskSpareAlert, &mut Node), Without<DynBar>>,
-    mut strips: Query<(Entity, &SparkStrip, &Children, &mut ChartSurface)>,
-    gates: Query<(Entity, &CurveGate)>,
-    sections: Query<(Entity, &DynSection)>,
-    blocks: Query<(Entity, &DynBlock)>,
-    mut nodes: Query<&mut Node, (Without<DynBar>, Without<DynDiskSpareAlert>)>,
-    mut transforms: Query<&mut UiTransform>,
+    mut surface: PerformanceRefreshQueries,
     mut commands: Commands,
 ) {
     let shell = track.shell();
-    rewrite_texts(shell, &mut texts);
-    rewrite_core_bars(shell, &mut bars);
-    sync_disk_spare_alerts(shell, &mut disk_alerts);
+    rewrite_texts(shell, &mut surface.texts);
+    rewrite_core_bars(shell, &mut surface.bars);
+    sync_disk_spare_alerts(shell, &mut surface.disk_alerts);
     sync_strips(
         shell,
         &palette.inner,
-        &mut strips,
-        &mut nodes,
-        &mut transforms,
+        &mut surface.strips,
+        &mut surface.nodes,
+        &mut surface.transforms,
         &mut commands,
     );
-    sync_card_gates(shell, focus.0, &gates, &mut nodes);
-    sync_blocks(shell, &palette.inner, &sections, &blocks, &mut commands);
+    sync_card_gates(shell, focus.0, &surface.gates, &mut surface.nodes);
+    sync_blocks(
+        shell,
+        &palette.inner,
+        &surface.sections,
+        &surface.blocks,
+        &mut commands,
+    );
 }
 
 fn sync_disk_spare_alerts(

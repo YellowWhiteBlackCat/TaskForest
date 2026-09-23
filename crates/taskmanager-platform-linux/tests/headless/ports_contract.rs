@@ -42,9 +42,10 @@ use taskmanager_platform_contract::{
 };
 use taskmanager_platform_linux::{
     EnvironmentProviders, IntegrationProviders, LinuxPlatformRuntime, LinuxProviderRegistry,
-    PowerProviders, ProcessControlProviders, ProcessObservationProviders, ProcessProviders,
+    LinuxProviderRegistryParams, PowerProviders, ProcessControlProviders,
+    ProcessObservationProviders, ProcessObservationProvidersParams, ProcessProviders,
     SensorProviders, ServiceProviders, StorageProviders, SystemAuxiliaryProviders,
-    SystemObservationProviders, SystemProviders,
+    SystemAuxiliaryProvidersParams, SystemObservationProviders, SystemProviders,
 };
 use taskmanager_platform_provider::{
     CommandLaunchProvider, ContainerRollupProvider, CpuTelemetryProvider, CpuThrottleProvider,
@@ -52,15 +53,15 @@ use taskmanager_platform_provider::{
     GpuEngineRowsProvider, GpuTelemetryProvider, HardwareInventoryProvider, HostTelemetryProvider,
     MemoryTelemetryProvider, MsrReadoutProvider, NetworkTelemetryProvider, NpuInventoryProvider,
     PowerSupplyProvider, ProcessAffinityControlProvider, ProcessAffinityProvider,
-    ProcessControlProvider, ProcessGpuProvider, ProcessIsolationProvider, ProcessListProvider,
-    ProcessNetworkEscalationProvider, ProcessNetworkProvider, ProcessOpenFilesProvider,
-    ProcessResourceControlProvider, ProcessResourcesProvider, ProcessThreadsProvider,
-    RaplPowerProvider, ResourceRevealProvider, SensorProvider, ServiceControlProvider,
-    ServiceDependenciesProvider, ServiceInventoryProvider, ServiceLogSnapshotProvider,
-    ServiceLogStreamProvider, SessionControlProvider, SessionInventoryProvider,
-    SmartSelfTestControlProvider, SmartSelfTestObservationProvider, SmbiosMemoryProvider,
-    StartupControlProvider, StartupEvidenceProvider, StartupInventoryProvider,
-    StorageTelemetryProvider, UrlOpenProvider,
+    ProcessControlProvider, ProcessEnvironmentProvider, ProcessGpuProvider,
+    ProcessIsolationProvider, ProcessListProvider, ProcessNetworkEscalationProvider,
+    ProcessNetworkProvider, ProcessOpenFilesProvider, ProcessResourceControlProvider,
+    ProcessResourcesProvider, ProcessThreadsProvider, RaplPowerProvider, ResourceRevealProvider,
+    SensorProvider, ServiceControlProvider, ServiceDependenciesProvider, ServiceInventoryProvider,
+    ServiceLogSnapshotProvider, ServiceLogStreamProvider, SessionControlProvider,
+    SessionInventoryProvider, SmartSelfTestControlProvider, SmartSelfTestObservationProvider,
+    SmbiosMemoryProvider, StartupControlProvider, StartupEvidenceProvider,
+    StartupInventoryProvider, StorageTelemetryProvider, UrlOpenProvider,
 };
 
 #[path = "ports_contract/fixture.rs"]

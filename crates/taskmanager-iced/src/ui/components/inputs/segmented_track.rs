@@ -29,22 +29,42 @@ pub(super) struct SegmentedTrack<'a> {
     focus_radius: f32,
 }
 
+/// The options a [`SegmentedTrack`] is constructed from: the wrapped content
+/// tree, the change callback and choice list, the caller's active value, and
+/// the focus identity and ring styling the keyboard shell paints.
+pub(super) struct SegmentedTrackOptions<'a> {
+    /// The widget id the focus shell registers for the whole track.
+    pub id: widget::Id,
+    /// The inner content tree the track wraps (the rendered segments).
+    pub content: Element<'a, Message, Theme, Renderer>,
+    /// The callback invoked with the newly selected choice value.
+    pub on_change: Box<dyn Fn(usize) -> Message + 'a>,
+    /// The `(label, value)` choices the keyboard path and index helpers read.
+    pub choices: Vec<(String, usize)>,
+    /// The caller's active value, compared against each choice.
+    pub active: usize,
+    /// The focus target published when the track gains keyboard focus.
+    pub focus_target: FocusTarget,
+    /// The resolved focus-ring color (its alpha gates the ring).
+    pub focus_color: Color,
+    /// The resolved focus-ring corner radius.
+    pub focus_radius: f32,
+}
+
 impl<'a> SegmentedTrack<'a> {
-    // The ctor mirrors the struct's field set one-to-one; the fields are the
-    // segmented control's own contract, not a grouping waiting to happen.
-    #[allow(clippy::too_many_arguments)]
-    pub(super) fn new(
-        id: impl Into<widget::Id>,
-        content: Element<'a, Message, Theme, Renderer>,
-        on_change: Box<dyn Fn(usize) -> Message + 'a>,
-        choices: Vec<(String, usize)>,
-        active: usize,
-        focus_target: FocusTarget,
-        focus_color: Color,
-        focus_radius: f32,
-    ) -> Self {
+    pub(super) fn new(options: SegmentedTrackOptions<'a>) -> Self {
+        let SegmentedTrackOptions {
+            id,
+            content,
+            on_change,
+            choices,
+            active,
+            focus_target,
+            focus_color,
+            focus_radius,
+        } = options;
         Self {
-            id: id.into(),
+            id,
             content,
             on_change,
             choices,

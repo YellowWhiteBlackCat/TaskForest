@@ -51,10 +51,12 @@ CRATES_DIR = "crates"
 # `taskmanager-ui/src/lib.rs`) does not inflate them. `too_many_arguments`
 # includes the multi-line attribute in `taskmanager-bevy-ui/src/drain.rs`.
 CEILINGS: dict[str, int] = {
-    "clippy::too_many_arguments": 32,
+    # Refactored away: every one of these is now a typed parameter struct or a
+    # collapsed branch, so a new occurrence must be a deliberate edit here.
+    "clippy::too_many_arguments": 0,
+    "clippy::collapsible_if": 0,
+    "clippy::explicit_auto_deref": 0,
     "clippy::type_complexity": 2,
-    "clippy::collapsible_if": 1,
-    "clippy::explicit_auto_deref": 1,
     "clippy::large_enum_variant": 1,
     "unused_imports": 1,
     "non_upper_case_globals": 1,

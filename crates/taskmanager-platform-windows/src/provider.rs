@@ -32,6 +32,10 @@ use taskmanager_core::ProviderId;
 use taskmanager_platform_contract::{
     CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
 };
+use taskmanager_platform_provider::{
+    CpuThrottleProvider, GpuEngineRowsProvider, HardwareInventoryProvider, MsrReadoutProvider,
+    NpuInventoryProvider, RaplPowerProvider, SmbiosMemoryProvider,
+};
 use taskmanager_platform_runtime::ProviderRegistration;
 
 use self::environment::{
@@ -88,7 +92,8 @@ pub use storage::WinStorageProviders;
 pub use system::{
     PendingCpuThrottleProvider, PendingMsrReadoutProvider, PendingRaplPowerProvider,
     PendingSmbiosMemoryProvider, WinGpuEngineRowsProvider, WinNpuInventoryProvider,
-    WinSystemAuxiliaryProviders, WinSystemObservationProviders, WinSystemProviders,
+    WinSystemAuxiliaryProviders, WinSystemAuxiliaryProvidersParams, WinSystemObservationProviders,
+    WinSystemProviders,
 };
 
 const HOST_TELEMETRY_PROVIDER: ProviderId = ProviderId::borrowed("windows.system.host");
@@ -173,31 +178,44 @@ pub struct WindowsProviderRegistry {
     pub(crate) power: WinPowerProviders,
 }
 
+/// Named composition input for [`WindowsProviderRegistry`].
+///
+/// Each field is one independently scheduled provider domain consumed once into
+/// its own execution lane. This is the final OS-owned registry assembly, not
+/// one runtime transaction; the names keep the eight application change axes
+/// explicit without a positional argument list, and the input stays a set of
+/// domain groups rather than one aggregate provider bag.
+pub struct WindowsProviderRegistryParams {
+    /// System telemetry and hardware inventory providers.
+    pub system: WinSystemProviders,
+    /// Process observation and control providers.
+    pub processes: WinProcessProviders,
+    /// Service inventory, dependency, control, and log providers.
+    pub services: WinServiceProviders,
+    /// Startup and session providers.
+    pub environment: WinEnvironmentProviders,
+    /// Shell and desktop integration providers.
+    pub integrations: WinIntegrationProviders,
+    /// Storage health and SMART providers.
+    pub storage: WinStorageProviders,
+    /// Sensor center providers.
+    pub sensors: WinSensorProviders,
+    /// Power supply providers.
+    pub power: WinPowerProviders,
+}
+
 impl WindowsProviderRegistry {
-    // The eight arguments are the eight independent application change axes.
-    // This is the final OS-owned registry assembly, not one runtime
-    // transaction; each field is consumed once into its separate lane family.
-    #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new(
-        system: WinSystemProviders,
-        processes: WinProcessProviders,
-        services: WinServiceProviders,
-        environment: WinEnvironmentProviders,
-        integrations: WinIntegrationProviders,
-        storage: WinStorageProviders,
-        sensors: WinSensorProviders,
-        power: WinPowerProviders,
-    ) -> Self {
+    pub fn new(params: WindowsProviderRegistryParams) -> Self {
         Self {
-            system,
-            processes,
-            services,
-            environment,
-            integrations,
-            storage,
-            sensors,
-            power,
+            system: params.system,
+            processes: params.processes,
+            services: params.services,
+            environment: params.environment,
+            integrations: params.integrations,
+            storage: params.storage,
+            sensors: params.sensors,
+            power: params.power,
         }
     }
 }
@@ -309,8 +327,8 @@ pub fn capability_surface() -> PlatformCapabilitySurface {
 }
 
 pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {
-    WindowsProviderRegistry::new(
-        WinSystemProviders::new(
+    WindowsProviderRegistry::new(WindowsProviderRegistryParams {
+        system: WinSystemProviders::new(
             WinSystemObservationProviders::new(
                 ProviderRegistration::<HostTelemetryRequest, _>::new(
                     HOST_TELEMETRY_PROVIDER.clone(),
@@ -341,38 +359,39 @@ pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {
                     WinContainerRollupProvider::new(),
                 ),
             ),
-            WinSystemAuxiliaryProviders::new(
-                ProviderRegistration::<HardwareInventoryRequest, _>::new(
+            WinSystemAuxiliaryProviders::new(WinSystemAuxiliaryProvidersParams {
+                hardware_inventory: ProviderRegistration::<HardwareInventoryRequest, _>::new(
                     HARDWARE_INVENTORY_PROVIDER.clone(),
-                    WinHardwareInventoryProvider::new(),
+                    Box::new(WinHardwareInventoryProvider::new())
+                        as Box<dyn HardwareInventoryProvider>,
                 ),
-                ProviderRegistration::<GpuEngineRowsRequest, _>::new(
+                gpu_engine_rows: ProviderRegistration::<GpuEngineRowsRequest, _>::new(
                     GPU_ENGINE_ROWS_PROVIDER.clone(),
-                    WinGpuEngineRowsProvider::new(),
+                    Box::new(WinGpuEngineRowsProvider::new()) as Box<dyn GpuEngineRowsProvider>,
                 ),
-                ProviderRegistration::<NpuInventoryRequest, _>::new(
+                npu_inventory: ProviderRegistration::<NpuInventoryRequest, _>::new(
                     NPU_INVENTORY_PROVIDER.clone(),
-                    WinNpuInventoryProvider::new(),
+                    Box::new(WinNpuInventoryProvider::new()) as Box<dyn NpuInventoryProvider>,
                 ),
-                ProviderRegistration::<SmbiosMemoryRequest, _>::new(
+                smbios_memory: ProviderRegistration::<SmbiosMemoryRequest, _>::new(
                     SMBIOS_MEMORY_PROVIDER.clone(),
-                    PendingSmbiosMemoryProvider,
+                    Box::new(PendingSmbiosMemoryProvider) as Box<dyn SmbiosMemoryProvider>,
                 ),
-                ProviderRegistration::<RaplPowerRequest, _>::new(
+                rapl_power: ProviderRegistration::<RaplPowerRequest, _>::new(
                     RAPL_POWER_PROVIDER.clone(),
-                    PendingRaplPowerProvider,
+                    Box::new(PendingRaplPowerProvider) as Box<dyn RaplPowerProvider>,
                 ),
-                ProviderRegistration::<MsrReadoutRequest, _>::new(
+                msr_readout: ProviderRegistration::<MsrReadoutRequest, _>::new(
                     MSR_READOUT_PROVIDER.clone(),
-                    PendingMsrReadoutProvider,
+                    Box::new(PendingMsrReadoutProvider) as Box<dyn MsrReadoutProvider>,
                 ),
-                ProviderRegistration::<CpuThrottleRequest, _>::new(
+                cpu_throttle: ProviderRegistration::<CpuThrottleRequest, _>::new(
                     CPU_THROTTLE_PROVIDER.clone(),
-                    PendingCpuThrottleProvider,
+                    Box::new(PendingCpuThrottleProvider) as Box<dyn CpuThrottleProvider>,
                 ),
-            ),
+            }),
         ),
-        WinProcessProviders::new(
+        processes: WinProcessProviders::new(
             WinProcessObservationProviders::new(
                 ProviderRegistration::<ProcessListRequest, _>::new(
                     PROCESS_LIST_PROVIDER.clone(),
@@ -432,7 +451,7 @@ pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {
                 ),
             ),
         ),
-        WinServiceProviders::new(
+        services: WinServiceProviders::new(
             ProviderRegistration::new(
                 SERVICE_INVENTORY_PROVIDER.clone(),
                 WinServiceInventoryProvider::new(),
@@ -454,7 +473,7 @@ pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {
                 WinServiceLogStreamProvider,
             ),
         ),
-        WinEnvironmentProviders::new(
+        environment: WinEnvironmentProviders::new(
             ProviderRegistration::<StartupInventoryRequest, _>::new(
                 STARTUP_INVENTORY_PROVIDER.clone(),
                 WinStartupInventoryProvider::new(),
@@ -476,7 +495,7 @@ pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {
                 WinSessionControlProvider,
             ),
         ),
-        WinIntegrationProviders::new(
+        integrations: WinIntegrationProviders::new(
             ProviderRegistration::new(COMMAND_LAUNCH_PROVIDER.clone(), WinCommandLaunchProvider),
             ProviderRegistration::new(
                 RESOURCE_REVEAL_PROVIDER.clone(),
@@ -496,7 +515,7 @@ pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {
             FIRST_RUN_SETUP_PROVIDER.clone(),
             PendingSetupScriptProvider,
         )),
-        WinStorageProviders::new(
+        storage: WinStorageProviders::new(
             ProviderRegistration::new(
                 FILESYSTEM_HEALTH_PROVIDER.clone(),
                 WinFilesystemHealthProvider::new(),
@@ -514,13 +533,13 @@ pub(super) fn windows_provider_registry() -> WindowsProviderRegistry {
             DIRECTORY_USAGE_PROVIDER.clone(),
             WinDirectoryUsageProvider::new(),
         )),
-        WinSensorProviders::new(ProviderRegistration::new(
+        sensors: WinSensorProviders::new(ProviderRegistration::new(
             SENSOR_CAPABILITY_PROVIDER.clone(),
             WinSensorProvider::new(),
         )),
-        WinPowerProviders::new(ProviderRegistration::new(
+        power: WinPowerProviders::new(ProviderRegistration::new(
             POWER_SUPPLY_CAPABILITY_PROVIDER.clone(),
             WinPowerSupplyProvider,
         )),
-    )
+    })
 }

@@ -26,10 +26,11 @@ pub mod window_capture;
 pub use window_capture::LinuxWindowCapture;
 
 pub use backend::{
-    EnvironmentProviders, IntegrationProviders, LinuxProviderRegistry, PowerProviders,
-    ProcessControlProviders, ProcessObservationProviders, ProcessProviders, SensorProviders,
-    ServiceProviders, StorageProviders, SystemAuxiliaryProviders, SystemObservationProviders,
-    SystemProviders,
+    EnvironmentProviders, IntegrationProviders, LinuxProviderRegistry, LinuxProviderRegistryParams,
+    PowerProviders, ProcessControlProviders, ProcessObservationProviders,
+    ProcessObservationProvidersParams, ProcessProviders, SensorProviders, ServiceProviders,
+    StorageProviders, SystemAuxiliaryProviders, SystemAuxiliaryProvidersParams,
+    SystemObservationProviders, SystemProviders,
 };
 pub use config::{user_config_path, user_history_dir};
 pub use local_time::local_time_rules;

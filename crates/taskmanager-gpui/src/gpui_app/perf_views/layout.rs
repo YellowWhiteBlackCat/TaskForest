@@ -22,8 +22,9 @@ use gpui::{
 use crate::gpui_app::elements;
 use crate::gpui_app::formatting::GraphUnit;
 use crate::gpui_app::graph::{
-    GraphCacheHandle, GraphHover, GraphOpts, GraphSecondarySeries, GraphSettings,
-    dual_series_colors, graph_element_hover, graph_element_hover_dual, graph_hover,
+    GraphCacheHandle, GraphHover, GraphHoverDual, GraphHoverElement, GraphOpts,
+    GraphSecondarySeries, GraphSettings, dual_series_colors, graph_element_hover,
+    graph_element_hover_dual, graph_hover,
 };
 use crate::gpui_app::perf_views::{
     badge_pct, badge_rpm, badge_temperature, badge_watts, drive_badge_format, graph_summary_row,
@@ -395,16 +396,16 @@ pub(crate) fn render_chart(
         ChartSeries::Single { samples } => {
             let samples = limited_window(settings, samples, &graph_cache);
             let summary_row = graph_summary_row(theme, &samples, &fmt);
-            let graph = graph_element_hover(
-                spec.id.clone(),
-                spec.slide_key,
-                Rc::clone(&samples),
-                taskmanager_ui::theme_binding::rgba(spec.color),
-                graph_opts,
-                fmt,
-                hover_slot.clone(),
-                graph_cache.clone(),
-            );
+            let graph = graph_element_hover(GraphHoverElement {
+                id: spec.id.clone(),
+                slide_key: spec.slide_key,
+                samples: Rc::clone(&samples),
+                base: taskmanager_ui::theme_binding::rgba(spec.color),
+                opts: graph_opts,
+                format_value: fmt,
+                slot: hover_slot.clone(),
+                cache: graph_cache.clone(),
+            });
             let card = elements::graph_card_with_state(theme, graph, &samples);
             let card = apply_tier_to_card(card, spec.tier, spec.max_height);
             let card = match summary_row
@@ -432,20 +433,24 @@ pub(crate) fn render_chart(
             let (primary_color, secondary_color) =
                 dual_series_colors(taskmanager_ui::theme_binding::rgba(spec.color));
             let graph = graph_element_hover_dual(
-                spec.id.clone(),
-                spec.slide_key,
-                Rc::clone(&primary),
-                primary_color,
-                primary_label.to_owned(),
-                GraphSecondarySeries {
-                    samples: Rc::clone(&secondary),
-                    base: secondary_color,
-                    label: secondary_label.to_owned(),
+                GraphHoverElement {
+                    id: spec.id.clone(),
+                    slide_key: spec.slide_key,
+                    samples: Rc::clone(&primary),
+                    base: primary_color,
+                    opts: graph_opts,
+                    format_value: fmt,
+                    slot: hover_slot.clone(),
+                    cache: graph_cache.clone(),
                 },
-                graph_opts,
-                fmt,
-                hover_slot.clone(),
-                graph_cache.clone(),
+                GraphHoverDual {
+                    primary_label: primary_label.to_owned(),
+                    secondary: GraphSecondarySeries {
+                        samples: Rc::clone(&secondary),
+                        base: secondary_color,
+                        label: secondary_label.to_owned(),
+                    },
+                },
             );
             let card = elements::graph_card_with_dual_state(theme, graph, &primary, &secondary);
             let card = apply_tier_to_card(card, spec.tier, spec.max_height);

@@ -12,13 +12,19 @@ pub use integration::IntegrationProviders;
 mod power;
 pub use power::PowerProviders;
 mod process;
-pub use process::{ProcessControlProviders, ProcessObservationProviders, ProcessProviders};
+pub use process::{
+    ProcessControlProviders, ProcessObservationProviders, ProcessObservationProvidersParams,
+    ProcessProviders,
+};
 mod sensor;
 pub use sensor::SensorProviders;
 mod service;
 pub use service::ServiceProviders;
 mod system;
-pub use system::{SystemAuxiliaryProviders, SystemObservationProviders, SystemProviders};
+pub use system::{
+    SystemAuxiliaryProviders, SystemAuxiliaryProvidersParams, SystemObservationProviders,
+    SystemProviders,
+};
 mod storage;
 pub use storage::StorageProviders;
 
@@ -37,31 +43,43 @@ pub struct LinuxProviderRegistry {
     pub(crate) power: PowerProviders,
 }
 
+/// Named composition input for [`LinuxProviderRegistry`].
+///
+/// Each field is one independently scheduled provider domain consumed once into
+/// its own execution lane. The names keep the eight application change axes
+/// explicit without a positional argument list, and the input stays a set of
+/// domain groups rather than one aggregate provider bag.
+pub struct LinuxProviderRegistryParams {
+    /// System telemetry and hardware inventory providers.
+    pub system: SystemProviders,
+    /// Process observation and control providers.
+    pub processes: ProcessProviders,
+    /// Service inventory, dependency, control, and log providers.
+    pub services: ServiceProviders,
+    /// Startup and session providers.
+    pub environment: EnvironmentProviders,
+    /// Shell and desktop integration providers.
+    pub integrations: IntegrationProviders,
+    /// Storage health and SMART providers.
+    pub storage: StorageProviders,
+    /// Sensor center providers.
+    pub sensors: SensorProviders,
+    /// Power supply providers.
+    pub power: PowerProviders,
+}
+
 impl LinuxProviderRegistry {
-    // The eight arguments are the eight independent application change axes.
-    // Nesting unrelated domains only to satisfy an argument-count heuristic
-    // would recreate the aggregate provider bag this registry prevents.
-    #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new(
-        system: SystemProviders,
-        processes: ProcessProviders,
-        services: ServiceProviders,
-        environment: EnvironmentProviders,
-        integrations: IntegrationProviders,
-        storage: StorageProviders,
-        sensors: SensorProviders,
-        power: PowerProviders,
-    ) -> Self {
+    pub fn new(params: LinuxProviderRegistryParams) -> Self {
         Self {
-            system,
-            processes,
-            services,
-            environment,
-            integrations,
-            storage,
-            sensors,
-            power,
+            system: params.system,
+            processes: params.processes,
+            services: params.services,
+            environment: params.environment,
+            integrations: params.integrations,
+            storage: params.storage,
+            sensors: params.sensors,
+            power: params.power,
         }
     }
 }

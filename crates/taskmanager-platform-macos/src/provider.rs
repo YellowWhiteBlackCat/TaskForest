@@ -29,6 +29,10 @@ use taskmanager_core::ProviderId;
 use taskmanager_platform_contract::{
     CapabilityId, CapabilityStatus, PlatformAxis, PlatformCapabilitySurface, PlatformSource,
 };
+use taskmanager_platform_provider::{
+    CpuThrottleProvider, GpuEngineRowsProvider, HardwareInventoryProvider, MsrReadoutProvider,
+    NpuInventoryProvider, RaplPowerProvider, SmbiosMemoryProvider,
+};
 use taskmanager_platform_runtime::ProviderRegistration;
 
 use self::environment::{
@@ -85,9 +89,10 @@ pub use sensor::MacSensorProviders;
 pub use service::MacServiceProviders;
 pub use storage::{MacDirectoryUsageProvider, MacStorageProviders};
 pub use system::{
-    MacSystemAuxiliaryProviders, MacSystemObservationProviders, MacSystemProviders,
-    PendingCpuThrottleProvider, PendingGpuEngineRowsProvider, PendingMsrReadoutProvider,
-    PendingNpuInventoryProvider, PendingRaplPowerProvider, PendingSmbiosMemoryProvider,
+    MacSystemAuxiliaryProviders, MacSystemAuxiliaryProvidersParams, MacSystemObservationProviders,
+    MacSystemProviders, PendingCpuThrottleProvider, PendingGpuEngineRowsProvider,
+    PendingMsrReadoutProvider, PendingNpuInventoryProvider, PendingRaplPowerProvider,
+    PendingSmbiosMemoryProvider,
 };
 
 const HOST_TELEMETRY_PROVIDER: ProviderId = ProviderId::borrowed("macos.system.host");
@@ -167,31 +172,43 @@ pub struct MacOsProviderRegistry {
     pub(crate) power: MacPowerProviders,
 }
 
+/// Named composition input for [`MacOsProviderRegistry`].
+///
+/// Each field is one independently scheduled provider domain consumed once into
+/// its own execution lane. The names keep the eight application change axes
+/// explicit without a positional argument list, and the input stays a set of
+/// domain groups rather than one aggregate provider bag.
+pub struct MacOsProviderRegistryParams {
+    /// System telemetry and hardware inventory providers.
+    pub system: MacSystemProviders,
+    /// Process observation and control providers.
+    pub processes: MacProcessProviders,
+    /// Service inventory, dependency, control, and log providers.
+    pub services: MacServiceProviders,
+    /// Startup and session providers.
+    pub environment: MacEnvironmentProviders,
+    /// Shell and desktop integration providers.
+    pub integrations: MacIntegrationProviders,
+    /// Storage health and SMART providers.
+    pub storage: MacStorageProviders,
+    /// Sensor center providers.
+    pub sensors: MacSensorProviders,
+    /// Power supply providers.
+    pub power: MacPowerProviders,
+}
+
 impl MacOsProviderRegistry {
-    // The eight arguments are the eight independent application change axes.
-    // Nesting unrelated domains only to satisfy an argument-count heuristic
-    // would recreate the aggregate provider bag this registry prevents.
-    #[allow(clippy::too_many_arguments)]
     #[must_use]
-    pub fn new(
-        system: MacSystemProviders,
-        processes: MacProcessProviders,
-        services: MacServiceProviders,
-        environment: MacEnvironmentProviders,
-        integrations: MacIntegrationProviders,
-        storage: MacStorageProviders,
-        sensors: MacSensorProviders,
-        power: MacPowerProviders,
-    ) -> Self {
+    pub fn new(params: MacOsProviderRegistryParams) -> Self {
         Self {
-            system,
-            processes,
-            services,
-            environment,
-            integrations,
-            storage,
-            sensors,
-            power,
+            system: params.system,
+            processes: params.processes,
+            services: params.services,
+            environment: params.environment,
+            integrations: params.integrations,
+            storage: params.storage,
+            sensors: params.sensors,
+            power: params.power,
         }
     }
 }
@@ -279,8 +296,8 @@ pub fn capability_surface() -> PlatformCapabilitySurface {
 }
 
 pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {
-    MacOsProviderRegistry::new(
-        MacSystemProviders::new(
+    MacOsProviderRegistry::new(MacOsProviderRegistryParams {
+        system: MacSystemProviders::new(
             MacSystemObservationProviders::new(
                 ProviderRegistration::<HostTelemetryRequest, _>::new(
                     HOST_TELEMETRY_PROVIDER.clone(),
@@ -311,38 +328,39 @@ pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {
                     MacContainerRollupProvider,
                 ),
             ),
-            MacSystemAuxiliaryProviders::new(
-                ProviderRegistration::<HardwareInventoryRequest, _>::new(
+            MacSystemAuxiliaryProviders::new(MacSystemAuxiliaryProvidersParams {
+                hardware_inventory: ProviderRegistration::<HardwareInventoryRequest, _>::new(
                     HARDWARE_INVENTORY_PROVIDER.clone(),
-                    MacHardwareInventoryProvider::new(),
+                    Box::new(MacHardwareInventoryProvider::new())
+                        as Box<dyn HardwareInventoryProvider>,
                 ),
-                ProviderRegistration::<GpuEngineRowsRequest, _>::new(
+                gpu_engine_rows: ProviderRegistration::<GpuEngineRowsRequest, _>::new(
                     GPU_ENGINE_ROWS_PROVIDER.clone(),
-                    PendingGpuEngineRowsProvider,
+                    Box::new(PendingGpuEngineRowsProvider) as Box<dyn GpuEngineRowsProvider>,
                 ),
-                ProviderRegistration::<NpuInventoryRequest, _>::new(
+                npu_inventory: ProviderRegistration::<NpuInventoryRequest, _>::new(
                     NPU_INVENTORY_PROVIDER.clone(),
-                    PendingNpuInventoryProvider,
+                    Box::new(PendingNpuInventoryProvider) as Box<dyn NpuInventoryProvider>,
                 ),
-                ProviderRegistration::<SmbiosMemoryRequest, _>::new(
+                smbios_memory: ProviderRegistration::<SmbiosMemoryRequest, _>::new(
                     SMBIOS_MEMORY_PROVIDER.clone(),
-                    PendingSmbiosMemoryProvider,
+                    Box::new(PendingSmbiosMemoryProvider) as Box<dyn SmbiosMemoryProvider>,
                 ),
-                ProviderRegistration::<RaplPowerRequest, _>::new(
+                rapl_power: ProviderRegistration::<RaplPowerRequest, _>::new(
                     RAPL_POWER_PROVIDER.clone(),
-                    PendingRaplPowerProvider,
+                    Box::new(PendingRaplPowerProvider) as Box<dyn RaplPowerProvider>,
                 ),
-                ProviderRegistration::<MsrReadoutRequest, _>::new(
+                msr_readout: ProviderRegistration::<MsrReadoutRequest, _>::new(
                     MSR_READOUT_PROVIDER.clone(),
-                    PendingMsrReadoutProvider,
+                    Box::new(PendingMsrReadoutProvider) as Box<dyn MsrReadoutProvider>,
                 ),
-                ProviderRegistration::<CpuThrottleRequest, _>::new(
+                cpu_throttle: ProviderRegistration::<CpuThrottleRequest, _>::new(
                     CPU_THROTTLE_PROVIDER.clone(),
-                    PendingCpuThrottleProvider,
+                    Box::new(PendingCpuThrottleProvider) as Box<dyn CpuThrottleProvider>,
                 ),
-            ),
+            }),
         ),
-        MacProcessProviders::new(
+        processes: MacProcessProviders::new(
             MacProcessObservationProviders::new(
                 ProviderRegistration::<ProcessListRequest, _>::new(
                     PROCESS_LIST_PROVIDER.clone(),
@@ -396,7 +414,7 @@ pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {
                 ),
             ),
         ),
-        MacServiceProviders::new(
+        services: MacServiceProviders::new(
             ProviderRegistration::new(
                 SERVICE_INVENTORY_PROVIDER.clone(),
                 MacServiceInventoryProvider,
@@ -415,7 +433,7 @@ pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {
                 PendingServiceLogStreamProvider,
             ),
         ),
-        MacEnvironmentProviders::new(
+        environment: MacEnvironmentProviders::new(
             ProviderRegistration::<StartupInventoryRequest, _>::new(
                 STARTUP_INVENTORY_PROVIDER.clone(),
                 MacStartupInventoryProvider,
@@ -437,7 +455,7 @@ pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {
                 PendingSessionControlProvider,
             ),
         ),
-        MacIntegrationProviders::new(
+        integrations: MacIntegrationProviders::new(
             ProviderRegistration::new(COMMAND_LAUNCH_PROVIDER.clone(), MacCommandLaunchProvider),
             ProviderRegistration::new(RESOURCE_REVEAL_PROVIDER.clone(), MacResourceRevealProvider),
             ProviderRegistration::new(URL_OPEN_PROVIDER.clone(), MacUrlOpenProvider),
@@ -454,7 +472,7 @@ pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {
             FIRST_RUN_SETUP_PROVIDER.clone(),
             PendingSetupScriptProvider,
         )),
-        MacStorageProviders::new(
+        storage: MacStorageProviders::new(
             ProviderRegistration::new(
                 FILESYSTEM_HEALTH_PROVIDER.clone(),
                 MacFilesystemHealthProvider::new(),
@@ -472,13 +490,13 @@ pub(super) fn macos_provider_registry() -> MacOsProviderRegistry {
                 MacDirectoryUsageProvider::new(),
             ),
         ),
-        MacSensorProviders::new(ProviderRegistration::new(
+        sensors: MacSensorProviders::new(ProviderRegistration::new(
             SENSOR_CAPABILITY_PROVIDER.clone(),
             MacSensorProvider,
         )),
-        MacPowerProviders::new(ProviderRegistration::new(
+        power: MacPowerProviders::new(ProviderRegistration::new(
             POWER_SUPPLY_CAPABILITY_PROVIDER.clone(),
             MacPowerSupplyProvider,
         )),
-    )
+    })
 }

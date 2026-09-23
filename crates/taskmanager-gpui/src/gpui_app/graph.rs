@@ -18,7 +18,9 @@ pub(crate) mod scene_cache;
 pub(crate) mod slide;
 pub(crate) use cache::{GraphCacheHandle, new_graph_cache};
 pub use hover::{GraphHover, GraphSecondarySeries, graph_hover};
-pub(crate) use hover::{graph_element_hover, graph_element_hover_dual};
+pub(crate) use hover::{
+    GraphHoverDual, GraphHoverElement, graph_element_hover, graph_element_hover_dual,
+};
 
 use slide::slide_progress;
 
@@ -794,14 +796,16 @@ pub(crate) fn graph_element(
                 px(0.0)
             };
             scene_cache::paint_graph_scene(
-                cache.scenes_mut(),
-                window,
-                cx,
-                bounds,
+                scene_cache::GraphPaintContext {
+                    cache: cache.scenes_mut(),
+                    window: &mut *window,
+                    cx: &mut *cx,
+                    bounds,
+                    opts,
+                    slide_offset: offset,
+                },
                 &samples,
                 base,
-                opts,
-                offset,
             );
         },
     )

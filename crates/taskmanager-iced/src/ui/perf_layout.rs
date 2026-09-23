@@ -101,27 +101,57 @@ pub(super) const fn geometry_contract(compact: bool) -> GeometryContract {
     }
 }
 
+/// The three text slots of a Performance detail card's header band, in render
+/// order: the page title that owns the left edge, the right-aligned device
+/// subtitle, and the undroppable one-line vital fact rendered at every
+/// vertical rung.
+pub(super) struct DetailHeader {
+    /// The card's primary heading.
+    pub title: String,
+    /// The device identity shown on the heading baseline.
+    pub subtitle: String,
+    /// The one-line vital fact; `None` when the family has no loss fact.
+    pub vital_line: Option<String>,
+}
+
+/// The body of a Performance detail card: the left graph column below the
+/// header band, the pre-folded statistics rows, and the optional element
+/// pinned under the statistics rail.
+pub(super) struct DetailBody<'a> {
+    /// The left column's graph controls, primary graph, summaries and
+    /// secondary graphs.
+    pub left: Vec<Elem<'a>>,
+    /// The pre-folded shell [`StatRow`]s for the statistics rail.
+    pub stats: Vec<StatRow>,
+    /// The element pinned under the rail (status footer, SMART button).
+    pub footer: Option<Elem<'a>>,
+}
+
 /// Build one GPUI-shaped Performance detail card through the shared slot
 /// contract: title row, undroppable vital line, left graph column, and the
 /// statistics rail in the frame's presentation — Pinned beside the graphs,
 /// Stacked below them, or Hidden when the frame cannot carry either.
 ///
-/// `left` contains the header band, graph controls, primary graph, summaries
-/// and secondary graphs. `stats` are pre-folded shell [`StatRow`]s; missing
-/// values render the shared dash dimmed. `stats_footer` pins one element
-/// (status footer, SMART button) under the statistics rail.
-#[allow(clippy::too_many_arguments)]
+/// `header` owns the three text slots, and `body` owns the graph column, the
+/// pre-folded shell [`StatRow`]s (missing values render the shared dash
+/// dimmed) and the optional rail footer.
 pub(super) fn main_with_stats<'a>(
     theme_snapshot: &'a taskmanager_theme::Theme,
-    title: String,
-    subtitle: String,
-    vital_line: Option<String>,
-    left: Vec<Elem<'a>>,
-    stats: Vec<StatRow>,
-    stats_footer: Option<Elem<'a>>,
+    header: DetailHeader,
+    body: DetailBody<'a>,
     budget: PerformancePageBudget,
     extent: DetailExtent,
 ) -> Elem<'a> {
+    let DetailHeader {
+        title,
+        subtitle,
+        vital_line,
+    } = header;
+    let DetailBody {
+        left,
+        stats,
+        footer,
+    } = body;
     let compact = budget.device_navigation == DeviceNavigationPresentation::Strip;
     let geometry = geometry_contract(compact);
     let subtitle_size = if geometry.compact { 12 } else { 15 };
@@ -162,11 +192,13 @@ pub(super) fn main_with_stats<'a>(
         PerformanceDetailsPresentation::Pinned => {
             let stats = stats_rail(
                 theme_snapshot,
-                stats,
-                stats_footer,
-                Length::Fixed(budget.stats_width),
-                RailEdge::Left,
-                compact,
+                StatsRail {
+                    stats,
+                    footer,
+                    width: Length::Fixed(budget.stats_width),
+                    edge: RailEdge::Left,
+                    compact,
+                },
             );
             row![left, stats]
                 .spacing(16)
@@ -180,11 +212,13 @@ pub(super) fn main_with_stats<'a>(
             // of starving the primary graph.
             let stats = stats_rail(
                 theme_snapshot,
-                stats,
-                stats_footer,
-                Length::Fill,
-                RailEdge::Top,
-                compact,
+                StatsRail {
+                    stats,
+                    footer,
+                    width: Length::Fill,
+                    edge: RailEdge::Top,
+                    compact,
+                },
             );
             column![left, stats]
                 .spacing(12)
@@ -210,19 +244,29 @@ enum RailEdge {
     Top,
 }
 
-/// The one statistics surface used by both pinned and stacked modes: the
-/// pre-folded rows plus the optional footer, inside the rail's own vertical
-/// scroll boundary so a long inventory never clips silently (GPUI parity —
-/// its stats rail scrolls through `scroll_region_with_rail`).
-#[allow(clippy::too_many_arguments)]
-fn stats_rail<'a>(
-    theme_snapshot: &'a taskmanager_theme::Theme,
+/// The statistics rail's content and frame placement: the pre-folded rows and
+/// their optional pinned footer, the rail's resolved width, the edge that owns
+/// the divider to the main viewport, and the compact typography flag.
+struct StatsRail<'a> {
     stats: Vec<StatRow>,
     footer: Option<Elem<'a>>,
     width: Length,
     edge: RailEdge,
     compact: bool,
-) -> Elem<'a> {
+}
+
+/// The one statistics surface used by both pinned and stacked modes: the
+/// pre-folded rows plus the optional footer, inside the rail's own vertical
+/// scroll boundary so a long inventory never clips silently (GPUI parity —
+/// its stats rail scrolls through `scroll_region_with_rail`).
+fn stats_rail<'a>(theme_snapshot: &'a taskmanager_theme::Theme, rail: StatsRail<'a>) -> Elem<'a> {
+    let StatsRail {
+        stats,
+        footer,
+        width,
+        edge,
+        compact,
+    } = rail;
     let rail_padding = match edge {
         RailEdge::Left if compact => 8.0,
         RailEdge::Left => 12.0,

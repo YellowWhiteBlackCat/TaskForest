@@ -31,19 +31,41 @@ where
     }
 }
 
+/// The optional auxiliary system provider ports, bundled so the facet
+/// attachment seam takes one typed parameter instead of six positional lanes.
+///
+/// Each field is `Some` only when its provider binding created a lane; an
+/// absent binding stays `None` and its facet is left empty.
+pub(super) struct SystemAuxiliaryPorts {
+    /// Per-engine GPU utilization rows.
+    pub(super) gpu_engine_rows: Option<Arc<ChannelRequestPort<GpuEngineRowsRequest>>>,
+    /// NPU inventory and utilization.
+    pub(super) npu_inventory: Option<Arc<ChannelRequestPort<NpuInventoryRequest>>>,
+    /// SMBIOS memory-module inventory.
+    pub(super) smbios_memory: Option<Arc<ChannelRequestPort<SmbiosMemoryRequest>>>,
+    /// RAPL package power counters.
+    pub(super) rapl_power: Option<Arc<ChannelRequestPort<RaplPowerRequest>>>,
+    /// CPU MSR readout counters.
+    pub(super) msr_readout: Option<Arc<ChannelRequestPort<MsrReadoutRequest>>>,
+    /// CPU thermal-throttle counters.
+    pub(super) cpu_throttle: Option<Arc<ChannelRequestPort<CpuThrottleRequest>>>,
+}
+
 /// Attach the optional auxiliary system facets (per-engine GPU rows, NPU
 /// inventory, SMBIOS memory, RAPL package power, CPU MSR readouts, CPU
-/// thermal-throttle counters).
-#[allow(clippy::too_many_arguments)]
+/// thermal-throttle counters) from their bundled provider ports.
 pub(super) fn attach_system_auxiliary_facets(
     system: SystemFacets,
-    gpu_engine_rows: Option<Arc<ChannelRequestPort<GpuEngineRowsRequest>>>,
-    npu_inventory: Option<Arc<ChannelRequestPort<NpuInventoryRequest>>>,
-    smbios_memory: Option<Arc<ChannelRequestPort<SmbiosMemoryRequest>>>,
-    rapl_power: Option<Arc<ChannelRequestPort<RaplPowerRequest>>>,
-    msr_readout: Option<Arc<ChannelRequestPort<MsrReadoutRequest>>>,
-    cpu_throttle: Option<Arc<ChannelRequestPort<CpuThrottleRequest>>>,
+    ports: SystemAuxiliaryPorts,
 ) -> SystemFacets {
+    let SystemAuxiliaryPorts {
+        gpu_engine_rows,
+        npu_inventory,
+        smbios_memory,
+        rapl_power,
+        msr_readout,
+        cpu_throttle,
+    } = ports;
     let system = attach_optional(system, gpu_engine_rows, |system, port| {
         system.with_gpu_engine_rows(port)
     });

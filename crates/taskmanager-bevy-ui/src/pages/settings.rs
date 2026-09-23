@@ -41,7 +41,7 @@ use bevy::ecs::component::Component;
 use bevy::ecs::hierarchy::Children;
 use bevy::ecs::observer::On;
 use bevy::ecs::resource::Resource;
-use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut};
+use bevy::ecs::system::{Commands, NonSendMut, Query, Res, ResMut, SystemParam};
 use bevy::scene::{EntityScene, Scene, bsn};
 use bevy::ui::Checked;
 use bevy::ui::prelude::{
@@ -228,14 +228,24 @@ where
     Some(client.try_submit(updated))
 }
 
-#[allow(clippy::too_many_arguments)]
+/// The appearance authorities a settings choice writes through: the optional
+/// persisted theme preferences, the resolved window palette every renderer
+/// reads, and the optional camera clear color (absent headless).
+#[derive(SystemParam)]
+struct SettingsAppearanceTargets<'w> {
+    /// Persisted theme preferences, when the settings page installed them.
+    prefs: Option<ResMut<'w, ThemePreferences>>,
+    /// The resolved window palette.
+    palette: ResMut<'w, WindowPalette>,
+    /// The camera clear color (absent headless).
+    clear: Option<ResMut<'w, ClearColor>>,
+}
+
 fn settings_choice_observer(
     change: On<ValueChange<bool>>,
     choices: Query<&SettingsChoice>,
     mut track: NonSendMut<FrontendTrack>,
-    mut prefs: Option<ResMut<ThemePreferences>>,
-    mut palette: ResMut<WindowPalette>,
-    mut clear: Option<ResMut<ClearColor>>,
+    mut appearance: SettingsAppearanceTargets,
     runtime: Option<Res<SharedRuntimeHandle>>,
     mut commands: Commands,
 ) {
@@ -244,11 +254,19 @@ fn settings_choice_observer(
     };
     match choice.0.clone() {
         SettingsField::Theme(mode) => {
-            if let Some(prefs) = prefs.as_deref_mut() {
+            if let Some(prefs) = appearance.prefs.as_deref_mut() {
                 prefs.mode = Some(mode);
-                apply_preferences(prefs, &mut palette, clear.as_deref_mut());
+                apply_preferences(
+                    prefs,
+                    &mut appearance.palette,
+                    appearance.clear.as_deref_mut(),
+                );
             } else {
-                apply_theme(mode, &mut palette, clear.as_deref_mut());
+                apply_theme(
+                    mode,
+                    &mut appearance.palette,
+                    appearance.clear.as_deref_mut(),
+                );
             }
             let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
                 cfg.mode = match mode {
@@ -259,20 +277,28 @@ fn settings_choice_observer(
             });
         }
         SettingsField::SystemMode => {
-            if let Some(prefs) = prefs.as_deref_mut() {
+            if let Some(prefs) = appearance.prefs.as_deref_mut() {
                 prefs.mode = None;
-                apply_preferences(prefs, &mut palette, clear.as_deref_mut());
+                apply_preferences(
+                    prefs,
+                    &mut appearance.palette,
+                    appearance.clear.as_deref_mut(),
+                );
             }
             let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
                 cfg.mode = "System".to_string();
             });
         }
         SettingsField::HighContrast(on) => {
-            if let Some(prefs) = prefs.as_deref_mut() {
+            if let Some(prefs) = appearance.prefs.as_deref_mut() {
                 prefs.hc = on;
-                apply_preferences(prefs, &mut palette, clear.as_deref_mut());
+                apply_preferences(
+                    prefs,
+                    &mut appearance.palette,
+                    appearance.clear.as_deref_mut(),
+                );
             } else {
-                palette.inner.high_contrast = on;
+                appearance.palette.inner.high_contrast = on;
             }
             let _ = patch_persisted_config(runtime.as_deref(), |cfg| {
                 cfg.hc = on;

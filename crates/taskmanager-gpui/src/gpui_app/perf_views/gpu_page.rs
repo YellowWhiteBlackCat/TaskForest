@@ -278,16 +278,16 @@ pub(crate) fn render_gpu(
     let memory_graph =
         if gpu_state.budget.vertical.carries_below() && gpu_memory_fits(lower_capacity) {
             memory_metric.and_then(|metric| {
-                render_gpu_memory_graph(
+                render_gpu_memory_graph(GpuMemoryGraphProps {
                     theme,
                     live_graph,
-                    g,
+                    gpu: g,
                     metric,
                     graph_settings,
-                    gpu_state.budget.vertical,
+                    vertical: gpu_state.budget.vertical,
                     hover_slot,
-                    gpu_state.graph_cache.clone(),
-                )
+                    graph_cache: gpu_state.graph_cache.clone(),
+                })
             })
         } else {
             None
@@ -409,21 +409,44 @@ fn gpu_engine_row_budget(lower_capacity: Option<f32>, memory_visible: bool) -> O
     Some(rows)
 }
 
+/// Inputs for the compact GPU-memory chart: the live history window, the
+/// viewed device's metrics, the resolved memory metric, the graph
+/// preferences, the vertical runway that admits the card, and the
+/// window-owned hover slot + scene cache.
+struct GpuMemoryGraphProps<'a> {
+    /// Active theme.
+    theme: &'a Theme,
+    /// Live telemetry history the metric series is read from.
+    live_graph: &'a LiveGraphHistory,
+    /// The viewed GPU's metrics (device id and generation key the series).
+    gpu: &'a GpuMetrics,
+    /// Resolved memory metric family.
+    metric: GpuChartMetric,
+    /// Graph data-point/sliding preferences.
+    graph_settings: GraphSettings,
+    /// Vertical runway the card is admitted into.
+    vertical: crate::gpui_app::root::responsive::PerformanceVerticalRunway,
+    /// Window-owned hover slot.
+    hover_slot: &'a Rc<RefCell<Option<GraphHover>>>,
+    /// Cross-frame graph scene cache.
+    graph_cache: GraphCacheHandle,
+}
+
 /// Render the one compact GPU-memory chart. It is deliberately independent of
 /// the engine group: the current used/total pair controls whether this card
 /// exists, while an empty history produces the shared collecting state rather
 /// than a fabricated flat zero line.
-#[allow(clippy::too_many_arguments)]
-fn render_gpu_memory_graph(
-    theme: &Theme,
-    live_graph: &LiveGraphHistory,
-    gpu: &GpuMetrics,
-    metric: GpuChartMetric,
-    graph_settings: GraphSettings,
-    vertical: crate::gpui_app::root::responsive::PerformanceVerticalRunway,
-    hover_slot: &Rc<RefCell<Option<GraphHover>>>,
-    graph_cache: GraphCacheHandle,
-) -> Option<AnyElement> {
+fn render_gpu_memory_graph(props: GpuMemoryGraphProps<'_>) -> Option<AnyElement> {
+    let GpuMemoryGraphProps {
+        theme,
+        live_graph,
+        gpu,
+        metric,
+        graph_settings,
+        vertical,
+        hover_slot,
+        graph_cache,
+    } = props;
     let samples = gpu_chart_metric_history(
         live_graph,
         &gpu.device_id,

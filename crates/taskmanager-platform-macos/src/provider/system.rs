@@ -15,7 +15,7 @@ mod network;
 mod rapl_power;
 mod smbios_memory;
 
-pub use auxiliary::MacSystemAuxiliaryProviders;
+pub use auxiliary::{MacSystemAuxiliaryProviders, MacSystemAuxiliaryProvidersParams};
 pub use cpu_throttle::PendingCpuThrottleProvider;
 pub use msr_readout::PendingMsrReadoutProvider;
 pub use network::MacNetworkTelemetryProvider;

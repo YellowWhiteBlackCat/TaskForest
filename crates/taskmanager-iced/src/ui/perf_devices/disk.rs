@@ -286,25 +286,21 @@ pub(crate) fn disk_section(
             vec![tables::message_panel(theme_snapshot, t("disk.empty"))]
         }
         (tables::ListState::Ready, Some(snapshot)) => match snapshot.disks.get(index) {
-            Some(disk) => vec![disk_block(
-                app,
-                disk,
-                index,
-                disk_graphs(
+            Some(disk) => {
+                let ctx = DeviceBlockContext {
                     app,
-                    disk,
-                    index,
+                    theme: theme_snapshot,
                     color,
-                    theme_snapshot,
-                    disk_graph,
                     compact,
                     budget,
-                ),
-                smart_footer(app, disk, index, theme_snapshot),
-                theme_snapshot,
-                compact,
-                budget,
-            )],
+                };
+                vec![disk_block(
+                    ctx,
+                    disk,
+                    disk_graphs(ctx, disk, disk_graph),
+                    smart_footer(app, disk, index, theme_snapshot),
+                )]
+            }
             None => vec![tables::message_panel(theme_snapshot, t("disk.empty"))],
         },
         (tables::ListState::Ready, None) => {
@@ -372,18 +368,18 @@ fn smart_footer<'a>(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn disk_graphs<'a>(
-    app: &'a crate::IcedApp,
+    ctx: DeviceBlockContext<'a>,
     disk: &'a DiskMetrics,
-    index: usize,
-    color: iced::Color,
-    theme_snapshot: &'a taskmanager_theme::Theme,
     graph: device_chart::GraphPrefs,
-    compact: bool,
-    budget: PerformancePageBudget,
 ) -> Vec<Element<'a, Message, iced::Theme, iced::Renderer>> {
-    let _ = index;
+    let DeviceBlockContext {
+        app,
+        theme: theme_snapshot,
+        color,
+        compact,
+        budget,
+    } = ctx;
     let (read_samples, write_samples) =
         app.cached_disk_split_series(&disk.device_id, disk.device_generation.get());
     let activity_samples =
@@ -691,17 +687,18 @@ fn partition_label(partition: &DiskPartition) -> String {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
 fn disk_block<'a>(
-    app: &'a crate::IcedApp,
+    ctx: DeviceBlockContext<'a>,
     disk: &'a DiskMetrics,
-    _index: usize,
     graphs: Vec<Element<'a, Message, iced::Theme, iced::Renderer>>,
     stats_footer: Option<Element<'a, Message, iced::Theme, iced::Renderer>>,
-    theme_snapshot: &'a taskmanager_theme::Theme,
-    _compact: bool,
-    budget: PerformancePageBudget,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let DeviceBlockContext {
+        app,
+        theme: theme_snapshot,
+        budget,
+        ..
+    } = ctx;
     let temperature_samples =
         app.cached_disk_temperature_series(&disk.device_id, disk.device_generation.get());
     let subtitle = [
@@ -715,17 +712,21 @@ fn disk_block<'a>(
     .join(" · ");
     perf_layout::main_with_stats(
         theme_snapshot,
-        disk_title(disk),
-        subtitle,
-        Some(disk_vital_line(disk, app.drive_units())),
-        graphs,
-        disk_summary_lines(
-            disk,
-            app.drive_units().use_bytes,
-            app.drive_units().use_base2,
-            &temperature_samples,
-        ),
-        stats_footer,
+        perf_layout::DetailHeader {
+            title: disk_title(disk),
+            subtitle,
+            vital_line: Some(disk_vital_line(disk, app.drive_units())),
+        },
+        perf_layout::DetailBody {
+            left: graphs,
+            stats: disk_summary_lines(
+                disk,
+                app.drive_units().use_bytes,
+                app.drive_units().use_base2,
+                &temperature_samples,
+            ),
+            footer: stats_footer,
+        },
         budget,
         perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation),
     )

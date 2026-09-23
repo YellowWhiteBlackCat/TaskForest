@@ -14,7 +14,7 @@ use gpui::{
     fill, point, px, size,
 };
 
-use super::scene_cache::{paint_graph_dual_scene, paint_graph_scene};
+use super::scene_cache::{GraphPaintContext, paint_graph_dual_scene, paint_graph_scene};
 use super::slide::slide_progress;
 use super::{
     DualGraphSeries, GraphCacheHandle, GraphOpts, GraphSettings, graph_slide_spacing,
@@ -141,21 +141,40 @@ fn sample_slot_at_cursor_x_slide(
     Some(index)
 }
 
+/// One frame's crosshair projection: the canvas and pointer geometry plus the
+/// series ink the crosshair marks. The owning hover element already holds the
+/// samples/color/opts, so this view borrows them for the paint pass.
+struct GraphCrosshair<'a> {
+    /// Canvas bounds in window space.
+    bounds: Bounds<Pixels>,
+    /// Primary series samples.
+    samples: &'a [f32],
+    /// Primary (family) color.
+    base: Rgba,
+    /// Geometry and scale tunables.
+    opts: GraphOpts,
+    /// Window-space pointer position, or `None` when no hover is active.
+    cursor: Option<Point<Pixels>>,
+    /// Slide progress while the refresh animation is in flight.
+    slide: Option<f32>,
+    /// Secondary series samples plus its tint color, sharing the slot grid.
+    secondary: Option<(&'a [f32], Rgba)>,
+}
+
 /// Paint the active graph's focus crosshair after the area/stroke. The vertical
 /// rule follows the pointer; each series that holds a finite sample at the
 /// resolved slot gets its own horizontal rule and snap dot in its color, so a
 /// gap in one direction never fabricates a mark for it.
-#[allow(clippy::too_many_arguments)]
-fn draw_graph_crosshair(
-    window: &mut Window,
-    bounds: Bounds<Pixels>,
-    samples: &[f32],
-    base: Rgba,
-    opts: GraphOpts,
-    cursor: Option<Point<Pixels>>,
-    slide: Option<f32>,
-    secondary: Option<(&[f32], Rgba)>,
-) {
+fn draw_graph_crosshair(window: &mut Window, crosshair: GraphCrosshair<'_>) {
+    let GraphCrosshair {
+        bounds,
+        samples,
+        base,
+        opts,
+        cursor,
+        slide,
+        secondary,
+    } = crosshair;
     let Some(cursor) = cursor else {
         return;
     };
@@ -234,80 +253,84 @@ fn draw_graph_crosshair(
     series_mark(window, samples, base);
 }
 
+/// The shared inputs of a stateful hover graph element: its element identity,
+/// the series ink, the rendering options, the tooltip formatter, and the
+/// window-owned hover slot + scene cache the element reads and writes. The
+/// single-series and two-series constructors differ only in the optional
+/// [`GraphHoverDual`] direction pair.
+pub(crate) struct GraphHoverElement<F> {
+    /// Element id, also the `tm-graph:{id}` debug-selector base.
+    pub(crate) id: ElementId,
+    /// Element id whose slide timing drives the refresh animation.
+    pub(crate) slide_key: ElementId,
+    /// Window-limited primary sample series (one `Rc` clone per UI-only frame).
+    pub(crate) samples: Rc<[f32]>,
+    /// Primary (family) color.
+    pub(crate) base: Rgba,
+    /// Geometry, scale, and animation tunables.
+    pub(crate) opts: GraphOpts,
+    /// Tooltip value formatter for the hovered slot.
+    pub(crate) format_value: F,
+    /// Window-owned hover slot the pointer handlers write and the tooltip reads.
+    pub(crate) slot: Rc<RefCell<Option<GraphHover>>>,
+    /// Cross-frame scene cache shared by every graph on the page.
+    pub(crate) cache: GraphCacheHandle,
+}
+
+/// The optional second direction of a two-series hover graph: the primary
+/// direction's tooltip label plus the [`GraphSecondarySeries`] ink (its
+/// samples, tint, and direction label).
+pub(crate) struct GraphHoverDual {
+    /// Label prefixing the primary direction in the composed tooltip.
+    pub(crate) primary_label: String,
+    /// The secondary series' samples, tint, and label.
+    pub(crate) secondary: GraphSecondarySeries,
+}
+
 /// Stateful graph canvas with per-window tooltip and crosshair projection.
 ///
-/// `samples` converts from a `Vec<f32>` or a shared `Rc<[f32]>`. Callers whose
-/// projection is already generation-cached (per-core grid, memory page) pass
-/// the `Rc` so a UI-only frame (hover, resize, animation repaint) pays one
-/// `Rc` clone instead of copying the whole history window into the element.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn graph_element_hover(
-    id: impl Into<ElementId>,
-    slide_key: impl Into<ElementId>,
-    samples: impl Into<Rc<[f32]>>,
-    base: Rgba,
-    opts: GraphOpts,
-    format_value: impl Fn(f32) -> String + 'static,
-    slot: Rc<RefCell<Option<GraphHover>>>,
-    cache: GraphCacheHandle,
-) -> AnyElement {
-    graph_element_hover_impl(
-        id,
-        slide_key,
-        samples.into(),
-        base,
-        None,
-        opts,
-        format_value,
-        slot,
-        cache,
-    )
+/// `samples` is a shared `Rc<[f32]>`. Callers whose projection is already
+/// generation-cached (per-core grid, memory page) pass the `Rc` so a UI-only
+/// frame (hover, resize, animation repaint) pays one `Rc` clone instead of
+/// copying the whole history window into the element.
+pub(crate) fn graph_element_hover<F>(inputs: GraphHoverElement<F>) -> AnyElement
+where
+    F: Fn(f32) -> String + 'static,
+{
+    graph_element_hover_impl(inputs, None)
 }
 
 /// The two-series variant: the primary series wears the family token, the
 /// secondary (see [`GraphSecondarySeries`]) the same token lifted toward
 /// white, both through one shared slot grid and one shared `opts.max`.
-/// `primary_label` prefixes the primary direction in the composed tooltip.
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn graph_element_hover_dual(
-    id: impl Into<ElementId>,
-    slide_key: impl Into<ElementId>,
-    samples: impl Into<Rc<[f32]>>,
-    base: Rgba,
-    primary_label: String,
-    secondary: GraphSecondarySeries,
-    opts: GraphOpts,
-    format_value: impl Fn(f32) -> String + 'static,
-    slot: Rc<RefCell<Option<GraphHover>>>,
-    cache: GraphCacheHandle,
-) -> AnyElement {
-    graph_element_hover_impl(
+/// `dual.primary_label` prefixes the primary direction in the composed tooltip.
+pub(crate) fn graph_element_hover_dual<F>(
+    inputs: GraphHoverElement<F>,
+    dual: GraphHoverDual,
+) -> AnyElement
+where
+    F: Fn(f32) -> String + 'static,
+{
+    graph_element_hover_impl(inputs, Some(dual))
+}
+
+fn graph_element_hover_impl<F>(
+    inputs: GraphHoverElement<F>,
+    dual: Option<GraphHoverDual>,
+) -> AnyElement
+where
+    F: Fn(f32) -> String + 'static,
+{
+    let GraphHoverElement {
         id,
         slide_key,
-        samples.into(),
+        samples,
         base,
-        Some((primary_label, secondary)),
         opts,
         format_value,
         slot,
         cache,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-fn graph_element_hover_impl(
-    id: impl Into<ElementId>,
-    slide_key: impl Into<ElementId>,
-    samples: Rc<[f32]>,
-    base: Rgba,
-    dual: Option<(String, GraphSecondarySeries)>,
-    opts: GraphOpts,
-    format_value: impl Fn(f32) -> String + 'static,
-    slot: Rc<RefCell<Option<GraphHover>>>,
-    cache: GraphCacheHandle,
-) -> AnyElement {
-    let id: ElementId = id.into();
-    let slide_key: ElementId = slide_key.into();
+    } = inputs;
     let debug_selector = format!("tm-graph:{id}");
     let bounds = Rc::new(RefCell::new(None::<Bounds<Pixels>>));
     // Window limiting keeps the series' identity on UI-only frames. A
@@ -317,17 +340,17 @@ fn graph_element_hover_impl(
     // a capacity+1 window while the secondary anchors capacity).
     let primary_slide_supported = graph_slide_supported(&samples, opts.data_points);
     let slide_supported = primary_slide_supported
-        && dual.as_ref().is_none_or(|(_, secondary)| {
-            graph_slide_supported(&secondary.samples, opts.data_points)
-        });
+        && dual
+            .as_ref()
+            .is_none_or(|dual| graph_slide_supported(&dual.secondary.samples, opts.data_points));
     let (samples_rc, secondary_rc) = match (&dual, opts.sliding) {
         (_, false) => {
             let primary = cache
                 .borrow_mut()
                 .latest_samples(samples, opts.data_points, false);
-            let secondary = dual.as_ref().map(|(_, secondary)| {
+            let secondary = dual.as_ref().map(|dual| {
                 cache.borrow_mut().latest_samples(
-                    Rc::clone(&secondary.samples),
+                    Rc::clone(&dual.secondary.samples),
                     opts.data_points,
                     false,
                 )
@@ -340,13 +363,13 @@ fn graph_element_hover_impl(
                 .latest_samples(samples, opts.data_points, true);
             (primary, None)
         }
-        (Some((_, secondary)), true) => {
+        (Some(dual), true) => {
             let primary =
                 cache
                     .borrow_mut()
                     .latest_samples(Rc::clone(&samples), opts.data_points, true);
             let secondary_samples = cache.borrow_mut().latest_samples(
-                Rc::clone(&secondary.samples),
+                Rc::clone(&dual.secondary.samples),
                 opts.data_points,
                 true,
             );
@@ -368,13 +391,13 @@ fn graph_element_hover_impl(
     let paint_bounds = bounds.clone();
     let paint_samples = samples_rc.clone();
     let paint_secondary = secondary_rc.clone();
-    let paint_secondary_base = dual.as_ref().map(|(_, secondary)| secondary.base);
+    let paint_secondary_base = dual.as_ref().map(|dual| dual.secondary.base);
     // The direction labels ride along so the value badge can compose both
     // directions' newest values (the legend names the same pairing above the
     // card); cloned Strings because the paint closure outlives `dual`.
     let paint_dual_labels = dual
         .as_ref()
-        .map(|(primary_label, secondary)| (primary_label.clone(), secondary.label.clone()));
+        .map(|dual| (dual.primary_label.clone(), dual.secondary.label.clone()));
     let paint_hover_slot = slot.clone();
     let paint_cache = cache.clone();
     let graph_canvas = canvas(
@@ -401,10 +424,14 @@ fn graph_element_hover_impl(
                 (Some(secondary), Some(secondary_base)) => {
                     let labels = paint_dual_labels.as_ref();
                     paint_graph_dual_scene(
-                        cache.scenes_mut(),
-                        window,
-                        cx,
-                        bnd,
+                        GraphPaintContext {
+                            cache: cache.scenes_mut(),
+                            window: &mut *window,
+                            cx: &mut *cx,
+                            bounds: bnd,
+                            opts,
+                            slide_offset: offset,
+                        },
                         &DualGraphSeries {
                             samples: &paint_samples,
                             base,
@@ -415,33 +442,35 @@ fn graph_element_hover_impl(
                             base: secondary_base,
                             label: labels.map(|(_, secondary_label)| secondary_label.as_str()),
                         },
-                        opts,
-                        offset,
                     );
                 }
                 _ => paint_graph_scene(
-                    cache.scenes_mut(),
-                    window,
-                    cx,
-                    bnd,
+                    GraphPaintContext {
+                        cache: cache.scenes_mut(),
+                        window: &mut *window,
+                        cx: &mut *cx,
+                        bounds: bnd,
+                        opts,
+                        slide_offset: offset,
+                    },
                     &paint_samples,
                     base,
-                    opts,
-                    offset,
                 ),
             }
             let cursor = paint_hover_slot.borrow().as_ref().map(|hover| hover.cursor);
             draw_graph_crosshair(
                 window,
-                bnd,
-                paint_samples.as_ref(),
-                base,
-                opts,
-                cursor,
-                sliding.then_some(progress),
-                paint_secondary_base
-                    .zip(paint_secondary.as_deref())
-                    .map(|(secondary_base, secondary)| (secondary, secondary_base)),
+                GraphCrosshair {
+                    bounds: bnd,
+                    samples: paint_samples.as_ref(),
+                    base,
+                    opts,
+                    cursor,
+                    slide: sliding.then_some(progress),
+                    secondary: paint_secondary_base
+                        .zip(paint_secondary.as_deref())
+                        .map(|(secondary_base, secondary)| (secondary, secondary_base)),
+                },
             );
         },
     )
@@ -449,9 +478,13 @@ fn graph_element_hover_impl(
 
     let mv_bounds = bounds.clone();
     let mv_samples = samples_rc.clone();
-    let mv_secondary = dual
-        .as_ref()
-        .map(|(label, secondary)| (label.clone(), secondary_rc.clone(), secondary.label.clone()));
+    let mv_secondary = dual.as_ref().map(|dual| {
+        (
+            dual.primary_label.clone(),
+            secondary_rc.clone(),
+            dual.secondary.label.clone(),
+        )
+    });
     let mv_fmt = format_value;
     let mv_slot = slot.clone();
     let move_cache = cache.clone();
