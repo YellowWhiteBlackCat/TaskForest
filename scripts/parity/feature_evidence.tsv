@@ -312,5 +312,5 @@ power.thermal-throttle-events	bevy	pages::performance::tests::cpu_thermal_thrott
 # two surveyed `pending` gaps.
 memory.process-swap-charge	iced	ui::tests::pages::apps_resource_projection_preserves_typed_pss_swap_and_measured_zero	anchored	-
 memory.process-swap-charge	tui	ui::tests::process_render::apps_table_projects_typed_pss_and_swap_without_zero_fallbacks	anchored	-
-memory.process-swap-charge	gpui	-	pending	no discoverable test proves the Apps-table Swap cell renders the observed per-process charge (the swap-column test pins auto-hide, the capture test asserts the fixture only)
-memory.process-swap-charge	bevy	-	pending	the contract-column test proves only the honest dash for an unobserved Swap cell, never an observed charge
+memory.process-swap-charge	gpui	gpui_app::processes_view::tests::projection::canonical_category::swap_cell_renders_the_observed_per_process_charge_without_a_zero_fallback	anchored	-
+memory.process-swap-charge	bevy	pages::processes::tests::row_view_renders_the_observed_per_process_swap_charge	anchored	-
