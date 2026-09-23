@@ -10,6 +10,7 @@ use std::time::Duration;
 use crate::TuiApp;
 use crate::theme::ThemeParams;
 use crate::ui::settings::SettingsForm;
+use taskmanager_application::i18n::t;
 use taskmanager_application::{AppPage, TelemetryInterval};
 use taskmanager_shell::{FeedbackLifecycle, FeedbackSeverity, FeedbackSource, SortCol, SortDir};
 
@@ -378,7 +379,8 @@ impl TuiApp {
         }
         match publication.outcome() {
             taskmanager_application::ConfigPublicationOutcome::SaveFailed { error, .. } => {
-                let detail = format!("Settings save failed: {}", error.kind().stable_code());
+                let detail =
+                    t("tui.settings_save_failed").replacen("{}", error.kind().stable_code(), 1);
                 self.settings_form.save_error = Some(detail.clone());
                 self.open_local_surface(crate::TuiSurface::Settings);
                 self.report_notice(
