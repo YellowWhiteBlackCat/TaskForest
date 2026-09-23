@@ -81,6 +81,13 @@ impl TuiApp {
         );
         seed_demo_npu_inventory(&mut app);
         seed_demo_history(&mut app);
+        // The demo boot has no persisted appearance preference, so the shared
+        // `TM_SKIN` testing override is the only appearance input here. When it
+        // is unset/invalid the `ThemeParams::default()` (GNOME dark) set by
+        // `from_shell` is preserved verbatim; production never reads it.
+        if let Some(forced) = crate::theme::forced_theme_params_from_env() {
+            app.theme_params = forced;
+        }
         apply_capture_overrides(&mut app);
         app
     }

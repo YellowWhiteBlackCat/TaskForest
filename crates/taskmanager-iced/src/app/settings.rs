@@ -160,6 +160,54 @@ impl IcedApp {
     }
 }
 
+/// Parse the shared testing/developer appearance override GPUI owns
+/// (`TM_SKIN=<skin>-<mode>`): skin `gnome`/`kde`/`win`/`windows`/`mac`/`macos`
+/// and mode `dark`/`light`/`eyeforest`/`eye-forest`, all case-insensitive.
+/// `None` for an unset or syntactically invalid value, so an invalid request
+/// never forces a wrong skin. This is the SAME vocabulary (and env name) GPUI's
+/// `taskmanager_gpui::gpui_app::theme::forced_skin_from_env` reads — a second
+/// vocabulary would let the capture harness and the frontends drift.
+#[must_use]
+pub(super) fn parse_skin_override(value: &str) -> Option<(Skin, LightDark)> {
+    let (skin_token, mode_token) = value.split_once('-')?;
+    let skin = match skin_token.to_ascii_lowercase().as_str() {
+        "gnome" => Skin::Gnome,
+        "kde" => Skin::Kde,
+        "win" | "windows" => Skin::Windows,
+        "mac" | "macos" => Skin::Macos,
+        _ => return None,
+    };
+    let mode = match mode_token.to_ascii_lowercase().as_str() {
+        "dark" => LightDark::Dark,
+        "light" => LightDark::Light,
+        "eyeforest" | "eye-forest" => LightDark::EyeForest,
+        _ => return None,
+    };
+    Some((skin, mode))
+}
+
+/// Resolve the shared `TM_SKIN` override plus the optional `TM_SKIN_HC`
+/// contrast flag. The override is a FALLBACK: an explicit persisted
+/// preference wins because the production `load_config` path never consults
+/// the environment. `None` when the variable is unset or invalid.
+#[must_use]
+pub(super) fn forced_appearance(
+    value: Option<&str>,
+    high_contrast: bool,
+) -> Option<(Skin, LightDark, bool)> {
+    let (skin, mode) = parse_skin_override(value?)?;
+    Some((skin, mode, high_contrast))
+}
+
+/// Read the shared `TM_SKIN`/`TM_SKIN_HC` override from the process
+/// environment for the demo/capture boot.
+#[must_use]
+pub(super) fn forced_appearance_from_env() -> Option<(Skin, LightDark, bool)> {
+    let value = std::env::var("TM_SKIN").ok();
+    let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
+    forced_appearance(value.as_deref(), high_contrast)
+}
+
 /// Parse a persisted `Config::skin` token into the theme enum. Unknown or
 /// empty tokens fall back to GNOME (the theme crate's own fallback).
 #[must_use]

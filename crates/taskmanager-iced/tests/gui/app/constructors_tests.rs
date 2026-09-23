@@ -2,6 +2,67 @@ use super::{IcedApp, apply_capture_target, capture_device_from_name, capture_pag
 use crate::app::PerfDevice;
 use crate::app::{LocalSurfaceKind, Message};
 use taskmanager_application::{ConfigStore, PlatformClient};
+use taskmanager_theme::{LightDark, Skin};
+
+/// The shared `TM_SKIN` testing override selects the demo/capture appearance.
+/// Unset keeps today's GNOME-dark demo default; a valid token resolves the
+/// requested skin/mode through the production config pipeline and repaints the
+/// resolved theme.
+#[test]
+fn demo_capture_tm_skin_override_resolves_the_theme() {
+    let default = IcedApp::demo_for_capture_with(None, None);
+    assert_eq!(default.theme().skin, Skin::Gnome);
+    assert_eq!(
+        default.theme().mode,
+        LightDark::Dark,
+        "unset keeps the GNOME-dark demo default"
+    );
+
+    let light = IcedApp::demo_for_capture_with(None, Some((Skin::Gnome, LightDark::Light, false)));
+    assert_eq!(light.theme().skin, Skin::Gnome);
+    assert_eq!(light.theme().mode, LightDark::Light);
+    assert_ne!(
+        default.theme().palette().window_backdrop,
+        light.theme().palette().window_backdrop,
+        "gnome-light must repaint the resolved demo theme"
+    );
+
+    let contrast = IcedApp::demo_for_capture_with(None, Some((Skin::Kde, LightDark::Dark, true)));
+    assert_eq!(contrast.theme().skin, Skin::Kde);
+    assert_eq!(contrast.theme().mode, LightDark::Dark);
+    assert!(contrast.theme().hc, "TM_SKIN_HC rides the same override");
+}
+
+/// The `TM_SKIN` vocabulary is the shared GPUI contract, not a frontend-local
+/// spelling: every skin/mode alias parses and every malformed token is
+/// rejected.
+#[test]
+fn tm_skin_vocabulary_matches_the_shared_contract() {
+    for (input, expected) in [
+        ("gnome-dark", (Skin::Gnome, LightDark::Dark)),
+        ("kde-light", (Skin::Kde, LightDark::Light)),
+        ("win-dark", (Skin::Windows, LightDark::Dark)),
+        ("windows-dark", (Skin::Windows, LightDark::Dark)),
+        ("mac-light", (Skin::Macos, LightDark::Light)),
+        ("macos-light", (Skin::Macos, LightDark::Light)),
+        ("gnome-eyeforest", (Skin::Gnome, LightDark::EyeForest)),
+        ("kde-eye-forest", (Skin::Kde, LightDark::EyeForest)),
+        ("GNOME-DARK", (Skin::Gnome, LightDark::Dark)),
+    ] {
+        assert_eq!(
+            crate::app::settings::parse_skin_override(input),
+            Some(expected),
+            "input {input}"
+        );
+    }
+    for invalid in ["plasma-dark", "kde-vibes", "kde", "kde-dark-extra", ""] {
+        assert_eq!(
+            crate::app::settings::parse_skin_override(invalid),
+            None,
+            "input {invalid}"
+        );
+    }
+}
 
 #[test]
 fn capture_device_selector_accepts_only_the_complete_performance_vocabulary() {

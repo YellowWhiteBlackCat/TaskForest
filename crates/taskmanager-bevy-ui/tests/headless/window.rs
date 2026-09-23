@@ -30,10 +30,10 @@ use taskmanager_platform_contract::{
     EventEnvelope, EventPort, EventPortError, RequestEnvelope, RequestPort, SubmissionError,
 };
 
-use taskmanager_theme::Theme;
 use taskmanager_theme::tokens;
+use taskmanager_theme::{LightDark, Skin, Theme};
 
-use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole};
+use super::{FeedbackLine, FrontendWindowPlugin, Role, SummaryLine, TextRole, resolve_demo_theme};
 use crate::palette::ui_palette;
 use crate::runtime::{RuntimeCache, SharedRuntime};
 
@@ -231,6 +231,39 @@ fn text_role_observer_stamps_palette_typography() {
         ui_palette(&Theme::dark()).dim_color.to_srgba(),
         "the observer stamped the dim ink token"
     );
+}
+
+/// The shared `TM_SKIN` testing override selects the demo/capture appearance.
+/// Unset (and invalid) keeps today's GNOME-light reference skin; a valid token
+/// resolves the requested skin/mode and repaints the window palette.
+#[test]
+fn tm_skin_override_resolves_the_demo_theme() {
+    let default = resolve_demo_theme(None, false);
+    assert_eq!(default.skin, Skin::Gnome, "unset keeps the GNOME skin");
+    assert_eq!(
+        default.mode,
+        LightDark::Light,
+        "unset keeps the light reference mode"
+    );
+    assert_eq!(
+        resolve_demo_theme(Some("plasma-dark"), false).skin,
+        Skin::Gnome,
+        "an unknown skin is not an override"
+    );
+
+    let dark = resolve_demo_theme(Some("gnome-dark"), false);
+    assert_eq!(dark.skin, Skin::Gnome);
+    assert_eq!(dark.mode, LightDark::Dark);
+    assert_ne!(
+        ui_palette(&default).window_clear,
+        ui_palette(&dark).window_clear,
+        "gnome-dark must repaint the window backdrop"
+    );
+
+    let contrast = resolve_demo_theme(Some("KDE-DARK"), true);
+    assert_eq!(contrast.skin, Skin::Kde, "case-insensitive skin alias");
+    assert_eq!(contrast.mode, LightDark::Dark);
+    assert!(contrast.hc, "TM_SKIN_HC rides the same override");
 }
 
 #[test]

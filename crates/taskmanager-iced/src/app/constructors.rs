@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use taskmanager_application::PlatformClient;
 use taskmanager_core::core::metrics::ScalarObservation;
+use taskmanager_theme::{LightDark, Skin};
 
 use super::*;
 
@@ -168,29 +169,51 @@ impl IcedApp {
     }
 
     /// Build the deterministic demo shape for an evidence run. The optional
-    /// environment selector is deliberately a fixed vocabulary so capture can
-    /// target a device page without adding a production command or arbitrary
-    /// state injection path.
+    /// environment selectors are deliberately a fixed vocabulary so capture can
+    /// target a device page and an appearance without adding a production
+    /// command or arbitrary state injection path.
     pub(crate) fn demo_for_capture() -> Self {
+        let locale = std::env::var_os("TM_ICED_CAPTURE_LOCALE")
+            .and_then(|value| value.to_str().map(str::to_owned));
+        Self::demo_for_capture_with(locale, super::settings::forced_appearance_from_env())
+    }
+
+    /// Build the capture demo with the two capture-only overrides injected
+    /// explicitly (the environment readers live in [`Self::demo_for_capture`]).
+    /// Both ride ONE synthesized configuration snapshot through the ordinary
+    /// config pipeline; when neither is present the demo default is untouched.
+    pub(crate) fn demo_for_capture_with(
+        locale: Option<String>,
+        appearance: Option<(Skin, LightDark, bool)>,
+    ) -> Self {
         let mut app = Self::demo();
         app.process_presentation.expanded_groups = default_category_expansions();
         seed_capture_performance_fixture(&mut app);
-        // The locale snapshot must land BEFORE the capture target: it runs
-        // the startup fold (`apply_startup_page`), which resets the active
-        // page — the target selector below has to win on page semantics.
-        if let Some(locale) = std::env::var_os("TM_ICED_CAPTURE_LOCALE")
-            .and_then(|value| value.to_str().map(str::to_owned))
-        {
+        // The locale/appearance snapshot must land BEFORE the capture target:
+        // it runs the startup fold (`apply_startup_page`), which resets the
+        // active page — the target selector below has to win on page semantics.
+        let mut config = Config::default();
+        let mut overridden = false;
+        if let Some(locale) = locale {
             // The demo boot deliberately skips `load_config` (no host I/O),
             // so the capture locale rides the production pipeline one level
             // up: one synthesized snapshot whose only override is the shared
             // language token. Everything downstream (localized labels, the
             // synced shared catalog) follows the same code path a settings
             // change uses.
-            let config = taskmanager_core::core::config::Config {
-                language: Some(locale),
-                ..Config::default()
-            };
+            config.language = Some(locale);
+            overridden = true;
+        }
+        if let Some((skin, mode, high_contrast)) = appearance {
+            // The shared `TM_SKIN` testing override (the same vocabulary GPUI
+            // reads) resolves through the persisted skin/mode tokens, so the
+            // capture frame renders exactly what a saved preference would.
+            config.skin = skin.label().to_string();
+            config.mode = mode.label().to_string();
+            config.hc = high_contrast;
+            overridden = true;
+        }
+        if overridden {
             app.apply_config_snapshot(&config, true);
         }
         if let Some(target) = std::env::var_os("TM_ICED_CAPTURE_DEVICE")

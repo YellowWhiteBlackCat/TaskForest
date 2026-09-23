@@ -93,6 +93,57 @@ impl ThemeParams {
     }
 }
 
+/// Parse the shared testing/developer appearance override GPUI owns
+/// (`TM_SKIN=<skin>-<mode>`): skin `gnome`/`kde`/`win`/`windows`/`mac`/`macos`
+/// and mode `dark`/`light`/`eyeforest`/`eye-forest`, all case-insensitive.
+/// `None` for an unset or syntactically invalid value, so an invalid request
+/// never forces a wrong skin. This is the SAME vocabulary (and env name) GPUI's
+/// `taskmanager_gpui::gpui_app::theme::forced_skin_from_env` reads — a second
+/// vocabulary would let the capture harness and the frontends drift.
+#[must_use]
+pub(crate) fn parse_tm_skin(value: &str) -> Option<(Skin, LightDark)> {
+    let (skin_token, mode_token) = value.split_once('-')?;
+    let skin = match skin_token.to_ascii_lowercase().as_str() {
+        "gnome" => Skin::Gnome,
+        "kde" => Skin::Kde,
+        "win" | "windows" => Skin::Windows,
+        "mac" | "macos" => Skin::Macos,
+        _ => return None,
+    };
+    let mode = match mode_token.to_ascii_lowercase().as_str() {
+        "dark" => LightDark::Dark,
+        "light" => LightDark::Light,
+        "eyeforest" | "eye-forest" => LightDark::EyeForest,
+        _ => return None,
+    };
+    Some((skin, mode))
+}
+
+/// Resolve the demo/capture theme parameters from the shared `TM_SKIN`
+/// override plus the optional `TM_SKIN_HC` contrast flag. The override is a
+/// FALLBACK: an explicit configuration/preference (the production
+/// `from_config_tokens_with_appearance` path) is never displaced because it
+/// does not consult the environment. `None` when the variable is unset or
+/// invalid, which keeps the demo default exactly as it is today.
+#[must_use]
+pub(crate) fn forced_theme_params(value: Option<&str>, high_contrast: bool) -> Option<ThemeParams> {
+    let (skin, mode) = parse_tm_skin(value?)?;
+    Some(ThemeParams {
+        skin,
+        mode,
+        hc: high_contrast,
+    })
+}
+
+/// Read the shared `TM_SKIN`/`TM_SKIN_HC` override from the process
+/// environment for the demo/capture boot.
+#[must_use]
+pub(crate) fn forced_theme_params_from_env() -> Option<ThemeParams> {
+    let value = std::env::var("TM_SKIN").ok();
+    let high_contrast = std::env::var("TM_SKIN_HC").is_ok_and(|raw| !raw.is_empty());
+    forced_theme_params(value.as_deref(), high_contrast)
+}
+
 /// The TUI's resolved terminal palette, derived once per app construction
 /// from the neutral [`taskmanager_theme::Palette`]. Terminal colors are opaque RGB — translucent
 /// tints are composited over the backdrop here, at the edge.

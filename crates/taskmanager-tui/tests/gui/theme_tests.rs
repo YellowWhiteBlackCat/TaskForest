@@ -120,6 +120,60 @@ fn config_tokens_resolve_onto_typed_theme_params() {
     );
 }
 
+/// The shared `TM_SKIN` testing override selects the demo appearance. Unset
+/// (and invalid) keeps today's GNOME-dark demo default; a valid token resolves
+/// the requested skin/mode (with the optional `TM_SKIN_HC` contrast flag) and
+/// repaints the terminal palette.
+#[test]
+fn tm_skin_override_resolves_the_demo_appearance() {
+    assert_eq!(
+        ThemeParams::default(),
+        ThemeParams {
+            skin: Skin::Gnome,
+            mode: LightDark::Dark,
+            hc: false,
+        },
+        "the demo default must stay GNOME dark"
+    );
+    assert_eq!(
+        forced_theme_params(None, false),
+        None,
+        "unset is not an override"
+    );
+    assert_eq!(
+        forced_theme_params(Some("plasma-dark"), false),
+        None,
+        "an unknown skin is not an override"
+    );
+
+    let light = forced_theme_params(Some("gnome-light"), false).expect("gnome-light override");
+    assert_eq!(
+        light,
+        ThemeParams {
+            skin: Skin::Gnome,
+            mode: LightDark::Light,
+            hc: false,
+        }
+    );
+    let default = TuiTheme::from_params(ThemeParams::default());
+    let light_theme = TuiTheme::from_params(light);
+    assert_ne!(
+        light_theme.bg, default.bg,
+        "gnome-light must repaint the demo backdrop"
+    );
+
+    let contrast = forced_theme_params(Some("KDE-DARK"), true).expect("case-insensitive override");
+    assert_eq!(
+        contrast,
+        ThemeParams {
+            skin: Skin::Kde,
+            mode: LightDark::Dark,
+            hc: true,
+        },
+        "TM_SKIN_HC rides the same override"
+    );
+}
+
 /// A settings change re-skins the terminal palette: different params
 /// produce a different resolved palette, and every params combination
 /// still resolves a valid theme.
