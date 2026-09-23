@@ -451,16 +451,16 @@ pub(crate) fn segmented<'a>(
         .style(move |_theme| segmented_track_style(theme_snapshot))
         .width(Length::Shrink);
     let palette = theme_snapshot.palette();
-    SegmentedTrack::new(
-        focus_id(focus_target),
-        track.into(),
+    SegmentedTrack::new(SegmentedTrackOptions {
+        id: focus_id(focus_target).into(),
+        content: track.into(),
         on_change,
-        choices.to_vec(),
+        choices: choices.to_vec(),
         active,
         focus_target,
-        crate::theme_binding::color(palette.accent),
-        f32::from(palette.control_radius),
-    )
+        focus_color: crate::theme_binding::color(palette.accent),
+        focus_radius: f32::from(palette.control_radius),
+    })
     .into()
 }
 
@@ -564,7 +564,7 @@ fn segment_style(
 }
 
 mod segmented_track;
-use segmented_track::SegmentedTrack;
+use segmented_track::{SegmentedTrack, SegmentedTrackOptions};
 
 #[cfg(test)]
 #[path = "../../../tests/gui/ui/components_inputs_tests.rs"]

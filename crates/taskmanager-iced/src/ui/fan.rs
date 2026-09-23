@@ -23,6 +23,7 @@ use taskmanager_core::core::sensors::{
 use taskmanager_shell::viewmodel::StatRow;
 
 use super::device_chart;
+use super::perf_devices::DeviceBlockContext;
 use super::responsive::{
     DeviceNavigationPresentation, PerformanceChartInventory, PerformancePageBudget,
 };
@@ -70,14 +71,16 @@ pub(super) fn fan_section(
             .nth(index)
         {
             Some(fan) => vec![fan_block(
-                app,
+                DeviceBlockContext {
+                    app,
+                    theme: theme_snapshot,
+                    color,
+                    compact,
+                    budget,
+                },
                 snapshot,
                 fan,
-                color,
-                theme_snapshot,
-                compact,
                 true,
-                budget,
             )],
             None => vec![tables::message_panel(theme_snapshot, t("fan.empty"))],
         },
@@ -178,17 +181,19 @@ fn fan_pwm_percent(sensors: &SensorCenterSnapshot, fan: &SensorReading) -> Optio
 /// same-device temperature secondary chart while the Full chart inventory
 /// keeps secondary charts (GPUI parity — hover-interactive like every shared
 /// chart), then its scalar rows and the status footer under the stats rail.
-#[allow(clippy::too_many_arguments)]
 fn fan_block<'a>(
-    app: &'a crate::IcedApp,
+    ctx: DeviceBlockContext<'a>,
     sensors: &SensorCenterSnapshot,
     fan: &SensorReading,
-    color: iced::Color,
-    theme_snapshot: &'a taskmanager_theme::Theme,
-    compact: bool,
     smooth: bool,
-    budget: PerformancePageBudget,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let DeviceBlockContext {
+        app,
+        theme: theme_snapshot,
+        color,
+        compact,
+        budget,
+    } = ctx;
     let samples = app.cached_fan_series(fan.id());
     // GPUI parity: the RPM dynamic scale floors at 1000 so an idle window
     // keeps a neutral axis.
@@ -238,14 +243,18 @@ fn fan_block<'a>(
     }
     super::perf_layout::main_with_stats(
         theme_snapshot,
-        fan_title(fan),
-        t("fan.speed_graph").to_string(),
-        None,
-        graphs,
-        fan_summary_lines(sensors, fan),
-        // GPUI parity: the fan page pins the device-status action hint under
-        // the statistics rail.
-        super::device_status_footer(theme_snapshot, fan.state().status),
+        super::perf_layout::DetailHeader {
+            title: fan_title(fan),
+            subtitle: t("fan.speed_graph").to_string(),
+            vital_line: None,
+        },
+        super::perf_layout::DetailBody {
+            left: graphs,
+            stats: fan_summary_lines(sensors, fan),
+            // GPUI parity: the fan page pins the device-status action hint under
+            // the statistics rail.
+            footer: super::device_status_footer(theme_snapshot, fan.state().status),
+        },
         budget,
         super::perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation),
     )

@@ -263,14 +263,16 @@ pub(crate) fn network_section(
                         .map(|speed_mbps| (speed_mbps as f64 * 1_000_000.0 / 8.0) as f32);
                 }
                 vec![network_block(
-                    app,
+                    DeviceBlockContext {
+                        app,
+                        theme: theme_snapshot,
+                        color,
+                        compact,
+                        budget,
+                    },
                     nic,
-                    color,
-                    theme_snapshot,
-                    compact,
                     app.network_units(),
                     graph,
-                    budget,
                 )]
             }
             None => vec![tables::message_panel(theme_snapshot, t("network.empty"))],
@@ -285,17 +287,19 @@ pub(crate) fn network_section(
     device_rows_panel(rows, theme_snapshot)
 }
 
-#[allow(clippy::too_many_arguments)]
 fn network_block<'a>(
-    app: &'a crate::IcedApp,
+    ctx: DeviceBlockContext<'a>,
     nic: &NetworkMetrics,
-    color: iced::Color,
-    theme_snapshot: &'a taskmanager_theme::Theme,
-    compact: bool,
     units: UnitPrefs,
     graph: device_chart::GraphPrefs,
-    budget: PerformancePageBudget,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let DeviceBlockContext {
+        app,
+        theme: theme_snapshot,
+        color,
+        compact,
+        budget,
+    } = ctx;
     let observed = super::projection::NetworkObservation::from(nic);
     let (rx_samples, tx_samples) =
         app.cached_network_split_series(&nic.device_id, nic.device_generation.get());
@@ -437,14 +441,18 @@ fn network_block<'a>(
     }
     perf_layout::main_with_stats(
         theme_snapshot,
-        network_title(nic),
-        // GPUI parity: the subtitle is the adapter's IPv4 address (empty when
-        // unassigned), and the one-line vital fact carries status + link speed.
-        nic.ipv4_addr.as_deref().unwrap_or_default().to_string(),
-        Some(network_vital_line(nic)),
-        graphs,
-        network_summary_lines(nic, units.use_bytes, units.use_base2),
-        super::device_status_footer(theme_snapshot, nic.device_state.status),
+        perf_layout::DetailHeader {
+            title: network_title(nic),
+            // GPUI parity: the subtitle is the adapter's IPv4 address (empty when
+            // unassigned), and the one-line vital fact carries status + link speed.
+            subtitle: nic.ipv4_addr.as_deref().unwrap_or_default().to_string(),
+            vital_line: Some(network_vital_line(nic)),
+        },
+        perf_layout::DetailBody {
+            left: graphs,
+            stats: network_summary_lines(nic, units.use_bytes, units.use_base2),
+            footer: super::device_status_footer(theme_snapshot, nic.device_state.status),
+        },
         budget,
         perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation),
     )

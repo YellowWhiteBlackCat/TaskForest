@@ -110,12 +110,16 @@ fn npu_block<'a>(
 
     perf_layout::main_with_stats(
         theme_snapshot,
-        title,
-        t("npu.device_title").to_string(),
-        None,
-        Vec::new(),
-        stats,
-        None,
+        perf_layout::DetailHeader {
+            title,
+            subtitle: t("npu.device_title").to_string(),
+            vital_line: None,
+        },
+        perf_layout::DetailBody {
+            left: Vec::new(),
+            stats,
+            footer: None,
+        },
         budget,
         perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation),
     )

@@ -145,14 +145,16 @@ pub(crate) fn battery_section(
         }
         (tables::ListState::Ready, Some(snapshot)) => match snapshot.batteries.get(index) {
             Some(battery) => vec![battery_block(
-                app,
+                DeviceBlockContext {
+                    app,
+                    theme: theme_snapshot,
+                    color,
+                    compact,
+                    budget,
+                },
                 battery,
-                color,
-                theme_snapshot,
-                compact,
                 index,
                 true,
-                budget,
             )],
             None => vec![tables::message_panel(theme_snapshot, t("battery.empty"))],
         },
@@ -170,17 +172,19 @@ pub(crate) fn battery_section(
 /// mini-graph (the device's OWN window, fixed 0..100), the power secondary
 /// chart while the Full chart inventory keeps secondary charts (GPUI parity),
 /// then its scalar rows — mirroring the GPU/disk/network block shape.
-#[allow(clippy::too_many_arguments)]
 fn battery_block<'a>(
-    app: &'a crate::IcedApp,
+    ctx: DeviceBlockContext<'a>,
     battery: &BatteryInfo,
-    color: iced::Color,
-    theme_snapshot: &'a taskmanager_theme::Theme,
-    compact: bool,
     index: usize,
     smooth: bool,
-    budget: PerformancePageBudget,
 ) -> Element<'a, Message, iced::Theme, iced::Renderer> {
+    let DeviceBlockContext {
+        app,
+        theme: theme_snapshot,
+        color,
+        compact,
+        budget,
+    } = ctx;
     let samples = app.cached_battery_series(&battery.id);
     let graphs = vec![device_chart::device_mini_graph_fill(
         samples,
@@ -218,16 +222,20 @@ fn battery_block<'a>(
     }
     perf_layout::main_with_stats(
         theme_snapshot,
-        battery_title(battery, index),
-        t("battery.charge_graph").to_string(),
-        None,
-        left,
-        battery_summary_lines(battery),
-        // A non-healthy battery pins its accent-tinted action hint under the
-        // statistics rail (GPUI `status_footer` parity): Stale /
-        // PermissionDenied / MissingTool surfaces the cause instead of
-        // reading like a healthy battery.
-        super::device_status_footer(theme_snapshot, battery.device_state.status),
+        perf_layout::DetailHeader {
+            title: battery_title(battery, index),
+            subtitle: t("battery.charge_graph").to_string(),
+            vital_line: None,
+        },
+        perf_layout::DetailBody {
+            left,
+            stats: battery_summary_lines(battery),
+            // A non-healthy battery pins its accent-tinted action hint under the
+            // statistics rail (GPUI `status_footer` parity): Stale /
+            // PermissionDenied / MissingTool surfaces the cause instead of
+            // reading like a healthy battery.
+            footer: super::device_status_footer(theme_snapshot, battery.device_state.status),
+        },
         budget,
         perf_layout::DetailExtent::for_scroll_parent(budget.device_navigation),
     )

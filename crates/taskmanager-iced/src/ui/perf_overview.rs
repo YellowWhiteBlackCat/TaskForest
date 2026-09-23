@@ -177,14 +177,18 @@ fn cpu_detail(
     let (title, subtitle, stats) = cpu_memory_header_and_stats(app, PerfDevice::Cpu);
     perf_layout::main_with_stats(
         theme_snapshot,
-        title,
-        subtitle,
-        // CPU/Memory pages carry no device-loss fact: the family cannot
-        // disappear (GPUI passes `None` too).
-        None,
-        left,
-        stats,
-        None,
+        perf_layout::DetailHeader {
+            title,
+            subtitle,
+            // CPU/Memory pages carry no device-loss fact: the family cannot
+            // disappear (GPUI passes `None` too).
+            vital_line: None,
+        },
+        perf_layout::DetailBody {
+            left,
+            stats,
+            footer: None,
+        },
         budget,
         perf_layout::DetailExtent::Fill,
     )
@@ -275,12 +279,16 @@ fn memory_detail(
     let (title, subtitle, stats) = cpu_memory_header_and_stats(app, PerfDevice::Memory);
     perf_layout::main_with_stats(
         theme_snapshot,
-        title,
-        subtitle,
-        None,
-        left,
-        stats,
-        None,
+        perf_layout::DetailHeader {
+            title,
+            subtitle,
+            vital_line: None,
+        },
+        perf_layout::DetailBody {
+            left,
+            stats,
+            footer: None,
+        },
         budget,
         extent,
     )

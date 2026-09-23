@@ -9,7 +9,7 @@ use crate::ui::device_chart::{
     DeviceMetricScale, ENGINE_DEVICE_CHART_HEIGHT, GraphPrefs, SECONDARY_DEVICE_CHART_HEIGHT,
     device_mini_graph_fill, device_mini_graph_with_height,
 };
-use crate::ui::perf_layout::{DetailExtent, main_with_stats};
+use crate::ui::perf_layout::{DetailBody, DetailExtent, DetailHeader, main_with_stats};
 use crate::ui::responsive::{PerformanceChartInventory, PerformancePageBudget};
 use iced::widget::{column, row, text};
 use iced::{Color, Element, Renderer};
@@ -74,11 +74,13 @@ pub(super) fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, Ic
         graphs.push(gpu_chart_metric_graph(
             app,
             gpu,
-            GpuChartMetric::Utilization,
+            GpuChartMetricSpec {
+                metric: GpuChartMetric::Utilization,
+                headline: true,
+            },
             color,
             theme_snapshot,
             compact,
-            true,
         ));
     }
     if compact {
@@ -101,10 +103,12 @@ pub(super) fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, Ic
         graphs.push(gpu_chart_metric_graph(
             app,
             gpu,
-            metric,
+            GpuChartMetricSpec {
+                metric,
+                headline: false,
+            },
             color,
             theme_snapshot,
-            false,
             false,
         ));
     }
@@ -152,14 +156,18 @@ pub(super) fn gpu_block<'a>(props: GpuBlockProps<'a>) -> Element<'a, Message, Ic
     let stats_footer = super::device_status_footer(theme_snapshot, gpu.device_state.status);
     let block = main_with_stats(
         theme_snapshot,
-        gpu_title(gpu, index),
-        gpu_subtitle(gpu),
-        // The undroppable one-line VRAM fact renders at every vertical rung
-        // (GPUI `gpu_vram_vital_line` parity).
-        Some(gpu_vram_vital_line(gpu, app.drive_units())),
-        graphs,
-        stats,
-        stats_footer,
+        DetailHeader {
+            title: gpu_title(gpu, index),
+            subtitle: gpu_subtitle(gpu),
+            // The undroppable one-line VRAM fact renders at every vertical rung
+            // (GPUI `gpu_vram_vital_line` parity).
+            vital_line: Some(gpu_vram_vital_line(gpu, app.drive_units())),
+        },
+        DetailBody {
+            left: graphs,
+            stats,
+            footer: stats_footer,
+        },
         budget,
         DetailExtent::Fill,
     );
@@ -277,21 +285,29 @@ fn gpu_engine_inventory<'a>(
     cards
 }
 
+/// One GPU scalar family's chart request: the shared shell metric that owns
+/// the family's window, unit and label, plus the tier that decides its height —
+/// the headline family fills the column's remaining height, a secondary family
+/// keeps the shared secondary floor.
+struct GpuChartMetricSpec {
+    /// The shared shell metric (window, unit and label authority).
+    metric: GpuChartMetric,
+    /// Whether this family is the column's headline.
+    headline: bool,
+}
+
 /// One chartable family's graph: the shared shell dispatch over the device's
 /// live windows, with the scale of the family's unit — an unavailable family
-/// yields its gaps (never a fabricated zero line). `headline` carries the
-/// tier contract: the headline family fills the column's remaining height,
-/// secondary families keep the shared secondary floor.
-#[allow(clippy::too_many_arguments)]
+/// yields its gaps (never a fabricated zero line).
 fn gpu_chart_metric_graph<'a>(
     app: &'a IcedApp,
     gpu: &GpuMetrics,
-    metric: GpuChartMetric,
+    spec: GpuChartMetricSpec,
     color: Color,
     theme_snapshot: &Theme,
     compact: bool,
-    headline: bool,
 ) -> Element<'a, Message, IcedTheme, Renderer> {
+    let GpuChartMetricSpec { metric, headline } = spec;
     let scale = match metric.unit() {
         GpuChartMetricUnit::Percent => DeviceMetricScale::Percent,
         GpuChartMetricUnit::Watts => DeviceMetricScale::Watts,
