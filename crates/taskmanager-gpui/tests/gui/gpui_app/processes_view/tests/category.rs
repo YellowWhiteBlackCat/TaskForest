@@ -4,14 +4,18 @@ use super::*;
 use std::collections::HashSet;
 use taskmanager_core::core::process::ProcessLiveKey;
 
-/// A primary double-click on a category aggregate row must expand and
-/// collapse the same stable-keyed bucket as the chevron and directional keys,
-/// through the real mouse event path. The fixture mixes a confirmed-absent
+/// A primary click on a category aggregate row's chevron must expand and
+/// collapse the same stable-keyed bucket that the row double-click branch and
+/// the directional keys use. The headless `TestPlatform` hard-codes
+/// `click_count: 1` and never derives a native multi-click count (that lives
+/// in the platform backends), so a real double-click sequence cannot be
+/// driven here; this test drives the real pointer gesture that shares the
+/// `toggle_expansion` policy instead. The fixture mixes a confirmed-absent
 /// pair (Background) with an Unknown-identity process (Uncategorized), so the
 /// test also pins the honest three-bucket split end-to-end: two headers
 /// collapsed, members revealed only while expanded.
 #[gpui::test]
-async fn category_group_double_click_expands_and_collapses_the_row(cx: &mut TestAppContext) {
+async fn category_group_chevron_click_expands_and_collapses_the_row(cx: &mut TestAppContext) {
     taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
     let (win, view) = wrapped_root(cx);
     let background = |pid: u32, name: &str, cpu: f32| {
@@ -57,25 +61,32 @@ async fn category_group_double_click_expands_and_collapses_the_row(cx: &mut Test
     );
 
     let position = collapsed.center();
-    vcx.simulate_event(MouseDownEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-        first_mouse: false,
-    });
-    vcx.simulate_event(MouseUpEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-    });
+    // A real single click on the row body must not expand the bucket: the
+    // expansion branch is gated on a second click.
+    vcx.simulate_click(position, Modifiers::none());
+    assert!(
+        !view.read_with(cx, |v, _cx| v
+            .processes_state
+            .expanded_apps
+            .contains("category:background")),
+        "a single click on the row body must not expand the background category bucket"
+    );
+
+    // A primary click on the chevron runs the same `toggle_expansion`.
+    let name_left = vcx
+        .debug_bounds("tm-proc-b-name")
+        .expect("the background category name cell must render")
+        .left();
+    vcx.simulate_click(
+        chevron_center(name_left, collapsed.center().y, 0),
+        Modifiers::none(),
+    );
     assert!(
         view.read_with(cx, |v, _cx| v
             .processes_state
             .expanded_apps
             .contains("category:background")),
-        "a primary double-click must expand the background category bucket"
+        "a primary click on the chevron must expand the background category bucket"
     );
 
     draw(cx, win);
@@ -94,26 +105,20 @@ async fn category_group_double_click_expands_and_collapses_the_row(cx: &mut Test
     let expanded = vcx
         .debug_bounds("tm-proc-row-root:0")
         .expect("the expanded category aggregate row must remain rendered");
-    let position = expanded.center();
-    vcx.simulate_event(MouseDownEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-        first_mouse: false,
-    });
-    vcx.simulate_event(MouseUpEvent {
-        position,
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-    });
+    let name_left = vcx
+        .debug_bounds("tm-proc-b-name")
+        .expect("the expanded category name cell must render")
+        .left();
+    vcx.simulate_click(
+        chevron_center(name_left, expanded.center().y, 0),
+        Modifiers::none(),
+    );
     assert!(
         view.read_with(cx, |v, _cx| !v
             .processes_state
             .expanded_apps
             .contains("category:background")),
-        "a second primary double-click must collapse the same category bucket"
+        "a second primary click on the chevron must collapse the same category bucket"
     );
     view.update(cx, |v, _cx| {
         let (rows, _, _) = v.processes_projection();
@@ -126,9 +131,12 @@ async fn category_group_double_click_expands_and_collapses_the_row(cx: &mut Test
 }
 
 /// Real GPUI event path for the new Applications hierarchy: the category
-/// expands to a PID-less app total, and a second double-click expands that
-/// total to process rows with distinct PIDs. The aggregate click selects the
-/// application row itself and must not select a hidden representative PID.
+/// expands to a PID-less app total, and a real click on that total's chevron
+/// expands it to process rows with distinct PIDs. The aggregate click selects
+/// the application row itself and must not select a hidden representative PID.
+/// The headless platform hard-codes `click_count: 1`, so the double-click
+/// branch is exercised through the chevron it shares `toggle_expansion` with,
+/// not a native multi-click sequence.
 #[gpui::test]
 async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mut TestAppContext) {
     taskmanager_application::i18n::set_language(taskmanager_application::i18n::Language::En);
@@ -171,38 +179,47 @@ async fn application_category_opens_pidless_total_then_real_process_tree(cx: &mu
         vcx.debug_bounds("tm-proc-row-root:2").is_none(),
         "the collapsed application total must hide its process tree"
     );
-    view.update(cx, |v, _cx| {
+    let app_depth = view.update(cx, |v, _cx| {
         let (rows, _, _) = v.processes_projection();
         assert_eq!(rows[0].process_identity, None);
         assert_eq!(rows[1].process_identity, None);
         assert_eq!(rows[1].cell_text.pid, "");
         assert_eq!(rows[1].name, "Mission Center");
+        rows[1].depth
     });
 
-    vcx.simulate_event(MouseDownEvent {
-        position: app_total.center(),
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-        first_mouse: false,
-    });
-    vcx.simulate_event(MouseUpEvent {
-        position: app_total.center(),
-        modifiers: Modifiers::none(),
-        button: MouseButton::Left,
-        click_count: 2,
-    });
-    assert!(view.read_with(cx, |v, _| {
-        v.processes_state
-            .expanded_apps
-            .contains("app-tree:pid:100:start:1001")
-    }));
+    // A real single click selects the PID-less application total without
+    // expanding it (the expansion branch needs a second click). A click on the
+    // chevron then runs the same `toggle_expansion` projection the
+    // double-click branch calls.
+    vcx.simulate_click(app_total.center(), Modifiers::none());
     assert!(view.read_with(cx, |v, _| v.selected_process_count() == 0));
     assert_eq!(
         view.read_with(cx, |v, _| v.selected_process_row()),
         Some(application_row_id(100)),
         "the PID-less application aggregate is the selected row identity"
     );
+    assert!(
+        !view.read_with(cx, |v, _| v
+            .processes_state
+            .expanded_apps
+            .contains("app-tree:pid:100:start:1001")),
+        "a single click on the application total must not expand its process tree"
+    );
+
+    let name_left = vcx
+        .debug_bounds("tm-proc-b-name")
+        .expect("the application-total name cell must render")
+        .left();
+    vcx.simulate_click(
+        chevron_center(name_left, app_total.center().y, app_depth),
+        Modifiers::none(),
+    );
+    assert!(view.read_with(cx, |v, _| {
+        v.processes_state
+            .expanded_apps
+            .contains("app-tree:pid:100:start:1001")
+    }));
 
     draw(cx, win);
     view.update(cx, |v, _cx| {
