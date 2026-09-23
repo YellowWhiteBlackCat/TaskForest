@@ -53,6 +53,19 @@ esac
 # The replacement is quoted: an unquoted bare '~' inside ${//} expands to $HOME.
 rpm_version=${version//'-'/'~'}
 
+# taskforest-common's versioned conflict boundary (the first release that
+# moved the shared assets out of the frontends) lives once in
+# packaging/split-version in Cargo form, shared with control-common. RPM orders
+# `~` below the final release, so a prerelease boundary must be rendered in
+# RPM's own ordering (`0.2.0-rc1` → `0.2.0~rc1`); a plain `< 0.2.0` would also
+# match the prerelease and conflict with this package's own frontends. The
+# boundary is a historical constant and does not follow the package version.
+split_version_src="$repo/packaging/split-version"
+[[ -f "$split_version_src" ]] || { echo "build-rpm: missing $split_version_src" >&2; exit 1; }
+split_version_cargo=$(head -n1 "$split_version_src")
+[[ -n "$split_version_cargo" ]] || { echo "build-rpm: empty $split_version_src" >&2; exit 1; }
+split_version=${split_version_cargo//'-'/'~'}
+
 [[ -d "$staged/usr" ]] || { echo "build-rpm: $staged does not contain a staged usr/ tree" >&2; exit 1; }
 command -v rpmbuild >/dev/null || { echo "build-rpm: rpmbuild not installed (apt-get install rpm)" >&2; exit 1; }
 
@@ -131,6 +144,7 @@ cp "$spec_file" "$topdir/SPECS/$spec_name"
 rpmbuild -bb \
     --define "_topdir $topdir" \
     --define "version $rpm_version" \
+    --define "split_version $split_version" \
     --define "packager TaskForest contributors" \
     "$topdir/SPECS/$spec_name" >/dev/null
 

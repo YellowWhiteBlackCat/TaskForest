@@ -21,15 +21,19 @@ License:    Apache-2.0
 URL:        https://github.com/YellowWhiteBlackCat/TaskForest
 Source0:    taskforest-tree.tar.gz
 # The shared hicolor icon set moved out of the frontend RPMs into this data
-# package at 0.2.0. A single `dnf upgrade` transaction moves the file cleanly
-# because RPM ignores a conflict whose old owner is upgraded in the same
-# transaction, but a host that upgrades one frontend without the others would
-# otherwise hit an implicit file conflict. The versioned conflict makes the
-# resolver upgrade the old owner instead; `Obsoletes` is deliberately absent
-# because it would erase the frontend product rather than upgrade it. Boundary
-# is the first release that ships this package (CHANGELOG 0.2.0); it must not
-# float with the current version. Fedora Packaging:Conflicts, "Splitting
-# Packages".
+# package at the first split release, held once in packaging/split-version
+# (shared with control-common). A single `dnf upgrade` transaction moves the
+# file cleanly because RPM ignores a conflict whose old owner is upgraded in
+# the same transaction, but a host that upgrades one frontend without the
+# others would otherwise hit an implicit file conflict. The versioned conflict
+# makes the resolver upgrade the old owner instead; `Obsoletes` is deliberately
+# absent because it would erase the frontend product rather than upgrade it.
+# The boundary is a historical constant naming the first release that ships
+# this package; it must not float with the current version. build-rpm.sh
+# renders it through the same `-`→`~` transform as the package version, because
+# RPM orders `~` below the final release: a plain `< 0.2.0` would also match the
+# prerelease `0.2.0~rc1` and conflict with its own frontends. Fedora
+# Packaging:Conflicts, "Splitting Packages".
 #
 # Only `taskforest` (GPUI) is named. It is the one RPM ever published before
 # the split (v0.1.3, whose %files carried the shared hicolor path), so it is
@@ -37,10 +41,10 @@ Source0:    taskforest-tree.tar.gz
 # shipped as DEBs at <=0.1.3 and are covered by control-common's `Replaces`/
 # `Breaks`, but their RPM specs first landed after v0.1.3 (the never-released
 # 0.1.4 tree), no `taskforest-i`/`taskforest-b` RPM was ever published, and
-# their 0.2.0 RPMs strip the common destinations (build-rpm.sh). No reachable
-# RPM upgrade path carries the shared icon under those names, so naming them
-# would guard a package that cannot exist.
-Conflicts:  taskforest < 0.2.0
+# their split-era RPMs strip the common destinations (build-rpm.sh). No
+# reachable RPM upgrade path carries the shared icon under those names, so
+# naming them would guard a package that cannot exist.
+Conflicts:  taskforest < %{split_version}
 ExclusiveArch: x86_64 aarch64
 
 %description
