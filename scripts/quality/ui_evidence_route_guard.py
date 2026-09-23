@@ -219,9 +219,9 @@ def _git(repo: Path, *args: str) -> str:
             env={
                 **os.environ,
                 "GIT_AUTHOR_NAME": "ui-route-guard",
-                "GIT_AUTHOR_EMAIL": "guard@example.invalid",
+                "GIT_AUTHOR_EMAIL": "ui-route-guard@users.noreply.github.com",
                 "GIT_COMMITTER_NAME": "ui-route-guard",
-                "GIT_COMMITTER_EMAIL": "guard@example.invalid",
+                "GIT_COMMITTER_EMAIL": "ui-route-guard@users.noreply.github.com",
             },
         )
     except (OSError, subprocess.SubprocessError) as exc:
