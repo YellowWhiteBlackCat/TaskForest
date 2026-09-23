@@ -582,6 +582,19 @@ fi
 if maybe production-config-wiring; then
     run_stage production-config-wiring quick run_py scripts/quality/production_config_wiring_guard.py
 fi
+if maybe ui-route-table-self; then
+    # The ui-evidence route's impact table is hand-maintained; this self-test
+    # proves the guard goes red on a re-broadened dev-only test tree and on a
+    # weakened ui-contract table, and fails closed (exit 2) on a route it
+    # cannot parse.
+    run_stage ui-route-table-self quick run_py scripts/quality/ui_evidence_route_guard.py --self-test
+fi
+if maybe ui-route-table; then
+    # Pin the live classification: declaration/test layers and dev-only test
+    # trees stay headless, paint-relevant inputs keep their real consumers,
+    # and an unlisted ui-contract path stays fail-closed at all four.
+    run_stage ui-route-table quick run_py scripts/quality/ui_evidence_route_guard.py
+fi
 
 [[ "$tier" == "quick" ]] && exit "$((failures > 0))"
 
@@ -629,11 +642,12 @@ if maybe parity-evidence; then
     # `--requirements` keeps the
     # per-frontend P0-MC coverage report visible in the stage output/JSON
     # without failing on an uncovered (frontend, requirement) pair -- today
-    # Bevy is 0/8 and the facet matcher is not a second vocabulary.  The
-    # deferred hard gate is `--require-requirement-coverage`; release condition
-    # is the Bevy `p0_id` mapping landing (decision register D1, option A),
-    # after which this line adds the flag in the same change that fills the
-    # mapping.
+    # Bevy is 4/8 (D1 resolved as a partial mapping with a reasoned exemption
+    # for P0-MC-01/02/04/05; see scripts/parity/README.md) and the facet
+    # matcher is not a second vocabulary.  The deferred hard gate is
+    # `--require-requirement-coverage`; it stays deferred until the four
+    # exempt pairs are a first-class concept rather than a documented
+    # exemption, at which point this line adds the flag in the same change.
     if scope_skip parity-evidence "merge-owner evidence surface" standard; then
         run_stage parity-evidence standard timeout --kill-after=30s 900s python3 scripts/parity/resolve_frontend_evidence.py \
             --nextest --scope auto \

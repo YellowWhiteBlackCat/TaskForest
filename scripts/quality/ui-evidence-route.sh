@@ -46,10 +46,21 @@
 #                                    the TUI maps `IconId` to terminal glyphs
 #                                    itself and does not link this crate)
 #
-# Frontend test trees and root acceptance tests (`tests/gui/*`,
-# `crates/taskmanager-*/tests/**`) keep their existing per-frontend routing;
-# narrowing that dev-only layer is a separate owner decision, not an implicit
-# part of this refinement.
+# Dev-only test trees (`tests/gui/*` and `crates/taskmanager-{gpui,ui,tui,
+# iced,bevy-ui}/tests/**`) are separate compilation units that `cargo build`
+# never links into a product binary, so a change confined there cannot move a
+# shipped pixel.  W28 narrows them to the headless channel: `ui_touched` stays
+# set, no frontend capture flag is; frontend `src/**` keeps its per-consumer
+# routing.
+#
+# G-4 record (W22-B/W28): `crates/taskmanager-ui-contract/**` never demands a
+# pixel receipt for its test tree or declaration-only modules; the input
+# modules that real render consumers import (`focus`, `columns`, `icon`,
+# `command`, `navigation`) keep exactly those consumers' receipts, and an
+# unlisted ui-contract path stays fail-closed at all four because `lib.rs` can
+# re-point a re-export and `Cargo.toml` can change a dependency's behavior --
+# neither is provably pixel-neutral.  `locales/*` also keeps all four: by path
+# alone the route cannot separate a key-only edit from a translated-value edit.
 #
 # S5 interaction route (W23-B): the headless requirement follows the unified
 # interaction declaration.  `scripts/parity/cross_frontend_matrix.tsv` carries
@@ -239,7 +250,18 @@ while IFS= read -r path; do
         iced_touched=1
         bevy_touched=1
         ;;
-    crates/taskmanager-gpui/* | crates/taskmanager-ui/* | tests/gui/* | \
+    tests/gui/* | \
+        crates/taskmanager-gpui/tests/* | crates/taskmanager-ui/tests/* | \
+        crates/taskmanager-tui/tests/* | crates/taskmanager-iced/tests/* | \
+        crates/taskmanager-bevy-ui/tests/*)
+        # Dev-only frontend test trees: separate compilation units that
+        # `cargo build` never links into a product binary, so a change
+        # confined here cannot move a shipped pixel.  Keep the headless
+        # channel, drop the pixel receipt.  This arm must stay before the
+        # product-crate arms below.
+        ui_touched=1
+        ;;
+    crates/taskmanager-gpui/* | crates/taskmanager-ui/* | \
         scripts/capture-niri.sh | scripts/capture-windows.sh | \
         scripts/accept-gpui-interactions.sh | scripts/windows/accept-gpui-interactions.sh | \
         scripts/gpui_interaction_matrix.tsv | \
